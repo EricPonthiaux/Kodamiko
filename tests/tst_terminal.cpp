@@ -1,0 +1,142 @@
+#include "terminal/IPty.h"
+#include "terminal/TerminalWidget.h"
+#include "terminal/VtScreen.h"
+
+#include <QSignalSpy>
+#include <QtTest>
+
+class TestTerminal : public QObject {
+    Q_OBJECT
+
+private slots:
+    void writesTextAndMovesCursor()
+    {
+        VtScreen screen(5, 20);
+        screen.feed("hello\r\nworld");
+        QCOMPARE(screen.lineText(0), QStringLiteral("hello"));
+        QCOMPARE(screen.lineText(1), QStringLiteral("world"));
+        QCOMPARE(screen.cursorPosition(), QPoint(5, 1));
+    }
+
+    void decodesColorsAndAttributes()
+    {
+        VtScreen screen(3, 20);
+        screen.setDefaultColors(Qt::white, Qt::black);
+        screen.feed("\x1b[1;38;2;255;0;0mR\x1b[0mn");
+        const TerminalCell red = screen.cell(0, 0);
+        QCOMPARE(red.text, QStringLiteral("R"));
+        QCOMPARE(red.foreground, QColor(255, 0, 0));
+        QVERIFY(red.bold);
+        QCOMPARE(screen.cell(0, 1).foreground, QColor(Qt::white));
+    }
+
+    void handlesWideCharactersAndUtf8()
+    {
+        VtScreen screen(2, 10);
+        screen.feed("é漢x");
+        QCOMPARE(screen.cell(0, 0).text, QStringLiteral("é"));
+        QCOMPARE(screen.cell(0, 1).width, 2);
+        QVERIFY(screen.cell(0, 2).isContinuation);
+        QCOMPARE(screen.cell(0, 3).text, QStringLiteral("x"));
+    }
+
+    void keepsScrolledOutLines()
+    {
+        VtScreen screen(2, 10);
+        screen.feed("one\r\ntwo\r\nthree\r\nfour");
+        QCOMPARE(screen.scrollbackSize(), 2);
+        QCOMPARE(screen.lineText(-2), QStringLiteral("one"));
+        QCOMPARE(screen.lineText(-1), QStringLiteral("two"));
+        QCOMPARE(screen.lineText(0), QStringLiteral("three"));
+    }
+
+    void encodesKeys_data()
+    {
+        QTest::addColumn<int>("key");
+        QTest::addColumn<int>("modifiers");
+        QTest::addColumn<QString>("text");
+        QTest::addColumn<QByteArray>("expected");
+        QTest::newRow("letter") << int(Qt::Key_A) << int(Qt::NoModifier) << "a" << QByteArray("a");
+        QTest::newRow("accent") << int(Qt::Key_Eacute) << int(Qt::NoModifier) << "é" << QByteArray("é");
+        QTest::newRow("enter") << int(Qt::Key_Return) << int(Qt::NoModifier) << "\r" << QByteArray("\r");
+        QTest::newRow("escape") << int(Qt::Key_Escape) << int(Qt::NoModifier) << "\x1b" << QByteArray("\x1b");
+        QTest::newRow("up") << int(Qt::Key_Up) << int(Qt::NoModifier) << "" << QByteArray("\x1b[A");
+        QTest::newRow("shift-tab") << int(Qt::Key_Backtab) << int(Qt::ShiftModifier) << "" << QByteArray("\x1b[Z");
+        QTest::newRow("backspace") << int(Qt::Key_Backspace) << int(Qt::NoModifier) << "\b" << QByteArray("\x7f");
+#ifndef Q_OS_MACOS
+        QTest::newRow("ctrl-c") << int(Qt::Key_C) << int(Qt::ControlModifier) << "\x03" << QByteArray("\x03");
+#endif
+    }
+
+    void encodesKeys()
+    {
+        QFETCH(int, key);
+        QFETCH(int, modifiers);
+        QFETCH(QString, text);
+        QFETCH(QByteArray, expected);
+
+        VtScreen screen(2, 10);
+        QByteArray output;
+        connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
+        QVERIFY(screen.sendKey(key, Qt::KeyboardModifiers(modifiers), text));
+        QCOMPARE(output, expected);
+    }
+
+    void letsModeShortcutsThrough()
+    {
+        const auto shortcut = [](int key, const QString &text, quint32 scanCode, quint32 virtualKey) {
+            const QKeyEvent event(QEvent::ShortcutOverride, key, Qt::ControlModifier, scanCode, virtualKey, 0, text);
+            return TerminalWidget::isModeShortcut(event);
+        };
+        QVERIFY(shortcut(Qt::Key_2, QStringLiteral("2"), 0, 0));
+        QVERIFY(!shortcut(Qt::Key_W, QStringLiteral("w"), 0, 0));
+        // AZERTY : la touche 2 donne « é » sans Maj.
+#if defined(Q_OS_MACOS)
+        QVERIFY(shortcut(Qt::Key_Eacute, QStringLiteral("é"), 0, 0x13));
+#elif defined(Q_OS_WIN)
+        QVERIFY(shortcut(Qt::Key_Eacute, QStringLiteral("é"), 0x03, 0));
+#else
+        QVERIFY(shortcut(Qt::Key_Eacute, QStringLiteral("é"), 11, 0));
+        QVERIFY(shortcut(Qt::Key_QuoteDbl, QStringLiteral("\""), 12, 0));
+#endif
+    }
+
+    void bracketedPasteWhenRequested()
+    {
+        VtScreen screen(2, 10);
+        QByteArray output;
+        connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
+        screen.feed("\x1b[?2004h"); // le programme active le collage entre crochets
+        screen.paste("a\nb");
+        QCOMPARE(output, QByteArray("\x1b[200~a\rb\x1b[201~"));
+    }
+
+    // Un vrai programme dans un vrai PTY : sa sortie arrive et sa fin est signalée.
+    void runsAProgramInAPty()
+    {
+        auto pty = createPty();
+        QByteArray output;
+        connect(pty.get(), &IPty::dataReceived, this, [&output](const QByteArray &data) { output += data; });
+        QSignalSpy finished(pty.get(), &IPty::finished);
+
+        ProcessSpec spec;
+        spec.environment = terminalEnvironment();
+#ifdef Q_OS_WIN
+        spec.program = "cmd.exe";
+        spec.arguments = {"/c", "echo enlumine-ok"};
+#else
+        spec.program = "/bin/sh";
+        spec.arguments = {"-c", "echo enlumine-ok; stty size; exit 3"};
+#endif
+        QVERIFY2(pty->start(spec, QSize(91, 33)), qPrintable(pty->errorString()));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
+        QVERIFY(output.contains("enlumine-ok"));
+#ifndef Q_OS_WIN
+        QVERIFY(output.contains("33 91")); // la taille de la grille est transmise au programme
+        QCOMPARE(finished.first().first().toInt(), 3);
+#endif
+    }
+};
+
+QTEST_GUILESS_MAIN(TestTerminal)
+#include "tst_terminal.moc"

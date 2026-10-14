@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Enlumine
+Comment=Éditeur de sources avec terminal Claude intégré
+Exec=enlumine %F
+Icon=enlumine
+Terminal=false
+Categories=Development;TextEditor;IDE;

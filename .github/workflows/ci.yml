@@ -1,0 +1,91 @@
+# Compile, teste et empaquette l'éditeur sur Linux, Windows et macOS.
+# Les paquets (AppImage, zip Windows, dmg) sont publiés comme artefacts.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  QT_VERSION: "6.8.3"
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      - name: Outils Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev libfuse2
+
+      - name: Outils macOS
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Environnement MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache des dépendances téléchargées
+        uses: actions/cache@v4
+        with:
+          path: build/_deps/*-subbuild
+          key: deps-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configurer
+        run: cmake --preset default
+
+      - name: Compiler
+        run: cmake --build --preset default
+
+      - name: Tester
+        run: ctest --preset default
+
+      - name: Paquet Linux (AppImage)
+        if: runner.os == 'Linux'
+        run: |
+          cmake --install build --component enlumine --prefix AppDir/usr
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
+            --desktop-file AppDir/usr/share/applications/enlumine.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/enlumine.svg \
+            --executable AppDir/usr/bin/enlumine-hook
+
+      - name: Paquet Windows (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --install build --component enlumine --prefix Enlumine
+          windeployqt --release --no-translations Enlumine/bin/enlumine.exe
+          Compress-Archive -Path Enlumine/* -DestinationPath Enlumine-windows.zip
+
+      - name: Paquet macOS (dmg)
+        if: runner.os == 'macOS'
+        run: |
+          cmake --install build --component enlumine --prefix dist
+          macdeployqt dist/Enlumine.app -dmg -executable=dist/Enlumine.app/Contents/MacOS/enlumine-hook
+
+      - name: Publier le paquet
+        uses: actions/upload-artifact@v4
+        with:
+          name: enlumine-${{ matrix.os }}
+          path: |
+            *.AppImage
+            Enlumine-windows.zip
+            dist/*.dmg
+          if-no-files-found: ignore

@@ -1,0 +1,74 @@
+# Dépendances tierces, téléchargées à la configuration et compilées en statique.
+#
+#   QScintilla   composant d'édition (Scintilla pour Qt)        GPLv3
+#   tree-sitter  analyse syntaxique incrémentale + grammaires   MIT
+#   libvterm     émulation de terminal VT220/xterm              MIT
+#   libgit2      lecture du dépôt git (mode Diff)               GPLv2 + linking exception
+
+include(FetchContent)
+set(FETCHCONTENT_QUIET ON)
+
+# Pointer SOURCE_SUBDIR vers un dossier inexistant fait que FetchContent
+# télécharge le projet sans l'ajouter au build : on définit nous-mêmes ses
+# cibles (fichiers inclus en fin de fichier), plus simples que les siennes.
+set(DOWNLOAD_ONLY "_download_only_")
+
+FetchContent_Declare(qscintilla
+    URL https://www.riverbankcomputing.com/static/Downloads/QScintilla/2.14.1/QScintilla_src-2.14.1.tar.gz
+    URL_HASH SHA256=dfe13c6acc9d85dfcba76ccc8061e71a223957a6c02f3c343b30a9d43a4cdd4d
+    DOWNLOAD_EXTRACT_TIMESTAMP ON)
+
+FetchContent_Declare(tree_sitter
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter.git
+    GIT_TAG v0.26.13
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
+FetchContent_Declare(tree_sitter_c
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-c.git
+    GIT_TAG v0.24.2
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
+FetchContent_Declare(tree_sitter_cpp
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-cpp.git
+    GIT_TAG v0.23.4
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
+FetchContent_Declare(tree_sitter_java
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-java.git
+    GIT_TAG v0.23.5
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
+FetchContent_Declare(tree_sitter_javascript
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-javascript.git
+    GIT_TAG v0.25.0
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
+FetchContent_Declare(tree_sitter_typescript
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-typescript.git
+    GIT_TAG v0.23.2
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
+FetchContent_Declare(libvterm
+    GIT_REPOSITORY https://github.com/neovim/libvterm.git
+    GIT_TAG v0.3.3
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
+FetchContent_Declare(libgit2
+    GIT_REPOSITORY https://github.com/libgit2/libgit2.git
+    GIT_TAG v1.9.7
+    GIT_SHALLOW ON)
+
+FetchContent_MakeAvailable(qscintilla tree_sitter tree_sitter_c tree_sitter_cpp tree_sitter_java
+                           tree_sitter_javascript tree_sitter_typescript libvterm)
+
+include(${CMAKE_CURRENT_LIST_DIR}/QScintilla.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/TreeSitter.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/Libvterm.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/Libgit2.cmake)

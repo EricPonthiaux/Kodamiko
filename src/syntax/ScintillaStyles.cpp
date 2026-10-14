@@ -1,0 +1,38 @@
+#include "ScintillaStyles.h"
+
+#include "Theme.h"
+
+#include <Qsci/qsciscintilla.h>
+
+#include <algorithm>
+
+namespace ScintillaStyles {
+
+void applyDefaultStyle(QsciScintilla &editor, const Theme &theme)
+{
+    const QByteArray family = theme.font.family().toUtf8();
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFONT, QsciScintillaBase::STYLE_DEFAULT,
+                         family.constData());
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETSIZE, QsciScintillaBase::STYLE_DEFAULT,
+                         static_cast<long>(theme.font.pointSize()));
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, QsciScintillaBase::STYLE_DEFAULT,
+                         theme.foreground);
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, QsciScintillaBase::STYLE_DEFAULT,
+                         theme.background);
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLECLEARALL);
+}
+
+void applySyntaxStyles(QsciScintilla &editor, const Theme &theme)
+{
+    const int count = std::min<int>(theme.syntaxStyles.size(), maxSyntaxStyles);
+    for (int i = 0; i < count; ++i) {
+        const TextStyle &style = theme.syntaxStyles[i].second;
+        const unsigned long styleNumber = firstSyntaxStyle + i;
+        editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, styleNumber, style.foreground);
+        editor.SendScintilla(QsciScintillaBase::SCI_STYLESETBOLD, styleNumber, static_cast<long>(style.bold));
+        editor.SendScintilla(QsciScintillaBase::SCI_STYLESETITALIC, styleNumber,
+                             static_cast<long>(style.italic));
+    }
+}
+
+} // namespace ScintillaStyles

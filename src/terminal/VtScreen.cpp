@@ -1,0 +1,320 @@
+#include "VtScreen.h"
+
+#include <algorithm>
+
+namespace {
+
+constexpr size_t maxScrollbackLines = 10000;
+
+VTermModifier toVTermModifier(Qt::KeyboardModifiers modifiers)
+{
+    int result = VTERM_MOD_NONE;
+    if (modifiers & Qt::ShiftModifier)
+        result |= VTERM_MOD_SHIFT;
+    if (modifiers & Qt::AltModifier)
+        result |= VTERM_MOD_ALT;
+    // Sous macOS, Qt appelle « Control » la touche Cmd et « Meta » la vraie
+    // touche Ctrl : c'est cette dernière qui produit les Ctrl+C du terminal.
+#ifdef Q_OS_MACOS
+    if (modifiers & Qt::MetaModifier)
+        result |= VTERM_MOD_CTRL;
+#else
+    if (modifiers & Qt::ControlModifier)
+        result |= VTERM_MOD_CTRL;
+#endif
+    return static_cast<VTermModifier>(result);
+}
+
+VTermKey toVTermKey(int key)
+{
+    switch (key) {
+    case Qt::Key_Return: return VTERM_KEY_ENTER;
+    case Qt::Key_Enter: return VTERM_KEY_KP_ENTER;
+    case Qt::Key_Tab:
+    case Qt::Key_Backtab: return VTERM_KEY_TAB;
+    case Qt::Key_Backspace: return VTERM_KEY_BACKSPACE;
+    case Qt::Key_Escape: return VTERM_KEY_ESCAPE;
+    case Qt::Key_Up: return VTERM_KEY_UP;
+    case Qt::Key_Down: return VTERM_KEY_DOWN;
+    case Qt::Key_Left: return VTERM_KEY_LEFT;
+    case Qt::Key_Right: return VTERM_KEY_RIGHT;
+    case Qt::Key_Insert: return VTERM_KEY_INS;
+    case Qt::Key_Delete: return VTERM_KEY_DEL;
+    case Qt::Key_Home: return VTERM_KEY_HOME;
+    case Qt::Key_End: return VTERM_KEY_END;
+    case Qt::Key_PageUp: return VTERM_KEY_PAGEUP;
+    case Qt::Key_PageDown: return VTERM_KEY_PAGEDOWN;
+    default: break;
+    }
+    if (key >= Qt::Key_F1 && key <= Qt::Key_F35)
+        return static_cast<VTermKey>(VTERM_KEY_FUNCTION(key - Qt::Key_F1 + 1));
+    return VTERM_KEY_NONE;
+}
+
+VTermColor rgbColor(const QColor &color)
+{
+    VTermColor result;
+    vterm_color_rgb(&result, static_cast<uint8_t>(color.red()), static_cast<uint8_t>(color.green()),
+                    static_cast<uint8_t>(color.blue()));
+    return result;
+}
+
+} // namespace
+
+VtScreen::VtScreen(int rows, int columns, QObject *parent)
+    : QObject(parent)
+    , terminal_(vterm_new(rows, columns))
+    , rows_(rows)
+    , columns_(columns)
+{
+    vterm_set_utf8(terminal_, 1);
+    vterm_output_set_callback(terminal_, &VtScreen::onOutput, this);
+
+    screen_ = vterm_obtain_screen(terminal_);
+    callbacks_.damage = &VtScreen::onDamage;
+    callbacks_.movecursor = &VtScreen::onMoveCursor;
+    callbacks_.settermprop = &VtScreen::onSetTermProp;
+    callbacks_.bell = &VtScreen::onBell;
+    callbacks_.sb_pushline = &VtScreen::onPushLine;
+    callbacks_.sb_popline = &VtScreen::onPopLine;
+    vterm_screen_set_callbacks(screen_, &callbacks_, this);
+    vterm_screen_enable_altscreen(screen_, 1);
+    vterm_screen_enable_reflow(screen_, true);
+    vterm_screen_reset(screen_, 1);
+}
+
+VtScreen::~VtScreen()
+{
+    vterm_free(terminal_);
+}
+
+void VtScreen::feed(const QByteArray &data)
+{
+    vterm_input_write(terminal_, data.constData(), static_cast<size_t>(data.size()));
+    vterm_screen_flush_damage(screen_);
+}
+
+void VtScreen::resize(int rows, int columns)
+{
+    rows = std::max(rows, 1);
+    columns = std::max(columns, 1);
+    if (rows == rows_ && columns == columns_)
+        return;
+    rows_ = rows;
+    columns_ = columns;
+    vterm_set_size(terminal_, rows, columns);
+    vterm_screen_flush_damage(screen_);
+    emit screenChanged();
+}
+
+void VtScreen::setDefaultColors(const QColor &foreground, const QColor &background)
+{
+    defaultForeground_ = foreground;
+    defaultBackground_ = background;
+    const VTermColor fg = rgbColor(foreground);
+    const VTermColor bg = rgbColor(background);
+    vterm_screen_set_default_colors(screen_, &fg, &bg);
+    emit screenChanged();
+}
+
+TerminalCell VtScreen::cell(int row, int column) const
+{
+    if (row >= 0) {
+        VTermScreenCell cell;
+        if (!vterm_screen_get_cell(screen_, VTermPos{row, column}, &cell))
+            return {};
+        return toTerminalCell(cell);
+    }
+
+    // Historique : la ligne -1 est la plus récente.
+    const int index = static_cast<int>(scrollback_.size()) + row;
+    if (index < 0)
+        return {};
+    const std::vector<VTermScreenCell> &line = scrollback_[static_cast<size_t>(index)];
+    if (column >= static_cast<int>(line.size())) {
+        TerminalCell blank;
+        blank.foreground = defaultForeground_;
+        blank.background = defaultBackground_;
+        return blank;
+    }
+    TerminalCell result = toTerminalCell(line[static_cast<size_t>(column)]);
+    // Les largeurs ne sont pas mémorisées dans l'historique : on les déduit.
+    if (column + 1 < static_cast<int>(line.size()) && line[static_cast<size_t>(column + 1)].chars[0] == uint32_t(-1))
+        result.width = 2;
+    return result;
+}
+
+QString VtScreen::lineText(int row) const
+{
+    QString text;
+    for (int column = 0; column < columns_; ++column) {
+        const TerminalCell c = cell(row, column);
+        if (c.isContinuation)
+            continue;
+        text += c.text.isEmpty() ? QStringLiteral(" ") : c.text;
+    }
+    while (text.endsWith(QLatin1Char(' ')))
+        text.chop(1);
+    return text;
+}
+
+bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text)
+{
+    const VTermModifier modifier = toVTermModifier(modifiers);
+
+    if (key == Qt::Key_Backtab) {
+        vterm_keyboard_key(terminal_, VTERM_KEY_TAB, static_cast<VTermModifier>(modifier | VTERM_MOD_SHIFT));
+        return true;
+    }
+    if (const VTermKey special = toVTermKey(key); special != VTERM_KEY_NONE) {
+        vterm_keyboard_key(terminal_, special, modifier);
+        return true;
+    }
+
+    // Ctrl+lettre : libvterm calcule lui-même le code de contrôle (Ctrl+C → 0x03).
+    if ((modifier & VTERM_MOD_CTRL) && key >= Qt::Key_A && key <= Qt::Key_Z) {
+        const uint32_t letter = static_cast<uint32_t>('a' + (key - Qt::Key_A));
+        vterm_keyboard_unichar(terminal_, letter, static_cast<VTermModifier>(modifier & ~VTERM_MOD_SHIFT));
+        return true;
+    }
+
+    if (text.isEmpty())
+        return false;
+    // Majuscules et symboles portent déjà l'effet de Maj : on ne le renvoie pas.
+    const auto withoutShift = static_cast<VTermModifier>(modifier & ~VTERM_MOD_SHIFT);
+    for (const char32_t codePoint : text.toUcs4()) {
+        if (codePoint < 0x20 && !(modifier & VTERM_MOD_CTRL))
+            continue; // caractère de contrôle produit par la plateforme, déjà traité
+        vterm_keyboard_unichar(terminal_, codePoint, withoutShift);
+    }
+    return true;
+}
+
+// Le collage « entre crochets » (si le programme l'a demandé) lui permet de
+// distinguer un collage d'une frappe : Claude Code ne valide pas un prompt
+// collé qui contient des retours à la ligne.
+void VtScreen::paste(const QString &text)
+{
+    vterm_keyboard_start_paste(terminal_);
+    QString normalized = text;
+    normalized.replace(QStringLiteral("\r\n"), QStringLiteral("\r")).replace(QLatin1Char('\n'), QLatin1Char('\r'));
+    for (const char32_t codePoint : normalized.toUcs4())
+        vterm_keyboard_unichar(terminal_, codePoint, VTERM_MOD_NONE);
+    vterm_keyboard_end_paste(terminal_);
+}
+
+TerminalCell VtScreen::toTerminalCell(const VTermScreenCell &cell) const
+{
+    TerminalCell result;
+    if (cell.chars[0] == uint32_t(-1)) {
+        result.isContinuation = true;
+    } else {
+        for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i] != 0; ++i)
+            result.text += QString::fromUcs4(reinterpret_cast<const char32_t *>(&cell.chars[i]), 1);
+    }
+    result.foreground = toQColor(cell.fg, true);
+    result.background = toQColor(cell.bg, false);
+    if (cell.attrs.reverse)
+        std::swap(result.foreground, result.background);
+    result.bold = cell.attrs.bold;
+    result.italic = cell.attrs.italic;
+    result.underline = cell.attrs.underline != VTERM_UNDERLINE_OFF;
+    result.strike = cell.attrs.strike;
+    result.width = cell.width;
+    return result;
+}
+
+QColor VtScreen::toQColor(VTermColor color, bool isForeground) const
+{
+    if (isForeground && VTERM_COLOR_IS_DEFAULT_FG(&color))
+        return defaultForeground_;
+    if (!isForeground && VTERM_COLOR_IS_DEFAULT_BG(&color))
+        return defaultBackground_;
+    vterm_screen_convert_color_to_rgb(screen_, &color);
+    return QColor(color.rgb.red, color.rgb.green, color.rgb.blue);
+}
+
+int VtScreen::onDamage(VTermRect, void *user)
+{
+    emit static_cast<VtScreen *>(user)->screenChanged();
+    return 1;
+}
+
+int VtScreen::onMoveCursor(VTermPos position, VTermPos, int visible, void *user)
+{
+    auto *self = static_cast<VtScreen *>(user);
+    self->cursor_ = QPoint(position.col, position.row);
+    self->cursorVisible_ = visible;
+    emit self->screenChanged();
+    return 1;
+}
+
+int VtScreen::onSetTermProp(VTermProp property, VTermValue *value, void *user)
+{
+    auto *self = static_cast<VtScreen *>(user);
+    switch (property) {
+    case VTERM_PROP_CURSORVISIBLE:
+        self->cursorVisible_ = value->boolean;
+        emit self->screenChanged();
+        break;
+    case VTERM_PROP_ALTSCREEN:
+        self->alternateScreen_ = value->boolean;
+        break;
+    case VTERM_PROP_TITLE: {
+        // Le titre peut arriver en plusieurs fragments.
+        const VTermStringFragment &fragment = value->string;
+        if (fragment.initial)
+            self->titleBuffer_.clear();
+        self->titleBuffer_ += QString::fromUtf8(fragment.str, static_cast<qsizetype>(fragment.len));
+        if (fragment.final)
+            emit self->titleChanged(self->titleBuffer_);
+        break;
+    }
+    default:
+        break;
+    }
+    return 1;
+}
+
+int VtScreen::onBell(void *user)
+{
+    emit static_cast<VtScreen *>(user)->bell();
+    return 1;
+}
+
+int VtScreen::onPushLine(int columns, const VTermScreenCell *cells, void *user)
+{
+    auto *self = static_cast<VtScreen *>(user);
+    self->scrollback_.emplace_back(cells, cells + columns);
+    if (self->scrollback_.size() > maxScrollbackLines)
+        self->scrollback_.pop_front();
+    return 1;
+}
+
+// Quand l'écran s'agrandit, libvterm redemande les dernières lignes sorties.
+int VtScreen::onPopLine(int columns, VTermScreenCell *cells, void *user)
+{
+    auto *self = static_cast<VtScreen *>(user);
+    if (self->scrollback_.empty())
+        return 0;
+
+    const std::vector<VTermScreenCell> &line = self->scrollback_.back();
+    const int copied = std::min(columns, static_cast<int>(line.size()));
+    std::copy_n(line.begin(), copied, cells);
+    if (copied < columns) {
+        VTermScreenCell blank{};
+        blank.width = 1;
+        vterm_color_rgb(&blank.fg, 0, 0, 0);
+        blank.fg.type = static_cast<uint8_t>(blank.fg.type | VTERM_COLOR_DEFAULT_FG);
+        vterm_color_rgb(&blank.bg, 0, 0, 0);
+        blank.bg.type = static_cast<uint8_t>(blank.bg.type | VTERM_COLOR_DEFAULT_BG);
+        std::fill(cells + copied, cells + columns, blank);
+    }
+    self->scrollback_.pop_back();
+    return 1;
+}
+
+void VtScreen::onOutput(const char *bytes, size_t length, void *user)
+{
+    emit static_cast<VtScreen *>(user)->outputReady(QByteArray(bytes, static_cast<qsizetype>(length)));
+}
