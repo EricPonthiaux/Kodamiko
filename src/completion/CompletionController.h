@@ -11,7 +11,7 @@ class CompletionService;
 class EditorWidget;
 
 // Completion in one editor: opens the popup on Ctrl+Space, while typing an
-// identifier (when the automatic popup is on) and after a trigger
+// identifier (when EditorOptions::autoCompletion is on) and after a trigger
 // character ("."), filters it as the user types, and inserts the chosen
 // candidate. While the popup is open, Up/Down/Page Up/Page Down move in
 // it, Enter inserts, Tab replaces the whole identifier, Escape closes.
@@ -27,7 +27,6 @@ public:
 
     // Ctrl+Space: opens the popup even with nothing typed.
     void complete();
-    void setAutoPopup(bool enabled) { autoPopup_ = enabled; }
     bool isActive() const;
     CompletionPopup *popup() const;
     void close();
@@ -57,7 +56,6 @@ private:
     CompletionService *service_;
     QPointer<CompletionPopup> popup_;
     QTimer autoTimer_;
-    bool autoPopup_ = true;
 
     // The session: from opening to closing the popup.
     bool active_ = false;

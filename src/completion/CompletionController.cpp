@@ -137,7 +137,7 @@ void CompletionController::onCharacterAdded(int character)
             start(false, typed);
         return;
     }
-    if (!autoPopup_ || !isIdentifierCharacter(typed))
+    if (!editor_->options().autoCompletion || !isIdentifierCharacter(typed))
         return;
     // An identifier, not a number.
     const int start = identifierStart(position);

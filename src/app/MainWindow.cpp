@@ -183,7 +183,8 @@ void MainWindow::createWidgets()
     completion_->addProvider(std::make_shared<ProjectSymbolsProvider>(symbolIndex_));
     completion_->addProvider(std::make_shared<KeywordProvider>());
     completion_->addProvider(std::make_shared<DocumentWordsProvider>());
-    editorTabs_->setCompletionService(completion_);
+    connect(editorTabs_, &EditorTabs::editorOpened, this,
+            [this](EditorWidget *editor) { new CompletionController(editor, completion_); });
     connect(editorTabs_, &EditorTabs::fileSaved, this, [this] { fileStatuses_->refresh(); });
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
         if (state == Qt::ApplicationActive) {

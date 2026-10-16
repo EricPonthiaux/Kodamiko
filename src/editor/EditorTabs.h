@@ -8,7 +8,6 @@
 #include <QSet>
 #include <QTabWidget>
 
-class CompletionService;
 class DiagramView;
 class ImageView;
 
@@ -44,9 +43,6 @@ public:
     QString currentFilePath() const;
     // Text of the files with unsaved changes, by path.
     QHash<QString, QString> unsavedTexts() const;
-
-    // Completion in the editors of files (not in diffs), open now or later.
-    void setCompletionService(CompletionService *service);
 
     // Display settings of every editor, open now or later.
     void setEditorOptions(const EditorOptions &options);
@@ -88,6 +84,8 @@ signals:
     void fileSaved(const QString &path);
     // Ctrl+click in the current editor.
     void definitionRequested();
+    // A file was opened in a new text editor (not emitted for diffs).
+    void editorOpened(EditorWidget *editor);
 
 private:
     QWidget *openImage(const QString &absolutePath);
@@ -110,12 +108,10 @@ private:
     void updateTabTitle(EditorWidget *editor);
     void updateTabIcon(QWidget *page);
     QList<EditorWidget *> editors() const;
-    void attachCompletion(EditorWidget *editor);
 
     Theme theme_;
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer
     bool formatOnSave_ = false;
-    CompletionService *completion_ = nullptr;
     EditorOptions editorOptions_;
 };
