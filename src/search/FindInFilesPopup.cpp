@@ -1,6 +1,7 @@
 #include "FindInFilesPopup.h"
 
 #include "editor/EditorWidget.h"
+#include "workspace/GripSplitter.h"
 #include "workspace/TreeMetrics.h"
 
 #include <QCheckBox>
@@ -153,7 +154,7 @@ FindInFilesPopup::FindInFilesPopup(const Theme &theme, QWidget *parent)
     preview_->setReadOnly(true);
     preview_->setFocusPolicy(Qt::NoFocus);
 
-    auto *splitter = new QSplitter(Qt::Vertical, this);
+    auto *splitter = new GripSplitter(Qt::Vertical, this);
     splitter->setChildrenCollapsible(false);
     splitter->addWidget(results_);
     splitter->addWidget(preview_);

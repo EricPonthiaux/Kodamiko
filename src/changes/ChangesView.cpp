@@ -5,6 +5,7 @@
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
+#include "workspace/GripSplitter.h"
 #include "workspace/UiIcons.h"
 
 #include <QCheckBox>
@@ -53,7 +54,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     , summary_(new QLabel(this))
     , list_(new QTreeWidget(this))
     , diff_(new DiffView(theme, this))
-    , splitter_(new QSplitter(Qt::Horizontal, this))
+    , splitter_(new GripSplitter(Qt::Horizontal, this))
     , stageButton_(new QToolButton(this))
     , unstageButton_(new QToolButton(this))
     , discardButton_(new QToolButton(this))

@@ -1,6 +1,7 @@
 #include "SnapshotsDialog.h"
 
 #include "git/GitCommands.h"
+#include "workspace/GripSplitter.h"
 
 #include <QDialogButtonBox>
 #include <QLabel>
@@ -29,7 +30,7 @@ SnapshotsDialog::SnapshotsDialog(const QString &folder, GitCommands *commands, Q
     help->setWordWrap(true);
 
     details_->setReadOnly(true);
-    auto *splitter = new QSplitter(Qt::Horizontal, this);
+    auto *splitter = new GripSplitter(Qt::Horizontal, this);
     splitter->addWidget(list_);
     splitter->addWidget(details_);
     splitter->setSizes({380, 380});

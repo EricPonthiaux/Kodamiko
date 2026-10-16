@@ -67,6 +67,7 @@ add_library(duet_core STATIC
     workspace/FileIcons.cpp
     workspace/FileOperations.cpp
     workspace/FilesPanel.cpp
+    workspace/GripSplitter.cpp
     workspace/FileTreeView.cpp
     workspace/OverlayPopup.cpp
     workspace/ProjectFiles.cpp

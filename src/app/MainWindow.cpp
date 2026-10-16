@@ -25,6 +25,7 @@
 #include "terminal/TerminalWidget.h"
 #include "workspace/CommandPalette.h"
 #include "workspace/FilesPanel.h"
+#include "workspace/GripSplitter.h"
 #include "workspace/SidePanel.h"
 #include "workspace/FileTreeView.h"
 #include "workspace/ThemeStyle.h"
@@ -311,7 +312,7 @@ QWidget *MainWindow::createEditPage()
     sidebar_->addView(filesPanel_, {}, tr("Files"));
     sidebar_->addView(outlineView_, {}, tr("Outline"));
 
-    editSplitter_ = new QSplitter(Qt::Horizontal, this);
+    editSplitter_ = new GripSplitter(Qt::Horizontal, this);
     editSplitter_->setChildrenCollapsible(false);
     editSplitter_->addWidget(sidebar_);
     editSplitter_->addWidget(editorArea);

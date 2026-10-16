@@ -4,6 +4,7 @@
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
 #include "git/ChangeKindStyle.h"
+#include "workspace/GripSplitter.h"
 #include "workspace/UiIcons.h"
 
 #include <QApplication>
@@ -77,9 +78,9 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     , files_(new QTreeWidget(this))
     , message_(new QTextBrowser(this))
     , diff_(new DiffView(theme, this))
-    , splitter_(new QSplitter(Qt::Horizontal, this))
-    , leftSplitter_(new QSplitter(Qt::Vertical, this))
-    , panel_(new QSplitter(Qt::Vertical, this))
+    , splitter_(new GripSplitter(Qt::Horizontal, this))
+    , leftSplitter_(new GripSplitter(Qt::Vertical, this))
+    , panel_(new GripSplitter(Qt::Vertical, this))
     , commitTitle_(new QLabel(this))
     , diffTitle_(new QLabel(this))
 {

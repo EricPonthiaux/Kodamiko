@@ -4,6 +4,7 @@
 #include "EditorWidget.h"
 #include "MarkdownHtml.h"
 #include "syntax/LanguageRegistry.h"
+#include "workspace/GripSplitter.h"
 
 #include <QButtonGroup>
 #include <QColor>
@@ -188,7 +189,7 @@ MarkdownPage::MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *pa
     editor_->setParent(this);
     connect(preview_, &MarkdownPreview::openFileRequested, this, &MarkdownPage::openFileRequested);
 
-    splitter_ = new QSplitter(Qt::Horizontal, this);
+    splitter_ = new GripSplitter(Qt::Horizontal, this);
     splitter_->setChildrenCollapsible(false);
     splitter_->addWidget(editor_);
     splitter_->addWidget(preview_);
