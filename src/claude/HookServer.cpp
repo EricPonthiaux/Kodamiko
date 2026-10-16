@@ -13,7 +13,7 @@ HookServer::HookServer(QObject *parent)
 
 bool HookServer::listen()
 {
-    const QString name = QStringLiteral("enlumine-%1-%2")
+    const QString name = QStringLiteral("duet-%1-%2")
                              .arg(QCoreApplication::applicationPid())
                              .arg(QRandomGenerator::global()->generate(), 8, 16, QLatin1Char('0'));
     return server_.listen(name);

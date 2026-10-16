@@ -1,9 +1,9 @@
-// enlumine-hook: relay between Claude Code and the editor.
+// duet-hook: relay between Claude Code and the editor.
 //
 // Claude Code runs this program for every event declared in the hooks
 // (see ClaudeLauncher) and passes it the event as JSON on standard
 // input. We forward it as is to the editor over the local socket named
-// in ENLUMINE_SOCKET, then wait for its acknowledgement.
+// in DUET_SOCKET, then wait for its acknowledgement.
 //
 // As a hook, this program never writes to its standard output (Claude Code
 // might interpret it) and always exits with code 0: a closed or unreachable
@@ -12,7 +12,7 @@
 // With the "statusline" argument, it is Claude Code's status line command:
 // it forwards the session state (model, context, usage limits) to the
 // editor, then prints the line to display: the output of the user's own
-// status line command (ENLUMINE_STATUSLINE_COMMAND) if there is one, a
+// status line command (DUET_STATUSLINE_COMMAND) if there is one, a
 // short summary otherwise.
 
 #include <QCoreApplication>
@@ -36,7 +36,7 @@ constexpr int statusLineTimeoutMs = 5000;
 
 void sendToEditor(const QJsonDocument &event, int acknowledgeTimeout)
 {
-    const QString serverName = qEnvironmentVariable("ENLUMINE_SOCKET");
+    const QString serverName = qEnvironmentVariable("DUET_SOCKET");
     if (serverName.isEmpty())
         return;
     QLocalSocket socket;
@@ -91,11 +91,11 @@ QByteArray defaultStatusLine(const QJsonObject &status)
 int statusLine(const QByteArray &input)
 {
     const QJsonObject status = QJsonDocument::fromJson(input).object();
-    sendToEditor(QJsonDocument(QJsonObject{{QLatin1String("hook_event_name"), QLatin1String("EnlumineStatusLine")},
+    sendToEditor(QJsonDocument(QJsonObject{{QLatin1String("hook_event_name"), QLatin1String("DuetStatusLine")},
                                            {QLatin1String("status"), status}}),
                  connectTimeoutMs);
 
-    const QString userCommand = qEnvironmentVariable("ENLUMINE_STATUSLINE_COMMAND");
+    const QString userCommand = qEnvironmentVariable("DUET_STATUSLINE_COMMAND");
     const QByteArray line = userCommand.isEmpty() ? defaultStatusLine(status) : runUserStatusLine(userCommand, input);
     std::fwrite(line.constData(), 1, static_cast<size_t>(line.size()), stdout);
     return 0;

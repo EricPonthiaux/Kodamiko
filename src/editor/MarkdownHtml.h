@@ -20,6 +20,9 @@ QString body(const QString &markdown, CodeColorizer *colorizer);
 // `body` in the article. Page scripts are forbidden.
 QString page(const QString &body, bool dark);
 
+// GitHub's page color, dark or light: the page's background.
+QString pageColor(bool dark);
+
 // "My Title!" → "my-title", as GitHub names heading anchors.
 QString headingAnchor(const QString &heading);
 

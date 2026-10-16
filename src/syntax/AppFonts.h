@@ -2,7 +2,7 @@
 
 #include <QFont>
 
-// Fonts embedded in Enlumine, so that it looks the same on every system:
+// Fonts embedded in Duet, so that it looks the same on every system:
 // Inter for the interface, JetBrains Mono for code (editor, terminal,
 // diffs). Each falls back on the system's font if it cannot be loaded.
 namespace AppFonts {

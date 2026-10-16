@@ -131,7 +131,7 @@ MainWindow::~MainWindow() = default;
 
 void MainWindow::createWidgets()
 {
-    // Enlumine's title bar in place of the menu bar: it holds the menus.
+    // Duet's title bar in place of the menu bar: it holds the menus.
     titleBar_ = new TitleBar(this);
     setMenuWidget(titleBar_);
     connect(titleBar_, &TitleBar::claudeClicked, this, &MainWindow::showClaudeSession);
@@ -487,7 +487,7 @@ void MainWindow::createMenus()
     view->addSeparator();
     systemTitleBar_ = view->addAction(tr("Use System &Title Bar"));
     systemTitleBar_->setCheckable(true);
-    systemTitleBar_->setToolTip(tr("The system's window frame instead of Enlumine's (tiling window managers…)"));
+    systemTitleBar_->setToolTip(tr("The system's window frame instead of Duet's (tiling window managers…)"));
     connect(systemTitleBar_, &QAction::toggled, this, [this](bool system) {
         setSystemTitleBar(system);
         QSettings().setValue(QStringLiteral("systemTitleBar"), system);
@@ -643,7 +643,7 @@ void MainWindow::openFolder(const QString &folder)
         changesView_->refresh();
     if (mode_ == Mode::History)
         historyView_->refresh();
-    setWindowTitle(QStringLiteral("%1 — Enlumine").arg(QFileInfo(folder_).fileName()));
+    setWindowTitle(QStringLiteral("%1 — Duet").arg(QFileInfo(folder_).fileName()));
     QStringList recent = QSettings().value(QStringLiteral("recentFolders")).toStringList();
     recent.removeAll(folder_);
     recent.prepend(folder_);
@@ -909,7 +909,7 @@ void MainWindow::setSystemTitleBar(bool system)
 {
 #ifdef Q_OS_MACOS
     Q_UNUSED(system);
-    // Enlumine's bar under the transparent system title bar, the traffic
+    // Duet's bar under the transparent system title bar, the traffic
     // lights at its left (Qt 6.9 and later).
     titleBar_->setWindowControlsVisible(false);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
@@ -920,7 +920,7 @@ void MainWindow::setSystemTitleBar(bool system)
 #else
     frame_->setFrameless(!system);
     titleBar_->setWindowControlsVisible(!system);
-    statusBar()->setSizeGripEnabled(system); // Enlumine's frame resizes from its edges
+    statusBar()->setSizeGripEnabled(system); // Duet's frame resizes from its edges
 #endif
 }
 
@@ -1002,7 +1002,7 @@ void MainWindow::notify(const QString &title, const QString &message)
         if (icon.isNull())
             icon = style()->standardIcon(QStyle::SP_MessageBoxInformation);
         trayIcon_ = new QSystemTrayIcon(icon, this);
-        trayIcon_->setToolTip(QStringLiteral("Enlumine"));
+        trayIcon_->setToolTip(QStringLiteral("Duet"));
         const auto showSession = [this] {
             showNormal();
             raise();

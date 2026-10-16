@@ -16,9 +16,9 @@ namespace {
 QString hookExecutablePath()
 {
 #ifdef Q_OS_WIN
-    const QString name = QStringLiteral("enlumine-hook.exe");
+    const QString name = QStringLiteral("duet-hook.exe");
 #else
-    const QString name = QStringLiteral("enlumine-hook");
+    const QString name = QStringLiteral("duet-hook");
 #endif
     const QString path = QDir(QCoreApplication::applicationDirPath()).filePath(name);
     return QFileInfo::exists(path) ? path : QString();
@@ -124,7 +124,7 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
     const QString hook = hookExecutablePath();
     if (hook.isEmpty()) {
         *error = QCoreApplication::translate("ClaudeLauncher",
-                                             "The enlumine-hook program is missing from the editor's folder.");
+                                             "The duet-hook program is missing from the editor's folder.");
         return std::nullopt;
     }
 
@@ -142,12 +142,12 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
     spec.arguments = {QStringLiteral("--settings"), *settingsFile};
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
-    spec.environment.insert(QStringLiteral("ENLUMINE_SOCKET"), hookServerName);
-    // Our status line replaces the user's: enlumine-hook runs it and
+    spec.environment.insert(QStringLiteral("DUET_SOCKET"), hookServerName);
+    // Our status line replaces the user's: duet-hook runs it and
     // displays its output.
     const QString userStatusLine = userStatusLineCommand(workingDirectory);
     if (!userStatusLine.isEmpty())
-        spec.environment.insert(QStringLiteral("ENLUMINE_STATUSLINE_COMMAND"), userStatusLine);
+        spec.environment.insert(QStringLiteral("DUET_STATUSLINE_COMMAND"), userStatusLine);
     // If the editor was itself launched from Claude Code, this variable
     // would make `claude` believe it is nested in another session.
     spec.environment.remove(QStringLiteral("CLAUDECODE"));

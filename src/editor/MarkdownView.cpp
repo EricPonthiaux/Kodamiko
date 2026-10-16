@@ -6,6 +6,7 @@
 #include "syntax/LanguageRegistry.h"
 
 #include <QButtonGroup>
+#include <QColor>
 #include <QContextMenuEvent>
 #include <QCoreApplication>
 #include <QDesktopServices>
@@ -93,6 +94,8 @@ MarkdownPreview::MarkdownPreview(const Theme &theme, QWidget *parent)
     , colorizer_(std::make_unique<CodeColorizer>())
 {
     setPage(new PreviewPage(this, [this](const QString &path) { emit openFileRequested(path); }));
+    // The page's color before it is loaded, not the view's default white.
+    page()->setBackgroundColor(QColor(MarkdownHtml::pageColor(dark_)));
     connect(page(), &QWebEnginePage::loadFinished, this, [this] {
         pageLoading_ = false;
         loaded_ = true;
@@ -104,7 +107,11 @@ MarkdownPreview::~MarkdownPreview() = default;
 
 void MarkdownPreview::render(const QString &text, const QString &folder)
 {
-    body_ = MarkdownHtml::body(text, colorizer_.get());
+    QString body = MarkdownHtml::body(text, colorizer_.get());
+    // The same text (a mode change): the page shown is left as it is.
+    if (body == body_ && folder == folder_ && (loaded_ || pageLoading_))
+        return;
+    body_ = std::move(body);
     if (folder != folder_ || !loaded_) {
         // Relative links and images: the page's address is the file's folder.
         folder_ = folder;
@@ -151,6 +158,7 @@ void MarkdownPreview::applyTheme(const Theme &theme)
     if (theme.isDark == dark_)
         return;
     dark_ = theme.isDark;
+    page()->setBackgroundColor(QColor(MarkdownHtml::pageColor(dark_)));
     if (folder_.isEmpty() && body_.isEmpty())
         return;
     // Another style sheet: the page is reloaded, at the same place.

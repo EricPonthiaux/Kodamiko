@@ -161,7 +161,7 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.BackendPlatformName = "enlumine-qt";
+    io.BackendPlatformName = "duet-qt";
     io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
     // The renderer is created with the GL context (initializeGL), but a file
     // can be loaded before: textures wait for it.

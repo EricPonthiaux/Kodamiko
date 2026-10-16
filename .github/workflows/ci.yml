@@ -58,35 +58,35 @@ jobs:
       - name: Linux package (AppImage)
         if: runner.os == 'Linux'
         run: |
-          cmake --install build --component enlumine --prefix AppDir/usr
+          cmake --install build --component duet --prefix AppDir/usr
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
-            --desktop-file AppDir/usr/share/applications/enlumine.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/enlumine.svg \
-            --executable AppDir/usr/bin/enlumine-hook
+            --desktop-file AppDir/usr/share/applications/duet.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/duet.svg \
+            --executable AppDir/usr/bin/duet-hook
 
       - name: Windows package (zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake --install build --component enlumine --prefix Enlumine
-          windeployqt --release --no-translations Enlumine/bin/enlumine.exe
-          Compress-Archive -Path Enlumine/* -DestinationPath Enlumine-windows.zip
+          cmake --install build --component duet --prefix Duet
+          windeployqt --release --no-translations Duet/bin/duet.exe
+          Compress-Archive -Path Duet/* -DestinationPath Duet-windows.zip
 
       - name: macOS package (dmg)
         if: runner.os == 'macOS'
         run: |
-          cmake --install build --component enlumine --prefix dist
-          macdeployqt dist/Enlumine.app -dmg -executable=dist/Enlumine.app/Contents/MacOS/enlumine-hook
+          cmake --install build --component duet --prefix dist
+          macdeployqt dist/Duet.app -dmg -executable=dist/Duet.app/Contents/MacOS/duet-hook
 
       - name: Upload the package
         uses: actions/upload-artifact@v4
         with:
-          name: enlumine-${{ matrix.os }}
+          name: duet-${{ matrix.os }}
           path: |
             *.AppImage
-            Enlumine-windows.zip
+            Duet-windows.zip
             dist/*.dmg
           if-no-files-found: ignore

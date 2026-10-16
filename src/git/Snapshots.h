@@ -7,7 +7,7 @@
 
 // Copy of working-directory files, taken before an operation that overwrites
 // them (discarding changes, a Claude prompt…). It is a commit stored under
-// refs/enlumine/snapshots/, outside any branch: it does not appear in the
+// refs/duet/snapshots/, outside any branch: it does not appear in the
 // history, but git keeps it.
 struct Snapshot {
     QString ref;

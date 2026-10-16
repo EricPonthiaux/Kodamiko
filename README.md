@@ -1,4 +1,4 @@
-# Enlumine
+# Duet
 
 Open source source code editor for **C, C++, Java and JavaScript/TypeScript**,
 with an **integrated Claude Code terminal** and **git integration**: pending
@@ -110,7 +110,7 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   violet accents) and Light. All three share the same controls: rounded
   fields and menus, focus outlines in the accent color, gradient selections,
   underlined current tab, thin scroll bars.
-- **Enlumine's own window**, in the manner of IntelliJ: one bar at the top
+- **Duet's own window**, in the manner of IntelliJ: one bar at the top
   holds the menus, the project (with the recent folders), Claude's state (a
   click shows the session), Go to File, Find in Files and the command
   palette, and the window controls (the git branch stays in the status bar,
@@ -119,10 +119,10 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   the window (snapping to the screen edges works); a double-click on the bar
   maximizes it. *View ▸ Use System Title Bar* brings the system's frame back
   (tiling window managers); on macOS, the traffic lights stay, over
-  Enlumine's bar.
+  Duet's bar.
 - **Typography**: the interface is set in [Inter](https://rsms.me/inter/) and the code
   (editor, diffs, terminal) in [JetBrains Mono](https://www.jetbrains.com/lp/mono/)
-  without ligatures, both embedded so that Enlumine looks the same on every
+  without ligatures, both embedded so that Duet looks the same on every
   system; lines of code at 1.5 times the font size, with room between the
   line numbers and the text.
 
@@ -143,7 +143,7 @@ automatically.
 cmake --preset default        # configure (Release, in build/)
 cmake --build --preset default
 ctest --preset default        # tests
-./build/bin/enlumine [project-folder]
+./build/bin/duet [project-folder]
 ```
 
 <a id="diagrams"></a>**Diagrams (optional).** The `.flow` diagram editor comes from
@@ -164,7 +164,7 @@ after adding Qt's `bin` folder to the `PATH`.
 To create an install folder (used by the packages):
 
 ```sh
-cmake --install build --component enlumine --prefix <folder>
+cmake --install build --component duet --prefix <folder>
 ```
 
 The CI (`.github/workflows/ci.yml`) builds and tests on all three systems,
@@ -260,7 +260,7 @@ soon as you click in a file.
    `UserPromptSubmit`, `PostToolUse` (editing tools and Bash),
    `PermissionRequest`, `Notification`, `Stop` and `StopFailure`, and with a
    status line. The user's Claude configuration is not modified.
-2. Each hook runs `enlumine-hook`, a small program shipped with the
+2. Each hook runs `duet-hook`, a small program shipped with the
    editor. It forwards the event to the editor over a local socket, then
    waits for its acknowledgement.
 3. On `UserPromptSubmit`, the editor records a snapshot of the whole
@@ -276,7 +276,7 @@ soon as you click in a file.
    waiting on `PermissionRequest` and on the notifications that need you.
    Claude Code sends no event when you interrupt it, so Esc in the Claude
    terminal resets the dot.
-6. The status line runs `enlumine-hook statusline`, which forwards the
+6. The status line runs `duet-hook statusline`, which forwards the
    session metrics to the editor and prints the line shown under Claude's
    prompt. If you configured your own status line, its output is shown
    instead.
@@ -298,7 +298,7 @@ src/
   search/     Find in Files
   workspace/  file tree, command palette, project file listing
   setup/      prerequisites check (git, Claude Code) and installation
-tools/enlumine-hook/   Claude Code hooks → editor relay
+tools/duet-hook/   Claude Code hooks → editor relay
 tests/                 Qt Test tests (ctest)
 cmake/                 third-party dependencies
 ```
@@ -318,7 +318,7 @@ outline is obtained by implementing `IOutlineProvider` (see
 
 ## License
 
-Enlumine is distributed under the **GNU GPL v3** (see `LICENSE`), the license required
+Duet is distributed under the **GNU GPL v3** (see `LICENSE`), the license required
 by QScintilla. Third-party components:
 
 | Component | License |

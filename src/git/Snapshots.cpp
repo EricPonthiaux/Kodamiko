@@ -18,7 +18,7 @@ using libgit2::Ptr;
 
 namespace {
 
-const QString refPrefix = QStringLiteral("refs/enlumine/snapshots/");
+const QString refPrefix = QStringLiteral("refs/duet/snapshots/");
 // Trailer of the commit message marking a snapshot of the whole working
 // directory.
 const QString wholeTreeTrailer = QStringLiteral("Scope: working tree");
@@ -27,10 +27,10 @@ const QString wholeTreeTrailer = QStringLiteral("Scope: working tree");
 const QHash<QString, QString> &snapshotIdentity()
 {
     static const QHash<QString, QString> identity{
-        {QStringLiteral("GIT_AUTHOR_NAME"), QStringLiteral("Enlumine")},
-        {QStringLiteral("GIT_AUTHOR_EMAIL"), QStringLiteral("enlumine@localhost")},
-        {QStringLiteral("GIT_COMMITTER_NAME"), QStringLiteral("Enlumine")},
-        {QStringLiteral("GIT_COMMITTER_EMAIL"), QStringLiteral("enlumine@localhost")},
+        {QStringLiteral("GIT_AUTHOR_NAME"), QStringLiteral("Duet")},
+        {QStringLiteral("GIT_AUTHOR_EMAIL"), QStringLiteral("duet@localhost")},
+        {QStringLiteral("GIT_COMMITTER_NAME"), QStringLiteral("Duet")},
+        {QStringLiteral("GIT_COMMITTER_EMAIL"), QStringLiteral("duet@localhost")},
     };
     return identity;
 }

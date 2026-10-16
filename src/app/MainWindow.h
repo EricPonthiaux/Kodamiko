@@ -93,8 +93,8 @@ private:
     // Dot on the Claude tab and on the Terminal mode tab.
     void updateClaudeIndicator();
     void updateTabIcons();
-    // Enlumine's frame and title bar, or the system's (View ▸ Use System
-    // Title Bar). On macOS, the system's traffic lights over Enlumine's bar.
+    // Duet's frame and title bar, or the system's (View ▸ Use System
+    // Title Bar). On macOS, the system's traffic lights over Duet's bar.
     void setSystemTitleBar(bool system);
     // Projects menu of the title bar, recent folders first.
     void updateProjectMenu();

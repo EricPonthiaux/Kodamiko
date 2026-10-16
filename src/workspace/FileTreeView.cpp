@@ -33,7 +33,7 @@ namespace {
 
 constexpr int pathRole = Qt::UserRole + 100;
 // Clipboard marker of files cut in the tree: pasting them moves them.
-const QString cutFormat = QStringLiteral("application/x-enlumine-cut");
+const QString cutFormat = QStringLiteral("application/x-duet-cut");
 
 // Colors of IntelliJ's file states (Darcula and light themes).
 QColor statusColor(FileStatus status, bool dark)

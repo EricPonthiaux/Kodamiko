@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Enlumine
+Name=Duet
 Comment=Source code editor with an integrated Claude terminal
-Exec=enlumine %F
-Icon=enlumine
+Exec=duet %F
+Icon=duet
 Terminal=false
 Categories=Development;TextEditor;IDE;

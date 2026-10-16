@@ -82,9 +82,9 @@ int main(int argc, char *argv[])
     // Required by Qt WebEngine (Markdown preview), before the application exists.
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QApplication app(argc, argv);
-    QApplication::setApplicationName(QStringLiteral("Enlumine"));
-    QApplication::setOrganizationName(QStringLiteral("Enlumine"));
-    QApplication::setApplicationVersion(QStringLiteral(ENLUMINE_VERSION));
+    QApplication::setApplicationName(QStringLiteral("Duet"));
+    QApplication::setOrganizationName(QStringLiteral("Duet"));
+    QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
     // Fusion follows the application palette on every system, which
     // enables the dark theme everywhere.
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));

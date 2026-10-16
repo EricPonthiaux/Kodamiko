@@ -154,14 +154,14 @@ private slots:
         spec.environment = terminalEnvironment();
 #ifdef Q_OS_WIN
         spec.program = "cmd.exe";
-        spec.arguments = {"/c", "echo enlumine-ok"};
+        spec.arguments = {"/c", "echo duet-ok"};
 #else
         spec.program = "/bin/sh";
-        spec.arguments = {"-c", "echo enlumine-ok; stty size; exit 3"};
+        spec.arguments = {"-c", "echo duet-ok; stty size; exit 3"};
 #endif
         QVERIFY2(pty->start(spec, QSize(91, 33)), qPrintable(pty->errorString()));
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
-        QVERIFY(output.contains("enlumine-ok"));
+        QVERIFY(output.contains("duet-ok"));
 #ifndef Q_OS_WIN
         QVERIFY(output.contains("33 91")); // the grid size is passed on to the program
         QCOMPARE(finished.first().first().toInt(), 3);

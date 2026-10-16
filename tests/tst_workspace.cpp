@@ -259,13 +259,13 @@ private slots:
 
         auto *project = new QMenu(&window);
         project->addAction("other");
-        titleBar->setProject("enlumine", "/p/enlumine", project);
+        titleBar->setProject("duet", "/p/duet", project);
         titleBar->setClaudeState({}, "Claude is working", "details");
         QStringList texts;
         for (QToolButton *button : titleBar->findChildren<QToolButton *>())
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
-        QVERIFY(texts.contains("enlumine  ▾"));
+        QVERIFY(texts.contains("duet  ▾"));
         QVERIFY(texts.contains("Claude is working"));
         titleBar->setClaudeState({}, {}, {});
 
@@ -465,7 +465,7 @@ private slots:
         QTRY_COMPARE(tree.currentPath(), root + "/lib/a (2).cpp");
         // A cut is pasted once.
         const QMimeData *clipboard = QApplication::clipboard()->mimeData();
-        QVERIFY(!clipboard || !clipboard->hasFormat("application/x-enlumine-cut"));
+        QVERIFY(!clipboard || !clipboard->hasFormat("application/x-duet-cut"));
     }
 
     void treeDuplicatesUnderANewName()

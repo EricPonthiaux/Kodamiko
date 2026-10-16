@@ -21,7 +21,7 @@ SnapshotsDialog::SnapshotsDialog(const QString &folder, GitCommands *commands, Q
     setWindowTitle(tr("Restore a Snapshot"));
     resize(760, 460);
 
-    auto *help = new QLabel(tr("Before discarding changes, Enlumine keeps a copy of the affected files; before each "
+    auto *help = new QLabel(tr("Before discarding changes, Duet keeps a copy of the affected files; before each "
                                "Claude prompt, a copy of the whole working directory. Restoring puts these files "
                                "back on disk as they were; their current state is first copied into a new "
                                "snapshot."),

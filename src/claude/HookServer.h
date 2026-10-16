@@ -8,7 +8,7 @@
 class QLocalSocket;
 
 // Receives notifications from Claude Code hooks, relayed by the small
-// `enlumine-hook` program through a local socket (named pipe on Windows).
+// `duet-hook` program through a local socket (named pipe on Windows).
 //
 // Protocol: the hook sends one JSON line; the server emits hookReceived()
 // — slots connected with a direct connection run immediately — then
@@ -21,7 +21,7 @@ public:
     explicit HookServer(QObject *parent = nullptr);
 
     bool listen();
-    // Full name to pass to the hook (ENLUMINE_SOCKET variable).
+    // Full name to pass to the hook (DUET_SOCKET variable).
     QString serverName() const { return server_.fullServerName(); }
     QString errorString() const { return server_.errorString(); }
 

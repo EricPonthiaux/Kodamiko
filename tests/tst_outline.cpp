@@ -180,7 +180,7 @@ private slots:
 
     void markdown()
     {
-        const char *code = "# Enlumine\n"
+        const char *code = "# Duet\n"
                            "Intro\n"
                            "## Building\n"
                            "```sh\n"
@@ -193,7 +193,7 @@ private slots:
                            "---\n"
                            "# License\n";
         const auto symbols = outline("markdown", code);
-        QCOMPARE(describe(symbols), QStringLiteral("Enlumine{Building,Usage{Shortcuts}},License"));
+        QCOMPARE(describe(symbols), QStringLiteral("Duet{Building,Usage{Shortcuts}},License"));
         const OutlineSymbol *compilation = find(symbols, "Building");
         QCOMPARE(compilation->startLine, 2);
         QCOMPARE(compilation->endLine, 5);

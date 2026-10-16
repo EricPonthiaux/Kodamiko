@@ -6,7 +6,7 @@
 #include "MarkdownView.h"
 #include "workspace/FileIcons.h"
 #include "workspace/UiIcons.h"
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
 #include "DiagramView.h"
 #endif
 
@@ -42,7 +42,7 @@ QWidget *EditorTabs::openFile(const QString &path)
     }
     if (ImageView::isImageFile(absolutePath))
         return openImage(absolutePath);
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     if (DiagramView *existing = diagramViewFor(absolutePath)) {
         setCurrentWidget(existing);
         return existing;
@@ -106,7 +106,7 @@ QWidget *EditorTabs::openImage(const QString &absolutePath)
 
 QWidget *EditorTabs::openDiagram(const QString &absolutePath)
 {
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     auto *view = new DiagramView(theme_, this);
     QString error;
     if (!view->load(absolutePath, &error)) {
@@ -190,7 +190,7 @@ ImageView *EditorTabs::imageViewFor(const QString &path) const
 
 DiagramView *EditorTabs::diagramViewFor(const QString &path) const
 {
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     const QString absolutePath = QFileInfo(path).absoluteFilePath();
     for (DiagramView *view : diagramViews()) {
         if (view->filePath() == absolutePath)
@@ -205,7 +205,7 @@ DiagramView *EditorTabs::diagramViewFor(const QString &path) const
 QList<DiagramView *> EditorTabs::diagramViews() const
 {
     QList<DiagramView *> result;
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     for (int i = 0; i < count(); ++i) {
         if (auto *view = qobject_cast<DiagramView *>(widget(i)))
             result.append(view);
@@ -220,7 +220,7 @@ QString EditorTabs::filePathOf(QWidget *page) const
         return editor->filePath();
     if (auto *image = qobject_cast<ImageView *>(page))
         return image->filePath();
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     if (auto *diagram = qobject_cast<DiagramView *>(page))
         return diagram->filePath();
 #endif
@@ -245,7 +245,7 @@ bool EditorTabs::hasUnsavedChangesUnder(const QString &path) const
     for (QWidget *page : pagesUnder(path)) {
         if (auto *editor = editorIn(page); editor && editor->isModified())
             return true;
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
         if (auto *diagram = qobject_cast<DiagramView *>(page); diagram && diagram->isModified())
             return true;
 #endif
@@ -308,7 +308,7 @@ QString EditorTabs::currentFilePath() const
         return editor->filePath();
     if (auto *image = qobject_cast<ImageView *>(currentWidget()))
         return image->filePath();
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     if (auto *diagram = qobject_cast<DiagramView *>(currentWidget()))
         return diagram->filePath();
 #endif
@@ -337,7 +337,7 @@ QList<EditorWidget *> EditorTabs::editors() const
 
 bool EditorTabs::saveCurrent()
 {
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     if (auto *diagram = qobject_cast<DiagramView *>(currentWidget()))
         return saveDiagram(diagram);
 #endif
@@ -352,7 +352,7 @@ bool EditorTabs::saveAll()
         if (editor->isModified())
             allSaved = saveEditor(editor) && allSaved;
     }
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     for (DiagramView *view : diagramViews()) {
         if (view->isModified())
             allSaved = saveDiagram(view) && allSaved;
@@ -376,7 +376,7 @@ bool EditorTabs::saveEditor(EditorWidget *editor)
 
 bool EditorTabs::saveDiagram(DiagramView *view)
 {
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     QString error;
     if (!view->save(&error)) {
         QMessageBox::warning(this, tr("Cannot Save File"),
@@ -409,7 +409,7 @@ bool EditorTabs::closeTab(int index, bool askToSave)
         if (answer == QMessageBox::Cancel || (answer == QMessageBox::Save && !saveEditor(editor)))
             return false;
     }
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     if (auto *diagram = qobject_cast<DiagramView *>(widget(index))) {
         if (askToSave && diagram->isModified()) {
             const auto answer = QMessageBox::question(
@@ -493,7 +493,7 @@ void EditorTabs::syncWithDisk(const QString &path)
         return;
     }
 
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     if (DiagramView *diagram = diagramViewFor(path)) {
         const QString name = QFileInfo(path).fileName();
         if (pathsBeingResolved_.contains(diagram->filePath()))
@@ -576,7 +576,7 @@ void EditorTabs::updateTabTitle(EditorWidget *editor)
 
 void EditorTabs::updateDiagramTabTitle(DiagramView *view)
 {
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
     const int index = indexOf(view);
     if (index < 0)
         return;
@@ -610,7 +610,7 @@ void EditorTabs::applyTheme(const Theme &theme)
             editor->applyTheme(theme);
         else if (auto *image = qobject_cast<ImageView *>(widget(i)))
             image->applyTheme(theme);
-#ifdef ENLUMINE_WITH_DIAGRAMS
+#ifdef DUET_WITH_DIAGRAMS
         else if (auto *diagram = qobject_cast<DiagramView *>(widget(i)))
             diagram->applyTheme(theme);
 #endif

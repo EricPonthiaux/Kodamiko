@@ -34,7 +34,7 @@ private:
     bool hovered_ = false;
 };
 
-// Enlumine's own title bar, in the manner of IntelliJ's main toolbar: the
+// Duet's own title bar, in the manner of IntelliJ's main toolbar: the
 // menu, the project (with the recent folders), Claude's state, a few actions,
 // and the window controls. Dragging its empty parts moves the
 // window, a double-click maximizes it.

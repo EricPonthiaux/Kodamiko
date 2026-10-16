@@ -28,7 +28,7 @@ QString userStatusLineCommand(const QString &projectDir);
 QString findClaudeExecutable();
 
 // Process to launch, or nullopt (with `error` set) if `claude` or
-// `enlumine-hook` cannot be found.
+// `duet-hook` cannot be found.
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName,
                                          QString *error);
 

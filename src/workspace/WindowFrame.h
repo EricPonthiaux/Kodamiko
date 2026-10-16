@@ -6,7 +6,7 @@
 
 class QWidget;
 
-// Frame Enlumine draws itself around its window when the system's is
+// Frame Duet draws itself around its window when the system's is
 // turned off: rounded corners, a soft shadow, a fine outline, and the edges
 // to resize it (the system moves and resizes, so snapping still works).
 // Maximized or full screen, the window fills the screen without them.
@@ -20,7 +20,7 @@ public:
 
     explicit WindowFrame(QWidget *window);
 
-    // Frameless: Enlumine's frame; otherwise the system's.
+    // Frameless: Duet's frame; otherwise the system's.
     void setFrameless(bool frameless);
     bool isFrameless() const { return frameless_; }
     void applyTheme(const Theme &theme);

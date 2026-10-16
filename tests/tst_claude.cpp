@@ -81,7 +81,7 @@ private slots:
     void settingsDeclareHooksAndStatusLine()
     {
         const QJsonObject settings =
-            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/enlumine-hook\"")).object();
+            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"")).object();
         const QJsonObject hooks = settings["hooks"].toObject();
         QCOMPARE(hooks.keys(), (QStringList{"Notification", "PermissionRequest", "PostToolUse", "Stop", "StopFailure",
                                             "UserPromptSubmit"}));
@@ -89,9 +89,9 @@ private slots:
         QCOMPARE(postToolUse["matcher"].toString(), QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash"));
         const QJsonObject command = postToolUse["hooks"].toArray().first().toObject();
         QCOMPARE(command["type"].toString(), QStringLiteral("command"));
-        QCOMPARE(command["command"].toString(), QStringLiteral("\"/opt/enlumine-hook\""));
+        QCOMPARE(command["command"].toString(), QStringLiteral("\"/opt/duet-hook\""));
         QCOMPARE(settings["statusLine"].toObject()["command"].toString(),
-                 QStringLiteral("\"/opt/enlumine-hook\" statusline"));
+                 QStringLiteral("\"/opt/duet-hook\" statusline"));
     }
 
     void findsTheUserStatusLine()
@@ -174,7 +174,7 @@ private slots:
         QCOMPARE(attention.size(), 0);
     }
 
-    // End to end: the real enlumine-hook binary, launched as Claude Code
+    // End to end: the real duet-hook binary, launched as Claude Code
     // would, relays the event to the editor's server.
     void hookProgramRelaysEventsToTheServer()
     {
@@ -184,9 +184,9 @@ private slots:
 
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("ENLUMINE_SOCKET", server.serverName());
+        environment.insert("DUET_SOCKET", server.serverName());
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(ENLUMINE_HOOK_PATH), {});
+        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"hook_event_name":"Stop","session_id":"hello"})");
         hook.closeWriteChannel();
@@ -206,10 +206,10 @@ private slots:
 
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("ENLUMINE_SOCKET", server.serverName());
-        environment.remove("ENLUMINE_STATUSLINE_COMMAND");
+        environment.insert("DUET_SOCKET", server.serverName());
+        environment.remove("DUET_STATUSLINE_COMMAND");
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(ENLUMINE_HOOK_PATH), {"statusline"});
+        hook.start(QStringLiteral(DUET_HOOK_PATH), {"statusline"});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"model":{"display_name":"Opus"},"context_window":{"used_percentage":42}})");
         hook.closeWriteChannel();
@@ -226,9 +226,9 @@ private slots:
     {
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("ENLUMINE_SOCKET", "enlumine-nonexistent-server");
+        environment.insert("DUET_SOCKET", "duet-nonexistent-server");
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(ENLUMINE_HOOK_PATH), {});
+        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"hook_event_name":"Stop"})");
         hook.closeWriteChannel();

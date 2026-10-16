@@ -40,8 +40,8 @@ target_link_libraries(tree_sitter_grammars INTERFACE
     tree_sitter_javascript tree_sitter_typescript tree_sitter_tsx)
 
 # The grammars' highlights.scm queries and the Outline panel's outline.scm
-# queries (written for Enlumine, in src/syntax/queries), exposed to the application as
-# Qt resources (`:/queries/<grammar>/<file>`) via enlumine_add_queries().
+# queries (written for Duet, in src/syntax/queries), exposed to the application as
+# Qt resources (`:/queries/<grammar>/<file>`) via duet_add_queries().
 set(TREE_SITTER_QUERY_FILES
     "c/highlights.scm|${tree_sitter_c_SOURCE_DIR}/queries/highlights.scm"
     "cpp/highlights.scm|${tree_sitter_cpp_SOURCE_DIR}/queries/highlights.scm"
@@ -55,7 +55,7 @@ foreach(grammar IN ITEMS c cpp java javascript typescript)
         "${grammar}/outline.scm|${PROJECT_SOURCE_DIR}/src/syntax/queries/${grammar}/outline.scm")
 endforeach()
 
-function(enlumine_add_queries target)
+function(duet_add_queries target)
     set(query_dir ${CMAKE_BINARY_DIR}/queries)
     set(resource_files "")
     foreach(entry IN LISTS TREE_SITTER_QUERY_FILES)

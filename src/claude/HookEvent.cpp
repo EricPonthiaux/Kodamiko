@@ -52,7 +52,7 @@ std::optional<HookEvent> HookEvent::fromJson(const QByteArray &json)
         event.message = object.value(QLatin1String("message")).toString();
         return event;
     }
-    if (eventName == QLatin1String("EnlumineStatusLine")) { // sent by `enlumine-hook statusline`
+    if (eventName == QLatin1String("DuetStatusLine")) { // sent by `duet-hook statusline`
         event.kind = Kind::StatusUpdated;
         event.status = object.value(QLatin1String("status")).toObject();
         return event;

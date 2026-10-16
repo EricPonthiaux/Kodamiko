@@ -11,6 +11,6 @@ Copied as published, without changes (Inter's file renamed):
 
 The Markdown preview renders with GitHub's style sheet and icons. The
 interface is set in Inter and the code (editor, terminal, diffs) in
-JetBrains Mono, embedded so that Enlumine looks the same everywhere. To update
+JetBrains Mono, embedded so that Duet looks the same everywhere. To update
 them, replace the files with those of a newer version and change the
 versions above.

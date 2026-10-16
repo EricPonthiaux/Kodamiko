@@ -286,6 +286,11 @@ QString body(const QString &markdown, CodeColorizer *colorizer)
     return html;
 }
 
+QString pageColor(bool dark)
+{
+    return dark ? QStringLiteral("#0d1117") : QStringLiteral("#ffffff");
+}
+
 QString page(const QString &body, bool dark)
 {
     const QString css = resource(dark ? QStringLiteral(":/markdown/github-markdown-css/github-markdown-dark.css")
@@ -296,7 +301,7 @@ QString page(const QString &body, bool dark)
                                ".markdown-body { box-sizing: border-box; min-width: 200px; max-width: 980px; "
                                "margin: 0 auto; padding: 45px; }\n"
                                "@media (max-width: 767px) { .markdown-body { padding: 15px; } }\n")
-                               .arg(dark ? QStringLiteral("#0d1117") : QStringLiteral("#ffffff"));
+                               .arg(pageColor(dark));
     return QStringLiteral("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\">\n"
                           "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; "
                           "img-src file: data: https: http:; style-src 'unsafe-inline'; font-src file: data:\">\n"

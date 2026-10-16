@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(Enlumine
+project(Duet
     VERSION 0.1.0
     DESCRIPTION "C/C++/Java/JavaScript source editor with an integrated Claude terminal"
     LANGUAGES C CXX)
@@ -34,5 +34,5 @@ endif()
 enable_testing()
 
 add_subdirectory(src)
-add_subdirectory(tools/enlumine-hook)
+add_subdirectory(tools/duet-hook)
 add_subdirectory(tests)
