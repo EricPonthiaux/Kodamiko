@@ -24,7 +24,11 @@ public:
     // Fuzzy match: -1 if the letters of `query` do not all appear, in
     // order, in `text`; otherwise a score that favors consecutive letters
     // and word starts. Case insensitive.
-    static int matchScore(const QString &text, const QString &query);
+    static int matchScore(QStringView text, QStringView query);
+    static int matchScore(const QString &text, const QString &query)
+    {
+        return matchScore(QStringView(text), QStringView(query));
+    }
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;

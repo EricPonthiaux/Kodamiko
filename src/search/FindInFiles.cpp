@@ -36,18 +36,35 @@ std::optional<QRegularExpression> FindQuery::compile(QString *error) const
 
 bool FindQuery::acceptsFile(const QString &fileName) const
 {
+    // Asked for every file of the project: the masks are compiled once per
+    // query (and per thread), not once per file.
+    struct Mask {
+        QRegularExpression wildcard;
+        bool exclusion;
+    };
+    thread_local QString compiledFor;
+    thread_local QList<Mask> masks;
+    if (masks.isEmpty() || compiledFor != fileMask) {
+        masks.clear();
+        compiledFor = fileMask;
+        for (const QString &part : fileMask.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+            QString mask = part.trimmed();
+            if (mask.isEmpty())
+                continue;
+            const bool exclusion = mask.startsWith(QLatin1Char('!'));
+            if (exclusion)
+                mask.remove(0, 1);
+            masks.append({QRegularExpression(QRegularExpression::wildcardToRegularExpression(mask),
+                                             QRegularExpression::CaseInsensitiveOption),
+                          exclusion});
+        }
+    }
+
     bool hasInclusion = false;
     bool included = false;
-    for (const QString &part : fileMask.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
-        QString mask = part.trimmed();
-        if (mask.isEmpty())
-            continue;
-        const bool exclusion = mask.startsWith(QLatin1Char('!'));
-        if (exclusion)
-            mask.remove(0, 1);
-        const QRegularExpression wildcard(QRegularExpression::wildcardToRegularExpression(mask),
-                                          QRegularExpression::CaseInsensitiveOption);
-        const bool matches = wildcard.match(fileName).hasMatch();
+    for (const Mask &mask : std::as_const(masks)) {
+        const bool exclusion = mask.exclusion;
+        const bool matches = mask.wildcard.match(fileName).hasMatch();
         if (exclusion && matches)
             return false;
         if (!exclusion) {

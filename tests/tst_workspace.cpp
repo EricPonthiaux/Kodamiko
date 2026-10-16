@@ -381,6 +381,38 @@ private slots:
         QTRY_COMPARE(rowsOf(model, src), QStringList({"a.cpp(a.h)", "c.cpp"}));
     }
 
+    // Many rows added and removed at once, in runs: the persistent rows
+    // that stay keep pointing at the same files.
+    void modelUpdatesRunsOfRows()
+    {
+        QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.filePath("project"));
+        for (int i = 0; i < 100; i += 2)
+            write(root + QStringLiteral("/f%1.txt").arg(i, 3, 10, QLatin1Char('0')));
+        ProjectTreeModel model;
+        model.setRootPath(root);
+        const QModelIndex top = model.index(0, 0);
+        QCOMPARE(rowsOf(model, top).size(), 50);
+        const QPersistentModelIndex kept = model.index(30, 0, top); // f060.txt
+        QCOMPARE(kept.data().toString(), QString("f060.txt"));
+
+        for (int i = 1; i < 100; i += 2)
+            write(root + QStringLiteral("/f%1.txt").arg(i, 3, 10, QLatin1Char('0')));
+        for (int i = 0; i < 40; i += 2)
+            QFile::remove(root + QStringLiteral("/f%1.txt").arg(i, 3, 10, QLatin1Char('0')));
+        model.refresh();
+
+        QStringList expected;
+        for (int i = 0; i < 100; ++i) {
+            if (i >= 40 || i % 2 == 1)
+                expected.append(QStringLiteral("f%1.txt").arg(i, 3, 10, QLatin1Char('0')));
+        }
+        QCOMPARE(rowsOf(model, top), expected);
+        QVERIFY(kept.isValid());
+        QCOMPARE(kept.data().toString(), QString("f060.txt"));
+        QCOMPARE(kept.row(), int(expected.indexOf("f060.txt")));
+    }
+
     void nestingRules()
     {
         const QStringList siblings{"x.ts", "x.js", "x.js.map", "x.d.ts", "y.c", "y.h", "z.h", "go.mod", "go.sum"};

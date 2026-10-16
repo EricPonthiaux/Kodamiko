@@ -24,9 +24,9 @@ LanguageServers::~LanguageServers()
     stopAll();
 }
 
-QList<LanguageServerSpec> LanguageServers::known()
+const QList<LanguageServerSpec> &LanguageServers::known()
 {
-    return {
+    static const QList<LanguageServerSpec> specs = {
         // No header insertion: Duet does not apply the edits that come with
         // a candidate. Parsing always: otherwise, while the file's headers
         // are being read, clangd answers with mere words (the local
@@ -51,6 +51,7 @@ QList<LanguageServerSpec> LanguageServers::known()
          QStringLiteral(".")},
         {QStringLiteral("pylsp"), QStringLiteral("pylsp"), {}, {QStringLiteral("python")}, QStringLiteral(".")},
     };
+    return specs;
 }
 
 QString LanguageServers::protocolLanguage(const QString &languageId)
@@ -88,6 +89,14 @@ QString LanguageServers::programFor(const LanguageServerSpec &spec) const
 }
 
 std::optional<LanguageServerSpec> LanguageServers::specFor(const QString &languageId) const
+{
+    auto cached = specs_.constFind(languageId);
+    if (cached == specs_.constEnd())
+        cached = specs_.insert(languageId, findSpec(languageId));
+    return cached.value();
+}
+
+std::optional<LanguageServerSpec> LanguageServers::findSpec(const QString &languageId) const
 {
     if (const LanguageSetup *setup = setupFor(languageId)) {
         // The project chose: that server or none.
@@ -129,15 +138,17 @@ void LanguageServers::setFolder(const QString &folder)
     stopAll();
     folder_ = folder;
     project_ = {};
+    specs_.clear();
 }
 
 void LanguageServers::setProject(const ProjectConfig &project, Toolchains *toolchains)
 {
-    // Downloads made meanwhile are seen.
+    // Downloads made meanwhile are seen (Duet's installs are listed from
+    // disk each time). The machine's runtimes are not probed again: that
+    // runs programs, and the installer refreshes after a download.
     programPaths_.clear();
+    specs_.clear();
     toolchains_ = toolchains;
-    if (toolchains_)
-        toolchains_->refresh();
     const QString folder = QDir(project.path).absolutePath();
     if (folder == folder_ && project.languages == project_.languages)
         return;

@@ -25,6 +25,7 @@ public:
     static QString relativeDate(const QDateTime &date, const QDateTime &now = QDateTime::currentDateTime());
     // Round avatar with the initials of `name`, on a color derived from it.
     static QPixmap avatar(const QString &name, int size, qreal ratio);
+    static QPixmap drawAvatar(const QString &name, int size, qreal ratio);
     // Color of a branch or tag pill.
     static QColor refColor(const QString &name);
 

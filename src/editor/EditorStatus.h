@@ -32,6 +32,10 @@ public:
 
 private:
     void update();
+    // Moving the cursor signals both a cursor and a selection change: the
+    // texts are computed once, after both.
+    void scheduleUpdate();
+    bool updateScheduled_ = false;
     void showLineEndingMenu();
     void showIndentationMenu();
     QToolButton *addButton(const QString &toolTip);

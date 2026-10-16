@@ -63,20 +63,28 @@ public:
         int shownLength = length;
         QFont bold = item.font;
         bold.setBold(true);
+        const QFontMetrics plain(item.font);
+        const QFontMetrics strong(bold);
         const auto widthOf = [&](const QString &candidate) {
-            const QFontMetrics plain(item.font);
-            const QFontMetrics strong(bold);
             const int end = std::min<int>(start + length, candidate.size());
             return plain.horizontalAdvance(candidate.left(start)) + strong.horizontalAdvance(candidate.mid(start, end - start))
                 + plain.horizontalAdvance(candidate.mid(end));
         };
         if (widthOf(shown) > rect.width()) {
+            // The longest prefix that fits, found by bisection: painted
+            // for every visible row, at every repaint.
             const QString ellipsis = QStringLiteral("…");
-            int keep = int(text.size());
-            while (keep > start + 1 && widthOf(text.left(keep) + ellipsis) > rect.width())
-                --keep;
-            shown = text.left(keep) + ellipsis;
-            shownLength = std::min(length, keep - start);
+            int fits = start + 1; // kept even if it does not fit
+            int tooLong = int(text.size());
+            while (tooLong - fits > 1) {
+                const int middle = fits + (tooLong - fits) / 2;
+                if (widthOf(text.left(middle) + ellipsis) > rect.width())
+                    tooLong = middle;
+                else
+                    fits = middle;
+            }
+            shown = text.left(fits) + ellipsis;
+            shownLength = std::min(length, fits - start);
         }
         QTextLayout layout(shown, item.font);
         QTextCharFormat format;
@@ -281,6 +289,9 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
             text = QStringLiteral("…") + text.mid(cut);
             start = start - cut + 1;
         }
+        // And no more than a column can show after it (minified files).
+        if (text.size() > start + match.length + matchContext * 4)
+            text = text.left(start + match.length + matchContext * 4) + QStringLiteral("…");
         // Leading whitespace is dropped, as in IntelliJ.
         qsizetype leading = 0;
         while (leading < text.size() && leading < start && text.at(leading).isSpace())

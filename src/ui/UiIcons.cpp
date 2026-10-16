@@ -1,5 +1,6 @@
 #include "UiIcons.h"
 
+#include <QHash>
 #include <QPainter>
 #include <QPainterPath>
 
@@ -29,7 +30,27 @@ QIcon drawIcon(const QColor &color, const std::function<void(QPainter &)> &draw)
 
 namespace UiIcons {
 
+namespace {
+
+QIcon draw(const QString &name, const QColor &color);
+
+} // namespace
+
+// Icons are redrawn with every theme change and indicator update: each
+// one is drawn once per color.
 QIcon icon(const QString &name, const QColor &color)
+{
+    static QHash<QString, QIcon> cache;
+    const QString key = name + QLatin1Char('#') + QString::number(color.rgba(), 16);
+    auto it = cache.constFind(key);
+    if (it == cache.constEnd())
+        it = cache.insert(key, draw(name, color));
+    return it.value();
+}
+
+namespace {
+
+QIcon draw(const QString &name, const QColor &color)
 {
     if (name == QLatin1String("terminal")) {
         return drawIcon(color, [](QPainter &p) {
@@ -229,5 +250,7 @@ QIcon icon(const QString &name, const QColor &color)
         p.drawLine(QPointF(8, 10), QPointF(11, 10));
     });
 }
+
+} // namespace
 
 } // namespace UiIcons

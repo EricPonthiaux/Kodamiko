@@ -184,15 +184,13 @@ void MarkdownPreview::contextMenuEvent(QContextMenuEvent *event)
 MarkdownPage::MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *parent)
     : QWidget(parent)
     , editor_(editor)
-    , preview_(new MarkdownPreview(theme, this))
+    , theme_(theme)
 {
     editor_->setParent(this);
-    connect(preview_, &MarkdownPreview::openFileRequested, this, &MarkdownPage::openFileRequested);
 
     splitter_ = new GripSplitter(Qt::Horizontal, this);
     splitter_->setChildrenCollapsible(false);
     splitter_->addWidget(editor_);
-    splitter_->addWidget(preview_);
 
     auto *group = new QButtonGroup(this);
     auto *toolbar = new QHBoxLayout;
@@ -227,7 +225,7 @@ MarkdownPage::MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *pa
     updateTimer_.setInterval(updateDelayMs);
     connect(&updateTimer_, &QTimer::timeout, this, &MarkdownPage::updatePreview);
     connect(editor_, &QsciScintilla::textChanged, this, [this] {
-        if (mode_ != Mode::Editor)
+        if (mode_ != Mode::Editor && preview_)
             updateTimer_.start();
     });
     connect(editor_->verticalScrollBar(), &QScrollBar::valueChanged, this, &MarkdownPage::syncScroll);
@@ -241,15 +239,34 @@ void MarkdownPage::setMode(Mode mode)
 {
     mode_ = mode;
     buttons_[static_cast<int>(mode)]->setChecked(true);
-    editor_->setVisible(mode != Mode::Preview);
-    preview_->setVisible(mode != Mode::Editor);
-    setFocusProxy(mode == Mode::Preview ? static_cast<QWidget *>(preview_) : editor_);
+    if (mode != Mode::Editor && isVisible())
+        ensurePreview();
+    editor_->setVisible(mode != Mode::Preview || !preview_);
+    if (preview_)
+        preview_->setVisible(mode != Mode::Editor);
+    setFocusProxy(mode == Mode::Preview && preview_ ? static_cast<QWidget *>(preview_) : editor_);
     if (mode == Mode::Split) {
         const int half = std::max(splitter_->width() / 2, 100);
         splitter_->setSizes({half, half});
     }
-    if (mode != Mode::Editor)
+    if (mode != Mode::Editor && preview_)
         updatePreview();
+}
+
+void MarkdownPage::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    if (mode_ != Mode::Editor && !preview_)
+        setMode(mode_);
+}
+
+void MarkdownPage::ensurePreview()
+{
+    if (preview_)
+        return;
+    preview_ = new MarkdownPreview(theme_, this);
+    connect(preview_, &MarkdownPreview::openFileRequested, this, &MarkdownPage::openFileRequested);
+    splitter_->addWidget(preview_);
 }
 
 void MarkdownPage::revealEditor()
@@ -261,6 +278,8 @@ void MarkdownPage::revealEditor()
 void MarkdownPage::updatePreview()
 {
     updateTimer_.stop();
+    if (!preview_)
+        return;
     preview_->render(editor_->text(), QFileInfo(editor_->filePath()).absolutePath());
     syncScroll();
 }
@@ -268,7 +287,7 @@ void MarkdownPage::updatePreview()
 // In Split mode, the preview shows the same share of the text as the editor.
 void MarkdownPage::syncScroll()
 {
-    if (mode_ != Mode::Split)
+    if (mode_ != Mode::Split || !preview_)
         return;
     const QScrollBar *source = editor_->verticalScrollBar();
     if (source->maximum() > 0)
@@ -277,8 +296,10 @@ void MarkdownPage::syncScroll()
 
 void MarkdownPage::applyTheme(const Theme &theme)
 {
+    theme_ = theme;
     editor_->applyTheme(theme);
-    preview_->applyTheme(theme);
+    if (preview_)
+        preview_->applyTheme(theme);
 }
 
 bool MarkdownPage::isMarkdownFile(const QString &path)

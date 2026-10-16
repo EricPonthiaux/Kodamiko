@@ -15,6 +15,13 @@
 
 namespace {
 
+// What was found on the machine, by tool, for the whole application.
+QHash<QString, QList<RuntimeInstall>> &probedRuntimes()
+{
+    static QHash<QString, QList<RuntimeInstall>> runtimes;
+    return runtimes;
+}
+
 const QString completeMarker = QStringLiteral(".complete");
 
 // The output of `executable --version`, empty if it does not answer.
@@ -190,15 +197,23 @@ QList<RuntimeInstall> Toolchains::machineRuntimes(const QString &tool) const
     auto it = machine_.find(tool);
     if (it != machine_.end())
         return it.value();
-    QList<RuntimeInstall> runtimes;
-    if (tool == QLatin1String("jdk")) {
-        for (const JavaRuntime &java : JavaRuntimes::find())
-            runtimes.append({tool, QString::number(java.majorVersion), java.home, java.executable, false});
-    } else if (tool == QLatin1String("node")) {
-        runtimes = machineNodes();
-    } else if (tool == QLatin1String("python")) {
-        runtimes = machinePythons();
+    // Probing runs programs ("node --version"...): its result is shared by
+    // every Toolchains of the application (welcome window, main window).
+    QHash<QString, QList<RuntimeInstall>> &probed = probedRuntimes();
+    auto known = probed.find(tool);
+    if (known == probed.end()) {
+        QList<RuntimeInstall> found;
+        if (tool == QLatin1String("jdk")) {
+            for (const JavaRuntime &java : JavaRuntimes::find())
+                found.append({tool, QString::number(java.majorVersion), java.home, java.executable, false});
+        } else if (tool == QLatin1String("node")) {
+            found = machineNodes();
+        } else if (tool == QLatin1String("python")) {
+            found = machinePythons();
+        }
+        known = probed.insert(tool, found);
     }
+    QList<RuntimeInstall> runtimes = known.value();
     // Duet's own downloads are listed apart.
     const QString own = QFileInfo(root_).canonicalFilePath();
     if (!own.isEmpty()) {
@@ -337,4 +352,5 @@ void Toolchains::refresh()
 {
     machine_.clear();
     programs_.clear();
+    probedRuntimes().clear();
 }

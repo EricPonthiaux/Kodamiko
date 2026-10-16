@@ -294,11 +294,11 @@ void DiagramView::runFrame(bool render, const std::function<void()> &beforeFrame
     gl->glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-    const ImGuiMouseCursor cursor = ImGui::GetMouseCursor();
-    if (cursor == ImGuiMouseCursor_None)
-        setCursor(Qt::BlankCursor);
-    else
-        setCursor(toQtCursor(cursor));
+    // Set only when it changes: every frame asks for it.
+    const ImGuiMouseCursor imguiCursor = ImGui::GetMouseCursor();
+    const Qt::CursorShape shape = imguiCursor == ImGuiMouseCursor_None ? Qt::BlankCursor : toQtCursor(imguiCursor);
+    if (cursor().shape() != shape)
+        setCursor(shape);
 }
 
 void DiagramView::initializeGL()

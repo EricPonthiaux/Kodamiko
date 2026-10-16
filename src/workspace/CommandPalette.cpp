@@ -89,7 +89,7 @@ void CommandPalette::popup(const QMenuBar *menuBar)
     search_->setFocus();
 }
 
-int CommandPalette::matchScore(const QString &text, const QString &query)
+int CommandPalette::matchScore(QStringView text, QStringView query)
 {
     int score = 0;
     qsizetype position = 0;

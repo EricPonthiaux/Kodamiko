@@ -46,11 +46,11 @@ QColor statusColor(FileStatus status, bool dark)
 {
     switch (status) {
     case FileStatus::Modified:
-    case FileStatus::Renamed: return QColor(dark ? "#6897bb" : "#0032a0");
-    case FileStatus::Added: return QColor(dark ? "#629755" : "#067d17");
-    case FileStatus::Untracked: return QColor(dark ? "#d1675a" : "#993300");
-    case FileStatus::Conflicted: return QColor(dark ? "#d5756c" : "#c00000");
-    case FileStatus::Ignored: return QColor(dark ? "#848504" : "#808000");
+    case FileStatus::Renamed: return QColor::fromRgb(dark ? 0x6897bb : 0x0032a0);
+    case FileStatus::Added: return QColor::fromRgb(dark ? 0x629755 : 0x067d17);
+    case FileStatus::Untracked: return QColor::fromRgb(dark ? 0xd1675a : 0x993300);
+    case FileStatus::Conflicted: return QColor::fromRgb(dark ? 0xd5756c : 0xc00000);
+    case FileStatus::Ignored: return QColor::fromRgb(dark ? 0x848504 : 0x808000);
     }
     return {};
 }
@@ -113,13 +113,18 @@ class TreeDecorations : public QSortFilterProxyModel {
 public:
     using QSortFilterProxyModel::QSortFilterProxyModel;
 
-    void setRootPath(const QString &rootPath) { rootPath_ = rootPath; }
+    void setRootPath(const QString &rootPath)
+    {
+        rootPath_ = rootPath;
+        inIgnored_.clear();
+    }
 
     void setStatuses(const FileStatusMap &statuses)
     {
         statuses_ = statuses;
         folderStatuses_ = FileStatuses::folderStatuses(statuses, rootPath_);
         hasIgnored_ = std::any_of(statuses.cbegin(), statuses.cend(), [](FileStatus s) { return s == FileStatus::Ignored; });
+        inIgnored_.clear();
     }
     void setTouched(const QSet<QString> &paths) { touched_ = paths; }
     void setCut(const QString &path) { cut_ = path; }
@@ -143,15 +148,27 @@ public:
             if (const auto it = folderStatuses_.constFind(path); it != folderStatuses_.cend())
                 return *it;
         }
-        if (hasIgnored_) {
-            // In an ignored folder.
-            for (QString folder = QFileInfo(path).absolutePath(); folder.size() > rootPath_.size();
-                 folder = QFileInfo(folder).absolutePath()) {
-                if (statuses_.value(folder, FileStatus::Modified) == FileStatus::Ignored)
-                    return FileStatus::Ignored;
+        if (hasIgnored_ && isInIgnoredFolder(path))
+            return FileStatus::Ignored;
+        return std::nullopt;
+    }
+
+    // Asked for each role of each painted row: the walk up the folders is
+    // remembered until the statuses change.
+    bool isInIgnoredFolder(const QString &path) const
+    {
+        if (const auto it = inIgnored_.constFind(path); it != inIgnored_.cend())
+            return *it;
+        bool ignored = false;
+        for (qsizetype slash = path.lastIndexOf(QLatin1Char('/')); slash > rootPath_.size();
+             slash = path.lastIndexOf(QLatin1Char('/'), slash - 1)) {
+            if (statuses_.value(path.left(slash), FileStatus::Modified) == FileStatus::Ignored) {
+                ignored = true;
+                break;
             }
         }
-        return std::nullopt;
+        inIgnored_.insert(path, ignored);
+        return ignored;
     }
 
     QVariant data(const QModelIndex &index, int role) const override
@@ -236,6 +253,7 @@ private:
     FileStatusMap statuses_;
     FileStatusMap folderStatuses_;
     bool hasIgnored_ = false;
+    mutable QHash<QString, bool> inIgnored_; // isInIgnoredFolder(), by path
     QSet<QString> touched_;
     std::optional<QSet<QString>> scopeFiles_;
     QSet<QString> scopeAncestors_;

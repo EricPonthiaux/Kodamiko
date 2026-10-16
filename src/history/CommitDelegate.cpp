@@ -3,6 +3,7 @@
 #include "git/CommitLog.h"
 
 #include <QApplication>
+#include <QHash>
 #include <QLocale>
 #include <QPainter>
 #include <QTreeWidgetItem>
@@ -70,7 +71,20 @@ QString CommitDelegate::relativeDate(const QDateTime &date, const QDateTime &now
     return QLocale().toString(date.toLocalTime().date(), QLocale::ShortFormat);
 }
 
+// Painted for every visible row at every repaint (hovering repaints): each
+// avatar is drawn once.
 QPixmap CommitDelegate::avatar(const QString &name, int size, qreal ratio)
+{
+    static QHash<QString, QPixmap> cache;
+    const QString key = QStringLiteral("%1\n%2\n%3").arg(name).arg(size).arg(ratio);
+    if (const auto it = cache.constFind(key); it != cache.constEnd())
+        return it.value();
+    if (cache.size() > 1000)
+        cache.clear();
+    return cache.insert(key, drawAvatar(name, size, ratio)).value();
+}
+
+QPixmap CommitDelegate::drawAvatar(const QString &name, int size, qreal ratio)
 {
     // Soft colors, one per author.
     static const QColor colors[] = {QColor("#7c6cf0"), QColor("#4c9be8"), QColor("#2fae8f"), QColor("#e07b53"),

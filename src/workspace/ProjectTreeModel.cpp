@@ -5,6 +5,7 @@
 
 #include <QDir>
 #include <QMimeData>
+#include <QSet>
 #include <QUrl>
 
 #include <algorithm>
@@ -277,44 +278,73 @@ void ProjectTreeModel::watch(Node *node)
     // splits the chain.
     for (const auto &child : node->children)
         paths += child->chain;
-    const QStringList watched = watcher_.directories();
+    const QStringList directories = watcher_.directories();
+    const QSet<QString> watched(directories.cbegin(), directories.cend());
     paths.removeIf([&watched](const QString &path) { return watched.contains(path); });
     if (!paths.isEmpty())
         watcher_.addPaths(paths);
 }
 
+// Linear in the folder's size, with one notification per run of rows: a
+// folder of generated files changes thousands of rows at once.
 void ProjectTreeModel::update(Node *node, std::vector<Entry> entries)
 {
     const QModelIndex parent = indexOf(node);
     const auto sameRow = [](const Node &existing, const Entry &entry) {
         return existing.path == entry.path && existing.isDir == entry.isDir && existing.chain == entry.chain;
     };
+    const auto keyOf = [](const QString &path, bool isDir, const QStringList &chain) {
+        return path + (isDir ? QStringLiteral("\nd\n") : QStringLiteral("\nf\n")) + chain.join(QLatin1Char('\n'));
+    };
+    QSet<QString> present;
+    present.reserve(static_cast<qsizetype>(entries.size()));
+    for (const Entry &entry : entries)
+        present.insert(keyOf(entry.path, entry.isDir, entry.chain));
 
-    // Rows that are gone, from the end.
-    for (int row = static_cast<int>(node->children.size()) - 1; row >= 0; --row) {
-        const Node &child = *node->children[static_cast<size_t>(row)];
-        const bool kept = std::any_of(entries.begin(), entries.end(), [&](const Entry &e) { return sameRow(child, e); });
-        if (kept)
-            continue;
-        beginRemoveRows(parent, row, row);
-        node->children.erase(node->children.begin() + row);
-        node->renumber();
-        endRemoveRows();
-    }
-    // New rows, at their place; the remaining ones are in the same order.
-    for (size_t i = 0; i < entries.size(); ++i) {
-        Entry &entry = entries[i];
-        if (i < node->children.size() && sameRow(*node->children[i], entry)) {
-            Node *child = node->children[i].get();
-            if (!child->isDir)
-                update(child, std::move(entry.nested)); // nested files
+    // Rows that are gone, from the end, a run at a time.
+    auto &children = node->children;
+    for (int row = static_cast<int>(children.size()) - 1; row >= 0;) {
+        const Node &child = *children[static_cast<size_t>(row)];
+        if (present.contains(keyOf(child.path, child.isDir, child.chain))) {
+            --row;
             continue;
         }
-        const int row = static_cast<int>(i);
-        beginInsertRows(parent, row, row);
-        node->children.insert(node->children.begin() + row, makeNode(std::move(entry), node));
+        int first = row;
+        while (first > 0) {
+            const Node &previous = *children[static_cast<size_t>(first - 1)];
+            if (present.contains(keyOf(previous.path, previous.isDir, previous.chain)))
+                break;
+            --first;
+        }
+        beginRemoveRows(parent, first, row);
+        children.erase(children.begin() + first, children.begin() + row + 1);
+        node->renumber();
+        endRemoveRows();
+        row = first - 1;
+    }
+    // New rows, at their place, a run at a time; the remaining ones are in
+    // the same order.
+    for (size_t i = 0; i < entries.size();) {
+        if (i < children.size() && sameRow(*children[i], entries[i])) {
+            Node *child = children[i].get();
+            if (!child->isDir)
+                update(child, std::move(entries[i].nested)); // nested files
+            ++i;
+            continue;
+        }
+        size_t end = i + 1;
+        while (end < entries.size() && !(i < children.size() && sameRow(*children[i], entries[end])))
+            ++end;
+        beginInsertRows(parent, static_cast<int>(i), static_cast<int>(end - 1));
+        std::vector<std::unique_ptr<Node>> added;
+        added.reserve(end - i);
+        for (size_t j = i; j < end; ++j)
+            added.push_back(makeNode(std::move(entries[j]), node));
+        children.insert(children.begin() + static_cast<std::ptrdiff_t>(i), std::make_move_iterator(added.begin()),
+                        std::make_move_iterator(added.end()));
         node->renumber();
         endInsertRows();
+        i = end;
     }
 }
 

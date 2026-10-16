@@ -18,6 +18,8 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -192,17 +194,24 @@ std::pair<QString, int> GoToPopup::splitLine(const QString &query)
 
 int GoToPopup::fileScore(const QString &relativePath, const QString &query)
 {
-    if (query.isEmpty())
-        return 0;
     const QString normalized = QDir::fromNativeSeparators(query);
-    const qsizetype slash = relativePath.lastIndexOf(QLatin1Char('/'));
-    const QString name = relativePath.mid(slash + 1);
-    if (!normalized.contains(QLatin1Char('/'))) {
+    return fileScore(relativePath, normalized, normalized.contains(QLatin1Char('/')));
+}
+
+// Runs over every file of the project at each keystroke: no allocation.
+int GoToPopup::fileScore(QStringView relativePath, QStringView normalized, bool hasSlash)
+{
+    if (normalized.isEmpty())
+        return 0;
+    const QStringView name = relativePath.sliced(relativePath.lastIndexOf(QLatin1Char('/')) + 1);
+    if (!hasSlash) {
         const int score = CommandPalette::matchScore(name, normalized);
         if (score >= 0) {
             // Whole name first, then names that start with the query.
             int bonus = name.startsWith(normalized, Qt::CaseInsensitive) ? 20 : 0;
-            if (QFileInfo(name).completeBaseName().compare(normalized, Qt::CaseInsensitive) == 0
+            const qsizetype dot = name.lastIndexOf(QLatin1Char('.'));
+            const QStringView baseName = dot >= 0 ? name.first(dot) : name;
+            if (baseName.compare(normalized, Qt::CaseInsensitive) == 0
                 || name.compare(normalized, Qt::CaseInsensitive) == 0)
                 bonus += 30;
             return 2 * score + bonus;
@@ -268,19 +277,24 @@ QString GoToPopup::relativePath(const QString &path) const
 void GoToPopup::filterFiles(const QString &query, QList<Entry> &entries) const
 {
     const auto [name, line] = splitLine(query);
-    QList<QPair<int, qsizetype>> matches; // score, index in files_
+    const QString normalized = QDir::fromNativeSeparators(name);
+    const bool hasSlash = normalized.contains(QLatin1Char('/'));
+    std::vector<std::pair<int, qsizetype>> matches; // score, index in files_
     for (qsizetype i = 0; i < files_.size(); ++i) {
-        const int score = fileScore(files_[i], name);
+        const int score = fileScore(files_[i], normalized, hasSlash);
         if (score >= 0)
-            matches.append({score, i});
+            matches.emplace_back(score, i);
     }
-    std::stable_sort(matches.begin(), matches.end(), [this](const auto &a, const auto &b) {
+    // Only the shown ones are sorted: one letter matches nearly every file.
+    const auto shown = std::min<qsizetype>(static_cast<qsizetype>(matches.size()), maxShown);
+    std::partial_sort(matches.begin(), matches.begin() + shown, matches.end(), [this](const auto &a, const auto &b) {
         if (a.first != b.first)
             return a.first > b.first;
-        return files_[a.second].size() < files_[b.second].size(); // shallower files first
+        if (files_[a.second].size() != files_[b.second].size())
+            return files_[a.second].size() < files_[b.second].size(); // shallower files first
+        return a.second < b.second;
     });
-    if (matches.size() > maxShown)
-        matches.resize(maxShown);
+    matches.resize(static_cast<size_t>(shown));
     for (const auto &[score, index] : std::as_const(matches)) {
         const QString &path = files_[index];
         const qsizetype slash = path.lastIndexOf(QLatin1Char('/'));

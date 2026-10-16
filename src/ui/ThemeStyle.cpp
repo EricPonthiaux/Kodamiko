@@ -161,8 +161,14 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
 
 void apply(const Theme &theme)
 {
-    QApplication::setPalette(palette(theme));
-    qApp->setStyleSheet(styleSheet(theme));
+    // Setting either one restyles every widget of the application, even
+    // when nothing changes (a window opening on the current theme).
+    const QPalette colors = palette(theme);
+    if (QApplication::palette() != colors)
+        QApplication::setPalette(colors);
+    const QString sheet = styleSheet(theme);
+    if (qApp->styleSheet() != sheet)
+        qApp->setStyleSheet(sheet);
 }
 
 } // namespace ThemeStyle

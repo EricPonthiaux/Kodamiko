@@ -11,6 +11,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace {
 
 // Indicator of the highlighted matches (the first ones belong to lexers).
@@ -276,18 +278,21 @@ int FindBar::currentMatch() const
         return 0;
     const long start = editor_->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONSTART);
     const long end = editor_->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONEND);
-    for (qsizetype i = 0; i < matches_.size(); ++i) {
-        if (matches_[i].start == start && matches_[i].end == end)
-            return static_cast<int>(i + 1);
-    }
+    // Matches are in text order and do not overlap.
+    const auto it = std::lower_bound(matches_.cbegin(), matches_.cend(), start,
+                                     [](const Match &match, long position) { return match.start < position; });
+    if (it != matches_.cend() && it->start == start && it->end == end)
+        return static_cast<int>(it - matches_.cbegin() + 1);
     return 0;
 }
 
 void FindBar::updateCount()
 {
     const bool error = !valid_ || (!search_->text().isEmpty() && matches_.isEmpty());
-    search_->setStyleSheet(error ? QStringLiteral("QLineEdit { border: 1px solid %1; }").arg(errorColor(theme_))
-                                 : QString());
+    // Updated at each keystroke: a style sheet is only set when it changes.
+    const QString sheet = error ? QStringLiteral("QLineEdit { border: 1px solid %1; }").arg(errorColor(theme_)) : QString();
+    if (sheet != search_->styleSheet())
+        search_->setStyleSheet(sheet);
     if (!valid_)
         count_->setText(tr("Bad pattern"));
     else if (search_->text().isEmpty())

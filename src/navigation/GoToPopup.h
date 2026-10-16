@@ -44,6 +44,8 @@ public:
     // than the folders; a query with a "/" also matches the folders. -1 if
     // it does not match.
     static int fileScore(const QString &relativePath, const QString &query);
+    // Same, with the query's separators already normalized.
+    static int fileScore(QStringView relativePath, QStringView normalized, bool hasSlash);
 
 signals:
     // `line` from 0, -1 to keep the file's position.

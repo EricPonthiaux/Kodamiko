@@ -27,7 +27,12 @@ QString resource(const QString &path)
 // An Octicon from the resources, with the classes GitHub gives it.
 QString octicon(const QString &name, const QString &classes)
 {
-    QString svg = resource(QStringLiteral(":/markdown/octicons/%1-16.svg").arg(name)).trimmed();
+    // One per heading at each render (as typing pauses): read once.
+    static QHash<QString, QString> icons;
+    auto it = icons.constFind(name);
+    if (it == icons.constEnd())
+        it = icons.insert(name, resource(QStringLiteral(":/markdown/octicons/%1-16.svg").arg(name)).trimmed());
+    QString svg = it.value();
     svg.replace(QLatin1String("<svg "),
                 QStringLiteral("<svg class=\"octicon octicon-%1%2\" aria-hidden=\"true\" ")
                     .arg(name, classes.isEmpty() ? QString() : QLatin1Char(' ') + classes));

@@ -123,8 +123,12 @@ QIcon activityIcon(ClaudeActivity::State state, const Theme &theme)
 
 MainWindow::MainWindow(const QString &folder, QWidget *parent)
     : QMainWindow(parent)
-    , theme_(Theme::dark())
+    , theme_(Theme::named(savedThemeName()))
 {
+    // The saved theme from the start: the widgets are styled as they are
+    // created, rather than all restyled when restoreSettings() applies it.
+    theme_.font = Preferences::load().codeFont();
+    ThemeStyle::apply(theme_);
     createWidgets();
     createMenus();
     applyKeymap(Keymap::loadOverrides());
@@ -253,13 +257,6 @@ void MainWindow::createWidgets()
     projectSettings_ = new ProjectSettingsPopup(toolchains_.get(), theme_, this);
     connect(projectSettings_, &ProjectSettingsPopup::applied, this, &MainWindow::applyProject);
     connect(newBranchPopup_, &NewBranchPopup::createRequested, this, &MainWindow::createBranch);
-    preferencesPopup_ = new PreferencesPopup(theme_, this);
-    preferencesPopup_->setInstalledServers(languageServers_->installed());
-    connect(preferencesPopup_, &PreferencesPopup::applied, this, [this] {
-        applyPreferences(preferencesPopup_->preferences());
-        Keymap::saveOverrides(preferencesPopup_->shortcutOverrides());
-        applyKeymap(preferencesPopup_->shortcutOverrides());
-    });
     findInFiles_ = new FindInFilesPopup(theme_, this);
     findInFiles_->setBufferProvider([this] { return editorTabs_->unsavedTexts(); });
     connect(findInFiles_, &FindInFilesPopup::matchChosen, this,
@@ -776,7 +773,8 @@ void MainWindow::openFolder(const QString &folder)
         ProjectStore::save(project_);
     }
     languageServers_->setProject(project_, toolchains_.get());
-    preferencesPopup_->setInstalledServers(languageServers_->installed());
+    if (preferencesPopup_)
+        preferencesPopup_->setInstalledServers(languageServers_->installed());
     updateToolsNotice();
     goToPopup_->setFolder(folder_);
     fileStatuses_->setFolder(folder_);
@@ -853,7 +851,8 @@ void MainWindow::applyProject(const ProjectConfig &project)
         return; // another project's downloads, finished after a switch
     project_ = project;
     languageServers_->setProject(project_, toolchains_.get());
-    preferencesPopup_->setInstalledServers(languageServers_->installed());
+    if (preferencesPopup_)
+        preferencesPopup_->setInstalledServers(languageServers_->installed());
     dismissedServerNotices_.clear();
     updateToolsNotice();
     updateServerNotice();
@@ -989,7 +988,8 @@ void MainWindow::setTheme(const QString &name)
     serverNotice_->applyTheme(theme_);
     toolsNotice_->applyTheme(theme_);
     projectSettings_->applyTheme(theme_);
-    preferencesPopup_->applyTheme(theme_);
+    if (preferencesPopup_)
+        preferencesPopup_->applyTheme(theme_);
     snapshotsPopup_->applyTheme(theme_);
     newBranchPopup_->applyTheme(theme_);
     if (modeTabs_) {
@@ -1002,6 +1002,16 @@ void MainWindow::setTheme(const QString &name)
 
 void MainWindow::showPreferences()
 {
+    // Built on first use: it lists every font of the system.
+    if (!preferencesPopup_) {
+        preferencesPopup_ = new PreferencesPopup(theme_, this);
+        preferencesPopup_->setInstalledServers(languageServers_->installed());
+        connect(preferencesPopup_, &PreferencesPopup::applied, this, [this] {
+            applyPreferences(preferencesPopup_->preferences());
+            Keymap::saveOverrides(preferencesPopup_->shortcutOverrides());
+            applyKeymap(preferencesPopup_->shortcutOverrides());
+        });
+    }
     preferencesPopup_->popup(Preferences::load(), Keymap::commands(titleBar_->menuBar()), Keymap::loadOverrides());
 }
 

@@ -8,7 +8,8 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "DUET_LTO": "ON"
+        "DUET_LTO": "ON",
+        "DUET_NATIVE": "ON"
       }
     },
     {
@@ -18,7 +19,8 @@
       "binaryDir": "${sourceDir}/build-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "DUET_LTO": "OFF"
+        "DUET_LTO": "OFF",
+        "DUET_NATIVE": "OFF"
       }
     },
     {
@@ -30,7 +32,8 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "DUET_LTO": "OFF",
         "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O2 -g -fno-omit-frame-pointer -DNDEBUG",
-        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -fno-omit-frame-pointer -DNDEBUG"
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -fno-omit-frame-pointer -DNDEBUG",
+        "DUET_NATIVE": "OFF"
       }
     }
   ],

@@ -36,7 +36,7 @@ public:
     ~LanguageServers() override;
 
     // Every server Duet knows, installed or not.
-    static QList<LanguageServerSpec> known();
+    static const QList<LanguageServerSpec> &known();
     // Protocol identifier of a LanguageRegistry language ("typescriptreact"
     // for "tsx").
     static QString protocolLanguage(const QString &languageId);
@@ -106,6 +106,7 @@ private:
     // The command of `spec` for the project: Duet's download of the chosen
     // version, else the PATH's. Empty when there is none.
     QString programFor(const LanguageServerSpec &spec) const;
+    std::optional<LanguageServerSpec> findSpec(const QString &languageId) const;
 
     QString folder_;
     ProjectConfig project_;
@@ -120,4 +121,7 @@ private:
     };
     QHash<QString, Document> documents_; // by path
     mutable QHash<QString, QString> programPaths_; // lookups in the PATH
+    // specFor() by language: asked at every typed character (trigger
+    // characters), and it looks for programs on disk.
+    mutable QHash<QString, std::optional<LanguageServerSpec>> specs_;
 };

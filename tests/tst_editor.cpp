@@ -333,7 +333,11 @@ private slots:
         QCOMPARE(tabs.editorFor(dir.filePath("README.md")), page->editor());
         QCOMPARE(tabs.currentFilePath(), dir.filePath("README.md"));
         QCOMPARE(tabs.openFile(dir.filePath("README.md")), page);
-        QVERIFY(page->preview()->bodyHtml().contains("Hello"));
+        // No web engine until the page shows.
+        QVERIFY(!page->preview());
+        tabs.show();
+        QTRY_VERIFY(page->preview());
+        QTRY_VERIFY(page->preview()->bodyHtml().contains("Hello"));
 
         // The preview follows the text.
         page->editor()->setText("# Changed\n");

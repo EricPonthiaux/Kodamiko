@@ -73,6 +73,9 @@ public:
     MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *parent = nullptr);
 
     EditorWidget *editor() const { return editor_; }
+    // Created the first time the page shows in Split or Preview mode: a
+    // web engine for each Markdown tab restored at startup would slow it
+    // down. nullptr until then.
     MarkdownPreview *preview() const { return preview_; }
     Mode mode() const { return mode_; }
     void setMode(Mode mode);
@@ -86,12 +89,17 @@ public:
 signals:
     void openFileRequested(const QString &path);
 
+protected:
+    void showEvent(QShowEvent *event) override;
+
 private:
+    void ensurePreview();
     void updatePreview();
     void syncScroll();
 
     EditorWidget *editor_;
-    MarkdownPreview *preview_;
+    Theme theme_;
+    MarkdownPreview *preview_ = nullptr;
     QSplitter *splitter_;
     QToolButton *buttons_[3];
     Mode mode_ = Mode::Preview;

@@ -10,6 +10,8 @@
 #include <QMenu>
 #include <QToolButton>
 
+#include <utility>
+
 namespace {
 
 // Spelled out: the status bar has room for no "(s)".
@@ -55,8 +57,8 @@ void EditorStatus::setEditor(EditorWidget *editor)
     // Diffs and other read-only texts have no file to describe.
     editor_ = editor && !editor->filePath().isEmpty() ? editor : nullptr;
     if (editor_) {
-        connect(editor_, &QsciScintilla::cursorPositionChanged, this, &EditorStatus::update);
-        connect(editor_, &QsciScintilla::selectionChanged, this, &EditorStatus::update);
+        connect(editor_, &QsciScintilla::cursorPositionChanged, this, &EditorStatus::scheduleUpdate);
+        connect(editor_, &QsciScintilla::selectionChanged, this, &EditorStatus::scheduleUpdate);
         connect(editor_, &EditorWidget::formatChanged, this, &EditorStatus::update);
     }
     setVisible(editor_ != nullptr);
@@ -114,6 +116,16 @@ QString EditorStatus::indentationText() const
     if (!editor_)
         return {};
     return editor_->indentationsUseTabs() ? tr("Tab") : spaces(editor_->tabWidth());
+}
+
+void EditorStatus::scheduleUpdate()
+{
+    if (std::exchange(updateScheduled_, true))
+        return;
+    QMetaObject::invokeMethod(this, [this] {
+        updateScheduled_ = false;
+        update();
+    }, Qt::QueuedConnection);
 }
 
 void EditorStatus::update()

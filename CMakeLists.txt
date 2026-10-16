@@ -36,6 +36,23 @@ if(DUET_LTO)
     endif()
 endif()
 
+# Code generated for the processor of the building machine (AVX2...): faster,
+# but the binary may not run on an older processor. For local builds only,
+# never for packages meant for other machines.
+option(DUET_NATIVE "Optimize for the building machine's processor (-march=native)" OFF)
+if(DUET_NATIVE)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag(-march=native duet_native_supported)
+    if(duet_native_supported)
+        # Before the dependencies: they are built with it too. At link time
+        # as well, where link-time optimization generates the code.
+        add_compile_options(-march=native)
+        add_link_options(-march=native)
+    else()
+        message(WARNING "-march=native is not supported by this compiler")
+    endif()
+endif()
+
 include(cmake/Dependencies.cmake)
 
 # Diagram editor for .flow files (Flowboard, Dear ImGui), built from its
