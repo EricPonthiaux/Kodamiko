@@ -39,6 +39,8 @@ class QTabWidget;
 class QToolButton;
 class RepositoryWatcher;
 class SidePanel;
+class NewBranchPopup;
+class SnapshotsPopup;
 class SymbolIndex;
 class TerminalWidget;
 struct Preferences;
@@ -132,6 +134,9 @@ private:
     // and History modes.
     void onRepositoryChanged();
     void showSnapshots();
+    // Git ▸ New Branch: the popup, then the branch created at HEAD.
+    void showNewBranch();
+    void createBranch(const QString &name, bool switchTo);
     // Help ▸ Check Prerequisites, also shown at startup if git or claude is missing.
     void showPrerequisites();
     // File ▸ Preferences.
@@ -187,6 +192,8 @@ private:
     GoToPopup *goToPopup_ = nullptr;
     FindInFilesPopup *findInFiles_ = nullptr;
     PreferencesPopup *preferencesPopup_ = nullptr;
+    SnapshotsPopup *snapshotsPopup_ = nullptr;
+    NewBranchPopup *newBranchPopup_ = nullptr;
     RecentFiles recentFiles_;
     PrerequisitesDialog *prerequisitesDialog_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;

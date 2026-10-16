@@ -1,3 +1,4 @@
+#include "git/Branches.h"
 #include "git/FilePatch.h"
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
@@ -670,6 +671,45 @@ private slots:
         QTemporaryDir outside;
         write(outside, "b.txt", "x\n");
         QVERIFY(!LineChanges::indexVersion(outside.filePath("b.txt")));
+    }
+
+    void branchNamesFollowGitsRules()
+    {
+        for (const char *valid : {"main", "feature/login", "fix-42", "release/v1.2", "user@work"})
+            QVERIFY2(Branches::nameError(valid).isEmpty(), valid);
+        for (const char *invalid : {"", "with space", "a..b", "-x", "a/", "a.", "/a", "a//b", ".hidden", "a/.b",
+                                    "x.lock", "a~1", "a^", "a:b", "a?", "a*", "a[b", "a\\b", "@", "a@{b"})
+            QVERIFY2(!Branches::nameError(invalid).isEmpty(), invalid);
+        QCOMPARE(Branches::sanitizedName("Fix the  login bug"), QString("Fix-the-login-bug"));
+        QCOMPARE(Branches::sanitizedName("a..b~c"), QString("a.bc"));
+    }
+
+    void createBranch()
+    {
+        QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        write(project, "a.txt", "uncommitted\n");
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+
+        Branches::create(info, "feature/one", false);
+        QCOMPARE(Branches::local(project.path()), QStringList({"feature/one", "main"}));
+        QCOMPARE(RepositoryInfo::read(project.path())->branch, QString("main"));
+
+        Branches::create(info, "feature/two", true);
+        QCOMPARE(RepositoryInfo::read(project.path())->branch, QString("feature/two"));
+        QCOMPARE(read(project, "a.txt"), QByteArray("uncommitted\n")); // the changes come along
+
+        QVERIFY_THROWS_EXCEPTION(GitError, Branches::create(info, "feature/one", false)); // already exists
+    }
+
+    void createBranchWithoutCommits()
+    {
+        QTemporaryDir project;
+        git(project, {"init", "-q", "-b", "main"});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        QVERIFY(info.unborn);
+        Branches::create(info, "start", true);
+        QCOMPARE(RepositoryInfo::read(project.path())->branch, QString("start"));
     }
 
 private:

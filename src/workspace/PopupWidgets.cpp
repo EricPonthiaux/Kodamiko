@@ -1,4 +1,6 @@
-#include "PreferenceWidgets.h"
+#include "PopupWidgets.h"
+
+#include "UiIcons.h"
 
 #include <QApplication>
 #include <QHBoxLayout>
@@ -48,6 +50,26 @@ private:
 };
 
 } // namespace
+
+QString popupStyleSheet(const Theme &theme, const QString &extra)
+{
+    QString sheet = QStringLiteral(R"(
+QLabel#pageDescription, QLabel#settingsDescription, QLabel#settingsSection, QLabel#footerHint { color: @muted; }
+QFrame#settingsCard { background: @base; border: 1px solid @line; border-radius: 10px; }
+QFrame#settingsSeparator { background: @line; border: none; margin: 0 16px; }
+QScrollArea#pageScroll, QWidget#pageContent { background: transparent; border: none; }
+QFrame#popupFooter { border: none; border-top: 1px solid @line; }
+)") + extra;
+    const QList<std::pair<QString, QColor>> colors = {
+        {"@accentText", theme.accentText}, {"@accent", theme.accent},       {"@text", theme.foreground},
+        {"@muted", theme.mutedText},       {"@window", theme.window},       {"@panel", theme.alternateBase},
+        {"@base", theme.background},       {"@line", theme.line},           {"@hover", theme.hover},
+        {"@selection", theme.selection},
+    };
+    for (const auto &[name, color] : colors)
+        sheet.replace(name, color.name());
+    return sheet;
+}
 
 // ToggleSwitch
 
@@ -325,6 +347,26 @@ void SettingsCard::addWidget(QWidget *widget)
     layout->setContentsMargins(16, 12, 16, 12);
     layout->addWidget(widget);
     layout_->addWidget(holder);
+}
+
+QPixmap iconTile(const QString &icon, const Theme &theme, int size, qreal devicePixelRatio)
+{
+    QPixmap pixmap(QSize(size, size) * devicePixelRatio);
+    pixmap.setDevicePixelRatio(devicePixelRatio);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    QColor tint = theme.accent;
+    tint.setAlpha(theme.isDark ? 46 : 30);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(tint);
+    painter.drawRoundedRect(QRectF(0, 0, size, size), size * 0.27, size * 0.27);
+    // The icons are drawn at 16 pixels: scaled up to half the tile.
+    const qreal margin = size / 4.0;
+    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    painter.drawPixmap(QRectF(margin, margin, size - 2 * margin, size - 2 * margin),
+                       UiIcons::icon(icon, theme.accent).pixmap(QSize(16, 16), 2.0), QRectF());
+    return pixmap;
 }
 
 QWidget *sectionHeading(const QString &text)

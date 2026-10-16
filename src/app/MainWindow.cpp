@@ -1,7 +1,8 @@
 #include "MainWindow.h"
 
 #include "changes/ChangesView.h"
-#include "changes/SnapshotsDialog.h"
+#include "changes/NewBranchPopup.h"
+#include "changes/SnapshotsPopup.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
 #include "editor/ChangeGutter.h"
@@ -10,6 +11,7 @@
 #include "editor/EditorWidget.h"
 #include "editor/FindBar.h"
 #include "git/FileStatuses.h"
+#include "git/Branches.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
 #include "git/RepositoryStatus.h"
@@ -216,6 +218,9 @@ void MainWindow::createWidgets()
         setMode(Mode::Edit);
         navigator_->goTo(symbol.filePath, symbol.position);
     });
+    snapshotsPopup_ = new SnapshotsPopup(gitCommands_, theme_, this);
+    newBranchPopup_ = new NewBranchPopup(theme_, this);
+    connect(newBranchPopup_, &NewBranchPopup::createRequested, this, &MainWindow::createBranch);
     preferencesPopup_ = new PreferencesPopup(theme_, this);
     connect(preferencesPopup_, &PreferencesPopup::applied, this, [this] {
         applyPreferences(preferencesPopup_->preferences());
@@ -644,6 +649,8 @@ void MainWindow::createGitMenu()
         changesView_->unstageAll();
     });
     git->addSeparator();
+    git->addAction(tr("&New Branch…"), this, &MainWindow::showNewBranch);
+    git->addSeparator();
     git->addAction(tr("Restore a S&napshot…"), this, &MainWindow::showSnapshots);
 }
 
@@ -869,6 +876,8 @@ void MainWindow::setTheme(const QString &name)
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
     preferencesPopup_->applyTheme(theme_);
+    snapshotsPopup_->applyTheme(theme_);
+    newBranchPopup_->applyTheme(theme_);
     if (modeTabs_) {
         updateTabIcons();
         updateClaudeIndicator();
@@ -1355,10 +1364,43 @@ void MainWindow::onRepositoryChanged()
         historyView_->refresh();
 }
 
+void MainWindow::showNewBranch()
+{
+    std::optional<RepositoryInfo> repository;
+    QStringList branches;
+    try {
+        repository = RepositoryInfo::read(folder_);
+        if (repository && !repository->unborn)
+            branches = Branches::local(repository->workDir);
+    } catch (const GitError &error) {
+        statusBar()->showMessage(QString::fromStdString(error.what()), statusMessageMs);
+        return;
+    }
+    if (!repository) {
+        statusBar()->showMessage(tr("The folder is not in a git repository"), statusMessageMs);
+        return;
+    }
+    newBranchPopup_->popup(*repository, branches);
+}
+
+void MainWindow::createBranch(const QString &name, bool switchTo)
+{
+    gitCommands_->run(
+        tr("New branch"),
+        [folder = folder_, name, switchTo] {
+            const std::optional<RepositoryInfo> repository = RepositoryInfo::read(folder);
+            if (!repository)
+                throw GitError(QObject::tr("The folder is not in a git repository"));
+            Branches::create(*repository, name, switchTo);
+            return switchTo ? QObject::tr("Switched to the new branch %1").arg(name)
+                            : QObject::tr("Branch %1 created").arg(name);
+        },
+        [this] { onRepositoryChanged(); });
+}
+
 void MainWindow::showSnapshots()
 {
-    SnapshotsDialog dialog(folder_, gitCommands_, this);
-    dialog.exec();
+    snapshotsPopup_->popup(folder_);
 }
 
 void MainWindow::showPrerequisites()

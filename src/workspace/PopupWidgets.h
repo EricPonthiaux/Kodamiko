@@ -9,7 +9,16 @@
 class QVariantAnimation;
 class QVBoxLayout;
 
-// Controls of the Preferences popup, drawn in the application's palette.
+// Controls of the popups built like Preferences (pages of cards, a footer),
+// drawn in the application's palette.
+
+// Style sheet of these popups' cards, headings, descriptions and footer,
+// followed by `extra` (rules of one popup). Both can use the theme's colors
+// as @accent, @accentText, @text, @muted, @window, @panel, @base, @line,
+// @hover and @selection. Object names: "settingsCard", "settingsSeparator",
+// "settingsSection", "settingsDescription", "pageDescription",
+// "footerHint", "popupFooter".
+QString popupStyleSheet(const Theme &theme, const QString &extra = {});
 
 // On/off switch: a pill whose knob slides across.
 class ToggleSwitch : public QAbstractButton {
@@ -66,6 +75,10 @@ private:
     void addSeparator();
     QVBoxLayout *layout_;
 };
+
+// A UiIcons icon on a rounded tile tinted with the accent, `size` pixels
+// square: the mark of a popup's header.
+QPixmap iconTile(const QString &icon, const Theme &theme, int size, qreal devicePixelRatio);
 
 // Small uppercase heading above a card.
 QWidget *sectionHeading(const QString &text);

@@ -1,6 +1,6 @@
 #include "PreferencesPopup.h"
 
-#include "PreferenceWidgets.h"
+#include "workspace/PopupWidgets.h"
 #include "workspace/UiIcons.h"
 
 #include <QAction>
@@ -64,36 +64,20 @@ QString shortcutsText(const QList<QKeySequence> &shortcuts)
     return texts.join(QStringLiteral(", "));
 }
 
-// Colors of the controls' style sheet that belong to this popup.
-QString popupStyleSheet(const Theme &theme)
-{
-    QString sheet = QStringLiteral(R"(
+// The side bar and the keymap, besides the shared rules (popupStyleSheet).
+const char *preferencesRules = R"(
 QFrame#preferencesSidebar { background: @window; border: none; border-right: 1px solid @line;
                             border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
 QListWidget#preferencesNav { background: transparent; border: none; outline: 0; }
 QListWidget#preferencesNav::item { padding: 7px 10px; margin: 1px 0; border-radius: 7px; color: @text; }
 QListWidget#preferencesNav::item:hover { background: @hover; }
 QListWidget#preferencesNav::item:selected { background: @selection; color: @accentText; }
-QLabel#pageDescription, QLabel#settingsDescription, QLabel#settingsSection, QLabel#footerHint { color: @muted; }
 QLabel#keymapNote { color: @accent; }
-QFrame#settingsCard { background: @base; border: 1px solid @line; border-radius: 10px; }
-QFrame#settingsSeparator { background: @line; border: none; margin: 0 16px; }
-QScrollArea#pageScroll, QWidget#pageContent { background: transparent; border: none; }
-QFrame#preferencesFooter { border: none; border-top: 1px solid @line; }
 QTreeWidget#keymapList { background: transparent; border: none; border-radius: 10px; }
 QTreeWidget#keymapList::item { padding: 0 6px; }
 QLineEdit#keymapSearch { padding: 6px 10px; border-radius: 8px; }
 QKeySequenceEdit QLineEdit { padding: 4px 8px; }
-)");
-    const QList<std::pair<QString, QColor>> colors = {
-        {"@accentText", theme.accentText}, {"@accent", theme.accent},  {"@text", theme.foreground},
-        {"@muted", theme.mutedText},       {"@window", theme.window},  {"@base", theme.background},
-        {"@line", theme.line},             {"@hover", theme.hover},    {"@selection", theme.selection},
-    };
-    for (const auto &[name, color] : colors)
-        sheet.replace(name, color.name());
-    return sheet;
-}
+)";
 
 } // namespace
 
@@ -111,7 +95,7 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
     pageList_->setCurrentRow(0);
 
     auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("preferencesFooter"));
+    footer->setObjectName(QStringLiteral("popupFooter"));
     auto *hint = mutedLabel(tr("Changes apply with OK or Apply · Esc to close"), "footerHint");
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     auto *apply = new QPushButton(tr("Apply"), footer);
@@ -456,7 +440,7 @@ QWidget *PreferencesPopup::createKeymapPage()
 void PreferencesPopup::applyTheme(const Theme &theme)
 {
     theme_ = theme;
-    setStyleSheet(popupStyleSheet(theme));
+    setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(preferencesRules)));
     if (auto *icon = findChild<QLabel *>(QStringLiteral("preferencesIcon")))
         icon->setPixmap(UiIcons::icon(QStringLiteral("settings"), theme.accent).pixmap(QSize(18, 18)));
     for (int i = 0; i < pageList_->count(); ++i)

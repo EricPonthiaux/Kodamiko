@@ -4,7 +4,8 @@ add_library(duet_core STATIC
     changes/ChangesView.cpp
     changes/DiffView.cpp
     changes/FileChangeDelegate.cpp
-    changes/SnapshotsDialog.cpp
+    changes/NewBranchPopup.cpp
+    changes/SnapshotsPopup.cpp
     claude/ClaudeActivity.cpp
     claude/ClaudeLauncher.cpp
     claude/ClaudeUsage.cpp
@@ -22,6 +23,7 @@ add_library(duet_core STATIC
     editor/MarkdownHtml.cpp
     editor/MarkdownView.cpp
     editor/TextFile.cpp
+    git/Branches.cpp
     git/CommitLog.cpp
     git/FilePatch.cpp
     git/FileStatuses.cpp
@@ -52,7 +54,6 @@ add_library(duet_core STATIC
     setup/PrerequisitesDialog.cpp
     settings/Keymap.cpp
     settings/Preferences.cpp
-    settings/PreferenceWidgets.cpp
     settings/PreferencesPopup.cpp
     syntax/AppFonts.cpp
     syntax/HighlighterFactory.cpp
@@ -76,6 +77,7 @@ add_library(duet_core STATIC
     workspace/GripSplitter.cpp
     workspace/FileTreeView.cpp
     workspace/OverlayPopup.cpp
+    workspace/PopupWidgets.cpp
     workspace/ProjectFiles.cpp
     workspace/ProjectTreeModel.cpp
     workspace/EntryPopups.cpp

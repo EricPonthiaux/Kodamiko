@@ -1,11 +1,18 @@
 #include "changes/ChangesView.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
+#include "changes/NewBranchPopup.h"
+#include "changes/SnapshotsPopup.h"
 #include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
+#include "git/Snapshots.h"
+#include "workspace/PopupWidgets.h"
 
 #include <QCheckBox>
+#include <QLineEdit>
+#include <QLabel>
+#include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QStandardPaths>
@@ -150,6 +157,86 @@ private slots:
         QTRY_COMPARE(sectionTitles(list), QStringList({"Staged (0)", "Unstaged (0)"}));
         QVERIFY(message->toPlainText().isEmpty());
         QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("second\n"));
+    }
+
+    void snapshotsPopupListsAndRestores()
+    {
+        QTemporaryDir project;
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "changed\n");
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        Snapshots::create(info, "Before discarding a.txt", {"a.txt"});
+        write(project, "a.txt", "later\n");
+
+        QWidget window;
+        GitCommands commands;
+        SnapshotsPopup popup(&commands, Theme::dark(), &window);
+        popup.load(project.path());
+        QCOMPARE(popup.list()->count(), 1);
+        QCOMPARE(popup.detailsTitle()->text(), QString("Before discarding a.txt"));
+        QCOMPARE(popup.files()->count(), 1);
+        QCOMPARE(popup.files()->item(0)->text(), QString("a.txt"));
+
+        QSignalSpy succeeded(&commands, &GitCommands::succeeded);
+        popup.restoreSelected();
+        QTRY_COMPARE(succeeded.count(), 1);
+        QFile file(project.filePath("a.txt"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("changed\n"));
+    }
+
+    void snapshotsPopupWithoutSnapshots()
+    {
+        QTemporaryDir project;
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        QWidget window;
+        GitCommands commands;
+        SnapshotsPopup popup(&commands, Theme::dark(), &window);
+        popup.load(project.path());
+        QCOMPARE(popup.list()->count(), 0);
+    }
+
+    void snapshotDatesReadNaturally()
+    {
+        const QDateTime now(QDate(2026, 10, 16), QTime(15, 0)); // a Friday
+        QCOMPARE(SnapshotsPopup::describeDate(now.addSecs(-20), now), QString("Just now"));
+        QCOMPARE(SnapshotsPopup::describeDate(now.addSecs(-12 * 60), now), QString("12 min ago"));
+        QVERIFY(SnapshotsPopup::describeDate(now.addSecs(-3 * 3600), now).startsWith("Today at "));
+        QVERIFY(SnapshotsPopup::describeDate(now.addDays(-1), now).startsWith("Yesterday at "));
+        QVERIFY(SnapshotsPopup::describeDate(now.addDays(-3), now).startsWith(QLocale().dayName(2)));
+    }
+
+    void newBranchPopupChecksTheName()
+    {
+        QWidget window;
+        NewBranchPopup popup(Theme::dark(), &window);
+        RepositoryInfo info;
+        info.branch = "main";
+        info.headId = "abc1234";
+        popup.load(info, {"main", "feature/x"});
+        QSignalSpy requested(&popup, &NewBranchPopup::createRequested);
+
+        QVERIFY(!popup.createButton()->isEnabled()); // no name yet
+        QTest::keyClicks(popup.nameField(), "fix login bug");
+        QCOMPARE(popup.nameField()->text(), QString("fix-login-bug")); // as typed
+        QVERIFY(popup.createButton()->isEnabled());
+
+        popup.nameField()->setText("feature/x");
+        QVERIFY(!popup.createButton()->isEnabled());
+        QVERIFY(popup.message()->text().contains("already exists"));
+        popup.nameField()->setText("bad..name");
+        QVERIFY(!popup.createButton()->isEnabled());
+
+        popup.nameField()->setText("feature/y");
+        popup.switchToggle()->setChecked(false);
+        popup.create();
+        QCOMPARE(requested.count(), 1);
+        QCOMPARE(requested.first().at(0).toString(), QString("feature/y"));
+        QCOMPARE(requested.first().at(1).toBool(), false);
+        popup.switchToggle()->setChecked(true); // the saved choice back to its default
     }
 
 private:
