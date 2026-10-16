@@ -1,8 +1,8 @@
 #include "Toolchains.h"
 
-#include "ToolCatalog.h"
-#include "lsp/JavaRuntimes.h"
+#include "JavaRuntimes.h"
 #include "projects/ProjectDetector.h"
+#include "ToolCatalog.h"
 
 #include <QDir>
 #include <QFileInfo>

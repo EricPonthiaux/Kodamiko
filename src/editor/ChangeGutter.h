@@ -1,7 +1,7 @@
 #pragma once
 
 #include "git/LineChanges.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QObject>
 #include <QPointer>

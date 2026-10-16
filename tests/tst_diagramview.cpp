@@ -1,5 +1,5 @@
-#include "editor/DiagramView.h"
 #include "editor/EditorTabs.h"
+#include "viewers/DiagramView.h"
 
 #include <QFile>
 #include <QSignalSpy>

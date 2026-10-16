@@ -2,9 +2,9 @@
 
 #include "HighlightQuery.h"
 #include "ScintillaStyles.h"
-#include "Theme.h"
 #include "TreeSitterFolds.h"
 #include "TreeSitterGrammars.h"
+#include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
 

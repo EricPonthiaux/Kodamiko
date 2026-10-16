@@ -1,6 +1,6 @@
 #include "FilesPanel.h"
 
-#include "UiIcons.h"
+#include "ui/UiIcons.h"
 
 #include <QComboBox>
 #include <QHBoxLayout>

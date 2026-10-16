@@ -1,10 +1,10 @@
 #include "MarkdownView.h"
 
-#include "CodeColorizer.h"
-#include "EditorWidget.h"
+#include "editor/CodeColorizer.h"
+#include "editor/EditorWidget.h"
 #include "MarkdownHtml.h"
 #include "syntax/LanguageRegistry.h"
-#include "workspace/GripSplitter.h"
+#include "ui/GripSplitter.h"
 
 #include <QButtonGroup>
 #include <QColor>

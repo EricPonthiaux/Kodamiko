@@ -1,15 +1,15 @@
 #include "WelcomeWindow.h"
 
+#include "projects/ProjectStore.h"
 #include "ProjectSetupForm.h"
 #include "ProjectSetupPanel.h"
-#include "projects/ProjectStore.h"
 #include "settings/Preferences.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
-#include "workspace/PopupWidgets.h"
-#include "workspace/ThemeStyle.h"
-#include "workspace/TitleBar.h"
-#include "workspace/WindowFrame.h"
+#include "ui/PopupWidgets.h"
+#include "ui/ThemeStyle.h"
+#include "ui/TitleBar.h"
+#include "ui/WindowFrame.h"
 
 #include <QApplication>
 #include <QDir>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "git/CommitLog.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QWidget>
 

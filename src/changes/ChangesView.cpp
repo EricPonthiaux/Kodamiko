@@ -5,8 +5,8 @@
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
-#include "workspace/GripSplitter.h"
-#include "workspace/UiIcons.h"
+#include "ui/GripSplitter.h"
+#include "ui/UiIcons.h"
 
 #include <QCheckBox>
 #include <QHBoxLayout>

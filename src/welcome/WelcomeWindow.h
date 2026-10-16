@@ -1,7 +1,7 @@
 #pragma once
 
 #include "projects/ProjectConfig.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QWidget>
 

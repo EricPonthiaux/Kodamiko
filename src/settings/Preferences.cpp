@@ -1,6 +1,6 @@
 #include "Preferences.h"
 
-#include "syntax/AppFonts.h"
+#include "ui/AppFonts.h"
 
 #include <QSettings>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "syntax/Theme.h"
+#include "Theme.h"
 
 #include <QFrame>
 

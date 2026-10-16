@@ -2,7 +2,7 @@
 
 #include "git/FilePatch.h"
 #include "git/RepositoryStatus.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QWidget>
 

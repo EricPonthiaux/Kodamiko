@@ -4,12 +4,12 @@
 #include "CodeFormatter.h"
 #include "completion/CompletionController.h"
 #include "EditorWidget.h"
-#include "ImageView.h"
-#include "MarkdownView.h"
+#include "ui/UiIcons.h"
+#include "viewers/ImageView.h"
+#include "viewers/MarkdownView.h"
 #include "workspace/FileIcons.h"
-#include "workspace/UiIcons.h"
 #ifdef DUET_WITH_DIAGRAMS
-#include "DiagramView.h"
+#include "viewers/DiagramView.h"
 #endif
 
 #include <QDir>

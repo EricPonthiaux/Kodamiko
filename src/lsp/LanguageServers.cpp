@@ -1,7 +1,7 @@
 #include "LanguageServers.h"
 
-#include "JavaRuntimes.h"
 #include "LspClient.h"
+#include "toolchains/JavaRuntimes.h"
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
 

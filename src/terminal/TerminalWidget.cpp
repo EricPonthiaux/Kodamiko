@@ -1,8 +1,8 @@
 #include "TerminalWidget.h"
 
 #include "IPty.h"
+#include "ui/Theme.h"
 #include "VtScreen.h"
-#include "syntax/Theme.h"
 
 #include <QApplication>
 #include <QFontMetricsF>

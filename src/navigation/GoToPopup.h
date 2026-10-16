@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SymbolIndex.h"
-#include "workspace/OverlayPopup.h"
+#include "ui/OverlayPopup.h"
 
 #include <QThreadPool>
 

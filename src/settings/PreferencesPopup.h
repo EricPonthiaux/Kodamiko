@@ -2,8 +2,8 @@
 
 #include "Keymap.h"
 #include "Preferences.h"
-#include "syntax/Theme.h"
-#include "workspace/OverlayPopup.h"
+#include "ui/OverlayPopup.h"
+#include "ui/Theme.h"
 
 class QAbstractButton;
 class QButtonGroup;

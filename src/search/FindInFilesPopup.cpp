@@ -1,8 +1,8 @@
 #include "FindInFilesPopup.h"
 
 #include "editor/EditorWidget.h"
-#include "workspace/GripSplitter.h"
-#include "workspace/TreeMetrics.h"
+#include "ui/GripSplitter.h"
+#include "ui/TreeMetrics.h"
 
 #include <QCheckBox>
 #include <QDir>

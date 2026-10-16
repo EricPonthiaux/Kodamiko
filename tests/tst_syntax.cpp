@@ -1,8 +1,8 @@
 #include "syntax/HighlighterFactory.h"
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
-#include "syntax/Theme.h"
 #include "syntax/TreeSitterGrammars.h"
+#include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
 

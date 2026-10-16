@@ -1,11 +1,11 @@
 #include "ProjectSetupPanel.h"
 
+#include "projects/ProjectStore.h"
 #include "ProjectSetupForm.h"
 #include "ProvisioningView.h"
-#include "projects/ProjectStore.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
-#include "workspace/PopupWidgets.h"
+#include "ui/PopupWidgets.h"
 
 #include <QDir>
 #include <QHBoxLayout>

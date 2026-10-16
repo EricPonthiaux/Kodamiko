@@ -1,7 +1,7 @@
 #pragma once
 
 #include "TextFile.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
 

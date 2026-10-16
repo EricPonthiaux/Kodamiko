@@ -1,7 +1,7 @@
 #include "ProjectSettingsPopup.h"
 
 #include "ProjectSetupPanel.h"
-#include "workspace/PopupWidgets.h"
+#include "ui/PopupWidgets.h"
 
 #include <QKeyEvent>
 #include <QVBoxLayout>

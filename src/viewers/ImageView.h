@@ -1,6 +1,6 @@
 #pragma once
 
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QImage>
 #include <QScrollArea>

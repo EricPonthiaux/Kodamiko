@@ -286,8 +286,12 @@ soon as you click in a file.
 ```
 src/
   app/        main window, wiring of the modules
+  ui/         shared UI foundation: theme, fonts, icons, window frame, popups, splitters
   editor/     QScintilla editor, tabs, file reading/writing, disk watching, find bar, change marks
-  syntax/     highlighting: tree-sitter (highlights.scm queries), QScintilla lexers, themes
+  viewers/    non-text tabs: Markdown preview, images, diagrams
+  completion/ code completion: popup, fuzzy matching, snippets, local and LSP providers
+  lsp/        language server client and server management
+  syntax/     highlighting: tree-sitter (highlights.scm queries), QScintilla lexers
   outline/    Outline panel: outline.scm queries (syntax/queries), Markdown, CMake
   terminal/   PTY (forkpty / ConPTY), VT emulation (libvterm), terminal widget
   claude/     Claude Code launching, hooks, local server
@@ -296,7 +300,11 @@ src/
   history/    History mode: commits, their files and their diffs
   navigation/ symbol index, Go to Definition, Go to File / Symbol / Recent Files
   search/     Find in Files
-  workspace/  file tree, command palette, project file listing
+  workspace/  file tree, side panel, command palette, project file listing
+  projects/   project detection and per-project configuration
+  toolchains/ toolchain and runtime detection (JDKs…), installation plans
+  welcome/    welcome window, project setup and provisioning
+  settings/   preferences and keymap
   setup/      prerequisites check (git, Claude Code) and installation
 tools/duet-hook/   Claude Code hooks → editor relay
 tests/                 Qt Test tests (ctest)

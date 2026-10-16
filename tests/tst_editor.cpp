@@ -5,9 +5,9 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/FindBar.h"
-#include "editor/MarkdownHtml.h"
-#include "editor/MarkdownView.h"
 #include "git/GitProcess.h"
+#include "viewers/MarkdownHtml.h"
+#include "viewers/MarkdownView.h"
 
 #include <QLineEdit>
 #include <Qsci/qscicommandset.h>

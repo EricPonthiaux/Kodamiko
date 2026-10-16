@@ -1,6 +1,6 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
-#include "editor/ImageView.h"
+#include "viewers/ImageView.h"
 
 #include <QImage>
 #include <QTemporaryDir>

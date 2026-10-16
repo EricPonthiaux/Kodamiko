@@ -1,10 +1,10 @@
 #include "SnapshotsPopup.h"
 
 #include "git/GitCommands.h"
-#include "syntax/AppFonts.h"
+#include "ui/AppFonts.h"
+#include "ui/PopupWidgets.h"
+#include "ui/UiIcons.h"
 #include "workspace/FileIcons.h"
-#include "workspace/PopupWidgets.h"
-#include "workspace/UiIcons.h"
 
 #include <QFileInfo>
 #include <QHBoxLayout>

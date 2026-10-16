@@ -1,7 +1,7 @@
-#include "lsp/JavaRuntimes.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "lsp/LspCompletionProvider.h"
+#include "toolchains/JavaRuntimes.h"
 #include "toolchains/Toolchains.h"
 
 #include <QElapsedTimer>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "JavaRuntimes.h"
 #include "projects/ProjectConfig.h"
+#include "toolchains/JavaRuntimes.h"
 
 #include <QHash>
 #include <QJsonObject>

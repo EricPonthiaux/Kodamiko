@@ -1,7 +1,7 @@
 #include "NewBranchPopup.h"
 
 #include "git/Branches.h"
-#include "workspace/PopupWidgets.h"
+#include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
 #include <QKeyEvent>

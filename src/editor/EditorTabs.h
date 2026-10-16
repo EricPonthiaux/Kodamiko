@@ -2,7 +2,7 @@
 
 #include "EditorWidget.h"
 #include "FileWatcher.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QHash>
 #include <QSet>

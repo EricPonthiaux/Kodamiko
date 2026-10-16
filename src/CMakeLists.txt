@@ -7,16 +7,16 @@ add_library(duet_core STATIC
     changes/NewBranchPopup.cpp
     changes/SnapshotsPopup.cpp
     claude/ClaudeActivity.cpp
+    claude/ClaudeLauncher.cpp
+    claude/ClaudeUsage.cpp
+    claude/HookEvent.cpp
+    claude/HookServer.cpp
     completion/CompletionController.cpp
     completion/CompletionPopup.cpp
     completion/CompletionService.cpp
     completion/FuzzyMatch.cpp
     completion/LocalCompletion.cpp
     completion/Snippet.cpp
-    claude/ClaudeLauncher.cpp
-    claude/ClaudeUsage.cpp
-    claude/HookEvent.cpp
-    claude/HookServer.cpp
     editor/ChangeGutter.cpp
     editor/CodeColorizer.cpp
     editor/CodeFormatter.cpp
@@ -25,9 +25,6 @@ add_library(duet_core STATIC
     editor/EditorWidget.cpp
     editor/FileWatcher.cpp
     editor/FindBar.cpp
-    editor/ImageView.cpp
-    editor/MarkdownHtml.cpp
-    editor/MarkdownView.cpp
     editor/TextFile.cpp
     git/Branches.cpp
     git/CommitLog.cpp
@@ -43,7 +40,6 @@ add_library(duet_core STATIC
     git/Snapshots.cpp
     history/CommitDelegate.cpp
     history/HistoryView.cpp
-    lsp/JavaRuntimes.cpp
     lsp/LanguageServers.cpp
     lsp/LspClient.cpp
     lsp/LspCompletionProvider.cpp
@@ -63,19 +59,17 @@ add_library(duet_core STATIC
     projects/ProjectStore.cpp
     search/FindInFiles.cpp
     search/FindInFilesPopup.cpp
-    setup/Prerequisites.cpp
-    setup/PrerequisitesDialog.cpp
     settings/Keymap.cpp
     settings/Preferences.cpp
     settings/PreferencesPopup.cpp
-    syntax/AppFonts.cpp
+    setup/Prerequisites.cpp
+    setup/PrerequisitesDialog.cpp
     syntax/HighlighterFactory.cpp
     syntax/HighlightQuery.cpp
     syntax/LanguageRegistry.cpp
     syntax/LexillaHighlighter.cpp
     syntax/PlainTextHighlighter.cpp
     syntax/ScintillaStyles.cpp
-    syntax/Theme.cpp
     syntax/TreeSitterFolds.cpp
     syntax/TreeSitterGrammars.cpp
     syntax/TreeSitterHighlighter.cpp
@@ -83,35 +77,41 @@ add_library(duet_core STATIC
     terminal/ProcessSpec.cpp
     terminal/TerminalWidget.cpp
     terminal/VtScreen.cpp
-    toolchains/InstallPlan.cpp
     toolchains/Installer.cpp
+    toolchains/InstallPlan.cpp
+    toolchains/JavaRuntimes.cpp
     toolchains/ToolCatalog.cpp
     toolchains/Toolchains.cpp
+    ui/AppFonts.cpp
+    ui/GripSplitter.cpp
+    ui/NoticeBar.cpp
+    ui/OverlayPopup.cpp
+    ui/PopupWidgets.cpp
+    ui/Theme.cpp
+    ui/ThemeStyle.cpp
+    ui/TitleBar.cpp
+    ui/TrailingTabButton.cpp
+    ui/TreeColumnFit.cpp
+    ui/TreeMetrics.cpp
+    ui/UiIcons.cpp
+    ui/WindowFrame.cpp
+    viewers/ImageView.cpp
+    viewers/MarkdownHtml.cpp
+    viewers/MarkdownView.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
     welcome/ProjectSetupPanel.cpp
     welcome/ProvisioningView.cpp
     welcome/WelcomeWindow.cpp
     workspace/CommandPalette.cpp
+    workspace/EntryPopups.cpp
     workspace/FileIcons.cpp
     workspace/FileOperations.cpp
     workspace/FilesPanel.cpp
-    workspace/GripSplitter.cpp
     workspace/FileTreeView.cpp
-    workspace/NoticeBar.cpp
-    workspace/OverlayPopup.cpp
-    workspace/PopupWidgets.cpp
     workspace/ProjectFiles.cpp
     workspace/ProjectTreeModel.cpp
-    workspace/EntryPopups.cpp
     workspace/SidePanel.cpp
-    workspace/ThemeStyle.cpp
-    workspace/TrailingTabButton.cpp
-    workspace/TitleBar.cpp
-    workspace/TreeColumnFit.cpp
-    workspace/TreeMetrics.cpp
-    workspace/UiIcons.cpp
-    workspace/WindowFrame.cpp
 )
 
 # The PTY depends on the system: ConPTY on Windows, forkpty elsewhere.
@@ -157,7 +157,7 @@ qt_add_resources(duet_core fonts
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-BoldItalic.ttf)
 
 if(TARGET flowboard_ui)
-    target_sources(duet_core PRIVATE editor/DiagramView.cpp)
+    target_sources(duet_core PRIVATE viewers/DiagramView.cpp)
     target_link_libraries(duet_core PRIVATE flowboard_ui PUBLIC Qt6::OpenGLWidgets)
     target_compile_definitions(duet_core PUBLIC DUET_WITH_DIAGRAMS)
 endif()

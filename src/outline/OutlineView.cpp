@@ -1,9 +1,9 @@
 #include "OutlineView.h"
 
+#include "editor/EditorWidget.h"
 #include "IOutlineProvider.h"
 #include "OutlineProviders.h"
-#include "editor/EditorWidget.h"
-#include "workspace/TreeColumnFit.h"
+#include "ui/TreeColumnFit.h"
 
 #include <QHBoxLayout>
 #include <QHeaderView>

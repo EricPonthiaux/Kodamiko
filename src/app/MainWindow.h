@@ -5,7 +5,7 @@
 #include "navigation/RecentFiles.h"
 #include "projects/ProjectConfig.h"
 #include "settings/Keymap.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QJsonObject>
 #include <QSet>

@@ -1,8 +1,8 @@
 #include "editor/EditorWidget.h"
 #include "outline/OutlineProviders.h"
 #include "outline/OutlineView.h"
-#include "syntax/Theme.h"
 #include "syntax/TreeSitterGrammars.h"
+#include "ui/Theme.h"
 
 #include <QHeaderView>
 #include <QLineEdit>

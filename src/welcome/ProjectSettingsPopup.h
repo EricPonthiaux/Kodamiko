@@ -2,8 +2,8 @@
 
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
-#include "syntax/Theme.h"
-#include "workspace/OverlayPopup.h"
+#include "ui/OverlayPopup.h"
+#include "ui/Theme.h"
 
 class ProjectSetupPanel;
 class Toolchains;

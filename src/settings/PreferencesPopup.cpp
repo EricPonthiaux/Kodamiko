@@ -1,7 +1,7 @@
 #include "PreferencesPopup.h"
 
-#include "workspace/PopupWidgets.h"
-#include "workspace/UiIcons.h"
+#include "ui/PopupWidgets.h"
+#include "ui/UiIcons.h"
 
 #include <QAction>
 #include <QButtonGroup>

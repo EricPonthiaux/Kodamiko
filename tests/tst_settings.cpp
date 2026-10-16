@@ -1,7 +1,7 @@
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"
-#include "syntax/Theme.h"
+#include "ui/Theme.h"
 
 #include <QAction>
 #include <QLabel>

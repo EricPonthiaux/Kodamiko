@@ -2,7 +2,7 @@
 
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
-#include "workspace/PopupWidgets.h"
+#include "ui/PopupWidgets.h"
 
 #include <QComboBox>
 #include <QDir>

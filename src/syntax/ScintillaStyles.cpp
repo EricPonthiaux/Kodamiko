@@ -1,7 +1,7 @@
 #include "ScintillaStyles.h"
 
-#include "AppFonts.h"
-#include "Theme.h"
+#include "ui/AppFonts.h"
+#include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
 

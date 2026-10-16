@@ -7,7 +7,7 @@
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
-#include "workspace/PopupWidgets.h"
+#include "ui/PopupWidgets.h"
 
 #include <QCheckBox>
 #include <QLineEdit>

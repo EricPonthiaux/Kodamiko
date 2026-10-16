@@ -1,8 +1,8 @@
 #include "FileTreeView.h"
 
 #include "EntryPopups.h"
-#include "TreeColumnFit.h"
-#include "TreeMetrics.h"
+#include "ui/TreeColumnFit.h"
+#include "ui/TreeMetrics.h"
 
 #include "CommandPalette.h"
 #include "FileOperations.h"

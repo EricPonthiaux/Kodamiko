@@ -1,7 +1,7 @@
 #include "MainWindow.h"
 #include "projects/ProjectConfig.h"
+#include "ui/AppFonts.h"
 #include "welcome/WelcomeWindow.h"
-#include "syntax/AppFonts.h"
 
 #include <QApplication>
 #include <QCommandLineParser>

@@ -1,11 +1,11 @@
 #include "HistoryView.h"
 
-#include "CommitDelegate.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
+#include "CommitDelegate.h"
 #include "git/ChangeKindStyle.h"
-#include "workspace/GripSplitter.h"
-#include "workspace/UiIcons.h"
+#include "ui/GripSplitter.h"
+#include "ui/UiIcons.h"
 
 #include <QApplication>
 #include <QClipboard>

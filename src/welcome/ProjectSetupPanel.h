@@ -2,8 +2,8 @@
 
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
-#include "syntax/Theme.h"
 #include "toolchains/InstallPlan.h"
+#include "ui/Theme.h"
 
 #include <QWidget>
 
