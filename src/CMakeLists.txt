@@ -12,6 +12,7 @@ add_library(duet_core STATIC
     claude/HookServer.cpp
     editor/ChangeGutter.cpp
     editor/CodeColorizer.cpp
+    editor/CodeFormatter.cpp
     editor/EditorStatus.cpp
     editor/EditorTabs.cpp
     editor/EditorWidget.cpp
@@ -49,6 +50,10 @@ add_library(duet_core STATIC
     search/FindInFilesPopup.cpp
     setup/Prerequisites.cpp
     setup/PrerequisitesDialog.cpp
+    settings/Keymap.cpp
+    settings/Preferences.cpp
+    settings/PreferenceWidgets.cpp
+    settings/PreferencesPopup.cpp
     syntax/AppFonts.cpp
     syntax/HighlighterFactory.cpp
     syntax/HighlightQuery.cpp
@@ -57,6 +62,7 @@ add_library(duet_core STATIC
     syntax/PlainTextHighlighter.cpp
     syntax/ScintillaStyles.cpp
     syntax/Theme.cpp
+    syntax/TreeSitterFolds.cpp
     syntax/TreeSitterGrammars.cpp
     syntax/TreeSitterHighlighter.cpp
     terminal/IPty.h
@@ -75,6 +81,7 @@ add_library(duet_core STATIC
     workspace/EntryPopups.cpp
     workspace/SidePanel.cpp
     workspace/ThemeStyle.cpp
+    workspace/TrailingTabButton.cpp
     workspace/TitleBar.cpp
     workspace/TreeColumnFit.cpp
     workspace/TreeMetrics.cpp

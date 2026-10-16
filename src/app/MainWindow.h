@@ -3,6 +3,7 @@
 #include "claude/ClaudeActivity.h"
 #include "claude/HookServer.h"
 #include "navigation/RecentFiles.h"
+#include "settings/Keymap.h"
 #include "syntax/Theme.h"
 
 #include <QJsonObject>
@@ -25,6 +26,7 @@ class TitleBar;
 class WindowFrame;
 class HistoryView;
 class OutlineView;
+class PreferencesPopup;
 class PrerequisitesDialog;
 class QAction;
 class QActionGroup;
@@ -39,6 +41,7 @@ class RepositoryWatcher;
 class SidePanel;
 class SymbolIndex;
 class TerminalWidget;
+struct Preferences;
 struct ProcessSpec;
 
 // Main window with four full-screen modes, chosen with the tabs at the
@@ -131,6 +134,12 @@ private:
     void showSnapshots();
     // Help ▸ Check Prerequisites, also shown at startup if git or claude is missing.
     void showPrerequisites();
+    // File ▸ Preferences.
+    void showPreferences();
+    void applyPreferences(const Preferences &preferences);
+    // Menu shortcuts, with the user's changes; QScintilla leaves them to the
+    // menus.
+    void applyKeymap(const Keymap::Overrides &overrides);
 
     QString absolutePath(const QString &relativePath) const;
 
@@ -152,6 +161,8 @@ private:
     OutlineView *outlineView_ = nullptr;
     SidePanel *sidebar_ = nullptr;
     QTabWidget *terminalTabs_ = nullptr;
+    QToolButton *newTerminalButton_ = nullptr; // "+" at the right of the terminal tabs
+    QToolButton *emptyNewTerminalButton_ = nullptr; // the same, when no terminal is open
     TerminalWidget *claudeTerminal_ = nullptr;
     QStackedWidget *terminalPage_ = nullptr;
     ChangesView *changesView_ = nullptr;
@@ -167,12 +178,15 @@ private:
     QAction *findInFilesAction_ = nullptr;
     QAction *paletteAction_ = nullptr;
     QAction *systemTitleBar_ = nullptr;
+    QAction *formatOnSave_ = nullptr;
+    QActionGroup *themeActions_ = nullptr;
     QLabel *usageLabel_ = nullptr;
     CommandPalette *commandPalette_ = nullptr;
     FindBar *findBar_ = nullptr;
     EditorStatus *editorStatus_ = nullptr;
     GoToPopup *goToPopup_ = nullptr;
     FindInFilesPopup *findInFiles_ = nullptr;
+    PreferencesPopup *preferencesPopup_ = nullptr;
     RecentFiles recentFiles_;
     PrerequisitesDialog *prerequisitesDialog_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;

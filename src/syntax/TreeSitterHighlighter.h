@@ -39,6 +39,8 @@ private:
     // Reparses if the text changed; returns the first position whose syntax
     // structure changed (INT_MAX if none).
     int reparseIfNeeded();
+    // Fold levels of the lines, from the new tree (see TreeSitterFolds).
+    void updateFoldLevels();
     TSPoint pointAt(int position) const;
     const char *documentText() const;
     int documentLength() const;

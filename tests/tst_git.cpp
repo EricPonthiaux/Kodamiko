@@ -441,6 +441,23 @@ private slots:
         QCOMPARE(snapshots.first().reason, QString::number(Snapshots::maximumCount + 1));
     }
 
+    void snapshotsOfEnlumineAreAdopted()
+    {
+        QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        const QString ref = Snapshots::create(info, "old", {"a.txt"});
+        const QString legacy = QString(ref).replace("refs/duet/", "refs/enlumine/");
+        git(project, {"update-ref", legacy, ref});
+        git(project, {"update-ref", "-d", ref});
+
+        const QList<Snapshot> snapshots = Snapshots::list(project.path());
+        QCOMPARE(snapshots.size(), 1);
+        QCOMPARE(snapshots.first().ref, ref);
+        QCOMPARE(snapshots.first().reason, QString("old"));
+        QVERIFY(git(project, {"for-each-ref", "refs/enlumine/"}).isEmpty());
+    }
+
     void snapshotOfWorkingTreeSkipsUnchangedStates()
     {
         QTemporaryDir project;

@@ -169,6 +169,43 @@ QIcon icon(const QString &name, const QColor &color)
             p.drawPath(path);
         });
     }
+    if (name == QLatin1String("appearance")) {
+        // A disc, half filled: light and dark.
+        return drawIcon(color, [](QPainter &p) {
+            p.drawEllipse(QRectF(2, 2, 12, 12));
+            QPainterPath half;
+            half.moveTo(8, 2);
+            half.arcTo(QRectF(2, 2, 12, 12), 90, 180);
+            half.closeSubpath();
+            p.setBrush(p.pen().color());
+            p.drawPath(half);
+        });
+    }
+    if (name == QLatin1String("keyboard")) {
+        return drawIcon(color, [](QPainter &p) {
+            p.drawRoundedRect(QRectF(1, 3.5, 14, 9), 2, 2);
+            p.setBrush(p.pen().color());
+            p.setPen(Qt::NoPen);
+            for (int i = 0; i < 4; ++i) {
+                p.drawEllipse(QPointF(4 + i * 2.7, 6.5), 0.8, 0.8);
+                if (i == 0 || i == 3)
+                    p.drawEllipse(QPointF(4 + i * 2.7, 9.5), 0.8, 0.8);
+            }
+            p.drawRoundedRect(QRectF(6, 8.8, 4, 1.4), 0.7, 0.7);
+        });
+    }
+    if (name == QLatin1String("settings")) {
+        // A gear: a ring and eight teeth.
+        return drawIcon(color, [](QPainter &p) {
+            p.drawEllipse(QPointF(8, 8), 2.2, 2.2);
+            p.drawEllipse(QPointF(8, 8), 4.6, 4.6);
+            for (int i = 0; i < 8; ++i) {
+                const qreal angle = i * M_PI / 4;
+                p.drawLine(QPointF(8 + 4.6 * std::cos(angle), 8 + 4.6 * std::sin(angle)),
+                           QPointF(8 + 6.6 * std::cos(angle), 8 + 6.6 * std::sin(angle)));
+            }
+        });
+    }
     // Command palette: a prompt.
     return drawIcon(color, [](QPainter &p) {
         p.drawRoundedRect(QRectF(1.5, 2.5, 13, 11), 2, 2);

@@ -3,6 +3,7 @@
 #include "HighlightQuery.h"
 #include "ScintillaStyles.h"
 #include "Theme.h"
+#include "TreeSitterFolds.h"
 #include "TreeSitterGrammars.h"
 
 #include <Qsci/qsciscintilla.h>
@@ -132,7 +133,20 @@ int TreeSitterHighlighter::reparseIfNeeded()
     }
     tree_ = newTree;
     treeIsOutdated_ = false;
+    updateFoldLevels();
     return firstChange;
+}
+
+void TreeSitterHighlighter::updateFoldLevels()
+{
+    const int lineCount = editor_->SendScintilla(QsciScintillaBase::SCI_GETLINECOUNT);
+    const std::vector<int> levels = TreeSitterFolds::levels(ts_tree_root_node(tree_), lineCount);
+    constexpr int levelMask = QsciScintillaBase::SC_FOLDLEVELNUMBERMASK | QsciScintillaBase::SC_FOLDLEVELHEADERFLAG;
+    for (int line = 0; line < lineCount; ++line) {
+        // Only the lines that change: Scintilla redraws (and may unfold) them.
+        if ((editor_->SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) & levelMask) != levels[line])
+            editor_->SendScintilla(QsciScintillaBase::SCI_SETFOLDLEVEL, line, levels[line]);
+    }
 }
 
 // Each byte takes the style of the most specific capture covering it:

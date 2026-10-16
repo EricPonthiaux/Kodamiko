@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QProxyStyle>
+#include <QSettings>
 #include <QStyleOption>
 #include <QStyleFactory>
 
@@ -75,6 +76,23 @@ public:
     }
 };
 
+// The settings saved when the editor was called Enlumine, taken over once
+// under its new name; those already chosen under the new name stay.
+void adoptLegacySettings()
+{
+    const QString adopted = QStringLiteral("adoptedEnlumineSettings");
+    QSettings settings;
+    if (settings.value(adopted).toBool())
+        return;
+    const QSettings legacy(QStringLiteral("Enlumine"), QStringLiteral("Enlumine"));
+    const QStringList keys = legacy.allKeys();
+    for (const QString &key : keys) {
+        if (!settings.contains(key))
+            settings.setValue(key, legacy.value(key));
+    }
+    settings.setValue(adopted, true);
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -85,6 +103,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("Duet"));
     QApplication::setOrganizationName(QStringLiteral("Duet"));
     QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
+    adoptLegacySettings();
     // Fusion follows the application palette on every system, which
     // enables the dark theme everywhere.
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));

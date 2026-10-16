@@ -11,6 +11,7 @@
 #include "workspace/SidePanel.h"
 #include "workspace/ThemeStyle.h"
 #include "workspace/TitleBar.h"
+#include "workspace/TrailingTabButton.h"
 #include "workspace/WindowFrame.h"
 #include "git/GitProcess.h"
 #include "workspace/EntryPopups.h"
@@ -779,6 +780,37 @@ private slots:
 
         tabs.closeFilesUnder(dir.filePath("b.txt")); // unsaved changes discarded, no question
         QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("lib/a.txt")}));
+    }
+
+    void addButtonFollowsTheLastTab()
+    {
+        QTabWidget tabs;
+        tabs.setDocumentMode(true);
+        tabs.resize(800, 300);
+        auto *button = new QToolButton;
+        button->setText("+");
+        new TrailingTabButton(&tabs, button);
+        tabs.addTab(new QWidget, "first");
+        tabs.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&tabs));
+
+        const auto afterLastTab = [&] {
+            const QTabBar *bar = tabs.tabBar();
+            return bar->geometry().left() + bar->tabRect(bar->count() - 1).right() + 1;
+        };
+        QTRY_VERIFY(button->x() >= afterLastTab() && button->x() <= afterLastTab() + 8);
+        const int first = button->x();
+        tabs.addTab(new QWidget, "second tab");
+        QTRY_VERIFY(button->x() > first);
+        QVERIFY(button->x() >= afterLastTab() && button->x() <= afterLastTab() + 8);
+        tabs.removeTab(1);
+        QTRY_COMPARE(button->x(), first);
+
+        // Tabs filling the bar: the button stays inside the widget.
+        for (int i = 0; i < 30; ++i)
+            tabs.addTab(new QWidget, QString("terminal %1").arg(i));
+        QTRY_VERIFY(button->geometry().right() < tabs.width());
+        QVERIFY(button->isVisible());
     }
 };
 

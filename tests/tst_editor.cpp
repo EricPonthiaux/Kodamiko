@@ -1,5 +1,6 @@
 #include "editor/ChangeGutter.h"
 #include "editor/CodeColorizer.h"
+#include "editor/CodeFormatter.h"
 #include "editor/EditorStatus.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
@@ -9,6 +10,7 @@
 #include "git/GitProcess.h"
 
 #include <QLineEdit>
+#include <Qsci/qscicommandset.h>
 #include <QTextBlock>
 #include <QToolButton>
 #include <QSettings>
@@ -346,6 +348,152 @@ private slots:
         QCOMPARE(page->mode(), MarkdownPage::Mode::Editor);
         QCOMPARE(QSettings().value("markdown/mode").toInt(), 0); // kept for the next files
         QSettings().remove("markdown/mode");
+    }
+
+    void formatterPositionsFollowTheCode()
+    {
+        const QByteArray before = "int  f( int a ){\n  return a;}\n";
+        const QByteArray after = "int f(int a) {\n    return a;\n}\n";
+        // Before "return": still before it, after the new indentation.
+        QCOMPARE(CodeFormatter::mapPosition(before, before.indexOf("return"), after), after.indexOf("return"));
+        // Before the brace that moves to its own line: it follows the brace.
+        QCOMPARE(CodeFormatter::mapPosition(before, before.indexOf("a;}") + 2, after), after.lastIndexOf('}'));
+        // At the end of a line: after the same code.
+        QCOMPARE(CodeFormatter::mapPosition(before, before.indexOf("{\n") + 1, after), after.indexOf("{\n") + 1);
+        QCOMPARE(CodeFormatter::mapPosition(before, 0, after), 0);
+        QCOMPARE(CodeFormatter::mapPosition(before, before.size(), after), after.size() - 1);
+        // Never inside a UTF-8 character.
+        QCOMPARE(CodeFormatter::mapPosition("x = \"é\";", 7, "x=\"e\xcc\x81\";"), 4);
+    }
+
+    void formatterCandidatesDependOnTheLanguage()
+    {
+        auto programs = [](const QString &languageId) {
+            QStringList names;
+            for (const CodeFormatter::Command &command : CodeFormatter::candidates(languageId, "/p/file"))
+                names.append(command.program);
+            return names;
+        };
+        QCOMPARE(programs("cpp"), QStringList{"clang-format"});
+        QCOMPARE(programs("typescript"), (QStringList{"prettier", "clang-format"}));
+        QCOMPARE(programs("python"), (QStringList{"ruff", "black"}));
+        QVERIFY(programs("text").isEmpty());
+        QCOMPARE(CodeFormatter::describeCandidates("json", "/p/a.json"), QString("prettier or clang-format"));
+        QCOMPARE(CodeFormatter::candidates("cpp", "/p/a.cpp").first().arguments,
+                 QStringList{"--assume-filename=/p/a.cpp"});
+    }
+
+    void formattedTextKeepsLineEndingAndUndoesAtOnce()
+    {
+        QTemporaryDir dir;
+        write(dir.filePath("a.cpp"), "int  x;\r\nint y;\r\n");
+        EditorWidget editor(Theme::dark());
+        QVERIFY(editor.load(dir.filePath("a.cpp"), nullptr));
+        editor.setCursorPosition(1, 4); // on "y"
+
+        QVERIFY(editor.applyFormattedText("int x;\nint y;\n"));
+        QCOMPARE(editor.text(), QString("int x;\r\nint y;\r\n"));
+        int line = 0;
+        int index = 0;
+        editor.getCursorPosition(&line, &index);
+        QCOMPARE(line, 1);
+        QCOMPARE(index, 4);
+        QVERIFY(!editor.applyFormattedText("int x;\r\nint y;\r\n"));
+
+        editor.undo();
+        QCOMPARE(editor.text(), QString("int  x;\r\nint y;\r\n"));
+    }
+
+    void formatDocumentRunsClangFormat()
+    {
+        if (QStandardPaths::findExecutable("clang-format").isEmpty())
+            QSKIP("clang-format is not installed");
+        QTemporaryDir dir;
+        write(dir.filePath(".clang-format"), "BasedOnStyle: LLVM\nIndentWidth: 4\n");
+        write(dir.filePath("a.cpp"), "int f(){return 1;}\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openFile(dir.filePath("a.cpp")));
+        QSignalSpy messages(&tabs, &EditorTabs::statusMessage);
+
+        tabs.formatCurrent();
+        QCOMPARE(tabs.currentEditor()->text(), QString("int f() { return 1; }\n"));
+        QCOMPARE(messages.last().first().toString(), QString("a.cpp formatted"));
+        tabs.formatCurrent();
+        QCOMPARE(messages.last().first().toString(), QString("a.cpp is already formatted"));
+
+        // Format on save: the file on disk is the formatted text.
+        tabs.currentEditor()->setText("int g(){return 2;}\n");
+        tabs.setFormatOnSave(true);
+        QVERIFY(tabs.saveCurrent());
+        QFile file(dir.filePath("a.cpp"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("int g() { return 2; }\n"));
+    }
+
+    void formatDocumentReportsAMissingFormatter()
+    {
+        QTemporaryDir dir;
+        write(dir.filePath("notes.txt"), "text\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openFile(dir.filePath("notes.txt")));
+        QSignalSpy messages(&tabs, &EditorTabs::statusMessage);
+        tabs.formatCurrent();
+        QCOMPARE(messages.last().first().toString(), QString("No formatter for notes.txt"));
+    }
+
+    void foldsTheBlockAroundTheCursor()
+    {
+        QTemporaryDir dir;
+        write(dir.filePath("a.cpp"), "int f() {\n    int a;\n    int b;\n}\nint g() {\n    int c;\n    int d;\n}\n");
+        EditorWidget editor(Theme::dark());
+        QVERIFY(editor.load(dir.filePath("a.cpp"), nullptr));
+        editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
+        const auto visible = [&editor](int line) {
+            return editor.SendScintilla(QsciScintillaBase::SCI_GETLINEVISIBLE, line) != 0;
+        };
+        const auto cursorLine = [&editor] {
+            int line = 0;
+            int index = 0;
+            editor.getCursorPosition(&line, &index);
+            return line;
+        };
+
+        editor.setCursorPosition(2, 4); // in f
+        editor.foldBlock(true);
+        QVERIFY(!visible(1) && !visible(2));
+        QVERIFY(visible(3)); // the closing brace stays
+        QCOMPARE(cursorLine(), 0); // never on a hidden line
+        editor.foldBlock(false);
+        QVERIFY(visible(1) && visible(2));
+
+        editor.foldEverything(true);
+        QVERIFY(!visible(1) && !visible(5));
+        // A jump into a folded block opens it (once the editor updates).
+        editor.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&editor));
+        editor.setCursorPosition(5, 4);
+        QTRY_VERIFY(visible(5));
+        QVERIFY(!visible(1));
+
+        // Without folding, nothing stays hidden.
+        editor.setOptions({.codeFolding = false});
+        QVERIFY(visible(1));
+        editor.foldBlock(true);
+        QVERIFY(visible(1));
+    }
+
+    void menuShortcutsWinOverQScintilla()
+    {
+        EditorWidget editor(Theme::dark());
+        const auto bound = [&editor](const char *shortcut) {
+            return editor.standardCommands()->boundTo(QKeySequence(shortcut)[0].toCombined()) != nullptr;
+        };
+        QVERIFY(bound("Ctrl+-")); // QScintilla's zoom out
+        EditorWidget::setReservedKeys({QKeySequence("Ctrl+-"), QKeySequence("Ctrl+K, Ctrl+O")});
+        QVERIFY(!bound("Ctrl+-"));
+        EditorWidget::setReservedKeys({});
+        QVERIFY(bound("Ctrl+-")); // given back
+        EditorWidget::setReservedKeys({QKeySequence("Ctrl+B"), QKeySequence("Alt+Left"), QKeySequence("Alt+Right")});
     }
 
 private:

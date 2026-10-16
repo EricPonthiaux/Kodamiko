@@ -5,7 +5,8 @@
 // Line icons of the interface (toolbars, title bar, status bar), drawn in
 // the theme's colors: "search", "find-in-files", "palette", "branch",
 // "plus", "minus", "discard", "refresh", "terminal", "code", "diff",
-// "history", "files", "outline", "claude", "locate".
+// "history", "files", "outline", "claude", "locate", "appearance",
+// "keyboard", "settings".
 namespace UiIcons {
 
 QIcon icon(const QString &name, const QColor &color);

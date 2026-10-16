@@ -1,6 +1,7 @@
 #include "EditorTabs.h"
 
 #include "ChangeGutter.h"
+#include "CodeFormatter.h"
 #include "EditorWidget.h"
 #include "ImageView.h"
 #include "MarkdownView.h"
@@ -52,6 +53,7 @@ QWidget *EditorTabs::openFile(const QString &path)
 #endif
 
     auto *editor = new EditorWidget(theme_, this);
+    editor->setOptions(editorOptions_);
     QString error;
     if (!editor->load(absolutePath, &error)) {
         delete editor;
@@ -133,6 +135,7 @@ QWidget *EditorTabs::openDiagram(const QString &absolutePath)
 void EditorTabs::showDiff(const QString &title, const QString &diffText)
 {
     auto *view = new EditorWidget(theme_, this);
+    view->setOptions(editorOptions_);
     view->showReadOnlyText(diffText.isEmpty() ? tr("(no textual differences)") : diffText,
                            QStringLiteral("diff"));
     const int index = addTab(view, title);
@@ -361,8 +364,52 @@ bool EditorTabs::saveAll()
     return allSaved;
 }
 
+void EditorTabs::setEditorOptions(const EditorOptions &options)
+{
+    editorOptions_ = options;
+    for (EditorWidget *editor : editors())
+        editor->setOptions(options);
+}
+
+void EditorTabs::formatCurrent()
+{
+    if (EditorWidget *editor = currentEditor())
+        formatEditor(editor, false);
+}
+
+void EditorTabs::formatEditor(EditorWidget *editor, bool quiet)
+{
+    if (editor->isReadOnly() || editor->filePath().isEmpty())
+        return;
+    const QString path = editor->filePath();
+    const QString name = QFileInfo(path).fileName();
+    const std::optional<CodeFormatter::Command> command = CodeFormatter::find(editor->languageId(), path);
+    if (!command) {
+        if (quiet)
+            return;
+        const QString candidates = CodeFormatter::describeCandidates(editor->languageId(), path);
+        emit statusMessage(candidates.isEmpty()
+                               ? tr("No formatter for %1").arg(name)
+                               : tr("Cannot format %1: install %2").arg(name, candidates));
+        return;
+    }
+
+    QString error;
+    const std::optional<QString> formatted =
+        CodeFormatter::run(*command, QFileInfo(path).absolutePath(), editor->text(), &error);
+    if (!formatted) {
+        emit statusMessage(tr("Could not format %1: %2").arg(name, error));
+        return;
+    }
+    const bool changed = editor->applyFormattedText(*formatted);
+    if (!quiet)
+        emit statusMessage(changed ? tr("%1 formatted").arg(name) : tr("%1 is already formatted").arg(name));
+}
+
 bool EditorTabs::saveEditor(EditorWidget *editor)
 {
+    if (formatOnSave_)
+        formatEditor(editor, true);
     QString error;
     if (!editor->save(&error)) {
         QMessageBox::warning(this, tr("Cannot Save File"),

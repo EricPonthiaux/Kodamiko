@@ -18,6 +18,9 @@ public:
         setAttribute(Qt::WA_Hover);
     }
 
+    // Fixed, whatever handle width a saved splitter state brings back.
+    QSize sizeHint() const override { return {handleSize, handleSize}; }
+
 protected:
     bool event(QEvent *event) override
     {

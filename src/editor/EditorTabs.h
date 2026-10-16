@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EditorWidget.h"
 #include "FileWatcher.h"
 #include "syntax/Theme.h"
 
@@ -8,7 +9,6 @@
 #include <QTabWidget>
 
 class DiagramView;
-class EditorWidget;
 class ImageView;
 
 // Tabs for open files (and displayed diffs). Reloads files modified on
@@ -43,6 +43,17 @@ public:
     QString currentFilePath() const;
     // Text of the files with unsaved changes, by path.
     QHash<QString, QString> unsavedTexts() const;
+
+    // Display settings of every editor, open now or later.
+    void setEditorOptions(const EditorOptions &options);
+    const EditorOptions &editorOptions() const { return editorOptions_; }
+
+    // Formats the current editor with its language's formatter (see
+    // CodeFormatter); the result is reported by statusMessage.
+    void formatCurrent();
+    // Formats each text file before saving it.
+    void setFormatOnSave(bool enabled) { formatOnSave_ = enabled; }
+    bool formatOnSave() const { return formatOnSave_; }
 
     bool saveCurrent();
     bool saveAll();
@@ -89,6 +100,9 @@ private:
     bool closeTabs(const QList<QWidget *> &pages);
     void showTabContextMenu(const QPoint &pos);
     bool saveEditor(EditorWidget *editor);
+    // `quiet`: no message when the file has no installed formatter or is
+    // already formatted (format on save).
+    void formatEditor(EditorWidget *editor, bool quiet);
     void updateTabTitle(EditorWidget *editor);
     void updateTabIcon(QWidget *page);
     QList<EditorWidget *> editors() const;
@@ -96,4 +110,6 @@ private:
     Theme theme_;
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer
+    bool formatOnSave_ = false;
+    EditorOptions editorOptions_;
 };

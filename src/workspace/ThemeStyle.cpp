@@ -104,7 +104,6 @@ QTreeView, QTreeWidget, QListView { background: @base; border: none; outline: 0;
 QTreeView::item:selected, QTreeWidget::item:selected { background: @selection; color: @text; }
 QTreeView::item:selected:active, QTreeWidget::item:selected:active { color: white; background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 @grad1, stop:1 @grad2); }
 QTreeView::item:hover { background: @hover; }
-QSplitter::handle { background: @window; }
 QFrame#card { background: @panel; border: 1px solid @line; border-radius: 10px; }
 QFrame#card QPlainTextEdit { background: @base; }
 QStatusBar { background: transparent; border-top: 1px solid @line; color: @muted; }

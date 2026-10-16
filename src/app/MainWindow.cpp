@@ -27,7 +27,11 @@
 #include "workspace/FilesPanel.h"
 #include "workspace/GripSplitter.h"
 #include "workspace/SidePanel.h"
+#include "workspace/TrailingTabButton.h"
 #include "workspace/FileTreeView.h"
+#include "settings/Keymap.h"
+#include "settings/Preferences.h"
+#include "settings/PreferencesPopup.h"
 #include "workspace/ThemeStyle.h"
 #include "workspace/TitleBar.h"
 #include "workspace/UiIcons.h"
@@ -110,6 +114,7 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
 {
     createWidgets();
     createMenus();
+    applyKeymap(Keymap::loadOverrides());
     restoreSettings();
 
     connect(&hookServer_, &HookServer::hookReceived, this, &MainWindow::onHookReceived);
@@ -140,6 +145,7 @@ void MainWindow::createWidgets()
     projectMenu_ = new QMenu(this);
 
     editorTabs_ = new EditorTabs(theme_, this);
+    editorTabs_->setEditorOptions(Preferences::load().editor);
     connect(editorTabs_, &EditorTabs::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
 
@@ -209,6 +215,12 @@ void MainWindow::createWidgets()
     connect(goToPopup_, &GoToPopup::symbolChosen, this, [this](const SymbolLocation &symbol) {
         setMode(Mode::Edit);
         navigator_->goTo(symbol.filePath, symbol.position);
+    });
+    preferencesPopup_ = new PreferencesPopup(theme_, this);
+    connect(preferencesPopup_, &PreferencesPopup::applied, this, [this] {
+        applyPreferences(preferencesPopup_->preferences());
+        Keymap::saveOverrides(preferencesPopup_->shortcutOverrides());
+        applyKeymap(preferencesPopup_->shortcutOverrides());
     });
     findInFiles_ = new FindInFilesPopup(theme_, this);
     findInFiles_->setBufferProvider([this] { return editorTabs_->unsavedTexts(); });
@@ -344,12 +356,33 @@ QWidget *MainWindow::createTerminalPage()
     });
     connect(terminalTabs_, &QTabWidget::currentChanged, this, &MainWindow::updateClaudeWatched);
 
-    auto *placeholder = new QLabel(tr("No terminal open\n\n"
-                                      "Ctrl+Shift+L: start the Claude session\n"
-                                      "Ctrl+Shift+T: new terminal"),
-                                   this);
-    placeholder->setAlignment(Qt::AlignCenter);
-    placeholder->setEnabled(false);
+    newTerminalButton_ = new QToolButton(terminalTabs_);
+    newTerminalButton_->setAutoRaise(true);
+    newTerminalButton_->setFocusPolicy(Qt::NoFocus);
+    newTerminalButton_->setToolTip(tr("New Terminal (Ctrl+Shift+T)"));
+    connect(newTerminalButton_, &QToolButton::clicked, this, &MainWindow::newShell);
+    new TrailingTabButton(terminalTabs_, newTerminalButton_); // right after the last tab
+
+    auto *hint = new QLabel(tr("No terminal open\n\n"
+                               "Ctrl+Shift+L: start the Claude session"),
+                            this);
+    hint->setAlignment(Qt::AlignCenter);
+    hint->setEnabled(false);
+    emptyNewTerminalButton_ = new QToolButton(this);
+    emptyNewTerminalButton_->setText(tr("New Terminal"));
+    emptyNewTerminalButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    emptyNewTerminalButton_->setAutoRaise(true);
+    emptyNewTerminalButton_->setFocusPolicy(Qt::NoFocus);
+    emptyNewTerminalButton_->setToolTip(tr("New Terminal (Ctrl+Shift+T)"));
+    connect(emptyNewTerminalButton_, &QToolButton::clicked, this, &MainWindow::newShell);
+
+    auto *placeholder = new QWidget(this);
+    auto *placeholderLayout = new QVBoxLayout(placeholder);
+    placeholderLayout->addStretch();
+    placeholderLayout->addWidget(hint);
+    placeholderLayout->addSpacing(8);
+    placeholderLayout->addWidget(emptyNewTerminalButton_, 0, Qt::AlignHCenter);
+    placeholderLayout->addStretch();
 
     terminalPage_ = new QStackedWidget(this);
     terminalPage_->addWidget(placeholder);
@@ -410,6 +443,10 @@ void MainWindow::createMenus()
     file->addAction(tr("Open &Folder…"), QKeySequence(tr("Ctrl+K, Ctrl+O")), this, &MainWindow::chooseFolder);
     file->addAction(tr("&Open File…"), QKeySequence::Open, this, &MainWindow::chooseFile);
     file->addSeparator();
+    QAction *preferences =
+        file->addAction(tr("&Preferences…"), QKeySequence(tr("Ctrl+,")), this, &MainWindow::showPreferences);
+    preferences->setMenuRole(QAction::PreferencesRole);
+    file->addSeparator();
     file->addAction(tr("&Save"), QKeySequence::Save, editorTabs_, &EditorTabs::saveCurrent);
     file->addAction(tr("Save &All"), QKeySequence(tr("Ctrl+Alt+S")), editorTabs_, &EditorTabs::saveAll);
     file->addAction(tr("&Close Tab"), QKeySequence::Close, editorTabs_, &EditorTabs::closeCurrent);
@@ -448,6 +485,7 @@ void MainWindow::createMenus()
     view->addSeparator();
     QMenu *themes = view->addMenu(tr("T&heme"));
     auto *themeGroup = new QActionGroup(themes);
+    themeActions_ = themeGroup;
     for (const Theme &theme : Theme::all()) {
         QAction *action = themes->addAction(theme.title);
         action->setCheckable(true);
@@ -518,6 +556,35 @@ void MainWindow::createEditMenu()
         if (mode_ == Mode::Edit)
             findBar_->findPrevious();
     });
+    edit->addSeparator();
+    edit->addAction(tr("F&ormat Document"), QKeySequence(tr("Ctrl+Alt+L")), this, [this] {
+        if (mode_ == Mode::Edit)
+            editorTabs_->formatCurrent();
+    });
+    formatOnSave_ = edit->addAction(tr("Format on Sa&ve"));
+    formatOnSave_->setCheckable(true);
+    formatOnSave_->setChecked(QSettings().value(QStringLiteral("formatOnSave"), false).toBool());
+    formatOnSave_->setToolTip(tr("Format each file with its language's formatter before saving it"));
+    editorTabs_->setFormatOnSave(formatOnSave_->isChecked());
+    connect(formatOnSave_, &QAction::toggled, this, [this](bool checked) {
+        editorTabs_->setFormatOnSave(checked);
+        QSettings().setValue(QStringLiteral("formatOnSave"), checked);
+    });
+    edit->addSeparator();
+    const auto inEditor = [this](void (EditorWidget::*fold)(bool), bool folds) {
+        return [this, fold, folds] {
+            if (EditorWidget *editor = editorTabs_->currentEditor(); editor && mode_ == Mode::Edit)
+                (editor->*fold)(folds);
+        };
+    };
+    QMenu *folding = edit->addMenu(tr("Fol&ding"));
+    folding->addAction(tr("&Fold Block"), QKeySequence(tr("Ctrl+-")), this, inEditor(&EditorWidget::foldBlock, true));
+    folding->addAction(tr("&Unfold Block"), this, inEditor(&EditorWidget::foldBlock, false))
+        ->setShortcuts({QKeySequence(tr("Ctrl+=")), QKeySequence(tr("Ctrl++"))});
+    folding->addAction(tr("Fold &All"), QKeySequence(tr("Ctrl+Shift+-")), this,
+                       inEditor(&EditorWidget::foldEverything, true));
+    folding->addAction(tr("Unfold A&ll"), this, inEditor(&EditorWidget::foldEverything, false))
+        ->setShortcuts({QKeySequence(tr("Ctrl+Shift+=")), QKeySequence(tr("Ctrl+Shift++"))});
     edit->addSeparator();
     findInFilesAction_ =
         edit->addAction(tr("Find in F&iles…"), QKeySequence(tr("Ctrl+Shift+F")), this, &MainWindow::showFindInFiles);
@@ -775,16 +842,15 @@ TerminalWidget *MainWindow::addTerminal(const QString &title, const ProcessSpec 
 
 QString MainWindow::savedThemeName()
 {
-    const QSettings settings;
-    if (settings.contains(QStringLiteral("theme")))
-        return settings.value(QStringLiteral("theme")).toString();
-    // Before the theme menu: a "Dark Theme" checkbox.
-    return settings.value(QStringLiteral("darkTheme"), true).toBool() ? QStringLiteral("dark") : QStringLiteral("light");
+    return Preferences::load().theme;
 }
 
 void MainWindow::setTheme(const QString &name)
 {
     theme_ = Theme::named(name);
+    theme_.font = Preferences::load().codeFont();
+    for (QAction *action : themeActions_->actions())
+        action->setChecked(action->data().toString() == theme_.name);
     ThemeStyle::apply(theme_);
     titleBar_->applyTheme(theme_);
     frame_->applyTheme(theme_);
@@ -802,12 +868,40 @@ void MainWindow::setTheme(const QString &name)
     historyView_->applyTheme(theme_);
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
+    preferencesPopup_->applyTheme(theme_);
     if (modeTabs_) {
         updateTabIcons();
         updateClaudeIndicator();
         updateUsage();
     }
     QSettings().setValue(QStringLiteral("theme"), theme_.name);
+}
+
+void MainWindow::showPreferences()
+{
+    preferencesPopup_->popup(Preferences::load(), Keymap::commands(titleBar_->menuBar()), Keymap::loadOverrides());
+}
+
+void MainWindow::applyPreferences(const Preferences &preferences)
+{
+    const Preferences previous = Preferences::load();
+    preferences.save();
+    if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont())
+        setTheme(preferences.theme);
+    // The menus' commands apply their own settings.
+    systemTitleBar_->setChecked(preferences.systemTitleBar);
+    formatOnSave_->setChecked(preferences.formatOnSave);
+    snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
+    claudeNotifications_->setChecked(preferences.claudeNotifications);
+    editorTabs_->setEditorOptions(preferences.editor);
+    filesPanel_->setAlwaysSelectOpenedFile(preferences.alwaysSelectOpenedFile);
+}
+
+void MainWindow::applyKeymap(const Keymap::Overrides &overrides)
+{
+    const QList<Keymap::Command> commands = Keymap::commands(titleBar_->menuBar());
+    Keymap::apply(commands, overrides);
+    EditorWidget::setReservedKeys(Keymap::shortcutsInUse(commands));
 }
 
 void MainWindow::setMode(Mode mode)
@@ -951,6 +1045,8 @@ void MainWindow::updateTabIcons()
         modeTabs_->setTabIcon(i, UiIcons::icon(QLatin1String(modes[i]), color));
     sidebar_->setViewIcon(filesPanel_, UiIcons::icon(QStringLiteral("files"), color));
     sidebar_->setViewIcon(outlineView_, UiIcons::icon(QStringLiteral("outline"), color));
+    newTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
+    emptyNewTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     for (int i = 0; i < terminalTabs_->count(); ++i) {
         if (terminalTabs_->widget(i) != claudeTerminal_) // its icon shows Claude's state
             terminalTabs_->setTabIcon(i, UiIcons::icon(QStringLiteral("terminal"), color));

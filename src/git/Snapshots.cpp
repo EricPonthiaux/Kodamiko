@@ -19,6 +19,8 @@ using libgit2::Ptr;
 namespace {
 
 const QString refPrefix = QStringLiteral("refs/duet/snapshots/");
+// Where snapshots were kept when the editor was called Enlumine.
+const QString legacyRefPrefix = QStringLiteral("refs/enlumine/snapshots/");
 // Trailer of the commit message marking a snapshot of the whole working
 // directory.
 const QString wholeTreeTrailer = QStringLiteral("Scope: working tree");
@@ -158,6 +160,34 @@ QString createSnapshot(const RepositoryInfo &repository, const QString &reason, 
     return ref;
 }
 
+// Snapshots taken under the editor's former name move to refPrefix, with
+// the same name. A reference that cannot be moved stays where it is.
+void adoptLegacySnapshots(git_repository *repository)
+{
+    QStringList names;
+    {
+        git_reference_iterator *iterator = nullptr;
+        if (git_reference_iterator_glob_new(&iterator, repository,
+                                            (legacyRefPrefix + QLatin1Char('*')).toUtf8().constData()) < 0)
+            return;
+        const Ptr<git_reference_iterator> iteratorGuard(iterator);
+        const char *name = nullptr;
+        while (git_reference_next_name(&name, iterator) == 0)
+            names.append(QString::fromUtf8(name));
+    }
+    for (const QString &name : names) {
+        git_reference *reference = nullptr;
+        if (git_reference_lookup(&reference, repository, name.toUtf8().constData()) < 0)
+            continue;
+        const Ptr<git_reference> referenceGuard(reference);
+        git_reference *renamed = nullptr;
+        if (git_reference_rename(&renamed, reference, (refPrefix + name.mid(legacyRefPrefix.size())).toUtf8().constData(),
+                                 0, "Snapshot of Enlumine, renamed Duet")
+            == 0)
+            git_reference_free(renamed);
+    }
+}
+
 // Puts `paths` back on disk as `commitId` recorded them, deleting those it
 // does not contain.
 void restorePaths(const RepositoryInfo &repository, const QString &commitId, const QStringList &paths)
@@ -202,6 +232,7 @@ QList<Snapshot> list(const QString &folder)
         return {};
     check(opened, "Opening the git repository");
     const Ptr<git_repository> repositoryGuard(repository);
+    adoptLegacySnapshots(repository);
 
     git_reference_iterator *iterator = nullptr;
     check(git_reference_iterator_glob_new(&iterator, repository, (refPrefix + QLatin1Char('*')).toUtf8().constData()),

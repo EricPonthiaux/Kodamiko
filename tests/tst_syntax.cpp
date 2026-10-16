@@ -168,6 +168,50 @@ private slots:
         auto h = highlight(editor, "json", "{\"key\": \"value\"}\n", theme);
         QVERIFY(editor.lexer() != nullptr);
     }
+
+    void foldsBlocksCommentsAndConditionals()
+    {
+        QsciScintilla editor;
+        auto h = highlight(editor, "cpp",
+                           "int f(int x) {\n"   // 0
+                           "    if (x) {\n"     // 1
+                           "        return 1;\n" // 2
+                           "    } else {\n"     // 3
+                           "        return 2;\n" // 4
+                           "    }\n"            // 5
+                           "}\n"                // 6
+                           "/* a\n"             // 7
+                           "   b */\n"          // 8
+                           "#if A\n"            // 9
+                           "int y;\n"           // 10
+                           "#endif\n"           // 11
+                           "int z(int a,\n"     // 12: two lines, nothing to hide
+                           "      int b);\n",
+                           Theme::dark());
+        const auto depth = [&editor](int line) {
+            return static_cast<int>((editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line)
+                                     & QsciScintillaBase::SC_FOLDLEVELNUMBERMASK)
+                                    - QsciScintillaBase::SC_FOLDLEVELBASE);
+        };
+        const auto isHeader = [&editor](int line) {
+            return (editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line)
+                    & QsciScintillaBase::SC_FOLDLEVELHEADERFLAG) != 0;
+        };
+        const QList<int> depths = {0, 1, 2, 1, 2, 1, 0, 0, 1, 0, 1, 0, 0, 0};
+        const QList<int> headers = {0, 1, 3, 7, 9};
+        for (int line = 0; line < depths.size(); ++line) {
+            QVERIFY2(depth(line) == depths[line], qPrintable(QString("line %1: depth %2").arg(line).arg(depth(line))));
+            QVERIFY2(isHeader(line) == headers.contains(line), qPrintable(QString("line %1").arg(line)));
+        }
+
+        // The levels follow the edits.
+        editor.setSelection(4, 0, 5, 0); // "return 2;": the else block has nothing left to hide
+        editor.removeSelectedText();
+        editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
+        QVERIFY(!isHeader(3));
+        QCOMPARE(depth(4), 1);
+        QVERIFY(isHeader(6)); // the comment, one line up
+    }
 };
 
 QTEST_MAIN(TestSyntax)
