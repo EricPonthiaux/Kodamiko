@@ -37,6 +37,8 @@ private:
     FileTreeView *tree_;
     QComboBox *scope_;
     QToolButton *select_;
+    QToolButton *collapse_;
+    QToolButton *options_;
     QAction *alwaysSelect_;
     QAction *compactFolders_;
     QAction *nestFiles_;

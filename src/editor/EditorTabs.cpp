@@ -2,6 +2,7 @@
 
 #include "ChangeGutter.h"
 #include "CodeFormatter.h"
+#include "completion/CompletionController.h"
 #include "EditorWidget.h"
 #include "ImageView.h"
 #include "MarkdownView.h"
@@ -54,6 +55,7 @@ QWidget *EditorTabs::openFile(const QString &path)
 
     auto *editor = new EditorWidget(theme_, this);
     editor->setOptions(editorOptions_);
+    attachCompletion(editor);
     QString error;
     if (!editor->load(absolutePath, &error)) {
         delete editor;
@@ -367,8 +369,28 @@ bool EditorTabs::saveAll()
 void EditorTabs::setEditorOptions(const EditorOptions &options)
 {
     editorOptions_ = options;
-    for (EditorWidget *editor : editors())
+    for (EditorWidget *editor : editors()) {
         editor->setOptions(options);
+        if (CompletionController *completion = CompletionController::of(editor))
+            completion->setAutoPopup(options.autoCompletion);
+    }
+}
+
+void EditorTabs::setCompletionService(CompletionService *service)
+{
+    completion_ = service;
+    for (EditorWidget *editor : editors()) {
+        if (!editor->isReadOnly())
+            attachCompletion(editor);
+    }
+}
+
+void EditorTabs::attachCompletion(EditorWidget *editor)
+{
+    if (!completion_ || CompletionController::of(editor))
+        return;
+    auto *completion = new CompletionController(editor, completion_);
+    completion->setAutoPopup(editorOptions_.autoCompletion);
 }
 
 void EditorTabs::formatCurrent()

@@ -128,7 +128,7 @@ void EditorWidget::applyFoldColors()
     // QScintilla's fold marks are black and white: those of the margin
     // instead, the boxes filled with the margin's background.
     setFoldMarginColors(theme_.marginBackground, theme_.marginBackground);
-    for (int marker = SC_MARKNUM_FOLDEREND; marker <= SC_MARKNUM_FOLDEROPEN; ++marker) {
+    for (int marker = SC_MARKNUM_FOLDEREND; marker <= int(SC_MARKNUM_FOLDEROPEN); ++marker) {
         SendScintilla(SCI_MARKERSETFORE, marker, theme_.marginBackground);
         SendScintilla(SCI_MARKERSETBACK, marker, theme_.marginForeground);
     }

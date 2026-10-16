@@ -19,6 +19,8 @@ struct EditorOptions {
     bool codeFolding = true;
     bool wrapLines = false;
     bool showWhitespace = false;
+    // The completion popup opens while typing; Ctrl+Space always opens it.
+    bool autoCompletion = true;
 
     bool operator==(const EditorOptions &) const = default;
 };
@@ -73,6 +75,7 @@ public:
     // Marks of the lines that differ from the git index.
     ChangeGutter *changeGutter() const { return changeGutter_; }
     void applyTheme(const Theme &theme);
+    const Theme &theme() const { return theme_; }
 
 signals:
     void languageChanged();

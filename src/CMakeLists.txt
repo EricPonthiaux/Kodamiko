@@ -7,6 +7,12 @@ add_library(duet_core STATIC
     changes/NewBranchPopup.cpp
     changes/SnapshotsPopup.cpp
     claude/ClaudeActivity.cpp
+    completion/CompletionController.cpp
+    completion/CompletionPopup.cpp
+    completion/CompletionService.cpp
+    completion/FuzzyMatch.cpp
+    completion/LocalCompletion.cpp
+    completion/Snippet.cpp
     claude/ClaudeLauncher.cpp
     claude/ClaudeUsage.cpp
     claude/HookEvent.cpp
@@ -37,6 +43,10 @@ add_library(duet_core STATIC
     git/Snapshots.cpp
     history/CommitDelegate.cpp
     history/HistoryView.cpp
+    lsp/JavaRuntimes.cpp
+    lsp/LanguageServers.cpp
+    lsp/LspClient.cpp
+    lsp/LspCompletionProvider.cpp
     navigation/CodeNavigator.cpp
     navigation/Definitions.cpp
     navigation/GoToPopup.cpp
@@ -48,6 +58,9 @@ add_library(duet_core STATIC
     outline/OutlineView.cpp
     outline/TextOutlines.cpp
     outline/TreeSitterOutline.cpp
+    projects/ProjectConfig.cpp
+    projects/ProjectDetector.cpp
+    projects/ProjectStore.cpp
     search/FindInFiles.cpp
     search/FindInFilesPopup.cpp
     setup/Prerequisites.cpp
@@ -70,12 +83,22 @@ add_library(duet_core STATIC
     terminal/ProcessSpec.cpp
     terminal/TerminalWidget.cpp
     terminal/VtScreen.cpp
+    toolchains/InstallPlan.cpp
+    toolchains/Installer.cpp
+    toolchains/ToolCatalog.cpp
+    toolchains/Toolchains.cpp
+    welcome/ProjectSettingsPopup.cpp
+    welcome/ProjectSetupForm.cpp
+    welcome/ProjectSetupPanel.cpp
+    welcome/ProvisioningView.cpp
+    welcome/WelcomeWindow.cpp
     workspace/CommandPalette.cpp
     workspace/FileIcons.cpp
     workspace/FileOperations.cpp
     workspace/FilesPanel.cpp
     workspace/GripSplitter.cpp
     workspace/FileTreeView.cpp
+    workspace/NoticeBar.cpp
     workspace/OverlayPopup.cpp
     workspace/PopupWidgets.cpp
     workspace/ProjectFiles.cpp

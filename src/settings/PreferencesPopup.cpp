@@ -298,6 +298,20 @@ QWidget *PreferencesPopup::createEditorPage()
     display->addRow(tr("Show whitespace"), tr("Spaces appear as dots and tabs as arrows."), showWhitespace_);
     addGroup(layout, tr("Display"), display);
 
+    auto *completion = new SettingsCard;
+    autoCompletion_ = new ToggleSwitch;
+    completion->addRow(tr("Suggest while typing"),
+                       tr("The completion list opens as you type a name. Ctrl+Space opens it at any time."),
+                       autoCompletion_);
+    languageServers_ = new ToggleSwitch;
+    completion->addRow(tr("Language servers"),
+                       tr("Members, signatures and types from clangd (C, C++), jdtls (Java), "
+                          "typescript-language-server, pyright or pylsp, when installed."),
+                       languageServers_);
+    serversFound_ = mutedLabel(QString(), "settingsDescription");
+    completion->addWidget(serversFound_);
+    addGroup(layout, tr("Completion"), completion);
+
     auto *saving = new SettingsCard;
     formatOnSave_ = new ToggleSwitch;
     saving->addRow(tr("Format on save"),
@@ -450,6 +464,12 @@ void PreferencesPopup::applyTheme(const Theme &theme)
     updateFontPreview();
 }
 
+void PreferencesPopup::setInstalledServers(const QStringList &names)
+{
+    serversFound_->setText(names.isEmpty() ? tr("No language server found on this machine.")
+                                           : tr("Found: %1.").arg(names.join(QStringLiteral(", "))));
+}
+
 void PreferencesPopup::updateFontPreview()
 {
     if (!fontPreview_)
@@ -504,6 +524,8 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
     codeFolding_->setChecked(preferences.editor.codeFolding);
     wrapLines_->setChecked(preferences.editor.wrapLines);
     showWhitespace_->setChecked(preferences.editor.showWhitespace);
+    autoCompletion_->setChecked(preferences.editor.autoCompletion);
+    languageServers_->setChecked(preferences.languageServers);
     formatOnSave_->setChecked(preferences.formatOnSave);
     alwaysSelectOpenedFile_->setChecked(preferences.alwaysSelectOpenedFile);
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
@@ -537,6 +559,8 @@ Preferences PreferencesPopup::preferences() const
     preferences.editor.codeFolding = codeFolding_->isChecked();
     preferences.editor.wrapLines = wrapLines_->isChecked();
     preferences.editor.showWhitespace = showWhitespace_->isChecked();
+    preferences.editor.autoCompletion = autoCompletion_->isChecked();
+    preferences.languageServers = languageServers_->isChecked();
     preferences.formatOnSave = formatOnSave_->isChecked();
     preferences.alwaysSelectOpenedFile = alwaysSelectOpenedFile_->isChecked();
     preferences.snapshotBeforePrompt = snapshotBeforePrompt_->isChecked();

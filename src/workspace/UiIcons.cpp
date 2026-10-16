@@ -169,6 +169,22 @@ QIcon icon(const QString &name, const QColor &color)
             p.drawPath(path);
         });
     }
+    if (name == QLatin1String("collapse-all")) {
+        // Two chevrons pointing at each other: everything folds to the middle.
+        return drawIcon(color, [](QPainter &p) {
+            p.drawPolyline(QPolygonF({QPointF(4.5, 2.5), QPointF(8, 6), QPointF(11.5, 2.5)}));
+            p.drawPolyline(QPolygonF({QPointF(4.5, 13.5), QPointF(8, 10), QPointF(11.5, 13.5)}));
+        });
+    }
+    if (name == QLatin1String("more")) {
+        // Three dots, one above the other.
+        return drawIcon(color, [](QPainter &p) {
+            p.setBrush(p.pen().color());
+            p.setPen(Qt::NoPen);
+            for (const qreal y : {3.5, 8.0, 12.5})
+                p.drawEllipse(QPointF(8, y), 1.4, 1.4);
+        });
+    }
     if (name == QLatin1String("appearance")) {
         // A disc, half filled: light and dark.
         return drawIcon(color, [](QPainter &p) {

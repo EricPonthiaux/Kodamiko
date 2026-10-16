@@ -21,25 +21,30 @@ FilesPanel::FilesPanel(QWidget *parent)
     connect(scope_, &QComboBox::currentIndexChanged, this,
             [this] { tree_->setScope(static_cast<FileTreeView::Scope>(scope_->currentData().toInt())); });
 
-    const auto addButton = [this](const QString &text, const QString &toolTip) {
+    // Icons only, all the same size (see setIconColor).
+    const auto addButton = [this](const QString &toolTip) {
         auto *button = new QToolButton(this);
-        button->setText(text);
         button->setToolTip(toolTip);
         button->setAutoRaise(true);
         button->setFocusPolicy(Qt::NoFocus);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        button->setIconSize(QSize(16, 16));
+        button->setFixedSize(26, 24);
         return button;
     };
-    select_ = addButton(QString(), tr("Select Opened File (Alt+F1)"));
-    select_->setIconSize(QSize(16, 16));
+    select_ = addButton(tr("Select Opened File (Alt+F1)"));
     connect(select_, &QToolButton::clicked, this, &FilesPanel::selectOpenedFileRequested);
-    QToolButton *collapse = addButton(QStringLiteral("⊟"), tr("Collapse All"));
+    collapse_ = addButton(tr("Collapse All"));
+    QToolButton *collapse = collapse_;
     connect(collapse, &QToolButton::clicked, this, [this] {
         tree_->collapseAll();
         if (const QModelIndex root = tree_->model()->index(0, 0, tree_->rootIndex()); root.isValid())
             tree_->expand(root); // the working folder stays open
     });
-    QToolButton *options = addButton(QStringLiteral("⋮"), tr("Options"));
+    options_ = addButton(tr("Options"));
+    QToolButton *options = options_;
     options->setPopupMode(QToolButton::InstantPopup);
+    options->setStyleSheet(QStringLiteral("QToolButton::menu-indicator { image: none; width: 0; }"));
     auto *menu = new QMenu(options);
     alwaysSelect_ = menu->addAction(tr("Always Select Opened File"));
     alwaysSelect_->setCheckable(true);
@@ -110,4 +115,6 @@ void FilesPanel::setAlwaysSelectOpenedFile(bool enabled)
 void FilesPanel::setIconColor(const QColor &color)
 {
     select_->setIcon(UiIcons::icon(QStringLiteral("locate"), color));
+    collapse_->setIcon(UiIcons::icon(QStringLiteral("collapse-all"), color));
+    options_->setIcon(UiIcons::icon(QStringLiteral("more"), color));
 }

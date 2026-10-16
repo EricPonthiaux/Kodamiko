@@ -18,6 +18,8 @@ struct Preferences {
     // Editor
     EditorOptions editor;
     bool formatOnSave = false;
+    // Completion from clangd, jdtls... when installed.
+    bool languageServers = true;
 
     // Files
     bool alwaysSelectOpenedFile = false;

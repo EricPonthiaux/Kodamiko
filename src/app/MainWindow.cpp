@@ -2,6 +2,11 @@
 
 #include "changes/ChangesView.h"
 #include "changes/NewBranchPopup.h"
+#include "completion/CompletionController.h"
+#include "completion/CompletionService.h"
+#include "completion/LocalCompletion.h"
+#include "lsp/LanguageServers.h"
+#include "lsp/LspCompletionProvider.h"
 #include "changes/SnapshotsPopup.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
@@ -34,6 +39,12 @@
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"
+#include "projects/ProjectStore.h"
+#include "toolchains/InstallPlan.h"
+#include "toolchains/Toolchains.h"
+#include "welcome/ProjectSettingsPopup.h"
+#include "welcome/ProjectSetupForm.h"
+#include "workspace/NoticeBar.h"
 #include "workspace/ThemeStyle.h"
 #include "workspace/TitleBar.h"
 #include "workspace/UiIcons.h"
@@ -135,7 +146,11 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
         QTimer::singleShot(0, this, &MainWindow::showPrerequisites);
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    // Its downloads use the toolchains, destroyed before the children.
+    delete projectSettings_;
+}
 
 void MainWindow::createWidgets()
 {
@@ -155,6 +170,20 @@ void MainWindow::createWidgets()
     // save, and when returning to the application (files modified elsewhere).
     symbolIndex_ = new SymbolIndex(this);
     connect(editorTabs_, &EditorTabs::fileSaved, symbolIndex_, &SymbolIndex::refresh);
+
+    // Completion: the language server, project symbols, keywords, words
+    // of the file.
+    toolchains_ = std::make_unique<Toolchains>();
+    languageServers_ = new LanguageServers(this);
+    languageServers_->setEnabled(Preferences::load().languageServers);
+    connect(languageServers_, &LanguageServers::statusMessage, this,
+            [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
+    completion_ = new CompletionService(this);
+    completion_->addProvider(std::make_shared<LspCompletionProvider>(languageServers_));
+    completion_->addProvider(std::make_shared<ProjectSymbolsProvider>(symbolIndex_));
+    completion_->addProvider(std::make_shared<KeywordProvider>());
+    completion_->addProvider(std::make_shared<DocumentWordsProvider>());
+    editorTabs_->setCompletionService(completion_);
     connect(editorTabs_, &EditorTabs::fileSaved, this, [this] { fileStatuses_->refresh(); });
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
         if (state == Qt::ApplicationActive) {
@@ -220,8 +249,11 @@ void MainWindow::createWidgets()
     });
     snapshotsPopup_ = new SnapshotsPopup(gitCommands_, theme_, this);
     newBranchPopup_ = new NewBranchPopup(theme_, this);
+    projectSettings_ = new ProjectSettingsPopup(toolchains_.get(), theme_, this);
+    connect(projectSettings_, &ProjectSettingsPopup::applied, this, &MainWindow::applyProject);
     connect(newBranchPopup_, &NewBranchPopup::createRequested, this, &MainWindow::createBranch);
     preferencesPopup_ = new PreferencesPopup(theme_, this);
+    preferencesPopup_->setInstalledServers(languageServers_->installed());
     connect(preferencesPopup_, &PreferencesPopup::applied, this, [this] {
         applyPreferences(preferencesPopup_->preferences());
         Keymap::saveOverrides(preferencesPopup_->shortcutOverrides());
@@ -321,6 +353,22 @@ QWidget *MainWindow::createEditPage()
     editorLayout->setContentsMargins(0, 0, 0, 0);
     editorLayout->setSpacing(0);
     editorLayout->addWidget(findBar_);
+    // Tools of the project's setup not downloaded yet.
+    toolsNotice_ = new NoticeBar(editorArea);
+    connect(toolsNotice_, &NoticeBar::actionClicked, this, [this] { projectSettings_->download(project_); });
+    editorLayout->addWidget(toolsNotice_);
+    // A language server that cannot run, for the current file's language.
+    serverNotice_ = new NoticeBar(editorArea);
+    connect(serverNotice_, &NoticeBar::actionClicked, this, [this] {
+        if (EditorWidget *editor = editorTabs_->currentEditor())
+            languageServers_->retry(editor->languageId());
+    });
+    connect(serverNotice_, &NoticeBar::dismissed, this, [this] {
+        if (EditorWidget *editor = editorTabs_->currentEditor())
+            dismissedServerNotices_.insert(languageServers_->failure(editor->languageId()));
+    });
+    connect(languageServers_, &LanguageServers::serverFailed, this, &MainWindow::updateServerNotice);
+    editorLayout->addWidget(serverNotice_);
     editorLayout->addWidget(editorTabs_, 1);
 
     // Files and Outline as KDevelop's tool views: vertical tabs at the
@@ -448,6 +496,9 @@ void MainWindow::createMenus()
     file->addAction(tr("Open &Folder…"), QKeySequence(tr("Ctrl+K, Ctrl+O")), this, &MainWindow::chooseFolder);
     file->addAction(tr("&Open File…"), QKeySequence::Open, this, &MainWindow::chooseFile);
     file->addSeparator();
+    file->addAction(tr("Project Se&ttings…"), this, &MainWindow::showProjectSettings);
+    file->addAction(tr("Close Pro&ject"), this, &MainWindow::closeProject);
+    file->addSeparator();
     QAction *preferences =
         file->addAction(tr("&Preferences…"), QKeySequence(tr("Ctrl+,")), this, &MainWindow::showPreferences);
     preferences->setMenuRole(QAction::PreferencesRole);
@@ -562,6 +613,11 @@ void MainWindow::createEditMenu()
             findBar_->findPrevious();
     });
     edit->addSeparator();
+    edit->addAction(tr("&Complete Code"), QKeySequence(tr("Ctrl+Space")), this, [this] {
+        if (EditorWidget *editor = editorTabs_->currentEditor(); editor && mode_ == Mode::Edit)
+            if (CompletionController *completion = CompletionController::of(editor))
+                completion->complete();
+    });
     edit->addAction(tr("F&ormat Document"), QKeySequence(tr("Ctrl+Alt+L")), this, [this] {
         if (mode_ == Mode::Edit)
             editorTabs_->formatCurrent();
@@ -689,6 +745,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
     settings.setValue(QStringLiteral("sidebarTab"), sidebar_->tabBar()->currentIndex());
     settings.setValue(QStringLiteral("viewMode"), static_cast<int>(mode_));
     settings.setValue(QStringLiteral("lastFolder"), folder_);
+    // The welcome window shows before this one closes: the application
+    // goes on.
+    if (closingProject_)
+        emit projectClosed();
     event->accept();
 }
 
@@ -705,6 +765,18 @@ void MainWindow::openFolder(const QString &folder)
     claudeTouched_.clear();
     updateClaudeMarks();
     symbolIndex_->setFolder(folder_);
+    project_ = ProjectStore::touch(folder_);
+    if (!project_.configured) {
+        // Opened without the welcome window: set up from its files.
+        const QDateTime lastOpened = project_.lastOpened;
+        project_ = ProjectSetupForm::detectedProject(folder_, *toolchains_);
+        project_.lastOpened = lastOpened;
+        project_.configured = true;
+        ProjectStore::save(project_);
+    }
+    languageServers_->setProject(project_, toolchains_.get());
+    preferencesPopup_->setInstalledServers(languageServers_->installed());
+    updateToolsNotice();
     goToPopup_->setFolder(folder_);
     fileStatuses_->setFolder(folder_);
     findInFiles_->setFolder(folder_);
@@ -719,10 +791,6 @@ void MainWindow::openFolder(const QString &folder)
     if (mode_ == Mode::History)
         historyView_->refresh();
     setWindowTitle(QStringLiteral("%1 — Duet").arg(QFileInfo(folder_).fileName()));
-    QStringList recent = QSettings().value(QStringLiteral("recentFolders")).toStringList();
-    recent.removeAll(folder_);
-    recent.prepend(folder_);
-    QSettings().setValue(QStringLiteral("recentFolders"), recent.mid(0, 10));
     updateProjectMenu();
 }
 
@@ -763,8 +831,50 @@ void MainWindow::restoreSession()
 void MainWindow::chooseFolder()
 {
     const QString folder = QFileDialog::getExistingDirectory(this, tr("Open Folder"), folder_);
-    if (!folder.isEmpty())
-        openFolder(folder);
+    if (folder.isEmpty())
+        return;
+    const std::optional<ProjectConfig> known = ProjectStore::find(folder);
+    const bool imported = !known || !known->configured;
+    openFolder(folder);
+    // A new project: its detected setup, to check.
+    if (imported && folder_ == QDir(folder).absolutePath())
+        showProjectSettings();
+}
+
+void MainWindow::showProjectSettings()
+{
+    projectSettings_->popup(project_);
+}
+
+void MainWindow::applyProject(const ProjectConfig &project)
+{
+    if (QDir(project.path).absolutePath() != folder_)
+        return; // another project's downloads, finished after a switch
+    project_ = project;
+    languageServers_->setProject(project_, toolchains_.get());
+    preferencesPopup_->setInstalledServers(languageServers_->installed());
+    dismissedServerNotices_.clear();
+    updateToolsNotice();
+    updateServerNotice();
+}
+
+void MainWindow::closeProject()
+{
+    closingProject_ = true;
+    if (!close())
+        closingProject_ = false;
+}
+
+void MainWindow::updateToolsNotice()
+{
+    const QList<InstallStep> steps = InstallPlan::plan(project_, *toolchains_);
+    if (steps.isEmpty()) {
+        toolsNotice_->hide();
+        return;
+    }
+    toolsNotice_->showNotice(tr("This project's setup needs tools Duet has not downloaded yet: %1")
+                                 .arg(InstallPlan::summary(steps)),
+                             tr("Download"));
 }
 
 void MainWindow::chooseFile()
@@ -875,6 +985,9 @@ void MainWindow::setTheme(const QString &name)
     historyView_->applyTheme(theme_);
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
+    serverNotice_->applyTheme(theme_);
+    toolsNotice_->applyTheme(theme_);
+    projectSettings_->applyTheme(theme_);
     preferencesPopup_->applyTheme(theme_);
     snapshotsPopup_->applyTheme(theme_);
     newBranchPopup_->applyTheme(theme_);
@@ -903,6 +1016,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     editorTabs_->setEditorOptions(preferences.editor);
+    languageServers_->setEnabled(preferences.languageServers);
     filesPanel_->setAlwaysSelectOpenedFile(preferences.alwaysSelectOpenedFile);
 }
 
@@ -1031,17 +1145,22 @@ void MainWindow::setSystemTitleBar(bool system)
 void MainWindow::updateProjectMenu()
 {
     projectMenu_->clear();
-    const QStringList recent = QSettings().value(QStringLiteral("recentFolders")).toStringList();
-    for (const QString &folder : recent) {
-        if (folder == folder_ || !QFileInfo(folder).isDir())
+    projectMenu_->addAction(tr("Project Settings…"), this, &MainWindow::showProjectSettings);
+    projectMenu_->addSeparator();
+    int listed = 0;
+    for (const ProjectConfig &project : ProjectStore::all()) {
+        if (project.path == folder_ || !QFileInfo(project.path).isDir() || listed == 10)
             continue;
+        const QString folder = project.path;
         QAction *action = projectMenu_->addAction(QFileInfo(folder).fileName(), this, [this, folder] { openFolder(folder); });
         action->setToolTip(QDir::toNativeSeparators(folder));
+        ++listed;
     }
     projectMenu_->setToolTipsVisible(true);
-    if (!projectMenu_->isEmpty())
+    if (listed > 0)
         projectMenu_->addSeparator();
     projectMenu_->addAction(tr("Open Folder…"), QKeySequence(tr("Ctrl+K, Ctrl+O")), this, &MainWindow::chooseFolder);
+    projectMenu_->addAction(tr("Close Project"), this, &MainWindow::closeProject);
     titleBar_->setProject(QFileInfo(folder_).fileName(), QDir::toNativeSeparators(folder_), projectMenu_);
 }
 
@@ -1176,6 +1295,18 @@ void MainWindow::onCurrentTabChanged()
         updateClaudeMarks();
     if (filesPanel_->alwaysSelectOpenedFile() && !path.isEmpty())
         fileTree_->select(path);
+    updateServerNotice();
+}
+
+void MainWindow::updateServerNotice()
+{
+    const EditorWidget *editor = editorTabs_->currentEditor();
+    const QString failure = editor ? languageServers_->failure(editor->languageId()) : QString();
+    if (failure.isEmpty() || dismissedServerNotices_.contains(failure)) {
+        serverNotice_->hide();
+        return;
+    }
+    serverNotice_->showNotice(tr("Completion is limited to the words of the project: %1").arg(failure), tr("Retry"));
 }
 
 void MainWindow::updateClaudeMarks()

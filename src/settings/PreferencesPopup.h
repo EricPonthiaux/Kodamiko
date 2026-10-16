@@ -35,6 +35,8 @@ public:
     void load(const Preferences &preferences, const QList<Keymap::Command> &commands,
               const Keymap::Overrides &overrides);
     void applyTheme(const Theme &theme);
+    // Names of the language servers found on this machine, for the Editor page.
+    void setInstalledServers(const QStringList &names);
 
     Preferences preferences() const;
     Keymap::Overrides shortcutOverrides() const { return overrides_; }
@@ -87,6 +89,9 @@ private:
     ToggleSwitch *codeFolding_ = nullptr;
     ToggleSwitch *wrapLines_ = nullptr;
     ToggleSwitch *showWhitespace_ = nullptr;
+    ToggleSwitch *autoCompletion_ = nullptr;
+    ToggleSwitch *languageServers_ = nullptr;
+    QLabel *serversFound_ = nullptr;
     ToggleSwitch *formatOnSave_ = nullptr;
     ToggleSwitch *alwaysSelectOpenedFile_ = nullptr;
     ToggleSwitch *snapshotBeforePrompt_ = nullptr;

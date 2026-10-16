@@ -1,8 +1,11 @@
 #include "MainWindow.h"
+#include "projects/ProjectConfig.h"
+#include "welcome/WelcomeWindow.h"
 #include "syntax/AppFonts.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QDir>
 #include <QProxyStyle>
 #include <QSettings>
 #include <QStyleOption>
@@ -93,6 +96,29 @@ void adoptLegacySettings()
     settings.setValue(adopted, true);
 }
 
+void showWelcome();
+
+// A main window on `folder`; Close Project brings the welcome window back.
+void openProject(const QString &folder)
+{
+    auto *window = new MainWindow(folder);
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    QObject::connect(window, &MainWindow::projectClosed, [] { showWelcome(); });
+    window->show();
+}
+
+// The projects opened before; the one chosen opens in a main window.
+void showWelcome()
+{
+    auto *welcome = new WelcomeWindow;
+    welcome->setAttribute(Qt::WA_DeleteOnClose);
+    QObject::connect(welcome, &WelcomeWindow::projectChosen, welcome, [welcome](const ProjectConfig &project) {
+        openProject(project.path);
+        welcome->close();
+    });
+    welcome->show();
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -117,8 +143,11 @@ int main(int argc, char *argv[])
     parser.addPositionalArgument(QStringLiteral("folder"), QStringLiteral("Project folder to open"));
     parser.process(app);
 
+    // A folder given: straight to it, set up from its files if it is new.
     const QStringList arguments = parser.positionalArguments();
-    MainWindow window(arguments.isEmpty() ? QString() : arguments.first());
-    window.show();
+    if (arguments.isEmpty())
+        showWelcome();
+    else
+        openProject(QDir(arguments.first()).absolutePath());
     return app.exec();
 }

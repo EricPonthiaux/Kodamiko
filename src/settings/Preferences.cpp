@@ -23,7 +23,9 @@ Preferences Preferences::load()
     preferences.editor.codeFolding = settings.value(QStringLiteral("editor/codeFolding"), true).toBool();
     preferences.editor.wrapLines = settings.value(QStringLiteral("editor/wrapLines"), false).toBool();
     preferences.editor.showWhitespace = settings.value(QStringLiteral("editor/showWhitespace"), false).toBool();
+    preferences.editor.autoCompletion = settings.value(QStringLiteral("editor/autoCompletion"), true).toBool();
     preferences.formatOnSave = settings.value(QStringLiteral("formatOnSave"), false).toBool();
+    preferences.languageServers = settings.value(QStringLiteral("editor/languageServers"), true).toBool();
 
     preferences.alwaysSelectOpenedFile = settings.value(QStringLiteral("alwaysSelectOpenedFile"), false).toBool();
 
@@ -43,7 +45,9 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("editor/codeFolding"), editor.codeFolding);
     settings.setValue(QStringLiteral("editor/wrapLines"), editor.wrapLines);
     settings.setValue(QStringLiteral("editor/showWhitespace"), editor.showWhitespace);
+    settings.setValue(QStringLiteral("editor/autoCompletion"), editor.autoCompletion);
     settings.setValue(QStringLiteral("formatOnSave"), formatOnSave);
+    settings.setValue(QStringLiteral("editor/languageServers"), languageServers);
 
     settings.setValue(QStringLiteral("alwaysSelectOpenedFile"), alwaysSelectOpenedFile);
 

@@ -3,6 +3,7 @@
 #include "claude/ClaudeActivity.h"
 #include "claude/HookServer.h"
 #include "navigation/RecentFiles.h"
+#include "projects/ProjectConfig.h"
 #include "settings/Keymap.h"
 #include "syntax/Theme.h"
 
@@ -10,9 +11,13 @@
 #include <QSet>
 #include <QMainWindow>
 
+#include <memory>
+
 class ChangesView;
 class CodeNavigator;
 class CommandPalette;
+class CompletionService;
+class LanguageServers;
 class EditorStatus;
 class EditorTabs;
 class FileStatusReader;
@@ -28,6 +33,7 @@ class HistoryView;
 class OutlineView;
 class PreferencesPopup;
 class PrerequisitesDialog;
+class ProjectSettingsPopup;
 class QAction;
 class QActionGroup;
 class QLabel;
@@ -40,9 +46,11 @@ class QToolButton;
 class RepositoryWatcher;
 class SidePanel;
 class NewBranchPopup;
+class NoticeBar;
 class SnapshotsPopup;
 class SymbolIndex;
 class TerminalWidget;
+class Toolchains;
 struct Preferences;
 struct ProcessSpec;
 
@@ -58,6 +66,11 @@ public:
 
     explicit MainWindow(const QString &folder, QWidget *parent = nullptr);
     ~MainWindow() override;
+
+signals:
+    // File ▸ Close Project: the window closes, the welcome window should
+    // show. Emitted before it closes.
+    void projectClosed();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -82,6 +95,12 @@ private:
     void restoreSession();
     void chooseFolder();
     void chooseFile();
+    // File ▸ Project Settings.
+    void showProjectSettings();
+    void applyProject(const ProjectConfig &project);
+    void closeProject();
+    // Says when the project lacks tools Duet can download.
+    void updateToolsNotice();
     bool startClaudeSession(QString *error = nullptr);
     void showClaudeSession();
     void newShell();
@@ -115,6 +134,9 @@ private:
     void showCommandPalette();
     // The current tab changed: find bar, status bar widgets, recent files.
     void onCurrentTabChanged();
+    // Bar above the editor when the current file's language server cannot
+    // run, saying why.
+    void updateServerNotice();
     // Find bar of the editor, in Edit mode only.
     void showFind(bool withReplace);
     void showGoTo(int tab);
@@ -162,6 +184,15 @@ private:
     // Files written by Claude since the last prompt: a dot in the tree.
     QSet<QString> claudeTouched_;
     SymbolIndex *symbolIndex_ = nullptr;
+    CompletionService *completion_ = nullptr;
+    LanguageServers *languageServers_ = nullptr;
+    std::unique_ptr<Toolchains> toolchains_;
+    ProjectConfig project_;
+    ProjectSettingsPopup *projectSettings_ = nullptr;
+    NoticeBar *toolsNotice_ = nullptr;
+    bool closingProject_ = false;
+    NoticeBar *serverNotice_ = nullptr;
+    QSet<QString> dismissedServerNotices_; // closed by the user, by message
     CodeNavigator *navigator_ = nullptr;
     OutlineView *outlineView_ = nullptr;
     SidePanel *sidebar_ = nullptr;
