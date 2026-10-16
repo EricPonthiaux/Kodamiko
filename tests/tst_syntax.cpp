@@ -12,13 +12,13 @@ class TestSyntax : public QObject {
     Q_OBJECT
 
 private:
-    // Style Scintilla attendu pour une catégorie du thème.
+    // Expected Scintilla style for a theme category.
     static int styleFor(const Theme &theme, const char *capture)
     {
         return ScintillaStyles::firstSyntaxStyle + theme.syntaxStyleIndex(QString::fromLatin1(capture));
     }
 
-    // Style posé sur la première occurrence de `word` dans `editor`.
+    // Style set on the first occurrence of `word` in `editor`.
     static int styleOfWord(QsciScintilla &editor, const char *word)
     {
         const int position = editor.text().toUtf8().indexOf(word);
@@ -26,7 +26,7 @@ private:
         return editor.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position);
     }
 
-    // Charge `code` dans un éditeur colorié pour `languageId`, le texte entier stylé.
+    // Loads `code` into an editor highlighted for `languageId`, with the whole text styled.
     static std::unique_ptr<ISyntaxHighlighter> highlight(QsciScintilla &editor, const QString &languageId,
                                                          const char *code, const Theme &theme)
     {
@@ -40,6 +40,27 @@ private:
     }
 
 private slots:
+    void themesAreListedByName()
+    {
+        QStringList names;
+        for (const Theme &theme : Theme::all())
+            names.append(theme.name);
+        QCOMPARE(names, QStringList({"dark", "purple", "light"}));
+        const Theme purple = Theme::named("purple");
+        QVERIFY(purple.isDark);
+        QVERIFY(purple.accent.isValid() && purple.window.isValid() && purple.findHighlight.isValid());
+        QVERIFY(purple.syntaxStyleIndex(u"function.method") >= 0);
+        QVERIFY(!Theme::named("light").isDark);
+        // Every theme has the interface colors the controls' style sheet uses.
+        for (const Theme &theme : Theme::all()) {
+            for (const QColor &color : {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent,
+                                        theme.accentText, theme.mutedText, theme.border, theme.line, theme.hover,
+                                        theme.gradientStart, theme.gradientEnd})
+                QVERIFY2(color.isValid(), qPrintable(theme.name));
+        }
+        QCOMPARE(Theme::named("unknown").name, QString("dark"));
+    }
+
     void languageForFile_data()
     {
         QTest::addColumn<QString>("path");

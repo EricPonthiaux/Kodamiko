@@ -1,16 +1,17 @@
-# Dépendances tierces, téléchargées à la configuration et compilées en statique.
+# Third-party dependencies, downloaded at configure time and built statically.
 #
-#   QScintilla   composant d'édition (Scintilla pour Qt)        GPLv3
-#   tree-sitter  analyse syntaxique incrémentale + grammaires   MIT
-#   libvterm     émulation de terminal VT220/xterm              MIT
-#   libgit2      lecture du dépôt git (mode Diff)               GPLv2 + linking exception
+#   QScintilla   editing component (Scintilla for Qt)           GPLv3
+#   tree-sitter  incremental parsing + grammars                 MIT
+#   libvterm     VT220/xterm terminal emulation                 MIT
+#   libgit2      git repository reading (Diff mode)             GPLv2 + linking exception
+#   cmark-gfm    GitHub's Markdown parser (Markdown preview)    BSD-2-Clause
 
 include(FetchContent)
 set(FETCHCONTENT_QUIET ON)
 
-# Pointer SOURCE_SUBDIR vers un dossier inexistant fait que FetchContent
-# télécharge le projet sans l'ajouter au build : on définit nous-mêmes ses
-# cibles (fichiers inclus en fin de fichier), plus simples que les siennes.
+# Pointing SOURCE_SUBDIR at a nonexistent folder makes FetchContent
+# download the project without adding it to the build: we define its
+# targets ourselves (files included at the end), simpler than its own.
 set(DOWNLOAD_ONLY "_download_only_")
 
 FetchContent_Declare(qscintilla
@@ -65,6 +66,12 @@ FetchContent_Declare(libgit2
     GIT_TAG v1.9.7
     GIT_SHALLOW ON)
 
+FetchContent_Declare(cmark_gfm
+    GIT_REPOSITORY https://github.com/github/cmark-gfm.git
+    GIT_TAG 0.29.0.gfm.13
+    GIT_SHALLOW ON
+    EXCLUDE_FROM_ALL) # only its libraries are built, not its command
+
 FetchContent_MakeAvailable(qscintilla tree_sitter tree_sitter_c tree_sitter_cpp tree_sitter_java
                            tree_sitter_javascript tree_sitter_typescript libvterm)
 
@@ -72,3 +79,4 @@ include(${CMAKE_CURRENT_LIST_DIR}/QScintilla.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/TreeSitter.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/Libvterm.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/Libgit2.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/CmarkGfm.cmake)

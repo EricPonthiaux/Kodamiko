@@ -4,13 +4,16 @@
 #include "syntax/Theme.h"
 #include "syntax/TreeSitterGrammars.h"
 
+#include <QHeaderView>
+#include <QLineEdit>
+#include <QScrollBar>
 #include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QtTest>
 
 namespace {
 
-// Structure sous forme lisible : « Foo{bar,baz} » ; genre d'un symbole par kindOf().
+// Outline in readable form: "Foo{bar,baz}"; a symbol's kind via kindOf().
 QString describe(const std::vector<OutlineSymbol> &symbols)
 {
     QStringList parts;
@@ -101,7 +104,7 @@ private slots:
                            "}\n";
         const auto symbols = outline("cpp", code);
         QCOMPARE(describe(symbols),
-                 QStringLiteral("app{Foo{Foo,size,run,n_},Foo::run,(anonyme){helper},Id}"));
+                 QStringLiteral("app{Foo{Foo,size,run,n_},Foo::run,(anonymous){helper},Id}"));
         QCOMPARE(find(symbols, "size")->kind, SymbolKind::Method);
         QCOMPARE(find(symbols, "Foo::run")->kind, SymbolKind::Method);
         QCOMPARE(find(symbols, "helper")->kind, SymbolKind::Function);
@@ -179,23 +182,23 @@ private slots:
     {
         const char *code = "# Enlumine\n"
                            "Intro\n"
-                           "## Compilation\n"
+                           "## Building\n"
                            "```sh\n"
-                           "# pas un titre\n"
+                           "# not a heading\n"
                            "```\n"
-                           "Utilisation\n"
-                           "-----------\n"
-                           "### Raccourcis ###\n"
-                           "- liste\n"
+                           "Usage\n"
+                           "-----\n"
+                           "### Shortcuts ###\n"
+                           "- list\n"
                            "---\n"
-                           "# Licence\n";
+                           "# License\n";
         const auto symbols = outline("markdown", code);
-        QCOMPARE(describe(symbols), QStringLiteral("Enlumine{Compilation,Utilisation{Raccourcis}},Licence"));
-        const OutlineSymbol *compilation = find(symbols, "Compilation");
+        QCOMPARE(describe(symbols), QStringLiteral("Enlumine{Building,Usage{Shortcuts}},License"));
+        const OutlineSymbol *compilation = find(symbols, "Building");
         QCOMPARE(compilation->startLine, 2);
         QCOMPARE(compilation->endLine, 5);
-        QCOMPARE(compilation->position, QByteArray(code).indexOf("Compilation"));
-        QCOMPARE(find(symbols, "Utilisation")->endLine, 10);
+        QCOMPARE(compilation->position, QByteArray(code).indexOf("Building"));
+        QCOMPARE(find(symbols, "Usage")->endLine, 10);
     }
 
     void cmake()
@@ -224,7 +227,7 @@ private slots:
         EditorWidget editor(Theme::dark());
         QString error;
         QVERIFY(editor.load(path, &error));
-        editor.show(); // QScintilla signale le déplacement du curseur à l'affichage
+        editor.show(); // QScintilla reports the cursor move when shown
 
         OutlineView view;
         view.show();
@@ -233,20 +236,51 @@ private slots:
         QCOMPARE(tree->topLevelItemCount(), 2);
         QCOMPARE(tree->topLevelItem(1)->text(0), QStringLiteral("second"));
 
-        // Le curseur dans le corps de second() sélectionne second.
+        // The cursor in the body of second() selects second.
         editor.setCursorPosition(3, 2);
         QTRY_COMPARE(tree->currentItem(), tree->topLevelItem(1));
 
-        // Un clic sur first place le curseur sur son nom.
+        // A click on first places the cursor on its name.
         emit tree->itemClicked(tree->topLevelItem(0), 0);
         QCOMPARE(int(editor.SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)), 4);
 
-        // Une modification est prise en compte après le délai.
+        // An edit is taken into account after the delay.
         editor.append(QStringLiteral("int third() { return 3; }\n"));
         QTRY_COMPARE(tree->topLevelItemCount(), 3);
 
         view.setEditor(nullptr);
         QCOMPARE(tree->topLevelItemCount(), 0);
+    }
+
+    void viewScrollsLongNamesHorizontally()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("main.cpp"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("int " + QByteArray(120, 'n') + "() { return 1; }\nint short_() { return 2; }\n");
+        file.close();
+
+        EditorWidget editor(Theme::dark());
+        QString error;
+        QVERIFY(editor.load(path, &error));
+
+        OutlineView view;
+        view.resize(200, 300);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        view.setEditor(&editor);
+        QTreeWidget *tree = view.tree();
+        QCOMPARE(tree->topLevelItemCount(), 2);
+
+        // The long name is not truncated: the column overflows, the scrollbar appears.
+        QTRY_VERIFY(tree->header()->sectionSize(0) > tree->viewport()->width());
+        QTRY_VERIFY(tree->horizontalScrollBar()->maximum() > 0);
+
+        // Filtered out, it no longer counts: the column goes back to the view's width.
+        view.findChild<QLineEdit *>()->setText(QStringLiteral("short"));
+        QTRY_COMPARE(tree->header()->sectionSize(0), tree->viewport()->width());
+        QTRY_COMPARE(tree->horizontalScrollBar()->maximum(), 0);
     }
 };
 

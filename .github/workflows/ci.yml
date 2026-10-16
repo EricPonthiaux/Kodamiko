@@ -1,5 +1,5 @@
-# Compile, teste et empaquette l'éditeur sur Linux, Windows et macOS.
-# Les paquets (AppImage, zip Windows, dmg) sont publiés comme artefacts.
+# Builds, tests and packages the editor on Linux, Windows and macOS.
+# The packages (AppImage, Windows zip, dmg) are published as artifacts.
 name: CI
 
 on:
@@ -21,40 +21,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Installer Qt
+      - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
+          modules: qtwebengine qtwebchannel qtpositioning
           cache: true
 
-      - name: Outils Linux
+      - name: Linux tools
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev libfuse2
 
-      - name: Outils macOS
+      - name: macOS tools
         if: runner.os == 'macOS'
         run: brew install ninja
 
-      - name: Environnement MSVC
+      - name: MSVC environment
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Cache des dépendances téléchargées
+      - name: Cache downloaded dependencies
         uses: actions/cache@v4
         with:
           path: build/_deps/*-subbuild
           key: deps-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake') }}
 
-      - name: Configurer
+      - name: Configure
         run: cmake --preset default
 
-      - name: Compiler
+      - name: Build
         run: cmake --build --preset default
 
-      - name: Tester
+      - name: Test
         run: ctest --preset default
 
-      - name: Paquet Linux (AppImage)
+      - name: Linux package (AppImage)
         if: runner.os == 'Linux'
         run: |
           cmake --install build --component enlumine --prefix AppDir/usr
@@ -66,7 +67,7 @@ jobs:
             --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/enlumine.svg \
             --executable AppDir/usr/bin/enlumine-hook
 
-      - name: Paquet Windows (zip)
+      - name: Windows package (zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -74,13 +75,13 @@ jobs:
           windeployqt --release --no-translations Enlumine/bin/enlumine.exe
           Compress-Archive -Path Enlumine/* -DestinationPath Enlumine-windows.zip
 
-      - name: Paquet macOS (dmg)
+      - name: macOS package (dmg)
         if: runner.os == 'macOS'
         run: |
           cmake --install build --component enlumine --prefix dist
           macdeployqt dist/Enlumine.app -dmg -executable=dist/Enlumine.app/Contents/MacOS/enlumine-hook
 
-      - name: Publier le paquet
+      - name: Upload the package
         uses: actions/upload-artifact@v4
         with:
           name: enlumine-${{ matrix.os }}

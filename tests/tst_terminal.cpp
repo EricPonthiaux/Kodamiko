@@ -3,12 +3,43 @@
 #include "terminal/VtScreen.h"
 
 #include <QSignalSpy>
+#include <QKeyEvent>
 #include <QtTest>
 
 class TestTerminal : public QObject {
     Q_OBJECT
 
 private slots:
+    void applicationShortcutsPassTheTerminal()
+    {
+        const auto passes = [](int key, Qt::KeyboardModifiers modifiers, const QString &text = {}) {
+            const QKeyEvent event(QEvent::ShortcutOverride, key, modifiers, text);
+            return TerminalWidget::isApplicationShortcut(event);
+        };
+        // The keys programs use stay in the terminal.
+        QVERIFY(!passes(Qt::Key_C, Qt::ControlModifier));
+        QVERIFY(!passes(Qt::Key_R, Qt::ControlModifier));
+        QVERIFY(!passes(Qt::Key_B, Qt::AltModifier));
+        QVERIFY(!passes(Qt::Key_Escape, Qt::NoModifier));
+        QVERIFY(!passes(Qt::Key_Tab, Qt::ShiftModifier));
+        QVERIFY(!passes(Qt::Key_A, Qt::NoModifier, "a"));
+        // Mode switching and F11, as before.
+        QVERIFY(passes(Qt::Key_F11, Qt::NoModifier));
+        QVERIFY(passes(Qt::Key_2, Qt::ControlModifier));
+#ifndef Q_OS_MACOS
+        // Combinations terminal programs do not use go to the application.
+        QVERIFY(passes(Qt::Key_P, Qt::ControlModifier | Qt::ShiftModifier));
+        QVERIFY(passes(Qt::Key_N, Qt::ControlModifier | Qt::ShiftModifier));
+        QVERIFY(passes(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier));
+        QVERIFY(passes(Qt::Key_N, Qt::ControlModifier | Qt::AltModifier | Qt::ShiftModifier));
+        QVERIFY(passes(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier));
+        // Except the terminal's copy and paste, and AltGr characters.
+        QVERIFY(!passes(Qt::Key_C, Qt::ControlModifier | Qt::ShiftModifier));
+        QVERIFY(!passes(Qt::Key_V, Qt::ControlModifier | Qt::ShiftModifier));
+        QVERIFY(!passes(Qt::Key_At, Qt::ControlModifier | Qt::AltModifier, "@"));
+#endif
+    }
+
     void writesTextAndMovesCursor()
     {
         VtScreen screen(5, 20);
@@ -90,7 +121,7 @@ private slots:
         };
         QVERIFY(shortcut(Qt::Key_2, QStringLiteral("2"), 0, 0));
         QVERIFY(!shortcut(Qt::Key_W, QStringLiteral("w"), 0, 0));
-        // AZERTY : la touche 2 donne « é » sans Maj.
+        // AZERTY: the 2 key produces "é" without Shift.
 #if defined(Q_OS_MACOS)
         QVERIFY(shortcut(Qt::Key_Eacute, QStringLiteral("é"), 0, 0x13));
 #elif defined(Q_OS_WIN)
@@ -106,12 +137,12 @@ private slots:
         VtScreen screen(2, 10);
         QByteArray output;
         connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
-        screen.feed("\x1b[?2004h"); // le programme active le collage entre crochets
+        screen.feed("\x1b[?2004h"); // the program enables bracketed paste
         screen.paste("a\nb");
         QCOMPARE(output, QByteArray("\x1b[200~a\rb\x1b[201~"));
     }
 
-    // Un vrai programme dans un vrai PTY : sa sortie arrive et sa fin est signalée.
+    // A real program in a real PTY: its output arrives and its exit is reported.
     void runsAProgramInAPty()
     {
         auto pty = createPty();
@@ -132,7 +163,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
         QVERIFY(output.contains("enlumine-ok"));
 #ifndef Q_OS_WIN
-        QVERIFY(output.contains("33 91")); // la taille de la grille est transmise au programme
+        QVERIFY(output.contains("33 91")); // the grid size is passed on to the program
         QCOMPARE(finished.first().first().toInt(), 3);
 #endif
     }

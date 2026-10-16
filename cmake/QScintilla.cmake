@@ -1,5 +1,5 @@
-# Cible statique `qscintilla`, reprise de src/qscintilla.pro (QScintilla ne
-# fournit qu'un projet qmake).
+# Static `qscintilla` target, adapted from src/qscintilla.pro (QScintilla
+# only ships a qmake project).
 
 set(QSCI_ROOT ${qscintilla_SOURCE_DIR})
 
@@ -29,7 +29,7 @@ target_compile_definitions(qscintilla PRIVATE SCINTILLA_QT SCI_LEXER INCLUDE_DEP
 target_link_libraries(qscintilla PUBLIC Qt6::Widgets Qt6::PrintSupport)
 set_target_properties(qscintilla PROPERTIES AUTOMOC ON CXX_STANDARD 17)
 
-# Code tiers : on ne veut pas de ses avertissements dans notre build.
+# Third-party code: we do not want its warnings in our build.
 if(MSVC)
     target_compile_options(qscintilla PRIVATE /w)
 else()

@@ -1,7 +1,9 @@
 #include "git/FilePatch.h"
+#include "git/FileStatuses.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
 #include "git/GitProcess.h"
+#include "git/LineChanges.h"
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
 
@@ -33,13 +35,13 @@ QByteArray git(const QTemporaryDir &dir, const QStringList &arguments)
     return Git::run(dir.path(), arguments);
 }
 
-// Contenu d'un fichier dans l'index.
+// Contents of a file in the index.
 QByteArray indexed(const QTemporaryDir &dir, const QString &path)
 {
     return git(dir, {"show", ":" + path});
 }
 
-// Dépôt avec un premier commit contenant `files`.
+// Repository with a first commit containing `files`.
 void initRepository(const QTemporaryDir &dir, const QHash<QString, QByteArray> &files)
 {
     for (auto it = files.begin(); it != files.end(); ++it)
@@ -55,7 +57,7 @@ RepositoryStatus status(const QTemporaryDir &dir)
 {
     const std::optional<RepositoryStatus> result = RepositoryStatus::read(dir.path());
     if (!result)
-        qFatal("pas de dépôt git");
+        qFatal("no git repository");
     return *result;
 }
 
@@ -68,7 +70,7 @@ const FileDiff *find(const QList<FileDiff> &diffs, const QString &path)
     return nullptr;
 }
 
-// Lignes « + » / « - » du patch dont le texte vérifie `accept`.
+// "+" / "-" lines of the patch whose text satisfies `accept`.
 PatchSelection selectLines(const FilePatch &patch, const std::function<bool(const QByteArray &)> &accept)
 {
     PatchSelection selection;
@@ -90,9 +92,9 @@ private slots:
     void initTestCase()
     {
         if (QStandardPaths::findExecutable("git").isEmpty())
-            QSKIP("git indisponible");
-        // Ni la configuration de l'utilisateur (signature des commits…) ni
-        // celle du système.
+            QSKIP("git unavailable");
+        // Neither the user's configuration (commit signing…) nor the
+        // system's.
         QVERIFY(config_.open());
         qputenv("GIT_CONFIG_GLOBAL", config_.fileName().toUtf8());
         qputenv("GIT_CONFIG_NOSYSTEM", "1");
@@ -202,7 +204,7 @@ private slots:
         QCOMPARE(patch.locate(6), std::make_pair(0, 1));
         QCOMPARE(patch.locate(9), std::make_pair(1, 0));
         QVERIFY(patch.partial({}, PatchDirection::Forward).isEmpty());
-        // Le second bloc seul : sa ligne de contexte n'appartient pas au premier.
+        // The second hunk alone: its context line does not belong to the first.
         QCOMPARE(patch.partial(patch.selectHunk(1), PatchDirection::Forward),
                  QByteArray("diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -10,1 +10,1 @@\n-x\n+X\n"));
     }
@@ -216,14 +218,14 @@ private slots:
         RepositoryStatus result = status(project);
         const FilePatch patch = FilePatch::parse(result.unstaged.first().patch);
         QCOMPARE(patch.hunks.size(), 2);
-        // Seulement les lignes du second bloc qui touchent « 11 », pas l'ajout final.
+        // Only the lines of the second hunk that touch "11", not the final addition.
         const PatchSelection selection = selectLines(patch, [](const QByteArray &line) {
             return line == "-11" || line == "+ELEVEN";
         });
         GitOperations::applyToIndex(result.info, patch.partial(selection, PatchDirection::Forward), PatchDirection::Forward);
         QCOMPARE(indexed(project, "f.txt"), QByteArray("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\nELEVEN\n12\n"));
 
-        // Puis le premier bloc : son début ne dépend pas de ce qui est déjà indexé.
+        // Then the first hunk: its start does not depend on what is already staged.
         result = status(project);
         const FilePatch rest = FilePatch::parse(result.unstaged.first().patch);
         GitOperations::applyToIndex(result.info, rest.partial(rest.selectHunk(0), PatchDirection::Forward),
@@ -256,7 +258,7 @@ private slots:
         write(project, "new.txt", "1\n2\n3\n");
         QFile::remove(project.filePath("old.txt"));
 
-        // Une partie d'un fichier non suivi : il est créé dans l'index.
+        // Part of an untracked file: it is created in the index.
         RepositoryStatus result = status(project);
         FilePatch created = FilePatch::parse(find(result.unstaged, "new.txt")->patch);
         GitOperations::applyToIndex(result.info,
@@ -265,7 +267,7 @@ private slots:
                                     PatchDirection::Forward);
         QCOMPARE(indexed(project, "new.txt"), QByteArray("1\n3\n"));
 
-        // Une partie d'une suppression : le fichier reste dans l'index.
+        // Part of a deletion: the file stays in the index.
         const FilePatch deleted = FilePatch::parse(find(result.unstaged, "old.txt")->patch);
         GitOperations::applyToIndex(result.info,
                                     deleted.partial(selectLines(deleted, [](const QByteArray &line) { return line == "-y"; }),
@@ -273,7 +275,7 @@ private slots:
                                     PatchDirection::Forward);
         QCOMPARE(indexed(project, "old.txt"), QByteArray("x\nz\n"));
 
-        // Retirer une partie d'un fichier créé : il reste dans l'index.
+        // Unstaging part of a created file: it stays in the index.
         result = status(project);
         created = FilePatch::parse(find(result.staged, "new.txt")->patch);
         GitOperations::applyToIndex(result.info,
@@ -345,15 +347,15 @@ private slots:
         RepositoryInfo info = *RepositoryInfo::read(project.path());
         GitOperations::stage(info, {"a.txt"});
 
-        const QString id = GitOperations::commit(info, "#12 premier\n\ndétails", false);
+        const QString id = GitOperations::commit(info, "#12 first — café ✓\n\ndetails", false);
         info = *RepositoryInfo::read(project.path());
         QCOMPARE(info.headId, id);
-        QCOMPARE(info.headMessage, QString("#12 premier\n\ndétails\n"));
+        QCOMPARE(info.headMessage, QString("#12 first — café ✓\n\ndetails\n"));
         QVERIFY(status(project).staged.isEmpty());
 
-        GitOperations::commit(info, "reformulé", true);
+        GitOperations::commit(info, "reworded", true);
         QCOMPARE(QString::fromUtf8(git(project, {"rev-list", "--count", "HEAD"})).trimmed(), QString("2"));
-        QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("reformulé\n"));
+        QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("reworded\n"));
     }
 
     void commitRunsTheRepositoryHooks()
@@ -363,7 +365,7 @@ private slots:
 #endif
         QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
-        write(project, ".git/hooks/pre-commit", "#!/bin/sh\necho 'refusé par le hook' >&2\nexit 1\n");
+        write(project, ".git/hooks/pre-commit", "#!/bin/sh\necho 'rejected by the hook' >&2\nexit 1\n");
         QFile::setPermissions(project.filePath(".git/hooks/pre-commit"),
                               QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
         write(project, "a.txt", "b\n");
@@ -371,9 +373,9 @@ private slots:
         GitOperations::stage(info, {"a.txt"});
         try {
             GitOperations::commit(info, "message", false);
-            QFAIL("le hook aurait dû refuser le commit");
+            QFAIL("the hook should have rejected the commit");
         } catch (const GitError &error) {
-            QVERIFY(QString::fromStdString(error.what()).contains("refusé par le hook"));
+            QVERIFY(QString::fromStdString(error.what()).contains("rejected by the hook"));
         }
     }
 
@@ -381,34 +383,34 @@ private slots:
     {
         QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
-        write(project, "a.txt", "modifié\n");
-        write(project, "b.txt", "indexé\n");
+        write(project, "a.txt", "modified\n");
+        write(project, "b.txt", "staged\n");
         git(project, {"add", "b.txt"});
-        write(project, "b.txt", "indexé puis modifié\n");
-        write(project, "dir/untracked.txt", "non suivi\n");
+        write(project, "b.txt", "staged then modified\n");
+        write(project, "dir/untracked.txt", "untracked\n");
 
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
         GitOperations::discard(info, {"a.txt", "b.txt", "dir/untracked.txt"});
         QCOMPARE(read(project, "a.txt"), QByteArray("a\n"));
-        QCOMPARE(read(project, "b.txt"), QByteArray("indexé\n")); // version de l'index
+        QCOMPARE(read(project, "b.txt"), QByteArray("staged\n")); // index version
         QVERIFY(!QFileInfo::exists(project.filePath("dir")));
-        QCOMPARE(indexed(project, "b.txt"), QByteArray("indexé\n"));
+        QCOMPARE(indexed(project, "b.txt"), QByteArray("staged\n"));
 
         QList<Snapshot> snapshots = Snapshots::list(project.path());
         QCOMPARE(snapshots.size(), 1);
         QCOMPARE(snapshots.first().paths, QStringList({"a.txt", "b.txt", "dir/untracked.txt"}));
-        // Hors des branches : l'historique n'a pas bougé.
+        // Outside the branches: the history has not moved.
         QCOMPARE(QString::fromUtf8(git(project, {"rev-list", "--count", "HEAD"})).trimmed(), QString("1"));
 
         Snapshots::restore(info, snapshots.first());
-        QCOMPARE(read(project, "a.txt"), QByteArray("modifié\n"));
-        QCOMPARE(read(project, "b.txt"), QByteArray("indexé puis modifié\n"));
-        QCOMPARE(read(project, "dir/untracked.txt"), QByteArray("non suivi\n"));
-        QCOMPARE(indexed(project, "b.txt"), QByteArray("indexé\n"));
-        // La restauration elle-même est réversible.
+        QCOMPARE(read(project, "a.txt"), QByteArray("modified\n"));
+        QCOMPARE(read(project, "b.txt"), QByteArray("staged then modified\n"));
+        QCOMPARE(read(project, "dir/untracked.txt"), QByteArray("untracked\n"));
+        QCOMPARE(indexed(project, "b.txt"), QByteArray("staged\n"));
+        // The restore itself is reversible.
         snapshots = Snapshots::list(project.path());
         QCOMPARE(snapshots.size(), 2);
-        QVERIFY(snapshots.first().reason.startsWith("Avant la restauration"));
+        QVERIFY(snapshots.first().reason.startsWith("Before restoring"));
     }
 
     void discardSelectedLines()
@@ -439,6 +441,84 @@ private slots:
         QCOMPARE(snapshots.first().reason, QString::number(Snapshots::maximumCount + 1));
     }
 
+    void snapshotOfWorkingTreeSkipsUnchangedStates()
+    {
+        QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        // A clean working directory is recorded too: it is what a prompt
+        // starting from it would be undone to.
+        QVERIFY(!Snapshots::createOfWorkingTree(info, "clean").isEmpty());
+        QVERIFY(Snapshots::createOfWorkingTree(info, "still clean").isEmpty());
+
+        write(project, "a.txt", "modified\n");
+        write(project, "new.txt", "untracked\n");
+        QVERIFY(!Snapshots::createOfWorkingTree(info, "first").isEmpty());
+        QVERIFY(Snapshots::createOfWorkingTree(info, "same state").isEmpty());
+        write(project, "a.txt", "modified again\n");
+        QVERIFY(!Snapshots::createOfWorkingTree(info, "second").isEmpty());
+
+        const QList<Snapshot> snapshots = Snapshots::list(project.path());
+        QCOMPARE(snapshots.size(), 3);
+        QCOMPARE(snapshots.first().reason, QString("second"));
+        QCOMPARE(snapshots.first().paths, QStringList({"a.txt", "new.txt"}));
+        QVERIFY(snapshots.first().wholeWorkingTree);
+        QVERIFY(snapshots.last().paths.isEmpty());
+
+        write(project, "a.txt", "lost\n");
+        QCOMPARE(Snapshots::restore(info, snapshots.first()), 1);
+        QCOMPARE(read(project, "a.txt"), QByteArray("modified again\n"));
+    }
+
+    void snapshotOfWorkingTreeUndoesAPrompt()
+    {
+        QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}, {"b.txt", "b\n"}, {".gitignore", "*.log\n"}});
+        write(project, "a.txt", "pending\n");
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        QVERIFY(!Snapshots::createOfWorkingTree(info, "before the prompt").isEmpty());
+
+        // What Claude does during the prompt: files clean until then are
+        // changed, created or deleted.
+        write(project, "a.txt", "pending, then edited\n");
+        write(project, "b.txt", "edited\n");
+        write(project, "dir/created.txt", "created\n");
+        write(project, "build.log", "ignored\n");
+        write(project, "b.txt", "rewritten\n");
+        git(project, {"add", "b.txt"});
+
+        const Snapshot before = Snapshots::list(project.path()).first();
+        QCOMPARE(Snapshots::restore(info, before), 3);
+        QCOMPARE(read(project, "a.txt"), QByteArray("pending\n"));
+        QCOMPARE(read(project, "b.txt"), QByteArray("b\n"));
+        QVERIFY(!QFileInfo::exists(project.filePath("dir")));
+        QCOMPARE(read(project, "build.log"), QByteArray("ignored\n"));
+        QCOMPARE(indexed(project, "b.txt"), QByteArray("rewritten\n")); // the index is not touched
+
+        // The restore can itself be undone.
+        const Snapshot restored = Snapshots::list(project.path()).first();
+        QVERIFY(restored.reason.startsWith("Before restoring"));
+        QVERIFY(restored.wholeWorkingTree);
+        Snapshots::restore(info, restored);
+        QCOMPARE(read(project, "a.txt"), QByteArray("pending, then edited\n"));
+        QCOMPARE(read(project, "b.txt"), QByteArray("rewritten\n"));
+        QCOMPARE(read(project, "dir/created.txt"), QByteArray("created\n"));
+    }
+
+    void snapshotOfWorkingTreeInUnbornRepository()
+    {
+        QTemporaryDir project;
+        initRepository(project, {});
+        write(project, "a.txt", "a\n");
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        QVERIFY(!Snapshots::createOfWorkingTree(info, "before").isEmpty());
+        write(project, "a.txt", "edited\n");
+        write(project, "b.txt", "created\n");
+        Snapshots::restore(info, Snapshots::list(project.path()).first());
+        QCOMPARE(read(project, "a.txt"), QByteArray("a\n"));
+        QVERIFY(!QFileInfo::exists(project.filePath("b.txt")));
+    }
+
     void commandsRunInOrderAndReportErrors()
     {
         GitCommands commands;
@@ -447,16 +527,132 @@ private slots:
         QSignalSpy busy(&commands, &GitCommands::busyChanged);
         QStringList order;
         bool callbackRan = false;
-        commands.run("un", [&order] { order << "un"; return QString("fait"); }, [&callbackRan] { callbackRan = true; });
-        commands.run("deux", []() -> QString { throw GitError("échec"); });
+        commands.run("one", [&order] { order << "one"; return QString("done"); }, [&callbackRan] { callbackRan = true; });
+        commands.run("two", []() -> QString { throw GitError("failure"); });
         QVERIFY(commands.isBusy());
         QTRY_COMPARE(busy.size(), 2);
         QVERIFY(!commands.isBusy());
         QVERIFY(callbackRan);
         QCOMPARE(succeeded.size(), 1);
-        QCOMPARE(succeeded.first().at(1).toString(), QString("fait"));
+        QCOMPARE(succeeded.first().at(1).toString(), QString("done"));
         QCOMPARE(failed.size(), 1);
-        QCOMPARE(failed.first().at(1).toString(), QString("échec"));
+        QCOMPARE(failed.first().at(1).toString(), QString("failure"));
+    }
+
+    void fileStatusesForTheTree()
+    {
+        QTemporaryDir project;
+        initRepository(project, {{"src/kept.cpp", "k\n"}, {"src/changed.cpp", "c\n"}, {".gitignore", "build/\n*.log\n"}});
+        write(project, "src/changed.cpp", "c2\n");
+        write(project, "src/new/added.cpp", "a\n");
+        git(project, {"add", "src/new/added.cpp"});
+        write(project, "notes.txt", "n\n");
+        write(project, "build/out.o", "o");
+        write(project, "debug.log", "l");
+
+        const QString root = QDir::cleanPath(project.path());
+        const FileStatusMap statuses = FileStatuses::read(root);
+        QCOMPARE(statuses.value(root + "/src/changed.cpp"), FileStatus::Modified);
+        QCOMPARE(statuses.value(root + "/src/new/added.cpp"), FileStatus::Added);
+        QCOMPARE(statuses.value(root + "/notes.txt"), FileStatus::Untracked);
+        QCOMPARE(statuses.value(root + "/build"), FileStatus::Ignored); // the folder, not its files
+        QCOMPARE(statuses.value(root + "/debug.log"), FileStatus::Ignored);
+        QVERIFY(!statuses.contains(root + "/src/kept.cpp"));
+        QVERIFY(!statuses.contains(root + "/build/out.o"));
+
+        // Folders take the worst state of their files.
+        const FileStatusMap folders = FileStatuses::folderStatuses(statuses, root);
+        QCOMPARE(folders.value(root + "/src"), FileStatus::Modified);
+        QCOMPARE(folders.value(root + "/src/new"), FileStatus::Added);
+        QCOMPARE(folders.value(root), FileStatus::Modified);
+        QVERIFY(!folders.contains(root + "/build"));
+
+        // From a subfolder, paths stay absolute and only its files appear.
+        const FileStatusMap sub = FileStatuses::read(root + "/src");
+        QCOMPARE(sub.value(root + "/src/changed.cpp"), FileStatus::Modified);
+        QVERIFY(!sub.contains(root + "/notes.txt"));
+
+        QTemporaryDir outside;
+        QVERIFY(FileStatuses::read(outside.path()).isEmpty());
+    }
+
+    void fileStatusReaderSignalsChanges()
+    {
+        QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        FileStatusReader reader;
+        QSignalSpy changed(&reader, &FileStatusReader::statusesChanged);
+        reader.setFolder(project.path());
+        write(project, "a.txt", "b\n");
+        reader.refresh(); // merged with the read in progress
+        const QString file = QDir::cleanPath(project.path()) + "/a.txt";
+        QTRY_VERIFY(reader.statuses().contains(file));
+        QCOMPARE(reader.statuses().value(file), FileStatus::Modified);
+        QVERIFY(changed.size() >= 2); // emptied, then read
+    }
+
+    void lineChangesOfEachKind()
+    {
+        const QByteArray base = "a\nb\nc\nd\ne\n";
+        // b modified, a line added after d, e deleted.
+        const QList<LineChange> changes = LineChanges::compute(base, "a\nB\nc\nd\nnew\n");
+        QCOMPARE(changes.size(), 2);
+        QCOMPARE(changes[0].kind(), LineChange::Kind::Modified);
+        QCOMPARE(changes[0].start, 1);
+        QCOMPARE(changes[0].count, 1);
+        QCOMPARE(changes[0].baseStart, 1);
+        QCOMPARE(changes[1].kind(), LineChange::Kind::Modified); // e replaced by new
+
+        const QList<LineChange> added = LineChanges::compute(base, "a\nb\nx\ny\nc\nd\ne\n");
+        QCOMPARE(added.size(), 1);
+        QCOMPARE(added[0].kind(), LineChange::Kind::Added);
+        QCOMPARE(added[0].start, 2);
+        QCOMPARE(added[0].count, 2);
+        QCOMPARE(added[0].baseStart, 2);
+        QCOMPARE(added[0].baseCount, 0);
+
+        const QList<LineChange> deleted = LineChanges::compute(base, "a\nd\ne\n");
+        QCOMPARE(deleted.size(), 1);
+        QCOMPARE(deleted[0].kind(), LineChange::Kind::Deleted);
+        QCOMPARE(deleted[0].start, 1); // the marker goes on "d"
+        QCOMPARE(deleted[0].baseStart, 1);
+        QCOMPARE(deleted[0].baseCount, 2);
+        QVERIFY(deleted[0].covers(1, 3));
+        QVERIFY(!deleted[0].covers(0, 3));
+
+        QVERIFY(LineChanges::compute(base, base).isEmpty());
+    }
+
+    void lineChangesRevertEveryKind()
+    {
+        const QByteArray base = "a\nb\nc\nd\ne";
+        const QList<QByteArray> currents = {"a\nB\nc\nd\ne", "a\nb\nx\nc\nd\ne", "a\nd\ne", "a\nb\nc\nd\ne\n",
+                                            "z\na\nb\nc\nd\ne", "a\nb\nc\nd", ""};
+        for (const QByteArray &current : currents) {
+            QByteArray text = current;
+            // Undoing the changes one by one, from the last, gives the base back.
+            QList<LineChange> changes = LineChanges::compute(base, text);
+            QVERIFY2(!changes.isEmpty(), current.constData());
+            for (auto it = changes.crbegin(); it != changes.crend(); ++it)
+                text = LineChanges::revert(base, text, *it);
+            QCOMPARE(text, base);
+        }
+    }
+
+    void lineChangesBaseIsTheIndex()
+    {
+        QTemporaryDir project;
+        initRepository(project, {{"a.txt", "one\n"}});
+        write(project, "a.txt", "two\n");
+        QCOMPARE(*LineChanges::indexVersion(project.filePath("a.txt")), QByteArray("one\n"));
+        git(project, {"add", "a.txt"});
+        QCOMPARE(*LineChanges::indexVersion(project.filePath("a.txt")), QByteArray("two\n"));
+
+        write(project, "untracked.txt", "x\n");
+        QVERIFY(!LineChanges::indexVersion(project.filePath("untracked.txt")));
+        QTemporaryDir outside;
+        write(outside, "b.txt", "x\n");
+        QVERIFY(!LineChanges::indexVersion(outside.filePath("b.txt")));
     }
 
 private:

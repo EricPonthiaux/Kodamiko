@@ -1,5 +1,5 @@
-# Un exécutable Qt Test par fichier tst_*.cpp. Les tests qui créent des
-# widgets tournent sans affichage (plateforme Qt « offscreen »).
+# One Qt Test executable per tst_*.cpp file. Tests that create
+# widgets run without a display (Qt "offscreen" platform).
 function(enlumine_add_test name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE enlumine_core Qt6::Test)
@@ -9,11 +9,22 @@ endfunction()
 
 enlumine_add_test(tst_syntax)
 enlumine_add_test(tst_outline)
+enlumine_add_test(tst_navigation)
 enlumine_add_test(tst_changes)
 enlumine_add_test(tst_git)
+enlumine_add_test(tst_history)
+enlumine_add_test(tst_editor)
+# The Markdown preview's web engine: no Chromium sandbox on CI machines.
+set_property(TEST tst_editor APPEND PROPERTY ENVIRONMENT "QTWEBENGINE_DISABLE_SANDBOX=1")
+enlumine_add_test(tst_search)
 enlumine_add_test(tst_textfile)
 enlumine_add_test(tst_imageview)
+enlumine_add_test(tst_workspace)
 enlumine_add_test(tst_terminal)
+enlumine_add_test(tst_setup)
+if(TARGET flowboard_ui)
+    enlumine_add_test(tst_diagramview)
+endif()
 enlumine_add_test(tst_claude)
 target_compile_definitions(tst_claude PRIVATE ENLUMINE_HOOK_PATH="$<TARGET_FILE:enlumine-hook>")
 add_dependencies(tst_claude enlumine-hook)

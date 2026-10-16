@@ -1,7 +1,7 @@
-# libgit2 sert uniquement à lire le dépôt local (état, diffs, instantanés) ; les
-# écritures passent par la commande git (voir src/git/GitOperations.h). Pas de
-# réseau, pas de SSH ni de HTTPS, et zlib embarqué pour rester sans dépendance
-# système.
+# libgit2 is only used to read the local repository (status, diffs, snapshots);
+# writes go through the git command (see src/git/GitOperations.h). No
+# network, no SSH or HTTPS, and bundled zlib to avoid any system
+# dependency.
 
 set(BUILD_TESTS        OFF CACHE BOOL "" FORCE)
 set(BUILD_CLI          OFF CACHE BOOL "" FORCE)
@@ -15,9 +15,9 @@ set(USE_BUNDLED_ZLIB   ON  CACHE BOOL "" FORCE)
 set(REGEX_BACKEND      builtin CACHE STRING "" FORCE)
 set(USE_HTTP_PARSER    builtin CACHE STRING "" FORCE)
 
-# libgit2 détecte `struct stat::st_mtim` en C90 strict, où glibc ne l'expose
-# pas sans _DEFAULT_SOURCE : sans cette définition, la détection échoue et la
-# compilation s'arrête sur « unknown struct stat nanosecond type ».
+# libgit2 detects `struct stat::st_mtim` in strict C90, where glibc does not
+# expose it without _DEFAULT_SOURCE: without this definition, detection fails and
+# the build stops with "unknown struct stat nanosecond type".
 set(CMAKE_REQUIRED_DEFINITIONS -D_DEFAULT_SOURCE)
 FetchContent_MakeAvailable(libgit2)
 unset(CMAKE_REQUIRED_DEFINITIONS)

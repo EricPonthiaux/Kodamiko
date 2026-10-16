@@ -1,4 +1,4 @@
-# Runtime tree-sitter + une cible par grammaire + requêtes de coloration.
+# tree-sitter runtime + one target per grammar + highlighting queries.
 
 add_library(tree_sitter STATIC ${tree_sitter_SOURCE_DIR}/lib/src/lib.c)
 target_include_directories(tree_sitter
@@ -6,11 +6,11 @@ target_include_directories(tree_sitter
     PRIVATE ${tree_sitter_SOURCE_DIR}/lib/src
             ${tree_sitter_SOURCE_DIR}/lib/src/wasm)
 target_compile_definitions(tree_sitter PRIVATE _POSIX_C_SOURCE=200112L _DEFAULT_SOURCE)
-# Fixé explicitement : libgit2 place CMAKE_C_STANDARD=90 dans le cache, ce qui
-# s'appliquerait sinon à toutes les cibles C du projet.
+# Set explicitly: libgit2 puts CMAKE_C_STANDARD=90 in the cache, which
+# would otherwise apply to every C target of the project.
 set_target_properties(tree_sitter PROPERTIES C_STANDARD 11)
 
-# Une grammaire = parser.c (+ scanner.c éventuel) dans un dossier src/.
+# A grammar = parser.c (+ optional scanner.c) in a src/ folder.
 function(add_tree_sitter_grammar target grammar_src_dir)
     set(sources ${grammar_src_dir}/parser.c)
     if(EXISTS ${grammar_src_dir}/scanner.c)
@@ -39,9 +39,9 @@ target_link_libraries(tree_sitter_grammars INTERFACE
     tree_sitter_c tree_sitter_cpp tree_sitter_java
     tree_sitter_javascript tree_sitter_typescript tree_sitter_tsx)
 
-# Requêtes highlights.scm des grammaires et requêtes outline.scm du volet
-# Structure (écrites pour Enlumine, dans src/syntax/queries), exposées à l'application sous forme
-# de ressources Qt (`:/queries/<grammaire>/<fichier>`) via enlumine_add_queries().
+# The grammars' highlights.scm queries and the Outline panel's outline.scm
+# queries (written for Enlumine, in src/syntax/queries), exposed to the application as
+# Qt resources (`:/queries/<grammar>/<file>`) via enlumine_add_queries().
 set(TREE_SITTER_QUERY_FILES
     "c/highlights.scm|${tree_sitter_c_SOURCE_DIR}/queries/highlights.scm"
     "cpp/highlights.scm|${tree_sitter_cpp_SOURCE_DIR}/queries/highlights.scm"
