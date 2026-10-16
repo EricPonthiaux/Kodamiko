@@ -1,89 +1,106 @@
-#include "changes/WorkingTreeDiff.h"
+#include "changes/ChangesView.h"
+#include "git/GitCommands.h"
+#include "git/GitProcess.h"
+#include "git/RepositoryStatus.h"
 
-#include <QProcess>
+#include <QCheckBox>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QTreeWidget>
 #include <QtTest>
+
+namespace {
+
+void write(const QTemporaryDir &dir, const QString &path, const QByteArray &content)
+{
+    QDir().mkpath(QFileInfo(dir.filePath(path)).absolutePath());
+    QFile file(dir.filePath(path));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(content);
+}
+
+QStringList sectionTitles(const QTreeWidget *list)
+{
+    QStringList titles;
+    for (int i = 0; i < list->topLevelItemCount(); ++i)
+        titles << list->topLevelItem(i)->text(0);
+    return titles;
+}
+
+} // namespace
 
 class TestChanges : public QObject {
     Q_OBJECT
 
-private:
-    static void write(const QTemporaryDir &dir, const QString &path, const QByteArray &content)
-    {
-        QDir().mkpath(QFileInfo(dir.filePath(path)).absolutePath());
-        QFile file(dir.filePath(path));
-        QVERIFY(file.open(QIODevice::WriteOnly));
-        file.write(content);
-    }
-
-    // Lance git dans `dir` ; le test est ignoré si git n'est pas installé.
-    static bool git(const QTemporaryDir &dir, const QStringList &arguments)
-    {
-        QProcess process;
-        process.setWorkingDirectory(dir.path());
-        process.start(QStringLiteral("git"),
-                      QStringList{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}
-                          + arguments);
-        return process.waitForFinished() && process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
-    }
-
 private slots:
-    void workingTreeDiffOutsideARepository()
+    void initTestCase()
+    {
+        if (QStandardPaths::findExecutable("git").isEmpty())
+            QSKIP("git indisponible");
+        QVERIFY(config_.open());
+        qputenv("GIT_CONFIG_GLOBAL", config_.fileName().toUtf8());
+        qputenv("GIT_CONFIG_NOSYSTEM", "1");
+        qputenv("GIT_AUTHOR_NAME", "t");
+        qputenv("GIT_AUTHOR_EMAIL", "t@t");
+        qputenv("GIT_COMMITTER_NAME", "t");
+        qputenv("GIT_COMMITTER_EMAIL", "t@t");
+    }
+
+    void outsideARepository()
+    {
+        QTemporaryDir project;
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.setFolder(project.path());
+        view.refresh();
+        const auto *list = view.findChild<QTreeWidget *>();
+        QVERIFY(list->topLevelItem(0)->isHidden());
+        QVERIFY(!view.findChild<QPushButton *>()->isEnabled());
+    }
+
+    void stageAllThenCommit()
     {
         QTemporaryDir project;
         write(project, "a.txt", "a\n");
-        QList<WorkingTreeChange> changes;
-        QVERIFY(!WorkingTreeDiff::compute(project.path(), &changes));
-        QVERIFY(changes.isEmpty());
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "b\n");
+        write(project, "new.txt", "n\n");
+
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        view.refresh();
+        const auto *list = view.findChild<QTreeWidget *>();
+        QCOMPARE(sectionTitles(list), QStringList({"Indexés (0)", "Non indexés (2)"}));
+        QCOMPARE(list->topLevelItem(1)->child(0)->text(0), QString("M  a.txt"));
+        QCOMPARE(list->topLevelItem(1)->child(1)->text(0), QString("A  new.txt"));
+
+        view.stageAll();
+        QTRY_COMPARE(sectionTitles(list), QStringList({"Indexés (2)", "Non indexés (0)"}));
+
+        // Le message du dernier commit est proposé pour « amend », puis retiré.
+        auto *message = view.findChild<QPlainTextEdit *>();
+        auto *amend = view.findChild<QCheckBox *>();
+        amend->setChecked(true);
+        QCOMPARE(message->toPlainText(), QString("init"));
+        amend->setChecked(false);
+        QVERIFY(message->toPlainText().isEmpty());
+
+        message->setPlainText("second");
+        view.findChild<QPushButton *>()->click();
+        QTRY_COMPARE(sectionTitles(list), QStringList({"Indexés (0)", "Non indexés (0)"}));
+        QVERIFY(message->toPlainText().isEmpty());
+        QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("second\n"));
     }
 
-    void workingTreeDiffComparesWithLastCommit()
-    {
-        QTemporaryDir project;
-        write(project, "keep.txt", "same\n");
-        write(project, "edit.cpp", "int a;\n");
-        write(project, "gone.txt", "bye\n");
-        if (!git(project, {"init", "-q"}) || !git(project, {"add", "."}) || !git(project, {"commit", "-qm", "init"}))
-            QSKIP("git indisponible");
-
-        write(project, "edit.cpp", "int b;\n");
-        QFile::remove(project.filePath("gone.txt"));
-        write(project, "src/new.js", "let x;\n");
-
-        QList<WorkingTreeChange> changes;
-        QVERIFY(WorkingTreeDiff::compute(project.path(), &changes));
-        QList<FileChange> files;
-        for (const WorkingTreeChange &change : changes)
-            files.append(change.change);
-        QCOMPARE(files.size(), 3);
-        QVERIFY(files.contains(FileChange{ChangeKind::Modified, "edit.cpp", {}}));
-        QVERIFY(files.contains(FileChange{ChangeKind::Deleted, "gone.txt", {}}));
-        QVERIFY(files.contains(FileChange{ChangeKind::Added, "src/new.js", {}}));
-        for (const WorkingTreeChange &change : changes) {
-            if (change.change.path == "edit.cpp")
-                QVERIFY(change.patch.contains("-int a;") && change.patch.contains("+int b;"));
-            if (change.change.path == "src/new.js")
-                QVERIFY(change.patch.contains("+let x;"));
-        }
-    }
-
-    void workingTreeDiffOfASubfolderUsesRelativePaths()
-    {
-        QTemporaryDir project;
-        write(project, "root.txt", "r\n");
-        write(project, "sub/file.txt", "f\n");
-        if (!git(project, {"init", "-q"}) || !git(project, {"add", "."}) || !git(project, {"commit", "-qm", "init"}))
-            QSKIP("git indisponible");
-
-        write(project, "root.txt", "r2\n");
-        write(project, "sub/file.txt", "f2\n");
-
-        QList<WorkingTreeChange> changes;
-        QVERIFY(WorkingTreeDiff::compute(project.filePath("sub"), &changes));
-        QCOMPARE(changes.size(), 1);
-        QCOMPARE(changes.first().change, (FileChange{ChangeKind::Modified, "file.txt", {}}));
-    }
+private:
+    QTemporaryFile config_;
 };
 
-QTEST_GUILESS_MAIN(TestChanges)
+QTEST_MAIN(TestChanges)
 #include "tst_changes.moc"

@@ -1,8 +1,12 @@
 #include "ScintillaStyles.h"
 
+#include "AppFonts.h"
 #include "Theme.h"
 
 #include <Qsci/qsciscintilla.h>
+
+#include <QFontInfo>
+#include <QFontMetricsF>
 
 #include <algorithm>
 
@@ -33,6 +37,16 @@ void applySyntaxStyles(QsciScintilla &editor, const Theme &theme)
         editor.SendScintilla(QsciScintillaBase::SCI_STYLESETITALIC, styleNumber,
                              static_cast<long>(style.italic));
     }
+}
+
+void applyTypography(QsciScintilla &editor, const QFont &font)
+{
+    const qreal fontPixels = QFontInfo(font).pixelSize();
+    const int extra = std::max(0, qRound(fontPixels * AppFonts::codeLineHeight - QFontMetricsF(font).height()));
+    editor.SendScintilla(QsciScintillaBase::SCI_SETEXTRAASCENT, extra / 2);
+    editor.SendScintilla(QsciScintillaBase::SCI_SETEXTRADESCENT, extra - extra / 2);
+    editor.SendScintilla(QsciScintillaBase::SCI_SETMARGINLEFT, 0, 8L);
+    editor.SendScintilla(QsciScintillaBase::SCI_SETCARETWIDTH, 2);
 }
 
 } // namespace ScintillaStyles

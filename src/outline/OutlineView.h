@@ -17,11 +17,12 @@ class QLineEdit;
 class QStackedWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
+class TreeColumnFit;
 
-// Volet Structure : les symboles du fichier de l'éditeur courant (fonctions,
-// classes, titres...). Un clic place le curseur sur le symbole ; le symbole
-// qui contient le curseur est sélectionné. La structure est recalculée peu
-// après chaque modification du texte, seulement quand le volet est visible.
+// Outline pane: the symbols of the current editor's file (functions,
+// classes, headings...). A click places the cursor on the symbol; the symbol
+// containing the cursor is selected. The outline is recomputed shortly
+// after each text change, only while the pane is visible.
 class OutlineView : public QWidget {
     Q_OBJECT
 
@@ -29,9 +30,9 @@ public:
     explicit OutlineView(QWidget *parent = nullptr);
     ~OutlineView() override;
 
-    // Éditeur à suivre (nullptr : aucun).
+    // Editor to follow (nullptr: none).
     void setEditor(EditorWidget *editor);
-    // Donne le focus au champ de filtre.
+    // Gives focus to the filter field.
     void focusFilter();
 
     QTreeWidget *tree() const { return tree_; }
@@ -58,11 +59,12 @@ private:
     QTimer refreshTimer_;
     bool needsRefresh_ = false;
 
-    // Éléments repliés par l'utilisateur, par fichier, conservés d'un calcul à l'autre.
+    // Items collapsed by the user, per file, kept from one computation to the next.
     QHash<QString, QSet<QString>> collapsedPaths_;
 
     QLineEdit *filter_;
     QTreeWidget *tree_;
+    TreeColumnFit *columnFit_;
     QLabel *placeholder_;
     QStackedWidget *stack_;
 };

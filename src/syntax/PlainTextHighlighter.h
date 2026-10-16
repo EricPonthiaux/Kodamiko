@@ -2,7 +2,7 @@
 
 #include "ISyntaxHighlighter.h"
 
-// Aucune coloration : seulement la police et les couleurs de base du thème.
+// No highlighting: only the theme's font and base colors.
 class PlainTextHighlighter : public ISyntaxHighlighter {
 public:
     void attach(QsciScintilla *editor) override;

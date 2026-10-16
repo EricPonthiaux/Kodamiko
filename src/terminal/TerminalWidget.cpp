@@ -17,8 +17,8 @@ namespace {
 constexpr int initialRows = 24;
 constexpr int initialColumns = 80;
 
-// Copier/coller propres au terminal : Ctrl+C et Ctrl+V doivent rester
-// disponibles pour le programme (Ctrl+C interrompt Claude).
+// Terminal-specific copy/paste: Ctrl+C and Ctrl+V must remain available to
+// the program (Ctrl+C interrupts Claude).
 bool isCopyShortcut(const QKeyEvent *event)
 {
 #ifdef Q_OS_MACOS
@@ -39,7 +39,7 @@ bool isPasteShortcut(const QKeyEvent *event)
 #endif
 }
 
-// Ordre de lecture : ligne puis colonne. QPoint(x = colonne, y = ligne).
+// Reading order: row then column. QPoint(x = column, y = row).
 bool comesBefore(const QPoint &a, const QPoint &b)
 {
     return a.y() < b.y() || (a.y() == b.y() && a.x() < b.x());
@@ -111,7 +111,7 @@ void TerminalWidget::applyTheme(const Theme &theme)
 void TerminalWidget::onProcessFinished(int exitCode)
 {
     running_ = false;
-    screen_->feed(QStringLiteral("\r\n\x1b[2m[Processus terminé, code %1]\x1b[0m\r\n").arg(exitCode).toUtf8());
+    screen_->feed(QStringLiteral("\r\n\x1b[2m[Process exited, code %1]\x1b[0m\r\n").arg(exitCode).toUtf8());
     emit finished(exitCode);
 }
 
@@ -152,29 +152,48 @@ bool TerminalWidget::isModeShortcut(const QKeyEvent &event)
 {
     if (event.modifiers() != Qt::ControlModifier)
         return false;
-    if (event.key() >= Qt::Key_1 && event.key() <= Qt::Key_3)
+    if (event.key() >= Qt::Key_1 && event.key() <= Qt::Key_4)
         return true;
-    // Touches 1, 2 et 3 de la rangée du haut, quelle que soit la disposition.
+    // Keys 1 to 4 of the top row, whatever the layout.
 #if defined(Q_OS_MACOS)
-    const quint32 code = event.nativeVirtualKey(); // kVK_ANSI_1..3
-    return code >= 0x12 && code <= 0x14;
+    const quint32 code = event.nativeVirtualKey(); // kVK_ANSI_1..4
+    return code >= 0x12 && code <= 0x15;
 #elif defined(Q_OS_WIN)
     const quint32 code = event.nativeScanCode();
-    return code >= 0x02 && code <= 0x04;
+    return code >= 0x02 && code <= 0x05;
 #else
-    const quint32 code = event.nativeScanCode(); // code de touche XKB (evdev + 8)
-    return code >= 10 && code <= 12;
+    const quint32 code = event.nativeScanCode(); // XKB keycode (evdev + 8)
+    return code >= 10 && code <= 13;
+#endif
+}
+
+bool TerminalWidget::isApplicationShortcut(const QKeyEvent &event)
+{
+    if (event.key() == Qt::Key_F11 || isModeShortcut(event))
+        return true;
+    if (isCopyShortcut(&event) || isPasteShortcut(&event))
+        return false; // the terminal's own
+    const Qt::KeyboardModifiers modifiers = event.modifiers() & ~Qt::KeypadModifier;
+#ifdef Q_OS_MACOS
+    // Cmd (Qt's Control) belongs to the application, as in Terminal.app.
+    return modifiers & Qt::ControlModifier;
+#else
+    if (!(modifiers & Qt::ControlModifier))
+        return false;
+    // AltGr is Ctrl+Alt on Windows: a character typed with it is text.
+    if ((modifiers & Qt::AltModifier) && !event.text().isEmpty() && event.text().at(0).isPrint())
+        return false;
+    return modifiers & (Qt::ShiftModifier | Qt::AltModifier);
 #endif
 }
 
 bool TerminalWidget::event(QEvent *event)
 {
-    // Le terminal veut toutes les touches : sans cela, les raccourcis de
-    // l'application (Ctrl+W, Ctrl+S...) ne parviendraient pas au programme.
-    // Exceptions : F11 et Ctrl+1/2/3, qui changent de mode (Terminal, Edit, Diff).
+    // The terminal wants the keys programs use: plain Ctrl+letter (Ctrl+C,
+    // Ctrl+R…), Alt+letter, Escape, the function keys. Combinations they do
+    // not use go to the application's shortcuts (see isApplicationShortcut).
     if (event->type() == QEvent::ShortcutOverride) {
-        const auto *key = static_cast<QKeyEvent *>(event);
-        if (key->key() == Qt::Key_F11 || isModeShortcut(*key))
+        if (isApplicationShortcut(*static_cast<QKeyEvent *>(event)))
             return QAbstractScrollArea::event(event);
         event->accept();
         return true;
@@ -184,7 +203,7 @@ bool TerminalWidget::event(QEvent *event)
 
 bool TerminalWidget::focusNextPrevChild(bool)
 {
-    return false; // Tab et Maj+Tab vont au programme (complétion, modes de Claude)
+    return false; // Tab and Shift+Tab go to the program (completion, Claude's modes)
 }
 
 void TerminalWidget::resizeEvent(QResizeEvent *event)
@@ -270,7 +289,7 @@ void TerminalWidget::keyPressEvent(QKeyEvent *event)
     QAbstractScrollArea::keyPressEvent(event);
 }
 
-// Caractères composés par une méthode de saisie (accents morts, IME).
+// Characters composed by an input method (dead keys, IME).
 void TerminalWidget::inputMethodEvent(QInputMethodEvent *event)
 {
     if (!event->commitString().isEmpty())
@@ -297,7 +316,7 @@ void TerminalWidget::mousePressEvent(QMouseEvent *event)
 {
     setFocus();
     if (event->button() == Qt::MiddleButton) {
-        // Collage de la sélection primaire, comme dans les terminaux X11.
+        // Paste the primary selection, as in X11 terminals.
         const QString text = QApplication::clipboard()->text(QClipboard::Selection);
         if (!text.isEmpty())
             screen_->paste(text);
@@ -326,7 +345,7 @@ void TerminalWidget::mouseReleaseEvent(QMouseEvent *event)
     selecting_ = false;
     selectionEnd_ = cellAt(event->position().toPoint());
     if (selectionEnd_ == selectionAnchor_) {
-        selectionAnchor_ = QPoint(-1, 0); // simple clic : pas de sélection
+        selectionAnchor_ = QPoint(-1, 0); // single click: no selection
         selectionEnd_ = selectionAnchor_;
     } else if (QApplication::clipboard()->supportsSelection()) {
         copySelection(QClipboard::Selection);
@@ -382,7 +401,11 @@ void TerminalWidget::copySelection(QClipboard::Mode mode) const
 
 void TerminalWidget::pasteClipboard()
 {
-    const QString text = QApplication::clipboard()->text();
+    paste(QApplication::clipboard()->text());
+}
+
+void TerminalWidget::paste(const QString &text)
+{
     if (text.isEmpty())
         return;
     screen_->paste(text);

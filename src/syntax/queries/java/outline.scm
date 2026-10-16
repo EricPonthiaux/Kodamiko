@@ -1,4 +1,4 @@
-; Structure d'un fichier Java (voir README.md).
+; Outline of a Java file (see README.md).
 
 (class_declaration name: (identifier) @name) @definition.class
 (record_declaration name: (identifier) @name) @definition.class

@@ -22,7 +22,7 @@
 
 namespace {
 
-// Tableau de chaînes C terminé par nullptr, pour execve().
+// nullptr-terminated array of C strings, for execve().
 class CStringArray {
 public:
     explicit CStringArray(const QStringList &strings)
@@ -73,12 +73,12 @@ bool UnixPty::start(const ProcessSpec &spec, QSize cells)
 {
     const QString program = resolveProgram(spec);
     if (program.isEmpty()) {
-        errorString_ = tr("Programme introuvable : %1").arg(spec.program);
+        errorString_ = tr("Program not found: %1").arg(spec.program);
         return false;
     }
 
-    // Tout est préparé avant fork() : dans l'enfant, seuls des appels
-    // système simples sont permis jusqu'à execve().
+    // Everything is prepared before fork(): in the child, only simple system
+    // calls are allowed until execve().
     CStringArray argv(QStringList{program} + spec.arguments);
     CStringArray envp(spec.environment.toStringList());
     const QByteArray programPath = program.toLocal8Bit();
@@ -87,7 +87,7 @@ bool UnixPty::start(const ProcessSpec &spec, QSize cells)
 
     const pid_t pid = ::forkpty(&masterFd_, nullptr, nullptr, &size);
     if (pid < 0) {
-        errorString_ = tr("Création du pseudo-terminal impossible : %1").arg(QString::fromLocal8Bit(std::strerror(errno)));
+        errorString_ = tr("Cannot create the pseudo-terminal: %1").arg(QString::fromLocal8Bit(std::strerror(errno)));
         return false;
     }
     if (pid == 0) {
@@ -117,8 +117,8 @@ void UnixPty::write(const QByteArray &data)
     flushPendingWrites();
 }
 
-// Le PTY n'accepte qu'un tampon limité (quelques Ko) : un long collage est
-// envoyé par morceaux, au rythme où le programme le lit.
+// The PTY only accepts a limited buffer (a few KB): a long paste is sent in
+// chunks, at the pace the program reads it.
 void UnixPty::flushPendingWrites()
 {
     while (!pendingWrites_.isEmpty()) {
@@ -128,7 +128,7 @@ void UnixPty::flushPendingWrites()
         } else if (written < 0 && errno == EINTR) {
             continue;
         } else {
-            break; // EAGAIN : on réessaiera quand le PTY sera de nouveau prêt
+            break; // EAGAIN: retry when the PTY is ready again
         }
     }
     writeNotifier_->setEnabled(!pendingWrites_.isEmpty());
@@ -155,7 +155,7 @@ void UnixPty::readAvailable()
             continue;
         if (count < 0 && errno == EAGAIN)
             return;
-        // 0 ou EIO : le côté esclave est fermé, le programme est terminé.
+        // 0 or EIO: the slave side is closed, the program has exited.
         handleChildExit();
         return;
     }
@@ -166,9 +166,9 @@ void UnixPty::handleChildExit()
     readNotifier_->setEnabled(false);
     writeNotifier_->setEnabled(false);
 
-    // Le PTY se ferme juste avant que le processus soit récupérable : on lui
-    // laisse un court instant, sans jamais bloquer l'interface (un programme
-    // peut fermer son terminal et continuer à tourner).
+    // The PTY closes just before the process can be reaped: we give it a
+    // brief moment, without ever blocking the UI (a program may close its
+    // terminal and keep running).
     int status = 0;
     int exitCode = -1;
     for (int attempt = 0; attempt < 20; ++attempt) {

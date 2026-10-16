@@ -1,4 +1,4 @@
-; Structure d'un fichier JavaScript / JSX (voir README.md).
+; Outline of a JavaScript / JSX file (see README.md).
 
 (class_declaration name: (_) @name) @definition.class
 (variable_declarator name: (identifier) @name value: (class)) @definition.class

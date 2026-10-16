@@ -1,10 +1,16 @@
 #include "EditorWidget.h"
 
+#include "ChangeGutter.h"
+#include "syntax/ScintillaStyles.h"
+
 #include "syntax/HighlighterFactory.h"
 #include "syntax/ISyntaxHighlighter.h"
 #include "syntax/LanguageRegistry.h"
 
+#include <Qsci/qscicommandset.h>
+
 #include <QFile>
+#include <QMouseEvent>
 
 namespace {
 
@@ -23,6 +29,7 @@ QsciScintilla::EolMode toEolMode(LineEnding lineEnding)
 EditorWidget::EditorWidget(const Theme &theme, QWidget *parent)
     : QsciScintilla(parent)
     , theme_(theme)
+    , changeGutter_(new ChangeGutter(this))
 {
     configureEditing();
     installHighlighter(LanguageRegistry::plainText);
@@ -31,7 +38,7 @@ EditorWidget::EditorWidget(const Theme &theme, QWidget *parent)
 
 EditorWidget::~EditorWidget()
 {
-    // Le lexer appartient au highlighter : QScintilla ne doit plus y toucher.
+    // The lexer belongs to the highlighter: QScintilla must not touch it anymore.
     setLexer(nullptr);
 }
 
@@ -52,6 +59,31 @@ void EditorWidget::configureEditing()
     setScrollWidthTracking(true);
     setWrapMode(QsciScintilla::WrapNone);
     updateLineNumberMargin();
+
+    // Editor navigation shortcuts (see CodeNavigator), which QScintilla
+    // would intercept otherwise.
+    const QList<int> reservedKeys = {(Qt::CTRL | Qt::Key_B).toCombined(), (Qt::ALT | Qt::Key_Left).toCombined(),
+                                     (Qt::ALT | Qt::Key_Right).toCombined()};
+    for (QsciCommand *command : standardCommands()->commands()) {
+        if (reservedKeys.contains(command->key()))
+            command->setKey(0);
+        if (reservedKeys.contains(command->alternateKey()))
+            command->setAlternateKey(0);
+    }
+}
+
+void EditorWidget::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && event->modifiers() == Qt::ControlModifier) {
+        const QPoint point = event->position().toPoint();
+        const long position = SendScintilla(SCI_POSITIONFROMPOINTCLOSE, point.x(), point.y());
+        if (position >= 0) {
+            SendScintilla(SCI_GOTOPOS, position);
+            emit definitionRequested();
+            return;
+        }
+    }
+    QsciScintilla::mousePressEvent(event);
 }
 
 void EditorWidget::installHighlighter(const QString &languageId)
@@ -79,6 +111,8 @@ bool EditorWidget::load(const QString &path, QString *error)
     SendScintilla(SCI_EMPTYUNDOBUFFER);
     setModified(false);
     installHighlighter(LanguageRegistry::languageForFile(path));
+    changeGutter_->reloadBase();
+    emit formatChanged();
     return true;
 }
 
@@ -103,8 +137,11 @@ bool EditorWidget::reloadFromDisk(QString *error)
     int index = 0;
     getCursorPosition(&line, &index);
 
+    if (decoded->format.lineEnding != format_.lineEnding)
+        setEolMode(toEolMode(decoded->format.lineEnding));
     format_ = decoded->format;
-    // Remplacement (et non setText) pour que Ctrl+Z ramène le texte précédent.
+    emit formatChanged();
+    // Replace (rather than setText) so that Ctrl+Z restores the previous text.
     selectAll();
     replaceSelectedText(decoded->text);
     setModified(false);
@@ -131,16 +168,33 @@ void EditorWidget::showReadOnlyText(const QString &text, const QString &language
     installHighlighter(languageId);
 }
 
+void EditorWidget::setLineEnding(LineEnding lineEnding)
+{
+    format_.lineEnding = lineEnding;
+    setEolMode(toEolMode(lineEnding));
+    if (!isReadOnly())
+        convertEols(toEolMode(lineEnding));
+    emit formatChanged();
+}
+
+void EditorWidget::setIndentationStyle(bool useTabs, int width)
+{
+    setIndentationsUseTabs(useTabs);
+    setTabWidth(width);
+    emit formatChanged();
+}
+
 void EditorWidget::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     highlighter_->applyTheme(theme);
+    changeGutter_->applyTheme(theme);
 
-    // Après le highlighter : un lexer QScintilla réinitialise ces couleurs.
+    // After the highlighter: a QScintilla lexer resets these colors.
     setCaretForegroundColor(theme.caret);
     setCaretLineBackgroundColor(theme.caretLine);
     setSelectionBackgroundColor(theme.selection);
-    SendScintilla(SCI_SETSELFORE, false, 0L); // la sélection garde les couleurs syntaxiques
+    SendScintilla(SCI_SETSELFORE, false, 0L); // the selection keeps the syntax colors
     setMarginsBackgroundColor(theme.marginBackground);
     setMarginsForegroundColor(theme.marginForeground);
     setMarginsFont(theme.font);
@@ -149,6 +203,7 @@ void EditorWidget::applyTheme(const Theme &theme)
     setUnmatchedBraceForegroundColor(QColor("#e06c75"));
     setIndentationGuidesBackgroundColor(theme.background);
     setIndentationGuidesForegroundColor(theme.caretLine);
+    ScintillaStyles::applyTypography(*this, theme.font);
     updateLineNumberMargin();
 }
 

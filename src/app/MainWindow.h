@@ -1,38 +1,63 @@
 #pragma once
 
+#include "claude/ClaudeActivity.h"
 #include "claude/HookServer.h"
+#include "navigation/RecentFiles.h"
 #include "syntax/Theme.h"
 
+#include <QJsonObject>
+#include <QSet>
 #include <QMainWindow>
 
-class DiffView;
+class ChangesView;
+class CodeNavigator;
+class CommandPalette;
+class EditorStatus;
 class EditorTabs;
+class FileStatusReader;
+class FilesPanel;
 class FileTreeView;
+class FindBar;
+class FindInFilesPopup;
+class GitCommands;
+class GoToPopup;
+class TitleBar;
+class WindowFrame;
+class HistoryView;
 class OutlineView;
+class PrerequisitesDialog;
 class QAction;
 class QActionGroup;
+class QLabel;
 class QSplitter;
 class QStackedWidget;
+class QSystemTrayIcon;
 class QTabBar;
 class QTabWidget;
+class QToolButton;
+class RepositoryWatcher;
+class SidePanel;
+class SymbolIndex;
 class TerminalWidget;
 struct ProcessSpec;
 
-// Fenêtre principale à trois modes plein écran, choisis par les onglets en
-// bas à droite : Terminal, Edit (panneau Fichiers / Structure | onglets
-// d'éditeur) et Diff (changements en cours). Assemble les modules et relaie leurs
-// signaux.
+// Main window with four full-screen modes, chosen with the tabs at the
+// bottom right: Terminal, Edit (Files / Outline panel | editor
+// tabs), Diff (pending changes, commits) and History. Wires up the modules and relays their
+// signals.
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    enum class Mode { Terminal, Edit, Diff };
+    enum class Mode { Terminal, Edit, Diff, History };
 
     explicit MainWindow(const QString &folder, QWidget *parent = nullptr);
     ~MainWindow() override;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void changeEvent(QEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void createWidgets();
@@ -40,35 +65,119 @@ private:
     QWidget *createTerminalPage();
     void createModeTabs();
     void createMenus();
+    void createGitMenu();
+    void createEditMenu();
+    void createNavigateMenu();
+    void createHelpMenu();
     void restoreSettings();
 
     void openFolder(const QString &folder);
+    // Open files and expanded tree, remembered per working folder.
+    void saveSession();
+    void restoreSession();
     void chooseFolder();
     void chooseFile();
-    void newClaudeSession();
+    bool startClaudeSession(QString *error = nullptr);
+    void showClaudeSession();
     void newShell();
-    void addTerminal(const QString &title, const ProcessSpec &spec);
-    void setDarkTheme(bool dark);
+    TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);
+    // "dark", "purple" or "light" (see Theme::all), applied everywhere.
+    void setTheme(const QString &name);
+    static QString savedThemeName();
     void setMode(Mode mode);
     void toggleTerminalMode();
     void showOutline();
     void updateTerminalPage();
 
     void onHookReceived(const HookEvent &event);
+    // Dot on the Claude tab and on the Terminal mode tab.
+    void updateClaudeIndicator();
+    void updateTabIcons();
+    // Enlumine's frame and title bar, or the system's (View ▸ Use System
+    // Title Bar). On macOS, the system's traffic lights over Enlumine's bar.
+    void setSystemTitleBar(bool system);
+    // Projects menu of the title bar, recent folders first.
+    void updateProjectMenu();
+    // Tells ClaudeActivity whether the user is looking at the session.
+    void updateClaudeWatched();
+    // Taskbar alert and, when the window is inactive, desktop notification.
+    void notify(const QString &title, const QString &message);
+    // Snapshot of the pending changes, so that the state before a prompt
+    // can be restored.
+    void snapshotBeforePrompt(const QString &prompt);
+    // Context and plan usage, from the status line data.
+    void updateUsage();
+    void showCommandPalette();
+    // The current tab changed: find bar, status bar widgets, recent files.
+    void onCurrentTabChanged();
+    // Find bar of the editor, in Edit mode only.
+    void showFind(bool withReplace);
+    void showGoTo(int tab);
+    void showFindInFiles();
+    // Next or previous change mark, or the one at the cursor rolled back.
+    void goToChange(bool forward);
+    void rollbackChange();
+    // Alt+F1: the current file in the Files tree.
+    void selectOpenedFile();
+    // File tree commands.
+    void sendToClaude(const QString &path);
+    void runGitOnTree(const QString &title, const QString &path, bool rollback);
+    void updateClaudeMarks();
+    // Rereads the current branch and watches the project's git folder.
+    void updateRepositoryInfo();
+    // After a repository change: branch and, if they are displayed, Diff
+    // and History modes.
+    void onRepositoryChanged();
+    void showSnapshots();
+    // Help ▸ Check Prerequisites, also shown at startup if git or claude is missing.
+    void showPrerequisites();
 
     QString absolutePath(const QString &relativePath) const;
 
     Theme theme_;
     QString folder_;
     HookServer hookServer_;
+    ClaudeActivity claudeActivity_;
+    QJsonObject claudeStatus_; // last status line data
 
     EditorTabs *editorTabs_ = nullptr;
+    FilesPanel *filesPanel_ = nullptr;
     FileTreeView *fileTree_ = nullptr;
+    FileStatusReader *fileStatuses_ = nullptr;
+    bool inRepository_ = false;
+    // Files written by Claude since the last prompt: a dot in the tree.
+    QSet<QString> claudeTouched_;
+    SymbolIndex *symbolIndex_ = nullptr;
+    CodeNavigator *navigator_ = nullptr;
     OutlineView *outlineView_ = nullptr;
-    QTabWidget *sidebar_ = nullptr;
+    SidePanel *sidebar_ = nullptr;
     QTabWidget *terminalTabs_ = nullptr;
+    TerminalWidget *claudeTerminal_ = nullptr;
     QStackedWidget *terminalPage_ = nullptr;
-    DiffView *diffView_ = nullptr;
+    ChangesView *changesView_ = nullptr;
+    HistoryView *historyView_ = nullptr;
+    GitCommands *gitCommands_ = nullptr;
+    RepositoryWatcher *repositoryWatcher_ = nullptr;
+    TitleBar *titleBar_ = nullptr;
+    QToolButton *branchButton_ = nullptr; // status bar: branch, Git menu
+    WindowFrame *frame_ = nullptr;
+    QMenu *projectMenu_ = nullptr;
+    QMenu *gitMenu_ = nullptr;
+    QAction *goToFileAction_ = nullptr;
+    QAction *findInFilesAction_ = nullptr;
+    QAction *paletteAction_ = nullptr;
+    QAction *systemTitleBar_ = nullptr;
+    QLabel *usageLabel_ = nullptr;
+    CommandPalette *commandPalette_ = nullptr;
+    FindBar *findBar_ = nullptr;
+    EditorStatus *editorStatus_ = nullptr;
+    GoToPopup *goToPopup_ = nullptr;
+    FindInFilesPopup *findInFiles_ = nullptr;
+    RecentFiles recentFiles_;
+    PrerequisitesDialog *prerequisitesDialog_ = nullptr;
+    QSystemTrayIcon *trayIcon_ = nullptr;
+    QAction *snapshotBeforePrompt_ = nullptr;
+    QAction *claudeNotifications_ = nullptr;
     QSplitter *editSplitter_ = nullptr;
 
     QStackedWidget *modes_ = nullptr;

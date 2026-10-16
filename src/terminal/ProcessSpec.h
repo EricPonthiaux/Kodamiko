@@ -4,17 +4,17 @@
 #include <QString>
 #include <QStringList>
 
-// Programme à lancer dans un terminal.
+// Program to launch in a terminal.
 struct ProcessSpec {
-    QString program; // chemin absolu de préférence
+    QString program; // preferably an absolute path
     QStringList arguments;
     QString workingDirectory;
     QProcessEnvironment environment;
 };
 
-// Environnement commun à tous les programmes lancés dans le terminal : celui
-// de l'éditeur, plus les variables qui annoncent un terminal couleur.
+// Environment shared by all programs launched in the terminal: the editor's
+// own, plus the variables that advertise a color terminal.
 QProcessEnvironment terminalEnvironment();
 
-// Shell interactif de l'utilisateur ($SHELL, ou PowerShell sous Windows).
+// The user's interactive shell ($SHELL, or PowerShell on Windows).
 ProcessSpec defaultShell(const QString &workingDirectory);

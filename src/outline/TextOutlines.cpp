@@ -5,8 +5,8 @@
 namespace {
 
 struct Line {
-    QString text; // sans fin de ligne
-    int position; // décalage en octets du début de la ligne
+    QString text; // without line ending
+    int position; // byte offset of the start of the line
 };
 
 std::vector<Line> splitLines(const QByteArray &text)
@@ -26,7 +26,7 @@ std::vector<Line> splitLines(const QByteArray &text)
     return lines;
 }
 
-// Décalage en octets du caractère `index` d'une ligne.
+// Byte offset of character `index` in a line.
 int bytePosition(const Line &line, qsizetype index)
 {
     return line.position + static_cast<int>(QStringView(line.text).left(index).toUtf8().size());
@@ -63,7 +63,7 @@ std::vector<OutlineSymbol> MarkdownOutline::symbols(const QByteArray &text)
 
     const std::vector<Line> lines = splitLines(text);
     std::vector<Heading> headings;
-    QString openFence; // délimiteur du bloc de code ouvert
+    QString openFence; // delimiter of the open code block
     bool previousIsParagraph = false;
     for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
         const Line &line = lines[i];
@@ -97,7 +97,7 @@ std::vector<OutlineSymbol> MarkdownOutline::symbols(const QByteArray &text)
         previousIsParagraph = !line.text.trimmed().isEmpty() && !listOrQuote.match(line.text).hasMatch();
     }
 
-    // Une section va jusqu'au titre suivant de même niveau ou de niveau supérieur.
+    // A section extends to the next heading of the same or a higher level.
     std::vector<RangedSymbol> flat;
     const int lastLine = static_cast<int>(lines.size()) - 1;
     for (size_t i = 0; i < headings.size(); ++i) {
@@ -126,7 +126,7 @@ std::vector<OutlineSymbol> CMakeOutline::symbols(const QByteArray &text)
 
     const std::vector<Line> lines = splitLines(text);
     std::vector<RangedSymbol> flat;
-    std::vector<size_t> openBlocks; // function/macro sans endfunction/endmacro encore
+    std::vector<size_t> openBlocks; // function/macro without endfunction/endmacro yet
     for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
         const Line &line = lines[i];
         if (const QRegularExpressionMatch match = block.match(line.text); match.hasMatch()) {

@@ -6,8 +6,8 @@
 
 class QSocketNotifier;
 
-// PTY POSIX (Linux, macOS) : forkpty() crée la paire maître/esclave et le
-// processus enfant ; on lit et écrit côté maître, en non bloquant.
+// POSIX PTY (Linux, macOS): forkpty() creates the master/slave pair and the
+// child process; we read and write on the master side, non-blocking.
 class UnixPty : public IPty {
     Q_OBJECT
 
@@ -29,6 +29,6 @@ private:
     pid_t childPid_ = -1;
     QSocketNotifier *readNotifier_ = nullptr;
     QSocketNotifier *writeNotifier_ = nullptr;
-    QByteArray pendingWrites_; // octets que le PTY n'a pas encore acceptés
+    QByteArray pendingWrites_; // bytes the PTY has not accepted yet
     QString errorString_;
 };

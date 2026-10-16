@@ -3,52 +3,97 @@
 #include "FileWatcher.h"
 #include "syntax/Theme.h"
 
+#include <QHash>
 #include <QSet>
 #include <QTabWidget>
 
+class DiagramView;
 class EditorWidget;
 class ImageView;
 
-// Onglets des fichiers ouverts (et des diffs affichés). Recharge les
-// fichiers modifiés sur disque — par Claude notamment — et demande quoi
-// faire si l'utilisateur avait des modifications non enregistrées.
+// Tabs for open files (and displayed diffs). Reloads files modified on
+// disk — by Claude in particular — and asks what to do if the user had
+// unsaved changes.
 class EditorTabs : public QTabWidget {
     Q_OBJECT
 
 public:
     explicit EditorTabs(const Theme &theme, QWidget *parent = nullptr);
 
-    // Ouvre un fichier texte dans un éditeur, ou une image dans une
-    // visionneuse. Renvoie l'onglet, ou nullptr en cas d'échec.
+    // Opens a text file in an editor (a Markdown file with its preview), an
+    // image in a viewer, or a diagram (.flow) in the diagram editor. Returns
+    // the tab, or nullptr on failure.
     QWidget *openFile(const QString &path);
     void showDiff(const QString &title, const QString &diffText);
 
     EditorWidget *currentEditor() const;
+    // Text editor of a tab: the tab itself, or the editor of a Markdown tab.
+    static EditorWidget *editorIn(QWidget *page);
+    // Tab that holds `editor`.
+    QWidget *pageOf(EditorWidget *editor) const;
+    // A Markdown tab in Preview mode shows its editor too: to display a
+    // position or a search in it.
+    void revealEditor(EditorWidget *editor);
     EditorWidget *editorFor(const QString &path) const;
     ImageView *imageViewFor(const QString &path) const;
+    DiagramView *diagramViewFor(const QString &path) const;
+
+    // Paths of open files, in tab order (excluding diffs).
+    QStringList openFilePaths() const;
+    QString currentFilePath() const;
+    // Text of the files with unsaved changes, by path.
+    QHash<QString, QString> unsavedTexts() const;
 
     bool saveCurrent();
     bool saveAll();
     void closeCurrent();
-    // Ferme tous les onglets, après confirmation s'il reste des modifications.
+    // Closes all tabs, asking for confirmation if there are unsaved changes.
     bool closeAll();
 
-    // À appeler quand un fichier a pu changer sur disque.
+    // Call when a file may have changed on disk.
     void syncWithDisk(const QString &path);
+    // Rereads the git index versions the change marks compare with.
+    void reloadChangeBases();
+
+    // Whether a file open under `path` (the file itself, or one in that
+    // folder) has unsaved changes.
+    bool hasUnsavedChangesUnder(const QString &path) const;
+    // `path` was deleted: closes the tabs of the files under it, discarding
+    // their unsaved changes.
+    void closeFilesUnder(const QString &path);
+    // `oldPath` was renamed `newPath`: the tabs of the files under it are
+    // reopened from the new path, at the same place, with the same cursor
+    // position. They must have no unsaved changes.
+    void followRename(const QString &oldPath, const QString &newPath);
 
     void applyTheme(const Theme &theme);
 
 signals:
     void statusMessage(const QString &message);
+    void fileSaved(const QString &path);
+    // Ctrl+click in the current editor.
+    void definitionRequested();
 
 private:
     QWidget *openImage(const QString &absolutePath);
-    bool closeTab(int index);
+    QWidget *openDiagram(const QString &absolutePath);
+    bool saveDiagram(DiagramView *view);
+    void updateDiagramTabTitle(DiagramView *view);
+    QList<DiagramView *> diagramViews() const;
+    bool closeTab(int index, bool askToSave = true);
+    // Path of the file shown in `page`, empty for a diff.
+    QString filePathOf(QWidget *page) const;
+    // Pages of the files under `path`.
+    QList<QWidget *> pagesUnder(const QString &path) const;
+    // Closes the given pages, stopping if the user cancels.
+    bool closeTabs(const QList<QWidget *> &pages);
+    void showTabContextMenu(const QPoint &pos);
     bool saveEditor(EditorWidget *editor);
     void updateTabTitle(EditorWidget *editor);
+    void updateTabIcon(QWidget *page);
     QList<EditorWidget *> editors() const;
 
     Theme theme_;
     FileWatcher watcher_;
-    QSet<QString> pathsBeingResolved_; // conflits en attente de réponse
+    QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer
 };

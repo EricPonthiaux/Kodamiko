@@ -13,7 +13,7 @@
 
 namespace {
 
-// Portion de texte capturée par la requête, avec le style à lui appliquer.
+// Span of text captured by the query, with the style to apply to it.
 struct StyledSpan {
     uint32_t start;
     uint32_t end;
@@ -45,8 +45,8 @@ void TreeSitterHighlighter::attach(QsciScintilla *editor)
     editor_->setLexer(nullptr);
     editor_->SendScintilla(QsciScintillaBase::SCI_SETLEXER, QsciScintillaBase::SCLEX_CONTAINER);
 
-    // BEFOREDELETE est indispensable : après une suppression, on ne peut plus
-    // calculer la ligne/colonne de la fin du texte supprimé.
+    // BEFOREDELETE is essential: after a deletion, the line/column of the end
+    // of the deleted text can no longer be computed.
     const long eventMask = editor_->SendScintilla(QsciScintillaBase::SCI_GETMODEVENTMASK);
     editor_->SendScintilla(QsciScintillaBase::SCI_SETMODEVENTMASK,
                            eventMask | QsciScintillaBase::SC_MOD_INSERTTEXT
@@ -75,7 +75,7 @@ void TreeSitterHighlighter::applyTheme(const Theme &theme)
 void TreeSitterHighlighter::onModified(int position, int modificationType, const char *, int length, int,
                                        int, int, int, int, int)
 {
-    // Sans arbre, la prochaine analyse sera complète : rien à reporter.
+    // Without a tree, the next parse will be a full one: nothing to apply.
     if (!tree_)
         return;
 
@@ -107,9 +107,9 @@ void TreeSitterHighlighter::onStyleNeeded(int endPosition)
     const int firstLine = editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, endStyled);
     const int lineStart = editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, firstLine);
 
-    // Une modification peut changer le sens du texte qui la précède (taper
-    // « ( » après un identifiant en fait un appel de fonction) : on recolore
-    // aussi depuis le premier changement de structure signalé par tree-sitter.
+    // An edit can change the meaning of the text before it (typing "(" after
+    // an identifier turns it into a function call), so we also recolor from
+    // the first structural change reported by tree-sitter.
     const int firstStructuralChange = reparseIfNeeded();
     styleRange(std::min(lineStart, firstStructuralChange), endPosition);
 }
@@ -135,11 +135,11 @@ int TreeSitterHighlighter::reparseIfNeeded()
     return firstChange;
 }
 
-// Chaque octet prend le style de la capture la plus précise qui le couvre :
-//  - un nœud intérieur l'emporte sur le nœud qui le contient (une séquence
-//    d'échappement dans une chaîne) : on peint du plus long au plus court ;
-//  - pour un même nœud capturé par plusieurs motifs, le dernier motif de la
-//    requête l'emporte : on peint dans l'ordre des motifs.
+// Each byte takes the style of the most specific capture covering it:
+//  - an inner node wins over the node containing it (an escape sequence
+//    inside a string), so we paint from longest to shortest;
+//  - for the same node captured by several patterns, the query's last
+//    pattern wins, so we paint in pattern order.
 void TreeSitterHighlighter::styleRange(int start, int end)
 {
     end = std::min(end, documentLength());
@@ -193,7 +193,7 @@ TSPoint TreeSitterHighlighter::pointAt(int position) const
 
 const char *TreeSitterHighlighter::documentText() const
 {
-    // Le pointeur reste valide jusqu'à la prochaine modification du texte.
+    // The pointer stays valid until the next modification of the text.
     return static_cast<const char *>(
         editor_->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
 }

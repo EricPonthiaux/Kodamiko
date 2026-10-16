@@ -1,23 +1,36 @@
 #pragma once
 
 #include <QByteArray>
+#include <QJsonObject>
 #include <QString>
 #include <QStringList>
 
 #include <optional>
 
-// Notification envoyée par un hook de Claude Code (voir ClaudeLauncher).
+// Notification sent by a Claude Code hook, or by the status line command
+// (see ClaudeLauncher).
 struct HookEvent {
     enum class Kind {
-        FilesEdited,      // PostToolUse sur Edit/Write/MultiEdit/NotebookEdit
-        ResponseFinished, // Stop : fin de la réponse
+        PromptSubmitted,     // UserPromptSubmit: Claude starts working on a prompt
+        FilesEdited,         // PostToolUse on Edit/Write/MultiEdit/NotebookEdit
+        CommandFinished,     // PostToolUse on Bash: any file may have changed
+        PermissionRequested, // PermissionRequest: Claude waits for an approval
+        NeedsAttention,      // Notification: Claude waits for the user
+        ResponseFinished,    // Stop or StopFailure: end of the response
+        StatusUpdated,       // status line refresh: model, context, usage limits
     };
 
     Kind kind;
     QString sessionId;
-    QStringList filePaths; // FilesEdited, chemins absolus
+    QStringList filePaths; // FilesEdited, absolute paths
+    QString prompt;        // PromptSubmitted
+    // PermissionRequested: the tool name; NeedsAttention: Claude's message;
+    // ResponseFinished: the error, if any.
+    QString message;
+    bool failed = false; // ResponseFinished after an API error (StopFailure)
+    QJsonObject status;  // StatusUpdated: the JSON Claude Code passes to status lines
 
-    // Décode le JSON transmis par Claude Code sur l'entrée du hook ;
-    // nullopt pour un JSON invalide ou un événement qui ne nous concerne pas.
+    // Decodes the JSON passed by Claude Code on the hook's input;
+    // nullopt for invalid JSON or an event that does not concern us.
     static std::optional<HookEvent> fromJson(const QByteArray &json);
 };

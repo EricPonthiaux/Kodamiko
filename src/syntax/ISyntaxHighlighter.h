@@ -3,15 +3,15 @@
 class QsciScintilla;
 struct Theme;
 
-// Colore le texte d'un éditeur. Chaque éditeur possède son propre highlighter,
-// choisi selon le langage du fichier (voir HighlighterFactory).
+// Highlights an editor's text. Each editor owns its own highlighter, chosen
+// according to the file's language (see HighlighterFactory).
 class ISyntaxHighlighter {
 public:
     virtual ~ISyntaxHighlighter() = default;
 
-    // Prend en charge la coloration de `editor`. Appelé une seule fois.
+    // Takes over highlighting of `editor`. Called only once.
     virtual void attach(QsciScintilla *editor) = 0;
 
-    // (Re)définit les styles Scintilla d'après le thème et recolore le texte.
+    // (Re)defines the Scintilla styles from the theme and recolors the text.
     virtual void applyTheme(const Theme &theme) = 0;
 };

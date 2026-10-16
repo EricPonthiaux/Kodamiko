@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -23,7 +24,7 @@ QString hookExecutablePath()
     return QFileInfo::exists(path) ? path : QString();
 }
 
-QJsonArray commandHook(const QString &command, const QString &matcher = {})
+QJsonArray commandHook(const QString &command, const QString &matcher = {}, int timeout = 60)
 {
     QJsonObject entry;
     if (!matcher.isEmpty())
@@ -31,7 +32,7 @@ QJsonArray commandHook(const QString &command, const QString &matcher = {})
     entry.insert(QLatin1String("hooks"), QJsonArray{QJsonObject{
                                              {QLatin1String("type"), QLatin1String("command")},
                                              {QLatin1String("command"), command},
-                                             {QLatin1String("timeout"), 60},
+                                             {QLatin1String("timeout"), timeout},
                                          }});
     return QJsonArray{entry};
 }
@@ -49,12 +50,50 @@ std::optional<QString> writeSettingsFile(const QByteArray &settings)
 
 } // namespace
 
-QByteArray hooksSettings(const QString &hookCommand)
+QByteArray sessionSettings(const QString &hookCommand)
 {
     QJsonObject hooks;
-    hooks.insert(QLatin1String("PostToolUse"), commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit")));
+    // The editor takes a snapshot before replying: Claude only starts once
+    // the files are saved.
+    hooks.insert(QLatin1String("UserPromptSubmit"), commandHook(hookCommand, {}, 30));
+    hooks.insert(QLatin1String("PostToolUse"),
+                 commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash")));
+    hooks.insert(QLatin1String("PermissionRequest"), commandHook(hookCommand));
+    hooks.insert(QLatin1String("Notification"), commandHook(hookCommand));
     hooks.insert(QLatin1String("Stop"), commandHook(hookCommand));
-    return QJsonDocument(QJsonObject{{QLatin1String("hooks"), hooks}}).toJson();
+    hooks.insert(QLatin1String("StopFailure"), commandHook(hookCommand));
+
+    const QJsonObject statusLine{
+        {QLatin1String("type"), QLatin1String("command")},
+        {QLatin1String("command"), hookCommand + QLatin1String(" statusline")},
+        {QLatin1String("padding"), 0},
+    };
+    return QJsonDocument(QJsonObject{{QLatin1String("hooks"), hooks}, {QLatin1String("statusLine"), statusLine}})
+        .toJson();
+}
+
+QString userStatusLineCommand(const QString &projectDir)
+{
+    const QString configDir = qEnvironmentVariableIsSet("CLAUDE_CONFIG_DIR")
+                                  ? qEnvironmentVariable("CLAUDE_CONFIG_DIR")
+                                  : QDir::home().filePath(QStringLiteral(".claude"));
+    // From the lowest to the highest precedence.
+    const QStringList files{
+        QDir(configDir).filePath(QStringLiteral("settings.json")),
+        QDir(projectDir).filePath(QStringLiteral(".claude/settings.json")),
+        QDir(projectDir).filePath(QStringLiteral(".claude/settings.local.json")),
+    };
+    QString command;
+    for (const QString &path : files) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly))
+            continue;
+        const QJsonObject statusLine =
+            QJsonDocument::fromJson(file.readAll()).object().value(QLatin1String("statusLine")).toObject();
+        if (statusLine.value(QLatin1String("type")).toString() == QLatin1String("command"))
+            command = statusLine.value(QLatin1String("command")).toString();
+    }
+    return command;
 }
 
 QString findClaudeExecutable()
@@ -63,8 +102,8 @@ QString findClaudeExecutable()
     if (!inPath.isEmpty())
         return inPath;
 
-    // Lancé depuis le bureau, l'éditeur n'hérite pas toujours du PATH du
-    // shell : on essaie les emplacements d'installation habituels.
+    // When launched from the desktop, the editor does not always inherit the
+    // shell's PATH: try the usual installation locations.
     const QString home = QDir::homePath();
     return QStandardPaths::findExecutable(QStringLiteral("claude"),
                                           {home + QStringLiteral("/.local/bin"),
@@ -78,23 +117,23 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
     const QString claude = findClaudeExecutable();
     if (claude.isEmpty()) {
         *error = QCoreApplication::translate("ClaudeLauncher",
-                                             "La commande « claude » est introuvable. Installez Claude Code "
-                                             "(https://claude.com/claude-code) puis relancez l'éditeur.");
+                                             "The \"claude\" command was not found. Install Claude Code "
+                                             "from Help ▸ Check Prerequisites.");
         return std::nullopt;
     }
     const QString hook = hookExecutablePath();
     if (hook.isEmpty()) {
         *error = QCoreApplication::translate("ClaudeLauncher",
-                                             "Le programme enlumine-hook est absent du dossier de l'éditeur.");
+                                             "The enlumine-hook program is missing from the editor's folder.");
         return std::nullopt;
     }
 
-    // Barres obliques et guillemets : la commande est valide pour sh comme
-    // pour cmd.exe, même si le chemin contient des espaces.
+    // Forward slashes and quotes: the command is valid for both sh and
+    // cmd.exe, even if the path contains spaces.
     const QString hookCommand = QLatin1Char('"') + QDir::fromNativeSeparators(hook) + QLatin1Char('"');
-    const std::optional<QString> settingsFile = writeSettingsFile(hooksSettings(hookCommand));
+    const std::optional<QString> settingsFile = writeSettingsFile(sessionSettings(hookCommand));
     if (!settingsFile) {
-        *error = QCoreApplication::translate("ClaudeLauncher", "Impossible d'écrire la configuration des hooks.");
+        *error = QCoreApplication::translate("ClaudeLauncher", "Could not write the hooks configuration.");
         return std::nullopt;
     }
 
@@ -104,13 +143,18 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
     spec.environment.insert(QStringLiteral("ENLUMINE_SOCKET"), hookServerName);
-    // Si l'éditeur a lui-même été lancé depuis Claude Code, cette variable
-    // ferait croire à `claude` qu'il est imbriqué dans une autre session.
+    // Our status line replaces the user's: enlumine-hook runs it and
+    // displays its output.
+    const QString userStatusLine = userStatusLineCommand(workingDirectory);
+    if (!userStatusLine.isEmpty())
+        spec.environment.insert(QStringLiteral("ENLUMINE_STATUSLINE_COMMAND"), userStatusLine);
+    // If the editor was itself launched from Claude Code, this variable
+    // would make `claude` believe it is nested in another session.
     spec.environment.remove(QStringLiteral("CLAUDECODE"));
 
 #ifdef Q_OS_WIN
-    // Une installation npm fournit claude.cmd, que CreateProcess ne lance
-    // qu'à travers cmd.exe.
+    // An npm installation provides claude.cmd, which CreateProcess can only
+    // launch through cmd.exe.
     if (claude.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive)
         || claude.endsWith(QLatin1String(".bat"), Qt::CaseInsensitive)) {
         spec.arguments.prepend(QDir::toNativeSeparators(claude));

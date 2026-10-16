@@ -1,5 +1,5 @@
-; Structure d'un fichier C++ (voir README.md). Les définitions hors de la
-; classe (« void Foo::bar() ») sont des méthodes.
+; Outline of a C++ file (see README.md). Out-of-class definitions
+; ("void Foo::bar()") are methods.
 
 (namespace_definition name: (_) @name) @definition.namespace
 (namespace_definition !name body: (_)) @definition.namespace
@@ -30,7 +30,7 @@
     (reference_declarator (function_declarator declarator: (qualified_identifier) @name))
   ]) @definition.method
 
-; Prototypes, y compris les méthodes et constructeurs déclarés dans une classe.
+; Prototypes, including methods and constructors declared inside a class.
 (declaration
   declarator: [
     (function_declarator declarator: [(identifier) (field_identifier) (destructor_name) (operator_name) (qualified_identifier)] @name)

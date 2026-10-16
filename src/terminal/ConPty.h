@@ -8,13 +8,12 @@
 
 #include <windows.h>
 
-// PTY Windows (ConPTY, Windows 10 1809+). La lecture des sorties est
-// bloquante : elle tourne dans un thread dédié qui renvoie les octets au
-// thread de l'interface.
+// Windows PTY (ConPTY, Windows 10 1809+). Reading the output is blocking:
+// it runs in a dedicated thread that forwards the bytes to the UI thread.
 //
-// Particularité de ConPTY : la fin du programme ne ferme pas le tube de
-// sortie, seule la fermeture de la pseudo-console le fait. On surveille donc
-// le processus lui-même (QWinEventNotifier) pour détecter sa fin.
+// ConPTY quirk: the program exiting does not close the output pipe; only
+// closing the pseudo-console does. So we watch the process itself
+// (QWinEventNotifier) to detect when it exits.
 class ConPty : public IPty {
     Q_OBJECT
 

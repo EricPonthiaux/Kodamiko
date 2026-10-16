@@ -28,8 +28,8 @@ bool isIdentifierChar(char c)
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
 }
 
-// Remplace chaque occurrence isolée de `word` par des espaces (les positions
-// ne changent pas).
+// Replaces each standalone occurrence of `word` with spaces (positions
+// do not change).
 void blankWord(QByteArray &text, const QByteArray &word)
 {
     for (qsizetype at = text.indexOf(word); at >= 0; at = text.indexOf(word, at + word.size())) {
@@ -98,6 +98,7 @@ std::vector<OutlineSymbol> TreeSitterOutline::symbols(const QByteArray &original
         ranged.start = static_cast<int>(ts_node_start_byte(*definitionNode));
         ranged.end = static_cast<int>(ts_node_end_byte(*definitionNode));
         ranged.declarationOnly = declarationOnly;
+        ranged.symbol.declarationOnly = declarationOnly;
         OutlineSymbol &symbol = ranged.symbol;
         symbol.kind = *kind;
         symbol.startLine = static_cast<int>(ts_node_start_point(*definitionNode).row);
@@ -107,7 +108,7 @@ std::vector<OutlineSymbol> TreeSitterOutline::symbols(const QByteArray &original
             symbol.name = QString::fromUtf8(text.constData() + start, ts_node_end_byte(*nameNode) - start).simplified();
             symbol.position = static_cast<int>(start);
         } else {
-            symbol.name = QStringLiteral("(anonyme)");
+            symbol.name = QStringLiteral("(anonymous)");
             symbol.position = ranged.start;
         }
         flat.push_back(std::move(ranged));

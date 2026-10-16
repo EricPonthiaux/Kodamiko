@@ -7,13 +7,13 @@
 
 class QLocalSocket;
 
-// Reçoit les notifications des hooks Claude Code, relayées par le petit
-// programme `enlumine-hook` via un socket local (named pipe sous Windows).
+// Receives notifications from Claude Code hooks, relayed by the small
+// `enlumine-hook` program through a local socket (named pipe on Windows).
 //
-// Protocole : le hook envoie une ligne JSON ; le serveur émet hookReceived()
-// — les slots branchés en connexion directe s'exécutent aussitôt — puis
-// répond « ok ». Le hook attend cette réponse avant de rendre la main à
-// Claude.
+// Protocol: the hook sends one JSON line; the server emits hookReceived()
+// — slots connected with a direct connection run immediately — then
+// replies "ok". The hook waits for this reply before handing control back
+// to Claude.
 class HookServer : public QObject {
     Q_OBJECT
 
@@ -21,7 +21,7 @@ public:
     explicit HookServer(QObject *parent = nullptr);
 
     bool listen();
-    // Nom complet à transmettre au hook (variable ENLUMINE_SOCKET).
+    // Full name to pass to the hook (ENLUMINE_SOCKET variable).
     QString serverName() const { return server_.fullServerName(); }
     QString errorString() const { return server_.errorString(); }
 

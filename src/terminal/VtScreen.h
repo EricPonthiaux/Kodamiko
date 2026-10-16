@@ -10,26 +10,26 @@
 
 #include <vterm.h>
 
-// Une case de la grille du terminal, prête à dessiner.
+// One cell of the terminal grid, ready to draw.
 struct TerminalCell {
-    QString text;     // vide pour une case blanche
+    QString text;     // empty for a blank cell
     QColor foreground;
     QColor background;
     bool bold = false;
     bool italic = false;
     bool underline = false;
     bool strike = false;
-    int width = 1;    // 2 pour un caractère large (CJK, emoji)
-    bool isContinuation = false; // seconde moitié d'un caractère large
+    int width = 1;    // 2 for a wide character (CJK, emoji)
+    bool isContinuation = false; // second half of a wide character
 };
 
-// Écran d'un terminal VT/xterm, émulé par libvterm.
+// Screen of a VT/xterm terminal, emulated by libvterm.
 //
-//   sortie du programme --feed()--> libvterm --> grille de cellules (cell())
-//   touches, collages  --sendKey()/paste()--> libvterm --> outputReady()
+//   program output --feed()--> libvterm --> cell grid (cell())
+//   keys, pastes   --sendKey()/paste()--> libvterm --> outputReady()
 //
-// Les lignes qui sortent par le haut de l'écran sont conservées dans un
-// historique ; cell() y accède avec des numéros de ligne négatifs.
+// Lines that scroll off the top of the screen are kept in a history;
+// cell() accesses them with negative row numbers.
 class VtScreen : public QObject {
     Q_OBJECT
 
@@ -45,21 +45,21 @@ public:
     int columns() const { return columns_; }
     int scrollbackSize() const { return static_cast<int>(scrollback_.size()); }
 
-    // `row` dans [-scrollbackSize(), rows()[ ; 0 = première ligne de l'écran.
+    // `row` in [-scrollbackSize(), rows()[; 0 = first row of the screen.
     TerminalCell cell(int row, int column) const;
     QString lineText(int row) const;
 
-    QPoint cursorPosition() const { return cursor_; } // x = colonne, y = ligne
+    QPoint cursorPosition() const { return cursor_; } // x = column, y = row
     bool isCursorVisible() const { return cursorVisible_; }
     bool isAlternateScreen() const { return alternateScreen_; }
 
-    // Touche pressée. `key` : Qt::Key, `text` : texte produit (QKeyEvent::text).
-    // Renvoie false si la touche n'a pas d'équivalent terminal.
+    // Key press. `key`: Qt::Key, `text`: produced text (QKeyEvent::text).
+    // Returns false if the key has no terminal equivalent.
     bool sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text);
     void paste(const QString &text);
 
 signals:
-    void outputReady(const QByteArray &data); // à écrire vers le programme
+    void outputReady(const QByteArray &data); // to be written to the program
     void screenChanged();
     void titleChanged(const QString &title);
     void bell();

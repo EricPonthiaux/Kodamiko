@@ -9,11 +9,11 @@
 #include <optional>
 #include <vector>
 
-// Requête tree-sitter de coloration (highlights.scm) compilée pour un langage.
+// Tree-sitter highlighting query (highlights.scm) compiled for a language.
 //
-// L'API C de tree-sitter ne fait qu'analyser les prédicats (#eq?, #match?...) :
-// c'est à l'appelant de les évaluer. Cette classe les précompile et expose
-// matchSatisfiesPredicates() pour filtrer les correspondances.
+// The tree-sitter C API only parses predicates (#eq?, #match?...): evaluating
+// them is up to the caller. This class precompiles them and exposes
+// matchSatisfiesPredicates() to filter matches.
 class HighlightQuery {
 public:
     HighlightQuery(const TSLanguage *language, const QByteArray &source);
@@ -29,7 +29,7 @@ public:
     uint32_t captureCount() const;
     QString captureName(uint32_t captureIndex) const;
 
-    // `documentText` : texte UTF-8 complet du document analysé.
+    // `documentText`: full UTF-8 text of the parsed document.
     bool matchSatisfiesPredicates(const TSQueryMatch &match, const char *documentText) const;
 
 private:

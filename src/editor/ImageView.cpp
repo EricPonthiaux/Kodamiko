@@ -16,7 +16,7 @@ constexpr double minZoom = 0.05;
 constexpr double maxZoom = 32.0;
 constexpr double zoomStep = 1.25;
 
-// Damier dessiné sous les zones transparentes de l'image.
+// Checkerboard drawn under the transparent areas of the image.
 QBrush checkerboard(const QColor &background)
 {
     QPixmap tile(16, 16);
@@ -50,7 +50,7 @@ bool ImageView::isImageFile(const QString &path)
 bool ImageView::load(const QString &path, QString *error)
 {
     QImageReader reader(path);
-    reader.setAutoTransform(true); // orientation EXIF des photos
+    reader.setAutoTransform(true); // EXIF orientation of photos
     QImage image = reader.read();
     if (image.isNull()) {
         *error = reader.errorString();
@@ -67,7 +67,7 @@ bool ImageView::load(const QString &path, QString *error)
 
 QString ImageView::description() const
 {
-    return tr("%1 × %2, zoom %3 %")
+    return tr("%1 × %2, zoom %3%")
         .arg(image_.width())
         .arg(image_.height())
         .arg(QLocale().toString(std::round(zoom_ * 100)));
@@ -101,7 +101,7 @@ void ImageView::zoomToFit()
     const QSize available = viewport()->size();
     const double fit = std::min(double(available.width()) / image_.width(),
                                 double(available.height()) / image_.height());
-    setZoom(std::min(1.0, fit)); // on réduit les grandes images, sans agrandir les petites
+    setZoom(std::min(1.0, fit)); // shrink large images, without enlarging small ones
 }
 
 void ImageView::updatePixmap()
@@ -109,7 +109,7 @@ void ImageView::updatePixmap()
     if (image_.isNull())
         return;
     const QSize size = (QSizeF(image_.size()) * zoom_).toSize().expandedTo(QSize(1, 1));
-    // Au-delà de 100 %, on garde les pixels nets plutôt que de les lisser.
+    // Above 100%, keep pixels sharp rather than smoothing them.
     const Qt::TransformationMode mode = zoom_ < 1.0 ? Qt::SmoothTransformation : Qt::FastTransformation;
     label_->setPixmap(QPixmap::fromImage(image_.scaled(size, Qt::KeepAspectRatio, mode)));
     label_->resize(size);

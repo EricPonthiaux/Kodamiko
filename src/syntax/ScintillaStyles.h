@@ -1,19 +1,24 @@
 #pragma once
 
+class QFont;
 class QsciScintilla;
 struct Theme;
 
 namespace ScintillaStyles {
 
-// Style Scintilla attribué à theme.syntaxStyles[i] : les numéros 1..31 sont
-// libres (0 = texte par défaut, 32 et plus = styles réservés par Scintilla).
+// Scintilla style assigned to theme.syntaxStyles[i]: numbers 1..31 are free
+// (0 = default text, 32 and above = styles reserved by Scintilla).
 constexpr int firstSyntaxStyle = 1;
 constexpr int maxSyntaxStyles = 31;
 
-// Police, couleurs de texte et de fond par défaut, copiées dans tous les styles.
+// Default font, text and background colors, copied into every style.
 void applyDefaultStyle(QsciScintilla &editor, const Theme &theme);
 
-// Styles des catégories syntaxiques (firstSyntaxStyle + index dans le thème).
+// Syntax category styles (firstSyntaxStyle + index in the theme).
 void applySyntaxStyles(QsciScintilla &editor, const Theme &theme);
+
+// Lines set at AppFonts::codeLineHeight times the font size, some room
+// between the margin and the text, a caret two pixels wide.
+void applyTypography(QsciScintilla &editor, const QFont &font);
 
 } // namespace ScintillaStyles

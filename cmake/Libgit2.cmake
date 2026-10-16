@@ -1,5 +1,7 @@
-# libgit2 sert uniquement à lire le dépôt local (mode Diff) : pas de réseau, pas
-# de SSH ni de HTTPS, et zlib embarqué pour rester sans dépendance système.
+# libgit2 sert uniquement à lire le dépôt local (état, diffs, instantanés) ; les
+# écritures passent par la commande git (voir src/git/GitOperations.h). Pas de
+# réseau, pas de SSH ni de HTTPS, et zlib embarqué pour rester sans dépendance
+# système.
 
 set(BUILD_TESTS        OFF CACHE BOOL "" FORCE)
 set(BUILD_CLI          OFF CACHE BOOL "" FORCE)

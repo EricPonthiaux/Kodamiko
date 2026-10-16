@@ -1,4 +1,4 @@
-; Structure d'un fichier C (voir README.md).
+; Outline of a C file (see README.md).
 
 (function_definition
   declarator: [

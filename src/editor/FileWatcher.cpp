@@ -40,8 +40,8 @@ void FileWatcher::emitPendingChanges()
 {
     const QSet<QString> paths = std::exchange(pendingPaths_, {});
     for (const QString &path : paths) {
-        // Un enregistrement « atomique » remplace le fichier par un nouveau :
-        // le système cesse alors de surveiller le chemin, qu'il faut réinscrire.
+        // An "atomic" save replaces the file with a new one: the system then
+        // stops watching the path, which must be added again.
         if (QFileInfo::exists(path) && !watcher_.files().contains(path))
             watcher_.addPath(path);
         emit fileChanged(path);

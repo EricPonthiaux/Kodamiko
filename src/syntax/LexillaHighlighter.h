@@ -6,8 +6,8 @@
 
 class QsciLexer;
 
-// Coloration par un lexer intégré à QScintilla, pour les fichiers annexes
-// (JSON, CMake, Markdown, XML...) qui n'ont pas de grammaire tree-sitter.
+// Highlighting through a lexer built into QScintilla, for auxiliary files
+// (JSON, CMake, Markdown, XML...) that have no tree-sitter grammar.
 class LexillaHighlighter : public ISyntaxHighlighter {
 public:
     explicit LexillaHighlighter(std::unique_ptr<QsciLexer> lexer);

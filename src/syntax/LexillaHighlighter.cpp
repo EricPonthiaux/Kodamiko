@@ -7,10 +7,9 @@
 
 namespace {
 
-// Les lexers QScintilla ont chacun leurs propres numéros de style mais
-// décrivent chaque style en anglais (« Double-quoted string », « Comment
-// line »...). On en déduit la catégorie du thème à utiliser, ce qui évite une
-// table de correspondance par lexer.
+// QScintilla lexers each have their own style numbers but describe every
+// style in English ("Double-quoted string", "Comment line"...). We infer the
+// theme category to use from that, which avoids a mapping table per lexer.
 QString categoryForLexerStyle(const QString &description)
 {
     const QString text = description.toLower();
@@ -88,6 +87,6 @@ void LexillaHighlighter::applyTheme(const Theme &theme)
         lexer_->setFont(textStyle.bold ? boldFont : textStyle.italic ? italicFont : theme.font, style);
     }
 
-    // QsciScintilla ne relit les styles du lexer qu'au moment de setLexer().
+    // QsciScintilla only rereads the lexer's styles on setLexer().
     editor_->setLexer(lexer_.get());
 }

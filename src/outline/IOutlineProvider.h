@@ -6,12 +6,12 @@
 
 #include <vector>
 
-// Calcule la structure d'un fichier (voir OutlineProviders::create). Chaque
-// volet Structure possède son fournisseur, choisi selon le langage du fichier.
+// Computes the outline of a file (see OutlineProviders::create). Each
+// Outline pane owns its provider, chosen according to the file's language.
 class IOutlineProvider {
 public:
     virtual ~IOutlineProvider() = default;
 
-    // Structure de `text`, texte UTF-8 complet du fichier.
+    // Outline of `text`, the file's complete UTF-8 text.
     virtual std::vector<OutlineSymbol> symbols(const QByteArray &text) = 0;
 };

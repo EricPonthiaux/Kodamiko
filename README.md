@@ -1,8 +1,8 @@
 # Enlumine
 
 Éditeur de code source open source pour **C, C++, Java et JavaScript/TypeScript**,
-avec un **terminal Claude Code intégré** et une **vue des changements en cours**
-par rapport au dernier commit git. Il tourne sous Linux, Windows et macOS (Qt 6).
+avec un **terminal Claude Code intégré** et une **gestion git** : changements en
+cours, indexation fichier par fichier, bloc par bloc ou ligne par ligne, commits. Il tourne sous Linux, Windows et macOS (Qt 6).
 
 ## Fonctionnalités
 
@@ -13,8 +13,13 @@ par rapport au dernier commit git. Il tourne sous Linux, Windows et macOS (Qt 6)
   Markdown, XML, HTML, CSS, shell, Python, YAML, Makefile, INI/TOML, SQL, diff.
 - **Terminal intégré** (émulation xterm 256 couleurs / truecolor par libvterm) :
   sessions Claude Code et shells classiques, dans des onglets.
-- **Mode Diff** : les fichiers ajoutés, modifiés, supprimés ou renommés depuis
-  le dernier commit git, avec leur diff, mis à jour à chaque réponse de Claude.
+- **Mode Diff** : les changements en cours, séparés comme dans `git status`
+  entre indexés et non indexés, avec leur diff, mis à jour à chaque réponse de
+  Claude et à chaque commande git. On y indexe ou retire des fichiers, des
+  blocs ou des lignes, on abandonne des modifications et on committe.
+- **Filet de sécurité** : avant d'abandonner des modifications, l'éditeur garde
+  une copie des fichiers (fichiers non suivis compris), récupérable par
+  *Git ▸ Récupérer un instantané*.
 - **Volet Structure** : les fonctions, classes, méthodes, champs… du fichier
   affiché (titres pour Markdown, fonctions et cibles pour CMake), imbriqués et
   filtrables. Un clic amène le curseur sur le symbole ; le symbole qui
@@ -65,10 +70,31 @@ La fenêtre a trois modes plein écran, choisis par les onglets en bas à droite
 - **Terminal** : les sessions Claude et les terminaux.
 - **Edit** : panneau latéral (onglets **Fichiers** et **Structure**) et
   onglets d'éditeur.
-- **Diff** : les changements en cours sur tous les fichiers du projet, par
-  rapport au dernier commit du dépôt git (fichiers non suivis compris). Cliquer
-  un fichier fait défiler jusqu'à son diff, double-cliquer l'ouvre dans
-  l'éditeur. La vue se met à jour à chaque modification de Claude.
+- **Diff** : les changements en cours du dépôt git, en deux sections :
+  **Indexés** (ce que le prochain commit contiendra) et **Non indexés**
+  (fichiers non suivis compris). Cliquer un fichier fait défiler jusqu'à son
+  diff, double-cliquer l'ouvre dans l'éditeur. La vue se met à jour à chaque
+  modification de Claude et à chaque commande git lancée dans un terminal.
+
+### Commits ciblés
+
+- **Fichiers** : boutons *Indexer*, *Retirer*, *Abandonner…* ou clic droit sur
+  les fichiers choisis (un titre de section vaut tous ses fichiers).
+- **Blocs et lignes** : clic droit dans le diff. Sans sélection, l'action porte
+  sur le bloc sous la souris ; avec une sélection, sur les lignes `+` et `-`
+  sélectionnées seulement.
+- **Commit** : message sous la liste, puis *Committer* ou Ctrl+Entrée. *Modifier
+  le dernier commit* remplace le dernier commit (`--amend`) et reprend son
+  message. Si rien n'est indexé, l'éditeur propose de tout indexer.
+- **Abandonner** des modifications remet les fichiers dans l'état de l'index
+  (les fichiers non suivis sont supprimés). Une copie est prise avant :
+  *Git ▸ Récupérer un instantané* la remet sur disque.
+
+Les opérations passent par la commande `git`, qui doit être installée : les
+hooks du dépôt (pre-commit…), la signature des commits et votre configuration
+s'appliquent comme dans un terminal. Un échec affiche le message de git,
+sortie des hooks comprise. La branche courante est indiquée dans la barre
+d'état.
 
 | Action | Raccourci |
 |---|---|
@@ -76,6 +102,8 @@ La fenêtre a trois modes plein écran, choisis par les onglets en bas à droite
 | Basculer vers le terminal et revenir | F11 |
 | Structure du fichier (filtre) | Ctrl+Shift+O |
 | Rafraîchir le diff | F5 |
+| Préparer un commit | Ctrl+Shift+G |
+| Committer (dans le message) | Ctrl+Entrée |
 | Ouvrir un dossier | Ctrl+K, Ctrl+O |
 | Nouvelle session Claude | Ctrl+Shift+L |
 | Nouveau terminal | Ctrl+Shift+T |
@@ -101,8 +129,8 @@ terminal, pour changer de mode.
 3. Sur `PostToolUse`, l'éditeur recharge les fichiers ouverts modifiés. Sur
    `PostToolUse` et `Stop`, il recalcule le mode Diff à partir du dépôt git
    du projet : les modifications faites par des commandes shell (`sed`,
-   générateurs…) apparaissent donc aussi. Le dépôt est seulement lu, jamais
-   modifié.
+   générateurs…) apparaissent donc aussi. Le suivi de Claude ne modifie
+   jamais le dépôt : seules vos actions dans le mode Diff le font.
 
 ## Architecture
 
@@ -114,7 +142,8 @@ src/
   outline/    volet Structure : requêtes outline.scm (syntax/queries), Markdown, CMake
   terminal/   PTY (forkpty / ConPTY), émulation VT (libvterm), widget terminal
   claude/     lancement de Claude Code, hooks, serveur local
-  changes/    diff du répertoire de travail (libgit2), mode Diff
+  git/        état du dépôt (libgit2), opérations (commande git), patchs partiels, instantanés
+  changes/    mode Diff : indexation, commit, récupération des instantanés
   workspace/  arborescence des fichiers
 tools/enlumine-hook/   relais hooks Claude Code → éditeur
 tests/                 tests Qt Test (ctest)

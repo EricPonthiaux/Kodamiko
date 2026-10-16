@@ -5,10 +5,10 @@
 #include <QSet>
 #include <QTimer>
 
-// Surveille les fichiers ouverts et signale leurs modifications sur disque.
+// Watches open files and reports their modifications on disk.
 //
-// Les rafales de notifications (un outil qui écrit un fichier en plusieurs
-// fois) sont regroupées en un seul signal par fichier.
+// Bursts of notifications (a tool writing a file in several steps) are
+// merged into a single signal per file.
 class FileWatcher : public QObject {
     Q_OBJECT
 

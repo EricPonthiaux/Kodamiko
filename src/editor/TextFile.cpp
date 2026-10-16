@@ -26,7 +26,7 @@ LineEnding detectLineEnding(const QByteArray &bytes)
 #endif
 }
 
-// Heuristique des éditeurs courants : un octet nul au début = fichier binaire.
+// Common editor heuristic: a null byte near the start = binary file.
 bool looksBinary(const QByteArray &bytes)
 {
     return bytes.left(8192).contains('\0');
@@ -44,8 +44,8 @@ DecodedText decode(const QByteArray &bytes)
     }
     result.format.lineEnding = detectLineEnding(content);
 
-    // Stateless : une séquence incomplète en fin de fichier est une erreur,
-    // au lieu d'être gardée en attente d'octets qui ne viendront pas.
+    // Stateless: an incomplete sequence at the end of the file is an error,
+    // instead of being held back waiting for bytes that will never come.
     QStringDecoder utf8(QStringDecoder::Utf8, QStringConverter::Flag::Stateless);
     result.text = utf8.decode(content);
     if (utf8.hasError()) {
@@ -72,7 +72,7 @@ std::optional<DecodedText> load(const QString &path, QString *error)
     }
     const QByteArray bytes = file.readAll();
     if (looksBinary(bytes)) {
-        *error = QCoreApplication::translate("TextFile", "Fichier binaire : ouverture impossible dans l'éditeur.");
+        *error = QCoreApplication::translate("TextFile", "Binary file: cannot be opened in the editor.");
         return std::nullopt;
     }
     return decode(bytes);

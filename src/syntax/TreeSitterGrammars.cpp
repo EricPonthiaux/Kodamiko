@@ -23,9 +23,9 @@ namespace {
 
 struct GrammarDefinition {
     const TSLanguage *(*language)();
-    // Concaténées dans cet ordre. Quand plusieurs motifs capturent le même
-    // nœud, le dernier l'emporte : on va donc du plus général au plus précis
-    // (C avant C++, JavaScript avant TypeScript).
+    // Concatenated in this order. When several patterns capture the same
+    // node, the last one wins, so we go from most general to most specific
+    // (C before C++, JavaScript before TypeScript).
     QStringList queryResources;
     QString outlineResource;
 };
@@ -62,7 +62,7 @@ QByteArray readQuerySources(const QStringList &resources)
     for (const QString &resource : resources) {
         QFile file(resource);
         if (!file.open(QIODevice::ReadOnly)) {
-            qWarning() << "Requête tree-sitter introuvable :" << resource;
+            qWarning() << "Tree-sitter query not found:" << resource;
             continue;
         }
         source += file.readAll();
@@ -73,8 +73,8 @@ QByteArray readQuerySources(const QStringList &resources)
 
 struct LoadedGrammar {
     std::unique_ptr<HighlightQuery> query;
-    std::unique_ptr<HighlightQuery> outline; // nullptr si la requête est invalide
-    std::unique_ptr<TreeSitterGrammar> grammar; // nullptr si la requête est invalide
+    std::unique_ptr<HighlightQuery> outline; // nullptr if the query is invalid
+    std::unique_ptr<TreeSitterGrammar> grammar; // nullptr if the query is invalid
 };
 
 } // namespace
@@ -95,13 +95,13 @@ const TreeSitterGrammar *forLanguage(const QString &languageId)
     entry.query = std::make_unique<HighlightQuery>(language, readQuerySources(definition->second.queryResources));
     entry.outline = std::make_unique<HighlightQuery>(language, readQuerySources({definition->second.outlineResource}));
     if (!entry.outline->isValid()) {
-        qWarning().noquote() << "Requête de structure" << languageId << "invalide :" << entry.outline->errorMessage();
+        qWarning().noquote() << "Invalid outline query" << languageId << ":" << entry.outline->errorMessage();
         entry.outline.reset();
     }
     if (entry.query->isValid())
         entry.grammar = std::make_unique<TreeSitterGrammar>(TreeSitterGrammar{language, *entry.query, entry.outline.get()});
     else
-        qWarning().noquote() << "Requête de coloration" << languageId << "invalide :" << entry.query->errorMessage();
+        qWarning().noquote() << "Invalid highlighting query" << languageId << ":" << entry.query->errorMessage();
 
     const TreeSitterGrammar *grammar = entry.grammar.get();
     loaded.emplace(languageId, std::move(entry));

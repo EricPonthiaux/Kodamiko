@@ -3,7 +3,9 @@
 #include "IOutlineProvider.h"
 #include "OutlineProviders.h"
 #include "editor/EditorWidget.h"
+#include "workspace/TreeColumnFit.h"
 
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QLabel>
@@ -32,23 +34,23 @@ struct KindStyle {
 KindStyle styleOf(SymbolKind kind)
 {
     switch (kind) {
-    case SymbolKind::Namespace: return {'N', QColor("#8a94a6"), QT_TRANSLATE_NOOP("OutlineView", "Espace de noms")};
-    case SymbolKind::Class: return {'C', QColor("#d19a40"), QT_TRANSLATE_NOOP("OutlineView", "Classe")};
-    case SymbolKind::Struct: return {'S', QColor("#c7783e"), QT_TRANSLATE_NOOP("OutlineView", "Structure")};
+    case SymbolKind::Namespace: return {'N', QColor("#8a94a6"), QT_TRANSLATE_NOOP("OutlineView", "Namespace")};
+    case SymbolKind::Class: return {'C', QColor("#d19a40"), QT_TRANSLATE_NOOP("OutlineView", "Class")};
+    case SymbolKind::Struct: return {'S', QColor("#c7783e"), QT_TRANSLATE_NOOP("OutlineView", "Struct")};
     case SymbolKind::Interface: return {'I', QColor("#3fa7a0"), QT_TRANSLATE_NOOP("OutlineView", "Interface")};
-    case SymbolKind::Enum: return {'E', QColor("#b5a13a"), QT_TRANSLATE_NOOP("OutlineView", "Énumération")};
+    case SymbolKind::Enum: return {'E', QColor("#b5a13a"), QT_TRANSLATE_NOOP("OutlineView", "Enum")};
     case SymbolKind::Type: return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Type")};
-    case SymbolKind::Function: return {'f', QColor("#9b6fd1"), QT_TRANSLATE_NOOP("OutlineView", "Fonction")};
-    case SymbolKind::Method: return {'m', QColor("#a573c9"), QT_TRANSLATE_NOOP("OutlineView", "Méthode")};
-    case SymbolKind::Field: return {'v', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Champ")};
+    case SymbolKind::Function: return {'f', QColor("#9b6fd1"), QT_TRANSLATE_NOOP("OutlineView", "Function")};
+    case SymbolKind::Method: return {'m', QColor("#a573c9"), QT_TRANSLATE_NOOP("OutlineView", "Method")};
+    case SymbolKind::Field: return {'v', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Field")};
     case SymbolKind::Macro: return {'#', QColor("#c25b6b"), QT_TRANSLATE_NOOP("OutlineView", "Macro")};
-    case SymbolKind::Heading: return {'H', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Titre")};
-    case SymbolKind::Target: return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Cible")};
+    case SymbolKind::Heading: return {'H', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Heading")};
+    case SymbolKind::Target: return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Target")};
     }
     return {'?', QColor("#8a94a6"), ""};
 }
 
-// Pastille colorée portant une lettre, lisible sur fond clair comme sombre.
+// Colored badge bearing a letter, readable on light and dark backgrounds alike.
 QIcon iconFor(SymbolKind kind)
 {
     static QHash<int, QIcon> cache;
@@ -87,7 +89,7 @@ OutlineView::OutlineView(QWidget *parent)
     , placeholder_(new QLabel(this))
     , stack_(new QStackedWidget(this))
 {
-    filter_->setPlaceholderText(tr("Filtrer les symboles"));
+    filter_->setPlaceholderText(tr("Filter symbols"));
     filter_->setClearButtonEnabled(true);
     filter_->installEventFilter(this);
     connect(filter_, &QLineEdit::textChanged, this, [this] {
@@ -98,6 +100,7 @@ OutlineView::OutlineView(QWidget *parent)
 
     tree_->header()->hide();
     tree_->setUniformRowHeights(true);
+    columnFit_ = new TreeColumnFit(tree_);
     tree_->setAnimated(false);
     tree_->setExpandsOnDoubleClick(false);
     connect(tree_, &QTreeWidget::itemClicked, this, &OutlineView::jumpTo);
@@ -118,10 +121,15 @@ OutlineView::OutlineView(QWidget *parent)
     stack_->addWidget(placeholder_);
     stack_->addWidget(tree_);
 
+    // Same margins as the scope box above the file tree.
+    auto *toolbar = new QHBoxLayout;
+    toolbar->setContentsMargins(4, 2, 2, 2);
+    toolbar->addWidget(filter_);
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(filter_);
+    layout->addLayout(toolbar);
     layout->addWidget(stack_, 1);
 
     refreshTimer_.setSingleShot(true);
@@ -169,7 +177,7 @@ void OutlineView::showEvent(QShowEvent *event)
         refresh();
 }
 
-// Depuis le filtre : Bas descend dans la liste, Échap revient à l'éditeur.
+// From the filter: Down moves into the list, Escape returns to the editor.
 bool OutlineView::eventFilter(QObject *watched, QEvent *event)
 {
     if (watched == filter_ && event->type() == QEvent::KeyPress) {
@@ -219,11 +227,11 @@ void OutlineView::refresh()
         stack_->setCurrentWidget(placeholder_);
     };
     if (!editor_) {
-        showPlaceholder(tr("Aucun fichier ouvert"));
+        showPlaceholder(tr("No open file"));
         return;
     }
     if (!provider_) {
-        showPlaceholder(tr("Pas de structure pour ce type de fichier"));
+        showPlaceholder(tr("No outline for this file type"));
         return;
     }
 
@@ -232,7 +240,7 @@ void OutlineView::refresh()
     const long length = editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
     const std::vector<OutlineSymbol> symbols = provider_->symbols(QByteArray(text, length));
     if (symbols.empty()) {
-        showPlaceholder(tr("Aucun symbole dans ce fichier"));
+        showPlaceholder(tr("No symbols in this file"));
         return;
     }
     populate(symbols);
@@ -252,7 +260,7 @@ void OutlineView::populate(const std::vector<OutlineSymbol> &symbols)
                 auto *item = new QTreeWidgetItem(parent);
                 item->setText(0, symbol.name);
                 item->setIcon(0, iconFor(symbol.kind));
-                item->setToolTip(0, QStringLiteral("%1 — %2 (ligne %3)")
+                item->setToolTip(0, QStringLiteral("%1 — %2 (line %3)")
                                         .arg(symbol.name, tr(styleOf(symbol.kind).description))
                                         .arg(symbol.startLine + 1));
                 item->setData(0, PositionRole, symbol.position);
@@ -267,8 +275,8 @@ void OutlineView::populate(const std::vector<OutlineSymbol> &symbols)
     tree_->verticalScrollBar()->setValue(scroll);
 }
 
-// Sans filtre : tout est visible, déplié sauf ce que l'utilisateur a replié.
-// Avec filtre : seuls les symboles correspondants et leurs parents restent.
+// Without a filter: everything is visible, expanded except what the user collapsed.
+// With a filter: only matching symbols and their parents remain.
 void OutlineView::applyFilter()
 {
     const QSignalBlocker blocker(tree_);
@@ -287,9 +295,10 @@ void OutlineView::applyFilter()
     };
     for (int i = 0; i < tree_->topLevelItemCount(); ++i)
         visit(tree_->topLevelItem(i));
+    columnFit_->refit(); // hidden rows and expansion, signals blocked
 }
 
-// Sélectionne le symbole visible le plus imbriqué qui contient le curseur.
+// Selects the most deeply nested visible symbol containing the cursor.
 void OutlineView::selectSymbolAtCursor()
 {
     if (!editor_ || stack_->currentWidget() != tree_)
@@ -335,7 +344,7 @@ void OutlineView::jumpTo(QTreeWidgetItem *item)
     editor_->setFocus();
 }
 
-// Premier symbole correspondant au filtre (le premier tout court sans filtre).
+// First symbol matching the filter (simply the first one without a filter).
 QTreeWidgetItem *OutlineView::firstMatchingItem() const
 {
     const QString text = filter_->text().trimmed();

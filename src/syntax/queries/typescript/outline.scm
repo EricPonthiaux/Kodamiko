@@ -1,4 +1,4 @@
-; Structure d'un fichier TypeScript / TSX (voir README.md).
+; Outline of a TypeScript / TSX file (see README.md).
 
 (internal_module name: (_) @name) @definition.namespace
 (module name: (_) @name) @definition.namespace

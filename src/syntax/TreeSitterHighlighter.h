@@ -10,14 +10,14 @@
 
 struct TreeSitterGrammar;
 
-// Coloration par tree-sitter, branchée sur le « container lexer » de
-// Scintilla : Scintilla signale le texte à colorer (SCN_STYLENEEDED), on
-// interroge l'arbre syntaxique et on pose les styles octet par octet.
+// Tree-sitter highlighting, plugged into Scintilla's "container lexer":
+// Scintilla reports the text to style (SCN_STYLENEEDED), we query the syntax
+// tree and set the styles byte by byte.
 //
-// L'arbre est mis à jour incrémentalement : chaque insertion/suppression est
-// reportée dans l'arbre (ts_tree_edit), puis le texte est ré-analysé au
-// prochain besoin de coloration. Scintilla travaillant en UTF-8 comme
-// tree-sitter, positions Scintilla et octets tree-sitter coïncident.
+// The tree is updated incrementally: each insertion/deletion is applied to
+// the tree (ts_tree_edit), then the text is reparsed the next time
+// highlighting is needed. Since Scintilla works in UTF-8 like tree-sitter,
+// Scintilla positions and tree-sitter bytes coincide.
 class TreeSitterHighlighter : public QObject, public ISyntaxHighlighter {
     Q_OBJECT
 
@@ -28,7 +28,7 @@ public:
     void attach(QsciScintilla *editor) override;
     void applyTheme(const Theme &theme) override;
 
-    // Colore [start, end[. Public pour les tests ; sinon appelé par Scintilla.
+    // Styles [start, end[. Public for tests; otherwise called by Scintilla.
     void styleRange(int start, int end);
 
 private:
@@ -36,8 +36,8 @@ private:
                     int line, int foldLevelNow, int foldLevelPrev, int token, int annotationLinesAdded);
     void onStyleNeeded(int endPosition);
 
-    // Ré-analyse si le texte a changé ; renvoie la première position dont la
-    // structure syntaxique a changé (INT_MAX si aucune).
+    // Reparses if the text changed; returns the first position whose syntax
+    // structure changed (INT_MAX if none).
     int reparseIfNeeded();
     TSPoint pointAt(int position) const;
     const char *documentText() const;
@@ -50,6 +50,6 @@ private:
     TSQueryCursor *cursor_ = nullptr;
     bool treeIsOutdated_ = true;
 
-    // Style Scintilla de chaque capture de la requête (0 = non colorée).
+    // Scintilla style of each query capture (0 = not highlighted).
     std::vector<char> styleOfCapture_;
 };

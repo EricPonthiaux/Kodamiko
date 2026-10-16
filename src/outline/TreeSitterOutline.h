@@ -8,14 +8,14 @@
 
 class HighlightQuery;
 
-// Structure d'après une requête tree-sitter outline.scm (voir
-// src/syntax/queries/README.md). Le texte est analysé en entier à chaque
-// appel : quelques millisecondes, même pour un gros fichier.
+// Outline from a tree-sitter outline.scm query (see
+// src/syntax/queries/README.md). The whole text is parsed on each
+// call: a few milliseconds, even for a large file.
 class TreeSitterOutline : public IOutlineProvider {
 public:
-    // `blankedMacros` : macros sans argument remplacées par des espaces avant
-    // l'analyse, quand elles la perturbent (Q_OBJECT suivi de « public: »
-    // se lit comme un champ nommé « public »).
+    // `blankedMacros`: argument-less macros replaced with spaces before
+    // parsing, when they confuse it (Q_OBJECT followed by "public:"
+    // reads as a field named "public").
     TreeSitterOutline(const TSLanguage *language, const HighlightQuery &query, QByteArrayList blankedMacros = {});
     ~TreeSitterOutline() override;
 

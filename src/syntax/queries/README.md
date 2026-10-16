@@ -1,14 +1,14 @@
-# Requêtes de structure (outline.scm)
+# Outline queries (outline.scm)
 
-Requêtes tree-sitter du volet Structure, écrites pour Enlumine (les requêtes
-de coloration viennent, elles, des grammaires). Conventions :
+tree-sitter queries for the Outline panel, written for Enlumine (the
+highlighting queries come from the grammars themselves). Conventions:
 
-- `@definition.<genre>` couvre l'élément entier (corps compris) : sa plage
-  sert à imbriquer les éléments et à suivre le curseur ;
-- `@declaration.<genre>` : simple déclaration (prototype, signature),
-  ignorée à l'intérieur d'une fonction ;
-- `@name` : le nom affiché, sur lequel le curseur est placé.
+- `@definition.<kind>` covers the whole element (body included): its range
+  is used to nest elements and to follow the cursor;
+- `@declaration.<kind>`: a mere declaration (prototype, signature),
+  ignored inside a function;
+- `@name`: the displayed name, where the cursor is placed.
 
-Genres : `namespace`, `class`, `struct`, `interface`, `enum`, `type`,
-`function`, `method`, `field`, `macro`. Une fonction contenue dans une
-classe, une structure ou une interface est affichée comme une méthode.
+Kinds: `namespace`, `class`, `struct`, `interface`, `enum`, `type`,
+`function`, `method`, `field`, `macro`. A function contained in a
+class, a struct or an interface is displayed as a method.

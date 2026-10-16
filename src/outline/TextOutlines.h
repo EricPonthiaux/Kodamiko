@@ -2,15 +2,15 @@
 
 #include "IOutlineProvider.h"
 
-// Fournisseurs ligne à ligne, pour les fichiers sans grammaire tree-sitter.
+// Line-by-line providers, for files without a tree-sitter grammar.
 
-// Titres Markdown (« # Titre » et soulignés « === » / « --- »), hors blocs de code.
+// Markdown headings ("# Heading" and "===" / "---" underlines), outside code blocks.
 class MarkdownOutline : public IOutlineProvider {
 public:
     std::vector<OutlineSymbol> symbols(const QByteArray &text) override;
 };
 
-// CMake : function(), macro() et cibles (add_executable, add_library...).
+// CMake: function(), macro() and targets (add_executable, add_library...).
 class CMakeOutline : public IOutlineProvider {
 public:
     std::vector<OutlineSymbol> symbols(const QByteArray &text) override;

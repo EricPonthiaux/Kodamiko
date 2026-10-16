@@ -5,13 +5,13 @@ namespace {
 QString errorTypeName(TSQueryError error)
 {
     switch (error) {
-    case TSQueryErrorSyntax: return QStringLiteral("syntaxe");
-    case TSQueryErrorNodeType: return QStringLiteral("type de nœud inconnu");
-    case TSQueryErrorField: return QStringLiteral("champ inconnu");
-    case TSQueryErrorCapture: return QStringLiteral("capture inconnue");
-    case TSQueryErrorStructure: return QStringLiteral("structure impossible");
-    case TSQueryErrorLanguage: return QStringLiteral("version de langage incompatible");
-    default: return QStringLiteral("erreur");
+    case TSQueryErrorSyntax: return QStringLiteral("syntax");
+    case TSQueryErrorNodeType: return QStringLiteral("unknown node type");
+    case TSQueryErrorField: return QStringLiteral("unknown field");
+    case TSQueryErrorCapture: return QStringLiteral("unknown capture");
+    case TSQueryErrorStructure: return QStringLiteral("impossible structure");
+    case TSQueryErrorLanguage: return QStringLiteral("incompatible language version");
+    default: return QStringLiteral("error");
     }
 }
 
@@ -41,7 +41,7 @@ HighlightQuery::HighlightQuery(const TSLanguage *language, const QByteArray &sou
                           &errorType);
     if (!query_) {
         const QByteArray context = source.mid(errorOffset, 60);
-        errorMessage_ = QStringLiteral("%1 à l'octet %2 : %3")
+        errorMessage_ = QStringLiteral("%1 at byte %2: %3")
                             .arg(errorTypeName(errorType))
                             .arg(errorOffset)
                             .arg(QString::fromUtf8(context));
@@ -75,7 +75,7 @@ QString HighlightQuery::stringValue(uint32_t stringId) const
     return QString::fromUtf8(value, length);
 }
 
-// Les prédicats d'un motif arrivent sous forme d'une suite d'étapes :
+// A pattern's predicates arrive as a sequence of steps:
 //   String("match?") Capture(@x) String("^[A-Z]") Done  String("eq?") ... Done
 void HighlightQuery::compilePredicates()
 {
@@ -123,7 +123,7 @@ void HighlightQuery::compilePredicates()
                 for (uint32_t i = 1; i < argumentCount; ++i)
                     predicate.literals.append(stringArgument(i));
             } else {
-                continue; // #is-not?, #set!... : sans effet sur la coloration
+                continue; // #is-not?, #set!...: no effect on highlighting
             }
             predicatesByPattern_[pattern].push_back(std::move(predicate));
         }

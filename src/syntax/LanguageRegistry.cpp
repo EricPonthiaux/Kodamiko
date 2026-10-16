@@ -12,8 +12,8 @@ struct LanguageFiles {
     QStringList fileNames;
 };
 
-// Les en-têtes « .h » sont traités en C++ : la grammaire C++ lit aussi le C,
-// l'inverse est faux.
+// ".h" headers are treated as C++: the C++ grammar also reads C, but not the
+// other way around.
 const QList<LanguageFiles> &knownLanguages()
 {
     static const QList<LanguageFiles> languages = {

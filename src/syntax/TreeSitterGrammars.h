@@ -9,14 +9,14 @@ class HighlightQuery;
 struct TreeSitterGrammar {
     const TSLanguage *language;
     const HighlightQuery &highlights;
-    const HighlightQuery *outline; // requête du volet Structure, nullptr si absente ou invalide
+    const HighlightQuery *outline; // Outline pane query, nullptr if missing or invalid
 };
 
 namespace TreeSitterGrammars {
 
-// Grammaire et requêtes (coloration, structure) du langage, ou nullptr si le
-// langage n'a pas de grammaire tree-sitter embarquée. Les requêtes sont
-// compilées au premier appel puis conservées.
+// Grammar and queries (highlighting, outline) for the language, or nullptr if
+// the language has no embedded tree-sitter grammar. Queries are compiled on
+// the first call and then kept.
 const TreeSitterGrammar *forLanguage(const QString &languageId);
 
 } // namespace TreeSitterGrammars

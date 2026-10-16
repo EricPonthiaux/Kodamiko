@@ -7,22 +7,28 @@
 
 #include <optional>
 
-// Prépare le lancement de la CLI `claude` dans un terminal de l'éditeur.
+// Prepares launching the `claude` CLI in an editor terminal.
 //
-// Les hooks qui signalent l'activité de Claude sont passés par `--settings` : la
-// configuration Claude de l'utilisateur n'est jamais modifiée, et ces hooks
-// n'existent que pour les sessions lancées depuis l'éditeur.
+// The hooks that report Claude's activity are passed via `--settings`: the
+// user's Claude configuration is never modified, and these hooks only
+// exist for sessions launched from the editor.
 namespace ClaudeLauncher {
 
-// Contenu JSON du fichier --settings : hooks PostToolUse (outils d'édition)
-// et Stop, qui lancent tous deux `hookCommand`.
-QByteArray hooksSettings(const QString &hookCommand);
+// JSON content of the --settings file: hooks that run `hookCommand` on
+// the events the editor follows (prompt, file edits, permission requests,
+// notifications, end of the response), and a status line that runs
+// `hookCommand statusline`.
+QByteArray sessionSettings(const QString &hookCommand);
 
-// Programme `claude` trouvé, ou chaîne vide.
+// Status line command configured by the user for `projectDir` (user,
+// project and local settings), or an empty string.
+QString userStatusLineCommand(const QString &projectDir);
+
+// The `claude` program found, or an empty string.
 QString findClaudeExecutable();
 
-// Processus à lancer, ou nullopt (avec `error` renseigné) si `claude` ou
-// `enlumine-hook` sont introuvables.
+// Process to launch, or nullopt (with `error` set) if `claude` or
+// `enlumine-hook` cannot be found.
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName,
                                          QString *error);
 

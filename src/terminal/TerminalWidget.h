@@ -13,9 +13,9 @@ class VtScreen;
 struct Theme;
 struct TerminalCell;
 
-// Terminal graphique : relie un PTY (le programme) à un VtScreen (l'écran
-// émulé) et dessine la grille de cellules. La barre de défilement parcourt
-// l'historique des lignes sorties de l'écran.
+// Graphical terminal: connects a PTY (the program) to a VtScreen (the
+// emulated screen) and draws the cell grid. The scroll bar browses the
+// history of lines that scrolled off the screen.
 class QKeyEvent;
 
 class TerminalWidget : public QAbstractScrollArea {
@@ -30,11 +30,18 @@ public:
     bool isRunning() const { return running_; }
 
     void applyTheme(const Theme &theme);
+    // Types `text` as a paste (bracketed if the program asked for it).
+    void paste(const QString &text);
 
-    // Vrai pour Ctrl+1/2/3 (changement de mode), que le terminal laisse à
-    // l'application. Reconnu par la touche physique : sur un clavier AZERTY,
-    // Ctrl+2 arrive comme Ctrl+é.
+    // True for Ctrl+1/2/3/4 (mode switch), which the terminal leaves to the
+    // application. Recognized by the physical key: on an AZERTY keyboard,
+    // Ctrl+2 arrives as Ctrl+é.
     static bool isModeShortcut(const QKeyEvent &event);
+    // Keys the terminal leaves to the application's shortcuts: F11,
+    // Ctrl+1/2/3/4, and the combinations terminal programs do not use,
+    // Ctrl+Shift+… and Ctrl+Alt+… (Cmd+… on macOS), except the terminal's
+    // copy and paste.
+    static bool isApplicationShortcut(const QKeyEvent &event);
 
 signals:
     void titleChanged(const QString &title);
@@ -64,8 +71,8 @@ private:
     void paintCell(QPainter &painter, const TerminalCell &cell, int x, int y, bool selected) const;
     void paintCursor(QPainter &painter) const;
 
-    // Position (colonne, ligne de contenu) sous un point du widget ; les
-    // lignes de contenu sont négatives dans l'historique.
+    // Position (column, content row) under a widget point; content rows are
+    // negative in the history.
     QPoint cellAt(const QPoint &widgetPosition) const;
     bool isSelected(int contentRow, int column) const;
     QString selectedText() const;
@@ -85,7 +92,7 @@ private:
     QColor foreground_;
     QColor background_;
 
-    int scrollOffset_ = 0; // lignes d'historique affichées au-dessus de l'écran
+    int scrollOffset_ = 0; // history lines shown above the screen
     bool selecting_ = false;
     QPoint selectionAnchor_{-1, 0};
     QPoint selectionEnd_{-1, 0};

@@ -14,8 +14,8 @@ COORD consoleSize(QSize cells)
     return COORD{static_cast<SHORT>(cells.width()), static_cast<SHORT>(cells.height())};
 }
 
-// Guillemets selon les règles de CommandLineToArgvW : les barres obliques
-// inverses ne sont doublées que devant un guillemet.
+// Quoting per the CommandLineToArgvW rules: backslashes are only doubled
+// before a double quote.
 QString quoteArgument(const QString &argument)
 {
     if (!argument.isEmpty() && !argument.contains(QRegularExpression(QStringLiteral("[\\s\"]"))))
@@ -48,7 +48,7 @@ std::wstring commandLine(const QString &program, const QStringList &arguments)
     return parts.join(QLatin1Char(' ')).toStdWString();
 }
 
-// Bloc d'environnement Unicode : « CLÉ=valeur\0 » répétés, terminé par « \0 ».
+// Unicode environment block: repeated "KEY=value\0", terminated by "\0".
 std::wstring environmentBlock(const QProcessEnvironment &environment)
 {
     std::wstring block;
@@ -78,9 +78,9 @@ ConPty::~ConPty()
         CloseHandle(process_);
 }
 
-// Fermer la console termine le programme s'il tourne encore, puis ferme le
-// tube de sortie : ReadFile échoue alors dans le thread de lecture, qu'on
-// peut attendre.
+// Closing the console terminates the program if it is still running, then
+// closes the output pipe: ReadFile then fails in the reader thread, which we
+// can join.
 void ConPty::closeConsole()
 {
     if (pseudoConsole_) {
@@ -99,25 +99,25 @@ bool ConPty::start(const ProcessSpec &spec, QSize cells)
 {
     const QString program = resolveProgram(spec);
     if (program.isEmpty()) {
-        errorString_ = tr("Programme introuvable : %1").arg(spec.program);
+        errorString_ = tr("Program not found: %1").arg(spec.program);
         return false;
     }
 
-    // Deux tubes : nos écritures → entrée de la console, sortie de la console → nos lectures.
+    // Two pipes: our writes → console input, console output → our reads.
     HANDLE inputRead = INVALID_HANDLE_VALUE;
     HANDLE outputWrite = INVALID_HANDLE_VALUE;
     if (!CreatePipe(&inputRead, &inputWrite_, nullptr, 0) || !CreatePipe(&outputRead_, &outputWrite, nullptr, 0)) {
-        setError(tr("Création des tubes"));
+        setError(tr("Creating the pipes"));
         return false;
     }
 
     const HRESULT created = CreatePseudoConsole(consoleSize(cells), inputRead, outputWrite, 0, &pseudoConsole_);
-    // La console a dupliqué ses extrémités des tubes : les nôtres ne servent plus.
+    // The console duplicated its ends of the pipes: ours are no longer needed.
     CloseHandle(inputRead);
     CloseHandle(outputWrite);
     if (FAILED(created)) {
         pseudoConsole_ = nullptr;
-        setError(tr("Création de la pseudo-console"));
+        setError(tr("Creating the pseudo-console"));
         return false;
     }
 
@@ -128,7 +128,7 @@ bool ConPty::start(const ProcessSpec &spec, QSize cells)
     if (!InitializeProcThreadAttributeList(attributeList, 1, 0, &attributeListSize)
         || !UpdateProcThreadAttribute(attributeList, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, pseudoConsole_,
                                       sizeof(HPCON), nullptr, nullptr)) {
-        setError(tr("Préparation du processus"));
+        setError(tr("Preparing the process"));
         return false;
     }
 
@@ -148,7 +148,7 @@ bool ConPty::start(const ProcessSpec &spec, QSize cells)
                                          &startupInfo.StartupInfo, &processInfo);
     DeleteProcThreadAttributeList(attributeList);
     if (!launched) {
-        setError(tr("Lancement de %1").arg(program));
+        setError(tr("Launching %1").arg(program));
         return false;
     }
 
@@ -177,8 +177,8 @@ void ConPty::onProcessExited()
     if (!GetExitCodeProcess(process_, &exitCode))
         exitCode = static_cast<DWORD>(-1);
 
-    // La console vidée, le thread de lecture a transmis les dernières sorties
-    // (en file d'attente) : `finished` est mis à la suite pour arriver après elles.
+    // Once the console is drained, the reader thread has forwarded the last
+    // output (queued): `finished` is queued behind it so it arrives after.
     closeConsole();
     QMetaObject::invokeMethod(this, [this, exitCode] { emit finished(static_cast<int>(exitCode)); },
                               Qt::QueuedConnection);
@@ -207,7 +207,7 @@ void ConPty::resize(QSize cells)
 
 void ConPty::setError(const QString &action)
 {
-    errorString_ = QStringLiteral("%1 : erreur Windows %2").arg(action).arg(GetLastError());
+    errorString_ = QStringLiteral("%1: Windows error %2").arg(action).arg(GetLastError());
 }
 
 std::unique_ptr<IPty> createPty()

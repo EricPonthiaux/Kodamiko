@@ -32,15 +32,15 @@ std::vector<OutlineSymbol> build(std::vector<RangedSymbol> &flat, const std::vec
 
 std::vector<OutlineSymbol> nest(std::vector<RangedSymbol> flat)
 {
-    // Ordre du texte ; à début égal, le plus long (le contenant) d'abord.
+    // Text order; for equal starts, the longest (the container) first.
     std::stable_sort(flat.begin(), flat.end(), [](const RangedSymbol &a, const RangedSymbol &b) {
         if (a.start != b.start)
             return a.start < b.start;
         return a.end > b.end;
     });
 
-    // Une même construction peut être capturée deux fois (deux motifs, ou
-    // « int a, b; » qui donne deux champs de même plage, eux distincts).
+    // The same construct can be captured twice (two patterns, or
+    // "int a, b;" which yields two fields with the same range, which are distinct).
     flat.erase(std::unique(flat.begin(), flat.end(),
                            [](const RangedSymbol &a, const RangedSymbol &b) {
                                return a.start == b.start && a.end == b.end && a.symbol.name == b.symbol.name;
@@ -49,7 +49,7 @@ std::vector<OutlineSymbol> nest(std::vector<RangedSymbol> flat)
 
     std::vector<std::vector<size_t>> children(flat.size());
     std::vector<size_t> roots;
-    std::vector<size_t> ancestors; // chaîne des contenants du symbole courant
+    std::vector<size_t> ancestors; // chain of containers of the current symbol
     for (size_t i = 0; i < flat.size(); ++i) {
         RangedSymbol &current = flat[i];
         while (!ancestors.empty()) {

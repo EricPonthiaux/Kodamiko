@@ -4,14 +4,14 @@
 
 #include <stdexcept>
 
-enum class ChangeKind { Added, Modified, Deleted, Renamed };
+enum class ChangeKind { Added, Modified, Deleted, Renamed, Conflicted };
 
-// Fichier modifié par rapport au dernier commit. Chemins relatifs à la racine
-// du projet, séparateurs « / ».
+// File changed between two states of the repository (last commit, index, disk).
+// Paths relative to the project root, "/" separators.
 struct FileChange {
     ChangeKind kind;
     QString path;
-    QString oldPath; // renseigné seulement pour ChangeKind::Renamed
+    QString oldPath; // set only for ChangeKind::Renamed
 
     bool operator==(const FileChange &) const = default;
 };

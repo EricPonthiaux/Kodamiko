@@ -1,0 +1,51 @@
+#pragma once
+
+#include "FileChange.h"
+
+#include <QByteArray>
+#include <QList>
+
+#include <optional>
+
+// Git repository containing the open folder, and the state of its HEAD.
+struct RepositoryInfo {
+    QString workDir; // root of the working directory, without a trailing "/"
+    QString gitDir;  // git folder of the working directory (".git")
+    // Path of the open folder within the repository ("src/"), empty at the root.
+    QString prefix;
+
+    QString branch; // empty if HEAD is detached
+    QString headId; // abbreviated identifier of the last commit, empty without commits
+    QString headMessage;
+    bool detached = false;
+    bool unborn = false; // repository without commits
+    // Operation in progress ("merge", "rebase"…), empty otherwise.
+    QString operation;
+
+    // Repository path of a path relative to the open folder.
+    QString repoPath(const QString &relativePath) const { return prefix + relativePath; }
+
+    // Returns nullopt if `folder` belongs to no git repository (or to a
+    // repository without a working directory). Throws GitError on failure.
+    static std::optional<RepositoryInfo> read(const QString &folder);
+};
+
+// Changed file and its diff.
+struct FileDiff {
+    FileChange change;
+    // Raw unified diff (paths relative to the repository root): the file's
+    // bytes are kept as is, so that it can be reapplied.
+    QByteArray patch;
+};
+
+// Pending changes, split as in "git status". Only the files of the open
+// folder are compared, and their paths are relative to that folder. The
+// repository is only read.
+struct RepositoryStatus {
+    RepositoryInfo info;
+    QList<FileDiff> staged;   // last commit → index
+    QList<FileDiff> unstaged; // index → disk, untracked files included
+
+    // Returns nullopt outside a git repository. Throws GitError on failure.
+    static std::optional<RepositoryStatus> read(const QString &folder);
+};

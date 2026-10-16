@@ -8,17 +8,17 @@
 
 #include <memory>
 
-// Pseudo-terminal : lance un programme qui se croit dans un vrai terminal et
-// échange avec lui des octets bruts (séquences VT comprises).
+// Pseudo-terminal: launches a program that believes it is in a real terminal
+// and exchanges raw bytes with it (VT sequences included).
 //
-// Implémentations : UnixPty (forkpty, Linux et macOS), ConPty (Windows 10+).
+// Implementations: UnixPty (forkpty, Linux and macOS), ConPty (Windows 10+).
 class IPty : public QObject {
     Q_OBJECT
 
 public:
     using QObject::QObject;
 
-    // `cells` : largeur = colonnes, hauteur = lignes.
+    // `cells`: width = columns, height = rows.
     virtual bool start(const ProcessSpec &spec, QSize cells) = 0;
     virtual void write(const QByteArray &data) = 0;
     virtual void resize(QSize cells) = 0;
@@ -29,5 +29,5 @@ signals:
     void finished(int exitCode);
 };
 
-// PTY adapté au système courant.
+// PTY suited to the current system.
 std::unique_ptr<IPty> createPty();

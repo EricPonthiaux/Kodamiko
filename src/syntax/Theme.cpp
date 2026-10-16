@@ -1,14 +1,12 @@
 #include "Theme.h"
 
-#include <QFontDatabase>
+#include "AppFonts.h"
 
 namespace {
 
 QFont editorFont()
 {
-    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    font.setPointSize(11);
-    return font;
+    return AppFonts::codeFont(11);
 }
 
 TextStyle plain(const char *color) { return {QColor(color)}; }
@@ -21,6 +19,7 @@ Theme Theme::dark()
 {
     Theme theme;
     theme.name = QStringLiteral("dark");
+    theme.title = QStringLiteral("Dark");
     theme.font = editorFont();
     theme.background = QColor("#1f2329");
     theme.foreground = QColor("#abb2bf");
@@ -30,6 +29,19 @@ Theme Theme::dark()
     theme.marginBackground = QColor("#1f2329");
     theme.marginForeground = QColor("#5c6370");
     theme.braceMatch = QColor("#515a6b");
+    theme.findHighlight = QColor("#e5c07b");
+    theme.window = QColor("#21252b");
+    theme.button = QColor("#2c313a");
+    theme.alternateBase = QColor("#262a31");
+    theme.highlight = QColor("#3e5f8a");
+    theme.accent = QColor("#528bff");
+    theme.accentText = QColor("#e6edf8");
+    theme.mutedText = QColor("#7f848e");
+    theme.border = QColor("#3b414d");
+    theme.line = QColor("#2c313a");
+    theme.hover = QColor("#262a31");
+    theme.gradientStart = QColor("#3e6fd8");
+    theme.gradientEnd = QColor("#5c8eff");
     theme.syntaxStyles = {
         {"comment", italic("#7f848e")},
         {"string", plain("#98c379")},
@@ -63,10 +75,72 @@ Theme Theme::dark()
     return theme;
 }
 
+Theme Theme::purple()
+{
+    Theme theme;
+    theme.name = QStringLiteral("purple");
+    theme.title = QStringLiteral("Purple");
+    theme.font = editorFont();
+    theme.background = QColor("#17131f");
+    theme.foreground = QColor("#ddd6f3");
+    theme.caret = QColor("#c4b5fd");
+    theme.caretLine = QColor("#221c30");
+    theme.selection = QColor("#3b2f5e");
+    theme.marginBackground = QColor("#17131f");
+    theme.marginForeground = QColor("#5f5680");
+    theme.braceMatch = QColor("#4a3d78");
+    theme.findHighlight = QColor("#c084fc");
+    theme.window = QColor("#120f19");
+    theme.button = QColor("#251f36");
+    theme.alternateBase = QColor("#1c1727");
+    theme.highlight = QColor("#5b3fc4");
+    theme.accent = QColor("#a78bfa");
+    theme.accentText = QColor("#ede7ff");
+    theme.mutedText = QColor("#8d84b0");
+    theme.border = QColor("#3a3058");
+    theme.line = QColor("#251f36");
+    theme.hover = QColor("#201a2e");
+    theme.gradientStart = QColor("#6d4fd8");
+    theme.gradientEnd = QColor("#a855f7");
+    theme.syntaxStyles = {
+        {"comment", italic("#6e6790")},
+        {"string", plain("#9fe0c0")},
+        {"string.special", plain("#7dd3fc")},
+        {"escape", plain("#7dd3fc")},
+        {"number", plain("#f7a8c4")},
+        {"constant", plain("#f7a8c4")},
+        {"constant.builtin", plain("#f7a8c4")},
+        {"keyword", plain("#c4a1ff")},
+        {"operator", plain("#89ddff")},
+        {"type", plain("#f5c2e7")},
+        {"type.builtin", plain("#f5c2e7")},
+        {"constructor", plain("#f5c2e7")},
+        {"module", plain("#f5c2e7")},
+        {"function", plain("#8fb4ff")},
+        {"function.builtin", plain("#89ddff")},
+        {"variable", plain("#ddd6f3")},
+        {"variable.builtin", plain("#ff8fb1")},
+        {"variable.parameter", plain("#f0c38e")},
+        {"property", plain("#b9a8ff")},
+        {"label", plain("#ff8fb1")},
+        {"attribute", plain("#f0c38e")},
+        {"tag", plain("#ff8fb1")},
+        {"punctuation", plain("#a39cc2")},
+        {"punctuation.special", plain("#c4a1ff")},
+        {"embedded", plain("#ddd6f3")},
+        {"heading", bold("#c4a1ff")},
+        {"diff.plus", plain("#9fe0c0")},
+        {"diff.minus", plain("#ff8fb1")},
+    };
+    return theme;
+}
+
 Theme Theme::light()
 {
     Theme theme;
     theme.name = QStringLiteral("light");
+    theme.title = QStringLiteral("Light");
+    theme.isDark = false;
     theme.font = editorFont();
     theme.background = QColor("#fafafa");
     theme.foreground = QColor("#383a42");
@@ -76,6 +150,19 @@ Theme Theme::light()
     theme.marginBackground = QColor("#fafafa");
     theme.marginForeground = QColor("#9d9d9f");
     theme.braceMatch = QColor("#c8ccd4");
+    theme.window = QColor("#eef0f3");
+    theme.button = QColor("#ffffff");
+    theme.alternateBase = QColor("#f4f5f7");
+    theme.highlight = QColor("#4a6cf7");
+    theme.accent = QColor("#4a6cf7");
+    theme.accentText = QColor("#1f2329");
+    theme.mutedText = QColor("#6b7080");
+    theme.border = QColor("#c8ccd4");
+    theme.line = QColor("#dfe2e7");
+    theme.hover = QColor("#eceef2");
+    theme.gradientStart = QColor("#3d63f2");
+    theme.gradientEnd = QColor("#6a8bff");
+    theme.findHighlight = QColor("#c18401");
     theme.syntaxStyles = {
         {"comment", italic("#a0a1a7")},
         {"string", plain("#50a14f")},
@@ -107,6 +194,20 @@ Theme Theme::light()
         {"diff.minus", plain("#e45649")},
     };
     return theme;
+}
+
+QList<Theme> Theme::all()
+{
+    return {dark(), purple(), light()};
+}
+
+Theme Theme::named(const QString &name)
+{
+    for (const Theme &theme : all()) {
+        if (theme.name == name)
+            return theme;
+    }
+    return dark();
 }
 
 int Theme::syntaxStyleIndex(QStringView captureName) const

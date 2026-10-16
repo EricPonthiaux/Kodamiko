@@ -2,9 +2,9 @@
 
 #include <QString>
 
-// Détermine le langage d'un fichier d'après son nom. Les identifiants
-// renvoyés (« cpp », « java », « json »...) sont ceux qu'attend
-// HighlighterFactory ; « text » désigne un fichier sans coloration.
+// Determines a file's language from its name. The returned identifiers
+// ("cpp", "java", "json"...) are the ones HighlighterFactory expects;
+// "text" denotes a file without highlighting.
 namespace LanguageRegistry {
 
 inline const QString plainText = QStringLiteral("text");

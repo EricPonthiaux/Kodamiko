@@ -7,7 +7,7 @@
 namespace OutlineProviders {
 namespace {
 
-// Macros Qt de déclaration de classe, sans argument ni point-virgule.
+// Qt class declaration macros, with no arguments and no semicolon.
 const QByteArrayList qtClassMacros = {"Q_OBJECT", "Q_GADGET", "Q_NAMESPACE"};
 
 } // namespace

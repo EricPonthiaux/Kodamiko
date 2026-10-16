@@ -7,22 +7,22 @@
 
 class QLabel;
 
-// Visionneuse d'une image (PNG, JPEG, GIF, SVG... selon les greffons Qt
-// installés), ouverte dans un onglet à la place d'un éditeur de texte.
-// L'image est réduite pour tenir dans l'onglet ; Ctrl+molette ou Ctrl++ /
-// Ctrl+- zooment, Ctrl+0 revient à la taille réelle.
+// Image viewer (PNG, JPEG, GIF, SVG... depending on the installed Qt
+// plugins), opened in a tab instead of a text editor.
+// The image is shrunk to fit the tab; Ctrl+wheel or Ctrl++ /
+// Ctrl+- zoom, Ctrl+0 returns to actual size.
 class ImageView : public QScrollArea {
     Q_OBJECT
 
 public:
     explicit ImageView(const Theme &theme, QWidget *parent = nullptr);
 
-    // Vrai si le fichier est une image que Qt sait lire (d'après son contenu).
+    // True if the file is an image Qt can read (based on its content).
     static bool isImageFile(const QString &path);
 
     bool load(const QString &path, QString *error);
     QString filePath() const { return filePath_; }
-    // Description pour la barre d'état : « 640 × 480, zoom 50 % ».
+    // Description for the status bar: "640 × 480, zoom 50%".
     QString description() const;
 
     void applyTheme(const Theme &theme);

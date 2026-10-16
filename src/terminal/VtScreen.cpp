@@ -13,8 +13,8 @@ VTermModifier toVTermModifier(Qt::KeyboardModifiers modifiers)
         result |= VTERM_MOD_SHIFT;
     if (modifiers & Qt::AltModifier)
         result |= VTERM_MOD_ALT;
-    // Sous macOS, Qt appelle « Control » la touche Cmd et « Meta » la vraie
-    // touche Ctrl : c'est cette dernière qui produit les Ctrl+C du terminal.
+    // On macOS, Qt calls the Cmd key "Control" and the real Ctrl key "Meta":
+    // the latter is the one that produces the terminal's Ctrl+C.
 #ifdef Q_OS_MACOS
     if (modifiers & Qt::MetaModifier)
         result |= VTERM_MOD_CTRL;
@@ -126,7 +126,7 @@ TerminalCell VtScreen::cell(int row, int column) const
         return toTerminalCell(cell);
     }
 
-    // Historique : la ligne -1 est la plus récente.
+    // History: row -1 is the most recent.
     const int index = static_cast<int>(scrollback_.size()) + row;
     if (index < 0)
         return {};
@@ -138,7 +138,7 @@ TerminalCell VtScreen::cell(int row, int column) const
         return blank;
     }
     TerminalCell result = toTerminalCell(line[static_cast<size_t>(column)]);
-    // Les largeurs ne sont pas mémorisées dans l'historique : on les déduit.
+    // Widths are not stored in the history: we infer them.
     if (column + 1 < static_cast<int>(line.size()) && line[static_cast<size_t>(column + 1)].chars[0] == uint32_t(-1))
         result.width = 2;
     return result;
@@ -171,7 +171,7 @@ bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &
         return true;
     }
 
-    // Ctrl+lettre : libvterm calcule lui-même le code de contrôle (Ctrl+C → 0x03).
+    // Ctrl+letter: libvterm computes the control code itself (Ctrl+C → 0x03).
     if ((modifier & VTERM_MOD_CTRL) && key >= Qt::Key_A && key <= Qt::Key_Z) {
         const uint32_t letter = static_cast<uint32_t>('a' + (key - Qt::Key_A));
         vterm_keyboard_unichar(terminal_, letter, static_cast<VTermModifier>(modifier & ~VTERM_MOD_SHIFT));
@@ -180,19 +180,19 @@ bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &
 
     if (text.isEmpty())
         return false;
-    // Majuscules et symboles portent déjà l'effet de Maj : on ne le renvoie pas.
+    // Uppercase letters and symbols already carry the effect of Shift: don't send it again.
     const auto withoutShift = static_cast<VTermModifier>(modifier & ~VTERM_MOD_SHIFT);
     for (const char32_t codePoint : text.toUcs4()) {
         if (codePoint < 0x20 && !(modifier & VTERM_MOD_CTRL))
-            continue; // caractère de contrôle produit par la plateforme, déjà traité
+            continue; // control character produced by the platform, already handled
         vterm_keyboard_unichar(terminal_, codePoint, withoutShift);
     }
     return true;
 }
 
-// Le collage « entre crochets » (si le programme l'a demandé) lui permet de
-// distinguer un collage d'une frappe : Claude Code ne valide pas un prompt
-// collé qui contient des retours à la ligne.
+// Bracketed paste (if the program requested it) lets it tell a paste apart
+// from typing: Claude Code does not submit a pasted prompt that contains
+// line breaks.
 void VtScreen::paste(const QString &text)
 {
     vterm_keyboard_start_paste(terminal_);
@@ -261,7 +261,7 @@ int VtScreen::onSetTermProp(VTermProp property, VTermValue *value, void *user)
         self->alternateScreen_ = value->boolean;
         break;
     case VTERM_PROP_TITLE: {
-        // Le titre peut arriver en plusieurs fragments.
+        // The title may arrive in several fragments.
         const VTermStringFragment &fragment = value->string;
         if (fragment.initial)
             self->titleBuffer_.clear();
@@ -291,7 +291,7 @@ int VtScreen::onPushLine(int columns, const VTermScreenCell *cells, void *user)
     return 1;
 }
 
-// Quand l'écran s'agrandit, libvterm redemande les dernières lignes sorties.
+// When the screen grows, libvterm asks for the most recently scrolled-out lines back.
 int VtScreen::onPopLine(int columns, VTermScreenCell *cells, void *user)
 {
     auto *self = static_cast<VtScreen *>(user);
