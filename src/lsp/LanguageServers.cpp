@@ -357,6 +357,8 @@ LspClient *LanguageServers::clientFor(const QString &languageId)
         client->setInitializationOptions(options.initialization);
         client->setSettings(options.settings);
     }
+    for (auto handler = requestHandlers_.cbegin(); handler != requestHandlers_.cend(); ++handler)
+        client->setRequestHandler(handler.key(), handler.value());
     clients_.insert(name, client);
     connect(client, &LspClient::ready, this, [this, name] { emit statusMessage(tr("%1 is ready").arg(name)); });
     connect(client, &LspClient::failed, this, [this, name, languages](const QString &message) {
@@ -407,6 +409,13 @@ LanguageServers::Options LanguageServers::optionsFor(const QString &server, cons
                  QJsonObject{{"plugins", QJsonObject{{"jedi", QJsonObject{{"environment", runtimeExecutable}}}}}}}};
     }
     return options;
+}
+
+void LanguageServers::setRequestHandler(const QString &method, LspClient::RequestHandler handler)
+{
+    requestHandlers_.insert(method, handler);
+    for (LspClient *client : std::as_const(clients_))
+        client->setRequestHandler(method, handler);
 }
 
 void LanguageServers::syncDocument(LspClient *client, const QString &path, const QString &languageId,

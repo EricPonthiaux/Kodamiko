@@ -16,6 +16,7 @@ duet_add_test(tst_history)
 duet_add_test(tst_editor)
 duet_add_test(tst_completion)
 duet_add_test(tst_lsp)
+duet_add_test(tst_codeintelligence)
 duet_add_test(tst_projects)
 # The Markdown preview's web engine: no Chromium sandbox on CI machines.
 set_property(TEST tst_editor APPEND PROPERTY ENVIRONMENT "QTWEBENGINE_DISABLE_SANDBOX=1")

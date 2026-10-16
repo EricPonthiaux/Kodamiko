@@ -14,6 +14,7 @@
 #include <memory>
 
 class ChangesView;
+class CodeIntelligence;
 class CodeNavigator;
 class CommandPalette;
 class CompletionService;
@@ -194,6 +195,7 @@ private:
     NoticeBar *serverNotice_ = nullptr;
     QSet<QString> dismissedServerNotices_; // closed by the user, by message
     CodeNavigator *navigator_ = nullptr;
+    CodeIntelligence *intelligence_ = nullptr;
     OutlineView *outlineView_ = nullptr;
     SidePanel *sidebar_ = nullptr;
     QTabWidget *terminalTabs_ = nullptr;

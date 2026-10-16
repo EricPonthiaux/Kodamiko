@@ -25,8 +25,38 @@ QJsonObject clientCapabilities()
         {"contextSupport", true},
     };
     const QJsonObject synchronization{{"didSave", false}, {"willSave", false}, {"dynamicRegistration", false}};
+    // Quick fixes and refactorings, as edits or as commands the server
+    // carries out (it then sends "workspace/applyEdit").
+    const QJsonObject codeAction{
+        {"codeActionLiteralSupport",
+         QJsonObject{{"codeActionKind",
+                      QJsonObject{{"valueSet", QJsonArray{"", "quickfix", "refactor", "refactor.extract",
+                                                          "refactor.inline", "refactor.rewrite", "source"}}}}}},
+    };
+    const QJsonObject signatureHelp{
+        {"signatureInformation",
+         QJsonObject{{"documentationFormat", QJsonArray{"plaintext"}},
+                     {"parameterInformation", QJsonObject{{"labelOffsetSupport", true}}}}},
+    };
+    const QJsonObject textDocument{
+        {"completion", completion},
+        {"synchronization", synchronization},
+        {"hover", QJsonObject{{"contentFormat", QJsonArray{"plaintext"}}}},
+        {"signatureHelp", signatureHelp},
+        {"definition", QJsonObject{{"linkSupport", true}}},
+        {"declaration", QJsonObject{{"linkSupport", true}}},
+        {"references", QJsonObject{}},
+        {"rename", QJsonObject{{"prepareSupport", false}}},
+        {"codeAction", codeAction},
+    };
+    const QJsonObject workspace{
+        {"applyEdit", true},
+        {"workspaceEdit", QJsonObject{{"documentChanges", true}}},
+        {"configuration", true},
+    };
     return QJsonObject{
-        {"textDocument", QJsonObject{{"completion", completion}, {"synchronization", synchronization}}},
+        {"textDocument", textDocument},
+        {"workspace", workspace},
         {"general", QJsonObject{{"positionEncodings", QJsonArray{"utf-16"}}}},
     };
 }
@@ -260,7 +290,10 @@ void LspClient::handle(const QJsonObject &message)
         if (id.isUndefined() || id.isNull())
             return;
         QJsonValue result = QJsonValue::Null;
-        if (message.value("method").toString() == QLatin1String("workspace/configuration")) {
+        if (const auto handler = requestHandlers_.constFind(message.value("method").toString());
+            handler != requestHandlers_.cend()) {
+            result = (*handler)(message.value("params"));
+        } else if (message.value("method").toString() == QLatin1String("workspace/configuration")) {
             QJsonArray settings;
             for (const QJsonValue &item : message.value("params").toObject().value("items").toArray())
                 settings.append(settingAt(settings_, item.toObject().value("section").toString()));

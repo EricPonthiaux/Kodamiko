@@ -23,6 +23,7 @@
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspCompletionProvider.h"
+#include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/GoToPopup.h"
 #include "navigation/SymbolIndex.h"
@@ -197,7 +198,13 @@ void MainWindow::createWidgets()
         }
     });
     navigator_ = new CodeNavigator(editorTabs_, symbolIndex_, this);
-    connect(editorTabs_, &EditorTabs::definitionRequested, navigator_, &CodeNavigator::goToDefinition);
+    // The language server first (documentation, usages, rename...), the
+    // project's index when there is none.
+    intelligence_ = new CodeIntelligence(editorTabs_, languageServers_, navigator_, this);
+    connect(editorTabs_, &EditorTabs::editorOpened, intelligence_, &CodeIntelligence::attach);
+    connect(editorTabs_, &EditorTabs::definitionRequested, intelligence_, &CodeIntelligence::goToDefinition);
+    connect(intelligence_, &CodeIntelligence::statusMessage, this,
+            [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
     connect(navigator_, &CodeNavigator::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
 
@@ -616,6 +623,18 @@ void MainWindow::createEditMenu()
             if (CompletionController *completion = CompletionController::of(editor))
                 completion->complete();
     });
+    const auto inCode = [this](void (CodeIntelligence::*command)()) {
+        return [this, command] {
+            if (mode_ == Mode::Edit)
+                (intelligence_->*command)();
+        };
+    };
+    edit->addAction(tr("&Parameter Info"), QKeySequence(tr("Ctrl+P")), this, inCode(&CodeIntelligence::showParameterInfo));
+    edit->addAction(tr("&Quick Documentation"), QKeySequence(tr("Ctrl+Q")), this,
+                    inCode(&CodeIntelligence::showDocumentation));
+    edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
+                    inCode(&CodeIntelligence::showQuickFixes));
+    edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename));
     edit->addAction(tr("F&ormat Document"), QKeySequence(tr("Ctrl+Alt+L")), this, [this] {
         if (mode_ == Mode::Edit)
             editorTabs_->formatCurrent();
@@ -669,7 +688,15 @@ void MainWindow::createNavigateMenu()
     navigate->addSeparator();
     navigate->addAction(tr("Go to &Definition"), QKeySequence(tr("Ctrl+B")), this, [this] {
         if (mode_ == Mode::Edit)
-            navigator_->goToDefinition();
+            intelligence_->goToDefinition();
+    });
+    navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this, [this] {
+        if (mode_ == Mode::Edit)
+            intelligence_->findUsages();
+    });
+    navigate->addAction(tr("Switch &Header/Source"), QKeySequence(tr("Ctrl+Alt+Home")), this, [this] {
+        if (mode_ == Mode::Edit)
+            intelligence_->switchHeaderSource();
     });
     navigate->addAction(tr("&Back"), QKeySequence(tr("Alt+Left")), navigator_, &CodeNavigator::goBack);
     navigate->addAction(tr("&Forward"), QKeySequence(tr("Alt+Right")), navigator_, &CodeNavigator::goForward);

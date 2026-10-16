@@ -1,5 +1,6 @@
 #pragma once
 
+#include "LspClient.h"
 #include "projects/ProjectConfig.h"
 #include "toolchains/JavaRuntimes.h"
 
@@ -10,7 +11,6 @@
 
 #include <optional>
 
-class LspClient;
 class Toolchains;
 
 // A language server Duet knows how to run.
@@ -67,6 +67,12 @@ public:
     // preferences.
     QStringList describe() const;
 
+    // The open folder, the servers' workspace.
+    QString folder() const { return folder_; }
+    // How every server, started now or later, answers the requests of
+    // `method` it sends ("workspace/applyEdit").
+    void setRequestHandler(const QString &method, LspClient::RequestHandler handler);
+
     // Sends `text` as the content of `path` to `client`: didOpen the first
     // time, didChange when it changed since.
     void syncDocument(LspClient *client, const QString &path, const QString &languageId, const QByteArray &text);
@@ -113,6 +119,7 @@ private:
     Toolchains *toolchains_ = nullptr;
     bool enabled_ = true;
     QHash<QString, LspClient *> clients_; // by server name
+    QHash<QString, LspClient::RequestHandler> requestHandlers_; // by method
     QHash<QString, QString> failures_;    // by server name
     struct Document {
         QString server;

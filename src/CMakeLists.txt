@@ -45,6 +45,8 @@ add_library(duet_core STATIC
     lsp/LanguageServers.cpp
     lsp/LspClient.cpp
     lsp/LspCompletionProvider.cpp
+    lsp/LspProtocol.cpp
+    navigation/CodeIntelligence.cpp
     navigation/CodeNavigator.cpp
     navigation/Definitions.cpp
     navigation/GoToPopup.cpp

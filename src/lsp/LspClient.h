@@ -19,6 +19,8 @@ class LspClient : public QObject {
 
 public:
     using ResponseHandler = std::function<void(const QJsonValue &result, const QString &error)>;
+    // Answers a request from the server ("workspace/applyEdit"...).
+    using RequestHandler = std::function<QJsonValue(const QJsonValue &params)>;
 
     // `program` and `arguments` start the server; `rootFolder` is the
     // workspace it works on.
@@ -32,6 +34,8 @@ public:
     // to the server's "workspace/configuration" requests, also sent once
     // it is initialized.
     void setSettings(const QJsonObject &settings) { settings_ = settings; }
+    // How to answer the server's requests of `method`; the others get null.
+    void setRequestHandler(const QString &method, RequestHandler handler) { requestHandlers_.insert(method, handler); }
     // Asks the server to stop, and kills it if it does not.
     ~LspClient() override;
 
@@ -79,6 +83,7 @@ private:
     QJsonObject capabilities_;
     QJsonObject initializationOptions_;
     QJsonObject settings_;
+    QHash<QString, RequestHandler> requestHandlers_;
     bool ready_ = false;
     bool failed_ = false;
     bool stopping_ = false;
