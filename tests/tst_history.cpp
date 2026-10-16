@@ -207,7 +207,9 @@ private slots:
 
         HistoryView view(Theme::dark());
         view.setFolder(dir.path());
-        view.refresh();
+        QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh(); // off the UI thread
+        QTRY_COMPARE(refreshed.size(), 1);
         QCOMPARE(view.findChildren<QTreeWidget *>().size(), 2);
         auto *commits = view.findChild<QTreeWidget *>("commits");
         auto *files = view.findChild<QTreeWidget *>("files");
@@ -223,7 +225,7 @@ private slots:
         // A commit chosen: its message and files, no diff yet.
         commits->setCurrentItem(commits->topLevelItem(0));
         QVERIFY(files->isVisibleTo(&view));
-        QCOMPARE(files->topLevelItemCount(), 2);
+        QTRY_COMPARE(files->topLevelItemCount(), 2);
         QVERIFY(view.findChild<QTextBrowser *>()->toPlainText().contains("second"));
         QVERIFY(!diff->isVisibleTo(&view));
 
@@ -235,12 +237,13 @@ private slots:
 
         // Another commit: the diff disappears until a file is chosen.
         commits->setCurrentItem(commits->topLevelItem(1));
-        QCOMPARE(files->topLevelItemCount(), 1);
+        QTRY_COMPARE(files->topLevelItemCount(), 1);
         QVERIFY(!diff->isVisibleTo(&view));
 
         // A new commit: the selection stays on the chosen commit.
         commit(dir, "third", {{"c.txt", "c\n"}});
         view.refresh();
+        QTRY_COMPARE(refreshed.size(), 2);
         QCOMPARE(commits->topLevelItemCount(), 3);
         QCOMPARE(commits->currentItem()->text(0), QStringLiteral("first"));
         QCOMPARE(files->topLevelItemCount(), 1);
@@ -264,6 +267,7 @@ private slots:
 
         // The closed pane stays closed after a refresh.
         view.refresh();
+        QTRY_COMPARE(refreshed.size(), 3);
         QVERIFY(!files->isVisibleTo(&view));
     }
 

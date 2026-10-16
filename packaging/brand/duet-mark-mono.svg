@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- One color (the text's): the sizes keep the two cursors apart -->
+  <rect x="17" y="12" width="7" height="40" rx="3.5" fill="currentColor"/>
+  <rect x="31" y="24" width="16" height="28" rx="4" fill="currentColor"/>
+</svg>

@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QFontMetricsF>
 #include <QKeyEvent>
+#include <QPaintEvent>
 #include <QPainter>
 #include <QScrollBar>
 
@@ -43,6 +44,29 @@ bool isPasteShortcut(const QKeyEvent *event)
 bool comesBefore(const QPoint &a, const QPoint &b)
 {
     return a.y() < b.y() || (a.y() == b.y() && a.x() < b.x());
+}
+
+int fontIndex(bool bold, bool italic, bool underline, bool strike)
+{
+    return (bold ? 1 : 0) | (italic ? 2 : 0) | (underline ? 4 : 0) | (strike ? 8 : 0);
+}
+
+int fontIndex(const VTermScreenCell &cell)
+{
+    return fontIndex(cell.attrs.bold, cell.attrs.italic, cell.attrs.underline != VTERM_UNDERLINE_OFF,
+                     cell.attrs.strike);
+}
+
+bool isDecorated(int fontIndex)
+{
+    return fontIndex & (4 | 8);
+}
+
+// A printable ASCII character alone in its cell: always in the main font,
+// so it can be drawn within a run.
+bool isRunCharacter(const VTermScreenCell &cell)
+{
+    return cell.chars[0] >= 0x20 && cell.chars[0] < 0x7f && cell.chars[1] == 0 && cell.width == 1;
 }
 
 } // namespace
@@ -88,18 +112,25 @@ bool TerminalWidget::start(const ProcessSpec &spec)
 
 void TerminalWidget::applyTheme(const Theme &theme)
 {
-    font_ = theme.font;
-    font_.setStyleHint(QFont::TypeWriter);
-    font_.setKerning(false);
-    boldFont_ = font_;
-    boldFont_.setBold(true);
-    italicFont_ = font_;
-    italicFont_.setItalic(true);
+    QFont font = theme.font;
+    font.setStyleHint(QFont::TypeWriter);
+    font.setKerning(false);
 
-    const QFontMetricsF metrics(font_);
+    const QFontMetricsF metrics(font);
     cellSize_ = QSize(static_cast<int>(std::ceil(metrics.horizontalAdvance(QLatin1Char('M')))),
                       static_cast<int>(std::ceil(metrics.lineSpacing())));
     ascent_ = static_cast<int>(std::ceil(metrics.ascent()));
+
+    for (int index = 0; index < static_cast<int>(fonts_.size()); ++index) {
+        QFont variant = font;
+        variant.setBold(index & 1);
+        variant.setItalic(index & 2);
+        variant.setUnderline(index & 4);
+        variant.setStrikeOut(index & 8);
+        const qreal advance = QFontMetricsF(variant).horizontalAdvance(QLatin1Char('M'));
+        variant.setLetterSpacing(QFont::AbsoluteSpacing, cellSize_.width() - advance);
+        fonts_[static_cast<size_t>(index)] = variant;
+    }
 
     foreground_ = theme.foreground;
     background_ = theme.background;
@@ -117,8 +148,16 @@ void TerminalWidget::onProcessFinished(int exitCode)
 
 void TerminalWidget::onScreenChanged()
 {
+    const QRect damage = screen_->takeDamage();
     updateScrollBar();
-    viewport()->update();
+    if (scrollOffset_ != 0 || damage.isEmpty()) {
+        viewport()->update();
+        return;
+    }
+    // One extra column on each side: wide and italic glyphs overhang.
+    const QRect cells = damage.adjusted(-1, 0, 1, 0);
+    viewport()->update(QRect(cells.x() * cellSize_.width(), cells.y() * cellSize_.height(),
+                             cells.width() * cellSize_.width(), cells.height() * cellSize_.height()));
 }
 
 void TerminalWidget::updateGridSize()
@@ -212,23 +251,132 @@ void TerminalWidget::resizeEvent(QResizeEvent *event)
     updateGridSize();
 }
 
-void TerminalWidget::paintEvent(QPaintEvent *)
+void TerminalWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(viewport());
-    painter.fillRect(viewport()->rect(), background_);
+    const QRect area = event->rect();
+    painter.fillRect(area, background_);
 
-    for (int row = 0; row < screen_->rows(); ++row) {
-        const int contentRow = row - scrollOffset_;
-        for (int column = 0; column < screen_->columns(); ++column) {
-            const TerminalCell cell = screen_->cell(contentRow, column);
-            if (cell.isContinuation)
-                continue;
-            paintCell(painter, cell, column * cellSize_.width(), row * cellSize_.height(),
-                      isSelected(contentRow, column));
-        }
-    }
+    const int firstRow = std::max(0, area.top() / cellSize_.height());
+    const int lastRow = std::min(screen_->rows() - 1, area.bottom() / cellSize_.height());
+    for (int row = firstRow; row <= lastRow; ++row)
+        paintRow(painter, row);
     if (scrollOffset_ == 0)
         paintCursor(painter);
+}
+
+// Backgrounds are filled in runs of one color, then the text is drawn in
+// runs of ASCII characters sharing a font and a color: one drawText() per
+// run instead of one per cell. Other characters (box drawing, CJK, emoji)
+// may come from a fallback font with another advance: they are drawn one
+// by one, at their cell.
+void TerminalWidget::paintRow(QPainter &painter, int row)
+{
+    const int contentRow = row - scrollOffset_;
+    screen_->readRow(contentRow, rowCells_);
+    const int columns = static_cast<int>(rowCells_.size());
+    const int y = row * cellSize_.height();
+    const int cellWidth = cellSize_.width();
+
+    rowForegrounds_.resize(rowCells_.size());
+    rowBackgrounds_.resize(rowCells_.size());
+    for (int column = 0; column < columns; ++column) {
+        const auto index = static_cast<size_t>(column);
+        if (column > 0 && rowCells_[index].chars[0] == uint32_t(-1)) {
+            // Second half of a wide character: the colors of the first.
+            rowForegrounds_[index] = rowForegrounds_[index - 1];
+            rowBackgrounds_[index] = rowBackgrounds_[index - 1];
+            continue;
+        }
+        screen_->colorsOf(rowCells_[index], rowForegrounds_[index], rowBackgrounds_[index]);
+        if (isSelected(contentRow, column))
+            std::swap(rowForegrounds_[index], rowBackgrounds_[index]);
+    }
+
+    const QRgb defaultBackground = background_.rgb();
+    int runStart = 0;
+    for (int column = 1; column <= columns; ++column) {
+        const QRgb color = rowBackgrounds_[static_cast<size_t>(runStart)];
+        if (column < columns && rowBackgrounds_[static_cast<size_t>(column)] == color)
+            continue;
+        if (color != defaultBackground)
+            painter.fillRect(runStart * cellWidth, y, (column - runStart) * cellWidth, cellSize_.height(),
+                             QColor(color));
+        runStart = column;
+    }
+
+    int currentFont = -1;
+    QRgb currentPen = 0;
+    auto select = [&](int font, QRgb pen) {
+        if (font != currentFont) {
+            painter.setFont(fonts_[static_cast<size_t>(font)]);
+            currentFont = font;
+        }
+        if (pen != currentPen) {
+            painter.setPen(QColor(pen));
+            currentPen = pen;
+        }
+    };
+    painter.setPen(QColor(currentPen));
+
+    int runColumn = 0;
+    int runFont = 0;
+    QRgb runPen = 0;
+    runText_.clear();
+    auto flush = [&] {
+        if (!isDecorated(runFont)) {
+            while (runText_.endsWith(QLatin1Char(' ')))
+                runText_.chop(1);
+        }
+        if (!runText_.isEmpty()) {
+            select(runFont, runPen);
+            painter.drawText(runColumn * cellWidth, y + ascent_, runText_);
+        }
+        runText_.clear();
+    };
+
+    for (int column = 0; column < columns; ++column) {
+        const VTermScreenCell &cell = rowCells_[static_cast<size_t>(column)];
+        if (cell.chars[0] == uint32_t(-1))
+            continue;
+        const int font = fontIndex(cell);
+        const QRgb pen = rowForegrounds_[static_cast<size_t>(column)];
+        const bool blank = cell.chars[0] == 0 || cell.chars[0] == ' ';
+
+        if (blank && !isDecorated(font)) {
+            // A plain space fits in any run whose font draws nothing on it.
+            if (!runText_.isEmpty() && !isDecorated(runFont))
+                runText_ += QLatin1Char(' ');
+            continue;
+        }
+        if (blank || isRunCharacter(cell)) {
+            const char character = blank ? ' ' : static_cast<char>(cell.chars[0]);
+            if (!runText_.isEmpty() && font == runFont && pen == runPen) {
+                runText_ += QLatin1Char(character);
+                continue;
+            }
+            flush();
+            runColumn = column;
+            runFont = font;
+            runPen = pen;
+            runText_ += QLatin1Char(character);
+            continue;
+        }
+
+        flush();
+        int length = 0;
+        while (length < VTERM_MAX_CHARS_PER_CELL && cell.chars[length] != 0)
+            ++length;
+        select(font, pen);
+        painter.drawText(column * cellWidth, y + ascent_,
+                         QString::fromUcs4(reinterpret_cast<const char32_t *>(cell.chars), length));
+    }
+    flush();
+}
+
+const QFont &TerminalWidget::fontFor(bool bold, bool italic, bool underline, bool strike) const
+{
+    return fonts_[static_cast<size_t>(fontIndex(bold, italic, underline, strike))];
 }
 
 void TerminalWidget::paintCell(QPainter &painter, const TerminalCell &cell, int x, int y, bool selected) const
@@ -244,10 +392,7 @@ void TerminalWidget::paintCell(QPainter &painter, const TerminalCell &cell, int 
     if (cell.text.isEmpty() || cell.text == QLatin1String(" "))
         return;
 
-    QFont font = cell.bold ? boldFont_ : cell.italic ? italicFont_ : font_;
-    font.setUnderline(cell.underline);
-    font.setStrikeOut(cell.strike);
-    painter.setFont(font);
+    painter.setFont(fontFor(cell.bold, cell.italic, cell.underline, cell.strike));
     painter.setPen(foreground);
     painter.drawText(x, y + ascent_, cell.text);
 }

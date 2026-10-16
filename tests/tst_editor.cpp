@@ -5,9 +5,9 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/FindBar.h"
+#include "editor/MarkdownHtml.h"
+#include "editor/MarkdownView.h"
 #include "git/GitProcess.h"
-#include "viewers/MarkdownHtml.h"
-#include "viewers/MarkdownView.h"
 
 #include <QLineEdit>
 #include <Qsci/qscicommandset.h>
@@ -415,19 +415,32 @@ private slots:
         QVERIFY(tabs.openFile(dir.filePath("a.cpp")));
         QSignalSpy messages(&tabs, &EditorTabs::statusMessage);
 
+        // The formatter runs without blocking the editor.
         tabs.formatCurrent();
+        QTRY_COMPARE(messages.size(), 1);
         QCOMPARE(tabs.currentEditor()->text(), QString("int f() { return 1; }\n"));
         QCOMPARE(messages.last().first().toString(), QString("a.cpp formatted"));
         tabs.formatCurrent();
+        QTRY_COMPARE(messages.size(), 2);
         QCOMPARE(messages.last().first().toString(), QString("a.cpp is already formatted"));
 
         // Format on save: the file on disk is the formatted text.
         tabs.currentEditor()->setText("int g(){return 2;}\n");
         tabs.setFormatOnSave(true);
+        QSignalSpy saved(&tabs, &EditorTabs::fileSaved);
         QVERIFY(tabs.saveCurrent());
+        QTRY_COMPARE(saved.size(), 1);
         QFile file(dir.filePath("a.cpp"));
         QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll(), QByteArray("int g() { return 2; }\n"));
+        file.close();
+
+        // Typing while the formatter runs: the typed text is kept, and saved.
+        tabs.currentEditor()->setText("int h(){return 3;}\n");
+        QVERIFY(tabs.saveCurrent());
+        tabs.currentEditor()->setText("int h(){return 4;}\n");
+        QTRY_COMPARE(saved.size(), 2);
+        QCOMPARE(tabs.currentEditor()->text(), QString("int h(){return 4;}\n"));
     }
 
     void formatDocumentReportsAMissingFormatter()

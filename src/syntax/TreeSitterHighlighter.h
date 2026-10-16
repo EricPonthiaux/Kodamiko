@@ -3,6 +3,7 @@
 #include "ISyntaxHighlighter.h"
 
 #include <QObject>
+#include <QTimer>
 
 #include <tree_sitter/api.h>
 
@@ -27,6 +28,7 @@ public:
 
     void attach(QsciScintilla *editor) override;
     void applyTheme(const Theme &theme) override;
+    void flush() override;
 
     // Styles [start, end[. Public for tests; otherwise called by Scintilla.
     void styleRange(int start, int end);
@@ -51,6 +53,9 @@ private:
     TSTree *tree_ = nullptr;
     TSQueryCursor *cursor_ = nullptr;
     bool treeIsOutdated_ = true;
+    // Fold levels walk the whole tree and every line: after an edit, they
+    // are updated once typing pauses rather than at each keystroke.
+    QTimer foldTimer_;
 
     // Scintilla style of each query capture (0 = not highlighted).
     std::vector<char> styleOfCapture_;

@@ -108,7 +108,9 @@ void ChangeGutter::update()
     changes_.clear();
     if (base_) {
         try {
-            changes_ = LineChanges::compute(*base_, editor_->text().toUtf8());
+            // No copy: the diff is computed before the document can change.
+            const QByteArrayView text = editor_->utf8Bytes();
+            changes_ = LineChanges::compute(*base_, QByteArray::fromRawData(text.data(), text.size()));
         } catch (const GitError &) {
         }
     }

@@ -1249,18 +1249,24 @@ void MainWindow::snapshotBeforePrompt(const QString &prompt)
     QString summary = prompt.section(QLatin1Char('\n'), 0, 0).simplified();
     if (summary.size() > snapshotPromptLength)
         summary = summary.left(snapshotPromptLength - 1) + QStringLiteral("…");
-    try {
-        const std::optional<RepositoryInfo> info = RepositoryInfo::read(folder_);
-        if (!info)
-            return;
-        const QString reason = summary.isEmpty() ? tr("Before a Claude prompt")
-                                                 : tr("Before the Claude prompt \u201c%1\u201d").arg(summary);
-        if (!Snapshots::createOfWorkingTree(*info, reason).isEmpty())
-            statusBar()->showMessage(tr("Snapshot taken before the prompt"), statusMessageMs);
-    } catch (const GitError &error) {
-        statusBar()->showMessage(tr("Snapshot before the prompt failed: %1").arg(QString::fromStdString(error.what())),
-                                 statusMessageMs);
-    }
+    const QString reason = summary.isEmpty() ? tr("Before a Claude prompt")
+                                             : tr("Before the Claude prompt \u201c%1\u201d").arg(summary);
+    // A dozen git commands in a large repository: they run off the UI
+    // thread, and Claude waits for the snapshot before touching any file.
+    gitCommands_->runQuietly(
+        [folder = folder_, reason, taken = tr("Snapshot taken before the prompt")] {
+            const std::optional<RepositoryInfo> info = RepositoryInfo::read(folder);
+            if (!info || Snapshots::createOfWorkingTree(*info, reason).isEmpty())
+                return QString();
+            return taken;
+        },
+        [this, reply = hookServer_.deferReply()](const QString &message, const QString &error) {
+            reply();
+            if (!error.isEmpty())
+                statusBar()->showMessage(tr("Snapshot before the prompt failed: %1").arg(error), statusMessageMs);
+            else if (!message.isEmpty())
+                statusBar()->showMessage(message, statusMessageMs);
+        });
 }
 
 void MainWindow::updateUsage()
@@ -1324,7 +1330,7 @@ void MainWindow::selectOpenedFile()
     sidebar_->showView(filesPanel_);
     if (!fileTree_->select(path)) {
         // Outside the scope: back to the whole project, as IntelliJ does.
-        filesPanel_->scopeBox()->setCurrentIndex(0);
+        filesPanel_->setScopeIndex(0);
         if (!fileTree_->select(path)) {
             statusBar()->showMessage(tr("The current file is not in the project folder"), statusMessageMs);
             return;

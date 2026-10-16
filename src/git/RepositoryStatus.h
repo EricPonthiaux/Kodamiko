@@ -25,6 +25,8 @@ struct RepositoryInfo {
     // Repository path of a path relative to the open folder.
     QString repoPath(const QString &relativePath) const { return prefix + relativePath; }
 
+    bool operator==(const RepositoryInfo &) const = default;
+
     // Returns nullopt if `folder` belongs to no git repository (or to a
     // repository without a working directory). Throws GitError on failure.
     static std::optional<RepositoryInfo> read(const QString &folder);
@@ -36,6 +38,8 @@ struct FileDiff {
     // Raw unified diff (paths relative to the repository root): the file's
     // bytes are kept as is, so that it can be reapplied.
     QByteArray patch;
+
+    bool operator==(const FileDiff &) const = default;
 };
 
 // Pending changes, split as in "git status". Only the files of the open
@@ -45,6 +49,8 @@ struct RepositoryStatus {
     RepositoryInfo info;
     QList<FileDiff> staged;   // last commit → index
     QList<FileDiff> unstaged; // index → disk, untracked files included
+
+    bool operator==(const RepositoryStatus &) const = default;
 
     // Returns nullopt outside a git repository. Throws GitError on failure.
     static std::optional<RepositoryStatus> read(const QString &folder);

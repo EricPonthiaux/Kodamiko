@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -64,7 +66,8 @@ bool DocumentWordsProvider::handles(const CompletionContext &) const
 
 QStringList DocumentWordsProvider::words(const QByteArray &text, int exclude)
 {
-    QHash<QString, int> distance; // nearest occurrence
+    // Words are compared as bytes, and each distinct word is decoded once.
+    QHash<QByteArrayView, int> distance; // nearest occurrence
     const int size = int(text.size());
     for (int i = 0; i < size;) {
         if (!isIdentifierByte(text[i])) {
@@ -78,7 +81,7 @@ QStringList DocumentWordsProvider::words(const QByteArray &text, int exclude)
             continue;
         if (exclude >= start && exclude <= i)
             continue; // the word being typed
-        const QString word = QString::fromUtf8(text.constData() + start, i - start);
+        const QByteArrayView word(text.constData() + start, i - start);
         const int d = std::abs(start - exclude);
         auto it = distance.find(word);
         if (it == distance.end())
@@ -86,9 +89,16 @@ QStringList DocumentWordsProvider::words(const QByteArray &text, int exclude)
         else
             it.value() = std::min(it.value(), d);
     }
-    QStringList result = distance.keys();
-    std::sort(result.begin(), result.end(),
-              [&distance](const QString &a, const QString &b) { return distance.value(a) < distance.value(b); });
+    std::vector<std::pair<int, QByteArrayView>> nearest;
+    nearest.reserve(static_cast<size_t>(distance.size()));
+    for (auto it = distance.cbegin(); it != distance.cend(); ++it)
+        nearest.emplace_back(it.value(), it.key());
+    std::sort(nearest.begin(), nearest.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
+    QStringList result;
+    result.reserve(static_cast<qsizetype>(nearest.size()));
+    for (const auto &[d, word] : nearest)
+        result.append(QString::fromUtf8(word));
     return result;
 }
 
@@ -214,24 +224,34 @@ void ProjectSymbolsProvider::complete(const CompletionContext &context, const Ca
         done(items, false);
         return;
     }
-    QSet<QString> seen; // a name once, even if declared in several places
-    for (const SymbolLocation &symbol : index_->symbols()) {
-        if (family(symbol.languageId) != languages || symbol.name.isEmpty())
-            continue;
-        const CompletionItem::Kind kind = kindOf(symbol.kind);
-        if (kind == CompletionItem::Kind::Text)
-            continue;
-        const QString key = symbol.name + QLatin1Char('\n') + symbol.container;
-        if (seen.contains(key))
-            continue;
-        seen.insert(key);
-        CompletionItem item;
-        item.label = symbol.name;
-        item.kind = kind;
-        item.detail = symbol.container.isEmpty() ? QFileInfo(symbol.filePath).fileName() : symbol.container;
+    if (!candidatesValid_ || candidatesRevision_ != index_->revision() || candidatesFamily_ != languages) {
+        candidates_.clear();
+        QSet<QString> seen; // a name once, even if declared in several places
+        for (const SymbolLocation &symbol : index_->symbols()) {
+            if (symbol.name.isEmpty() || family(symbol.languageId) != languages)
+                continue;
+            const CompletionItem::Kind kind = kindOf(symbol.kind);
+            if (kind == CompletionItem::Kind::Text)
+                continue;
+            const QString key = symbol.name + QLatin1Char('\n') + symbol.container;
+            if (seen.contains(key))
+                continue;
+            seen.insert(key);
+            CompletionItem item;
+            item.label = symbol.name;
+            item.kind = kind;
+            item.detail = symbol.container.isEmpty() ? QFileInfo(symbol.filePath).fileName() : symbol.container;
+            candidates_.push_back({item, symbol.filePath});
+        }
+        candidatesFamily_ = languages;
+        candidatesRevision_ = index_->revision();
+        candidatesValid_ = true;
+    }
+    items.reserve(static_cast<qsizetype>(candidates_.size()));
+    for (const Candidate &candidate : candidates_) {
+        items.append(candidate.item);
         // The current file's symbols first.
-        item.priority = symbol.filePath == context.filePath ? 6 : 5;
-        items.append(item);
+        items.last().priority = candidate.filePath == context.filePath ? 6 : 5;
     }
     done(items, false);
 }

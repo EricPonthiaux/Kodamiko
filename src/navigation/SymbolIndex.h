@@ -52,6 +52,8 @@ public:
     // Symbols of a file, in text order.
     QList<SymbolLocation> symbolsIn(const QString &path) const;
     bool isIndexing() const { return running_; }
+    // Changes whenever the symbols change, for caches built from them.
+    quint64 revision() const { return revision_; }
 
     // Flattened symbols of a file outline.
     static QList<SymbolLocation> flatten(const std::vector<OutlineSymbol> &symbols, const QString &filePath,
@@ -78,6 +80,7 @@ private:
     Providers providers_;       // for updateFile, in the UI thread
     QThreadPool pool_;
     int generation_ = 0; // results for a previous folder are ignored
+    quint64 revision_ = 0;
     bool running_ = false;
     bool refreshPending_ = false;
 };

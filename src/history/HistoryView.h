@@ -3,6 +3,7 @@
 #include "git/CommitLog.h"
 #include "ui/Theme.h"
 
+#include <QThreadPool>
 #include <QWidget>
 
 #include <optional>
@@ -26,9 +27,11 @@ class HistoryView : public QWidget {
 
 public:
     explicit HistoryView(const Theme &theme, QWidget *parent = nullptr);
+    ~HistoryView() override;
 
     void setFolder(const QString &folder);
-    // Reloads the history; keeps the chosen commit if it still exists.
+    // Reloads the history off the UI thread, then shows it (refreshed());
+    // keeps the chosen commit if it still exists.
     void refresh();
     void focusFilter();
     // Only the commits that modify `relativePath` (a file or folder of the
@@ -43,8 +46,13 @@ public:
 signals:
     // Path relative to the project folder.
     void openFileRequested(const QString &relativePath);
+    // The history read by refresh() is shown.
+    void refreshed();
 
 private:
+    void onLogRead(const std::optional<CommitLog> &log, const QString &error, int generation);
+    void showLog(std::optional<CommitLog> log, const QString &error);
+    void onDetailsRead(const QString &id, const std::optional<CommitDetails> &details, const QString &error);
     void rebuildList();
     void applyFilter();
     void onCommitSelectionChanged();
@@ -62,7 +70,16 @@ private:
     QToolButton *refreshButton_;
     QAction *searchIcon_;
     std::optional<CommitLog> log_;
+    QString error_; // why there is no log_
     std::optional<CommitDetails> details_;
+
+    // Reading runs on pool_, in order (see ChangesView); generation_
+    // changes with the folder and the path filter.
+    QThreadPool pool_;
+    int generation_ = 0;
+    bool reading_ = false;
+    bool refreshPending_ = false;
+    QString detailsWanted_; // commit whose details are being read
     // Share of each splitter's second pane when it is visible.
     double panelShare_ = 0.5;
     double diffShare_ = 0.6;

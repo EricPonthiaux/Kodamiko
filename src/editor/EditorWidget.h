@@ -49,6 +49,13 @@ public:
     // Read-only text with no associated file (e.g. a diff).
     void showReadOnlyText(const QString &text, const QString &languageId);
 
+    // The document's UTF-8 bytes, without the copies and conversions of
+    // text(): valid until the next change to the document.
+    QByteArrayView utf8Bytes() const;
+    // Bytes [start, end[ of the document, copied in one call: for a short
+    // range, cheaper than utf8Bytes(), which may move the gap buffer.
+    QByteArray utf8Range(int start, int end) const;
+
     QString filePath() const { return filePath_; }
     // LanguageRegistry identifier of the displayed text.
     QString languageId() const { return languageId_; }

@@ -5,13 +5,14 @@
 #include <QWidget>
 
 class QAction;
-class QComboBox;
+class QActionGroup;
 class QToolButton;
 
-// Files pane of the side panel: a toolbar above the file tree, as in
-// IntelliJ's Project view. The scope (Project, Changed Files, Edited by
-// Claude), Select Opened File (Alt+F1), Collapse All, and an options menu
-// with Always Select Opened File.
+// Files pane of the side panel: a header above the file tree, as in
+// IntelliJ's Project view. The view selector (Project, Changed Files,
+// Edited by Claude; Alt+Left and Alt+Right go through them), Select Opened
+// File (Alt+F1), Collapse All, and an options menu with Always Select
+// Opened File.
 class FilesPanel : public QWidget {
     Q_OBJECT
 
@@ -19,7 +20,10 @@ public:
     explicit FilesPanel(QWidget *parent = nullptr);
 
     FileTreeView *tree() const { return tree_; }
-    QComboBox *scopeBox() const { return scope_; }
+    // The view shown: 0 Project, 1 Changed Files, 2 Edited by Claude.
+    int scopeIndex() const;
+    void setScopeIndex(int index);
+    QToolButton *scopeButton() const { return scope_; }
     bool alwaysSelectOpenedFile() const;
     void setAlwaysSelectOpenedFile(bool enabled);
     // Options menu entries for the tree's layout; applied to the tree.
@@ -35,7 +39,10 @@ signals:
 
 private:
     FileTreeView *tree_;
-    QComboBox *scope_;
+    void updateScopeText();
+
+    QToolButton *scope_;
+    QActionGroup *scopes_;
     QToolButton *select_;
     QToolButton *collapse_;
     QToolButton *options_;

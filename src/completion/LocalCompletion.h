@@ -4,6 +4,8 @@
 
 #include <QStringList>
 
+#include <vector>
+
 class SymbolIndex;
 
 // Completion without a language server: what can be known from the text.
@@ -38,7 +40,18 @@ public:
     void complete(const CompletionContext &context, const Callback &done) override;
 
 private:
+    struct Candidate {
+        CompletionItem item;
+        QString filePath;
+    };
+
     const SymbolIndex *index_;
+    // The project's symbols of one language family, deduplicated: rebuilt
+    // only when the index changes, not at every keystroke.
+    std::vector<Candidate> candidates_;
+    QString candidatesFamily_;
+    quint64 candidatesRevision_ = 0;
+    bool candidatesValid_ = false;
 };
 
 // Whether `c` belongs to an identifier.

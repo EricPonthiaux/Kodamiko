@@ -14,4 +14,8 @@ public:
 
     // (Re)defines the Scintilla styles from the theme and recolors the text.
     virtual void applyTheme(const Theme &theme) = 0;
+
+    // Brings work deferred after an edit (fold levels) up to date, before
+    // a command that relies on it.
+    virtual void flush() {}
 };

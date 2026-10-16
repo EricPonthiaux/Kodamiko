@@ -71,6 +71,52 @@ private slots:
         QCOMPARE(screen.cell(0, 3).text, QStringLiteral("x"));
     }
 
+    void signalsOncePerFeedWithMergedDamage()
+    {
+        VtScreen screen(5, 20);
+        screen.takeDamage();
+        QSignalSpy changed(&screen, &VtScreen::screenChanged);
+        screen.feed("ab\x1b[1mcd\x1b[0m\r\nef");
+        QCOMPARE(changed.size(), 1);
+        const QRect damage = screen.takeDamage();
+        QVERIFY(damage.contains(QPoint(0, 0)));
+        QVERIFY(damage.contains(QPoint(1, 1)));
+        QVERIFY(screen.takeDamage().isEmpty());
+        screen.feed("");
+        QCOMPARE(changed.size(), 1); // nothing changed: no signal
+    }
+
+    void readsRawRowsLikeCells()
+    {
+        VtScreen screen(2, 6);
+        screen.setDefaultColors(Qt::white, Qt::black);
+        screen.feed("\x1b[7mab\x1b[0m  \r\nxy\r\nzz");
+        std::vector<VTermScreenCell> cells;
+        screen.readRow(-1, cells); // history line, trailing blanks trimmed
+        QCOMPARE(cells.size(), size_t(6));
+        QCOMPARE(cells[0].chars[0], uint32_t('a'));
+        QRgb foreground = 0;
+        QRgb background = 0;
+        screen.colorsOf(cells[0], foreground, background);
+        QCOMPARE(foreground, QColor(Qt::black).rgb()); // reverse video
+        QCOMPARE(background, QColor(Qt::white).rgb());
+        QCOMPARE(cells[5].chars[0], uint32_t(0));
+        screen.colorsOf(cells[5], foreground, background);
+        QCOMPARE(background, QColor(Qt::black).rgb());
+        QCOMPARE(screen.lineText(-1), QStringLiteral("ab"));
+    }
+
+    void feedsLargeOutput()
+    {
+        QByteArray output;
+        for (int line = 0; line < 20000; ++line)
+            output += "\x1b[32mline\x1b[0m " + QByteArray::number(line) + " \x1b[1;34mlorem ipsum dolor sit amet\x1b[0m\r\n";
+        QBENCHMARK {
+            VtScreen screen(60, 200);
+            screen.feed(output);
+        }
+    }
+
     void keepsScrolledOutLines()
     {
         VtScreen screen(2, 10);

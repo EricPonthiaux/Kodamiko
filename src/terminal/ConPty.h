@@ -4,6 +4,7 @@
 
 #include <QWinEventNotifier>
 
+#include <mutex>
 #include <thread>
 
 #include <windows.h>
@@ -28,6 +29,7 @@ public:
 
 private:
     void readLoop();
+    void drainOutput();
     void onProcessExited();
     void closeConsole();
     void setError(const QString &action);
@@ -38,5 +40,7 @@ private:
     HANDLE process_ = INVALID_HANDLE_VALUE;
     QWinEventNotifier *exitNotifier_ = nullptr;
     std::thread reader_;
+    std::mutex outputMutex_;
+    QByteArray pendingOutput_; // read by the thread, not yet forwarded (guarded by outputMutex_)
     QString errorString_;
 };

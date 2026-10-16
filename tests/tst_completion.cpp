@@ -164,6 +164,33 @@ private slots:
         QVERIFY(!f.controller->isActive());
     }
 
+    // Benchmarks of what runs at each keystroke while the list is open.
+    void filtersManyCandidates()
+    {
+        QList<CompletionItem> items;
+        for (int i = 0; i < 20000; ++i) {
+            CompletionItem item;
+            item.label = QStringLiteral("get%1SelectedValue%2").arg(i % 7 == 0 ? "Item" : "Other").arg(i);
+            items.append(item);
+        }
+        QWidget parent;
+        CompletionPopup popup(&parent);
+        QBENCHMARK {
+            popup.setItems(items, QStringLiteral("gsv"));
+        }
+        QCOMPARE(popup.count(), 200);
+    }
+
+    void collectsDocumentWords()
+    {
+        QByteArray text;
+        for (int i = 0; i < 20000; ++i)
+            text += "    const int value" + QByteArray::number(i % 500) + " = compute(first, second);\n";
+        QBENCHMARK {
+            DocumentWordsProvider::words(text, int(text.size() / 2));
+        }
+    }
+
     void tabReplacesTheWholeIdentifier()
     {
         Fixture f("int printValue;\nint x = prinOld;\n", 1, 11);

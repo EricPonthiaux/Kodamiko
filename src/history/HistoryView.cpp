@@ -199,19 +199,28 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
 void HistoryView::setFolder(const QString &folder)
 {
     folder_ = folder;
+    ++generation_;
     pathFilter_.clear();
     showAll_->hide();
     log_.reset();
+    error_.clear();
     details_.reset();
+    detailsWanted_.clear();
     rebuildList();
     showDetails();
     hidePanes();
     summary_->clear();
 }
 
+HistoryView::~HistoryView()
+{
+    pool_.waitForDone();
+}
+
 void HistoryView::setPathFilter(const QString &relativePath)
 {
     pathFilter_ = relativePath;
+    ++generation_;
     showAll_->setVisible(!relativePath.isEmpty());
     refresh();
 }
@@ -220,17 +229,45 @@ void HistoryView::refresh()
 {
     if (folder_.isEmpty())
         return;
-
-    QString error;
-    std::optional<CommitLog> log;
-    try {
-        log = CommitLog::read(folder_, 2000, pathFilter_);
-        if (!log)
-            error = tr("This folder is not in a git repository.");
-    } catch (const GitError &exception) {
-        error = QString::fromStdString(exception.what());
+    if (reading_) {
+        refreshPending_ = true;
+        return;
     }
+    reading_ = true;
+    refreshPending_ = false;
+    // A path filter walks the whole history: off the UI thread.
+    pool_.start([this, folder = folder_, path = pathFilter_, generation = generation_] {
+        QString error;
+        std::optional<CommitLog> log;
+        try {
+            log = CommitLog::read(folder, 2000, path);
+            if (!log)
+                error = tr("This folder is not in a git repository.");
+        } catch (const GitError &exception) {
+            error = QString::fromStdString(exception.what());
+        }
+        QMetaObject::invokeMethod(
+            this, [this, log, error, generation] { onLogRead(log, error, generation); }, Qt::QueuedConnection);
+    });
+}
 
+void HistoryView::onLogRead(const std::optional<CommitLog> &log, const QString &error, int generation)
+{
+    reading_ = false;
+    if (generation != generation_ || refreshPending_) {
+        refreshPending_ = false;
+        refresh(); // outdated: read again
+        return;
+    }
+    // Refreshed on every repository change: rebuilt only if it changed.
+    if (log != log_ || error != error_)
+        showLog(log, error);
+    emit refreshed();
+}
+
+void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
+{
+    error_ = error;
     const QList<QTreeWidgetItem *> selected = commits_->selectedItems();
     const QString current = selected.isEmpty() ? QString() : selected.first()->data(0, idRole).toString();
     log_ = std::move(log);
@@ -239,6 +276,7 @@ void HistoryView::refresh()
     if (!log_) {
         summary_->setText(error);
         details_.reset();
+        detailsWanted_.clear();
         showDetails();
         hidePanes();
         return;
@@ -261,6 +299,7 @@ void HistoryView::refresh()
         }
     }
     details_.reset();
+    detailsWanted_.clear();
     showDetails();
     hidePanes();
 }
@@ -301,6 +340,7 @@ void HistoryView::onCommitSelectionChanged()
 {
     const QList<QTreeWidgetItem *> selected = commits_->selectedItems();
     if (selected.isEmpty()) {
+        detailsWanted_.clear();
         hidePanes();
         return;
     }
@@ -339,19 +379,35 @@ void HistoryView::hidePanes()
     diffPane_->hide();
 }
 
+// Every patch of a large commit: read off the UI thread.
 void HistoryView::showCommit(const QString &id)
 {
-    if (details_ && details_->summary.id == id)
+    if ((details_ && details_->summary.id == id) || detailsWanted_ == id)
         return;
-    try {
-        details_ = CommitDetails::read(folder_, id);
-    } catch (const GitError &exception) {
-        details_.reset();
-        showDetails();
-        message_->setPlainText(QString::fromStdString(exception.what()));
-        return;
-    }
+    detailsWanted_ = id;
+    diffPane_->hide(); // the diff of another commit
+    pool_.start([this, folder = folder_, id] {
+        std::optional<CommitDetails> details;
+        QString error;
+        try {
+            details = CommitDetails::read(folder, id);
+        } catch (const GitError &exception) {
+            error = QString::fromStdString(exception.what());
+        }
+        QMetaObject::invokeMethod(
+            this, [this, id, details, error] { onDetailsRead(id, details, error); }, Qt::QueuedConnection);
+    });
+}
+
+void HistoryView::onDetailsRead(const QString &id, const std::optional<CommitDetails> &details, const QString &error)
+{
+    if (id != detailsWanted_)
+        return; // another commit was chosen meanwhile
+    detailsWanted_.clear();
+    details_ = details;
     showDetails();
+    if (!details)
+        message_->setPlainText(error);
 }
 
 void HistoryView::showDetails()

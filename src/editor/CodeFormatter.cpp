@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QTimer>
 
 #include <algorithm>
 
@@ -108,25 +109,11 @@ QString describeCandidates(const QString &languageId, const QString &filePath)
     return QObject::tr("%1 or %2").arg(names.join(QStringLiteral(", ")), last);
 }
 
-std::optional<QString> run(const Command &command, const QString &workDir, const QString &text, QString *error)
-{
-    const QString name = QFileInfo(command.program).completeBaseName();
-    QProcess process;
-    process.setWorkingDirectory(workDir);
-    process.start(command.program, command.arguments);
-    if (!process.waitForStarted()) {
-        *error = QObject::tr("Cannot start %1: %2").arg(name, process.errorString());
-        return std::nullopt;
-    }
-    process.write(text.toUtf8());
-    process.closeWriteChannel();
-    if (!process.waitForFinished(timeoutMs)) {
-        process.kill();
-        process.waitForFinished();
-        *error = QObject::tr("%1 did not finish within %2 seconds").arg(name).arg(timeoutMs / 1000);
-        return std::nullopt;
-    }
+namespace {
 
+// The formatted text of a process that ran `command` to completion.
+std::optional<QString> resultOf(QProcess &process, const QString &name, const QString &text, QString *error)
+{
     const QByteArray output = process.readAllStandardOutput();
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
         // The first line names the problem (often a syntax error and its position).
@@ -142,6 +129,72 @@ std::optional<QString> run(const Command &command, const QString &workDir, const
         return std::nullopt;
     }
     return QString::fromUtf8(output);
+}
+
+QString timeoutMessage(const QString &name)
+{
+    return QObject::tr("%1 did not finish within %2 seconds").arg(name).arg(timeoutMs / 1000);
+}
+
+} // namespace
+
+std::optional<QString> run(const Command &command, const QString &workDir, const QString &text, QString *error)
+{
+    const QString name = QFileInfo(command.program).completeBaseName();
+    QProcess process;
+    process.setWorkingDirectory(workDir);
+    process.start(command.program, command.arguments);
+    if (!process.waitForStarted()) {
+        *error = QObject::tr("Cannot start %1: %2").arg(name, process.errorString());
+        return std::nullopt;
+    }
+    process.write(text.toUtf8());
+    process.closeWriteChannel();
+    if (!process.waitForFinished(timeoutMs)) {
+        process.kill();
+        process.waitForFinished();
+        *error = timeoutMessage(name);
+        return std::nullopt;
+    }
+    return resultOf(process, name, text, error);
+}
+
+void start(const Command &command, const QString &workDir, const QString &text, QObject *context, Done done)
+{
+    const QString name = QFileInfo(command.program).completeBaseName();
+    auto *process = new QProcess(context);
+    auto *timer = new QTimer(process);
+    timer->setSingleShot(true);
+
+    // Exactly one outcome: the first one disconnects the others.
+    auto finish = [process, timer, done](const std::optional<QString> &formatted, const QString &error) {
+        timer->stop();
+        QObject::disconnect(process, nullptr, nullptr, nullptr);
+        if (process->state() != QProcess::NotRunning) {
+            process->kill();
+            // Reaped by QProcess once it exits; deleting it now would block.
+            QObject::connect(process, &QProcess::finished, process, &QObject::deleteLater);
+        } else {
+            process->deleteLater();
+        }
+        done(formatted, error);
+    };
+    QObject::connect(process, &QProcess::errorOccurred, context, [process, name, finish](QProcess::ProcessError code) {
+        if (code == QProcess::FailedToStart)
+            finish(std::nullopt, QObject::tr("Cannot start %1: %2").arg(name, process->errorString()));
+    });
+    QObject::connect(process, &QProcess::finished, context, [process, name, text, finish] {
+        QString error;
+        const std::optional<QString> formatted = resultOf(*process, name, text, &error);
+        finish(formatted, error);
+    });
+    QObject::connect(timer, &QTimer::timeout, context, [name, finish] { finish(std::nullopt, timeoutMessage(name)); });
+
+    process->setWorkingDirectory(workDir);
+    process->start(command.program, command.arguments);
+    process->write(text.toUtf8());
+    process->closeWriteChannel();
+    timer->start(timeoutMs);
 }
 
 int mapPosition(const QByteArray &before, int position, const QByteArray &after)

@@ -68,7 +68,7 @@ private:
     QString program_;
     QStringList arguments_;
     QString rootFolder_;
-    QProcess process_;
+    QProcess *process_; // outlives this object while the server stops
     QByteArray buffer_;
     // The end of the server's error output: why it stopped.
     QByteArray errors_;

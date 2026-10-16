@@ -112,7 +112,9 @@ private slots:
         GitCommands commands;
         ChangesView view(Theme::dark(), &commands);
         view.setFolder(project.path());
+        QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
         const auto *list = view.findChild<QTreeWidget *>();
         QVERIFY(list->topLevelItem(0)->isHidden());
         QVERIFY(!view.findChild<QPushButton *>()->isEnabled());
@@ -132,7 +134,9 @@ private slots:
         ChangesView view(Theme::dark(), &commands);
         view.show();
         view.setFolder(project.path());
-        view.refresh();
+        QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh(); // off the UI thread
+        QTRY_COMPARE(refreshed.size(), 1);
         const auto *list = view.findChild<QTreeWidget *>();
         QCOMPARE(sectionTitles(list), QStringList({"Staged (0)", "Unstaged (2)"}));
         QCOMPARE(list->topLevelItem(1)->child(0)->text(0), QString("a.txt"));

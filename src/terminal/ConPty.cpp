@@ -165,9 +165,28 @@ void ConPty::readLoop()
     char buffer[65536];
     DWORD count = 0;
     while (ReadFile(outputRead_, buffer, sizeof buffer, &count, nullptr) && count > 0) {
-        QByteArray chunk(buffer, static_cast<qsizetype>(count));
-        QMetaObject::invokeMethod(this, [this, chunk] { emit dataReceived(chunk); }, Qt::QueuedConnection);
+        // Chunks pile up in one buffer drained by a single queued call: the
+        // event queue stays bounded and the screen is parsed once per batch.
+        bool drainQueued = false;
+        {
+            const std::lock_guard lock(outputMutex_);
+            drainQueued = !pendingOutput_.isEmpty();
+            pendingOutput_.append(buffer, static_cast<qsizetype>(count));
+        }
+        if (!drainQueued)
+            QMetaObject::invokeMethod(this, &ConPty::drainOutput, Qt::QueuedConnection);
     }
+}
+
+void ConPty::drainOutput()
+{
+    QByteArray output;
+    {
+        const std::lock_guard lock(outputMutex_);
+        output.swap(pendingOutput_);
+    }
+    if (!output.isEmpty())
+        emit dataReceived(output);
 }
 
 void ConPty::onProcessExited()
@@ -180,8 +199,13 @@ void ConPty::onProcessExited()
     // Once the console is drained, the reader thread has forwarded the last
     // output (queued): `finished` is queued behind it so it arrives after.
     closeConsole();
-    QMetaObject::invokeMethod(this, [this, exitCode] { emit finished(static_cast<int>(exitCode)); },
-                              Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        this,
+        [this, exitCode] {
+            drainOutput();
+            emit finished(static_cast<int>(exitCode));
+        },
+        Qt::QueuedConnection);
 }
 
 void ConPty::write(const QByteArray &data)

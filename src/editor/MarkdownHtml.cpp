@@ -1,6 +1,6 @@
 #include "MarkdownHtml.h"
 
-#include "editor/CodeColorizer.h"
+#include "CodeColorizer.h"
 #include "syntax/LanguageRegistry.h"
 
 #include <QFile>

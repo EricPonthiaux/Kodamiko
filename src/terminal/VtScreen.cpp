@@ -1,6 +1,7 @@
 #include "VtScreen.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -59,6 +60,24 @@ VTermColor rgbColor(const QColor &color)
     return result;
 }
 
+// Blank cell in the default colors.
+VTermScreenCell blankCell()
+{
+    VTermScreenCell blank{};
+    blank.width = 1;
+    vterm_color_rgb(&blank.fg, 0, 0, 0);
+    blank.fg.type = static_cast<uint8_t>(blank.fg.type | VTERM_COLOR_DEFAULT_FG);
+    vterm_color_rgb(&blank.bg, 0, 0, 0);
+    blank.bg.type = static_cast<uint8_t>(blank.bg.type | VTERM_COLOR_DEFAULT_BG);
+    return blank;
+}
+
+bool isBlank(const VTermScreenCell &cell)
+{
+    return cell.chars[0] == 0 && VTERM_COLOR_IS_DEFAULT_BG(&cell.bg) && !cell.attrs.reverse
+        && cell.attrs.underline == VTERM_UNDERLINE_OFF && !cell.attrs.strike;
+}
+
 } // namespace
 
 VtScreen::VtScreen(int rows, int columns, QObject *parent)
@@ -78,6 +97,9 @@ VtScreen::VtScreen(int rows, int columns, QObject *parent)
     callbacks_.sb_pushline = &VtScreen::onPushLine;
     callbacks_.sb_popline = &VtScreen::onPopLine;
     vterm_screen_set_callbacks(screen_, &callbacks_, this);
+    // Damage is merged until the end of each feed(): one notification per
+    // batch of output instead of one per cell.
+    vterm_screen_set_damage_merge(screen_, VTERM_DAMAGE_SCREEN);
     vterm_screen_enable_altscreen(screen_, 1);
     vterm_screen_enable_reflow(screen_, true);
     vterm_screen_reset(screen_, 1);
@@ -92,6 +114,10 @@ void VtScreen::feed(const QByteArray &data)
 {
     vterm_input_write(terminal_, data.constData(), static_cast<size_t>(data.size()));
     vterm_screen_flush_damage(screen_);
+    if (changed_) {
+        changed_ = false;
+        emit screenChanged();
+    }
 }
 
 void VtScreen::resize(int rows, int columns)
@@ -104,6 +130,8 @@ void VtScreen::resize(int rows, int columns)
     columns_ = columns;
     vterm_set_size(terminal_, rows, columns);
     vterm_screen_flush_damage(screen_);
+    addDamage(QRect(0, 0, columns_, rows_));
+    changed_ = false;
     emit screenChanged();
 }
 
@@ -114,6 +142,7 @@ void VtScreen::setDefaultColors(const QColor &foreground, const QColor &backgrou
     const VTermColor fg = rgbColor(foreground);
     const VTermColor bg = rgbColor(background);
     vterm_screen_set_default_colors(screen_, &fg, &bg);
+    addDamage(QRect(0, 0, columns_, rows_));
     emit screenChanged();
 }
 
@@ -142,6 +171,52 @@ TerminalCell VtScreen::cell(int row, int column) const
     if (column + 1 < static_cast<int>(line.size()) && line[static_cast<size_t>(column + 1)].chars[0] == uint32_t(-1))
         result.width = 2;
     return result;
+}
+
+void VtScreen::readRow(int row, std::vector<VTermScreenCell> &cells) const
+{
+    cells.resize(static_cast<size_t>(columns_));
+    if (row >= 0) {
+        for (int column = 0; column < columns_; ++column) {
+            if (!vterm_screen_get_cell(screen_, VTermPos{row, column}, &cells[static_cast<size_t>(column)]))
+                cells[static_cast<size_t>(column)] = blankCell();
+        }
+        return;
+    }
+
+    const int index = static_cast<int>(scrollback_.size()) + row;
+    if (index < 0) {
+        std::fill(cells.begin(), cells.end(), blankCell());
+        return;
+    }
+    const std::vector<VTermScreenCell> &line = scrollback_[static_cast<size_t>(index)];
+    const size_t stored = std::min(line.size(), cells.size());
+    std::copy_n(line.begin(), stored, cells.begin());
+    std::fill(cells.begin() + static_cast<std::ptrdiff_t>(stored), cells.end(), blankCell());
+    // Widths are not stored in the history: we infer them.
+    for (size_t column = 0; column + 1 < stored; ++column) {
+        if (cells[column + 1].chars[0] == uint32_t(-1))
+            cells[column].width = 2;
+    }
+}
+
+void VtScreen::colorsOf(const VTermScreenCell &cell, QRgb &foreground, QRgb &background) const
+{
+    foreground = toRgb(cell.fg, true);
+    background = toRgb(cell.bg, false);
+    if (cell.attrs.reverse)
+        std::swap(foreground, background);
+}
+
+QRect VtScreen::takeDamage()
+{
+    return std::exchange(damage_, QRect());
+}
+
+void VtScreen::addDamage(const QRect &cells)
+{
+    damage_ |= cells;
+    changed_ = true;
 }
 
 QString VtScreen::lineText(int row) const
@@ -234,18 +309,30 @@ QColor VtScreen::toQColor(VTermColor color, bool isForeground) const
     return QColor(color.rgb.red, color.rgb.green, color.rgb.blue);
 }
 
-int VtScreen::onDamage(VTermRect, void *user)
+QRgb VtScreen::toRgb(VTermColor color, bool isForeground) const
 {
-    emit static_cast<VtScreen *>(user)->screenChanged();
+    if (isForeground && VTERM_COLOR_IS_DEFAULT_FG(&color))
+        return defaultForeground_.rgb();
+    if (!isForeground && VTERM_COLOR_IS_DEFAULT_BG(&color))
+        return defaultBackground_.rgb();
+    vterm_screen_convert_color_to_rgb(screen_, &color);
+    return qRgb(color.rgb.red, color.rgb.green, color.rgb.blue);
+}
+
+int VtScreen::onDamage(VTermRect rect, void *user)
+{
+    static_cast<VtScreen *>(user)->addDamage(
+        QRect(rect.start_col, rect.start_row, rect.end_col - rect.start_col, rect.end_row - rect.start_row));
     return 1;
 }
 
-int VtScreen::onMoveCursor(VTermPos position, VTermPos, int visible, void *user)
+int VtScreen::onMoveCursor(VTermPos position, VTermPos oldPosition, int visible, void *user)
 {
     auto *self = static_cast<VtScreen *>(user);
     self->cursor_ = QPoint(position.col, position.row);
     self->cursorVisible_ = visible;
-    emit self->screenChanged();
+    self->addDamage(QRect(oldPosition.col, oldPosition.row, 1, 1));
+    self->addDamage(QRect(position.col, position.row, 1, 1));
     return 1;
 }
 
@@ -255,7 +342,7 @@ int VtScreen::onSetTermProp(VTermProp property, VTermValue *value, void *user)
     switch (property) {
     case VTERM_PROP_CURSORVISIBLE:
         self->cursorVisible_ = value->boolean;
-        emit self->screenChanged();
+        self->addDamage(QRect(self->cursor_, QSize(1, 1)));
         break;
     case VTERM_PROP_ALTSCREEN:
         self->alternateScreen_ = value->boolean;
@@ -285,7 +372,10 @@ int VtScreen::onBell(void *user)
 int VtScreen::onPushLine(int columns, const VTermScreenCell *cells, void *user)
 {
     auto *self = static_cast<VtScreen *>(user);
-    self->scrollback_.emplace_back(cells, cells + columns);
+    int stored = columns;
+    while (stored > 0 && isBlank(cells[stored - 1]))
+        --stored;
+    self->scrollback_.emplace_back(cells, cells + stored);
     if (self->scrollback_.size() > maxScrollbackLines)
         self->scrollback_.pop_front();
     return 1;
@@ -301,15 +391,8 @@ int VtScreen::onPopLine(int columns, VTermScreenCell *cells, void *user)
     const std::vector<VTermScreenCell> &line = self->scrollback_.back();
     const int copied = std::min(columns, static_cast<int>(line.size()));
     std::copy_n(line.begin(), copied, cells);
-    if (copied < columns) {
-        VTermScreenCell blank{};
-        blank.width = 1;
-        vterm_color_rgb(&blank.fg, 0, 0, 0);
-        blank.fg.type = static_cast<uint8_t>(blank.fg.type | VTERM_COLOR_DEFAULT_FG);
-        vterm_color_rgb(&blank.bg, 0, 0, 0);
-        blank.bg.type = static_cast<uint8_t>(blank.bg.type | VTERM_COLOR_DEFAULT_BG);
-        std::fill(cells + copied, cells + columns, blank);
-    }
+    if (copied < columns)
+        std::fill(cells + copied, cells + columns, blankCell());
     self->scrollback_.pop_back();
     return 1;
 }

@@ -4,6 +4,7 @@
 #include "git/RepositoryStatus.h"
 #include "ui/Theme.h"
 
+#include <QThreadPool>
 #include <QWidget>
 
 #include <optional>
@@ -27,9 +28,11 @@ class ChangesView : public QWidget {
 
 public:
     ChangesView(const Theme &theme, GitCommands *commands, QWidget *parent = nullptr);
+    ~ChangesView() override;
 
     void setFolder(const QString &folder);
-    // Rereads the repository state; keeps the selection and the diff position.
+    // Rereads the repository state off the UI thread, then shows it
+    // (refreshed()), keeping the selection and the diff position.
     void refresh();
 
     // Rereads the changes and shows those of `relativePath` (a file, or
@@ -47,6 +50,8 @@ signals:
     // Path relative to the project folder.
     void openFileRequested(const QString &relativePath);
     void statusMessage(const QString &message);
+    // The state read by refresh() is shown.
+    void refreshed();
 
 private:
     enum class Section { Staged, Unstaged };
@@ -63,6 +68,9 @@ private:
     // Path of the open folder within the repository, to stage or unstage "everything".
     QString folderPathspec() const;
 
+    void onStatusRead(const std::optional<RepositoryStatus> &status, const QString &error, int generation);
+    void showStatus(std::optional<RepositoryStatus> status, const QString &error);
+    void selectNow(const QString &relativePath);
     void rebuildList();
     void showSection(Section section);
     void onCurrentItemChanged();
@@ -86,6 +94,15 @@ private:
     GitCommands *commands_;
     QString folder_;
     std::optional<RepositoryStatus> status_;
+    QString error_; // why there is no status_
+
+    // Reading runs on pool_, one read at a time; a refresh() during a read
+    // reads again after it. generation_ changes with the folder.
+    QThreadPool pool_;
+    int generation_ = 0;
+    bool reading_ = false;
+    bool refreshPending_ = false;
+    std::optional<QString> pendingSelection_; // for selectFile()
 
     QLabel *summary_;
     QTreeWidget *list_;

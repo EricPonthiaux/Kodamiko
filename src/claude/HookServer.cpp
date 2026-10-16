@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QLocalSocket>
+#include <QPointer>
 #include <QRandomGenerator>
 
 HookServer::HookServer(QObject *parent)
@@ -34,8 +35,28 @@ void HookServer::onReadyRead(QLocalSocket *socket)
     if (!socket->canReadLine())
         return;
     const QByteArray line = socket->readLine();
+    receiving_ = socket;
+    replyDeferred_ = false;
     if (const std::optional<HookEvent> event = HookEvent::fromJson(line))
         emit hookReceived(*event);
+    receiving_ = nullptr;
+    if (!replyDeferred_)
+        reply(socket);
+}
+
+std::function<void()> HookServer::deferReply()
+{
+    if (!receiving_)
+        return [] {};
+    replyDeferred_ = true;
+    return [socket = QPointer<QLocalSocket>(receiving_)] {
+        if (socket)
+            reply(socket);
+    };
+}
+
+void HookServer::reply(QLocalSocket *socket)
+{
     socket->write("ok\n");
     socket->flush();
     socket->disconnectFromServer();

@@ -2,9 +2,11 @@
 
 #include "ui/UiIcons.h"
 
-#include <QComboBox>
+#include <QActionGroup>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QShortcut>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -12,14 +14,46 @@ FilesPanel::FilesPanel(QWidget *parent)
     : QWidget(parent)
     , tree_(new FileTreeView(this))
 {
-    scope_ = new QComboBox(this);
-    scope_->addItem(tr("Project"), static_cast<int>(FileTreeView::Scope::Project));
-    scope_->addItem(tr("Changed Files"), static_cast<int>(FileTreeView::Scope::ChangedFiles));
-    scope_->addItem(tr("Edited by Claude"), static_cast<int>(FileTreeView::Scope::EditedByClaude));
-    scope_->setToolTip(tr("Files shown in the tree"));
+    // The view selector: the view's name and a chevron, borderless, as
+    // wide as its text.
+    scope_ = new QToolButton(this);
+    scope_->setObjectName(QStringLiteral("viewSelector"));
+    scope_->setAutoRaise(true);
+    scope_->setToolTip(tr("Files shown in the tree (Alt+Left, Alt+Right)"));
     scope_->setFocusPolicy(Qt::NoFocus);
-    connect(scope_, &QComboBox::currentIndexChanged, this,
-            [this] { tree_->setScope(static_cast<FileTreeView::Scope>(scope_->currentData().toInt())); });
+    scope_->setPopupMode(QToolButton::InstantPopup);
+    scope_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    QFont scopeFont = scope_->font();
+    scopeFont.setWeight(QFont::DemiBold);
+    scope_->setFont(scopeFont);
+    auto *scopeMenu = new QMenu(scope_);
+    scopes_ = new QActionGroup(this);
+    scopes_->setExclusive(true);
+    for (const auto &[name, scope] : {std::pair{tr("Project"), FileTreeView::Scope::Project},
+                                      std::pair{tr("Changed Files"), FileTreeView::Scope::ChangedFiles},
+                                      std::pair{tr("Edited by Claude"), FileTreeView::Scope::EditedByClaude}}) {
+        QAction *action = scopeMenu->addAction(name);
+        action->setCheckable(true);
+        action->setData(static_cast<int>(scope));
+        scopes_->addAction(action);
+    }
+    scopes_->actions().first()->setChecked(true);
+    connect(scopes_, &QActionGroup::triggered, this, [this](QAction *action) {
+        updateScopeText();
+        tree_->setScope(static_cast<FileTreeView::Scope>(action->data().toInt()));
+    });
+    scope_->setMenu(scopeMenu);
+    updateScopeText();
+    // As IntelliJ: Alt+Left, Alt+Right go to the previous, next view.
+    for (const auto &[key, step] : {std::pair{Qt::ALT | Qt::Key_Left, -1}, std::pair{Qt::ALT | Qt::Key_Right, 1}}) {
+        auto *shortcut = new QShortcut(QKeySequence(key), this);
+        shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+        const int delta = step;
+        connect(shortcut, &QShortcut::activated, this, [this, delta] {
+            const int count = int(scopes_->actions().size());
+            setScopeIndex((scopeIndex() + delta + count) % count);
+        });
+    }
 
     // Icons only, all the same size (see setIconColor).
     const auto addButton = [this](const QString &toolTip) {
@@ -75,10 +109,15 @@ FilesPanel::FilesPanel(QWidget *parent)
     setTreeOptions(tree_->treeOptions());
     options->setMenu(menu);
 
-    auto *toolbar = new QHBoxLayout;
-    toolbar->setContentsMargins(4, 2, 2, 2);
+    // The header: room around its controls, a line under it.
+    auto *header = new QFrame(this);
+    header->setObjectName(QStringLiteral("viewHeader"));
+    header->setFixedHeight(34);
+    auto *toolbar = new QHBoxLayout(header);
+    toolbar->setContentsMargins(6, 0, 6, 0);
     toolbar->setSpacing(2);
-    toolbar->addWidget(scope_, 1);
+    toolbar->addWidget(scope_);
+    toolbar->addStretch(1);
     toolbar->addWidget(select_);
     toolbar->addWidget(collapse);
     toolbar->addWidget(options);
@@ -86,7 +125,7 @@ FilesPanel::FilesPanel(QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addLayout(toolbar);
+    layout->addWidget(header);
     layout->addWidget(tree_, 1);
 }
 
@@ -99,6 +138,26 @@ void FilesPanel::setTreeOptions(const ProjectTreeModel::Options &options)
                                                      : options.showIgnored);
     }
     tree_->setTreeOptions(options);
+}
+
+int FilesPanel::scopeIndex() const
+{
+    return int(scopes_->actions().indexOf(scopes_->checkedAction()));
+}
+
+void FilesPanel::setScopeIndex(int index)
+{
+    QAction *action = scopes_->actions().value(index);
+    if (!action || action->isChecked())
+        return;
+    action->setChecked(true);
+    updateScopeText();
+    tree_->setScope(static_cast<FileTreeView::Scope>(action->data().toInt()));
+}
+
+void FilesPanel::updateScopeText()
+{
+    scope_->setText(scopes_->checkedAction()->text() + QStringLiteral("  ▾"));
 }
 
 bool FilesPanel::alwaysSelectOpenedFile() const

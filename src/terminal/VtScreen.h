@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QObject>
 #include <QPoint>
+#include <QRect>
 #include <QString>
 
 #include <deque>
@@ -49,6 +50,15 @@ public:
     TerminalCell cell(int row, int column) const;
     QString lineText(int row) const;
 
+    // Drawing without allocations: the raw cells of a row (columns() of
+    // them, same numbering as cell()) and their colors, reverse video
+    // applied.
+    void readRow(int row, std::vector<VTermScreenCell> &cells) const;
+    void colorsOf(const VTermScreenCell &cell, QRgb &foreground, QRgb &background) const;
+
+    // Screen cells (x = column, y = row) changed since the last call.
+    QRect takeDamage();
+
     QPoint cursorPosition() const { return cursor_; } // x = column, y = row
     bool isCursorVisible() const { return cursorVisible_; }
     bool isAlternateScreen() const { return alternateScreen_; }
@@ -75,6 +85,8 @@ private:
 
     TerminalCell toTerminalCell(const VTermScreenCell &cell) const;
     QColor toQColor(VTermColor color, bool isForeground) const;
+    QRgb toRgb(VTermColor color, bool isForeground) const;
+    void addDamage(const QRect &cells);
 
     VTerm *terminal_ = nullptr;
     VTermScreen *screen_ = nullptr;
@@ -87,5 +99,8 @@ private:
     QColor defaultForeground_ = Qt::lightGray;
     QColor defaultBackground_ = Qt::black;
     QString titleBuffer_;
+    QRect damage_;
+    bool changed_ = false; // something to signal at the end of feed()
+    // Lines without their trailing blank cells.
     std::deque<std::vector<VTermScreenCell>> scrollback_;
 };

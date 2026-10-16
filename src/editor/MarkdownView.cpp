@@ -1,7 +1,7 @@
 #include "MarkdownView.h"
 
-#include "editor/CodeColorizer.h"
-#include "editor/EditorWidget.h"
+#include "CodeColorizer.h"
+#include "EditorWidget.h"
 #include "MarkdownHtml.h"
 #include "syntax/LanguageRegistry.h"
 #include "ui/GripSplitter.h"

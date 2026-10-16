@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <rect width="256" height="256" rx="48" fill="#1f2329"/>
-  <rect x="24" y="24" width="208" height="208" rx="32" fill="none" stroke="#c678dd" stroke-width="10"/>
-  <path d="M86 64h92v26h-62v26h52v24h-52v28h64v26H86z" fill="#e5c07b"/>
-  <circle cx="190" cy="190" r="10" fill="#61afef"/>
+  <!-- Duet: a text caret (the editor) next to a block cursor (the terminal) -->
+  <rect width="256" height="256" rx="56.32" fill="#1f232c"/>
+  <g transform="translate(40.96 40.96) scale(2.72)">
+    <rect x="17" y="12" width="7" height="40" rx="3.5" fill="#e7e9ef"/>
+    <rect x="31" y="24" width="16" height="28" rx="4" fill="#4f7cf0"/>
+  </g>
 </svg>

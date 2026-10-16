@@ -23,6 +23,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -189,10 +190,18 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     applyTheme(theme);
 }
 
+ChangesView::~ChangesView()
+{
+    pool_.waitForDone();
+}
+
 void ChangesView::setFolder(const QString &folder)
 {
     folder_ = folder;
+    ++generation_;
+    pendingSelection_.reset();
     status_.reset();
+    error_.clear();
     rebuildList();
     showSection(Section::Unstaged);
     summary_->clear();
@@ -215,16 +224,50 @@ void ChangesView::refresh()
 {
     if (folder_.isEmpty())
         return;
-
-    QString error;
-    std::optional<RepositoryStatus> status;
-    try {
-        status = RepositoryStatus::read(folder_);
-        if (!status)
-            error = tr("This folder is not in a git repository.");
-    } catch (const GitError &exception) {
-        error = QString::fromStdString(exception.what());
+    if (reading_) {
+        refreshPending_ = true;
+        return;
     }
+    reading_ = true;
+    refreshPending_ = false;
+    // Every diff of the working tree, untracked files included: long in a
+    // large repository, so off the UI thread.
+    pool_.start([this, folder = folder_, generation = generation_] {
+        QString error;
+        std::optional<RepositoryStatus> status;
+        try {
+            status = RepositoryStatus::read(folder);
+            if (!status)
+                error = tr("This folder is not in a git repository.");
+        } catch (const GitError &exception) {
+            error = QString::fromStdString(exception.what());
+        }
+        QMetaObject::invokeMethod(
+            this, [this, status, error, generation] { onStatusRead(status, error, generation); },
+            Qt::QueuedConnection);
+    });
+}
+
+void ChangesView::onStatusRead(const std::optional<RepositoryStatus> &status, const QString &error, int generation)
+{
+    reading_ = false;
+    if (generation != generation_ || refreshPending_) {
+        refreshPending_ = false;
+        refresh(); // outdated: read again
+        return;
+    }
+    // Refreshes are frequent (each git command, each Claude edit) and most
+    // change nothing: the list and the diff are rebuilt only on a change.
+    if (status != status_ || error != error_)
+        showStatus(status, error);
+    if (pendingSelection_)
+        selectNow(*std::exchange(pendingSelection_, std::nullopt));
+    emit refreshed();
+}
+
+void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QString &error)
+{
+    error_ = error;
 
     // Selection to restore: section and path of each file.
     const auto keyOf = [this](const QTreeWidgetItem *item) {
@@ -281,7 +324,12 @@ void ChangesView::refresh()
 
 void ChangesView::selectFile(const QString &relativePath)
 {
+    pendingSelection_ = relativePath;
     refresh();
+}
+
+void ChangesView::selectNow(const QString &relativePath)
+{
     if (!status_)
         return;
     const auto matches = [&relativePath](const QString &path) {

@@ -6,6 +6,7 @@
 #include "settings/Preferences.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
+#include "ui/BrandMark.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -143,7 +144,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     side->setFixedWidth(230);
     side->installEventFilter(this);
     auto *logo = new QLabel(side);
-    logo->setPixmap(iconTile(QStringLiteral("code"), theme_, 44, devicePixelRatioF()));
+    logo->setPixmap(BrandMark::appIcon(44, devicePixelRatioF()));
     auto *name = new QLabel(QStringLiteral("Duet"), side);
     QFont nameFont = name->font();
     nameFont.setPointSizeF(nameFont.pointSizeF() * 1.4);

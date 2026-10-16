@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QTimer>
 #include <QUrl>
 
 namespace {
@@ -38,23 +39,24 @@ LspClient::LspClient(const QString &program, const QStringList &arguments, const
     , program_(program)
     , arguments_(arguments)
     , rootFolder_(rootFolder)
+    , process_(new QProcess(this))
 {
-    process_.setProcessChannelMode(QProcess::SeparateChannels);
-    process_.setWorkingDirectory(rootFolder);
-    connect(&process_, &QProcess::readyReadStandardOutput, this, &LspClient::onOutput);
+    process_->setProcessChannelMode(QProcess::SeparateChannels);
+    process_->setWorkingDirectory(rootFolder);
+    connect(process_, &QProcess::readyReadStandardOutput, this, &LspClient::onOutput);
     // Servers log a lot there: only the end is kept, to say why one stopped.
-    connect(&process_, &QProcess::readyReadStandardError, this, [this] {
-        errors_.append(process_.readAllStandardError());
+    connect(process_, &QProcess::readyReadStandardError, this, [this] {
+        errors_.append(process_->readAllStandardError());
         if (errors_.size() > 8192)
             errors_ = errors_.right(4096);
     });
-    connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+    connect(process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart || failed_)
             return;
         failed_ = true;
-        emit failed(tr("Cannot start %1: %2").arg(QFileInfo(program_).fileName(), process_.errorString()));
+        emit failed(tr("Cannot start %1: %2").arg(QFileInfo(program_).fileName(), process_->errorString()));
     });
-    connect(&process_, &QProcess::finished, this, [this] {
+    connect(process_, &QProcess::finished, this, [this] {
         ready_ = false;
         if (stopping_ || failed_)
             return;
@@ -71,7 +73,7 @@ LspClient::LspClient(const QString &program, const QStringList &arguments, const
 
 void LspClient::setEnvironment(const QProcessEnvironment &environment)
 {
-    process_.setProcessEnvironment(environment);
+    process_->setProcessEnvironment(environment);
 }
 
 QString LspClient::lastError() const
@@ -91,26 +93,31 @@ QString LspClient::lastError() const
 LspClient::~LspClient()
 {
     stopping_ = true;
-    if (process_.state() == QProcess::NotRunning)
-        return;
+    disconnect(process_, nullptr, this, nullptr);
+    if (process_->state() == QProcess::NotRunning)
+        return; // deleted with this object
+    // The server is left to stop on its own, without blocking the UI (a
+    // project switch, quitting): its QProcess outlives this object and is
+    // deleted once the server has exited.
+    process_->setParent(nullptr);
+    connect(process_, &QProcess::finished, process_, &QObject::deleteLater);
     if (ready_) {
         // "shutdown" then "exit", as the protocol asks; no time to wait for
         // the answer.
         send(QJsonObject{{"jsonrpc", "2.0"}, {"id", nextId_++}, {"method", "shutdown"}});
         send(QJsonObject{{"jsonrpc", "2.0"}, {"method", "exit"}});
-        process_.closeWriteChannel();
-        if (process_.waitForFinished(1500))
-            return;
+        process_->closeWriteChannel();
+        QTimer::singleShot(1500, process_, &QProcess::kill);
+    } else {
+        process_->kill();
     }
-    process_.kill();
-    process_.waitForFinished(1000);
 }
 
 void LspClient::start()
 {
-    if (process_.state() != QProcess::NotRunning || failed_)
+    if (process_->state() != QProcess::NotRunning || failed_)
         return;
-    process_.start(program_, arguments_);
+    process_->start(program_, arguments_);
 
     QJsonObject params{
         {"processId", QCoreApplication::applicationPid()},
@@ -146,7 +153,7 @@ void LspClient::start()
 
 bool LspClient::isRunning() const
 {
-    return process_.state() != QProcess::NotRunning;
+    return process_->state() != QProcess::NotRunning;
 }
 
 void LspClient::request(const QString &method, const QJsonObject &params, ResponseHandler handler)
@@ -183,34 +190,45 @@ QByteArray LspClient::frame(const QJsonObject &message)
 
 void LspClient::send(const QJsonObject &message)
 {
-    if (process_.state() != QProcess::NotRunning)
-        process_.write(frame(message));
+    if (process_->state() != QProcess::NotRunning)
+        process_->write(frame(message));
 }
 
 QList<QJsonObject> LspClient::takeMessages(QByteArray &buffer)
 {
+    // Messages are read at an offset, and the buffer is shortened once:
+    // removing each message from the front would be quadratic when many
+    // arrive together (diagnostics, progress).
     QList<QJsonObject> messages;
+    qsizetype offset = 0;
     for (;;) {
-        const qsizetype headerEnd = buffer.indexOf("\r\n\r\n");
+        const qsizetype headerEnd = buffer.indexOf("\r\n\r\n", offset);
         if (headerEnd < 0)
             break;
         qsizetype length = -1;
-        for (const QByteArray &line : buffer.left(headerEnd).split('\n')) {
-            const QByteArray header = line.trimmed();
-            if (header.toLower().startsWith("content-length:"))
-                length = header.mid(15).trimmed().toLongLong();
+        for (qsizetype lineStart = offset; lineStart < headerEnd;) {
+            qsizetype lineEnd = buffer.indexOf('\n', lineStart);
+            if (lineEnd < 0 || lineEnd > headerEnd)
+                lineEnd = headerEnd;
+            const QByteArrayView header =
+                QByteArrayView(buffer.constData() + lineStart, lineEnd - lineStart).trimmed();
+            if (header.size() >= 15 && header.first(15).compare("content-length:", Qt::CaseInsensitive) == 0)
+                length = header.sliced(15).trimmed().toLongLong();
+            lineStart = lineEnd + 1;
         }
         if (length < 0) { // not a header: drop it
-            buffer.remove(0, headerEnd + 4);
+            offset = headerEnd + 4;
             continue;
         }
         if (buffer.size() < headerEnd + 4 + length)
             break; // the rest is still coming
-        const QJsonDocument document = QJsonDocument::fromJson(buffer.mid(headerEnd + 4, length));
-        buffer.remove(0, headerEnd + 4 + length);
+        const QJsonDocument document =
+            QJsonDocument::fromJson(QByteArray::fromRawData(buffer.constData() + headerEnd + 4, length));
+        offset = headerEnd + 4 + length;
         if (document.isObject())
             messages.append(document.object());
     }
+    buffer.remove(0, offset);
     return messages;
 }
 
@@ -227,7 +245,7 @@ QJsonValue LspClient::settingAt(const QJsonObject &settings, const QString &sect
 
 void LspClient::onOutput()
 {
-    buffer_.append(process_.readAllStandardOutput());
+    buffer_.append(process_->readAllStandardOutput());
     for (const QJsonObject &message : takeMessages(buffer_))
         handle(message);
 }

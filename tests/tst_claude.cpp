@@ -198,6 +198,32 @@ private slots:
         QCOMPARE(received.first().first().value<HookEvent>().sessionId, QStringLiteral("hello"));
     }
 
+    // A slot may postpone the reply (snapshot off the UI thread): the hook,
+    // and so Claude, waits until it is sent.
+    void hookWaitsForADeferredReply()
+    {
+        HookServer server;
+        QVERIFY(server.listen());
+        std::function<void()> reply;
+        connect(&server, &HookServer::hookReceived, this, [&] { reply = server.deferReply(); });
+
+        QProcess hook;
+        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("DUET_SOCKET", server.serverName());
+        hook.setProcessEnvironment(environment);
+        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        QVERIFY(hook.waitForStarted());
+        hook.write(R"({"hook_event_name":"Stop","session_id":"hello"})");
+        hook.closeWriteChannel();
+
+        QTRY_VERIFY(reply);
+        QTest::qWait(300);
+        QCOMPARE(hook.state(), QProcess::Running);
+        reply();
+        QTRY_COMPARE_WITH_TIMEOUT(hook.state(), QProcess::NotRunning, 5000);
+        QCOMPARE(hook.exitCode(), 0);
+    }
+
     void statusLineIsForwardedAndPrinted()
     {
         HookServer server;

@@ -22,6 +22,8 @@ struct StyledSpan {
     char style;
 };
 
+constexpr int foldDelayMs = 150;
+
 } // namespace
 
 TreeSitterHighlighter::TreeSitterHighlighter(const TreeSitterGrammar &grammar)
@@ -30,6 +32,12 @@ TreeSitterHighlighter::TreeSitterHighlighter(const TreeSitterGrammar &grammar)
     , cursor_(ts_query_cursor_new())
 {
     ts_parser_set_language(parser_, grammar_.language);
+    foldTimer_.setSingleShot(true);
+    foldTimer_.setInterval(foldDelayMs);
+    connect(&foldTimer_, &QTimer::timeout, this, [this] {
+        reparseIfNeeded();
+        updateFoldLevels();
+    });
 }
 
 TreeSitterHighlighter::~TreeSitterHighlighter()
@@ -131,14 +139,30 @@ int TreeSitterHighlighter::reparseIfNeeded()
         std::free(ranges);
         ts_tree_delete(tree_);
     }
+    const bool firstParse = !tree_;
     tree_ = newTree;
     treeIsOutdated_ = false;
-    updateFoldLevels();
+    if (firstParse)
+        updateFoldLevels(); // a loaded file can be folded at once
+    else
+        foldTimer_.start();
     return firstChange;
+}
+
+void TreeSitterHighlighter::flush()
+{
+    if (!foldTimer_.isActive() && !treeIsOutdated_)
+        return;
+    foldTimer_.stop();
+    reparseIfNeeded();
+    foldTimer_.stop();
+    updateFoldLevels();
 }
 
 void TreeSitterHighlighter::updateFoldLevels()
 {
+    if (!tree_)
+        return;
     const int lineCount = editor_->SendScintilla(QsciScintillaBase::SCI_GETLINECOUNT);
     const std::vector<int> levels = TreeSitterFolds::levels(ts_tree_root_node(tree_), lineCount);
     constexpr int levelMask = QsciScintillaBase::SC_FOLDLEVELNUMBERMASK | QsciScintillaBase::SC_FOLDLEVELHEADERFLAG;

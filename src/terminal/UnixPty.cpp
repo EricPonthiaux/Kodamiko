@@ -4,6 +4,7 @@
 #include <QSocketNotifier>
 #include <QStandardPaths>
 
+#include <algorithm>
 #include <cerrno>
 #include <csignal>
 #include <cstring>
@@ -121,16 +122,22 @@ void UnixPty::write(const QByteArray &data)
 // chunks, at the pace the program reads it.
 void UnixPty::flushPendingWrites()
 {
-    while (!pendingWrites_.isEmpty()) {
-        const ssize_t written = ::write(masterFd_, pendingWrites_.constData(), pendingWrites_.size());
+    // Written bytes are skipped with an offset, and the buffer is compacted
+    // once per call: removing from the front after each write would be
+    // quadratic for a long paste.
+    qsizetype offset = 0;
+    while (offset < pendingWrites_.size()) {
+        const ssize_t written =
+            ::write(masterFd_, pendingWrites_.constData() + offset, size_t(pendingWrites_.size() - offset));
         if (written > 0) {
-            pendingWrites_.remove(0, written);
+            offset += written;
         } else if (written < 0 && errno == EINTR) {
             continue;
         } else {
             break; // EAGAIN: retry when the PTY is ready again
         }
     }
+    pendingWrites_.remove(0, offset);
     writeNotifier_->setEnabled(!pendingWrites_.isEmpty());
 }
 
@@ -142,23 +149,33 @@ void UnixPty::resize(QSize cells)
     ::ioctl(masterFd_, TIOCSWINSZ, &size);
 }
 
+// Everything available is read into one chunk, so the screen is parsed and
+// repainted once per batch. The batch is bounded: a program that writes as
+// fast as we parse (`cat` of a big file, `yes`) must not starve input and
+// painting; the notifier fires again on the next event loop iteration.
 void UnixPty::readAvailable()
 {
-    char buffer[65536];
-    for (;;) {
-        const ssize_t count = ::read(masterFd_, buffer, sizeof buffer);
-        if (count > 0) {
-            emit dataReceived(QByteArray(buffer, count));
+    constexpr qsizetype chunkSize = 65536;
+    constexpr qsizetype maxBatch = 4 * chunkSize;
+    QByteArray batch;
+    bool exited = false;
+    while (batch.size() < maxBatch) {
+        const qsizetype start = batch.size();
+        batch.resize(start + chunkSize);
+        const ssize_t count = ::read(masterFd_, batch.data() + start, size_t(chunkSize));
+        batch.resize(start + std::max<qsizetype>(count, 0));
+        if (count > 0)
             continue;
-        }
         if (count < 0 && errno == EINTR)
             continue;
-        if (count < 0 && errno == EAGAIN)
-            return;
         // 0 or EIO: the slave side is closed, the program has exited.
-        handleChildExit();
-        return;
+        exited = !(count < 0 && errno == EAGAIN);
+        break;
     }
+    if (!batch.isEmpty())
+        emit dataReceived(batch);
+    if (exited)
+        handleChildExit();
 }
 
 void UnixPty::handleChildExit()

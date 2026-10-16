@@ -78,12 +78,7 @@ void CompletionController::complete()
 
 QString CompletionController::textBetween(int start, int end) const
 {
-    if (end <= start)
-        return {};
-    QByteArray bytes(end - start, Qt::Uninitialized);
-    for (int i = start; i < end; ++i)
-        bytes[i - start] = static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, i));
-    return QString::fromUtf8(bytes);
+    return QString::fromUtf8(editor_->utf8Range(start, end));
 }
 
 int CompletionController::identifierStart(int position) const
@@ -174,7 +169,7 @@ void CompletionController::start(bool explicitRequest, QChar triggerCharacter)
     CompletionContext context;
     context.filePath = editor_->filePath();
     context.languageId = editor_->languageId();
-    context.text = editor_->text().toUtf8();
+    context.text = editor_->utf8Bytes().toByteArray(); // one copy; text() makes three
     context.position = position;
     context.prefixStart = identifierStart(position);
     context.prefix = textBetween(context.prefixStart, position);
@@ -190,12 +185,14 @@ void CompletionController::start(bool explicitRequest, QChar triggerCharacter)
     line_ = context.line;
     if (!restarting)
         items_.clear(); // else, the current list stays until the answers
+    listStale_ = true;
     incomplete_ = false;
     requestedPrefix_ = context.prefix;
     service_->request(context, [this](const QList<CompletionItem> &items, bool incomplete) {
         if (!active_)
             return;
         items_ = items;
+        listStale_ = true;
         incomplete_ = incomplete;
         refilter();
     });
@@ -222,6 +219,12 @@ void CompletionController::refilter()
         start(false, {}); // the server's next part; the list stays meanwhile
         return;
     }
+    // Typing a character signals it several times (character added, text
+    // and cursor changed): the list is filtered once per change.
+    if (!listStale_ && prefix == listedPrefix_)
+        return;
+    listStale_ = false;
+    listedPrefix_ = prefix;
     if (popup_->setItems(items_, prefix) == 0) {
         popup_->hide(); // nothing yet: answers may still come
         return;
@@ -252,6 +255,7 @@ void CompletionController::close()
         return;
     active_ = false;
     items_.clear();
+    listStale_ = true;
     service_->cancel();
     if (popup_)
         popup_->hide();

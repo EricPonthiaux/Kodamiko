@@ -538,12 +538,12 @@ private slots:
         };
         QTRY_VERIFY(shown().contains("same.cpp"));
 
-        panel.scopeBox()->setCurrentIndex(1); // Changed Files: everything expanded
+        panel.setScopeIndex(1); // Changed Files: everything expanded
         QTRY_COMPARE(shown(), QStringList({QFileInfo(root).fileName(), "src", "deep", "changed.cpp"}));
         QVERIFY(!tree->select(root + "/src/same.cpp"));
-        panel.scopeBox()->setCurrentIndex(2);
+        panel.setScopeIndex(2);
         QTRY_COMPARE(shown(), QStringList({QFileInfo(root).fileName(), "other", "claude.md"}));
-        panel.scopeBox()->setCurrentIndex(0); // back to the project, as it was
+        panel.setScopeIndex(0); // back to the project, as it was
         QTRY_VERIFY(shown().contains("same.cpp"));
         QCOMPARE(tree->expandedPaths(), QStringList({root, root + "/src"}));
     }

@@ -25,6 +25,8 @@ add_library(duet_core STATIC
     editor/EditorWidget.cpp
     editor/FileWatcher.cpp
     editor/FindBar.cpp
+    editor/MarkdownHtml.cpp
+    editor/MarkdownView.cpp
     editor/TextFile.cpp
     git/Branches.cpp
     git/CommitLog.cpp
@@ -83,6 +85,7 @@ add_library(duet_core STATIC
     toolchains/ToolCatalog.cpp
     toolchains/Toolchains.cpp
     ui/AppFonts.cpp
+    ui/BrandMark.cpp
     ui/GripSplitter.cpp
     ui/NoticeBar.cpp
     ui/OverlayPopup.cpp
@@ -96,8 +99,6 @@ add_library(duet_core STATIC
     ui/UiIcons.cpp
     ui/WindowFrame.cpp
     viewers/ImageView.cpp
-    viewers/MarkdownHtml.cpp
-    viewers/MarkdownView.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
     welcome/ProjectSetupPanel.cpp
@@ -169,6 +170,10 @@ else()
 endif()
 
 qt_add_executable(duet WIN32 MACOSX_BUNDLE app/main.cpp app/MainWindow.cpp)
+# The executable's icon on Windows (Explorer, taskbar).
+if(WIN32)
+    target_sources(duet PRIVATE ${PROJECT_SOURCE_DIR}/packaging/windows/duet.rc)
+endif()
 target_link_libraries(duet PRIVATE duet_core)
 target_compile_definitions(duet PRIVATE DUET_VERSION="${PROJECT_VERSION}")
 set_target_properties(duet PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

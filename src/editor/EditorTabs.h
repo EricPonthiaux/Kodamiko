@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CodeFormatter.h"
 #include "EditorWidget.h"
 #include "FileWatcher.h"
 #include "ui/Theme.h"
@@ -7,6 +8,8 @@
 #include <QHash>
 #include <QSet>
 #include <QTabWidget>
+
+#include <optional>
 
 class DiagramView;
 class ImageView;
@@ -49,12 +52,15 @@ public:
     const EditorOptions &editorOptions() const { return editorOptions_; }
 
     // Formats the current editor with its language's formatter (see
-    // CodeFormatter); the result is reported by statusMessage.
+    // CodeFormatter), without blocking; the result is reported by
+    // statusMessage.
     void formatCurrent();
     // Formats each text file before saving it.
     void setFormatOnSave(bool enabled) { formatOnSave_ = enabled; }
     bool formatOnSave() const { return formatOnSave_; }
 
+    // With format on save, a file is written once its formatter has
+    // finished: true then only means the save has started.
     bool saveCurrent();
     bool saveAll();
     void closeCurrent();
@@ -101,10 +107,19 @@ private:
     // Closes the given pages, stopping if the user cancels.
     bool closeTabs(const QList<QWidget *> &pages);
     void showTabContextMenu(const QPoint &pos);
+    // Saves now, formatting first (blocking) with format on save: for the
+    // "Save changes?" question, which needs the outcome.
     bool saveEditor(EditorWidget *editor);
+    // Saves soon: formats first, off the UI thread, with format on save.
+    bool startSaving(EditorWidget *editor);
+    bool writeEditor(EditorWidget *editor);
     // `quiet`: no message when the file has no installed formatter or is
-    // already formatted (format on save).
-    void formatEditor(EditorWidget *editor, bool quiet);
+    // already formatted (format on save). `saveAfter`: writes the file
+    // once formatted, whatever the outcome.
+    void formatEditor(EditorWidget *editor, bool quiet, bool saveAfter = false);
+    std::optional<CodeFormatter::Command> formatterFor(EditorWidget *editor, bool quiet);
+    void applyFormatted(EditorWidget *editor, const std::optional<QString> &formatted, const QString &error,
+                        bool quiet);
     void updateTabTitle(EditorWidget *editor);
     void updateTabIcon(QWidget *page);
     QList<EditorWidget *> editors() const;
@@ -113,5 +128,7 @@ private:
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer
     bool formatOnSave_ = false;
+    // Editors whose formatter is running, and whether to save them after.
+    QHash<EditorWidget *, bool> formatting_;
     EditorOptions editorOptions_;
 };

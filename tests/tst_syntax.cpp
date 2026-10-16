@@ -208,7 +208,7 @@ private slots:
         editor.setSelection(4, 0, 5, 0); // "return 2;": the else block has nothing left to hide
         editor.removeSelectedText();
         editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
-        QVERIFY(!isHeader(3));
+        QTRY_VERIFY(!isHeader(3)); // once typing pauses
         QCOMPARE(depth(4), 1);
         QVERIFY(isHeader(6)); // the comment, one line up
     }

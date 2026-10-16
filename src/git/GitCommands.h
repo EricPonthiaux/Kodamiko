@@ -23,6 +23,10 @@ public:
     // `title` describes the operation ("Commit", "Staging"…). `onSuccess`
     // runs on the UI thread if the operation succeeds.
     void run(const QString &title, Job job, std::function<void()> onSuccess = {});
+    // Same queue, for background work the user did not ask for: no busy
+    // state, no succeeded()/failed(). `done` runs on the UI thread with the
+    // job's message, or its error (empty on success).
+    void runQuietly(Job job, std::function<void(const QString &message, const QString &error)> done);
     bool isBusy() const { return pending_ > 0; }
 
 signals:
@@ -31,6 +35,8 @@ signals:
     void failed(const QString &title, const QString &error);
 
 private:
+    void start(Job job, std::function<void(const QString &message, const QString &error)> done);
+
     QThreadPool pool_;
     int pending_ = 0;
 };

@@ -8,7 +8,7 @@ target_include_directories(tree_sitter
 target_compile_definitions(tree_sitter PRIVATE _POSIX_C_SOURCE=200112L _DEFAULT_SOURCE)
 # Set explicitly: libgit2 puts CMAKE_C_STANDARD=90 in the cache, which
 # would otherwise apply to every C target of the project.
-set_target_properties(tree_sitter PROPERTIES C_STANDARD 11)
+set_target_properties(tree_sitter PROPERTIES C_STANDARD 11 AUTOMOC OFF)
 
 # A grammar = parser.c (+ optional scanner.c) in a src/ folder.
 function(add_tree_sitter_grammar target grammar_src_dir)
@@ -18,7 +18,7 @@ function(add_tree_sitter_grammar target grammar_src_dir)
     endif()
     add_library(${target} STATIC ${sources})
     target_include_directories(${target} PRIVATE ${grammar_src_dir})
-    set_target_properties(${target} PROPERTIES C_STANDARD 11)
+    set_target_properties(${target} PROPERTIES C_STANDARD 11 AUTOMOC OFF)
     if(MSVC)
         target_compile_options(${target} PRIVATE /w)
     else()

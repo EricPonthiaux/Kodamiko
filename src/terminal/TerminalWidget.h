@@ -6,7 +6,11 @@
 #include <QClipboard>
 #include <QFont>
 
+#include <array>
 #include <memory>
+#include <vector>
+
+#include <vterm.h>
 
 class IPty;
 class VtScreen;
@@ -68,8 +72,10 @@ private:
     void updateScrollBar();
     void scrollToBottom();
 
+    void paintRow(QPainter &painter, int row);
     void paintCell(QPainter &painter, const TerminalCell &cell, int x, int y, bool selected) const;
     void paintCursor(QPainter &painter) const;
+    const QFont &fontFor(bool bold, bool italic, bool underline, bool strike) const;
 
     // Position (column, content row) under a widget point; content rows are
     // negative in the history.
@@ -84,9 +90,10 @@ private:
     QString errorString_;
     bool running_ = false;
 
-    QFont font_;
-    QFont boldFont_;
-    QFont italicFont_;
+    // Every combination of bold, italic, underline and strike-out, with a
+    // letter spacing that puts each character on the cell grid, so a run
+    // of cells is drawn in one call (see fontFor()).
+    std::array<QFont, 16> fonts_;
     QSize cellSize_{8, 16};
     int ascent_ = 12;
     QColor foreground_;
@@ -96,4 +103,10 @@ private:
     bool selecting_ = false;
     QPoint selectionAnchor_{-1, 0};
     QPoint selectionEnd_{-1, 0};
+
+    // Reused by paintRow() to avoid allocating on every paint.
+    std::vector<VTermScreenCell> rowCells_;
+    std::vector<QRgb> rowForegrounds_;
+    std::vector<QRgb> rowBackgrounds_;
+    QString runText_;
 };

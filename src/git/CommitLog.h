@@ -20,6 +20,8 @@ struct CommitSummary {
     // Branches and tags pointing to this commit ("main", "origin/main",
     // "v1.0"), with HEAD first if it points to it.
     QStringList refs;
+
+    bool operator==(const CommitSummary &) const = default;
 };
 
 // Commits of HEAD, newest first. If the open folder is a subfolder of the
@@ -29,6 +31,8 @@ struct CommitLog {
     RepositoryInfo info;
     QList<CommitSummary> commits;
     bool truncated = false; // more than `limit` commits: the rest is not read
+
+    bool operator==(const CommitLog &) const = default;
 
     // Returns nullopt outside a git repository. Throws GitError on failure.
     static std::optional<CommitLog> read(const QString &folder, int limit = 2000, const QString &path = {});

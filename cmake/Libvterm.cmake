@@ -9,7 +9,7 @@ target_include_directories(vterm
     PUBLIC  ${libvterm_SOURCE_DIR}/include
     PRIVATE ${libvterm_SOURCE_DIR}/src
             ${CMAKE_CURRENT_LIST_DIR}/libvterm)
-set_target_properties(vterm PROPERTIES C_STANDARD 99)
+set_target_properties(vterm PROPERTIES C_STANDARD 99 AUTOMOC OFF)
 if(MSVC)
     target_compile_options(vterm PRIVATE /w)
 else()

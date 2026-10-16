@@ -70,6 +70,10 @@ EditorWidget::~EditorWidget()
 void EditorWidget::configureEditing()
 {
     setUtf8(true);
+    // Keeps the layout of every visible line (not only the caret's):
+    // repainting while typing or scrolling, wrapped lines especially, does
+    // not lay the text out again.
+    SendScintilla(SCI_SETLAYOUTCACHE, SC_CACHE_PAGE);
     setMarginType(0, QsciScintilla::NumberMargin);
     setMarginLineNumbers(0, true);
     setMarginWidth(1, 0);
@@ -139,6 +143,7 @@ void EditorWidget::foldBlock(bool fold)
 {
     if (!options_.codeFolding)
         return;
+    highlighter_->flush();
     int line = 0;
     int index = 0;
     getCursorPosition(&line, &index);
@@ -162,6 +167,7 @@ void EditorWidget::foldBlock(bool fold)
 
 void EditorWidget::foldEverything(bool fold)
 {
+    highlighter_->flush();
     SendScintilla(SCI_FOLDALL, fold ? SC_FOLDACTION_CONTRACT : SC_FOLDACTION_EXPAND);
     moveCursorOutOfFolds();
 }
@@ -263,6 +269,22 @@ bool EditorWidget::reloadFromDisk(QString *error)
     setCursorPosition(std::min(line, lines() - 1), index);
     setFirstVisibleLine(topLine);
     return true;
+}
+
+QByteArrayView EditorWidget::utf8Bytes() const
+{
+    const auto length = static_cast<qsizetype>(SendScintilla(SCI_GETLENGTH));
+    return {static_cast<const char *>(SendScintillaPtrResult(SCI_GETCHARACTERPOINTER)), length};
+}
+
+QByteArray EditorWidget::utf8Range(int start, int end) const
+{
+    if (end <= start)
+        return {};
+    QByteArray bytes(end - start + 1, Qt::Uninitialized); // SCI_GETTEXTRANGE adds a NUL
+    SendScintilla(SCI_GETTEXTRANGE, static_cast<long>(start), static_cast<long>(end), bytes.data());
+    bytes.chop(1);
+    return bytes;
 }
 
 bool EditorWidget::matchesDisk() const

@@ -111,6 +111,10 @@ TitleBar QMenuBar { background: transparent; border: none; }
 QToolButton#chip { padding: 4px 9px; border-radius: 6px; }
 QToolButton#chip:hover { background: @button; }
 QToolButton#chip::menu-indicator { image: none; width: 0; }
+QFrame#viewHeader { border: none; border-bottom: 1px solid @line; }
+QToolButton#viewSelector { padding: 4px 6px; border-radius: 6px; }
+QToolButton#viewSelector:hover, QToolButton#viewSelector:pressed { background: @button; }
+QToolButton#viewSelector::menu-indicator { image: none; width: 0; }
 QStatusBar::item { border: none; }
 QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }
 QScrollBar:horizontal { background: transparent; height: 10px; margin: 0; }

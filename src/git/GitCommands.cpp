@@ -17,7 +17,28 @@ void GitCommands::run(const QString &title, Job job, std::function<void()> onSuc
 {
     if (pending_++ == 0)
         emit busyChanged(true);
-    pool_.start([this, title, job = std::move(job), onSuccess = std::move(onSuccess)] {
+    start(std::move(job), [this, title, onSuccess = std::move(onSuccess)](const QString &message,
+                                                                          const QString &error) {
+        if (error.isEmpty()) {
+            if (onSuccess)
+                onSuccess();
+            emit succeeded(title, message);
+        } else {
+            emit failed(title, error);
+        }
+        if (--pending_ == 0)
+            emit busyChanged(false);
+    });
+}
+
+void GitCommands::runQuietly(Job job, std::function<void(const QString &message, const QString &error)> done)
+{
+    start(std::move(job), std::move(done));
+}
+
+void GitCommands::start(Job job, std::function<void(const QString &message, const QString &error)> done)
+{
+    pool_.start([this, job = std::move(job), done = std::move(done)] {
         QString message;
         QString error;
         try {
@@ -28,18 +49,6 @@ void GitCommands::run(const QString &title, Job job, std::function<void()> onSuc
         // The result is handed back to the UI thread; it is lost if the
         // object was destroyed in the meantime.
         QMetaObject::invokeMethod(
-            this,
-            [this, title, message, error, onSuccess] {
-                if (error.isEmpty()) {
-                    if (onSuccess)
-                        onSuccess();
-                    emit succeeded(title, message);
-                } else {
-                    emit failed(title, error);
-                }
-                if (--pending_ == 0)
-                    emit busyChanged(false);
-            },
-            Qt::QueuedConnection);
+            this, [message, error, done] { done(message, error); }, Qt::QueuedConnection);
     });
 }

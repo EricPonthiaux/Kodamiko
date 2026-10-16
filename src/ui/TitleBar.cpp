@@ -1,5 +1,7 @@
 #include "TitleBar.h"
 
+#include "BrandMark.h"
+
 #include "UiIcons.h"
 
 #include <QAction>
@@ -96,6 +98,30 @@ void WindowButton::paintEvent(QPaintEvent *)
     }
 }
 
+namespace {
+
+// Duet's icon at the bar's start, drawn at the screen's resolution. Clicks
+// go through: dragging it moves the window, like the bar.
+class BrandLogo : public QWidget {
+public:
+    explicit BrandLogo(QWidget *parent)
+        : QWidget(parent)
+    {
+        setFixedSize(20, 20);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setToolTip(QStringLiteral("Duet"));
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        BrandMark::paintAppIcon(&painter, rect());
+    }
+};
+
+} // namespace
+
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
     , theme_(Theme::dark())
@@ -115,6 +141,9 @@ TitleBar::TitleBar(QWidget *parent)
     layout_->setContentsMargins(6, 0, 0, 0);
     layout_->setSpacing(4);
     layout_->addWidget(leadingSpace_);
+    layout_->addSpacing(4);
+    layout_->addWidget(new BrandLogo(this), 0, Qt::AlignVCenter);
+    layout_->addSpacing(2);
     layout_->addWidget(menuBar_, 0, Qt::AlignVCenter);
     layout_->addSpacing(8);
     project_ = addChip();

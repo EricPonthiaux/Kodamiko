@@ -1,6 +1,8 @@
 #include "MainWindow.h"
+#include "git/LibGit2.h"
 #include "projects/ProjectConfig.h"
 #include "ui/AppFonts.h"
+#include "ui/BrandMark.h"
 #include "welcome/WelcomeWindow.h"
 
 #include <QApplication>
@@ -126,6 +128,10 @@ int main(int argc, char *argv[])
     // Required by Qt WebEngine (Markdown preview), before the application exists.
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QApplication app(argc, argv);
+    // libgit2 stays initialized for the whole run: each read (change marks
+    // while typing, file statuses) would otherwise set up and tear down its
+    // global state.
+    const libgit2::Session git;
     QApplication::setApplicationName(QStringLiteral("Duet"));
     QApplication::setOrganizationName(QStringLiteral("Duet"));
     QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
@@ -135,6 +141,9 @@ int main(int argc, char *argv[])
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
     // Inter for the whole interface (embedded); the size stays the system one.
     QApplication::setFont(AppFonts::interfaceFont());
+    // Every window's icon; on Wayland, the desktop file's icon.
+    QApplication::setWindowIcon(BrandMark::windowIcon());
+    QGuiApplication::setDesktopFileName(QStringLiteral("duet"));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Source code editor with an integrated Claude terminal"));

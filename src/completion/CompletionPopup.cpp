@@ -194,34 +194,53 @@ void CompletionPopup::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     view_->setFont(theme.font); // the editor's
-    setStyleSheet(QStringLiteral("QFrame#completionPopup { background: %1; border: 1px solid %2; border-radius: 8px; }"
-                                 "QListView { background: transparent; border: none; outline: 0; }")
-                      .arg(theme.alternateBase.name(), theme.border.name()));
+    // Called each time the popup shows: a style sheet is only set when it
+    // changes, setting one restyles the whole popup.
+    const QString sheet =
+        QStringLiteral("QFrame#completionPopup { background: %1; border: 1px solid %2; border-radius: 8px; }"
+                       "QListView { background: transparent; border: none; outline: 0; }")
+            .arg(theme.alternateBase.name(), theme.border.name());
+    if (sheet != styleSheet())
+        setStyleSheet(sheet);
     view_->viewport()->update();
 }
 
 int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString &prefix)
 {
-    std::vector<Entry> entries;
-    for (const CompletionItem &item : items) {
+    // Candidates are scored by index; only the kept ones are copied (an
+    // item carries strings, edits and callbacks).
+    struct Scored {
+        int index;
+        int score;
+        FuzzyMatch::Match match;
+    };
+    std::vector<Scored> scored;
+    for (int i = 0; i < items.size(); ++i) {
+        const CompletionItem &item = items[i];
         // The word already typed in full is no suggestion.
         if (item.kind == CompletionItem::Kind::Text && item.label == prefix)
             continue;
         if (std::optional<FuzzyMatch::Match> match = FuzzyMatch::match(prefix, item.label))
-            entries.push_back({item, *match});
+            scored.push_back({i, match->score + item.priority, std::move(*match)});
     }
-    std::stable_sort(entries.begin(), entries.end(), [](const Entry &a, const Entry &b) {
-        const int scoreA = a.match.score + a.item.priority;
-        const int scoreB = b.match.score + b.item.priority;
-        if (scoreA != scoreB)
-            return scoreA > scoreB;
-        if (a.item.order != b.item.order)
-            return a.item.order < b.item.order;
-        return a.item.label.size() < b.item.label.size();
-    });
-    constexpr size_t kept = 200; // nobody scrolls further
-    if (entries.size() > kept)
-        entries.resize(kept);
+    const auto before = [&items](const Scored &a, const Scored &b) {
+        if (a.score != b.score)
+            return a.score > b.score;
+        const CompletionItem &first = items[a.index];
+        const CompletionItem &second = items[b.index];
+        if (first.order != second.order)
+            return first.order < second.order;
+        if (first.label.size() != second.label.size())
+            return first.label.size() < second.label.size();
+        return a.index < b.index; // stable
+    };
+    constexpr size_t maxKept = 200; // nobody scrolls further
+    const size_t kept = std::min(scored.size(), maxKept);
+    std::partial_sort(scored.begin(), scored.begin() + static_cast<std::ptrdiff_t>(kept), scored.end(), before);
+    std::vector<Entry> entries;
+    entries.reserve(kept);
+    for (size_t i = 0; i < kept; ++i)
+        entries.push_back({items[scored[i].index], std::move(scored[i].match)});
     model_->reset(std::move(entries));
     if (model_->rowCount() > 0)
         setCurrentRow(0);

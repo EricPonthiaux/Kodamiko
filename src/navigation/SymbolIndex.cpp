@@ -75,6 +75,7 @@ void SymbolIndex::setFolder(const QString &folder)
     folder_ = folder;
     files_.clear();
     ++generation_;
+    ++revision_;
     refresh();
 }
 
@@ -102,6 +103,7 @@ void SymbolIndex::apply(int generation, const ScanResult &result)
 {
     running_ = false;
     if (generation == generation_) {
+        const qsizetype before = files_.size();
         for (auto it = files_.begin(); it != files_.end();) {
             if (result.present.contains(it.key()))
                 ++it;
@@ -110,6 +112,8 @@ void SymbolIndex::apply(int generation, const ScanResult &result)
         }
         for (auto it = result.updated.cbegin(); it != result.updated.cend(); ++it)
             files_.insert(it.key(), it.value());
+        if (files_.size() != before || !result.updated.isEmpty())
+            ++revision_;
     }
     if (std::exchange(refreshPending_, false) || generation != generation_)
         refresh();
@@ -150,6 +154,7 @@ void SymbolIndex::updateFile(const QString &path, const QByteArray &text)
         return;
     // Null date: the next indexing will reread the saved file.
     files_.insert(path, {QDateTime(), flatten(provider->second->symbols(text), path, languageId)});
+    ++revision_;
 }
 
 QList<SymbolLocation> SymbolIndex::lookup(const QString &name) const

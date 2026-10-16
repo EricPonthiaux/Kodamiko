@@ -120,6 +120,9 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
+    void scrollContentsBy(int dx, int dy) override;
+    void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
@@ -139,6 +142,13 @@ private:
     QString speedSearch_;
     QColor searchHighlight_{229, 192, 123};
     QLabel *speedSearchLabel_;
+    // Folders pinned at the top while their contents scroll (sticky
+    // scroll), outermost first; set at each paint.
+    QList<QPersistentModelIndex> stickyRows_;
+    QList<QPersistentModelIndex> computeStickyRows() const;
+    int stickyRowHeight() const;
+    // A fine line under each folder holding `index`, in its branches' `rect`.
+    void drawIndentGuides(QPainter *painter, const QRect &rect, const QModelIndex &index) const;
 
     void collectExpanded(const QModelIndex &parent, QStringList *paths) const;
     void expandPending();

@@ -66,4 +66,7 @@ private:
     // longer prefix asks again.
     bool incomplete_ = false;
     QString requestedPrefix_;
+    // The popup shows items_ filtered with listedPrefix_, unless stale.
+    bool listStale_ = true;
+    QString listedPrefix_;
 };

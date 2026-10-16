@@ -32,6 +32,12 @@
 namespace {
 
 constexpr int pathRole = Qt::UserRole + 100;
+// The git state of a file as one letter (M, A, U...), shown at the row's end.
+constexpr int statusLetterRole = Qt::UserRole + 101;
+// At most this many folders stay pinned at the top, and in at most this
+// share of the height (as VS Code).
+constexpr int maximumStickyRows = 7;
+constexpr qreal maximumStickyShare = 0.4;
 // Clipboard marker of files cut in the tree: pasting them moves them.
 const QString cutFormat = QStringLiteral("application/x-duet-cut");
 
@@ -58,6 +64,20 @@ QString statusName(FileStatus status)
     case FileStatus::Untracked: return FileTreeView::tr("not tracked by git");
     case FileStatus::Conflicted: return FileTreeView::tr("in conflict");
     case FileStatus::Ignored: return FileTreeView::tr("ignored by git");
+    }
+    return {};
+}
+
+// VS Code's letters for the git states.
+QString statusLetter(FileStatus status)
+{
+    switch (status) {
+    case FileStatus::Modified: return QStringLiteral("M");
+    case FileStatus::Renamed: return QStringLiteral("R");
+    case FileStatus::Added: return QStringLiteral("A");
+    case FileStatus::Untracked: return QStringLiteral("U");
+    case FileStatus::Conflicted: return QStringLiteral("C");
+    case FileStatus::Ignored: return {};
     }
     return {};
 }
@@ -137,7 +157,7 @@ public:
     QVariant data(const QModelIndex &index, int role) const override
     {
         if (index.column() != 0 || (role != Qt::ForegroundRole && role != Qt::DecorationRole && role != Qt::ToolTipRole
-                                    && role != pathRole))
+                                    && role != pathRole && role != statusLetterRole))
             return QSortFilterProxyModel::data(index, role);
         const auto *model = static_cast<ProjectTreeModel *>(sourceModel());
         const QModelIndex source = mapToSource(index);
@@ -145,6 +165,8 @@ public:
         if (role == pathRole)
             return path;
         const std::optional<FileStatus> status = statusOf(path, model->isDir(source));
+        if (role == statusLetterRole) // files only: a folder's color says enough
+            return status && !model->isDir(source) ? statusLetter(*status) : QString();
         switch (role) {
         case Qt::ForegroundRole:
             if (!cut_.isEmpty() && FileOperations::isInside(path, cut_))
@@ -239,7 +261,10 @@ public:
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         QStyledItemDelegate::paint(painter, option, index);
-        if (view_->speedSearch_.isEmpty() || index.column() != 0)
+        if (index.column() != 0)
+            return;
+        paintStatusLetter(painter, option, index);
+        if (view_->speedSearch_.isEmpty())
             return;
         const QString name = index.data(Qt::DisplayRole).toString();
         const QList<qsizetype> positions = matchedPositions(name, view_->speedSearch_);
@@ -267,6 +292,33 @@ public:
     }
 
 private:
+    // The git letter at the right of the visible part of the row, in the
+    // state's color, if the name leaves room for it.
+    void paintStatusLetter(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+    {
+        const QString letter = index.data(statusLetterRole).toString();
+        if (letter.isEmpty())
+            return;
+        QStyleOptionViewItem item = option;
+        initStyleOption(&item, index);
+        const QStyle *style = item.widget ? item.widget->style() : QApplication::style();
+        const QRect text = style->subElementRect(QStyle::SE_ItemViewItemText, &item, item.widget);
+        const QFontMetrics metrics(item.font);
+        const int nameEnd = text.left() + metrics.horizontalAdvance(item.text) + 8;
+        // The column is as wide as the names: the letter goes at the view's edge.
+        const int right = view_->viewport()->width() - 10;
+        const int width = metrics.horizontalAdvance(letter);
+        if (right - width < nameEnd)
+            return;
+        const bool selected = (option.state & QStyle::State_Selected) && (option.state & QStyle::State_Active);
+        painter->save();
+        painter->setFont(item.font);
+        painter->setPen(selected ? QColor(Qt::white) : index.data(Qt::ForegroundRole).value<QColor>());
+        painter->drawText(QRect(right - width, option.rect.top(), width, option.rect.height()),
+                          Qt::AlignRight | Qt::AlignVCenter, letter);
+        painter->restore();
+    }
+
     FileTreeView *view_;
 };
 
@@ -963,7 +1015,137 @@ void FileTreeView::focusOutEvent(QFocusEvent *event)
 void FileTreeView::mousePressEvent(QMouseEvent *event)
 {
     setSpeedSearch({});
+    // A pinned folder: back to it.
+    const int rowHeight = stickyRowHeight();
+    const int row = rowHeight > 0 ? event->position().toPoint().y() / rowHeight : -1;
+    if (row >= 0 && row < stickyRows_.size() && event->button() == Qt::LeftButton) {
+        const QModelIndex folder = stickyRows_.at(row);
+        if (folder.isValid()) {
+            scrollTo(folder, QAbstractItemView::PositionAtTop);
+            setCurrentIndex(folder);
+        }
+        return;
+    }
     QTreeView::mousePressEvent(event);
+}
+
+int FileTreeView::stickyRowHeight() const
+{
+    return rowHeight(model()->index(0, 0, rootIndex()));
+}
+
+QList<QPersistentModelIndex> FileTreeView::computeStickyRows() const
+{
+    // As VS Code: the expanded folders whose rows went above the top while
+    // their contents are still in view, outermost first. The working folder
+    // is left out: it holds everything.
+    QList<QPersistentModelIndex> rows;
+    const int height = stickyRowHeight();
+    if (height <= 0)
+        return rows;
+    const int limit = std::min(maximumStickyRows, int(viewport()->height() * maximumStickyShare / height));
+    const QModelIndex workingFolder = model()->index(0, 0, rootIndex());
+    while (rows.size() < limit) {
+        // The first row below the pinned ones, and the folders around it.
+        const QModelIndex below = indexAt(QPoint(1, int(rows.size()) * height + 1));
+        if (!below.isValid())
+            break;
+        QList<QModelIndex> chain;
+        for (QModelIndex folder = below.parent(); folder.isValid() && folder != workingFolder && folder != rootIndex();
+             folder = folder.parent())
+            chain.prepend(folder);
+        // A folder whose own row is cut by the top is pinned too.
+        if (below != workingFolder && isExpanded(below) && model()->hasChildren(below)
+            && visualRect(below).top() < int(rows.size()) * height)
+            chain.append(below);
+        if (chain.size() <= rows.size())
+            break;
+        rows.append(chain.at(rows.size()));
+    }
+    return rows;
+}
+
+void FileTreeView::paintEvent(QPaintEvent *event)
+{
+    QTreeView::paintEvent(event);
+    stickyRows_ = computeStickyRows();
+    if (stickyRows_.isEmpty())
+        return;
+    const int height = stickyRowHeight();
+    QPainter painter(viewport());
+    const QColor background = palette().color(QPalette::Base);
+    QStyleOptionViewItem option;
+    initViewItemOption(&option);
+    for (int i = 0; i < stickyRows_.size(); ++i) {
+        const QModelIndex folder = stickyRows_.at(i);
+        const QRect row(0, i * height, viewport()->width(), height);
+        painter.fillRect(row, background);
+        const QRect item = visualRect(folder);
+        // Its guides and open arrow, then its icon and name, where they would
+        // be. (QTreeView::drawBranches only draws the row being painted.)
+        const QRect branches(0, row.top(), item.left(), height);
+        drawIndentGuides(&painter, branches, folder);
+        // As QTreeView builds it for a branch.
+        QStyleOptionViewItem arrow;
+        initViewItemOption(&arrow);
+        arrow.rect = QRect(item.left() - indentation(), row.top(), indentation(), height);
+        arrow.state = QStyle::State_Enabled | QStyle::State_Item | QStyle::State_Children | QStyle::State_Open;
+        style()->drawPrimitive(QStyle::PE_IndicatorBranch, &arrow, &painter, this);
+        option.rect = QRect(item.left(), row.top(), std::max(item.width(), row.width() - item.left()), height);
+        option.state = QStyle::State_Enabled | (hasFocus() ? QStyle::State_Active : QStyle::State_None);
+        option.index = folder;
+        itemDelegate(folder)->paint(&painter, option, folder);
+    }
+    // A hairline under the pinned rows, as faint as the indent guides.
+    const int bottom = int(stickyRows_.size()) * height;
+    QColor line = palette().color(QPalette::Text);
+    line.setAlpha(isDarkPalette(palette()) ? 45 : 50);
+    painter.fillRect(QRect(0, bottom - 1, viewport()->width(), 1), line);
+}
+
+void FileTreeView::scrollContentsBy(int dx, int dy)
+{
+    QTreeView::scrollContentsBy(dx, dy);
+    // The pinned rows are drawn over the contents: scrolling would move them.
+    if (dy != 0)
+        viewport()->update();
+}
+
+void FileTreeView::drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const
+{
+    QTreeView::drawBranches(painter, rect, index);
+    drawIndentGuides(painter, rect, index);
+}
+
+void FileTreeView::drawIndentGuides(QPainter *painter, const QRect &rect, const QModelIndex &index) const
+{
+    // Indent guides: a fine line under each folder that holds this row,
+    // brighter for the folder of the current item.
+    const int indent = indentation();
+    if (indent <= 0)
+        return;
+    QList<QModelIndex> folders;
+    for (QModelIndex folder = index.parent(); folder.isValid() && folder != rootIndex(); folder = folder.parent())
+        folders.prepend(folder);
+    if (folders.isEmpty())
+        return;
+    const QModelIndex current = currentIndex();
+    const QModelIndex active = current.isValid() ? (isExpanded(current) ? current : current.parent()) : QModelIndex();
+    QColor line = palette().color(QPalette::Text);
+    line.setAlpha(isDarkPalette(palette()) ? 38 : 45);
+    QColor strong = line;
+    strong.setAlpha(line.alpha() * 3);
+    painter->save();
+    // The branches' rect ends where the row's item starts: one indentation
+    // per level, the deepest at its right.
+    const int itemLeft = rect.right() + 1;
+    const int depth = int(folders.size());
+    for (int level = 0; level < depth; ++level) {
+        const int x = itemLeft - (depth - level + 1) * indent + indent / 2;
+        painter->setPen(QPen(folders.at(level) == active ? strong : line, 1));
+        painter->drawLine(QPointF(x + 0.5, rect.top()), QPointF(x + 0.5, rect.bottom() + 1));
+    }
+    painter->restore();
 }
 
 QStringList FileTreeView::localPaths(const QMimeData *data)

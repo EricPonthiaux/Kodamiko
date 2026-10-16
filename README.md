@@ -287,8 +287,8 @@ soon as you click in a file.
 src/
   app/        main window, wiring of the modules
   ui/         shared UI foundation: theme, fonts, icons, window frame, popups, splitters
-  editor/     QScintilla editor, tabs, file reading/writing, disk watching, find bar, change marks
-  viewers/    non-text tabs: Markdown preview, images, diagrams
+  editor/     QScintilla editor, tabs, file reading/writing, disk watching, find bar, change marks, Markdown preview
+  viewers/    non-text tabs: images, diagrams
   completion/ code completion: popup, fuzzy matching, snippets, local and LSP providers
   lsp/        language server client and server management
   syntax/     highlighting: tree-sitter (highlights.scm queries), QScintilla lexers

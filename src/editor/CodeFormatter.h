@@ -2,9 +2,11 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QObject>
 #include <QString>
 #include <QStringList>
 
+#include <functional>
 #include <optional>
 
 // Formatting a file's text with the external formatter of its language
@@ -35,6 +37,12 @@ QString describeCandidates(const QString &languageId, const QString &filePath);
 // Runs `command` in `workDir` with `text` as its input. Returns the
 // formatted text, or nullopt with the formatter's error message.
 std::optional<QString> run(const Command &command, const QString &workDir, const QString &text, QString *error);
+
+// Same as run(), without blocking: `done` is called later, on `context`'s
+// thread, with the formatted text, or nullopt and the error message. It is
+// not called if `context` is destroyed first.
+using Done = std::function<void(const std::optional<QString> &formatted, const QString &error)>;
+void start(const Command &command, const QString &workDir, const QString &text, QObject *context, Done done);
 
 // Where `position` (an offset in `before`) ends up in `after`: at the same
 // number of non-blank characters from the start. Formatters mostly move
