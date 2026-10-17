@@ -2,19 +2,34 @@
 
 #include "Completion.h"
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
 
+#include <optional>
+
 class CompletionPopup;
 class CompletionService;
 class EditorWidget;
+class SnippetSession;
 
-// Completion in one editor: opens the popup on Ctrl+Space, while typing an
-// identifier (when EditorOptions::autoCompletion is on) and after a trigger
-// character ("."), filters it as the user types, and inserts the chosen
-// candidate. While the popup is open, Up/Down/Page Up/Page Down move in
-// it, Enter inserts, Tab replaces the whole identifier, Escape closes.
+// Completion in one editor: opens the popup on Ctrl+Space, and while typing
+// an identifier or after a trigger character (".") as
+// EditorOptions::autoCompletion says, filters it as the user types, and
+// inserts the chosen candidate. While the popup is open, Up/Down/Page
+// Up/Page Down move in it, Enter inserts (unless
+// EditorOptions::completionAcceptsEnter is off), Tab replaces the whole
+// identifier, Ctrl+Right inserts the next word of the candidate,
+// Ctrl+Space shows or hides its documentation, Escape closes.
+//
+// A candidate that is a snippet (a call's arguments, a template) leaves
+// its placeholders to fill in: Tab goes to the next one (see
+// SnippetSession).
+//
+// The selected candidate's rest shows in gray after the cursor, at the end
+// of a line. The candidates the user chose before rank higher, those
+// erased right after being inserted lower (see CompletionHistory).
 class CompletionController : public QObject {
     Q_OBJECT
 
@@ -25,7 +40,8 @@ public:
     // The controller of `editor`, nullptr if it has none.
     static CompletionController *of(const EditorWidget *editor);
 
-    // Ctrl+Space: opens the popup even with nothing typed.
+    // Ctrl+Space: opens the popup even with nothing typed; when it is
+    // open, shows or hides the documentation.
     void complete();
     bool isActive() const;
     CompletionPopup *popup() const;
@@ -33,6 +49,13 @@ public:
     // Inserts the selected candidate; `replaceWord` also replaces the rest
     // of the identifier after the cursor (Tab).
     void accept(bool replaceWord = false);
+    // Inserts the selected candidate up to the end of its next word
+    // ("getSelected" of "getSelectedValue" after "get").
+    void acceptNextWord();
+    // The gray rest of the selected candidate, empty when hidden. For tests.
+    QString previewText() const;
+    // The placeholders of the snippet last inserted.
+    SnippetSession *snippet() const { return snippet_; }
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -42,6 +65,11 @@ private:
     void onCharacterAdded(int character);
     void refilter();
     void showPopup();
+    // Ranks the candidates by the user's past choices.
+    void applyHistory(QList<CompletionItem> &items) const;
+    void onCurrentChanged();
+    void updatePreview();
+    void onModified(int position, int modificationType, int length);
     // Start of the identifier ending at `position`, in bytes.
     int identifierStart(int position) const;
     bool insideCommentOrString(int position) const;
@@ -55,7 +83,21 @@ private:
     EditorWidget *editor_;
     CompletionService *service_;
     QPointer<CompletionPopup> popup_;
+    QWidget *preview_ = nullptr; // over the editor's viewport
+    SnippetSession *snippet_;
     QTimer autoTimer_;
+    QChar pendingTrigger_; // what autoTimer_ opens completion after
+    QString announcedLabel_; // the candidate last read to a screen reader
+
+    // A candidate just inserted: erased within a few seconds, it counts
+    // as a rejection.
+    struct Inserted {
+        QString label;
+        int start = 0;
+        int length = 0; // bytes of the label
+        QElapsedTimer age;
+    };
+    std::optional<Inserted> inserted_;
 
     // The session: from opening to closing the popup.
     bool active_ = false;

@@ -20,6 +20,7 @@ class CommandPalette;
 class CompletionService;
 class LanguageServers;
 class EditorStatus;
+class EditorWidget;
 class EditorTabs;
 class FileStatusReader;
 class FilesPanel;
@@ -138,6 +139,10 @@ private:
     // Bar above the editor when the current file's language server cannot
     // run, saying why.
     void updateServerNotice();
+    // Starts the language server of the editor's file ahead of the first
+    // completion (see LanguageServers::warmUp); of every open editor.
+    void warmUpLanguageServer(EditorWidget *editor);
+    void warmUpLanguageServers();
     // Find bar of the editor, in Edit mode only.
     void showFind(bool withReplace);
     void showGoTo(int tab);

@@ -1,5 +1,8 @@
 #include "Snippet.h"
 
+#include <QHash>
+#include <QMap>
+
 #include <climits>
 
 namespace Snippet {
@@ -27,6 +30,12 @@ public:
         } else {
             result.selectionStart = int(out_.size());
         }
+        for (auto it = stops_.cbegin(); it != stops_.cend(); ++it) {
+            if (it.key() > 0)
+                result.stops.append({it.key(), it.value()});
+        }
+        if (stops_.contains(0))
+            result.stops.append({0, stops_.value(0)});
         return result;
     }
 
@@ -62,6 +71,9 @@ private:
     void stop(int index, int start)
     {
         const int length = int(out_.size()) - start;
+        stops_[index].append({start, length});
+        if (length > 0 && !placeholders_.contains(index))
+            placeholders_.insert(index, out_.mid(start, length));
         if (index == 0) {
             if (finalStop_ < 0)
                 finalStop_ = start;
@@ -76,7 +88,10 @@ private:
     {
         ++i_; // "$"
         if (i_ < s_.size() && s_[i_].isDigit()) { // $1
-            stop(number(), int(out_.size()));
+            const int index = number();
+            const int start = int(out_.size());
+            out_ += placeholders_.value(index);
+            stop(index, start);
             return;
         }
         if (i_ < s_.size() && s_[i_] == u'{') {
@@ -102,6 +117,7 @@ private:
                     out_ += choice;
                 } else if (i_ < s_.size() && s_[i_] == u'}') { // ${1}
                     ++i_;
+                    out_ += placeholders_.value(index);
                 }
                 stop(index, start);
                 return;
@@ -135,6 +151,8 @@ private:
     int bestStart_ = 0;
     int bestLength_ = 0;
     int finalStop_ = -1;
+    QMap<int, QList<ExpandedSnippet::Range>> stops_; // by index
+    QHash<int, QString> placeholders_; // the first text of each tab stop
 };
 
 } // namespace

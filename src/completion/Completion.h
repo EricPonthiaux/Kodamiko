@@ -35,15 +35,30 @@ struct CompletionItem {
     int order = INT_MAX;
     // insertText is a snippet: "printValue(${1:int value})" (see Snippet).
     bool isSnippet = false;
+    // Where the insertion starts, in bytes of the context's text, when
+    // before the typed prefix: a postfix template replaces the expression
+    // before the dot ("items.for" → "for (auto &item : items)"). -1: the
+    // prefix's start.
+    int replaceStart = -1;
     // Applied with the candidate, elsewhere in the file (imports).
     QList<TextEdit> additionalEdits;
     // When the edits are only known once the candidate is chosen (jdtls's
     // imports): asks for them, and calls back with them.
     using EditsCallback = std::function<void(const QList<TextEdit> &edits)>;
     std::function<void(const EditsCallback &done)> resolveEdits;
+    // Shown beside the list while the candidate is selected.
+    QString documentation;
+    // When the documentation is only sent on demand (jdtls): asks for it
+    // once the candidate is selected.
+    using TextCallback = std::function<void(const QString &text)>;
+    std::function<void(const TextCallback &done)> resolveDocumentation;
 
     QString textToInsert() const { return insertText.isEmpty() ? label : insertText; }
 };
+
+// The kind in words ("method", "class"), for screen readers and the
+// documentation beside the list.
+QString kindName(CompletionItem::Kind kind);
 
 // Where completion is asked, as the providers see it.
 struct CompletionContext {

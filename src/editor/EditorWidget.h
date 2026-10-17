@@ -15,12 +15,21 @@ class ChangeGutter;
 class ISyntaxHighlighter;
 
 // Display settings shared by every editor (Preferences ▸ Editor).
+// When the completion popup opens by itself; Ctrl+Space always opens it.
+enum class AutoCompletion {
+    Off,   // only on Ctrl+Space
+    Calm,  // after a pause in typing, from the third letter of a name
+    Eager, // as soon as a name or a member access is typed
+};
+
 struct EditorOptions {
     bool codeFolding = true;
     bool wrapLines = false;
     bool showWhitespace = false;
-    // The completion popup opens while typing; Ctrl+Space always opens it.
-    bool autoCompletion = true;
+    AutoCompletion autoCompletion = AutoCompletion::Eager;
+    // Enter inserts the selected suggestion; otherwise only Tab does, and
+    // Enter always starts a new line.
+    bool completionAcceptsEnter = true;
 
     bool operator==(const EditorOptions &) const = default;
 };

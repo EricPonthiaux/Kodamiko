@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Completion.h"
+#include "CompletionHistory.h"
 
 #include <QObject>
 
@@ -21,6 +22,9 @@ public:
     ~CompletionService() override;
 
     void addProvider(std::shared_ptr<ICompletionProvider> provider);
+    // What the user chose before, to rank the candidates (see
+    // CompletionController).
+    CompletionHistory *history() { return &history_; }
 
     // Asks the providers; calls `update` with all the candidates gathered so
     // far each time one answers (right away for the local ones). A new
@@ -37,5 +41,6 @@ public:
 
 private:
     std::vector<std::shared_ptr<ICompletionProvider>> providers_;
+    CompletionHistory history_;
     int generation_ = 0;
 };

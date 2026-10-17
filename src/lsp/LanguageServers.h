@@ -7,6 +7,7 @@
 #include <QHash>
 #include <QJsonObject>
 #include <QObject>
+#include <QSet>
 #include <QStringList>
 
 #include <optional>
@@ -76,6 +77,13 @@ public:
     // Sends `text` as the content of `path` to `client`: didOpen the first
     // time, didChange when it changed since.
     void syncDocument(LspClient *client, const QString &path, const QString &languageId, const QByteArray &text);
+    // Starts the server of `languageId` before the first completion needs
+    // it, and gives it `path` to read: clangd builds the file's preamble,
+    // jdtls imports the project, tsserver loads its libraries. The first
+    // time for each server, a completion is also asked at the start of the
+    // file, its answer dropped: what the user's first one would wait for
+    // is then loaded.
+    void warmUp(const QString &path, const QString &languageId, const QByteArray &text);
 
     // How jdtls is started: its own Java command (no Python needed), with
     // `java`, a JDK of version 21 or more. nullopt, with `error`, if
@@ -127,6 +135,7 @@ private:
         size_t hash = 0;
     };
     QHash<QString, Document> documents_; // by path
+    QSet<QString> warmed_; // servers already asked a completion, by name
     mutable QHash<QString, QString> programPaths_; // lookups in the PATH
     // specFor() by language: asked at every typed character (trigger
     // characters), and it looks for programs on disk.

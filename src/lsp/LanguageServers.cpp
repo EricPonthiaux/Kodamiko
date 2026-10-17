@@ -27,14 +27,16 @@ LanguageServers::~LanguageServers()
 const QList<LanguageServerSpec> &LanguageServers::known()
 {
     static const QList<LanguageServerSpec> specs = {
-        // No header insertion: Duet does not apply the edits that come with
-        // a candidate. Parsing always: otherwise, while the file's headers
-        // are being read, clangd answers with mere words (the local
-        // providers already give those, at once).
+        // As CLion: a symbol of a header not included yet comes with its
+        // #include (header insertion), and symbols of every namespace are
+        // offered, qualified (all scopes). Parsing always: otherwise,
+        // while the file's headers are being read, clangd answers with
+        // mere words (the local providers already give those, at once).
         {QStringLiteral("clangd"),
          QStringLiteral("clangd"),
-         {QStringLiteral("--background-index"), QStringLiteral("--header-insertion=never"),
-          QStringLiteral("--pch-storage=memory"), QStringLiteral("--completion-parse=always")},
+         {QStringLiteral("--background-index"), QStringLiteral("--header-insertion=iwyu"),
+          QStringLiteral("--all-scopes-completion"), QStringLiteral("--pch-storage=memory"),
+          QStringLiteral("--completion-parse=always")},
          {QStringLiteral("c"), QStringLiteral("cpp")},
          QStringLiteral(".>:")},
         // Its workspace data goes to a cache folder (see clientFor).
@@ -169,6 +171,7 @@ void LanguageServers::stopAll()
     qDeleteAll(clients_); // each one asks its server to stop
     clients_.clear();
     documents_.clear();
+    warmed_.clear();
     failures_.clear(); // a new folder or a new setting: worth trying again
 }
 
@@ -442,4 +445,24 @@ void LanguageServers::syncDocument(LspClient *client, const QString &path, const
     client->notify(QStringLiteral("textDocument/didChange"),
                    QJsonObject{{"textDocument", QJsonObject{{"uri", uri}, {"version", version}}},
                                {"contentChanges", QJsonArray{QJsonObject{{"text", QString::fromUtf8(text)}}}}});
+}
+
+void LanguageServers::warmUp(const QString &path, const QString &languageId, const QByteArray &text)
+{
+    if (path.isEmpty())
+        return;
+    LspClient *client = clientFor(languageId);
+    if (!client)
+        return;
+    syncDocument(client, path, languageId, text);
+    const QString server = clients_.key(client);
+    if (warmed_.contains(server))
+        return;
+    warmed_.insert(server);
+    // Sent once the server is initialized, after the file.
+    client->request(QStringLiteral("textDocument/completion"),
+                    QJsonObject{{"textDocument", QJsonObject{{"uri", QUrl::fromLocalFile(path).toString()}}},
+                                {"position", QJsonObject{{"line", 0}, {"character", 0}}},
+                                {"context", QJsonObject{{"triggerKind", 1}}}},
+                    [](const QJsonValue &, const QString &) {});
 }

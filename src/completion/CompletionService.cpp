@@ -15,23 +15,37 @@ void CompletionService::addProvider(std::shared_ptr<ICompletionProvider> provide
     providers_.push_back(std::move(provider));
 }
 
+namespace {
+
+// A template is no keyword or member of the same name ("for", "begin").
+QString keyOf(const CompletionItem &item)
+{
+    return item.kind == CompletionItem::Kind::Snippet || item.replaceStart >= 0 ? item.label + QChar(0x1)
+                                                                                 : item.label;
+}
+
+} // namespace
+
 void CompletionService::merge(QList<CompletionItem> &into, const QList<CompletionItem> &items)
 {
     QHash<QString, qsizetype> index;
     index.reserve(into.size() + items.size());
     for (qsizetype i = 0; i < into.size(); ++i)
-        index.insert(into[i].label, i);
+        index.insert(keyOf(into[i]), i);
     for (const CompletionItem &item : items) {
-        const auto it = index.constFind(item.label);
+        const QString key = keyOf(item);
+        const auto it = index.constFind(key);
         if (it == index.constEnd()) {
-            index.insert(item.label, into.size());
+            index.insert(key, into.size());
             into.append(item);
             continue;
         }
         // The same name from two sources: the one that knows more.
         CompletionItem &existing = into[it.value()];
-        const bool richer = item.priority > existing.priority
-                         || (existing.kind == CompletionItem::Kind::Text && item.kind != CompletionItem::Kind::Text);
+        // A mere word of the file never replaces a keyword or a symbol.
+        const bool word = item.kind == CompletionItem::Kind::Text;
+        const bool richer = (existing.kind == CompletionItem::Kind::Text && !word)
+                         || (item.priority > existing.priority && (!word || existing.kind == CompletionItem::Kind::Text));
         if (richer)
             existing = item;
     }

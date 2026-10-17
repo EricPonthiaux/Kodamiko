@@ -3,9 +3,14 @@
 #include "FuzzyMatch.h"
 
 #include <QAbstractListModel>
+#include <QAccessible>
+#include <QApplication>
+#include <QLabel>
 #include <QListView>
 #include <QPainter>
+#include <QPointer>
 #include <QScrollBar>
+#include <QSettings>
 #include <QStyledItemDelegate>
 #include <QVBoxLayout>
 
@@ -16,10 +21,15 @@ namespace {
 constexpr int maximumRows = 10;
 constexpr int popupMinimumWidth = 300;
 constexpr int popupMaximumWidth = 600;
+constexpr int documentationWidth = 380;
+constexpr int documentationMaximumHeight = 320;
+constexpr int resolveDelayMs = 150;
+const QString documentationSetting = QStringLiteral("completion/showDocumentation");
 
 struct Entry {
     CompletionItem item;
     FuzzyMatch::Match match;
+    bool documentationRequested = false; // asked from the server once
 };
 
 // Letter and theme category of each kind's badge.
@@ -28,7 +38,8 @@ std::pair<QChar, const char *> badgeOf(CompletionItem::Kind kind)
     using Kind = CompletionItem::Kind;
     switch (kind) {
     case Kind::Keyword: return {QLatin1Char('k'), "keyword"};
-    case Kind::Function: return {QLatin1Char('f'), "function"};
+    // Not "f", which fields use: the letter alone tells them apart.
+    case Kind::Function: return {QChar(0x0192), "function"}; // ƒ
     case Kind::Method: return {QLatin1Char('m'), "function"};
     case Kind::Class: return {QLatin1Char('c'), "type"};
     case Kind::Struct: return {QLatin1Char('s'), "type"};
@@ -50,6 +61,32 @@ std::pair<QChar, const char *> badgeOf(CompletionItem::Kind kind)
 
 } // namespace
 
+QString kindName(CompletionItem::Kind kind)
+{
+    using Kind = CompletionItem::Kind;
+    const auto tr = [](const char *text) { return QCoreApplication::translate("Completion", text); };
+    switch (kind) {
+    case Kind::Keyword: return tr("keyword");
+    case Kind::Function: return tr("function");
+    case Kind::Method: return tr("method");
+    case Kind::Class: return tr("class");
+    case Kind::Struct: return tr("struct");
+    case Kind::Interface: return tr("interface");
+    case Kind::Enum: return tr("enum");
+    case Kind::Namespace: return tr("namespace");
+    case Kind::Module: return tr("module");
+    case Kind::Type: return tr("type");
+    case Kind::Field: return tr("field");
+    case Kind::Property: return tr("property");
+    case Kind::Variable: return tr("variable");
+    case Kind::Constant: return tr("constant");
+    case Kind::Macro: return tr("macro");
+    case Kind::Snippet: return tr("snippet");
+    case Kind::Text: break;
+    }
+    return tr("word");
+}
+
 class CompletionListModel : public QAbstractListModel {
 public:
     using QAbstractListModel::QAbstractListModel;
@@ -57,9 +94,18 @@ public:
     int rowCount(const QModelIndex &parent = {}) const override { return parent.isValid() ? 0 : int(entries.size()); }
     QVariant data(const QModelIndex &index, int role) const override
     {
-        if (role == Qt::DisplayRole && index.isValid())
-            return entries[index.row()].item.label;
-        return {};
+        if (!index.isValid())
+            return {};
+        const CompletionItem &item = entries[index.row()].item;
+        switch (role) {
+        case Qt::DisplayRole: return item.label;
+        // What a screen reader says of the row: the kind in words, not
+        // only the badge's letter and color.
+        case Qt::AccessibleTextRole: return QStringLiteral("%1, %2").arg(item.label, kindName(item.kind));
+        case Qt::AccessibleDescriptionRole: return item.detail;
+        case Qt::ToolTipRole: return kindName(item.kind);
+        default: return {};
+        }
     }
     void reset(std::vector<Entry> newEntries)
     {
@@ -184,10 +230,50 @@ CompletionPopup::CompletionPopup(QWidget *parent)
     view_->setUniformItemSizes(true);
     view_->setFrameShape(QFrame::NoFrame);
     connect(view_, &QListView::doubleClicked, this, &CompletionPopup::activated);
+    connect(view_->selectionModel(), &QItemSelectionModel::currentChanged, this, [this] {
+        updateDocumentation();
+        emit currentChanged();
+    });
+    setAccessibleName(tr("Code completion"));
+    view_->setAccessibleName(tr("Suggestions"));
+
+    hint_ = new QLabel(this);
+    hint_->setObjectName(QStringLiteral("completionHint"));
+    hint_->setContentsMargins(8, 2, 8, 2);
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(3, 3, 3, 3);
+    layout->setSpacing(0);
     layout->addWidget(view_);
+    layout->addWidget(hint_);
+
+    documentation_ = new QFrame(parent);
+    documentation_->setObjectName(QStringLiteral("completionDocumentation"));
+    documentation_->setFocusPolicy(Qt::NoFocus);
+    documentation_->setAccessibleName(tr("Documentation"));
+    documentationTitle_ = new QLabel(documentation_);
+    documentationTitle_->setWordWrap(true);
+    documentationTitle_->setTextFormat(Qt::PlainText);
+    documentationBody_ = new QLabel(documentation_);
+    documentationBody_->setWordWrap(true);
+    documentationBody_->setTextFormat(Qt::PlainText);
+    documentationBody_->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    auto *documentationLayout = new QVBoxLayout(documentation_);
+    documentationLayout->setContentsMargins(12, 10, 12, 10);
+    documentationLayout->setSpacing(8);
+    documentationLayout->addWidget(documentationTitle_);
+    documentationLayout->addWidget(documentationBody_, 1);
+    documentation_->hide();
+    documentationVisible_ = QSettings().value(documentationSetting, true).toBool();
+
+    resolveTimer_.setSingleShot(true);
+    resolveTimer_.setInterval(resolveDelayMs);
+    connect(&resolveTimer_, &QTimer::timeout, this, &CompletionPopup::resolveDocumentation);
     hide();
+}
+
+CompletionPopup::~CompletionPopup()
+{
+    delete documentation_;
 }
 
 void CompletionPopup::applyTheme(const Theme &theme)
@@ -198,10 +284,19 @@ void CompletionPopup::applyTheme(const Theme &theme)
     // changes, setting one restyles the whole popup.
     const QString sheet =
         QStringLiteral("QFrame#completionPopup { background: %1; border: 1px solid %2; border-radius: 8px; }"
-                       "QListView { background: transparent; border: none; outline: 0; }")
-            .arg(theme.alternateBase.name(), theme.border.name());
+                       "QListView { background: transparent; border: none; outline: 0; }"
+                       "QLabel#completionHint { color: %3; border-top: 1px solid %4; }")
+            .arg(theme.alternateBase.name(), theme.border.name(), theme.mutedText.name(), theme.line.name());
     if (sheet != styleSheet())
         setStyleSheet(sheet);
+    const QString documentationSheet =
+        QStringLiteral("QFrame#completionDocumentation { background: %1; border: 1px solid %2; border-radius: 8px; }"
+                       "QLabel { color: %3; background: transparent; }")
+            .arg(theme.alternateBase.name(), theme.border.name(), theme.foreground.name());
+    if (documentationSheet != documentation_->styleSheet())
+        documentation_->setStyleSheet(documentationSheet);
+    // The signature in the code font, the text in the interface's.
+    documentationTitle_->setFont(theme.font);
     view_->viewport()->update();
 }
 
@@ -244,9 +339,137 @@ int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString 
     model_->reset(std::move(entries));
     if (model_->rowCount() > 0)
         setCurrentRow(0);
+    updateDocumentation();
     if (isVisible())
         fitSize();
     return model_->rowCount();
+}
+
+void CompletionPopup::setKeyHint(const QString &hint)
+{
+    hint_->setText(hint);
+    hint_->setAccessibleName(hint);
+    hint_->setVisible(!hint.isEmpty());
+}
+
+QString CompletionPopup::keyHint() const
+{
+    return hint_->text();
+}
+
+QString CompletionPopup::describeCurrent() const
+{
+    const CompletionItem *item = current();
+    if (!item)
+        return {};
+    QStringList parts{item->label, kindName(item->kind)};
+    if (!item->detail.isEmpty())
+        parts.append(item->detail);
+    parts.append(tr("%1 of %2").arg(currentRow() + 1).arg(count()));
+    return parts.join(QStringLiteral(", "));
+}
+
+void CompletionPopup::announce(const QString &message)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    if (message.isEmpty() || !QAccessible::isActive())
+        return;
+    // The editor keeps the focus: the screen reader listens to it.
+    QObject *target = QApplication::focusWidget();
+    if (!target)
+        return;
+    QAccessibleAnnouncementEvent event(target, message);
+    QAccessible::updateAccessibility(&event);
+#else
+    Q_UNUSED(message);
+#endif
+}
+
+void CompletionPopup::setDocumentationVisible(bool visible)
+{
+    if (visible == documentationVisible_)
+        return;
+    documentationVisible_ = visible;
+    QSettings().setValue(documentationSetting, visible);
+    updateDocumentation();
+}
+
+QString CompletionPopup::documentationText() const
+{
+    if (documentation_->isHidden())
+        return {};
+    return documentationTitle_->text() + QLatin1Char('\n') + documentationBody_->text();
+}
+
+// The kind and the signature, then the documentation, which a server may
+// only send on demand.
+void CompletionPopup::updateDocumentation()
+{
+    resolveTimer_.stop();
+    const CompletionItem *item = current();
+    if (!documentationVisible_ || !isVisible() || !item) {
+        documentation_->hide();
+        return;
+    }
+    const Entry &entry = model_->entries[size_t(currentRow())];
+    QString title = item->label;
+    if (!item->detail.isEmpty())
+        title += QStringLiteral("  ") + item->detail;
+    documentationTitle_->setText(title);
+    QString body = item->documentation;
+    if (body.isEmpty() && item->resolveDocumentation && !entry.documentationRequested) {
+        body = tr("Loading the documentation…");
+        resolveTimer_.start();
+    }
+    documentationBody_->setText(body.isEmpty() ? kindName(item->kind) : kindName(item->kind) + QStringLiteral("\n\n") + body);
+    documentation_->setAccessibleDescription(documentationBody_->text());
+    placeDocumentation();
+    documentation_->show();
+    documentation_->raise();
+}
+
+void CompletionPopup::resolveDocumentation()
+{
+    const int row = currentRow();
+    if (row < 0 || row >= count())
+        return;
+    Entry &entry = model_->entries[size_t(row)];
+    if (!entry.item.resolveDocumentation || entry.documentationRequested)
+        return;
+    entry.documentationRequested = true;
+    const QString label = entry.item.label;
+    QPointer<CompletionPopup> self(this);
+    entry.item.resolveDocumentation([self, row, label](const QString &text) {
+        // The list may have changed meanwhile: only the same candidate.
+        if (!self || row >= self->count() || self->model_->entries[size_t(row)].item.label != label)
+            return;
+        self->model_->entries[size_t(row)].item.documentation = text;
+        if (self->currentRow() == row)
+            self->updateDocumentation();
+    });
+}
+
+// Right of the list, or left of it when there is no room.
+void CompletionPopup::placeDocumentation()
+{
+    const QWidget *area = parentWidget();
+    const int width = std::min(documentationWidth, std::max(area->width() / 3, 200));
+    documentation_->setFixedWidth(width);
+    const int height = std::min(documentation_->heightForWidth(width) > 0 ? documentation_->heightForWidth(width)
+                                                                          : documentation_->sizeHint().height(),
+                                documentationMaximumHeight);
+    documentation_->setFixedHeight(std::max(height, this->height() / 2));
+    int x = geometry().right() + 4;
+    if (x + width > area->width())
+        x = geometry().left() - width - 4;
+    documentation_->move(std::max(x, 0), y());
+}
+
+void CompletionPopup::hideEvent(QHideEvent *event)
+{
+    resolveTimer_.stop();
+    documentation_->hide();
+    QFrame::hideEvent(event);
 }
 
 int CompletionPopup::count() const
@@ -303,10 +526,14 @@ void CompletionPopup::fitSize()
                          + (item.detail.isEmpty() ? 0 : 40 + metrics.horizontalAdvance(item.detail));
         width = std::max(width, wanted);
     }
-    // As CompletionDelegate::sizeHint, plus the frame's margins.
+    // As CompletionDelegate::sizeHint, plus the frame's margins and the
+    // line of keys.
     const int rowHeight = metrics.height() + 8;
     const int rows = std::clamp(count(), 1, maximumRows);
-    resize(std::min(width, popupMaximumWidth), rows * rowHeight + 8);
+    const int hintHeight = hint_->isHidden() ? 0 : hint_->sizeHint().height();
+    if (!hint_->isHidden())
+        width = std::max(width, hint_->sizeHint().width() + 8); // the keys, in full
+    resize(std::min(width, popupMaximumWidth), rows * rowHeight + 8 + hintHeight);
 }
 
 void CompletionPopup::showAt(const QPoint &anchor, int anchorTop)
@@ -320,4 +547,5 @@ void CompletionPopup::showAt(const QPoint &anchor, int anchorTop)
     move(position);
     show();
     raise();
+    updateDocumentation();
 }

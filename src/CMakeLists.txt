@@ -12,11 +12,14 @@ add_library(duet_core STATIC
     claude/HookEvent.cpp
     claude/HookServer.cpp
     completion/CompletionController.cpp
+    completion/CompletionHistory.cpp
     completion/CompletionPopup.cpp
     completion/CompletionService.cpp
     completion/FuzzyMatch.cpp
     completion/LocalCompletion.cpp
     completion/Snippet.cpp
+    completion/SnippetSession.cpp
+    completion/Templates.cpp
     editor/ChangeGutter.cpp
     editor/CodeColorizer.cpp
     editor/CodeFormatter.cpp

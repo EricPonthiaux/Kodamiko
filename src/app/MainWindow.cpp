@@ -8,6 +8,7 @@
 #include "completion/CompletionController.h"
 #include "completion/CompletionService.h"
 #include "completion/LocalCompletion.h"
+#include "completion/Templates.h"
 #include "editor/ChangeGutter.h"
 #include "editor/EditorStatus.h"
 #include "editor/EditorTabs.h"
@@ -188,8 +189,13 @@ void MainWindow::createWidgets()
     completion_->addProvider(std::make_shared<ProjectSymbolsProvider>(symbolIndex_));
     completion_->addProvider(std::make_shared<KeywordProvider>());
     completion_->addProvider(std::make_shared<DocumentWordsProvider>());
-    connect(editorTabs_, &EditorTabs::editorOpened, this,
-            [this](EditorWidget *editor) { new CompletionController(editor, completion_); });
+    completion_->addProvider(std::make_shared<PostfixTemplateProvider>());
+    completion_->addProvider(std::make_shared<LiveTemplateProvider>());
+    connect(editorTabs_, &EditorTabs::editorOpened, this, [this](EditorWidget *editor) {
+        new CompletionController(editor, completion_);
+        // Once the file is loaded and the tab shown.
+        QTimer::singleShot(0, editor, [this, editor] { warmUpLanguageServer(editor); });
+    });
     connect(editorTabs_, &EditorTabs::fileSaved, this, [this] { fileStatuses_->refresh(); });
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
         if (state == Qt::ApplicationActive) {
@@ -790,6 +796,7 @@ void MainWindow::openFolder(const QString &folder)
     claudeTouched_.clear();
     updateClaudeMarks();
     symbolIndex_->setFolder(folder_);
+    completion_->history()->setFile(CompletionHistory::fileFor(folder_)); // the project's choices
     project_ = ProjectStore::touch(folder_);
     if (!project_.configured) {
         // Opened without the welcome window: set up from its files.
@@ -800,6 +807,7 @@ void MainWindow::openFolder(const QString &folder)
         ProjectStore::save(project_);
     }
     languageServers_->setProject(project_, toolchains_.get());
+    warmUpLanguageServers();
     if (preferencesPopup_)
         preferencesPopup_->setInstalledServers(languageServers_->installed());
     updateToolsNotice();
@@ -878,6 +886,7 @@ void MainWindow::applyProject(const ProjectConfig &project)
         return; // another project's downloads, finished after a switch
     project_ = project;
     languageServers_->setProject(project_, toolchains_.get());
+    warmUpLanguageServers();
     if (preferencesPopup_)
         preferencesPopup_->setInstalledServers(languageServers_->installed());
     dismissedServerNotices_.clear();
@@ -1055,6 +1064,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     editorTabs_->setEditorOptions(preferences.editor);
     languageServers_->setEnabled(preferences.languageServers);
+    warmUpLanguageServers();
     filesPanel_->setAlwaysSelectOpenedFile(preferences.alwaysSelectOpenedFile);
 }
 
@@ -1340,6 +1350,17 @@ void MainWindow::onCurrentTabChanged()
     if (filesPanel_->alwaysSelectOpenedFile() && !path.isEmpty())
         fileTree_->select(path);
     updateServerNotice();
+}
+
+void MainWindow::warmUpLanguageServer(EditorWidget *editor)
+{
+    languageServers_->warmUp(editor->filePath(), editor->languageId(), editor->utf8Bytes().toByteArray());
+}
+
+void MainWindow::warmUpLanguageServers()
+{
+    for (EditorWidget *editor : editorTabs_->editors())
+        warmUpLanguageServer(editor);
 }
 
 void MainWindow::updateServerNotice()

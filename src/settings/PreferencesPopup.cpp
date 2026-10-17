@@ -299,10 +299,19 @@ QWidget *PreferencesPopup::createEditorPage()
     addGroup(layout, tr("Display"), display);
 
     auto *completion = new SettingsCard;
-    autoCompletion_ = new ToggleSwitch;
+    autoCompletion_ = new QComboBox;
+    autoCompletion_->addItem(tr("Off"), int(AutoCompletion::Off));
+    autoCompletion_->addItem(tr("Calm"), int(AutoCompletion::Calm));
+    autoCompletion_->addItem(tr("Eager"), int(AutoCompletion::Eager));
+    autoCompletion_->setAccessibleName(tr("Suggest while typing"));
     completion->addRow(tr("Suggest while typing"),
-                       tr("The completion list opens as you type a name. Ctrl+Space opens it at any time."),
+                       tr("Off: only on Ctrl+Space. Calm: after a pause, from the third letter of a name. "
+                          "Eager: as soon as you type a name or a member access."),
                        autoCompletion_);
+    completionAcceptsEnter_ = new ToggleSwitch;
+    completion->addRow(tr("Enter inserts the suggestion"),
+                       tr("Otherwise only Tab inserts it, and Enter always starts a new line."),
+                       completionAcceptsEnter_);
     languageServers_ = new ToggleSwitch;
     completion->addRow(tr("Language servers"),
                        tr("Members, signatures and types from clangd (C, C++), jdtls (Java), "
@@ -524,7 +533,8 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
     codeFolding_->setChecked(preferences.editor.codeFolding);
     wrapLines_->setChecked(preferences.editor.wrapLines);
     showWhitespace_->setChecked(preferences.editor.showWhitespace);
-    autoCompletion_->setChecked(preferences.editor.autoCompletion);
+    autoCompletion_->setCurrentIndex(std::max(autoCompletion_->findData(int(preferences.editor.autoCompletion)), 0));
+    completionAcceptsEnter_->setChecked(preferences.editor.completionAcceptsEnter);
     languageServers_->setChecked(preferences.languageServers);
     formatOnSave_->setChecked(preferences.formatOnSave);
     alwaysSelectOpenedFile_->setChecked(preferences.alwaysSelectOpenedFile);
@@ -559,7 +569,8 @@ Preferences PreferencesPopup::preferences() const
     preferences.editor.codeFolding = codeFolding_->isChecked();
     preferences.editor.wrapLines = wrapLines_->isChecked();
     preferences.editor.showWhitespace = showWhitespace_->isChecked();
-    preferences.editor.autoCompletion = autoCompletion_->isChecked();
+    preferences.editor.autoCompletion = static_cast<AutoCompletion>(autoCompletion_->currentData().toInt());
+    preferences.editor.completionAcceptsEnter = completionAcceptsEnter_->isChecked();
     preferences.languageServers = languageServers_->isChecked();
     preferences.formatOnSave = formatOnSave_->isChecked();
     preferences.alwaysSelectOpenedFile = alwaysSelectOpenedFile_->isChecked();

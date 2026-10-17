@@ -26,6 +26,13 @@ bool isIdentifier(const QString &text)
     return true;
 }
 
+// A string, or MarkupContent ({"kind", "value"}).
+QString documentationOf(const QJsonValue &documentation)
+{
+    return (documentation.isObject() ? documentation.toObject().value("value").toString() : documentation.toString())
+        .trimmed();
+}
+
 CompletionItem::Kind kindOf(int lspKind)
 {
     using Kind = CompletionItem::Kind;
@@ -176,7 +183,23 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, boo
         item.kind = kindOf(lsp.value("kind").toInt());
         // The head of the server's list ranks higher.
         const int count = int(order.size());
-        item.priority = basePriority + (rank * 10 < count ? 6 : rank * 3 < count ? 3 : 0);
+        // The server ranks by the expected type and the scope: its order
+        // weighs in, from +8 for its first candidate down to +0, on top of
+        // how well the typed letters match.
+        item.priority = basePriority + 8 - (rank * 8) / std::max(count, 1);
+        item.documentation = documentationOf(lsp.value("documentation"));
+        if (resolves && item.documentation.isEmpty()) {
+            item.resolveDocumentation = [server, lsp](const CompletionItem::TextCallback &done) {
+                if (!server) {
+                    done({});
+                    return;
+                }
+                server->request(QStringLiteral("completionItem/resolve"), lsp,
+                                [done](const QJsonValue &resolved, const QString &) {
+                                    done(documentationOf(resolved.toObject().value("documentation")));
+                                });
+            };
+        }
         items.append(item);
     }
     return items;

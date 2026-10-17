@@ -89,7 +89,8 @@ private:
     ToggleSwitch *codeFolding_ = nullptr;
     ToggleSwitch *wrapLines_ = nullptr;
     ToggleSwitch *showWhitespace_ = nullptr;
-    ToggleSwitch *autoCompletion_ = nullptr;
+    QComboBox *autoCompletion_ = nullptr;
+    ToggleSwitch *completionAcceptsEnter_ = nullptr;
     ToggleSwitch *languageServers_ = nullptr;
     QLabel *serversFound_ = nullptr;
     ToggleSwitch *formatOnSave_ = nullptr;

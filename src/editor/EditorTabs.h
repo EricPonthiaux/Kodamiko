@@ -30,6 +30,8 @@ public:
     void showDiff(const QString &title, const QString &diffText);
 
     EditorWidget *currentEditor() const;
+    // The text editors of every tab.
+    QList<EditorWidget *> editors() const;
     // Text editor of a tab: the tab itself, or the editor of a Markdown tab.
     static EditorWidget *editorIn(QWidget *page);
     // Tab that holds `editor`.
@@ -122,7 +124,6 @@ private:
                         bool quiet);
     void updateTabTitle(EditorWidget *editor);
     void updateTabIcon(QWidget *page);
-    QList<EditorWidget *> editors() const;
 
     Theme theme_;
     FileWatcher watcher_;

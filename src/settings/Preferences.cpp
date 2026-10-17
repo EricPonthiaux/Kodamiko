@@ -23,7 +23,15 @@ Preferences Preferences::load()
     preferences.editor.codeFolding = settings.value(QStringLiteral("editor/codeFolding"), true).toBool();
     preferences.editor.wrapLines = settings.value(QStringLiteral("editor/wrapLines"), false).toBool();
     preferences.editor.showWhitespace = settings.value(QStringLiteral("editor/showWhitespace"), false).toBool();
-    preferences.editor.autoCompletion = settings.value(QStringLiteral("editor/autoCompletion"), true).toBool();
+    // Before the three modes, a switch: on was today's Eager.
+    const int legacyMode = settings.value(QStringLiteral("editor/autoCompletion"), true).toBool()
+                               ? int(AutoCompletion::Eager)
+                               : int(AutoCompletion::Off);
+    preferences.editor.autoCompletion = static_cast<AutoCompletion>(
+        std::clamp(settings.value(QStringLiteral("editor/completionMode"), legacyMode).toInt(),
+                   int(AutoCompletion::Off), int(AutoCompletion::Eager)));
+    preferences.editor.completionAcceptsEnter =
+        settings.value(QStringLiteral("editor/completionAcceptsEnter"), true).toBool();
     preferences.formatOnSave = settings.value(QStringLiteral("formatOnSave"), false).toBool();
     preferences.languageServers = settings.value(QStringLiteral("editor/languageServers"), true).toBool();
 
@@ -45,7 +53,8 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("editor/codeFolding"), editor.codeFolding);
     settings.setValue(QStringLiteral("editor/wrapLines"), editor.wrapLines);
     settings.setValue(QStringLiteral("editor/showWhitespace"), editor.showWhitespace);
-    settings.setValue(QStringLiteral("editor/autoCompletion"), editor.autoCompletion);
+    settings.setValue(QStringLiteral("editor/completionMode"), int(editor.autoCompletion));
+    settings.setValue(QStringLiteral("editor/completionAcceptsEnter"), editor.completionAcceptsEnter);
     settings.setValue(QStringLiteral("formatOnSave"), formatOnSave);
     settings.setValue(QStringLiteral("editor/languageServers"), languageServers);
 
