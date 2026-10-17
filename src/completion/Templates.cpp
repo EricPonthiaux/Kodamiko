@@ -1,8 +1,10 @@
 #include "Templates.h"
 
+#include "CodeScan.h"
 #include "Snippet.h"
 
 #include <QRegularExpression>
+#include <QSet>
 
 #include <vector>
 
@@ -142,15 +144,14 @@ unsigned languageOf(const QString &languageId)
     return 0;
 }
 
-bool isIdentifierByte(char c)
-{
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$'
-        || static_cast<unsigned char>(c) >= 0x80;
-}
+using CodeScan::isIdentifierByte;
+using CodeScan::startsStatement;
 
 // How far back an expression is looked for: a call's arguments rarely span
 // more.
 constexpr int maxExpressionBytes = 4000;
+// Expressions offered for a postfix template ("b", "a + b", "x * a + b").
+constexpr int maxExpressionChoices = 6;
 
 // The opening quote of the literal whose closing quote is at `close`.
 int quoteStart(const QByteArray &text, int close, int limit)
@@ -205,80 +206,6 @@ int angleOpenerOf(const QByteArray &text, int close, int limit)
     return -1;
 }
 
-// Whether a statement may start at `at`: only blanks before it on the
-// line, or after a "{", "}" or ";".
-bool startsStatement(const QByteArray &text, int at)
-{
-    int i = at - 1;
-    while (i >= 0 && (text[i] == ' ' || text[i] == '\t'))
-        --i;
-    return i < 0 || QByteArrayView("\n{};").contains(text[i]);
-}
-
-QString lineIndent(const QByteArray &text, int at)
-{
-    int start = at;
-    while (start > 0 && text[start - 1] != '\n')
-        --start;
-    int end = start;
-    while (end < text.size() && (text[end] == ' ' || text[end] == '\t'))
-        ++end;
-    return QString::fromUtf8(text.mid(start, end - start));
-}
-
-// One indentation step of the file: a tab if its lines start with tabs,
-// else the smallest indentation in spaces (4 when nothing tells).
-QString indentUnit(const QByteArray &text)
-{
-    int tabs = 0;
-    int spaced = 0;
-    int smallest = 0;
-    const qsizetype end = std::min<qsizetype>(text.size(), 200000);
-    qsizetype i = 0;
-    while (i < end) {
-        if (text[i] == '\t') {
-            ++tabs;
-        } else if (text[i] == ' ') {
-            qsizetype j = i;
-            while (j < end && text[j] == ' ')
-                ++j;
-            const int width = int(j - i);
-            // Not a blank line, nor the " *" of a comment.
-            if (j < end && text[j] != '\n' && text[j] != '*' && width >= 2) {
-                ++spaced;
-                smallest = smallest == 0 ? width : std::min(smallest, width);
-            }
-        }
-        while (i < end && text[i] != '\n')
-            ++i;
-        ++i;
-    }
-    if (tabs > spaced)
-        return QStringLiteral("\t");
-    return QString(smallest >= 2 && smallest <= 8 ? smallest : 4, QLatin1Char(' '));
-}
-
-QString escapeSnippet(QString text)
-{
-    text.replace(QLatin1Char('\\'), QLatin1String("\\\\"));
-    text.replace(QLatin1Char('$'), QLatin1String("\\$"));
-    text.replace(QLatin1Char('}'), QLatin1String("\\}"));
-    return text;
-}
-
-// `body` for its place: each line after the first at the indentation of
-// the first, each tab one step of the file.
-QString indented(const QString &body, const QString &indent, const QString &unit)
-{
-    QStringList lines = body.split(QLatin1Char('\n'));
-    for (qsizetype i = 0; i < lines.size(); ++i) {
-        lines[i].replace(QLatin1Char('\t'), unit);
-        if (i > 0 && !lines[i].isEmpty())
-            lines[i].prepend(indent);
-    }
-    return lines.join(QLatin1Char('\n'));
-}
-
 // The candidate of a template: matched on its key, described by what it
 // gives (with "expr" for the expression), showing the real result beside
 // the list.
@@ -303,14 +230,12 @@ CompletionItem itemOf(const Template &entry, const QString &snippet, const QStri
 
 // PostfixTemplateProvider
 
-int PostfixTemplateProvider::expressionStart(const QByteArray &text, int dot)
+namespace {
+
+// Start of the operand that ends at `end`: a chain of names, calls,
+// subscripts and member accesses, or a parenthesized expression.
+int operandStart(const QByteArray &text, int end, int limit)
 {
-    if (dot <= 0 || dot >= text.size() || text[dot] != '.')
-        return -1;
-    const int limit = std::max(0, dot - maxExpressionBytes);
-    int end = dot;
-    if (end > 0 && text[end - 1] == '?') // "a?.b"
-        --end;
     enum class After { Connector, Name, Group };
     After state = After::Connector;
     bool scopeConnector = false;
@@ -397,6 +322,67 @@ int PostfixTemplateProvider::expressionStart(const QByteArray &text, int dot)
     return start;
 }
 
+
+} // namespace
+
+int PostfixTemplateProvider::expressionStart(const QByteArray &text, int dot)
+{
+    if (dot <= 0 || dot >= text.size() || text[dot] != '.')
+        return -1;
+    const int limit = std::max(0, dot - maxExpressionBytes);
+    int end = dot;
+    if (end > 0 && text[end - 1] == '?') // "a?.b"
+        --end;
+    return operandStart(text, end, limit);
+}
+
+QList<int> PostfixTemplateProvider::expressionStarts(const QByteArray &text, int dot)
+{
+    QList<int> starts;
+    int start = expressionStart(text, dot);
+    if (start < 0)
+        return starts;
+    starts.append(start);
+    const int limit = std::max(0, dot - maxExpressionBytes);
+    const auto skipBlanks = [&text, limit](int i) {
+        while (i > limit && (text[i - 1] == ' ' || text[i - 1] == '\t' || text[i - 1] == '\n' || text[i - 1] == '\r'))
+            --i;
+        return i;
+    };
+    while (starts.size() < maxExpressionChoices) {
+        int i = skipBlanks(start);
+        // "!ready.if": the negation too.
+        if (i > limit && text[i - 1] == '!' && !(i < text.size() && text[i] == '=')) {
+            start = i - 1;
+            starts.append(start);
+            continue;
+        }
+        // A binary operator, then its left operand: "a + b.if".
+        int length = 0;
+        if (i - 2 >= limit) {
+            const QByteArray two = text.mid(i - 2, 2);
+            if (two == "&&" || two == "||" || two == "==" || two == "!=" || two == "<=" || two == ">=" || two == "<<"
+                || two == ">>")
+                length = 2;
+            else if (two == "++" || two == "--" || two == "->" || two == "::" || (two[1] == '=' && two[0] != ' '))
+                break; // an assignment, an increment
+        }
+        if (length == 0 && i - 1 >= limit && QByteArrayView("+-*/%<>&|^").contains(text[i - 1]))
+            length = 1;
+        if (length == 0)
+            break;
+        const int operandEnd = skipBlanks(i - length);
+        if (operandEnd <= limit)
+            break;
+        const int operand = operandStart(text, operandEnd, limit);
+        if (operand < 0)
+            break;
+        start = operand;
+        starts.append(start);
+    }
+    return starts;
+}
+
 QString PostfixTemplateProvider::suggestName(const QString &expression)
 {
     // The name the value comes from: the last one, outside arguments.
@@ -445,9 +431,9 @@ QString PostfixTemplateProvider::triggerCharacters(const QString &languageId) co
 void PostfixTemplateProvider::complete(const CompletionContext &context, const Callback &done)
 {
     const int dot = context.prefixStart - 1;
-    const int start = expressionStart(context.text, dot);
+    const QList<int> starts = expressionStarts(context.text, dot);
     // Nothing before the dot, or a number ("3.f").
-    if (start < 0 || (context.text[start] >= '0' && context.text[start] <= '9')) {
+    if (starts.isEmpty() || (context.text[starts.first()] >= '0' && context.text[starts.first()] <= '9')) {
         done({}, false);
         return;
     }
@@ -455,27 +441,60 @@ void PostfixTemplateProvider::complete(const CompletionContext &context, const C
     int end = dot;
     if (context.text[end - 1] == '?')
         --end;
-    const QString expression = QString::fromUtf8(context.text.mid(start, end - start));
-    const bool statement = startsStatement(context.text, start);
-    const QString indent = lineIndent(context.text, start);
-    const QString unit = indentUnit(context.text);
-    const QString name = suggestName(expression);
+    const QString unit = CodeScan::indentUnit(context.text);
     const QString postfix = QObject::tr("Postfix template");
+
+    // Each expression the template can wrap: the nearest first.
+    struct Candidate {
+        int start;
+        QString expression;
+        bool compound; // "a + b": parenthesized where it is an operand
+        bool statement;
+        QString indent;
+        QString name;
+    };
+    QList<Candidate> candidates;
+    for (int i = 0; i < starts.size(); ++i) {
+        const QString expression = QString::fromUtf8(context.text.mid(starts[i], end - starts[i]));
+        candidates.append({starts[i], expression, i > 0 && !expression.startsWith(QLatin1Char('!')),
+                           startsStatement(context.text, starts[i]), CodeScan::lineIndent(context.text, starts[i]),
+                           suggestName(expression)});
+    }
 
     QList<CompletionItem> items;
     for (const Template &entry : postfixTemplates()) {
-        if (!(entry.languages & language) || (entry.statement && !statement))
+        if (!(entry.languages & language))
             continue;
-        const QString body = indented(QString::fromUtf8(entry.body), indent, unit);
-        const auto fill = [&body, &name](const QString &value) {
-            QString snippet = body;
-            snippet.replace(QChar(0x00AC), escapeSnippet(QLatin1Char('!') + value)); // ¬
-            snippet.replace(QChar(0x00A7), escapeSnippet(value));                    // §
-            snippet.replace(QChar(0x00A4), name);                                    // ¤
+        // "((type) a + b)" and "a + b.begin()" need the parentheses.
+        static const QSet<QString> operands = {"cast", "begin", "cbegin", "co_await", "co_yield", "await", "new"};
+        const bool operand = operands.contains(QString::fromLatin1(entry.key));
+        const auto fill = [&entry, &unit, operand](const Candidate &candidate, const QString &value) {
+            QString snippet = CodeScan::indented(QString::fromUtf8(entry.body), candidate.indent, unit);
+            const QString wrapped = candidate.compound ? QLatin1Char('(') + value + QLatin1Char(')') : value;
+            snippet.replace(QChar(0x00AC), Snippet::escape(QLatin1Char('!') + wrapped));        // ¬
+            snippet.replace(QChar(0x00A7), Snippet::escape(operand ? wrapped : value));         // §
+            snippet.replace(QChar(0x00A4), candidate.name);                                     // ¤
             return snippet;
         };
-        CompletionItem item = itemOf(entry, fill(expression), fill(QStringLiteral("expr")), postfix, 3);
-        item.replaceStart = start;
+        QList<const Candidate *> fitting;
+        for (const Candidate &candidate : candidates) {
+            if (!entry.statement || candidate.statement)
+                fitting.append(&candidate);
+        }
+        if (fitting.isEmpty())
+            continue;
+        const Candidate &nearest = *fitting.first();
+        CompletionItem item = itemOf(entry, fill(nearest, nearest.expression), fill(nearest, QStringLiteral("expr")),
+                                     postfix, 3);
+        item.replaceStart = nearest.start;
+        if (fitting.size() > 1) {
+            for (const Candidate *candidate : fitting) {
+                QString label = candidate->expression.simplified();
+                if (label.size() > 60)
+                    label = label.left(59) + QChar(0x2026);
+                item.choices.append({label, fill(*candidate, candidate->expression), candidate->start});
+            }
+        }
         items.append(item);
     }
     done(items, false);
@@ -497,13 +516,13 @@ void LiveTemplateProvider::complete(const CompletionContext &context, const Call
     }
     const unsigned language = languageOf(context.languageId);
     const bool statement = startsStatement(context.text, context.prefixStart);
-    const QString indent = lineIndent(context.text, context.prefixStart);
-    const QString unit = indentUnit(context.text);
+    const QString indent = CodeScan::lineIndent(context.text, context.prefixStart);
+    const QString unit = CodeScan::indentUnit(context.text);
     const QString live = QObject::tr("Live template");
     for (const Template &entry : liveTemplates()) {
         if (!(entry.languages & language) || (entry.statement && !statement))
             continue;
-        const QString snippet = indented(QString::fromUtf8(entry.body), indent, unit);
+        const QString snippet = CodeScan::indented(QString::fromUtf8(entry.body), indent, unit);
         // Below the keyword of the same name ("for").
         items.append(itemOf(entry, snippet, snippet, live, 1));
     }

@@ -18,7 +18,8 @@ struct Match {
 // nullopt if `candidate` does not match `pattern`. An empty pattern
 // matches everything with a score of 0. Higher scores for a prefix, a
 // match with the same case, consecutive letters and word starts; lower for
-// long candidates.
-std::optional<Match> match(const QString &pattern, const QString &candidate);
+// long candidates. `anywhere`: the first letter may also be inside a word
+// ("get" matches "widget"), for extended completion.
+std::optional<Match> match(const QString &pattern, const QString &candidate, bool anywhere = false);
 
 } // namespace FuzzyMatch

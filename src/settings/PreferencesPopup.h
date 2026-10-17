@@ -56,6 +56,8 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
+    // The Full Line rows shown while it is on, the model for Ollama only.
+    void updateFullLineRows();
     QWidget *createSidebar();
     QWidget *createAppearancePage();
     QWidget *createEditorPage();
@@ -93,6 +95,13 @@ private:
     ToggleSwitch *completionAcceptsEnter_ = nullptr;
     ToggleSwitch *languageServers_ = nullptr;
     QLabel *serversFound_ = nullptr;
+    ToggleSwitch *fullLine_ = nullptr;
+    QComboBox *fullLineServer_ = nullptr;
+    QLineEdit *fullLineEndpoint_ = nullptr;
+    QLineEdit *fullLineModel_ = nullptr;
+    QWidget *fullLineServerRow_ = nullptr;
+    QWidget *fullLineEndpointRow_ = nullptr;
+    QWidget *fullLineModelRow_ = nullptr;
     ToggleSwitch *formatOnSave_ = nullptr;
     ToggleSwitch *alwaysSelectOpenedFile_ = nullptr;
     ToggleSwitch *snapshotBeforePrompt_ = nullptr;

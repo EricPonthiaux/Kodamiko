@@ -1,9 +1,11 @@
 #include "LocalCompletion.h"
 
+#include "ExpectedType.h"
 #include "navigation/SymbolIndex.h"
 
 #include <QFileInfo>
 #include <QHash>
+#include <QObject>
 #include <QSet>
 
 #include <algorithm>
@@ -112,6 +114,7 @@ void DocumentWordsProvider::complete(const CompletionContext &context, const Cal
     }
     const QStringList found = words(context.text, context.position);
     items.reserve(found.size());
+    QSet<QString> seen;
     for (int i = 0; i < found.size(); ++i) {
         CompletionItem item;
         item.label = found[i];
@@ -120,6 +123,20 @@ void DocumentWordsProvider::complete(const CompletionContext &context, const Cal
         // a name of the file is the likelier word.
         item.priority = i < 20 ? 4 : 1;
         items.append(item);
+        seen.insert(found[i]);
+    }
+    // Extended completion: the words of the other open files, below.
+    for (const QByteArray &other : context.otherTexts) {
+        for (const QString &word : words(other, -1)) {
+            if (seen.contains(word))
+                continue;
+            seen.insert(word);
+            CompletionItem item;
+            item.label = word;
+            item.kind = CompletionItem::Kind::Text;
+            item.detail = QObject::tr("open file");
+            items.append(item);
+        }
     }
     done(items, false);
 }
@@ -191,6 +208,30 @@ bool KeywordProvider::handles(const CompletionContext &context) const
 void KeywordProvider::complete(const CompletionContext &context, const Callback &done)
 {
     QList<CompletionItem> items;
+    if (context.mode == CompletionContext::Mode::Smart) {
+        // The literals of the expected type.
+        const QString expected = ExpectedType::normalized(context.expectedType);
+        QStringList literals;
+        if (expected == QLatin1String("bool") || expected == QLatin1String("boolean"))
+            literals = {QStringLiteral("true"), QStringLiteral("false")};
+        else if (expected.endsWith(QLatin1Char('*')))
+            literals = {context.languageId == QLatin1String("c") ? QStringLiteral("NULL") : QStringLiteral("nullptr")};
+        else if (!expected.isEmpty() && expected[0].isUpper()
+                 && (context.languageId == QLatin1String("java") || context.languageId.startsWith(QLatin1Char('t'))
+                     || context.languageId == QLatin1String("javascript")))
+            literals = {QStringLiteral("null")};
+        for (const QString &literal : literals) {
+            if (!keywords(context.languageId).contains(literal))
+                continue;
+            CompletionItem item;
+            item.label = literal;
+            item.kind = CompletionItem::Kind::Keyword;
+            item.priority = 2;
+            items.append(item);
+        }
+        done(items, false);
+        return;
+    }
     // After ".", a member is expected, not a keyword.
     if (context.triggerCharacter.isNull()) {
         for (const QString &keyword : keywords(context.languageId)) {

@@ -2,6 +2,8 @@
 
 #include "LanguageServers.h"
 #include "LspClient.h"
+#include "completion/CodeScan.h"
+#include "completion/ExpectedType.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -180,6 +182,11 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, boo
             };
         }
         item.detail = details.join(QStringLiteral("  "));
+        item.type = ExpectedType::ofDetail(!labelDetails.value("description").toString().trimmed().isEmpty()
+                                               ? labelDetails.value("description").toString()
+                                               : lsp.value("detail").toString());
+        if (item.type.isEmpty() && label.contains(QLatin1String(" : ")))
+            item.type = ExpectedType::ofDetail(label); // jdtls: "size() : int"
         item.kind = kindOf(lsp.value("kind").toInt());
         // The head of the server's list ranks higher.
         const int count = int(order.size());
@@ -205,6 +212,30 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, boo
     return items;
 }
 
+QString LspCompletionProvider::activeParameterType(const QJsonValue &result, const QString &languageId)
+{
+    const QJsonObject help = result.toObject();
+    const QJsonArray signatures = help.value("signatures").toArray();
+    if (signatures.isEmpty())
+        return {};
+    const int active = std::clamp(help.value("activeSignature").toInt(), 0, int(signatures.size()) - 1);
+    const QJsonObject signature = signatures.at(active).toObject();
+    const int parameter = signature.contains("activeParameter") ? signature.value("activeParameter").toInt()
+                                                                : help.value("activeParameter").toInt();
+    const QJsonArray parameters = signature.value("parameters").toArray();
+    if (parameter < 0 || parameter >= parameters.size())
+        return {};
+    // Its label: offsets in the signature's, or its text.
+    const QJsonValue name = parameters.at(parameter).toObject().value("label");
+    QString label = name.toString();
+    if (name.isArray()) {
+        const QString text = signature.value("label").toString();
+        const int start = name.toArray().at(0).toInt();
+        label = text.mid(start, name.toArray().at(1).toInt() - start);
+    }
+    return ExpectedType::ofParameter(label, languageId);
+}
+
 void LspCompletionProvider::complete(const CompletionContext &context, const Callback &done)
 {
     LspClient *client = servers_->clientFor(context.languageId);
@@ -213,7 +244,30 @@ void LspCompletionProvider::complete(const CompletionContext &context, const Cal
         return;
     }
     servers_->syncDocument(client, context.filePath, context.languageId, context.text);
+    if (context.mode != CompletionContext::Mode::Smart || !context.expectedType.isEmpty()
+        || CodeScan::enclosingParenthesis(CodeScan::blank(context.text.left(context.prefixStart)), context.prefixStart) < 0) {
+        request(client, context, context.expectedType, done);
+        return;
+    }
+    // In a call's arguments: the parameter's type, from the server.
+    const QJsonObject params{
+        {"textDocument", QJsonObject{{"uri", QUrl::fromLocalFile(context.filePath).toString()}}},
+        {"position", QJsonObject{{"line", context.line}, {"character", context.column}}},
+    };
+    client->request(QStringLiteral("textDocument/signatureHelp"), params,
+                    [this, context, done, server = QPointer<LspClient>(client)](const QJsonValue &result,
+                                                                                const QString &) {
+                        if (!server) {
+                            done({}, false);
+                            return;
+                        }
+                        request(server, context, activeParameterType(result, context.languageId), done);
+                    });
+}
 
+void LspCompletionProvider::request(LspClient *client, const CompletionContext &context, const QString &expectedType,
+                                    const Callback &done)
+{
     QJsonObject completionContext{{"triggerKind", context.triggerCharacter.isNull() ? 1 : 2}};
     if (!context.triggerCharacter.isNull())
         completionContext.insert("triggerCharacter", QString(context.triggerCharacter));
@@ -222,14 +276,27 @@ void LspCompletionProvider::complete(const CompletionContext &context, const Cal
         {"position", QJsonObject{{"line", context.line}, {"character", context.column}}},
         {"context", completionContext},
     };
+    const bool smart = context.mode == CompletionContext::Mode::Smart;
+    // "new |": the class to create.
+    int before = context.prefixStart;
+    while (before > 0 && context.text[before - 1] == ' ')
+        --before;
+    const bool afterNew = before >= 3 && context.text.mid(before - 3, 3) == "new"
+                       && (before == 3 || !CodeScan::isIdentifierByte(context.text[before - 4]));
     client->request(QStringLiteral("textDocument/completion"), params,
-                    [done, server = QPointer<LspClient>(client)](const QJsonValue &result, const QString &error) {
+                    [done, smart, expectedType, afterNew, server = QPointer<LspClient>(client)](const QJsonValue &result,
+                                                                                               const QString &error) {
                         if (!error.isEmpty()) {
                             done({}, false);
                             return;
                         }
                         bool incomplete = false;
-                        const QList<CompletionItem> items = parse(result, &incomplete, server);
+                        QList<CompletionItem> items = parse(result, &incomplete, server);
+                        if (smart) {
+                            items.removeIf([&](const CompletionItem &item) {
+                                return !ExpectedType::accepts(expectedType, item, afterNew);
+                            });
+                        }
                         done(items, incomplete);
                     });
 }

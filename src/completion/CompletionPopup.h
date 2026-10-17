@@ -27,7 +27,9 @@ public:
     ~CompletionPopup() override;
 
     // Filters and ranks `items` by `prefix`; returns how many match.
-    int setItems(const QList<CompletionItem> &items, const QString &prefix);
+    // `anywhere`: the prefix may start inside a word of a candidate
+    // (extended completion).
+    int setItems(const QList<CompletionItem> &items, const QString &prefix, bool anywhere = false);
     int count() const;
     // The selected candidate; nullptr when the list is empty.
     const CompletionItem *current() const;

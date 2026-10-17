@@ -34,6 +34,11 @@ Preferences Preferences::load()
         settings.value(QStringLiteral("editor/completionAcceptsEnter"), true).toBool();
     preferences.formatOnSave = settings.value(QStringLiteral("formatOnSave"), false).toBool();
     preferences.languageServers = settings.value(QStringLiteral("editor/languageServers"), true).toBool();
+    preferences.fullLineCompletion = settings.value(QStringLiteral("editor/fullLine"), false).toBool();
+    preferences.fullLineServer = settings.value(QStringLiteral("editor/fullLineServer"), preferences.fullLineServer).toString();
+    preferences.fullLineEndpoint =
+        settings.value(QStringLiteral("editor/fullLineEndpoint"), preferences.fullLineEndpoint).toString();
+    preferences.fullLineModel = settings.value(QStringLiteral("editor/fullLineModel"), preferences.fullLineModel).toString();
 
     preferences.alwaysSelectOpenedFile = settings.value(QStringLiteral("alwaysSelectOpenedFile"), false).toBool();
 
@@ -57,6 +62,10 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("editor/completionAcceptsEnter"), editor.completionAcceptsEnter);
     settings.setValue(QStringLiteral("formatOnSave"), formatOnSave);
     settings.setValue(QStringLiteral("editor/languageServers"), languageServers);
+    settings.setValue(QStringLiteral("editor/fullLine"), fullLineCompletion);
+    settings.setValue(QStringLiteral("editor/fullLineServer"), fullLineServer);
+    settings.setValue(QStringLiteral("editor/fullLineEndpoint"), fullLineEndpoint);
+    settings.setValue(QStringLiteral("editor/fullLineModel"), fullLineModel);
 
     settings.setValue(QStringLiteral("alwaysSelectOpenedFile"), alwaysSelectOpenedFile);
 

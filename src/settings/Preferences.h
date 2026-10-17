@@ -20,6 +20,12 @@ struct Preferences {
     bool formatOnSave = false;
     // Completion from clangd, jdtls... when installed.
     bool languageServers = true;
+    // Full Line completion: the rest of the line from a code model served
+    // on this machine (see FullLineModel).
+    bool fullLineCompletion = false;
+    QString fullLineServer = QStringLiteral("ollama"); // or "llama.cpp"
+    QString fullLineEndpoint = QStringLiteral("http://localhost:11434");
+    QString fullLineModel = QStringLiteral("qwen2.5-coder:1.5b");
 
     // Files
     bool alwaysSelectOpenedFile = false;

@@ -196,6 +196,11 @@ void CodeIntelligence::showParameterInfo()
         requestSignatureHelp(editor, true);
 }
 
+void CodeIntelligence::requestParameterInfo(EditorWidget *editor)
+{
+    requestSignatureHelp(editor, false);
+}
+
 void CodeIntelligence::requestSignatureHelp(EditorWidget *editor, bool explicitRequest)
 {
     LspClient *client = serverFor(editor, !explicitRequest);

@@ -38,6 +38,9 @@ public:
     void showDocumentation();
     // Parameters of the call around the cursor (Ctrl+P).
     void showParameterInfo();
+    // The same in `editor`, quietly: nothing said when there is no call
+    // or no server (after a function was chosen in the completion list).
+    void requestParameterInfo(EditorWidget *editor);
 
     // Applies `edit` to the open editors (one undo step each) and to the
     // files on disk. Returns the number of files changed.

@@ -1,16 +1,27 @@
+#include "completion/CodeGeneration.h"
+#include "completion/CodeScan.h"
 #include "completion/CompletionController.h"
 #include "completion/CompletionHistory.h"
 #include "completion/CompletionPopup.h"
 #include "completion/CompletionService.h"
+#include "completion/DocComments.h"
+#include "completion/ExpectedType.h"
+#include "completion/FullLine.h"
 #include "completion/FuzzyMatch.h"
 #include "completion/LocalCompletion.h"
+#include "completion/NameSuggestions.h"
 #include "completion/Snippet.h"
 #include "completion/SnippetSession.h"
 #include "completion/Templates.h"
 #include "editor/EditorWidget.h"
 
 #include <QAccessible>
+#include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QListView>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -37,6 +48,44 @@ public:
     void complete(const CompletionContext &, const Callback &done) override { pending = done; }
     QString triggerCharacters(const QString &) const override { return QStringLiteral("."); }
     Callback pending;
+};
+
+// Records what it is asked, and answers at once.
+class RecordingProvider : public ICompletionProvider {
+public:
+    explicit RecordingProvider(QList<CompletionItem> items, bool smart = false)
+        : items(std::move(items))
+        , smart(smart)
+    {
+    }
+    bool handles(const CompletionContext &) const override { return true; }
+    bool servesSmart() const override { return smart; }
+    void complete(const CompletionContext &context, const Callback &done) override
+    {
+        last = context;
+        ++calls;
+        done(items, false);
+    }
+    QList<CompletionItem> items;
+    bool smart;
+    CompletionContext last;
+    int calls = 0;
+};
+
+// A Full Line model answering what it is told to.
+class FakeFullLineModel : public FullLineModel {
+public:
+    void suggest(const QString &before, const QString &after, const QString &, Callback done) override
+    {
+        lastBefore = before;
+        lastAfter = after;
+        ++requests;
+        done(lineOf(answer, after));
+    }
+    QString answer;
+    QString lastBefore;
+    QString lastAfter;
+    int requests = 0;
 };
 
 } // namespace
@@ -263,10 +312,10 @@ private slots:
         QTest::keyClick(f.editor, Qt::Key_Up);
         QTest::keyClick(f.editor, Qt::Key_Down);
         QCOMPARE(resolved, 1);
-        // Ctrl+Space hides it, and shows it again.
-        f.controller->complete();
+        // Ctrl+Q hides it, and shows it again.
+        QTest::keyClick(f.editor, Qt::Key_Q, Qt::ControlModifier);
         QVERIFY(popup->documentationText().isEmpty());
-        f.controller->complete();
+        QTest::keyClick(f.editor, Qt::Key_Q, Qt::ControlModifier);
         QVERIFY(!popup->documentationText().isEmpty());
     }
 
@@ -593,13 +642,522 @@ private slots:
         QCOMPARE(labels.count("for"), 2);
     }
 
+    void secondCompletionShowsMore()
+    {
+        Fixture g("int widget;\nint getValue;\nint main() {\n    \n}\n", 3, 4);
+        // Another open file of the language.
+        auto *more = new EditorWidget(Theme::dark(), &g.window);
+        QFile moreFile(g.dir.filePath("b.cpp"));
+        QVERIFY(moreFile.open(QIODevice::WriteOnly));
+        moreFile.write("int getterElsewhere;\n");
+        moreFile.close();
+        more->load(g.dir.filePath("b.cpp"), nullptr);
+        g.editor->setFocus();
+        QTest::keyClicks(g.editor, "get");
+        QTRY_VERIFY(g.controller->isActive());
+        QVERIFY(!g.controller->popup()->labels().contains("widget"));
+        QVERIFY(!g.controller->popup()->labels().contains("getterElsewhere"));
+        QVERIFY(g.controller->popup()->keyHint().contains("Ctrl+Space more"));
+        g.controller->complete();
+        QCOMPARE(g.controller->mode(), CompletionContext::Mode::Extended);
+        QTRY_VERIFY(g.controller->popup()->labels().contains("widget")); // matched inside the word
+        QVERIFY(g.controller->popup()->labels().contains("getterElsewhere")); // the other file's
+        QCOMPARE(g.controller->popup()->labels().first(), QString("getValue")); // a prefix still first
+        QVERIFY(g.controller->popup()->keyHint().startsWith("All suggestions"));
+        // A third time: the documentation.
+        const bool shown = g.controller->popup()->isDocumentationVisible();
+        g.controller->complete();
+        QCOMPARE(g.controller->popup()->isDocumentationVisible(), !shown);
+        g.controller->popup()->setDocumentationVisible(shown);
+    }
+
+    void expectedTypeFromTheText()
+    {
+        const auto at = [](const QByteArray &text, const QString &language = QStringLiteral("cpp")) {
+            return ExpectedType::at(text, int(text.size()), language);
+        };
+        QCOMPARE(at("void f() {\n    Widget *w = "), QString("Widget *"));
+        QCOMPARE(at("void f() {\n    const std::string &name = "), QString("std::string &"));
+        QCOMPARE(at("void f() {\n    int count = 0;\n    count = "), QString("int"));
+        QCOMPARE(at("void f() {\n    QList<int> items;\n    items = "), QString("QList<int>"));
+        QCOMPARE(at("class A { double ratio; void f() { this->ratio = "), QString("double"));
+        QCOMPARE(at("int size() const {\n    if (x) {\n        return "), QString("int"));
+        QCOMPARE(at("void f() {\n    if ("), QString("bool"));
+        QCOMPARE(at("void f() {\n    ok = a && "), QString("bool"));
+        QCOMPARE(at("void f() {\n    auto x = "), QString());
+        QCOMPARE(at("void f() {\n    call("), QString()); // the server's signature help knows
+        QCOMPARE(at("String name() {\n    return ", "java"), QString("String"));
+        QCOMPARE(at("let total: number = ", "typescript"), QString("number"));
+        QCOMPARE(at("let total = ", "javascript"), QString());
+        QCOMPARE(at("for (int i = 0; i < n; ++i) {\n    i = "), QString("int"));
+    }
+
+    void smartCompletionKeepsTheExpectedType()
+    {
+        using Kind = CompletionItem::Kind;
+        CompletionItem count{"count", {}, {}, Kind::Variable};
+        count.type = "int";
+        CompletionItem name{"name", {}, {}, Kind::Variable};
+        name.type = "const QString &";
+        CompletionItem length{"length", {}, {}, Kind::Method};
+        length.type = ExpectedType::ofDetail("String.length() : long");
+        CompletionItem widget{"Widget", {}, {}, Kind::Class};
+        QVERIFY(ExpectedType::accepts("int", count));
+        QVERIFY(ExpectedType::accepts("size_t", count)); // numbers go together
+        QVERIFY(!ExpectedType::accepts("int", name));
+        QVERIFY(ExpectedType::accepts("QString", name));
+        QVERIFY(ExpectedType::accepts("int", length));
+        QVERIFY(ExpectedType::accepts("Widget *", widget, true)); // "new |"
+        QVERIFY(!ExpectedType::accepts("Widget *", count, true));
+        QVERIFY(!ExpectedType::accepts("int", widget));
+        QCOMPARE(ExpectedType::ofParameter("const QString &text", "cpp"), QString("const QString &"));
+        QCOMPARE(ExpectedType::ofParameter("size: number = 3", "typescript"), QString("number"));
+
+        // Only the smart providers, told the type.
+        auto smart = std::make_shared<RecordingProvider>(QList<CompletionItem>{count, name}, true);
+        smart->items.removeIf([](const CompletionItem &item) { return item.label != "count"; });
+        Fixture f("int main() {\n    int total = \n}\n", 1, 16, smart);
+        f.service.addProvider(std::make_shared<PostfixTemplateProvider>());
+        f.controller->completeSmart();
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(smart->last.mode, CompletionContext::Mode::Smart);
+        QCOMPARE(smart->last.expectedType, QString("int"));
+        QCOMPARE(f.controller->popup()->labels(), QStringList({"count"})); // no words, no keywords
+        QVERIFY(f.controller->popup()->keyHint().startsWith("Expected int"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(1), QString("    int total = count\n"));
+        // A boolean: the keywords "true" and "false".
+        Fixture g("int main() {\n    bool ok = \n}\n", 1, 14);
+        g.controller->completeSmart();
+        QTRY_VERIFY(g.controller->isActive());
+        QCOMPARE(g.controller->popup()->labels(), QStringList({"true", "false"}));
+    }
+
+    void fullLineSuggestsTheRestOfTheLine()
+    {
+        QCOMPARE(FullLineModel::lineOf("ue);\nmore", QString()), QString("ue);"));
+        QCOMPARE(FullLineModel::lineOf("value);  ", ");"), QString("value"));
+        QCOMPARE(FullLineModel::lineOf("   \n", QString()), QString());
+
+        Fixture f("int main() {\n    \n}\n", 1, 4);
+        f.editor->setOptions({.autoCompletion = AutoCompletion::Off});
+        FakeFullLineModel model;
+        model.answer = "Value(total);";
+        f.service.setFullLineModel(&model);
+        QTest::keyClicks(f.editor, "print");
+        QTRY_COMPARE(f.controller->fullLineText(), QString("Value(total);"));
+        QCOMPARE(model.lastBefore, QString("int main() {\n    print"));
+        QCOMPARE(model.lastAfter, QString("\n}\n"));
+        QCOMPARE(f.controller->previewText(), QString("Value(total);"));
+        // Typing what it shows keeps the rest.
+        QTest::keyClicks(f.editor, "Va");
+        QCOMPARE(f.controller->fullLineText(), QString("lue(total);"));
+        // Ctrl+Right takes a word, Tab the rest.
+        QTest::keyClick(f.editor, Qt::Key_Right, Qt::ControlModifier);
+        QCOMPARE(f.editor->text(1), QString("    printValue\n"));
+        QCOMPARE(f.controller->fullLineText(), QString("(total);"));
+        QTest::keyClick(f.editor, Qt::Key_Tab);
+        QCOMPARE(f.editor->text(1), QString("    printValue(total);\n"));
+        QVERIFY(f.controller->fullLineText().isEmpty());
+        // Something else typed, or Escape: gone.
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QTest::keyClicks(f.editor, "x");
+        QTRY_VERIFY(!f.controller->fullLineText().isEmpty());
+        QTest::keyClick(f.editor, Qt::Key_Escape);
+        QVERIFY(f.controller->fullLineText().isEmpty());
+        QVERIFY(f.controller->previewText().isEmpty());
+        QTest::keyClicks(f.editor, "y");
+        QTRY_VERIFY(!f.controller->fullLineText().isEmpty());
+        QTest::keyClicks(f.editor, "z");
+        QVERIFY(f.controller->fullLineText().isEmpty() || f.controller->fullLineText() == model.answer);
+        // Not where code follows the cursor.
+        const int requests = model.requests;
+        f.editor->setCursorPosition(0, 3);
+        QTest::keyClicks(f.editor, "q");
+        QTest::qWait(400);
+        QCOMPARE(model.requests, requests);
+    }
+
+    void fullLineAsksTheLocalServer()
+    {
+        // A server answering each request with `answer`, keeping what it got.
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        QByteArray received;
+        QByteArray answer;
+        connect(&server, &QTcpServer::newConnection, &server, [&] {
+            QTcpSocket *socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                received += socket->readAll();
+                const int headerEnd = int(received.indexOf("\r\n\r\n"));
+                const int length = int(received.mid(received.toLower().indexOf("content-length:") + 15).split('\r').first().trimmed().toInt());
+                if (headerEnd < 0 || received.size() < headerEnd + 4 + length)
+                    return;
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                              + QByteArray::number(answer.size()) + "\r\nConnection: close\r\n\r\n" + answer);
+                socket->disconnectFromHost();
+            });
+        });
+        const QUrl endpoint(QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort()));
+        LocalFullLineModel model;
+        QString suggestion = "<none>";
+        model.configure(LocalFullLineModel::Server::Ollama, endpoint, "coder");
+        answer = R"({"response": "Value(x);\nreturn 0;"})";
+        model.suggest("print", "\n}", "cpp", [&](const QString &text) { suggestion = text; });
+        QTRY_COMPARE(suggestion, QString("Value(x);"));
+        QVERIFY(received.startsWith("POST /api/generate "));
+        QJsonObject body = QJsonDocument::fromJson(received.mid(received.indexOf("\r\n\r\n") + 4)).object();
+        QCOMPARE(body.value("model").toString(), QString("coder"));
+        QCOMPARE(body.value("prompt").toString(), QString("print"));
+        QCOMPARE(body.value("suffix").toString(), QString("\n}"));
+
+        received.clear();
+        suggestion = "<none>";
+        model.configure(LocalFullLineModel::Server::LlamaCpp, endpoint, {});
+        answer = R"({"content": " + 1;"})";
+        model.suggest("x = y", "", "cpp", [&](const QString &text) { suggestion = text; });
+        QTRY_COMPARE(suggestion, QString(" + 1;"));
+        QVERIFY(received.startsWith("POST /infill "));
+        body = QJsonDocument::fromJson(received.mid(received.indexOf("\r\n\r\n") + 4)).object();
+        QCOMPARE(body.value("input_prefix").toString(), QString("x = y"));
+
+        // No server: an empty suggestion, the failure said once.
+        server.close();
+        QSignalSpy failures(&model, &LocalFullLineModel::failed);
+        suggestion = "<none>";
+        model.suggest("a", "", "cpp", [&](const QString &text) { suggestion = text; });
+        QTRY_COMPARE(suggestion, QString());
+        model.suggest("a", "", "cpp", [](const QString &) {});
+        QTRY_COMPARE(failures.count(), 1);
+    }
+
+    void docCommentOfTheFunctionBelow()
+    {
+        QCOMPARE(DocComments::commentStart("/** abc @", 9, "cpp"), 0);
+        QCOMPARE(DocComments::commentStart("/* abc @", 8, "cpp"), -1); // not a documentation comment
+        QCOMPARE(DocComments::commentStart("/** a */ x", 10, "cpp"), -1);
+        QCOMPARE(DocComments::commentStart("    /// see @", 13, "cpp"), 4);
+
+        Fixture f("\ntemplate <typename T>\nint add(int a, const T &b = {});\n", 0, 0);
+        QTest::keyClicks(f.editor, "/**");
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(), QString("/**\n * \n *\n * @tparam T \n * @param a \n * @param b \n * @return \n */\n"
+                                           "template <typename T>\nint add(int a, const T &b = {});\n"));
+        QCOMPARE(cursorLine(f.editor), 1); // the summary first
+        QVERIFY(f.controller->snippet()->isActive());
+        QTest::keyClicks(f.editor, "Adds them.");
+        QTest::keyClick(f.editor, Qt::Key_Tab);
+        QCOMPARE(cursorLine(f.editor), 3); // the template parameter's text
+        // Java: "@throws".
+        Fixture java("\npublic int read(byte[] buffer) throws IOException {\n}\n", 0, 0, {}, "A.java");
+        QTest::keyClicks(java.editor, "/**");
+        QTest::keyClick(java.editor, Qt::Key_Return);
+        QVERIFY(java.editor->text().contains(" * @param buffer \n * @return \n * @throws IOException \n */\n"));
+        // Nothing to document: the summary only.
+        Fixture empty("\n", 0, 0);
+        QTest::keyClicks(empty.editor, "/**");
+        QTest::keyClick(empty.editor, Qt::Key_Return);
+        QCOMPARE(empty.editor->text(), QString("/**\n * \n */\n"));
+    }
+
+    void docCommentTagsAndParameters()
+    {
+        Fixture f("/**\n * \n */\nint add(int first, int second);\n", 1, 3);
+        f.service.addProvider(std::make_shared<DocCommentProvider>());
+        QTest::keyClicks(f.editor, "@");
+        QTRY_VERIFY(f.controller->isActive());
+        QVERIFY(f.controller->popup()->labels().contains("param"));
+        QVERIFY(f.controller->popup()->labels().contains("brief"));
+        QVERIFY(!f.controller->popup()->labels().contains("int")); // no keywords in comments
+        QTest::keyClicks(f.editor, "par");
+        QCOMPARE(f.controller->popup()->labels().first(), QString("param"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QTest::keyClicks(f.editor, " ");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels(), QStringList({"first", "second"}));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(1), QString(" * @param first\n"));
+        // The next "@param": only the one left.
+        QTest::keyClick(f.editor, Qt::Key_End);
+        QTest::keyClicks(f.editor, " x @param ");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels(), QStringList({"second"}));
+        QTest::keyClick(f.editor, Qt::Key_Escape);
+        // "\" in C++ too.
+        QTest::keyClicks(f.editor, "\\ret");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("return"));
+    }
+
+    void codeScanReadsDeclarations()
+    {
+        CodeScan::Function f = CodeScan::parseFunction("virtual QSize sizeHint(int a, const QString &b = {}) const override");
+        QCOMPARE(f.name, QString("sizeHint"));
+        QCOMPARE(f.returnType, QString("QSize"));
+        QVERIFY(f.specifiers.contains("virtual"));
+        QCOMPARE(f.qualifiers(), QString("const"));
+        QCOMPARE(f.parameterList().size(), 2);
+        QCOMPARE(f.parameterList()[1].name, QString("b"));
+        QCOMPARE(f.parameterList()[1].text, QString("const QString &b"));
+        QCOMPARE(f.parameterList()[1].defaultValue, QString("{}"));
+        f = CodeScan::parseFunction("int Foo::Bar::size() const");
+        QCOMPARE(f.scope, QString("Foo::Bar"));
+        QCOMPARE(f.name, QString("size"));
+        QVERIFY(CodeScan::parseFunction("virtual void paint() = 0").pure);
+        QVERIFY(CodeScan::parseFunction("if (x > 0)").name.isEmpty());
+        QVERIFY(CodeScan::parseFunction("int x = f(y)").name.isEmpty());
+        QVERIFY(CodeScan::parseFunction("return f(y)").name.isEmpty());
+        QVERIFY(CodeScan::parseFunction("a.f(b)").name.isEmpty());
+        f = CodeScan::parseFunction("@Override\npublic java.util.List<String> names(int max) throws IOException");
+        QCOMPARE(f.name, QString("names"));
+        QCOMPARE(f.returnType, QString("java.util.List<String>"));
+        QVERIFY(f.specifiers.contains("@Override"));
+        QCOMPARE(CodeScan::parseFunction("Widget(QWidget *parent = nullptr)").returnType, QString());
+        QCOMPARE(CodeScan::parseParameter("void (*callback)(int)").name, QString("callback"));
+        QCOMPARE(CodeScan::parseParameter("int").name, QString());
+        QCOMPARE(CodeScan::parseParameter("char *argv[]").name, QString("argv"));
+        QCOMPARE(CodeScan::parseParameter("...rest", false).name, QString("rest"));
+
+        const QByteArray text = "// class Fake {\nclass Q_DECL_EXPORT Widget final : public QObject, private Base<int> {\n"
+                                "    Q_OBJECT\npublic:\n    void a();\nsignals:\n    void changed();\n"
+                                "private:\n    int b() const { return 1; }\n    struct Inner { int x; };\n};\n";
+        const QByteArray blanked = CodeScan::blank(text);
+        QCOMPARE(blanked.size(), text.size());
+        const int body = CodeScan::classBody(blanked, "Widget");
+        QCOMPARE(text[body], '{');
+        const CodeScan::ClassHeader header = CodeScan::classAt(blanked, body);
+        QCOMPARE(header.name, QString("Widget"));
+        QCOMPARE(header.bases, QStringList({"QObject", "Base"}));
+        const QList<CodeScan::Declaration> declarations = CodeScan::declarationsIn(blanked, body);
+        QCOMPARE(declarations.size(), 4);
+        QCOMPARE(declarations[0].text, QString("void a()"));
+        QCOMPARE(declarations[0].access, QString("public"));
+        QCOMPARE(declarations[1].access, QString("signals"));
+        QVERIFY(declarations[2].hasBody);
+        QCOMPARE(declarations[3].text, QString("struct Inner"));
+        QCOMPARE(CodeScan::blank("a = \"{\"; // }\nb").count('{'), 0);
+    }
+
+    void overridesFromTheBaseClass()
+    {
+        const QByteArray text = "class Base {\npublic:\n    virtual ~Base();\n    virtual void paint(int x) const;\n"
+                                "    virtual int size() const = 0;\n    void plain();\n    virtual void done() final;\n};\n"
+                                "class Derived : public Base {\npublic:\n    \n};\n";
+        auto provider = std::make_shared<CodeGenerationProvider>(nullptr, CodeGenerationProvider::Counterpart());
+        Fixture f(text, 10, 4, provider);
+        QTest::keyClicks(f.editor, "pai");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("paint"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(10), QString("    void paint(int x) const override\n"));
+        QCOMPARE(f.editor->text(11), QString("    {\n"));
+        QCOMPARE(f.editor->text(12), QString("        Base::paint(x);\n"));
+        QCOMPARE(f.editor->text(13), QString("    }\n"));
+        QTest::keyClick(f.editor, Qt::Key_End);
+        QTest::keyClick(f.editor, Qt::Key_Down);
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QTest::keyClicks(f.editor, "s");
+        f.controller->complete();
+        QTRY_VERIFY(f.controller->isActive());
+        const QStringList labels = f.controller->popup()->labels();
+        QVERIFY(labels.contains("size"));
+        QVERIFY(!labels.contains("paint")); // overridden now
+        QVERIFY(!labels.contains("plain")); // not virtual
+        f.controller->close();
+        QTest::keyClicks(f.editor, "d");
+        f.controller->complete();
+        QTRY_VERIFY(f.controller->isActive());
+        QVERIFY(!f.controller->popup()->labels().contains("done")); // final
+        // In a header: the declaration only.
+        Fixture h(text, 10, 4, provider, "a.h");
+        QTest::keyClicks(h.editor, "si");
+        QTRY_VERIFY(h.controller->isActive());
+        QCOMPARE(h.controller->popup()->labels().first(), QString("size"));
+        QTest::keyClick(h.editor, Qt::Key_Return);
+        QCOMPARE(h.editor->text(10), QString("    int size() const override;\n"));
+        // Java.
+        const QByteArray java = "interface Shape {\n    double area();\n    static Shape unit() { return null; }\n}\n"
+                                "class Circle implements Shape {\n    \n}\n";
+        Fixture j(java, 5, 4, provider, "Circle.java");
+        QTest::keyClicks(j.editor, "are");
+        QTRY_VERIFY(j.controller->isActive());
+        QCOMPARE(j.controller->popup()->labels().first(), QString("area"));
+        QTest::keyClick(j.editor, Qt::Key_Return);
+        QCOMPARE(j.editor->text(5), QString("    @Override\n"));
+        QCOMPARE(j.editor->text(6), QString("    public double area() {\n"));
+        j.controller->close();
+        j.editor->setCursorPosition(9, 0);
+        QTest::keyClicks(j.editor, "toS");
+        QTRY_VERIFY(j.controller->isActive());
+        QVERIFY(j.controller->popup()->labels().contains("toString")); // Object's
+        QVERIFY(!j.controller->popup()->labels().contains("unit"));    // static
+    }
+
+    void implementationsFromTheHeader()
+    {
+        QTemporaryDir headers;
+        QFile header(headers.filePath("a.h"));
+        QVERIFY(header.open(QIODevice::WriteOnly));
+        header.write("class Foo : public QObject {\n    Q_OBJECT\npublic:\n    explicit Foo(int n = 0);\n"
+                     "    virtual int size() const override;\n    void clear();\n    int inlined() const { return 0; }\n"
+                     "    virtual void abstract() = 0;\nsignals:\n    void changed();\n};\nint helper(double x);\n");
+        header.close();
+        const QString headerPath = headers.filePath("a.h");
+        auto provider = std::make_shared<CodeGenerationProvider>(nullptr, [headerPath](const QString &) { return headerPath; });
+        Fixture f("#include \"a.h\"\n\nvoid Foo::clear()\n{\n}\n\n", 5, 0, provider);
+        QTest::keyClicks(f.editor, "si");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("size"));
+        QTest::keyClick(f.editor, Qt::Key_Escape);
+        QTest::keyClick(f.editor, Qt::Key_Backspace);
+        QTest::keyClick(f.editor, Qt::Key_Backspace);
+        f.controller->complete();
+        QTRY_VERIFY(f.controller->isActive());
+        const QStringList labels = f.controller->popup()->labels();
+        QVERIFY(labels.contains("Foo")); // the constructor
+        QVERIFY(labels.contains("helper"));
+        QCOMPARE(labels.count("clear"), 1);    // defined already: the word of the file only
+        QVERIFY(!labels.contains("inlined"));  // has a body
+        QVERIFY(!labels.contains("abstract")); // pure
+        QVERIFY(!labels.contains("changed"));  // a signal: moc writes it
+        f.controller->close();
+        QTest::keyClicks(f.editor, "Foo::si");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels(), QStringList({"size"}));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(5), QString("int Foo::size() const\n"));
+        QCOMPARE(f.editor->text(6), QString("{\n"));
+        QCOMPARE(f.editor->text(8), QString("}\n"));
+        int line = 0;
+        int index = 0;
+        f.editor->getCursorPosition(&line, &index);
+        QCOMPARE(line, 7);
+    }
+
+    void namesFromTheDeclaredType()
+    {
+        using P = NameSuggestionProvider;
+        QCOMPARE(P::namesFor("QListWidget", "cpp"), QStringList({"listWidget", "widget"}));
+        QCOMPARE(P::namesFor("std::vector<Item>", "cpp").first(), QString("items"));
+        QCOMPARE(P::namesFor("QList<Entry *>", "cpp").first(), QString("entries"));
+        QCOMPARE(P::namesFor("std::unique_ptr<HttpRequest>", "cpp"), QStringList({"httpRequest", "request"}));
+        QCOMPARE(P::namesFor("HTMLParser", "cpp"), QStringList({"htmlParser", "parser"}));
+        QCOMPARE(P::namesFor("Box[]", "java").first(), QString("boxes"));
+        QCOMPARE(P::namesFor("my_type_t", "c"), QStringList({"my_type", "type"}));
+        QCOMPARE(P::namesFor("int", "cpp").first(), QString("i"));
+        QCOMPARE(P::declaredTypeAt("    const Widget *", 17, "cpp"), QString("Widget"));
+        QCOMPARE(P::declaredTypeAt("void f(std::map<K, V> ", 22, "cpp"), QString("std::map<K, V>"));
+        QCOMPARE(P::declaredTypeAt("    return Foo ", 15, "cpp"), QString());
+        QCOMPARE(P::declaredTypeAt("    foo ", 8, "cpp"), QString()); // not a type
+        QCOMPARE(P::declaredTypeAt("    Widget", 10, "cpp"), QString()); // the type itself
+        QCOMPARE(P::declaredTypeAt("    private final Widget ", 25, "java"), QString("Widget"));
+
+        Fixture f("int main() {\n    QListWidget \n}\n", 1, 16, std::make_shared<NameSuggestionProvider>());
+        QTest::keyClicks(f.editor, "w");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("widget"));
+        QTest::keyClick(f.editor, Qt::Key_Backspace);
+        f.controller->complete();
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().mid(0, 2), QStringList({"listWidget", "widget"}));
+    }
+
+    void parameterInfoAfterAFunction()
+    {
+        auto late = std::make_shared<LateProvider>();
+        Fixture f("int main() {\n    \n}\n", 1, 4, late);
+        QSignalSpy calls(f.controller, &CompletionController::callInserted);
+        QTest::keyClicks(f.editor, "pri");
+        QTRY_VERIFY(late->pending);
+        CompletionItem print{"print", "print(${1:int a})", {}, CompletionItem::Kind::Function, 10};
+        print.isSnippet = true;
+        CompletionItem variable{"printed", {}, {}, CompletionItem::Kind::Variable, 9};
+        late->pending({print, variable}, false);
+        QTRY_VERIFY(f.controller->isActive());
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(calls.count(), 1);
+        QTest::keyClick(f.editor, Qt::Key_End);
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QTest::keyClicks(f.editor, "pri");
+        QTRY_VERIFY(late->pending);
+        late->pending({print, variable}, false);
+        QTRY_VERIFY(f.controller->isActive());
+        QTest::keyClick(f.editor, Qt::Key_Down);
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(calls.count(), 1); // a variable: no call
+    }
+
+    void postfixChoosesTheExpression()
+    {
+        const auto starts = [](const QByteArray &text) {
+            const int dot = int(text.lastIndexOf('.'));
+            QList<QByteArray> result;
+            for (const int at : PostfixTemplateProvider::expressionStarts(text, dot))
+                result.append(text.mid(at, dot - at));
+            return result;
+        };
+        QCOMPARE(starts("    a + b."), QList<QByteArray>({"b", "a + b"}));
+        QCOMPARE(starts("x = n * f(y) - z."), QList<QByteArray>({"z", "f(y) - z", "n * f(y) - z"}));
+        QCOMPARE(starts("    ready && !done."), QList<QByteArray>({"done", "!done", "ready && !done"}));
+        QCOMPARE(starts("total += b."), QList<QByteArray>({"b"}));
+        QCOMPARE(starts("return a.b."), QList<QByteArray>({"a.b"}));
+
+        Fixture f("int main() {\n    a + b\n}\n", 1, 9);
+        f.service.addProvider(std::make_shared<PostfixTemplateProvider>());
+        // "if" only fits the whole: no choice.
+        QTest::keyClicks(f.editor, ".if");
+        QTRY_VERIFY(f.controller->isActive());
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(1), QString("    if (a + b) {\n"));
+        f.editor->undo();
+        QTest::keyClick(f.editor, Qt::Key_End);
+        for (int i = 0; i < 3; ++i)
+            QTest::keyClick(f.editor, Qt::Key_Backspace);
+        QCOMPARE(f.editor->text(1), QString("    a + b\n"));
+        // "not": "b" or "a + b".
+        QTest::keyClicks(f.editor, ".not");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("not"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QVERIFY(f.controller->isChoosing());
+        QCOMPARE(f.controller->popup()->labels(), QStringList({"b", "a + b"}));
+        QVERIFY(f.controller->popup()->keyHint().startsWith("Expression to wrap"));
+        QCOMPARE(f.editor->text(1), QString("    a + b.not\n")); // nothing inserted yet
+        QTest::keyClick(f.editor, Qt::Key_Down);
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QVERIFY(!f.controller->isActive());
+        QCOMPARE(f.editor->text(1), QString("    !(a + b)\n"));
+        f.editor->undo();
+        QCOMPARE(f.editor->text(1), QString("    a + b.not\n"));
+        // Escape gives the choice up.
+        QTest::keyClick(f.editor, Qt::Key_End);
+        for (int i = 0; i < 3; ++i)
+            QTest::keyClick(f.editor, Qt::Key_Backspace);
+        QTest::keyClicks(f.editor, "par");
+        QTRY_VERIFY(f.controller->isActive());
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QVERIFY(f.controller->isChoosing());
+        QTest::keyClick(f.editor, Qt::Key_Escape);
+        QVERIFY(!f.controller->isActive());
+        QCOMPARE(f.editor->text(1), QString("    a + b.par\n"));
+    }
+
 private:
+    static int cursorLine(EditorWidget *editor)
+    {
+        int line = 0;
+        int index = 0;
+        editor->getCursorPosition(&line, &index);
+        return line;
+    }
+
     // An editor showing a C++ file, with completion, the cursor at
     // (line, index).
     struct Fixture {
-        Fixture(const QByteArray &text, int line, int index, std::shared_ptr<ICompletionProvider> extra = {})
+        Fixture(const QByteArray &text, int line, int index, std::shared_ptr<ICompletionProvider> extra = {},
+                const QString &name = QStringLiteral("a.cpp"))
         {
-            QFile file(dir.filePath("a.cpp"));
+            QFile file(dir.filePath(name));
             if (!file.open(QIODevice::WriteOnly))
                 qFatal("cannot write");
             file.write(text);
@@ -609,7 +1167,7 @@ private:
             service.addProvider(std::make_shared<KeywordProvider>());
             service.addProvider(std::make_shared<DocumentWordsProvider>());
             editor = new EditorWidget(Theme::dark(), &window);
-            editor->load(dir.filePath("a.cpp"), nullptr);
+            editor->load(dir.filePath(name), nullptr);
             controller = new CompletionController(editor, &service);
             window.resize(800, 600);
             editor->resize(800, 600);

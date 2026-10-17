@@ -8,8 +8,10 @@
 // "items.for" becomes "for (auto &item : items) {}", "ptr.nn" becomes
 // "if (ptr != nullptr) {}", "Widget.make_unique" becomes
 // "std::make_unique<Widget>()". Statements (if, for, return, var...) are
-// only offered where the expression starts a statement. For C, C++, Java,
-// JavaScript and TypeScript.
+// only offered where the expression starts a statement. When several
+// expressions end at the dot ("a + b.if"), the user picks the one to
+// wrap (see CompletionItem::choices). For C, C++, Java, JavaScript and
+// TypeScript.
 class PostfixTemplateProvider : public ICompletionProvider {
 public:
     bool handles(const CompletionContext &context) const override;
@@ -22,6 +24,10 @@ public:
     // ("this->items[i].name", "make<int>(x)", "new Foo()"), or a
     // parenthesized expression. -1 if there is none.
     static int expressionStart(const QByteArray &text, int dot);
+    // The expressions a template after the dot at `dot` can wrap, nearest
+    // first: the one of expressionStart(), then with the operands before
+    // it ("b", "a + b", "!x" in "a + b.if", "!x.if"). Empty if none.
+    static QList<int> expressionStarts(const QByteArray &text, int dot);
     // A variable name for the value of `expression`: "getWidget()" →
     // "widget", "items.size()" → "size"; "value" when nothing fits.
     static QString suggestName(const QString &expression);

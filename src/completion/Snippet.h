@@ -34,5 +34,7 @@ struct ExpandedSnippet {
 namespace Snippet {
 
 ExpandedSnippet expand(const QString &snippet);
+// `text` as literal text in a snippet: "$", "}" and "\\" escaped.
+QString escape(QString text);
 
 } // namespace Snippet

@@ -300,7 +300,7 @@ void CompletionPopup::applyTheme(const Theme &theme)
     view_->viewport()->update();
 }
 
-int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString &prefix)
+int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString &prefix, bool anywhere)
 {
     // Candidates are scored by index; only the kept ones are copied (an
     // item carries strings, edits and callbacks).
@@ -315,7 +315,7 @@ int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString 
         // The word already typed in full is no suggestion.
         if (item.kind == CompletionItem::Kind::Text && item.label == prefix)
             continue;
-        if (std::optional<FuzzyMatch::Match> match = FuzzyMatch::match(prefix, item.label))
+        if (std::optional<FuzzyMatch::Match> match = FuzzyMatch::match(prefix, item.label, anywhere))
             scored.push_back({i, match->score + item.priority, std::move(*match)});
     }
     const auto before = [&items](const Scored &a, const Scored &b) {
@@ -329,7 +329,7 @@ int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString 
             return first.label.size() < second.label.size();
         return a.index < b.index; // stable
     };
-    constexpr size_t maxKept = 200; // nobody scrolls further
+    const size_t maxKept = anywhere ? 500 : 200; // nobody scrolls further
     const size_t kept = std::min(scored.size(), maxKept);
     std::partial_sort(scored.begin(), scored.begin() + static_cast<std::ptrdiff_t>(kept), scored.end(), before);
     std::vector<Entry> entries;

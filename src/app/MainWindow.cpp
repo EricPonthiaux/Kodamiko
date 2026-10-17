@@ -6,8 +6,12 @@
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
 #include "completion/CompletionController.h"
+#include "completion/CodeGeneration.h"
 #include "completion/CompletionService.h"
+#include "completion/DocComments.h"
+#include "completion/FullLine.h"
 #include "completion/LocalCompletion.h"
+#include "completion/NameSuggestions.h"
 #include "completion/Templates.h"
 #include "editor/ChangeGutter.h"
 #include "editor/EditorStatus.h"
@@ -191,8 +195,20 @@ void MainWindow::createWidgets()
     completion_->addProvider(std::make_shared<DocumentWordsProvider>());
     completion_->addProvider(std::make_shared<PostfixTemplateProvider>());
     completion_->addProvider(std::make_shared<LiveTemplateProvider>());
+    completion_->addProvider(std::make_shared<NameSuggestionProvider>());
+    completion_->addProvider(std::make_shared<CodeGenerationProvider>(symbolIndex_, &CodeIntelligence::counterpartOf));
+    completion_->addProvider(std::make_shared<DocCommentProvider>());
+    fullLineModel_ = new LocalFullLineModel(this);
+    connect(fullLineModel_, &LocalFullLineModel::failed, this,
+            [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
+    applyFullLine(Preferences::load());
     connect(editorTabs_, &EditorTabs::editorOpened, this, [this](EditorWidget *editor) {
-        new CompletionController(editor, completion_);
+        auto *controller = new CompletionController(editor, completion_);
+        // The parameters of the function just chosen.
+        connect(controller, &CompletionController::callInserted, this, [this, editor] {
+            if (intelligence_)
+                intelligence_->requestParameterInfo(editor);
+        });
         // Once the file is loaded and the tab shown.
         QTimer::singleShot(0, editor, [this, editor] { warmUpLanguageServer(editor); });
     });
@@ -629,6 +645,11 @@ void MainWindow::createEditMenu()
             if (CompletionController *completion = CompletionController::of(editor))
                 completion->complete();
     });
+    edit->addAction(tr("S&mart Complete Code"), QKeySequence(tr("Ctrl+Shift+Space")), this, [this] {
+        if (EditorWidget *editor = editorTabs_->currentEditor(); editor && mode_ == Mode::Edit)
+            if (CompletionController *completion = CompletionController::of(editor))
+                completion->completeSmart();
+    });
     const auto inCode = [this](void (CodeIntelligence::*command)()) {
         return [this, command] {
             if (mode_ == Mode::Edit)
@@ -1051,6 +1072,14 @@ void MainWindow::showPreferences()
     preferencesPopup_->popup(Preferences::load(), Keymap::commands(titleBar_->menuBar()), Keymap::loadOverrides());
 }
 
+void MainWindow::applyFullLine(const Preferences &preferences)
+{
+    fullLineModel_->configure(preferences.fullLineServer == QLatin1String("llama.cpp") ? LocalFullLineModel::Server::LlamaCpp
+                                                                                       : LocalFullLineModel::Server::Ollama,
+                              QUrl(preferences.fullLineEndpoint), preferences.fullLineModel);
+    completion_->setFullLineModel(preferences.fullLineCompletion ? fullLineModel_ : nullptr);
+}
+
 void MainWindow::applyPreferences(const Preferences &preferences)
 {
     const Preferences previous = Preferences::load();
@@ -1065,6 +1094,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     editorTabs_->setEditorOptions(preferences.editor);
     languageServers_->setEnabled(preferences.languageServers);
     warmUpLanguageServers();
+    applyFullLine(preferences);
     filesPanel_->setAlwaysSelectOpenedFile(preferences.alwaysSelectOpenedFile);
 }
 

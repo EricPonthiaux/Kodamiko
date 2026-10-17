@@ -17,6 +17,9 @@ public:
     bool handles(const CompletionContext &context) const override;
     void complete(const CompletionContext &context, const Callback &done) override;
     QString triggerCharacters(const QString &languageId) const override;
+    // Smart completion: the candidates of the expected type, asked from
+    // the server's signature help inside a call's arguments.
+    bool servesSmart() const override { return true; }
 
     // Candidates of a "textDocument/completion" result (a list, or an
     // object with "items" and "isIncomplete"). With `client`, the
@@ -24,7 +27,13 @@ public:
     // ("completionItem/resolve"). Public for tests.
     static QList<CompletionItem> parse(const QJsonValue &result, bool *incomplete, LspClient *client = nullptr);
     static QList<TextEdit> parseEdits(const QJsonArray &edits);
+    // The type of the active parameter in a "textDocument/signatureHelp"
+    // result, empty if none. Public for tests.
+    static QString activeParameterType(const QJsonValue &help, const QString &languageId);
 
 private:
+    void request(LspClient *client, const CompletionContext &context, const QString &expectedType,
+                 const Callback &done);
+
     LanguageServers *servers_;
 };

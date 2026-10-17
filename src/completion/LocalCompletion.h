@@ -10,7 +10,8 @@ class SymbolIndex;
 
 // Completion without a language server: what can be known from the text.
 
-// Identifiers of the current file, nearest to the cursor first.
+// Identifiers of the current file, nearest to the cursor first; in
+// extended completion, those of the other open files too.
 class DocumentWordsProvider : public ICompletionProvider {
 public:
     bool handles(const CompletionContext &context) const override;
@@ -27,6 +28,8 @@ class KeywordProvider : public ICompletionProvider {
 public:
     bool handles(const CompletionContext &context) const override;
     void complete(const CompletionContext &context, const Callback &done) override;
+    // "true", "nullptr"... where their type is expected.
+    bool servesSmart() const override { return true; }
 
     static QStringList keywords(const QString &languageId);
 };

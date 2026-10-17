@@ -3,7 +3,10 @@
 #include "Completion.h"
 #include "CompletionHistory.h"
 
+#include "FullLine.h"
+
 #include <QObject>
+#include <QPointer>
 
 #include <memory>
 #include <vector>
@@ -25,6 +28,10 @@ public:
     // What the user chose before, to rank the candidates (see
     // CompletionController).
     CompletionHistory *history() { return &history_; }
+    // The model that suggests the rest of the line (Full Line
+    // completion); nullptr when it is off.
+    void setFullLineModel(FullLineModel *model) { fullLineModel_ = model; }
+    FullLineModel *fullLineModel() const { return fullLineModel_; }
 
     // Asks the providers; calls `update` with all the candidates gathered so
     // far each time one answers (right away for the local ones). A new
@@ -42,5 +49,6 @@ public:
 private:
     std::vector<std::shared_ptr<ICompletionProvider>> providers_;
     CompletionHistory history_;
+    QPointer<FullLineModel> fullLineModel_;
     int generation_ = 0;
 };

@@ -14,8 +14,11 @@ bool isWordStart(const QString &text, int i)
         return true;
     const QChar previous = text[i - 1];
     const QChar current = text[i];
-    if (previous == QLatin1Char('_') || previous == QLatin1Char('-') || previous == QLatin1Char('$'))
-        return current != QLatin1Char('_');
+    // Separators, and the "::" or "." of a qualified name ("Foo::size").
+    if (previous == QLatin1Char('_') || previous == QLatin1Char('-') || previous == QLatin1Char('$')
+        || previous == QLatin1Char(':') || previous == QLatin1Char('.') || previous == QLatin1Char('~')
+        || previous == QLatin1Char(' '))
+        return current != previous;
     if (current.isUpper() && previous.isLower())
         return true;
     if (current.isLetter() && previous.isDigit())
@@ -27,7 +30,7 @@ constexpr int noMatch = INT_MIN / 2;
 
 } // namespace
 
-std::optional<Match> match(const QString &pattern, const QString &candidate)
+std::optional<Match> match(const QString &pattern, const QString &candidate, bool anywhere)
 {
     if (pattern.isEmpty())
         return Match{};
@@ -79,8 +82,8 @@ std::optional<Match> match(const QString &pattern, const QString &candidate)
     };
 
     for (int j = 0; j < m; ++j) {
-        // The first letter: at the start of a word only.
-        if (!wordStart[size_t(j)])
+        // The first letter: at the start of a word only, unless anywhere.
+        if (!wordStart[size_t(j)] && !anywhere)
             continue;
         const int score = charScore(0, j);
         if (score != noMatch)

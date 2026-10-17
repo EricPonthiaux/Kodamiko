@@ -17,11 +17,14 @@ void CompletionService::addProvider(std::shared_ptr<ICompletionProvider> provide
 
 namespace {
 
-// A template is no keyword or member of the same name ("for", "begin").
+// A template is no keyword or member of the same name ("for", "begin"),
+// and generated code no other of the same name (a constructor and the
+// destructor).
 QString keyOf(const CompletionItem &item)
 {
-    return item.kind == CompletionItem::Kind::Snippet || item.replaceStart >= 0 ? item.label + QChar(0x1)
-                                                                                 : item.label;
+    return item.kind == CompletionItem::Kind::Snippet || item.replaceStart >= 0
+               ? item.label + QChar(0x1) + item.insertText
+               : item.label;
 }
 
 } // namespace
@@ -59,7 +62,8 @@ void CompletionService::request(const CompletionContext &context, const Update &
     auto incomplete = std::make_shared<bool>(false);
     QPointer<CompletionService> self(this);
     for (const std::shared_ptr<ICompletionProvider> &provider : providers_) {
-        if (!provider->handles(context))
+        if (!provider->handles(context) || provider->servesComments() != context.inDocComment
+            || (context.mode == CompletionContext::Mode::Smart && !provider->servesSmart()))
             continue;
         provider->complete(context, [self, generation, gathered, incomplete,
                                      update](const QList<CompletionItem> &items, bool partial) {

@@ -35,11 +35,23 @@ struct CompletionItem {
     int order = INT_MAX;
     // insertText is a snippet: "printValue(${1:int value})" (see Snippet).
     bool isSnippet = false;
+    // The type of the candidate's value ("int" for a variable, the return
+    // type of a function), for smart completion; empty when unknown.
+    QString type;
     // Where the insertion starts, in bytes of the context's text, when
     // before the typed prefix: a postfix template replaces the expression
     // before the dot ("items.for" → "for (auto &item : items)"). -1: the
     // prefix's start.
     int replaceStart = -1;
+    // Other ways to insert it, one of which the user picks once the
+    // candidate is chosen: the expression a postfix template wraps ("b" or
+    // "a + b" in "a + b.if"), nearest first. Empty: none to choose.
+    struct Choice {
+        QString label; // shown in the list: the expression
+        QString insertText;
+        int replaceStart = -1;
+    };
+    QList<Choice> choices;
     // Applied with the candidate, elsewhere in the file (imports).
     QList<TextEdit> additionalEdits;
     // When the edits are only known once the candidate is chosen (jdtls's
@@ -62,6 +74,15 @@ QString kindName(CompletionItem::Kind kind);
 
 // Where completion is asked, as the providers see it.
 struct CompletionContext {
+    enum class Mode {
+        Basic,
+        // Ctrl+Space a second time: more candidates (matching anywhere
+        // in the name, words of the other open files).
+        Extended,
+        // Ctrl+Shift+Space: only what has the expected type.
+        Smart,
+    };
+
     QString filePath;
     QString languageId;  // LanguageRegistry identifier
     QByteArray text;     // the editor's text, UTF-8
@@ -74,6 +95,16 @@ struct CompletionContext {
     // typing an identifier or on Ctrl+Space.
     QChar triggerCharacter;
     bool explicitRequest = false; // Ctrl+Space
+    Mode mode = Mode::Basic;
+    // Smart completion: the type expected at the cursor, as far as the
+    // text tells (see ExpectedType); empty when unknown.
+    QString expectedType;
+    // Inside a documentation comment ("/** ... */", "///"): only the
+    // providers that serve comments are asked.
+    bool inDocComment = false;
+    // Extended completion: the text of the other open files of the
+    // language.
+    QList<QByteArray> otherTexts;
 };
 
 // A source of candidates. The candidates need not match the prefix: the
@@ -93,6 +124,12 @@ public:
     // language server answers asynchronously). `done` may be dropped
     // when the request is outdated.
     virtual void complete(const CompletionContext &context, const Callback &done) = 0;
+    // Whether it serves documentation comments (tags, parameter names);
+    // those that do serve nothing else.
+    virtual bool servesComments() const { return false; }
+    // Whether it takes part in smart completion, offering only what has
+    // the expected type.
+    virtual bool servesSmart() const { return false; }
     // Characters that open completion after them, such as "." for members.
     virtual QString triggerCharacters(const QString &languageId) const
     {

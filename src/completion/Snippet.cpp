@@ -162,4 +162,12 @@ ExpandedSnippet expand(const QString &snippet)
     return Parser(snippet).run();
 }
 
+QString escape(QString text)
+{
+    text.replace(QLatin1Char('\\'), QLatin1String("\\\\"));
+    text.replace(QLatin1Char('$'), QLatin1String("\\$"));
+    text.replace(QLatin1Char('}'), QLatin1String("\\}"));
+    return text;
+}
+
 } // namespace Snippet

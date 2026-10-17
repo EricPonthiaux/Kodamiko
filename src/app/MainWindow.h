@@ -18,20 +18,21 @@ class CodeIntelligence;
 class CodeNavigator;
 class CommandPalette;
 class CompletionService;
-class LanguageServers;
 class EditorStatus;
-class EditorWidget;
 class EditorTabs;
+class EditorWidget;
 class FileStatusReader;
-class FilesPanel;
 class FileTreeView;
+class FilesPanel;
 class FindBar;
 class FindInFilesPopup;
 class GitCommands;
 class GoToPopup;
-class TitleBar;
-class WindowFrame;
 class HistoryView;
+class LanguageServers;
+class LocalFullLineModel;
+class NewBranchPopup;
+class NoticeBar;
 class OutlineView;
 class PreferencesPopup;
 class PrerequisitesDialog;
@@ -47,12 +48,12 @@ class QTabWidget;
 class QToolButton;
 class RepositoryWatcher;
 class SidePanel;
-class NewBranchPopup;
-class NoticeBar;
 class SnapshotsPopup;
 class SymbolIndex;
 class TerminalWidget;
+class TitleBar;
 class Toolchains;
+class WindowFrame;
 struct Preferences;
 struct ProcessSpec;
 
@@ -170,6 +171,8 @@ private:
     // File ▸ Preferences.
     void showPreferences();
     void applyPreferences(const Preferences &preferences);
+    // Full Line completion on or off, with its server.
+    void applyFullLine(const Preferences &preferences);
     // Menu shortcuts, with the user's changes; QScintilla leaves them to the
     // menus.
     void applyKeymap(const Keymap::Overrides &overrides);
@@ -191,6 +194,7 @@ private:
     QSet<QString> claudeTouched_;
     SymbolIndex *symbolIndex_ = nullptr;
     CompletionService *completion_ = nullptr;
+    LocalFullLineModel *fullLineModel_ = nullptr;
     LanguageServers *languageServers_ = nullptr;
     std::unique_ptr<Toolchains> toolchains_;
     ProjectConfig project_;

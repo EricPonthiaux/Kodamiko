@@ -139,6 +139,60 @@ private slots:
         QCOMPARE(items[2].kind, CompletionItem::Kind::Method);
         QCOMPARE(items[2].detail, QString("(int dx)  void"));
         QVERIFY(items[2].insertText.isEmpty()); // the label itself
+        // The types, for smart completion.
+        QCOMPARE(items[0].type, QString("int"));
+        QCOMPARE(items[2].type, QString("void"));
+        QCOMPARE(items[3].type, QString("boolean"));
+    }
+
+    void readsTheActiveParameterType()
+    {
+        const QByteArray json = R"json({"activeSignature": 0, "activeParameter": 1, "signatures": [
+            {"label": "void take(int count, const char *name)",
+             "parameters": [{"label": [10, 19]}, {"label": [21, 37]}]}]})json";
+        QCOMPARE(LspCompletionProvider::activeParameterType(QJsonDocument::fromJson(json).object(), "cpp"),
+                 QString("const char *"));
+        const QByteArray ts = R"json({"signatures": [{"label": "f(size: number): void",
+            "parameters": [{"label": "size: number"}]}], "activeParameter": 0})json";
+        QCOMPARE(LspCompletionProvider::activeParameterType(QJsonDocument::fromJson(ts).object(), "typescript"),
+                 QString("number"));
+    }
+
+    void smartCompletionWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        QTemporaryDir dir;
+        const QByteArray text = "struct Point {\n  int x;\n  const char *name;\n  void move(int dx);\n};\n"
+                                "void take(const char *label);\n"
+                                "int main() {\n  Point p;\n  take(p.\n}\n";
+        QFile file(dir.filePath("a.cpp"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(text);
+        file.close();
+
+        LanguageServers servers;
+        servers.setFolder(dir.path());
+        LspCompletionProvider provider(&servers);
+        CompletionContext context;
+        context.filePath = dir.filePath("a.cpp");
+        context.languageId = "cpp";
+        context.text = text;
+        context.position = int(text.indexOf("p.\n}") + 2);
+        context.prefixStart = context.position;
+        context.line = 8;
+        context.column = 9;
+        context.triggerCharacter = '.';
+        context.mode = CompletionContext::Mode::Smart; // the type: from the signature help
+        QStringList labels;
+        bool answered = false;
+        provider.complete(context, [&](const QList<CompletionItem> &received, bool) {
+            for (const CompletionItem &item : received)
+                labels.append(item.label);
+            answered = true;
+        });
+        QTRY_VERIFY_WITH_TIMEOUT(answered, 30000);
+        QCOMPARE(labels, QStringList({"name"}));
     }
 
     void completesMembersWithClangd()

@@ -321,6 +321,38 @@ QWidget *PreferencesPopup::createEditorPage()
     completion->addWidget(serversFound_);
     addGroup(layout, tr("Completion"), completion);
 
+    auto *fullLine = new SettingsCard;
+    fullLine_ = new ToggleSwitch;
+    fullLine->addRow(tr("Full Line completion"),
+                     tr("A code model on this machine suggests the rest of the line in gray; Tab inserts it. "
+                        "The code around the cursor is sent to the server below."),
+                     fullLine_);
+    fullLineServer_ = new QComboBox;
+    fullLineServer_->addItem(tr("Ollama"), QStringLiteral("ollama"));
+    fullLineServer_->addItem(tr("llama.cpp server"), QStringLiteral("llama.cpp"));
+    fullLineServer_->setAccessibleName(tr("Model server"));
+    fullLineServerRow_ = fullLine->addRow(tr("Server"), tr("Ollama, or llama.cpp's llama-server with a model that fills in the middle."),
+                                          fullLineServer_);
+    fullLineEndpoint_ = new QLineEdit;
+    fullLineEndpoint_->setAccessibleName(tr("Server address"));
+    fullLineEndpoint_->setMinimumWidth(220);
+    fullLineEndpointRow_ = fullLine->addRow(tr("Address"), QString(), fullLineEndpoint_);
+    fullLineModel_ = new QLineEdit;
+    fullLineModel_->setAccessibleName(tr("Model"));
+    fullLineModel_->setMinimumWidth(220);
+    fullLineModelRow_ = fullLine->addRow(tr("Model"), tr("Ollama's model name, such as qwen2.5-coder:1.5b."), fullLineModel_);
+    connect(fullLine_, &ToggleSwitch::toggled, this, &PreferencesPopup::updateFullLineRows);
+    connect(fullLineServer_, &QComboBox::currentIndexChanged, this, [this] {
+        // Each server's usual port, unless another was set.
+        const QString endpoint = fullLineEndpoint_->text().trimmed();
+        const bool ollama = fullLineServer_->currentData().toString() == QLatin1String("ollama");
+        if (endpoint.isEmpty() || endpoint == QLatin1String("http://localhost:11434")
+            || endpoint == QLatin1String("http://localhost:8080"))
+            fullLineEndpoint_->setText(ollama ? QStringLiteral("http://localhost:11434") : QStringLiteral("http://localhost:8080"));
+        updateFullLineRows();
+    });
+    addGroup(layout, tr("Full Line"), fullLine);
+
     auto *saving = new SettingsCard;
     formatOnSave_ = new ToggleSwitch;
     saving->addRow(tr("Format on save"),
@@ -536,6 +568,14 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
     autoCompletion_->setCurrentIndex(std::max(autoCompletion_->findData(int(preferences.editor.autoCompletion)), 0));
     completionAcceptsEnter_->setChecked(preferences.editor.completionAcceptsEnter);
     languageServers_->setChecked(preferences.languageServers);
+    fullLine_->setChecked(preferences.fullLineCompletion);
+    {
+        const QSignalBlocker blocker(fullLineServer_);
+        fullLineServer_->setCurrentIndex(std::max(fullLineServer_->findData(preferences.fullLineServer), 0));
+    }
+    fullLineEndpoint_->setText(preferences.fullLineEndpoint);
+    fullLineModel_->setText(preferences.fullLineModel);
+    updateFullLineRows();
     formatOnSave_->setChecked(preferences.formatOnSave);
     alwaysSelectOpenedFile_->setChecked(preferences.alwaysSelectOpenedFile);
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
@@ -547,6 +587,14 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
     commandFilter_->clear();
     fillCommandList();
     updateFontPreview();
+}
+
+void PreferencesPopup::updateFullLineRows()
+{
+    const bool on = fullLine_->isChecked();
+    fullLineServerRow_->setVisible(on);
+    fullLineEndpointRow_->setVisible(on);
+    fullLineModelRow_->setVisible(on && fullLineServer_->currentData().toString() == QLatin1String("ollama"));
 }
 
 void PreferencesPopup::keyPressEvent(QKeyEvent *event)
@@ -572,6 +620,10 @@ Preferences PreferencesPopup::preferences() const
     preferences.editor.autoCompletion = static_cast<AutoCompletion>(autoCompletion_->currentData().toInt());
     preferences.editor.completionAcceptsEnter = completionAcceptsEnter_->isChecked();
     preferences.languageServers = languageServers_->isChecked();
+    preferences.fullLineCompletion = fullLine_->isChecked();
+    preferences.fullLineServer = fullLineServer_->currentData().toString();
+    preferences.fullLineEndpoint = fullLineEndpoint_->text().trimmed();
+    preferences.fullLineModel = fullLineModel_->text().trimmed();
     preferences.formatOnSave = formatOnSave_->isChecked();
     preferences.alwaysSelectOpenedFile = alwaysSelectOpenedFile_->isChecked();
     preferences.snapshotBeforePrompt = snapshotBeforePrompt_->isChecked();
