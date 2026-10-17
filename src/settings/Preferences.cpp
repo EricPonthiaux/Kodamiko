@@ -50,6 +50,7 @@ Preferences Preferences::load()
     preferences.alwaysSelectOpenedFile = settings.value(QStringLiteral("alwaysSelectOpenedFile"), false).toBool();
 
     preferences.snapshotBeforePrompt = settings.value(QStringLiteral("snapshotBeforePrompt"), true).toBool();
+    preferences.shareEditorContext = settings.value(QStringLiteral("shareEditorContext"), true).toBool();
     preferences.claudeNotifications = settings.value(QStringLiteral("claudeNotifications"), true).toBool();
     return preferences;
 }
@@ -79,6 +80,7 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("alwaysSelectOpenedFile"), alwaysSelectOpenedFile);
 
     settings.setValue(QStringLiteral("snapshotBeforePrompt"), snapshotBeforePrompt);
+    settings.setValue(QStringLiteral("shareEditorContext"), shareEditorContext);
     settings.setValue(QStringLiteral("claudeNotifications"), claudeNotifications);
 }
 

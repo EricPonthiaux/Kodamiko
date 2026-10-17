@@ -3,11 +3,13 @@
 // Claude Code runs this program for every event declared in the hooks
 // (see ClaudeLauncher) and passes it the event as JSON on standard
 // input. We forward it as is to the editor over the local socket named
-// in DUET_SOCKET, then wait for its acknowledgement.
+// in DUET_SOCKET, then wait for its acknowledgement: "ok", or "ok <json>"
+// when the editor answers the hook.
 //
-// As a hook, this program never writes to its standard output (Claude Code
-// might interpret it) and always exits with code 0: a closed or unreachable
-// editor must never block Claude.
+// As a hook, this program writes to its standard output only the editor's
+// answer, which Claude Code reads (context added to a prompt…), and always
+// exits with code 0: a closed or unreachable editor must never block
+// Claude.
 //
 // With the "statusline" argument, it is Claude Code's status line command:
 // it forwards the session state (model, context, usage limits) to the
@@ -34,19 +36,28 @@ constexpr int acknowledgeTimeoutMs = 10000;
 // update arrives: no need to wait long.
 constexpr int statusLineTimeoutMs = 5000;
 
-void sendToEditor(const QJsonDocument &event, int acknowledgeTimeout)
+// Returns the editor's answer: the JSON after "ok", empty if none.
+QByteArray sendToEditor(const QJsonDocument &event, int acknowledgeTimeout)
 {
     const QString serverName = qEnvironmentVariable("DUET_SOCKET");
     if (serverName.isEmpty())
-        return;
+        return {};
     QLocalSocket socket;
     socket.connectToServer(serverName);
     if (!socket.waitForConnected(connectTimeoutMs))
-        return;
+        return {};
     socket.write(event.toJson(QJsonDocument::Compact) + '\n');
     socket.waitForBytesWritten(connectTimeoutMs);
     while (!socket.canReadLine() && socket.waitForReadyRead(acknowledgeTimeout)) {
     }
+    if (!socket.canReadLine())
+        return {};
+    const QByteArray reply = socket.readLine().trimmed();
+    if (!reply.startsWith("ok "))
+        return {};
+    const QByteArray output = reply.mid(3);
+    // Only a JSON object reaches Claude Code.
+    return QJsonDocument::fromJson(output).isObject() ? output : QByteArray();
 }
 
 QByteArray runUserStatusLine(const QString &command, const QByteArray &input)
@@ -116,7 +127,12 @@ int main(int argc, char *argv[])
         return statusLine(json);
 
     const QJsonDocument event = QJsonDocument::fromJson(json);
-    if (!event.isNull())
-        sendToEditor(event, acknowledgeTimeoutMs);
+    if (event.isNull())
+        return 0;
+    const QByteArray output = sendToEditor(event, acknowledgeTimeoutMs);
+    if (!output.isEmpty()) {
+        std::fwrite(output.constData(), 1, static_cast<size_t>(output.size()), stdout);
+        std::fputc('\n', stdout);
+    }
     return 0;
 }

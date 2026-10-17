@@ -1,9 +1,18 @@
 #include "HookServer.h"
 
 #include <QCoreApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLocalSocket>
 #include <QPointer>
 #include <QRandomGenerator>
+
+namespace {
+
+// The hook's output, kept on the socket until the reply.
+constexpr char outputProperty[] = "duetHookOutput";
+
+} // namespace
 
 HookServer::HookServer(QObject *parent)
     : QObject(parent)
@@ -55,9 +64,16 @@ std::function<void()> HookServer::deferReply()
     };
 }
 
+void HookServer::respond(const QJsonObject &output)
+{
+    if (receiving_)
+        receiving_->setProperty(outputProperty, QJsonDocument(output).toJson(QJsonDocument::Compact));
+}
+
 void HookServer::reply(QLocalSocket *socket)
 {
-    socket->write("ok\n");
+    const QByteArray output = socket->property(outputProperty).toByteArray();
+    socket->write(output.isEmpty() ? QByteArray("ok\n") : "ok " + output + '\n');
     socket->flush();
     socket->disconnectFromServer();
 }

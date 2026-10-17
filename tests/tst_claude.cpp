@@ -6,6 +6,7 @@
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
 #include "claude/CommitMessage.h"
+#include "claude/EditorContext.h"
 #include "claude/HookEvent.h"
 #include "claude/HookServer.h"
 
@@ -228,6 +229,70 @@ private slots:
         reply();
         QTRY_COMPARE_WITH_TIMEOUT(hook.state(), QProcess::NotRunning, 5000);
         QCOMPARE(hook.exitCode(), 0);
+    }
+
+    // The editor's answer is what the hook prints: Claude Code reads it.
+    void hookPrintsTheEditorsAnswer()
+    {
+        HookServer server;
+        QVERIFY(server.listen());
+        std::function<void()> reply;
+        connect(&server, &HookServer::hookReceived, this, [&] {
+            reply = server.deferReply();
+            server.respond(EditorContext::promptHookOutput(QStringLiteral("Open file: a.cpp")));
+        });
+
+        QProcess hook;
+        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("DUET_SOCKET", server.serverName());
+        hook.setProcessEnvironment(environment);
+        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        QVERIFY(hook.waitForStarted());
+        hook.write(R"({"hook_event_name":"UserPromptSubmit","prompt":"fix this"})");
+        hook.closeWriteChannel();
+
+        QTRY_VERIFY(reply);
+        reply();
+        QTRY_COMPARE_WITH_TIMEOUT(hook.state(), QProcess::NotRunning, 5000);
+        QCOMPARE(hook.exitCode(), 0);
+        const QJsonObject output = QJsonDocument::fromJson(hook.readAllStandardOutput()).object();
+        const QJsonObject specific = output.value("hookSpecificOutput").toObject();
+        QCOMPARE(specific.value("hookEventName").toString(), QStringLiteral("UserPromptSubmit"));
+        QCOMPARE(specific.value("additionalContext").toString(), QStringLiteral("Open file: a.cpp"));
+    }
+
+    void describesTheEditorContext()
+    {
+        EditorContext context;
+        QVERIFY(context.describe().isEmpty());
+
+        context.filePath = QStringLiteral("src/a.cpp");
+        context.line = 12;
+        context.column = 5;
+        context.selectionStartLine = 10;
+        context.selectionEndLine = 12;
+        context.selectedText = QStringLiteral("int a = 0;\n```\nreturn a;");
+        context.problems.append({11, true, QStringLiteral("use of undeclared\n identifier 'b'")});
+        context.problems.append({12, false, QStringLiteral("unused variable")});
+        context.unsavedFiles = {QStringLiteral("src/a.cpp"), QStringLiteral("src/b.h")};
+
+        const QString text = context.describe();
+        QVERIFY(text.contains(QStringLiteral("- File open in the editor: src/a.cpp, cursor at line 12, column 5")));
+        QVERIFY(text.contains(QStringLiteral("- Selected text (lines 10-12):\n````\nint a = 0;\n```\nreturn a;\n````")));
+        QVERIFY(text.contains(QStringLiteral("  - line 11, error: use of undeclared identifier 'b'")));
+        QVERIFY(text.contains(QStringLiteral("  - line 12, warning: unused variable")));
+        QVERIFY(text.contains(QStringLiteral("- Unsaved changes in the editor (the files on disk are older): src/a.cpp, src/b.h")));
+    }
+
+    void cutsALongSelection()
+    {
+        EditorContext context;
+        context.filePath = QStringLiteral("a.txt");
+        context.line = context.column = context.selectionStartLine = context.selectionEndLine = 1;
+        context.selectedText = QString(EditorContext::maximumSelectionLength + 100, QLatin1Char('x'));
+        const QString text = context.describe();
+        QVERIFY(text.contains(QStringLiteral("(line 1, cut)")));
+        QVERIFY(!text.contains(QString(EditorContext::maximumSelectionLength + 1, QLatin1Char('x'))));
     }
 
     void statusLineIsForwardedAndPrinted()

@@ -7,6 +7,7 @@
 
 #include <functional>
 
+class QJsonObject;
 class QLocalSocket;
 
 // Receives notifications from Claude Code hooks, relayed by the small
@@ -16,7 +17,9 @@ class QLocalSocket;
 // — slots connected with a direct connection run immediately — then
 // replies "ok". The hook waits for this reply before handing control back
 // to Claude. A slot can postpone the reply with deferReply(), to finish
-// work off the UI thread before Claude goes on.
+// work off the UI thread before Claude goes on, and answer the hook with
+// respond(): the reply is then "ok <json>", which the hook prints for
+// Claude Code to read (additional context, decision…).
 class HookServer : public QObject {
     Q_OBJECT
 
@@ -32,6 +35,10 @@ public:
     // function is called (once), not when the slot returns. The hook gives
     // up waiting after a few seconds.
     std::function<void()> deferReply();
+
+    // Only from a hookReceived() slot: the JSON the hook prints on its
+    // standard output, sent with the reply (deferred or not).
+    void respond(const QJsonObject &output);
 
 signals:
     void hookReceived(const HookEvent &event);

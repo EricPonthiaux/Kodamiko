@@ -136,6 +136,7 @@ private:
     // Snapshot of the pending changes, so that the state before a prompt
     // can be restored.
     void snapshotBeforePrompt(const QString &prompt);
+    void shareEditorContext();
     // Context and plan usage, from the status line data.
     void updateUsage();
     void showCommandPalette();
@@ -247,6 +248,7 @@ private:
     PrerequisitesDialog *prerequisitesDialog_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;
     QAction *snapshotBeforePrompt_ = nullptr;
+    QAction *shareEditorContext_ = nullptr;
     QAction *claudeNotifications_ = nullptr;
     QSplitter *editSplitter_ = nullptr;
 

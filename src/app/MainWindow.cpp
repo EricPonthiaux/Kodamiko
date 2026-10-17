@@ -6,6 +6,7 @@
 #include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeLinter.h"
+#include "claude/EditorContext.h"
 #include "claude/EffectiveSettings.h"
 #include "claude/ClaudeUsage.h"
 #include "completion/CompletionController.h"
@@ -580,6 +581,12 @@ void MainWindow::createMenus()
     snapshotBeforePrompt_->setToolTip(tr("Keep a copy of the working directory before Claude works on a prompt, to undo its changes"));
     connect(snapshotBeforePrompt_, &QAction::toggled, this,
             [](bool checked) { QSettings().setValue(QStringLiteral("snapshotBeforePrompt"), checked); });
+    shareEditorContext_ = claude->addAction(tr("Share &Editor Context With Each Prompt"));
+    shareEditorContext_->setCheckable(true);
+    shareEditorContext_->setChecked(settings.value(QStringLiteral("shareEditorContext"), true).toBool());
+    shareEditorContext_->setToolTip(tr("Tell Claude the open file, the cursor, the selection, the problems shown and the unsaved files"));
+    connect(shareEditorContext_, &QAction::toggled, this,
+            [](bool checked) { QSettings().setValue(QStringLiteral("shareEditorContext"), checked); });
     claudeNotifications_ = claude->addAction(tr("&Notifications"));
     claudeNotifications_->setCheckable(true);
     claudeNotifications_->setChecked(settings.value(QStringLiteral("claudeNotifications"), true).toBool());
@@ -1166,6 +1173,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     systemTitleBar_->setChecked(preferences.systemTitleBar);
     formatOnSave_->setChecked(preferences.formatOnSave);
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
+    shareEditorContext_->setChecked(preferences.shareEditorContext);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     editorTabs_->setEditorOptions(preferences.editor);
     languageServers_->setEnabled(preferences.languageServers);
@@ -1246,6 +1254,7 @@ void MainWindow::onHookReceived(const HookEvent &event)
     claudeActivity_.handle(event);
     switch (event.kind) {
     case HookEvent::Kind::PromptSubmitted:
+        shareEditorContext();
         snapshotBeforePrompt(event.prompt);
         claudeTouched_.clear(); // the dots show the last prompt's files
         updateClaudeMarks();
@@ -1402,6 +1411,51 @@ void MainWindow::notify(const QString &title, const QString &message)
     }
     trayIcon_->show();
     trayIcon_->showMessage(title, message, QSystemTrayIcon::Information, notificationMs);
+}
+
+void MainWindow::shareEditorContext()
+{
+    if (!shareEditorContext_->isChecked())
+        return;
+    const QDir project(folder_);
+    const auto relative = [&project](const QString &path) {
+        const QString relativePath = project.relativeFilePath(path);
+        return relativePath.startsWith(QLatin1String("..")) ? path : relativePath;
+    };
+
+    EditorContext context;
+    if (EditorWidget *editor = editorTabs_->currentEditor(); editor && !editor->filePath().isEmpty()) {
+        context.filePath = relative(editor->filePath());
+        int line = 0;
+        int index = 0;
+        editor->getCursorPosition(&line, &index);
+        context.line = line + 1;
+        context.column = index + 1;
+        if (editor->hasSelectedText()) {
+            int lineFrom = 0, indexFrom = 0, lineTo = 0, indexTo = 0;
+            editor->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
+            // Whole lines selected end at the start of the next one.
+            if (indexTo == 0 && lineTo > lineFrom)
+                --lineTo;
+            context.selectionStartLine = lineFrom + 1;
+            context.selectionEndLine = lineTo + 1;
+            context.selectedText = editor->selectedText();
+        }
+        for (const Diagnostic &diagnostic : editor->diagnostics()) {
+            int problemLine = 0;
+            int problemIndex = 0;
+            editor->lineIndexFromPosition(diagnostic.start, &problemLine, &problemIndex);
+            context.problems.append(
+                {problemLine + 1, diagnostic.severity == Diagnostic::Severity::Error, diagnostic.message});
+        }
+    }
+    for (const QString &path : editorTabs_->unsavedTexts().keys())
+        context.unsavedFiles.append(relative(path));
+    context.unsavedFiles.sort();
+
+    const QString description = context.describe();
+    if (!description.isEmpty())
+        hookServer_.respond(EditorContext::promptHookOutput(description));
 }
 
 void MainWindow::snapshotBeforePrompt(const QString &prompt)

@@ -37,6 +37,7 @@ struct Preferences {
 
     // Claude
     bool snapshotBeforePrompt = true;
+    bool shareEditorContext = true;
     bool claudeNotifications = true;
 
     static constexpr int minimumFontSize = 6;

@@ -39,6 +39,12 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   prompt, a copy of the whole working directory (ignored files excepted).
   *Git ▸ Restore a Snapshot* puts them back, which undoes everything Claude
   changed during that prompt.
+- **Claude sees what you see**: with each prompt, the editor tells Claude
+  the file in front of you, the cursor, the selected lines and their text,
+  the problems underlined in the file and the files with unsaved changes,
+  so that "fix this" or "why is this line wrong?" needs no `@path`. Claude
+  receives it as context, not as part of your prompt; *Claude ▸ Share
+  Editor Context With Each Prompt* turns it off.
 - **Claude status at a glance**: a dot on the Claude tab and on the Terminal
   mode tab shows whether Claude is working (amber), waiting for you (blue) or
   has finished while you were elsewhere (green). When the window is in the
@@ -294,10 +300,13 @@ soon as you click in a file.
    status line. The user's Claude configuration is not modified.
 2. Each hook runs `duet-hook`, a small program shipped with the
    editor. It forwards the event to the editor over a local socket, then
-   waits for its acknowledgement.
+   waits for its acknowledgement, which may carry an answer for Claude
+   Code: `duet-hook` prints it, as hooks do, and prints nothing else.
 3. On `UserPromptSubmit`, the editor records a snapshot of the whole
    working directory (if it differs from the previous one) before letting
    Claude start; *Claude ▸ Snapshot Before Each Prompt* turns this off.
+   Its answer adds the editor context (open file, cursor, selection,
+   problems, unsaved files) to the prompt.
 4. On `PostToolUse`, the editor reloads the modified open files (all of them
    after a Bash command). On `PostToolUse` and `Stop`, it recomputes the Diff
    mode from the project's git repository: changes made by shell commands

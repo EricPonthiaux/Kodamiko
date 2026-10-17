@@ -107,6 +107,7 @@ private:
     ToggleSwitch *formatOnSave_ = nullptr;
     ToggleSwitch *alwaysSelectOpenedFile_ = nullptr;
     ToggleSwitch *snapshotBeforePrompt_ = nullptr;
+    ToggleSwitch *shareEditorContext_ = nullptr;
     ToggleSwitch *claudeNotifications_ = nullptr;
 
     QList<Keymap::Command> commands_;
