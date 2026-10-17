@@ -103,6 +103,24 @@ int FilePatch::lineCount() const
     return count;
 }
 
+int FilePatch::addedLines() const
+{
+    int count = 0;
+    for (const DiffHunk &hunk : hunks)
+        count += static_cast<int>(std::count_if(hunk.lines.begin(), hunk.lines.end(),
+                                                [](const QByteArray &line) { return line.startsWith('+'); }));
+    return count;
+}
+
+int FilePatch::removedLines() const
+{
+    int count = 0;
+    for (const DiffHunk &hunk : hunks)
+        count += static_cast<int>(std::count_if(hunk.lines.begin(), hunk.lines.end(),
+                                                [](const QByteArray &line) { return line.startsWith('-'); }));
+    return count;
+}
+
 std::pair<int, int> FilePatch::locate(int line) const
 {
     line -= static_cast<int>(header.size());

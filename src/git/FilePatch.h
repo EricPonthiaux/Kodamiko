@@ -39,6 +39,9 @@ struct FilePatch {
     // Number of lines in the diff: header, then for each hunk its "@@" line
     // and its lines.
     int lineCount() const;
+    // Lines added and removed, as "+12 −3" says them.
+    int addedLines() const;
+    int removedLines() const;
     // Position of a diff line: hunk number (-1 in the header) and line
     // number within the hunk (-1 on the "@@" line).
     std::pair<int, int> locate(int line) const;
