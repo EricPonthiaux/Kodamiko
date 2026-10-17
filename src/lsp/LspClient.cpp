@@ -287,8 +287,10 @@ void LspClient::handle(const QJsonObject &message)
         // A request from the server (configuration, progress…): answered
         // with nothing, which servers accept; for a configuration request,
         // the setting of each item's section.
-        if (id.isUndefined() || id.isNull())
+        if (id.isUndefined() || id.isNull()) {
+            emit notificationReceived(message.value("method").toString(), message.value("params"));
             return;
+        }
         QJsonValue result = QJsonValue::Null;
         if (const auto handler = requestHandlers_.constFind(message.value("method").toString());
             handler != requestHandlers_.cend()) {

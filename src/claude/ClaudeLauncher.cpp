@@ -15,15 +15,21 @@
 namespace ClaudeLauncher {
 namespace {
 
-QString hookExecutablePath()
+// A program shipped next to the editor, or an empty string.
+QString companionPath(const QString &program)
 {
 #ifdef Q_OS_WIN
-    const QString name = QStringLiteral("duet-hook.exe");
+    const QString name = program + QStringLiteral(".exe");
 #else
-    const QString name = QStringLiteral("duet-hook");
+    const QString name = program;
 #endif
     const QString path = QDir(QCoreApplication::applicationDirPath()).filePath(name);
     return QFileInfo::exists(path) ? path : QString();
+}
+
+QString hookExecutablePath()
+{
+    return companionPath(QStringLiteral("duet-hook"));
 }
 
 QJsonArray commandHook(const QString &command, const QString &matcher = {}, int timeout = 60)
@@ -39,9 +45,8 @@ QJsonArray commandHook(const QString &command, const QString &matcher = {}, int 
     return QJsonArray{entry};
 }
 
-std::optional<QString> writeSettingsFile(const QByteArray &settings)
+std::optional<QString> writeSettingsFile(const QByteArray &settings, const QString &path = sessionSettingsPath())
 {
-    const QString path = sessionSettingsPath();
     QDir().mkpath(QFileInfo(path).absolutePath());
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly) || file.write(settings) != settings.size() || !file.commit())
@@ -73,7 +78,7 @@ QString sessionSettingsPath()
         .filePath(QStringLiteral("claude-hooks.json"));
 }
 
-QByteArray sessionSettings(const QString &hookCommand)
+QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowedTools)
 {
     QJsonObject hooks;
     // The editor takes a snapshot before replying: Claude only starts once
@@ -94,8 +99,31 @@ QByteArray sessionSettings(const QString &hookCommand)
         {QLatin1String("command"), hookCommand + QLatin1String(" statusline")},
         {QLatin1String("padding"), 0},
     };
-    return QJsonDocument(QJsonObject{{QLatin1String("hooks"), hooks}, {QLatin1String("statusLine"), statusLine}})
+    QJsonObject settings{{QLatin1String("hooks"), hooks}, {QLatin1String("statusLine"), statusLine}};
+    if (!allowedTools.isEmpty())
+        settings.insert(QLatin1String("permissions"),
+                        QJsonObject{{QLatin1String("allow"), QJsonArray::fromStringList(allowedTools)}});
+    return QJsonDocument(settings).toJson();
+}
+
+QString mcpServerPath()
+{
+    return companionPath(QStringLiteral("duet-mcp"));
+}
+
+QByteArray mcpConfig(const QString &mcpServer)
+{
+    const QJsonObject duet{{QLatin1String("type"), QLatin1String("stdio")},
+                           {QLatin1String("command"), QDir::toNativeSeparators(mcpServer)},
+                           {QLatin1String("args"), QJsonArray{}}};
+    return QJsonDocument(QJsonObject{{QLatin1String("mcpServers"), QJsonObject{{QLatin1String("duet"), duet}}}})
         .toJson();
+}
+
+QString mcpConfigPath()
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+        .filePath(QStringLiteral("claude-mcp.json"));
 }
 
 QString userStatusLineCommand(const QString &projectDir)
@@ -158,7 +186,8 @@ QString findClaudeExecutable()
 }
 
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName,
-                                         QString *error, const QStringList &extraArguments)
+                                         QString *error, const QStringList &extraArguments,
+                                         const std::optional<QStringList> &mcpReadOnlyTools)
 {
     const QString claude = findClaudeExecutable();
     if (claude.isEmpty()) {
@@ -174,7 +203,14 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
         return std::nullopt;
     }
 
-    const std::optional<QString> settingsFile = writeSettingsFile(sessionSettings(hook));
+    // The editor's MCP server, when its program is there.
+    const QString mcpServer = mcpReadOnlyTools ? mcpServerPath() : QString();
+    std::optional<QString> mcpFile;
+    if (!mcpServer.isEmpty())
+        mcpFile = writeSettingsFile(mcpConfig(mcpServer), mcpConfigPath());
+
+    const std::optional<QString> settingsFile =
+        writeSettingsFile(sessionSettings(hook, mcpFile ? *mcpReadOnlyTools : QStringList()));
     if (!settingsFile) {
         *error = QCoreApplication::translate("ClaudeLauncher", "Could not write the hooks configuration.");
         return std::nullopt;
@@ -185,6 +221,8 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
     spec.arguments = QStringList{QStringLiteral("--settings"), *settingsFile};
     if (const QString plugin = pluginPath(); !plugin.isEmpty())
         spec.arguments << QStringLiteral("--plugin-dir") << QDir::toNativeSeparators(plugin);
+    if (mcpFile)
+        spec.arguments << QStringLiteral("--mcp-config") << *mcpFile;
     spec.arguments += extraArguments;
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();

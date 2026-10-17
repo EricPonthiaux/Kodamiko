@@ -79,5 +79,6 @@ enable_testing()
 
 add_subdirectory(src)
 add_subdirectory(tools/duet-hook)
+add_subdirectory(tools/duet-mcp)
 add_subdirectory(tools/claude-plugin)
 add_subdirectory(tests)

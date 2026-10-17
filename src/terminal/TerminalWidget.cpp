@@ -588,3 +588,20 @@ void TerminalWidget::paste(const QString &text)
     screen_->paste(text);
     scrollToBottom();
 }
+
+QStringList TerminalWidget::lastLines(int count) const
+{
+    QStringList lines;
+    if (!screen_)
+        return lines;
+    int last = screen_->rows() - 1;
+    while (last >= -screen_->scrollbackSize() && screen_->lineText(last).trimmed().isEmpty())
+        --last;
+    for (int row = std::max(-screen_->scrollbackSize(), last - count + 1); row <= last; ++row) {
+        QString line = screen_->lineText(row);
+        while (!line.isEmpty() && line.back().isSpace())
+            line.chop(1);
+        lines.append(line);
+    }
+    return lines;
+}

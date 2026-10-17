@@ -271,15 +271,33 @@ struct Printed {
 
 } // namespace
 
-void DiagramView::exportPng()
+bool DiagramView::exportImage(const QString &path, QString *error) const
 {
-    const QFileInfo info(filePath_);
-    const QString path = QFileDialog::getSaveFileName(this, tr("Export PNG"),
-                                                      info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(".png")),
-                                                      tr("PNG Image (*.png)"));
-    if (path.isEmpty())
-        return;
     Printed printed(*board_);
+    if (QFileInfo(path).suffix().compare(QStringLiteral("svg"), Qt::CaseInsensitive) == 0) {
+#ifdef DUET_WITH_SVG
+        QSvgGenerator generator;
+        generator.setFileName(path);
+        generator.setSize(printed.box.size().toSize());
+        generator.setViewBox(QRectF(QPointF(0, 0), printed.box.size()));
+        generator.setTitle(QFileInfo(filePath_).completeBaseName());
+        QPainter painter(&generator);
+        if (!painter.isActive()) {
+            if (error)
+                *error = tr("Cannot write %1").arg(path);
+            return false;
+        }
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.fillRect(QRectF(QPointF(0, 0), printed.box.size()), printed.board.style().background);
+        painter.translate(-printed.box.topLeft());
+        diagram::Canvas::paintBoard(painter, printed.board);
+        return true;
+#else
+        if (error)
+            *error = tr("This build of Duet cannot write SVG");
+        return false;
+#endif
+    }
     const qreal scale = 3;
     QImage image((printed.box.size() * scale).toSize(), QImage::Format_ARGB32_Premultiplied);
     image.fill(printed.board.style().background);
@@ -292,34 +310,33 @@ void DiagramView::exportPng()
         diagram::Canvas::paintBoard(painter, printed.board);
     }
     if (!image.save(path)) {
-        showMessage(tr("Export failed"));
-        return;
+        if (error)
+            *error = tr("Cannot write %1").arg(path);
+        return false;
     }
-    showMessage(tr("Exported %1").arg(QFileInfo(path).fileName()));
+    return true;
+}
+
+void DiagramView::exportPng()
+{
+    const QFileInfo info(filePath_);
+    const QString path = QFileDialog::getSaveFileName(this, tr("Export PNG"),
+                                                      info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(".png")),
+                                                      tr("PNG Image (*.png)"));
+    if (path.isEmpty())
+        return;
+    QString error;
+    showMessage(exportImage(path, &error) ? tr("Exported %1").arg(QFileInfo(path).fileName()) : error);
 }
 
 void DiagramView::exportSvg()
 {
-#ifdef DUET_WITH_SVG
     const QFileInfo info(filePath_);
     const QString path = QFileDialog::getSaveFileName(this, tr("Export SVG"),
                                                       info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(".svg")),
                                                       tr("SVG Image (*.svg)"));
     if (path.isEmpty())
         return;
-    Printed printed(*board_);
-    QSvgGenerator generator;
-    generator.setFileName(path);
-    generator.setSize(printed.box.size().toSize());
-    generator.setViewBox(QRectF(QPointF(0, 0), printed.box.size()));
-    generator.setTitle(info.completeBaseName());
-    {
-        QPainter painter(&generator);
-        painter.setRenderHint(QPainter::Antialiasing);
-        painter.fillRect(QRectF(QPointF(0, 0), printed.box.size()), printed.board.style().background);
-        painter.translate(-printed.box.topLeft());
-        diagram::Canvas::paintBoard(painter, printed.board);
-    }
-    showMessage(tr("Exported %1").arg(QFileInfo(path).fileName()));
-#endif
+    QString error;
+    showMessage(exportImage(path, &error) ? tr("Exported %1").arg(QFileInfo(path).fileName()) : error);
 }

@@ -41,6 +41,9 @@ public:
     bool matchesDisk() const;
     // The file's content for the diagram as it is now.
     QByteArray content() const;
+    // The diagram as an image in the printable palette: SVG or PNG, by the
+    // file's extension.
+    bool exportImage(const QString &path, QString *error) const;
 
     void applyTheme(const Theme &theme);
 

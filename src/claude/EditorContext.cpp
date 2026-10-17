@@ -1,5 +1,11 @@
 #include "EditorContext.h"
 
+#include "editor/EditorTabs.h"
+#include "editor/EditorWidget.h"
+
+#include <QDir>
+#include <QJsonArray>
+
 QString EditorContext::describe() const
 {
     if (isEmpty())
@@ -55,4 +61,70 @@ QJsonObject EditorContext::promptHookOutput(const QString &context)
                             {QLatin1String("hookEventName"), QLatin1String("UserPromptSubmit")},
                             {QLatin1String("additionalContext"), context},
                         }}};
+}
+
+EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFolder)
+{
+    const QDir project(projectFolder);
+    const auto relative = [&project, &projectFolder](const QString &path) {
+        if (projectFolder.isEmpty())
+            return path;
+        const QString relativePath = project.relativeFilePath(path);
+        return relativePath.startsWith(QLatin1String("..")) ? path : relativePath;
+    };
+
+    EditorContext context;
+    if (EditorWidget *editor = tabs.currentEditor(); editor && !editor->filePath().isEmpty()) {
+        context.filePath = relative(editor->filePath());
+        int line = 0;
+        int index = 0;
+        editor->getCursorPosition(&line, &index);
+        context.line = line + 1;
+        context.column = index + 1;
+        if (editor->hasSelectedText()) {
+            int lineFrom = 0, indexFrom = 0, lineTo = 0, indexTo = 0;
+            editor->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
+            // Whole lines selected end at the start of the next one.
+            if (indexTo == 0 && lineTo > lineFrom)
+                --lineTo;
+            context.selectionStartLine = lineFrom + 1;
+            context.selectionEndLine = lineTo + 1;
+            context.selectedText = editor->selectedText();
+        }
+        for (const Diagnostic &diagnostic : editor->diagnostics()) {
+            int problemLine = 0;
+            int problemIndex = 0;
+            editor->lineIndexFromPosition(diagnostic.start, &problemLine, &problemIndex);
+            context.problems.append(
+                {problemLine + 1, diagnostic.severity == Diagnostic::Severity::Error, diagnostic.message});
+        }
+    }
+    for (const QString &path : tabs.unsavedTexts().keys())
+        context.unsavedFiles.append(relative(path));
+    context.unsavedFiles.sort();
+    return context;
+}
+
+QJsonObject EditorContext::toJson() const
+{
+    QJsonObject json;
+    if (!filePath.isEmpty()) {
+        json.insert(QLatin1String("file"), filePath);
+        json.insert(QLatin1String("line"), line);
+        json.insert(QLatin1String("column"), column);
+    }
+    if (selectionStartLine > 0) {
+        json.insert(QLatin1String("selection"), QJsonObject{{QLatin1String("startLine"), selectionStartLine},
+                                                            {QLatin1String("endLine"), selectionEndLine},
+                                                            {QLatin1String("text"), selectedText}});
+    }
+    QJsonArray problemList;
+    for (const Problem &problem : problems)
+        problemList.append(QJsonObject{{QLatin1String("line"), problem.line},
+                                       {QLatin1String("severity"), problem.error ? QLatin1String("error")
+                                                                                 : QLatin1String("warning")},
+                                       {QLatin1String("message"), problem.message}});
+    json.insert(QLatin1String("problems"), problemList);
+    json.insert(QLatin1String("unsavedFiles"), QJsonArray::fromStringList(unsavedFiles));
+    return json;
 }

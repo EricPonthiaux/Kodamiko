@@ -38,6 +38,8 @@ struct Preferences {
     // Claude
     bool snapshotBeforePrompt = true;
     bool shareEditorContext = true;
+    // The editor's MCP server (tools, resources, prompts) in its sessions.
+    bool exposeTools = true;
     bool claudeNotifications = true;
 
     static constexpr int minimumFontSize = 6;

@@ -7,6 +7,7 @@
 
 #include <functional>
 
+class McpRegistry;
 class QJsonObject;
 class QLocalSocket;
 
@@ -20,6 +21,10 @@ class QLocalSocket;
 // work off the UI thread before Claude goes on, and answer the hook with
 // respond(): the reply is then "ok <json>", which the hook prints for
 // Claude Code to read (additional context, decision…).
+//
+// The same socket serves the duet-mcp relay, the editor's MCP server for
+// Claude: a connection whose first line is {"duet":"mcp"} stays open and is
+// handed to an McpSession serving the registry's tools.
 class HookServer : public QObject {
     Q_OBJECT
 
@@ -40,6 +45,10 @@ public:
     // standard output, sent with the reply (deferred or not).
     void respond(const QJsonObject &output);
 
+    // The tools, resources and prompts MCP connections serve; without a
+    // registry, they are closed.
+    void setMcpRegistry(McpRegistry *registry) { mcpRegistry_ = registry; }
+
 signals:
     void hookReceived(const HookEvent &event);
 
@@ -51,4 +60,5 @@ private:
     QLocalServer server_;
     QLocalSocket *receiving_ = nullptr; // during hookReceived()
     bool replyDeferred_ = false;
+    McpRegistry *mcpRegistry_ = nullptr;
 };

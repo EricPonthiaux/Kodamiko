@@ -20,6 +20,13 @@ add_library(duet_core STATIC
     claude/EffectiveSettings.cpp
     claude/HookEvent.cpp
     claude/HookServer.cpp
+    claude/mcp/CodeTools.cpp
+    claude/mcp/EditorTools.cpp
+    claude/mcp/GitTools.cpp
+    claude/mcp/McpRegistry.cpp
+    claude/mcp/McpSession.cpp
+    claude/mcp/TerminalTools.cpp
+    claude/mcp/WorkspaceTools.cpp
     claude/UnsavedEditGuard.cpp
     completion/CodeGeneration.cpp
     completion/CodeScan.cpp
@@ -194,6 +201,7 @@ if(GRAPHVIZ_FOUND)
     file(GLOB_RECURSE diagram_sources CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewers/diagram/*.cpp)
     target_sources(duet_core PRIVATE
+        claude/mcp/DiagramTools.cpp
         viewers/DiagramCheck.cpp
         viewers/DiagramGenerationView.cpp
         viewers/DiagramView.cpp
@@ -227,15 +235,16 @@ endif()
 target_link_libraries(duet PRIVATE duet_core)
 target_compile_definitions(duet PRIVATE DUET_VERSION="${PROJECT_VERSION}")
 set_target_properties(duet PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-add_dependencies(duet duet-hook)
+add_dependencies(duet duet-hook duet-mcp)
 
-# ClaudeLauncher looks for duet-hook next to the executable: on macOS,
+# ClaudeLauncher looks for duet-hook and duet-mcp next to the executable: on macOS,
 # that is inside the bundle (Duet.app/Contents/MacOS), with Duet's Claude
 # plugin in Contents/Resources.
 if(APPLE)
     set_target_properties(duet PROPERTIES OUTPUT_NAME Duet)
     add_custom_command(TARGET duet POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-mcp> $<TARGET_FILE_DIR:duet>
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/claude-plugin
                 $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin)
 endif()

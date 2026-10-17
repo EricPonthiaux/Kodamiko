@@ -5,6 +5,8 @@
 #include <QString>
 #include <QStringList>
 
+class EditorTabs;
+
 // What the user has in front of them in the editor when they send a
 // prompt, added to it as context (UserPromptSubmit hook): Claude knows the
 // file and the lines "this" refers to without an @path.
@@ -35,4 +37,11 @@ struct EditorContext {
 
     // The UserPromptSubmit hook's output adding `context` to the prompt.
     static QJsonObject promptHookOutput(const QString &context);
+
+    // What `tabs` show: the current editor's file, cursor, selection and
+    // problems, the unsaved files; paths relative to `projectFolder` when
+    // inside it.
+    static EditorContext of(const EditorTabs &tabs, const QString &projectFolder);
+    // As JSON, for the editor's MCP tools (the selection is not cut).
+    QJsonObject toJson() const;
 };

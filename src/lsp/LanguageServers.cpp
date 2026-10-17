@@ -173,6 +173,10 @@ void LanguageServers::stopAll()
     documents_.clear();
     warmed_.clear();
     failures_.clear(); // a new folder or a new setting: worth trying again
+    const QStringList reported = diagnostics_.keys();
+    diagnostics_.clear();
+    for (const QString &path : reported)
+        emit diagnosticsChanged(path);
 }
 
 QString LanguageServers::failure(const QString &languageId) const
@@ -276,6 +280,15 @@ std::optional<LanguageServers::Launch> LanguageServers::jdtlsLaunch(const QStrin
     return launch;
 }
 
+LspClient *LanguageServers::runningClientFor(const QString &languageId) const
+{
+    const std::optional<LanguageServerSpec> spec = specFor(languageId);
+    if (!enabled_ || !spec)
+        return nullptr;
+    LspClient *client = clients_.value(spec->name);
+    return client && !client->hasFailed() ? client : nullptr;
+}
+
 LspClient *LanguageServers::clientFor(const QString &languageId)
 {
     if (!enabled_ || folder_.isEmpty())
@@ -364,6 +377,15 @@ LspClient *LanguageServers::clientFor(const QString &languageId)
         client->setRequestHandler(handler.key(), handler.value());
     clients_.insert(name, client);
     connect(client, &LspClient::ready, this, [this, name] { emit statusMessage(tr("%1 is ready").arg(name)); });
+    connect(client, &LspClient::notificationReceived, this, [this](const QString &method, const QJsonValue &params) {
+        if (method != QLatin1String("textDocument/publishDiagnostics"))
+            return;
+        const QString path = QUrl(params.toObject().value("uri").toString()).toLocalFile();
+        if (path.isEmpty())
+            return;
+        diagnostics_.insert(path, params.toObject().value("diagnostics").toArray());
+        emit diagnosticsChanged(path);
+    });
     connect(client, &LspClient::failed, this, [this, name, languages](const QString &message) {
         // Its documents must be opened again if it is restarted.
         for (auto it = documents_.begin(); it != documents_.end();) {
@@ -421,7 +443,7 @@ void LanguageServers::setRequestHandler(const QString &method, LspClient::Reques
         client->setRequestHandler(method, handler);
 }
 
-void LanguageServers::syncDocument(LspClient *client, const QString &path, const QString &languageId,
+bool LanguageServers::syncDocument(LspClient *client, const QString &path, const QString &languageId,
                                    const QByteArray &text)
 {
     const QString server = clients_.key(client);
@@ -435,16 +457,28 @@ void LanguageServers::syncDocument(LspClient *client, const QString &path, const
                                                                 {"languageId", protocolLanguage(languageId)},
                                                                 {"version", 1},
                                                                 {"text", QString::fromUtf8(text)}}}});
-        return;
+        return true;
     }
     if (it.value().hash == hash)
-        return;
+        return false;
     it.value().hash = hash;
     const int version = ++it.value().version;
     // The whole text: simple, and fast enough for source files.
     client->notify(QStringLiteral("textDocument/didChange"),
                    QJsonObject{{"textDocument", QJsonObject{{"uri", uri}, {"version", version}}},
                                {"contentChanges", QJsonArray{QJsonObject{{"text", QString::fromUtf8(text)}}}}});
+    return true;
+}
+
+QStringList LanguageServers::filesWithDiagnostics() const
+{
+    QStringList files;
+    for (auto it = diagnostics_.cbegin(); it != diagnostics_.cend(); ++it) {
+        if (!it.value().isEmpty())
+            files.append(it.key());
+    }
+    files.sort();
+    return files;
 }
 
 void LanguageServers::warmUp(const QString &path, const QString &languageId, const QByteArray &text)

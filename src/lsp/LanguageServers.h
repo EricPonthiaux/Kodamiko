@@ -5,6 +5,7 @@
 #include "toolchains/JavaRuntimes.h"
 
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QObject>
 #include <QSet>
@@ -58,6 +59,9 @@ public:
     // The server for `languageId`, started on first use; nullptr when
     // there is none, it is disabled, or it failed.
     LspClient *clientFor(const QString &languageId);
+    // The server for `languageId` if it is already running, without
+    // starting it.
+    LspClient *runningClientFor(const QString &languageId) const;
     // Why the server of `languageId` cannot run ("jdtls needs Java 21..."),
     // empty if it can (or was not tried yet).
     QString failure(const QString &languageId) const;
@@ -76,7 +80,13 @@ public:
 
     // Sends `text` as the content of `path` to `client`: didOpen the first
     // time, didChange when it changed since.
-    void syncDocument(LspClient *client, const QString &path, const QString &languageId, const QByteArray &text);
+    // Returns whether anything was sent (the text was new to the server).
+    bool syncDocument(LspClient *client, const QString &path, const QString &languageId, const QByteArray &text);
+
+    // The problems the servers last reported for `path` (LSP Diagnostic
+    // objects), and the files they reported problems for.
+    QJsonArray diagnostics(const QString &path) const { return diagnostics_.value(path); }
+    QStringList filesWithDiagnostics() const;
     // Starts the server of `languageId` before the first completion needs
     // it, and gives it `path` to read: clangd builds the file's preamble,
     // jdtls imports the project, tsserver loads its libraries. The first
@@ -108,6 +118,8 @@ public:
 
 signals:
     void statusMessage(const QString &message);
+    // A server reported the problems of `path` (possibly none).
+    void diagnosticsChanged(const QString &path);
     // The server of `languages` could not start or stopped; `message` says
     // why. Also emitted, with an empty message, when it is retried.
     void serverFailed(const QString &server, const QStringList &languages, const QString &message);
@@ -135,6 +147,7 @@ private:
         size_t hash = 0;
     };
     QHash<QString, Document> documents_; // by path
+    QHash<QString, QJsonArray> diagnostics_; // by path
     QSet<QString> warmed_; // servers already asked a completion, by name
     mutable QHash<QString, QString> programPaths_; // lookups in the PATH
     // specFor() by language: asked at every typed character (trigger

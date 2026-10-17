@@ -36,6 +36,9 @@ public:
     void applyTheme(const Theme &theme);
     // Types `text` as a paste (bracketed if the program asked for it).
     void paste(const QString &text);
+    // The last `count` lines shown (scrollback included), without the
+    // blank lines at the end.
+    QStringList lastLines(int count) const;
 
     // True for Ctrl+1/2/3/4 (mode switch), which the terminal leaves to the
     // application. Recognized by the physical key: on an AZERTY keyboard,

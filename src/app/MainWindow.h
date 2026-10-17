@@ -2,6 +2,7 @@
 
 #include "claude/ClaudeActivity.h"
 #include "claude/HookServer.h"
+#include "claude/mcp/McpRegistry.h"
 #include "navigation/RecentFiles.h"
 #include "projects/ProjectConfig.h"
 #include "settings/Keymap.h"
@@ -137,6 +138,10 @@ private:
     // can be restored.
     void snapshotBeforePrompt(const QString &prompt);
     void shareEditorContext();
+    // The tools, resources and prompts of the editor's MCP server.
+    void registerMcpTools();
+    // Asks about the next sensitive tool Claude wants to run.
+    void showToolRequest();
     void guardUnsavedEdits(const QStringList &paths);
     void followDiagramEdits(const QStringList &paths);
     // Asks what Claude should draw in `folder`, then shows the drawing.
@@ -194,6 +199,8 @@ private:
     Theme theme_;
     QString folder_;
     HookServer hookServer_;
+    // What the editor's MCP server offers Claude (see DuetTools).
+    McpRegistry mcpRegistry_;
     ClaudeActivity claudeActivity_;
     QJsonObject claudeStatus_; // last status line data
 
@@ -216,6 +223,14 @@ private:
     NoticeBar *serverNotice_ = nullptr;
     QSet<QString> dismissedServerNotices_; // closed by the user, by message
     NoticeBar *unsavedEditNotice_ = nullptr; // an edit by Claude refused
+    // Claude asks to run a sensitive tool (restore a snapshot, commit…):
+    // above every mode, one request at a time.
+    NoticeBar *toolRequestBar_ = nullptr;
+    struct ToolRequest {
+        QString text;
+        std::function<void(bool)> answer;
+    };
+    QList<ToolRequest> toolRequests_;
     CodeNavigator *navigator_ = nullptr;
     CodeIntelligence *intelligence_ = nullptr;
     OutlineView *outlineView_ = nullptr;
@@ -255,6 +270,7 @@ private:
     QSystemTrayIcon *trayIcon_ = nullptr;
     QAction *snapshotBeforePrompt_ = nullptr;
     QAction *shareEditorContext_ = nullptr;
+    QAction *exposeTools_ = nullptr;
     QAction *claudeNotifications_ = nullptr;
     QSplitter *editSplitter_ = nullptr;
 

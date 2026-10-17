@@ -39,3 +39,8 @@ duet_add_test(tst_diagnostics)
 duet_add_test(tst_claude)
 target_compile_definitions(tst_claude PRIVATE DUET_HOOK_PATH="$<TARGET_FILE:duet-hook>")
 add_dependencies(tst_claude duet-hook)
+duet_add_test(tst_mcp)
+target_compile_definitions(tst_mcp PRIVATE DUET_HOOK_PATH="$<TARGET_FILE:duet-hook>"
+                                           DUET_MCP_PATH="$<TARGET_FILE:duet-mcp>")
+add_dependencies(tst_mcp duet-hook duet-mcp)
+duet_add_test(tst_mcptools)

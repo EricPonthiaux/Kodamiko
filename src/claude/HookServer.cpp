@@ -1,5 +1,7 @@
 #include "HookServer.h"
 
+#include "mcp/McpSession.h"
+
 #include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -44,6 +46,15 @@ void HookServer::onReadyRead(QLocalSocket *socket)
     if (!socket->canReadLine())
         return;
     const QByteArray line = socket->readLine();
+    if (QJsonDocument::fromJson(line).object().value(QLatin1String("duet")).toString() == QLatin1String("mcp")) {
+        // The MCP relay: the connection stays open for its session.
+        disconnect(socket, &QLocalSocket::readyRead, this, nullptr);
+        if (mcpRegistry_)
+            new McpSession(socket, mcpRegistry_, this);
+        else
+            socket->disconnectFromServer();
+        return;
+    }
     receiving_ = socket;
     replyDeferred_ = false;
     if (const std::optional<HookEvent> event = HookEvent::fromJson(line))

@@ -416,6 +416,7 @@ QWidget *PreferencesPopup::createClaudePage()
     auto *session = new SettingsCard;
     snapshotBeforePrompt_ = new ToggleSwitch;
     shareEditorContext_ = new ToggleSwitch;
+    exposeTools_ = new ToggleSwitch;
     claudeNotifications_ = new ToggleSwitch;
     session->addRow(tr("Snapshot before each prompt"),
                     tr("Keeps a copy of the working directory before Claude works on a prompt, to undo its "
@@ -425,6 +426,10 @@ QWidget *PreferencesPopup::createClaudePage()
                     tr("Tells Claude the open file, the cursor, the selection, the problems shown and the unsaved "
                        "files, so that \u201cthis\u201d needs no @path."),
                     shareEditorContext_);
+    session->addRow(tr("Expose Duet's tools to Claude"),
+                    tr("Lets Claude read and act in the editor (open files with their unsaved changes, problems, "
+                       "diagrams, terminals, git) through Duet's MCP server. Applies to the next session."),
+                    exposeTools_);
     session->addRow(tr("Notifications"), tr("Alerts you when Claude needs you or has finished while you are elsewhere."),
                     claudeNotifications_);
     addGroup(layout, tr("Session"), session);
@@ -611,6 +616,7 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
     alwaysSelectOpenedFile_->setChecked(preferences.alwaysSelectOpenedFile);
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
     shareEditorContext_->setChecked(preferences.shareEditorContext);
+    exposeTools_->setChecked(preferences.exposeTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
 
     commands_ = commands;
@@ -662,6 +668,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.alwaysSelectOpenedFile = alwaysSelectOpenedFile_->isChecked();
     preferences.snapshotBeforePrompt = snapshotBeforePrompt_->isChecked();
     preferences.shareEditorContext = shareEditorContext_->isChecked();
+    preferences.exposeTools = exposeTools_->isChecked();
     preferences.claudeNotifications = claudeNotifications_->isChecked();
     return preferences;
 }

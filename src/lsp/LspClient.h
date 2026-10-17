@@ -61,6 +61,8 @@ public:
 
 signals:
     void ready();
+    // A notification from the server ("textDocument/publishDiagnostics").
+    void notificationReceived(const QString &method, const QJsonValue &params);
     // The process stopped or could not start.
     void failed(const QString &message);
 

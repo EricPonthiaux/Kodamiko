@@ -45,6 +45,22 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   so that "fix this" or "why is this line wrong?" needs no `@path`. Claude
   receives it as context, not as part of your prompt; *Claude ▸ Share
   Editor Context With Each Prompt* turns it off.
+- **Claude works in the editor**: Duet's own MCP server gives its Claude
+  session tools that see what you see and act in the editor. Claude reads
+  your open files with their unsaved changes, the selection, the problems
+  the language servers report (also underlined in the editor now), symbols,
+  definitions and usages, search results, git status and history, snapshots,
+  terminals and diagrams (their content and what you selected in them). It
+  opens a file at a line, renames a symbol everywhere through the language
+  server, applies a quick fix, formats a file, shows a diff, lays out,
+  selects in or exports a diagram, triggers a menu command. What changes the
+  repository or runs something (restoring a snapshot, staging, committing,
+  running a command in a terminal you watch) waits for *Allow* in a bar at
+  the top of the window. The read-only tools need no permission; prompts
+  such as `/mcp__duet__review-selection`, `/mcp__duet__fix-diagnostics`,
+  `/mcp__duet__explain-symbol` and `/mcp__duet__draw-diagram` are offered
+  as commands. *Claude ▸ Expose Duet's Tools to Claude* turns it off (from
+  the next session).
 - **Your unsaved edits are safe from Claude**: when Claude is about to edit
   a file that has unsaved changes in the editor, the editor refuses the edit
   and tells Claude why, so that it asks you to save or discard them instead
@@ -376,6 +392,15 @@ soon as you click in a file.
    session metrics to the editor and prints the line shown under Claude's
    prompt. If you configured your own status line, its output is shown
    instead.
+7. The session is also given Duet's MCP server (`--mcp-config`):
+   `duet-mcp`, another small program shipped with the editor, which Claude
+   Code runs and talks MCP with over its standard input and output. It
+   relays each message to the editor over the same local socket (a
+   connection that stays open), where the tools, resources and prompts are
+   served; without an editor to reach, it answers as a server with no
+   tools. The read-only tools are allowed in the session's settings; the
+   others follow Claude Code's permissions, and the sensitive ones also
+   wait for the editor's *Allow*.
 
 ## Architecture
 
@@ -390,7 +415,7 @@ src/
   syntax/     highlighting: tree-sitter (highlights.scm queries), QScintilla lexers
   outline/    Outline panel: outline.scm queries (syntax/queries), Markdown, CMake
   terminal/   PTY (forkpty / ConPTY), VT emulation (libvterm), terminal widget
-  claude/     Claude Code launching, hooks, local server
+  claude/     Claude Code launching, hooks, local server; mcp/: the editor's MCP server and its tools
   git/        repository status and history (libgit2), operations (git command), partial patches, snapshots
   changes/    Diff mode: staging, commit, snapshot recovery
   history/    History mode: commits, their files and their diffs
@@ -403,6 +428,7 @@ src/
   settings/   preferences and keymap
   setup/      prerequisites check (git, Claude Code) and installation
 tools/duet-hook/   Claude Code hooks → editor relay
+tools/duet-mcp/    Claude Code's MCP server → editor relay
 tools/claude-plugin/ Duet's plugin for its Claude session: skills (diagrams)
 tests/                 Qt Test tests (ctest)
 cmake/                 third-party dependencies

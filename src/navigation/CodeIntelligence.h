@@ -66,6 +66,8 @@ private:
     // even before the server has indexed the project.
     void syncOpenEditors(LspClient *client, const QString &languageId);
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
+    // Shows the problems the server reported for `path` in its editor.
+    void showProblems(const QString &path);
     void showHover(EditorWidget *editor, int bytePosition, const QPoint &where, bool explicitRequest);
     // Menu under the cursor of `editor`; returns the chosen entry or -1.
     int chooseFrom(EditorWidget *editor, const QStringList &entries) const;

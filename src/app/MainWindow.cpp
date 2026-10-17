@@ -7,6 +7,7 @@
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeLinter.h"
 #include "claude/EditorContext.h"
+#include "claude/mcp/DuetTools.h"
 #include "claude/EffectiveSettings.h"
 #include "claude/UnsavedEditGuard.h"
 #include "claude/ClaudeUsage.h"
@@ -155,6 +156,7 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
     restoreSettings();
 
     connect(&hookServer_, &HookServer::hookReceived, this, &MainWindow::onHookReceived);
+    registerMcpTools();
     connect(&claudeActivity_, &ClaudeActivity::stateChanged, this, &MainWindow::updateClaudeIndicator);
     connect(&claudeActivity_, &ClaudeActivity::attentionRequested, this, &MainWindow::notify);
     if (!hookServer_.listen())
@@ -279,7 +281,29 @@ void MainWindow::createWidgets()
     modes_->addWidget(createEditPage());
     modes_->addWidget(changesView_);
     modes_->addWidget(historyView_);
-    setCentralWidget(modes_);
+    auto *central = new QWidget(this);
+    auto *centralLayout = new QVBoxLayout(central);
+    centralLayout->setContentsMargins(0, 0, 0, 0);
+    centralLayout->setSpacing(0);
+    toolRequestBar_ = new NoticeBar(central);
+    connect(toolRequestBar_, &NoticeBar::actionClicked, this, [this] {
+        if (toolRequests_.isEmpty())
+            return;
+        const ToolRequest request = toolRequests_.takeFirst();
+        toolRequestBar_->hide();
+        request.answer(true);
+        showToolRequest();
+    });
+    connect(toolRequestBar_, &NoticeBar::dismissed, this, [this] {
+        if (toolRequests_.isEmpty())
+            return;
+        const ToolRequest request = toolRequests_.takeFirst();
+        request.answer(false);
+        showToolRequest();
+    });
+    centralLayout->addWidget(toolRequestBar_);
+    centralLayout->addWidget(modes_, 1);
+    setCentralWidget(central);
     createModeTabs();
     commandPalette_ = new CommandPalette(this);
 
@@ -617,6 +641,12 @@ void MainWindow::createMenus()
     shareEditorContext_->setToolTip(tr("Tell Claude the open file, the cursor, the selection, the problems shown and the unsaved files"));
     connect(shareEditorContext_, &QAction::toggled, this,
             [](bool checked) { QSettings().setValue(QStringLiteral("shareEditorContext"), checked); });
+    exposeTools_ = claude->addAction(tr("E&xpose Duet's Tools to Claude"));
+    exposeTools_->setCheckable(true);
+    exposeTools_->setChecked(settings.value(QStringLiteral("exposeTools"), true).toBool());
+    exposeTools_->setToolTip(tr("Let Claude read and act in the editor through Duet's MCP server (next session)"));
+    connect(exposeTools_, &QAction::toggled, this,
+            [](bool checked) { QSettings().setValue(QStringLiteral("exposeTools"), checked); });
     claudeNotifications_ = claude->addAction(tr("&Notifications"));
     claudeNotifications_->setCheckable(true);
     claudeNotifications_->setChecked(settings.value(QStringLiteral("claudeNotifications"), true).toBool());
@@ -1028,7 +1058,10 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     }
     QString launchError;
     const std::optional<ProcessSpec> spec =
-        ClaudeLauncher::claudeProcess(folder_, hookServer_.serverName(), &launchError, extraArguments);
+        ClaudeLauncher::claudeProcess(folder_, hookServer_.serverName(), &launchError, extraArguments,
+                                      exposeTools_->isChecked()
+                                          ? std::optional(mcpRegistry_.readOnlyToolPermissions(QStringLiteral("duet")))
+                                          : std::nullopt);
     if (!spec) {
         statusBar()->showMessage(tr("Claude session unavailable: %1").arg(launchError));
         if (error)
@@ -1153,6 +1186,7 @@ void MainWindow::setTheme(const QString &name)
     findInFiles_->applyTheme(theme_);
     serverNotice_->applyTheme(theme_);
     unsavedEditNotice_->applyTheme(theme_);
+    toolRequestBar_->applyTheme(theme_);
     toolsNotice_->applyTheme(theme_);
     projectSettings_->applyTheme(theme_);
     if (preferencesPopup_)
@@ -1205,6 +1239,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     formatOnSave_->setChecked(preferences.formatOnSave);
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
     shareEditorContext_->setChecked(preferences.shareEditorContext);
+    exposeTools_->setChecked(preferences.exposeTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     editorTabs_->setEditorOptions(preferences.editor);
     languageServers_->setEnabled(preferences.languageServers);
@@ -1448,46 +1483,78 @@ void MainWindow::notify(const QString &title, const QString &message)
     trayIcon_->showMessage(title, message, QSystemTrayIcon::Information, notificationMs);
 }
 
+void MainWindow::registerMcpTools()
+{
+    DuetToolContext context;
+    context.folder = [this] { return folder_; };
+    context.tabs = editorTabs_;
+    context.navigator = navigator_;
+    context.symbols = symbolIndex_;
+    context.languageServers = languageServers_;
+    context.intelligence = intelligence_;
+    context.git = gitCommands_;
+    context.menus = titleBar_->menuBar();
+    context.showMessage = [this](const QString &message) { statusBar()->showMessage(message, 5000); };
+    context.terminals = [this] {
+        QList<std::pair<QString, TerminalWidget *>> terminals;
+        for (int i = 0; i < terminalTabs_->count(); ++i) {
+            if (auto *terminal = qobject_cast<TerminalWidget *>(terminalTabs_->widget(i)))
+                terminals.append({terminalTabs_->tabText(i), terminal});
+        }
+        return terminals;
+    };
+    context.addTerminal = [this](const QString &title, const ProcessSpec &spec) { return addTerminal(title, spec); };
+    context.showChanges = [this](const QString &relativePath) {
+        setMode(Mode::Diff);
+        changesView_->refresh();
+        if (!relativePath.isEmpty())
+            changesView_->selectFile(relativePath);
+    };
+    context.repositoryChanged = [this] { onRepositoryChanged(); };
+    DuetTools::registerEditorTools(mcpRegistry_, context);
+    DuetTools::registerWorkspaceTools(mcpRegistry_, context);
+    DuetTools::registerCodeTools(mcpRegistry_, context);
+    DuetTools::registerTerminalTools(mcpRegistry_, context);
+    DuetTools::registerGitTools(mcpRegistry_, context);
+#ifdef DUET_WITH_DIAGRAMS
+    DuetTools::registerDiagramTools(mcpRegistry_, context);
+#endif
+    mcpRegistry_.setConfirmer([this](const QString &tool, const QString &what, std::function<void(bool)> answer) {
+        toolRequests_.append({tr("Claude asks to %1 (%2).").arg(what, tool), std::move(answer)});
+        if (toolRequests_.size() == 1)
+            showToolRequest();
+    });
+    hookServer_.setMcpRegistry(&mcpRegistry_);
+
+    // Subscribed clients hear when the user moves in the editor (once
+    // things settle) and when the repository changes.
+    auto *editorMoved = new QTimer(this);
+    editorMoved->setSingleShot(true);
+    editorMoved->setInterval(400);
+    connect(editorMoved, &QTimer::timeout, this,
+            [this] { mcpRegistry_.notifyResourceUpdated(QStringLiteral("duet://editor/state")); });
+    connect(editorTabs_, &QTabWidget::currentChanged, editorMoved, qOverload<>(&QTimer::start));
+    connect(editorTabs_, &EditorTabs::editorOpened, this, [editorMoved](EditorWidget *editor) {
+        connect(editor, &QsciScintilla::cursorPositionChanged, editorMoved, qOverload<>(&QTimer::start));
+        connect(editor, &QsciScintilla::selectionChanged, editorMoved, qOverload<>(&QTimer::start));
+        connect(editor, &QsciScintilla::modificationChanged, editorMoved, qOverload<>(&QTimer::start));
+    });
+}
+
+void MainWindow::showToolRequest()
+{
+    if (toolRequests_.isEmpty())
+        return;
+    toolRequestBar_->showNotice(toolRequests_.first().text, tr("Allow"));
+    // Close refuses; the request waits for an answer.
+    QApplication::alert(this);
+}
+
 void MainWindow::shareEditorContext()
 {
     if (!shareEditorContext_->isChecked())
         return;
-    const QDir project(folder_);
-    const auto relative = [&project](const QString &path) {
-        const QString relativePath = project.relativeFilePath(path);
-        return relativePath.startsWith(QLatin1String("..")) ? path : relativePath;
-    };
-
-    EditorContext context;
-    if (EditorWidget *editor = editorTabs_->currentEditor(); editor && !editor->filePath().isEmpty()) {
-        context.filePath = relative(editor->filePath());
-        int line = 0;
-        int index = 0;
-        editor->getCursorPosition(&line, &index);
-        context.line = line + 1;
-        context.column = index + 1;
-        if (editor->hasSelectedText()) {
-            int lineFrom = 0, indexFrom = 0, lineTo = 0, indexTo = 0;
-            editor->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
-            // Whole lines selected end at the start of the next one.
-            if (indexTo == 0 && lineTo > lineFrom)
-                --lineTo;
-            context.selectionStartLine = lineFrom + 1;
-            context.selectionEndLine = lineTo + 1;
-            context.selectedText = editor->selectedText();
-        }
-        for (const Diagnostic &diagnostic : editor->diagnostics()) {
-            int problemLine = 0;
-            int problemIndex = 0;
-            editor->lineIndexFromPosition(diagnostic.start, &problemLine, &problemIndex);
-            context.problems.append(
-                {problemLine + 1, diagnostic.severity == Diagnostic::Severity::Error, diagnostic.message});
-        }
-    }
-    for (const QString &path : editorTabs_->unsavedTexts().keys())
-        context.unsavedFiles.append(relative(path));
-    context.unsavedFiles.sort();
-
+    const EditorContext context = EditorContext::of(*editorTabs_, folder_);
     const QString description = context.describe();
     if (!description.isEmpty())
         hookServer_.respond(EditorContext::promptHookOutput(description));
@@ -1855,6 +1922,7 @@ void MainWindow::updateRepositoryInfo()
 
 void MainWindow::onRepositoryChanged()
 {
+    mcpRegistry_.notifyResourceUpdated(QStringLiteral("duet://git/status"));
     updateRepositoryInfo();
     symbolIndex_->refresh(); // branch switch, pull…
     editorTabs_->reloadChangeBases(); // staging, commit…

@@ -1,6 +1,7 @@
 #include "CodeIntelligence.h"
 
 #include "CodeNavigator.h"
+#include "claude/ClaudeLint.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/TextFile.h"
@@ -13,6 +14,7 @@
 #include <QJsonArray>
 #include <QMenu>
 #include <QPointer>
+#include <QTimer>
 #include <QToolTip>
 
 #include <algorithm>
@@ -22,6 +24,8 @@ using namespace LspProtocol;
 namespace {
 
 constexpr int hoverDelayMs = 600;
+// After the last keystroke, the text goes to the server, which checks it.
+constexpr int problemsDelayMs = 700;
 constexpr int maxDocumentationLength = 3000;
 constexpr int maxUsagesShown = 300;
 
@@ -67,10 +71,44 @@ CodeIntelligence::CodeIntelligence(EditorTabs *tabs, LanguageServers *servers, C
         applyWorkspaceEdit(parseWorkspaceEdit(params.toObject().value("edit").toObject()));
         return QJsonValue(QJsonObject{{"applied", true}});
     });
+    connect(servers_, &LanguageServers::diagnosticsChanged, this, &CodeIntelligence::showProblems);
+}
+
+void CodeIntelligence::showProblems(const QString &path)
+{
+    EditorWidget *editor = tabs_->editorFor(path);
+    // Claude's configuration files have their own checker.
+    if (!editor || ClaudeLint::kindOf(path) != ClaudeLint::Kind::None)
+        return;
+    Diagnostics problems;
+    for (const QJsonValue &value : servers_->diagnostics(path)) {
+        const QJsonObject diagnostic = value.toObject();
+        const int severity = diagnostic.value("severity").toInt(1);
+        if (severity > 2)
+            continue; // information and hints stay quiet
+        const Range range = rangeFrom(diagnostic.value("range"));
+        const int start = positionOf(editor, range.start);
+        const int end = std::max(start, positionOf(editor, range.end));
+        problems.append({severity == 1 ? Diagnostic::Severity::Error : Diagnostic::Severity::Warning, start, end,
+                         diagnostic.value("message").toString()});
+    }
+    editor->setDiagnostics(problems);
 }
 
 void CodeIntelligence::attach(EditorWidget *editor)
 {
+    // The running server follows the text as it is typed, and reports its
+    // problems, shown in the editor.
+    auto *sync = new QTimer(editor);
+    sync->setSingleShot(true);
+    sync->setInterval(problemsDelayMs);
+    connect(editor, &QsciScintilla::textChanged, sync, qOverload<>(&QTimer::start));
+    connect(sync, &QTimer::timeout, this, [this, editor] {
+        if (LspClient *client = servers_->runningClientFor(editor->languageId()))
+            servers_->syncDocument(client, editor->filePath(), editor->languageId(), editor->utf8Bytes().toByteArray());
+    });
+    showProblems(editor->filePath());
+
     editor->SendScintilla(QsciScintillaBase::SCI_SETMOUSEDWELLTIME, hoverDelayMs);
     connect(editor, &QsciScintillaBase::SCN_DWELLSTART, this, [this, editor](int position, int x, int y) {
         if (position >= 0 && editor->isActiveWindow())

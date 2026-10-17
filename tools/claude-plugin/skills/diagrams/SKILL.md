@@ -67,6 +67,19 @@ Once the user has arranged it in Duet, the file ends with lines such as
 - for a deep restructuring, drop all the `duet` lines: the whole diagram is
   laid out again.
 
+## Duet's tools
+
+In a session started by Duet, its MCP server (tools `mcp__duet__…`) sees the
+diagram editor:
+
+- `get_diagram`: a diagram as the user has it, unsaved changes included,
+  with the elements they selected ("this box", "the selected ones");
+- `apply_diagram_source`: changes a diagram open in Duet without writing
+  the file (the user saves; one step they can undo) — prefer it while the
+  user is editing that diagram;
+- `layout_diagram`, `select_diagram_elements`, `export_diagram`,
+  `get_diagram_problems`, `open_file`.
+
 ## Readability
 
 Keep a diagram to about 25 elements, with short texts (a few words, the
