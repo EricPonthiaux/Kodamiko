@@ -49,6 +49,15 @@ QString autoMemoryDir(const QString &projectDir);
 // Duet passes with --settings (may be empty).
 QList<Entry> entries(const QString &projectDir, const QString &sessionSettings);
 
+struct SettingsFile {
+    Scope scope;
+    QString path;
+};
+// The settings files Claude Code merges, from the lowest precedence to the
+// highest: User, Project, Local, Duet's --settings (`sessionSettings`, if
+// not empty), Managed; existing or not.
+QList<SettingsFile> settingsFiles(const QString &projectDir, const QString &sessionSettings);
+
 QString categoryTitle(Category category);
 QString scopeTitle(Scope scope);
 QString scopeDescription(Scope scope);

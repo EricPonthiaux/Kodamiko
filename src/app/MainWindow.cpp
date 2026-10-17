@@ -5,6 +5,7 @@
 #include "changes/SnapshotsPopup.h"
 #include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLauncher.h"
+#include "claude/EffectiveSettings.h"
 #include "claude/ClaudeUsage.h"
 #include "completion/CompletionController.h"
 #include "completion/CodeGeneration.h"
@@ -380,6 +381,9 @@ QWidget *MainWindow::createEditPage()
     connect(claudeConfigView_, &ClaudeConfigView::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
     connect(editorTabs_, &EditorTabs::fileSaved, claudeConfigView_, &ClaudeConfigView::scheduleRefresh);
+    connect(claudeConfigView_, &ClaudeConfigView::effectiveSettingsRequested, this, [this] { showEffectiveSettings(true); });
+    // An open Effective Settings tab follows the files.
+    connect(claudeConfigView_, &ClaudeConfigView::refreshed, this, [this] { showEffectiveSettings(false); });
 
     outlineView_ = new OutlineView(this);
     connect(editorTabs_, &QTabWidget::currentChanged, this,
@@ -1030,6 +1034,20 @@ void MainWindow::restartClaudeSession()
         return;
     }
     setMode(Mode::Terminal);
+}
+
+void MainWindow::showEffectiveSettings(bool open)
+{
+    const QString title = tr("Effective Settings");
+    if (!open && !editorTabs_->textView(title))
+        return;
+    QWidget *current = editorTabs_->currentWidget();
+    const QList<EffectiveSettings::Layer> layers = EffectiveSettings::read(folder_, ClaudeLauncher::sessionSettingsPath());
+    editorTabs_->showText(title, EffectiveSettings::render(layers, folder_), QStringLiteral("json"), QStringLiteral("settings"));
+    if (open)
+        setMode(Mode::Edit);
+    else
+        editorTabs_->setCurrentWidget(current); // updated in the background
 }
 
 void MainWindow::newShell()

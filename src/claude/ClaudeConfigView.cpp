@@ -30,7 +30,7 @@ namespace {
 
 constexpr int refreshDelayMs = 400;
 
-enum ItemRole { EntryRole = Qt::UserRole, CategoryRole };
+enum ItemRole { EntryRole = Qt::UserRole, CategoryRole, EffectiveRole };
 
 constexpr Category allCategories[] = {Category::Memory,       Category::Rules,    Category::Skills,
                                       Category::Agents,       Category::Commands, Category::OutputStyles,
@@ -99,6 +99,7 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     options_->setPopupMode(QToolButton::InstantPopup);
     options_->setStyleSheet(noIndicator);
     auto *optionsMenu = new QMenu(options_);
+    optionsMenu->addAction(tr("Effective Settings"), this, &ClaudeConfigView::effectiveSettingsRequested);
     optionsMenu->addAction(tr("Restart Claude Session"), this, &ClaudeConfigView::restartSessionRequested)
         ->setToolTip(tr("Claude reads some of its configuration only when it starts; the conversation goes on"));
     optionsMenu->addAction(tr("Open Claude Folder"), this, [] {
@@ -187,6 +188,7 @@ void ClaudeConfigView::refresh()
     needsRefresh_ = false;
     entries_ = folder_.isEmpty() ? QList<Entry>() : ClaudeConfig::entries(folder_, sessionSettings_);
     populate();
+    emit refreshed();
 }
 
 void ClaudeConfigView::scheduleRefresh()
@@ -214,7 +216,9 @@ const Entry *ClaudeConfigView::entryOf(const QTreeWidgetItem *item) const
 
 void ClaudeConfigView::populate()
 {
-    const QString current = entryOf(tree_->currentItem()) ? entryOf(tree_->currentItem())->path : QString();
+    QString current = entryOf(tree_->currentItem()) ? entryOf(tree_->currentItem())->path : QString();
+    if (tree_->currentItem() && tree_->currentItem()->data(0, EffectiveRole).toBool())
+        current = QStringLiteral("#effective");
     const int scroll = tree_->verticalScrollBar()->value();
     const QSignalBlocker blocker(tree_);
     tree_->clear();
@@ -241,6 +245,17 @@ void ClaudeConfigView::populate()
     }
 
     QTreeWidgetItem *currentItem = nullptr;
+    if (!folder_.isEmpty()) {
+        auto *effective = new QTreeWidgetItem(categories.value(static_cast<int>(Category::Settings)));
+        effective->setData(0, EffectiveRole, true);
+        effective->setText(0, tr("Effective Settings"));
+        effective->setIcon(0, FileIcons::file(QStringLiteral("settings.json"), darkIcons_));
+        setRightText(effective, tr("Merged"));
+        effective->setForeground(1, muted);
+        effective->setToolTip(0, tr("The settings Claude applies, merged from every file, each value with its origin"));
+        if (current == QLatin1String("#effective"))
+            currentItem = effective;
+    }
     for (qsizetype i = 0; i < entries_.size(); ++i) {
         const Entry &entry = entries_[i];
         auto *item = new QTreeWidgetItem(categories.value(static_cast<int>(entry.category)));
@@ -272,8 +287,10 @@ void ClaudeConfigView::populate()
     for (QTreeWidgetItem *item : std::as_const(categories)) {
         const int count = item->childCount();
         int created = 0;
-        for (int i = 0; i < count; ++i)
-            created += entryOf(item->child(i))->exists ? 1 : 0;
+        for (int i = 0; i < count; ++i) {
+            const Entry *entry = entryOf(item->child(i));
+            created += entry && entry->exists ? 1 : 0;
+        }
         if (created > 0)
             setRightText(item, QString::number(created));
         if (count == 0)
@@ -287,6 +304,10 @@ void ClaudeConfigView::populate()
 
 void ClaudeConfigView::activate(QTreeWidgetItem *item)
 {
+    if (item && item->data(0, EffectiveRole).toBool()) {
+        emit effectiveSettingsRequested();
+        return;
+    }
     const Entry *entry = entryOf(item);
     if (!entry)
         return;
@@ -351,6 +372,11 @@ void ClaudeConfigView::showContextMenu(const QPoint &position)
         return;
     QMenu menu;
     const Entry *entry = entryOf(item);
+    if (item->data(0, EffectiveRole).toBool()) {
+        menu.addAction(tr("&Open"), this, &ClaudeConfigView::effectiveSettingsRequested);
+        menu.exec(tree_->viewport()->mapToGlobal(position));
+        return;
+    }
     if (!entry) {
         const auto category = static_cast<Category>(item->data(0, CategoryRole).toInt());
         if (!ClaudeConfig::canCreate(category))

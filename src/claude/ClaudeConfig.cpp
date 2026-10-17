@@ -188,16 +188,15 @@ QList<Entry> entries(const QString &projectDir, const QString &sessionSettings)
     }
 
     // Settings.
-    c.add(Category::Settings, Scope::Managed, QStringLiteral("managed-settings.json"),
-          managed.filePath(QStringLiteral("managed-settings.json")));
-    c.addUsual(Category::Settings, Scope::User, QStringLiteral("settings.json"), user.filePath(QStringLiteral("settings.json")));
+    for (const SettingsFile &file : settingsFiles(projectDir, sessionSettings)) {
+        switch (file.scope) {
+        case Scope::Managed: c.add(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path); break;
+        case Scope::Session: c.add(Category::Settings, file.scope, tr("Duet session hooks"), file.path); break;
+        case Scope::User: c.addUsual(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path); break;
+        default: c.addUsual(Category::Settings, file.scope, project.relativeFilePath(file.path), file.path); break;
+        }
+    }
     c.add(Category::Settings, Scope::User, QStringLiteral("keybindings.json"), user.filePath(QStringLiteral("keybindings.json")));
-    c.addUsual(Category::Settings, Scope::Project, QStringLiteral(".claude/settings.json"),
-               projectClaude.filePath(QStringLiteral("settings.json")));
-    c.addUsual(Category::Settings, Scope::Local, QStringLiteral(".claude/settings.local.json"),
-               projectClaude.filePath(QStringLiteral("settings.local.json")));
-    if (!sessionSettings.isEmpty())
-        c.add(Category::Settings, Scope::Session, tr("Duet session hooks"), sessionSettings);
 
     // MCP servers. Claude Code rewrites its state file all the time: it
     // is shown, never edited (`claude mcp` changes it).
@@ -211,6 +210,20 @@ QList<Entry> entries(const QString &projectDir, const QString &sessionSettings)
         return a.scope < b.scope;
     });
     return c.entries;
+}
+
+QList<SettingsFile> settingsFiles(const QString &projectDir, const QString &sessionSettings)
+{
+    const QDir projectClaude(QDir(projectDir).filePath(QStringLiteral(".claude")));
+    QList<SettingsFile> files{
+        {Scope::User, QDir(configDir()).filePath(QStringLiteral("settings.json"))},
+        {Scope::Project, projectClaude.filePath(QStringLiteral("settings.json"))},
+        {Scope::Local, projectClaude.filePath(QStringLiteral("settings.local.json"))},
+    };
+    if (!sessionSettings.isEmpty())
+        files.append({Scope::Session, sessionSettings});
+    files.append({Scope::Managed, QDir(managedDir()).filePath(QStringLiteral("managed-settings.json"))});
+    return files;
 }
 
 QString categoryTitle(Category category)

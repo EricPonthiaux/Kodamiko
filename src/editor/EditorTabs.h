@@ -28,6 +28,12 @@ public:
     // the tab, or nullptr on failure.
     QWidget *openFile(const QString &path);
     void showDiff(const QString &title, const QString &diffText);
+    // A read-only text in the tab named `title`, opened or, if it is open,
+    // updated in place; `iconName` is a UiIcons name.
+    EditorWidget *showText(const QString &title, const QString &text, const QString &languageId,
+                           const QString &iconName);
+    // The tab showText() opened under `title`, or nullptr.
+    EditorWidget *textView(const QString &title) const;
 
     EditorWidget *currentEditor() const;
     // The text editors of every tab.

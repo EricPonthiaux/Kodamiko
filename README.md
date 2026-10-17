@@ -48,7 +48,11 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   `.claude/settings.local.json`, `.mcp.json`…) are listed in italics and
   created on the first double-click. **+** makes a skill, an agent, a command
   or a rule, in the project or for every project, from a template with its
-  front matter. *Restart Claude Session* (in the pane's options) starts a new
+  front matter. *Effective Settings* (first under Settings) opens, read-only,
+  the settings Claude applies once its files are merged (User, Project,
+  Local, Duet's session, Managed): every value followed by the file it comes
+  from, and by the values it replaced (`// Local, over User: "sonnet"`); the
+  tab follows the files as they change. *Restart Claude Session* (in the pane's options) starts a new
   session that goes on with the conversation (`--continue`), for the
   settings Claude reads only when it starts.
 - **Usage in the status bar**: context window used and plan limits (5 hours,

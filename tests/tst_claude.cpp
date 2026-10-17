@@ -1,6 +1,7 @@
 #include "claude/ClaudeActivity.h"
 #include "claude/ClaudeConfig.h"
 #include "claude/ClaudeConfigView.h"
+#include "claude/EffectiveSettings.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
 #include "claude/HookEvent.h"
@@ -387,6 +388,51 @@ private slots:
         QVERIFY(QFileInfo::exists(project.filePath("CLAUDE.local.md")));
         QCOMPARE(opened.last().at(0).toString(), QDir::cleanPath(project.filePath("CLAUDE.local.md")));
         qunsetenv("CLAUDE_CONFIG_DIR");
+    }
+
+    void mergesSettingsByPrecedence()
+    {
+        QTemporaryDir user;
+        QTemporaryDir project;
+        QVERIFY(user.isValid() && project.isValid());
+        qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
+        writeFile(user.filePath("settings.json"),
+                  R"j({"model":"sonnet","permissions":{"allow":["Bash(make)"],"defaultMode":"default"},"env":{"A":"1"}})j");
+        writeFile(project.filePath(".claude/settings.json"),
+                  R"j({"permissions":{"allow":["Bash(make)","Read"]},"env":{"B":"2"}})j");
+        writeFile(project.filePath(".claude/settings.local.json"), R"j({"$schema":"x","model":"opus"})j");
+        writeFile(project.filePath("session.json"), "not json");
+        const QList<EffectiveSettings::Layer> layers =
+            EffectiveSettings::read(project.path(), project.filePath("session.json"));
+        qunsetenv("CLAUDE_CONFIG_DIR");
+
+        QCOMPARE(layers.size(), 5);
+        QCOMPARE(layers.first().scope, ClaudeConfig::Scope::User);
+        QCOMPARE(layers.last().scope, ClaudeConfig::Scope::Managed);
+        QVERIFY(!layers[3].error.isEmpty()); // the session file, ignored
+
+        const QJsonObject merged = EffectiveSettings::merged(layers);
+        QCOMPARE(merged.value("model").toString(), QStringLiteral("opus"));
+        QVERIFY(!merged.contains("$schema"));
+        QCOMPARE(merged.value("permissions").toObject().value("allow").toArray(),
+                 (QJsonArray{"Bash(make)", "Read"}));
+        QCOMPARE(merged.value("permissions").toObject().value("defaultMode").toString(), QStringLiteral("default"));
+        QCOMPARE(merged.value("env").toObject(), (QJsonObject{{"A", "1"}, {"B", "2"}}));
+
+        const QString text = EffectiveSettings::render(layers, project.path());
+        const auto lineWith = [&](const QString &needle) {
+            for (const QString &line : text.split('\n')) {
+                if (line.contains(needle))
+                    return line;
+            }
+            return QString();
+        };
+        QVERIFY(lineWith("\"model\": \"opus\"").contains("// Local, over User: \"sonnet\""));
+        QVERIFY(lineWith("\"Read\"").contains("// Project"));
+        QVERIFY(lineWith("\"Bash(make)\"").endsWith("\"Bash(make)\","));  // as the array: User
+        QVERIFY(lineWith("\"permissions\": {").contains("// User"));
+        QVERIFY(lineWith("\"B\": \"2\"").contains("// Project"));
+        QVERIFY(lineWith("session.json").contains("ignored"));
     }
 
 private:

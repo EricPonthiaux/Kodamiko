@@ -16,7 +16,8 @@ class QTreeWidgetItem;
 // grouped by category, each file with its scope (User, Project, Local...).
 // A double-click opens the file in the editor; a usual file not created
 // yet (CLAUDE.local.md...) is created first. New makes a skill, an agent, a
-// command or a rule, in the project or for every project.
+// command or a rule, in the project or for every project. Under Settings,
+// Effective Settings shows them merged (see EffectiveSettings).
 //
 // The list is reread when the pane shows, on refresh() and after Claude's
 // edits; only while the pane is visible.
@@ -52,6 +53,9 @@ signals:
     void fileRequested(const QString &path, bool readOnly);
     void sendToClaudeRequested(const QString &path);
     void restartSessionRequested();
+    void effectiveSettingsRequested();
+    // The configuration was reread.
+    void refreshed();
     void statusMessage(const QString &message);
 
 protected:

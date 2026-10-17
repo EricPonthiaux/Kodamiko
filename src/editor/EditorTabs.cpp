@@ -145,6 +145,36 @@ void EditorTabs::showDiff(const QString &title, const QString &diffText)
     setCurrentIndex(index);
 }
 
+EditorWidget *EditorTabs::showText(const QString &title, const QString &text, const QString &languageId,
+                                   const QString &iconName)
+{
+    EditorWidget *view = textView(title);
+    if (view) {
+        const int line = view->firstVisibleLine();
+        view->showReadOnlyText(text, languageId);
+        view->setFirstVisibleLine(line);
+    } else {
+        view = new EditorWidget(theme_, this);
+        view->setOptions(editorOptions_);
+        view->setProperty("textTitle", title);
+        view->setProperty("iconName", iconName);
+        view->showReadOnlyText(text, languageId);
+        addTab(view, title);
+        updateTabIcon(view);
+    }
+    setCurrentWidget(view);
+    return view;
+}
+
+EditorWidget *EditorTabs::textView(const QString &title) const
+{
+    for (int i = 0; i < count(); ++i) {
+        if (widget(i)->property("textTitle").toString() == title)
+            return qobject_cast<EditorWidget *>(widget(i));
+    }
+    return nullptr;
+}
+
 EditorWidget *EditorTabs::currentEditor() const
 {
     return editorIn(currentWidget());
@@ -694,8 +724,10 @@ void EditorTabs::updateTabIcon(QWidget *page)
     if (index < 0)
         return;
     const QString path = filePathOf(page);
-    setTabIcon(index, path.isEmpty() ? UiIcons::icon(QStringLiteral("diff"), theme_.mutedText)
-                                     : FileIcons::file(QFileInfo(path).fileName(), theme_.isDark));
+    const QString iconName = page->property("iconName").toString();
+    setTabIcon(index, !path.isEmpty() ? FileIcons::file(QFileInfo(path).fileName(), theme_.isDark)
+                                      : UiIcons::icon(iconName.isEmpty() ? QStringLiteral("diff") : iconName,
+                                                      theme_.mutedText));
 }
 
 void EditorTabs::applyTheme(const Theme &theme)

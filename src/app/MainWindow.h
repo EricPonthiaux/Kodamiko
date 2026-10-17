@@ -107,6 +107,8 @@ private:
     void updateToolsNotice();
     bool startClaudeSession(QString *error = nullptr, const QStringList &extraArguments = {});
     void restartClaudeSession();
+    // The Effective Settings tab, opened, or updated if it is open.
+    void showEffectiveSettings(bool open);
     void showClaudeSession();
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);
