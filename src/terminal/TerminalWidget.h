@@ -69,6 +69,8 @@ private:
     void onProcessFinished(int exitCode);
     void onScreenChanged();
     void updateGridSize();
+    // Rebuilds the fonts and the cell size from the theme font and zoom_.
+    void applyFont();
     void updateScrollBar();
     void scrollToBottom();
 
@@ -94,6 +96,8 @@ private:
     // letter spacing that puts each character on the cell grid, so a run
     // of cells is drawn in one call (see fontFor()).
     std::array<QFont, 16> fonts_;
+    QFont baseFont_;
+    int zoom_ = 0; // points added to the theme font by Ctrl+wheel
     QSize cellSize_{8, 16};
     int ascent_ = 12;
     QColor foreground_;

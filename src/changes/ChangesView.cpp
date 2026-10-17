@@ -5,6 +5,7 @@
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
+#include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
 
@@ -86,10 +87,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
 
     // "Changes" and the summary, the actions at the right.
     auto *title = new QLabel(tr("Changes"), this);
-    QFont titleFont = title->font();
-    titleFont.setWeight(QFont::DemiBold);
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.15);
-    title->setFont(titleFont);
+    AppFonts::setInterfaceFont(title, 1.15);
     summary_->setEnabled(false); // dimmed
     auto *header = new QHBoxLayout;
     header->setContentsMargins(16, 10, 12, 10);

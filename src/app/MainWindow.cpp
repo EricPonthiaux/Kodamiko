@@ -294,9 +294,7 @@ void MainWindow::createWidgets()
                 navigator_->goToLine(path, line, column, length);
             });
 
-    // Files, outline and changes: same proportions everywhere.
-    for (QTreeView *tree : findChildren<QTreeView *>())
-        applyTreeMetrics(tree, theme_.font);
+    applyTreeFont(Preferences::load().treeFont());
 
     resize(1400, 900);
 }
@@ -1084,8 +1082,12 @@ void MainWindow::applyPreferences(const Preferences &preferences)
 {
     const Preferences previous = Preferences::load();
     preferences.save();
+    if (preferences.interfaceFont() != previous.interfaceFont())
+        QApplication::setFont(preferences.interfaceFont());
     if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont())
         setTheme(preferences.theme);
+    if (preferences.treeFont() != previous.treeFont())
+        applyTreeFont(preferences.treeFont());
     // The menus' commands apply their own settings.
     systemTitleBar_->setChecked(preferences.systemTitleBar);
     formatOnSave_->setChecked(preferences.formatOnSave);
@@ -1096,6 +1098,13 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     warmUpLanguageServers();
     applyFullLine(preferences);
     filesPanel_->setAlwaysSelectOpenedFile(preferences.alwaysSelectOpenedFile);
+}
+
+// Files, outline and changes: same proportions everywhere.
+void MainWindow::applyTreeFont(const QFont &font)
+{
+    for (QTreeView *tree : findChildren<QTreeView *>())
+        applyTreeMetrics(tree, font);
 }
 
 void MainWindow::applyKeymap(const Keymap::Overrides &overrides)

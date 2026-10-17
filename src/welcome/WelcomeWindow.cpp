@@ -6,6 +6,7 @@
 #include "settings/Preferences.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
+#include "ui/AppFonts.h"
 #include "ui/BrandMark.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
@@ -146,10 +147,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     auto *logo = new QLabel(side);
     logo->setPixmap(BrandMark::appIcon(44, devicePixelRatioF()));
     auto *name = new QLabel(QStringLiteral("Duet"), side);
-    QFont nameFont = name->font();
-    nameFont.setPointSizeF(nameFont.pointSizeF() * 1.4);
-    nameFont.setWeight(QFont::DemiBold);
-    name->setFont(nameFont);
+    AppFonts::setInterfaceFont(name, 1.4);
     auto *version = new QLabel(QCoreApplication::applicationVersion(), side);
     version->setObjectName(QStringLiteral("welcomeVersion"));
     auto *identity = new QVBoxLayout;

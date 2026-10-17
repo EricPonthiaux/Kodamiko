@@ -1,6 +1,7 @@
 #include "NewBranchPopup.h"
 
 #include "git/Branches.h"
+#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -38,10 +39,7 @@ NewBranchPopup::NewBranchPopup(const Theme &theme, QWidget *parent)
 {
     // The header: where the branch starts.
     auto *title = new QLabel(tr("New Branch"), this);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.5);
-    titleFont.setWeight(QFont::DemiBold);
-    title->setFont(titleFont);
+    AppFonts::setInterfaceFont(title, 1.5);
     origin_->setObjectName(QStringLiteral("branchOrigin"));
     auto *heading = new QVBoxLayout;
     heading->setSpacing(4);

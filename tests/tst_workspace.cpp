@@ -1,6 +1,7 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/GitProcess.h"
+#include "ui/AppFonts.h"
 #include "ui/OverlayPopup.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -31,6 +32,7 @@
 #include <QMimeData>
 #include <QStandardPaths>
 #include <QHeaderView>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QPointer>
@@ -127,6 +129,23 @@ private slots:
         QAbstractItemDelegate *standard = plain.itemDelegate();
         applyTreeMetrics(&plain, QApplication::font());
         QVERIFY(plain.itemDelegate() != standard);
+    }
+
+    void titlesFollowTheInterfaceFont()
+    {
+        const QFont previous = QApplication::font();
+        QFont font = previous;
+        font.setPointSizeF(10);
+        QApplication::setFont(font);
+        QWidget window;
+        auto *title = new QLabel("Title", &window);
+        AppFonts::setInterfaceFont(title, 1.5);
+        QCOMPARE(title->font().pointSizeF(), 15.0);
+        QCOMPARE(title->font().weight(), QFont::DemiBold);
+        font.setPointSizeF(12); // Preferences ▸ Appearance
+        QApplication::setFont(font);
+        QCOMPARE(title->font().pointSizeF(), 18.0);
+        QApplication::setFont(previous);
     }
 
     void overlayPopupsAreCenteredAndResizable()

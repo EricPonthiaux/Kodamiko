@@ -126,10 +126,7 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
 {
     // The header: an icon, the title and what snapshots are.
     auto *title = new QLabel(tr("Restore a Snapshot"), this);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.5);
-    titleFont.setWeight(QFont::DemiBold);
-    title->setFont(titleFont);
+    AppFonts::setInterfaceFont(title, 1.5);
     auto *description = wrapped(QStringLiteral("pageDescription"), this);
     description->setText(tr("Duet keeps a copy of your files before discarding changes, and of the whole working "
                             "directory before each Claude prompt."));
@@ -199,10 +196,7 @@ QWidget *SnapshotsPopup::createDetails()
     card->setObjectName(QStringLiteral("settingsCard"));
 
     title_ = wrapped(QStringLiteral("snapshotTitle"), card);
-    QFont font = title_->font();
-    font.setPointSizeF(font.pointSizeF() * 1.12);
-    font.setWeight(QFont::DemiBold);
-    title_->setFont(font);
+    AppFonts::setInterfaceFont(title_, 1.12);
     title_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     date_ = wrapped(QStringLiteral("snapshotDate"), card);
     badge_ = new QLabel(card);
@@ -248,10 +242,7 @@ QWidget *SnapshotsPopup::createEmptyState()
     emptyIcon_->setAlignment(Qt::AlignCenter);
     emptyTitle_ = new QLabel(page);
     emptyTitle_->setAlignment(Qt::AlignCenter);
-    QFont font = emptyTitle_->font();
-    font.setPointSizeF(font.pointSizeF() * 1.2);
-    font.setWeight(QFont::DemiBold);
-    emptyTitle_->setFont(font);
+    AppFonts::setInterfaceFont(emptyTitle_, 1.2);
     emptyText_ = wrapped(QStringLiteral("pageDescription"), page);
     emptyText_->setAlignment(Qt::AlignCenter);
     emptyText_->setContentsMargins(60, 0, 60, 0);

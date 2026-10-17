@@ -1,6 +1,7 @@
 #include "FindInFilesPopup.h"
 
 #include "editor/EditorWidget.h"
+#include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
 #include "ui/TreeMetrics.h"
 
@@ -112,9 +113,7 @@ FindInFilesPopup::FindInFilesPopup(const Theme &theme, QWidget *parent)
 {
 
     auto *title = new QLabel(tr("Find in Files"), this);
-    QFont bold = title->font();
-    bold.setWeight(QFont::DemiBold);
-    title->setFont(bold);
+    AppFonts::setInterfaceFont(title, 1);
     summary_ = new QLabel(this);
     summary_->setEnabled(false);
 

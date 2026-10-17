@@ -2,6 +2,7 @@
 
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QWidget>
 
 namespace AppFonts {
 namespace {
@@ -35,9 +36,25 @@ QFont interfaceFont()
 {
     load();
     QFont font = QGuiApplication::font();
+    if (const qreal systemSize = QFontDatabase::systemFont(QFontDatabase::GeneralFont).pointSizeF(); systemSize > 0)
+        font.setPointSizeF(systemSize);
     if (!interfaceFamily_.isEmpty())
         font.setFamilies({interfaceFamily_, font.family()});
     return font;
+}
+
+void setInterfaceFont(QWidget *widget, qreal scale, QFont::Weight weight, qreal letterSpacing)
+{
+    const auto apply = [widget, scale, weight, letterSpacing] {
+        QFont font = QGuiApplication::font();
+        font.setPointSizeF(font.pointSizeF() * scale);
+        font.setWeight(weight);
+        if (letterSpacing != 0)
+            font.setLetterSpacing(QFont::AbsoluteSpacing, letterSpacing);
+        widget->setFont(font);
+    };
+    apply();
+    QObject::connect(qGuiApp, &QGuiApplication::fontChanged, widget, apply);
 }
 
 QFont codeFont(qreal pointSize)

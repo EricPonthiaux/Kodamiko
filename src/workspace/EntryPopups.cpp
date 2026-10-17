@@ -1,5 +1,7 @@
 #include "EntryPopups.h"
 
+#include "ui/AppFonts.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -112,9 +114,7 @@ EntryPopup::EntryPopup(const QString &title, const QString &location, QWidget *p
     setFrameShape(QFrame::StyledPanel);
 
     auto *titleLabel = new QLabel(title, this);
-    QFont bold = titleLabel->font();
-    bold.setWeight(QFont::DemiBold);
-    titleLabel->setFont(bold);
+    AppFonts::setInterfaceFont(titleLabel, 1);
     auto *locationLabel = new QLabel(this);
     locationLabel->setForegroundRole(QPalette::PlaceholderText);
     locationLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);

@@ -13,6 +13,11 @@ struct Preferences {
     QString theme = QStringLiteral("dark"); // Theme::name
     QString codeFontFamily; // empty: the embedded JetBrains Mono
     int codeFontSize = 11;
+    // Menus, tabs, panels and dialogs; 0: the system's size.
+    int interfaceFontSize = 0;
+    // The side trees (files, outline, changes); 0: the code font's size,
+    // never below the interface's.
+    int treeFontSize = 0;
     bool systemTitleBar = false;
 
     // Editor
@@ -42,6 +47,10 @@ struct Preferences {
 
     // Font of code (editor, terminal, diffs) for these preferences.
     QFont codeFont() const;
+    // Font of the interface (menus, tabs, panels, dialogs).
+    QFont interfaceFont() const;
+    // Font of the side trees.
+    QFont treeFont() const;
 
     bool operator==(const Preferences &) const = default;
 };

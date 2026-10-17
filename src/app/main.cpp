@@ -1,7 +1,7 @@
 #include "MainWindow.h"
 #include "git/LibGit2.h"
 #include "projects/ProjectConfig.h"
-#include "ui/AppFonts.h"
+#include "settings/Preferences.h"
 #include "ui/BrandMark.h"
 #include "welcome/WelcomeWindow.h"
 
@@ -139,8 +139,9 @@ int main(int argc, char *argv[])
     // Fusion follows the application palette on every system, which
     // enables the dark theme everywhere.
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
-    // Inter for the whole interface (embedded); the size stays the system one.
-    QApplication::setFont(AppFonts::interfaceFont());
+    // Inter for the whole interface (embedded), at the system's size unless
+    // Preferences ▸ Appearance sets one.
+    QApplication::setFont(Preferences::load().interfaceFont());
     // Every window's icon; on Wayland, the desktop file's icon.
     QApplication::setWindowIcon(BrandMark::windowIcon());
     QGuiApplication::setDesktopFileName(QStringLiteral("duet"));

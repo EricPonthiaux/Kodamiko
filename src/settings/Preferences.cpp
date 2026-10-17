@@ -18,6 +18,13 @@ Preferences Preferences::load()
     preferences.codeFontFamily = settings.value(QStringLiteral("codeFont/family")).toString();
     preferences.codeFontSize = std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(),
                                           minimumFontSize, maximumFontSize);
+    // 0 (the default size) or a size in the range.
+    const auto fontSize = [&settings](const QString &key) {
+        const int size = settings.value(key, 0).toInt();
+        return size <= 0 ? 0 : std::clamp(size, minimumFontSize, maximumFontSize);
+    };
+    preferences.interfaceFontSize = fontSize(QStringLiteral("interfaceFont/size"));
+    preferences.treeFontSize = fontSize(QStringLiteral("treeFont/size"));
     preferences.systemTitleBar = settings.value(QStringLiteral("systemTitleBar"), false).toBool();
 
     preferences.editor.codeFolding = settings.value(QStringLiteral("editor/codeFolding"), true).toBool();
@@ -53,6 +60,8 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("theme"), theme);
     settings.setValue(QStringLiteral("codeFont/family"), codeFontFamily);
     settings.setValue(QStringLiteral("codeFont/size"), codeFontSize);
+    settings.setValue(QStringLiteral("interfaceFont/size"), interfaceFontSize);
+    settings.setValue(QStringLiteral("treeFont/size"), treeFontSize);
     settings.setValue(QStringLiteral("systemTitleBar"), systemTitleBar);
 
     settings.setValue(QStringLiteral("editor/codeFolding"), editor.codeFolding);
@@ -78,5 +87,23 @@ QFont Preferences::codeFont() const
     QFont font = AppFonts::codeFont(codeFontSize);
     if (!codeFontFamily.isEmpty())
         font.setFamily(codeFontFamily);
+    return font;
+}
+
+QFont Preferences::interfaceFont() const
+{
+    QFont font = AppFonts::interfaceFont();
+    if (interfaceFontSize > 0)
+        font.setPointSize(interfaceFontSize);
+    return font;
+}
+
+QFont Preferences::treeFont() const
+{
+    QFont font = interfaceFont();
+    if (treeFontSize > 0)
+        font.setPointSize(treeFontSize);
+    else
+        font.setPointSizeF(std::max(font.pointSizeF(), qreal(codeFontSize)));
     return font;
 }

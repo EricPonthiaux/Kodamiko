@@ -1,6 +1,7 @@
 #include "TerminalWidget.h"
 
 #include "IPty.h"
+#include "settings/Preferences.h"
 #include "ui/Theme.h"
 #include "VtScreen.h"
 
@@ -11,6 +12,7 @@
 #include <QPainter>
 #include <QScrollBar>
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -112,9 +114,21 @@ bool TerminalWidget::start(const ProcessSpec &spec)
 
 void TerminalWidget::applyTheme(const Theme &theme)
 {
-    QFont font = theme.font;
+    baseFont_ = theme.font;
+    foreground_ = theme.foreground;
+    background_ = theme.background;
+    screen_->setDefaultColors(foreground_, background_);
+    applyFont();
+}
+
+void TerminalWidget::applyFont()
+{
+    QFont font = baseFont_;
     font.setStyleHint(QFont::TypeWriter);
     font.setKerning(false);
+    if (font.pointSizeF() > 0)
+        font.setPointSizeF(std::clamp(font.pointSizeF() + zoom_, qreal(Preferences::minimumFontSize),
+                                      qreal(Preferences::maximumFontSize)));
 
     const QFontMetricsF metrics(font);
     cellSize_ = QSize(static_cast<int>(std::ceil(metrics.horizontalAdvance(QLatin1Char('M')))),
@@ -132,9 +146,6 @@ void TerminalWidget::applyTheme(const Theme &theme)
         fonts_[static_cast<size_t>(index)] = variant;
     }
 
-    foreground_ = theme.foreground;
-    background_ = theme.background;
-    screen_->setDefaultColors(foreground_, background_);
     updateGridSize();
     viewport()->update();
 }
@@ -444,6 +455,22 @@ void TerminalWidget::inputMethodEvent(QInputMethodEvent *event)
 
 void TerminalWidget::wheelEvent(QWheelEvent *event)
 {
+    if (event->modifiers() & Qt::ControlModifier) {
+        // Zoom, as in the editors: one point per notch.
+        const int delta = event->angleDelta().y();
+        const qreal size = baseFont_.pointSizeF();
+        if (delta != 0 && size > 0) {
+            const int zoom = std::clamp(zoom_ + (delta > 0 ? 1 : -1),
+                                        Preferences::minimumFontSize - static_cast<int>(size),
+                                        Preferences::maximumFontSize - static_cast<int>(size));
+            if (zoom != zoom_) {
+                zoom_ = zoom;
+                applyFont();
+            }
+        }
+        event->accept();
+        return;
+    }
     const int lines = event->angleDelta().y() / 40;
     scrollOffset_ = std::clamp(scrollOffset_ + lines, 0, screen_->scrollbackSize());
     updateScrollBar();

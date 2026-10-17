@@ -1,5 +1,6 @@
 #include "TitleBar.h"
 
+#include "AppFonts.h"
 #include "BrandMark.h"
 
 #include "UiIcons.h"
@@ -147,6 +148,7 @@ TitleBar::TitleBar(QWidget *parent)
     layout_->addWidget(menuBar_, 0, Qt::AlignVCenter);
     layout_->addSpacing(8);
     project_ = addChip();
+    AppFonts::setInterfaceFont(project_, 1);
     layout_->addStretch(1);
     claude_ = addChip();
     connect(claude_, &QToolButton::clicked, this, &TitleBar::claudeClicked);
@@ -190,9 +192,6 @@ void TitleBar::setProject(const QString &name, const QString &toolTip, QMenu *me
     project_->setText(name + QStringLiteral("  ▾"));
     project_->setToolTip(toolTip);
     project_->setMenu(menu);
-    QFont font = project_->font();
-    font.setWeight(QFont::DemiBold);
-    project_->setFont(font);
 }
 
 void TitleBar::setClaudeState(const QIcon &icon, const QString &text, const QString &toolTip)

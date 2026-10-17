@@ -1,5 +1,6 @@
 #include "PopupWidgets.h"
 
+#include "AppFonts.h"
 #include "UiIcons.h"
 
 #include <QApplication>
@@ -373,11 +374,7 @@ QWidget *sectionHeading(const QString &text)
 {
     auto *label = new QLabel(text.toUpper());
     label->setObjectName(QStringLiteral("settingsSection"));
-    QFont font = label->font();
-    font.setPointSizeF(font.pointSizeF() * 0.82);
-    font.setWeight(QFont::DemiBold);
-    font.setLetterSpacing(QFont::AbsoluteSpacing, 0.9);
-    label->setFont(font);
+    AppFonts::setInterfaceFont(label, 0.82, QFont::DemiBold, 0.9);
     label->setContentsMargins(4, 0, 0, 0);
     return label;
 }

@@ -5,6 +5,7 @@
 #include "ProvisioningView.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
+#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
 
 #include <QDir>
@@ -32,10 +33,7 @@ ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, const QString &acti
     , action_(new QPushButton(actionText, this))
 {
     // The header: the project.
-    QFont titleFont = title_->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.5);
-    titleFont.setWeight(QFont::DemiBold);
-    title_->setFont(titleFont);
+    AppFonts::setInterfaceFont(title_, 1.5);
     location_->setObjectName(QStringLiteral("pageDescription"));
     auto *heading = new QVBoxLayout;
     heading->setSpacing(4);

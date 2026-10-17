@@ -31,6 +31,8 @@ private slots:
         QCOMPARE(Preferences::load(), preferences); // the defaults
         preferences.theme = QStringLiteral("light");
         preferences.codeFontSize = 14;
+        preferences.interfaceFontSize = 12;
+        preferences.treeFontSize = 15;
         preferences.editor.wrapLines = true;
         preferences.editor.codeFolding = false;
         preferences.claudeNotifications = false;
@@ -39,6 +41,20 @@ private slots:
         // The menu commands' keys.
         QCOMPARE(QSettings().value("claudeNotifications").toBool(), false);
         QCOMPARE(QSettings().value("theme").toString(), QString("light"));
+    }
+
+    void fontSizesHaveDefaults()
+    {
+        Preferences preferences;
+        preferences.codeFontSize = 30;
+        // The tree follows the code font, never below the interface's.
+        QCOMPARE(preferences.treeFont().pointSize(), 30);
+        preferences.interfaceFontSize = 9;
+        preferences.codeFontSize = 7;
+        QCOMPARE(preferences.interfaceFont().pointSize(), 9);
+        QCOMPARE(preferences.treeFont().pointSize(), 9);
+        preferences.treeFontSize = 14;
+        QCOMPARE(preferences.treeFont().pointSize(), 14);
     }
 
     void oldDarkThemeSettingIsRead()
@@ -81,6 +97,7 @@ private slots:
     {
         Preferences preferences;
         preferences.codeFontSize = 13;
+        preferences.interfaceFontSize = 10;
         preferences.editor.showWhitespace = true;
         preferences.snapshotBeforePrompt = false;
         QWidget window;

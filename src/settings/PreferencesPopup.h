@@ -87,6 +87,8 @@ private:
     QComboBox *fontFamily_ = nullptr;
     QSpinBox *fontSize_ = nullptr;
     QLabel *fontPreview_ = nullptr;
+    QSpinBox *interfaceFontSize_ = nullptr;
+    QSpinBox *treeFontSize_ = nullptr;
     ToggleSwitch *systemTitleBar_ = nullptr;
     ToggleSwitch *codeFolding_ = nullptr;
     ToggleSwitch *wrapLines_ = nullptr;

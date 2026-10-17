@@ -4,6 +4,7 @@
 #include "changes/FileChangeDelegate.h"
 #include "CommitDelegate.h"
 #include "git/ChangeKindStyle.h"
+#include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
 
@@ -52,9 +53,7 @@ QWidget *closablePane(QLabel *title, QWidget *content, const QString &closeTip, 
     QObject::connect(close, &QToolButton::clicked, pane, onClose);
 
     title->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    QFont font = title->font();
-    font.setWeight(QFont::DemiBold);
-    title->setFont(font);
+    AppFonts::setInterfaceFont(title, 1);
     auto *bar = new QHBoxLayout;
     bar->setContentsMargins(14, 6, 6, 6);
     bar->addWidget(title, 1);
@@ -105,10 +104,7 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
 
     // "History" and the summary; the filter and the reload at the right.
     auto *title = new QLabel(tr("History"), this);
-    QFont titleFont = title->font();
-    titleFont.setWeight(QFont::DemiBold);
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.15);
-    title->setFont(titleFont);
+    AppFonts::setInterfaceFont(title, 1.15);
     summary_->setEnabled(false); // dimmed
     auto *header = new QHBoxLayout;
     header->setContentsMargins(16, 10, 12, 10);

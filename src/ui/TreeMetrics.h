@@ -3,10 +3,9 @@
 class QFont;
 class QTreeView;
 
-// Proportions of the side trees, matched to the editor font so that
-// navigation reads at the same distance as the code:
-//  - font: the UI font (Inter if available, see main.cpp);
-//  - text: same size as the editor (1:1 ratio, never below the system font);
+// Proportions of the side trees, for their font (Preferences::treeFont:
+// by default the UI font at the editor's size, so that navigation reads at
+// the same distance as the code):
 //  - row: 1.6 × the text height, the spacing of typical file lists;
 //  - icon: the text height;
 //  - indentation: 1.25 × the text height, to follow depth at a glance.

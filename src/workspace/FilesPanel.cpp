@@ -1,5 +1,6 @@
 #include "FilesPanel.h"
 
+#include "ui/AppFonts.h"
 #include "ui/UiIcons.h"
 
 #include <QActionGroup>
@@ -23,9 +24,7 @@ FilesPanel::FilesPanel(QWidget *parent)
     scope_->setFocusPolicy(Qt::NoFocus);
     scope_->setPopupMode(QToolButton::InstantPopup);
     scope_->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    QFont scopeFont = scope_->font();
-    scopeFont.setWeight(QFont::DemiBold);
-    scope_->setFont(scopeFont);
+    AppFonts::setInterfaceFont(scope_, 1);
     auto *scopeMenu = new QMenu(scope_);
     scopes_ = new QActionGroup(this);
     scopes_->setExclusive(true);

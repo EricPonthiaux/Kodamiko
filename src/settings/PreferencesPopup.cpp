@@ -1,11 +1,13 @@
 #include "PreferencesPopup.h"
 
+#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
 
 #include <QAction>
 #include <QButtonGroup>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -62,6 +64,28 @@ QString shortcutsText(const QList<QKeySequence> &shortcuts)
     for (const QKeySequence &shortcut : shortcuts)
         texts.append(shortcut.toString(QKeySequence::NativeText));
     return texts.join(QStringLiteral(", "));
+}
+
+// A font size, or 0 for the default one shown as `defaultText` (one step
+// below the smallest size).
+QSpinBox *defaultableFontSize(const QString &defaultText)
+{
+    auto *size = new QSpinBox;
+    size->setRange(Preferences::minimumFontSize - 1, Preferences::maximumFontSize);
+    size->setSpecialValueText(defaultText);
+    size->setSuffix(QCoreApplication::translate("PreferencesPopup", " pt"));
+    size->setMinimumWidth(140);
+    return size;
+}
+
+int fontSizeValue(const QSpinBox *size)
+{
+    return size->value() == size->minimum() ? 0 : size->value();
+}
+
+void setFontSizeValue(QSpinBox *size, int value)
+{
+    size->setValue(value > 0 ? value : size->minimum());
 }
 
 // The side bar and the keymap, besides the shared rules (popupStyleSheet).
@@ -140,10 +164,7 @@ QWidget *PreferencesPopup::createSidebar()
     sidebar->setFixedWidth(210);
 
     auto *title = new QLabel(tr("Preferences"), sidebar);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.15);
-    titleFont.setWeight(QFont::DemiBold);
-    title->setFont(titleFont);
+    AppFonts::setInterfaceFont(title, 1.15);
     auto *icon = new QLabel(sidebar);
     icon->setObjectName(QStringLiteral("preferencesIcon"));
     auto *header = new QHBoxLayout;
@@ -178,10 +199,7 @@ QWidget *PreferencesPopup::page(const QString &title, const QString &description
 {
     auto *page = new QWidget;
     auto *titleLabel = new QLabel(title, page);
-    QFont font = titleLabel->font();
-    font.setPointSizeF(font.pointSizeF() * 1.5);
-    font.setWeight(QFont::DemiBold);
-    titleLabel->setFont(font);
+    AppFonts::setInterfaceFont(titleLabel, 1.5);
 
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 22, 0, 0);
@@ -266,6 +284,14 @@ QWidget *PreferencesPopup::createAppearancePage()
     fontCard->addWidget(fontPreview_);
     addGroup(layout, tr("Code font"), fontCard);
 
+    // Interface font: Inter, at the system's size unless one is chosen.
+    auto *interfaceCard = new SettingsCard;
+    interfaceFontSize_ = defaultableFontSize(tr("System"));
+    treeFontSize_ = defaultableFontSize(tr("Code font size"));
+    interfaceCard->addRow(tr("Menus and panels"), tr("Menus, tabs, buttons, panels and dialogs."), interfaceFontSize_);
+    interfaceCard->addRow(tr("Navigation trees"), tr("The files, the outline and the changes."), treeFontSize_);
+    addGroup(layout, tr("Interface font"), interfaceCard);
+
     systemTitleBar_ = new ToggleSwitch(content);
 #ifdef Q_OS_MACOS
     systemTitleBar_->hide(); // macOS keeps its own frame and traffic lights
@@ -277,7 +303,7 @@ QWidget *PreferencesPopup::createAppearancePage()
     addGroup(layout, tr("Window"), windowCard);
 #endif
 
-    return page(tr("Appearance"), tr("Colors, code font and window frame."), content);
+    return page(tr("Appearance"), tr("Colors, fonts and window frame."), content);
 }
 
 QWidget *PreferencesPopup::createEditorPage()
@@ -434,9 +460,7 @@ QWidget *PreferencesPopup::createKeymapPage()
     auto *editCard = new QFrame(content);
     editCard->setObjectName(QStringLiteral("settingsCard"));
     selectedTitle_ = new QLabel(editCard);
-    QFont bold = selectedTitle_->font();
-    bold.setWeight(QFont::DemiBold);
-    selectedTitle_->setFont(bold);
+    AppFonts::setInterfaceFont(selectedTitle_, 1);
     shortcutEdit_ = new QKeySequenceEdit(editCard);
     shortcutEdit_->setMaximumSequenceLength(2);
     shortcutEdit_->setClearButtonEnabled(false);
@@ -561,6 +585,8 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
         themes_->buttons().first()->setChecked(true);
     fontFamily_->setCurrentIndex(std::max(fontFamily_->findData(preferences.codeFontFamily), 0));
     fontSize_->setValue(preferences.codeFontSize);
+    setFontSizeValue(interfaceFontSize_, preferences.interfaceFontSize);
+    setFontSizeValue(treeFontSize_, preferences.treeFontSize);
     systemTitleBar_->setChecked(preferences.systemTitleBar);
     codeFolding_->setChecked(preferences.editor.codeFolding);
     wrapLines_->setChecked(preferences.editor.wrapLines);
@@ -613,6 +639,8 @@ Preferences PreferencesPopup::preferences() const
         preferences.theme = card->themeName();
     preferences.codeFontFamily = fontFamily_->currentData().toString();
     preferences.codeFontSize = fontSize_->value();
+    preferences.interfaceFontSize = fontSizeValue(interfaceFontSize_);
+    preferences.treeFontSize = fontSizeValue(treeFontSize_);
     preferences.systemTitleBar = systemTitleBar_->isChecked();
     preferences.editor.codeFolding = codeFolding_->isChecked();
     preferences.editor.wrapLines = wrapLines_->isChecked();
