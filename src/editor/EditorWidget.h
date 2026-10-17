@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TextFile.h"
+#include "diagnostics/Diagnostic.h"
 #include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
@@ -8,6 +9,7 @@
 #include <QKeySequence>
 #include <QList>
 
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -88,6 +90,14 @@ public:
   // keys it has a command for (Ctrl+- zooms out...).
   static void setReservedKeys(const QList<QKeySequence> &shortcuts);
 
+  // Problems found in the text: a wavy underline, red for an error, amber
+  // for a warning, and their messages when the mouse rests on them.
+  void setDiagnostics(const Diagnostics &diagnostics);
+  const Diagnostics &diagnostics() const { return diagnostics_; }
+  // Text shown when the mouse rests where there is no problem (the
+  // documentation of a setting...), from a byte position; empty: nothing.
+  void setHoverHelp(std::function<QString(int)> help);
+
   // Marks of the lines that differ from the git index.
   ChangeGutter *changeGutter() const { return changeGutter_; }
   void applyTheme(const Theme &theme);
@@ -117,6 +127,10 @@ private:
   void moveCursorOutOfFolds();
   void installHighlighter(const QString &languageId);
   void updateLineNumberMargin();
+  void showHoverInfo(int position, const QPoint &point);
+  // The mouse must rest a moment for the hover info (Scintilla's default:
+  // never).
+  void enableDwell();
 
   QString filePath_;
   QString languageId_;
@@ -125,6 +139,8 @@ private:
   std::unique_ptr<ISyntaxHighlighter> highlighter_;
   ChangeGutter *changeGutter_;
   EditorOptions options_;
+  Diagnostics diagnostics_;
+  std::function<QString(int)> hoverHelp_;
   // QScintilla's keys for each of its commands, before releaseReservedKeys.
   QList<std::pair<int, int>> defaultCommandKeys_;
 };

@@ -5,6 +5,7 @@
 #include "changes/SnapshotsPopup.h"
 #include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLauncher.h"
+#include "claude/ClaudeLinter.h"
 #include "claude/EffectiveSettings.h"
 #include "claude/ClaudeUsage.h"
 #include "completion/CompletionController.h"
@@ -381,6 +382,8 @@ QWidget *MainWindow::createEditPage()
     connect(claudeConfigView_, &ClaudeConfigView::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
     connect(editorTabs_, &EditorTabs::fileSaved, claudeConfigView_, &ClaudeConfigView::scheduleRefresh);
+    // Settings, skills and agents checked as they are edited.
+    connect(editorTabs_, &EditorTabs::editorOpened, new ClaudeLinter(this), &ClaudeLinter::attach);
     connect(claudeConfigView_, &ClaudeConfigView::effectiveSettingsRequested, this, [this] { showEffectiveSettings(true); });
     // An open Effective Settings tab follows the files.
     connect(claudeConfigView_, &ClaudeConfigView::refreshed, this, [this] { showEffectiveSettings(false); });

@@ -13,6 +13,7 @@
 #include <QFile>
 #include <QMouseEvent>
 #include <QTimer>
+#include <QToolTip>
 
 #include <algorithm>
 #include <vector>
@@ -21,6 +22,12 @@ namespace {
 
 // Margins, from the left: line numbers, change marks (ChangeGutter), folds.
 constexpr int foldMargin = 2;
+
+// After those of the find bar, snippets and completion choices.
+constexpr int errorIndicator = 13;
+constexpr int warningIndicator = 14;
+// As long as the documentation's hover (CodeIntelligence).
+constexpr int hoverDelayMs = 600;
 
 // Navigation shortcuts (see CodeNavigator) until MainWindow passes the
 // menu's shortcuts.
@@ -53,6 +60,8 @@ EditorWidget::EditorWidget(const Theme &theme, QWidget *parent)
     // A click on a fold mark can hide the cursor's line: the cursor goes to
     // the fold's header, so that typing never edits hidden text. Queued,
     // because QScintilla folds after this signal.
+    connect(this, &QsciScintillaBase::SCN_DWELLSTART, this,
+            [this](int position, int x, int y) { showHoverInfo(position, QPoint(x, y)); });
     connect(this, &QsciScintillaBase::SCN_MARGINCLICK, this, [this](int, int, int margin) {
         if (margin == foldMargin)
             QTimer::singleShot(0, this, &EditorWidget::moveCursorOutOfFolds);
@@ -388,6 +397,71 @@ void EditorWidget::applyTheme(const Theme &theme)
     ScintillaStyles::applyTypography(*this, theme.font);
     applyFoldColors();
     updateLineNumberMargin();
+}
+
+void EditorWidget::setDiagnostics(const Diagnostics &diagnostics)
+{
+    if (diagnostics == diagnostics_)
+        return;
+    diagnostics_ = diagnostics;
+    const long length = SendScintilla(SCI_GETLENGTH);
+    for (const auto &[indicator, color] : {std::pair{errorIndicator, QColor("#e5534b")},
+                                           std::pair{warningIndicator, QColor("#d4a72c")}}) {
+        SendScintilla(SCI_INDICSETSTYLE, indicator, INDIC_SQUIGGLEPIXMAP);
+        SendScintilla(SCI_INDICSETFORE, indicator, color);
+        SendScintilla(SCI_INDICSETUNDER, indicator, true);
+        SendScintilla(SCI_SETINDICATORCURRENT, indicator);
+        SendScintilla(SCI_INDICATORCLEARRANGE, 0, length);
+    }
+    for (const Diagnostic &diagnostic : diagnostics_) {
+        const long start = std::clamp<long>(diagnostic.start, 0, length);
+        const long end = std::clamp<long>(diagnostic.end, start, length);
+        SendScintilla(SCI_SETINDICATORCURRENT,
+                      diagnostic.severity == Diagnostic::Severity::Error ? errorIndicator : warningIndicator);
+        SendScintilla(SCI_INDICATORFILLRANGE, start, end - start);
+    }
+    if (!diagnostics_.isEmpty())
+        enableDwell();
+}
+
+void EditorWidget::setHoverHelp(std::function<QString(int)> help)
+{
+    hoverHelp_ = std::move(help);
+    if (hoverHelp_)
+        enableDwell();
+}
+
+void EditorWidget::enableDwell()
+{
+    if (SendScintilla(SCI_GETMOUSEDWELLTIME) >= SC_TIME_FOREVER)
+        SendScintilla(SCI_SETMOUSEDWELLTIME, hoverDelayMs);
+}
+
+void EditorWidget::showHoverInfo(int position, const QPoint &point)
+{
+    if (position < 0 || !isActiveWindow())
+        return;
+    QStringList messages;
+    for (const Diagnostic &diagnostic : std::as_const(diagnostics_)) {
+        if (position >= diagnostic.start && position < diagnostic.end)
+            messages.append(diagnostic.message.toHtmlEscaped());
+    }
+    if (messages.isEmpty() && hoverHelp_) {
+        const QString help = hoverHelp_(position);
+        if (!help.isEmpty()) {
+            // The first line in bold: what the text is about.
+            const qsizetype newline = help.indexOf(QLatin1Char('\n'));
+            messages.append(newline < 0 ? help.toHtmlEscaped()
+                                        : QStringLiteral("<b>%1</b><br>%2").arg(help.left(newline).toHtmlEscaped(),
+                                                                                help.mid(newline + 1).toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br>"))));
+        }
+    }
+    if (messages.isEmpty())
+        return;
+    QToolTip::showText(viewport()->mapToGlobal(point + QPoint(0, 12)),
+                       QStringLiteral("<p style=\"white-space: pre-wrap; margin: 0\">%1</p>")
+                           .arg(messages.join(QStringLiteral("<br>"))),
+                       viewport());
 }
 
 void EditorWidget::updateLineNumberMargin()

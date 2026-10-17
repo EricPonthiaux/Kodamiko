@@ -1,6 +1,7 @@
 #include "claude/ClaudeActivity.h"
 #include "claude/ClaudeConfig.h"
 #include "claude/ClaudeConfigView.h"
+#include "claude/ClaudeLint.h"
 #include "claude/EffectiveSettings.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
@@ -433,6 +434,67 @@ private slots:
         QVERIFY(lineWith("\"permissions\": {").contains("// User"));
         QVERIFY(lineWith("\"B\": \"2\"").contains("// Project"));
         QVERIFY(lineWith("session.json").contains("ignored"));
+    }
+
+    void lintRecognizesClaudeFiles()
+    {
+        qputenv("CLAUDE_CONFIG_DIR", "/home/me/.claude");
+        using K = ClaudeLint::Kind;
+        QCOMPARE(ClaudeLint::kindOf("/home/me/.claude/settings.json"), K::Settings);
+        QCOMPARE(ClaudeLint::kindOf("/p/.claude/settings.local.json"), K::Settings);
+        QCOMPARE(ClaudeLint::kindOf("/etc/claude-code/managed-settings.json"), K::Settings);
+        QCOMPARE(ClaudeLint::kindOf("/p/settings.json"), K::None);
+        QCOMPARE(ClaudeLint::kindOf("/p/.claude/skills/review/SKILL.md"), K::Skill);
+        QCOMPARE(ClaudeLint::kindOf("/p/.claude/agents/tester.md"), K::Agent);
+        QCOMPARE(ClaudeLint::kindOf("/p/docs/agents/tester.md"), K::None);
+        qunsetenv("CLAUDE_CONFIG_DIR");
+    }
+
+    void lintChecksSettingsAgainstTheSchema()
+    {
+        const QByteArray text = "{\n  \"model\": \"opus\",\n  \"permissions\": {\"defaultMode\": \"sometimes\"},\n"
+                                "  \"cleanupPeriodDays\": \"7\"\n}\n";
+        const Diagnostics diagnostics = ClaudeLint::check(ClaudeLint::Kind::Settings, text);
+        QStringList messages;
+        for (const Diagnostic &diagnostic : diagnostics)
+            messages.append(diagnostic.message);
+        QVERIFY2(diagnostics.size() == 2, qPrintable(messages.join(" | ")));
+        QCOMPARE(diagnostics[0].start, int(text.indexOf("\"sometimes\"")));
+        QVERIFY(messages[0].contains("\"acceptEdits\""));
+        QCOMPARE(diagnostics[1].start, int(text.indexOf("\"7\"")));
+
+        const Diagnostics syntax = ClaudeLint::check(ClaudeLint::Kind::Settings, "{\"model\": \"opus\",}");
+        QCOMPARE(syntax.size(), 1);
+        QCOMPARE(syntax[0].severity, Diagnostic::Severity::Error);
+        QCOMPARE(syntax[0].start, 17);
+
+        const Diagnostics rules = ClaudeLint::check(ClaudeLint::Kind::Settings,
+                                                    "{\"permissions\": {\"allow\": [\"Bash(make)\", \"Wirte\", \"Read(\"]}}");
+        QCOMPARE(rules.size(), 2);
+        QVERIFY(rules[0].message.contains("did you mean “Write”"));
+        QVERIFY(rules[1].message.contains("Tool permission rule")); // the pattern is too long to show
+
+        QVERIFY(ClaudeLint::settingsHelp(text, int(text.indexOf("model")) + 1).startsWith("model\n"));
+        QVERIFY(ClaudeLint::settingsHelp(text, 0).isEmpty());
+    }
+
+    void lintChecksFrontMatter()
+    {
+        using K = ClaudeLint::Kind;
+        QVERIFY(ClaudeLint::check(K::Skill, "---\nname: review\ndescription: Reviews code\n---\nBody\n").isEmpty());
+        QCOMPARE(ClaudeLint::check(K::Skill, "# Review\n").size(), 1);
+        QCOMPARE(ClaudeLint::check(K::Skill, "---\nname: review\n").first().severity, Diagnostic::Severity::Error);
+
+        const QByteArray bad = "---\nname: Review Code\n---\n";
+        const Diagnostics skill = ClaudeLint::check(K::Skill, bad);
+        QCOMPARE(skill.size(), 2); // the name, the missing description
+        QCOMPARE(skill[0].start, int(bad.indexOf("Review Code")));
+        QCOMPARE(skill[0].end, int(bad.indexOf("\n---\n", 4)));
+        QVERIFY(skill[1].message.contains("description"));
+
+        const Diagnostics agent = ClaudeLint::check(K::Agent, "---\ndescription: Runs tests\n---\n");
+        QCOMPARE(agent.size(), 1);
+        QVERIFY(agent[0].message.contains("name"));
     }
 
 private:

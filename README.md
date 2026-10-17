@@ -52,7 +52,14 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   the settings Claude applies once its files are merged (User, Project,
   Local, Duet's session, Managed): every value followed by the file it comes
   from, and by the values it replaced (`// Local, over User: "sonnet"`); the
-  tab follows the files as they change. *Restart Claude Session* (in the pane's options) starts a new
+  tab follows the files as they change. Settings files are checked as you
+  type against [SchemaStore](https://www.schemastore.org/)'s schema of
+  Claude Code's settings (embedded, no network): syntax errors underlined in
+  red, wrong types, values or keys in amber, with the message when the mouse
+  rests on them (`"defaultMode": "sometimes"` → the accepted modes, `"Wirte"`
+  in `permissions.allow` → did you mean `Write`?, `"modle"` → did you mean
+  `model`?); resting on a key shows its documentation. Skills and agents get
+  their front matter checked (a valid `name`, a `description`). *Restart Claude Session* (in the pane's options) starts a new
   session that goes on with the conversation (`--continue`), for the
   settings Claude reads only when it starts.
 - **Usage in the status bar**: context window used and plan limits (5 hours,

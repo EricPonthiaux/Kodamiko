@@ -9,6 +9,8 @@ add_library(duet_core STATIC
     claude/ClaudeActivity.cpp
     claude/ClaudeConfig.cpp
     claude/ClaudeConfigView.cpp
+    claude/ClaudeLint.cpp
+    claude/ClaudeLinter.cpp
     claude/ClaudeLauncher.cpp
     claude/ClaudeUsage.cpp
     claude/EffectiveSettings.cpp
@@ -29,6 +31,8 @@ add_library(duet_core STATIC
     completion/Snippet.cpp
     completion/SnippetSession.cpp
     completion/Templates.cpp
+    diagnostics/JsonSchema.cpp
+    diagnostics/JsonTree.cpp
     editor/ChangeGutter.cpp
     editor/CodeColorizer.cpp
     editor/CodeFormatter.cpp
@@ -159,6 +163,13 @@ qt_add_resources(duet_core markdown_assets
         ${PROJECT_SOURCE_DIR}/third_party/octicons/alert-16.svg
         ${PROJECT_SOURCE_DIR}/third_party/octicons/stop-16.svg
         ${PROJECT_SOURCE_DIR}/third_party/octicons/link-16.svg)
+
+# Schema of Claude Code's settings files, to check them in the editor.
+qt_add_resources(duet_core schemas
+    PREFIX /schemas
+    BASE ${PROJECT_SOURCE_DIR}/third_party/schemastore
+    FILES
+        ${PROJECT_SOURCE_DIR}/third_party/schemastore/claude-code-settings.json)
 
 # Interface and code fonts, the same on every system.
 qt_add_resources(duet_core fonts
