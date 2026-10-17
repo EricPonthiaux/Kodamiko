@@ -3,6 +3,7 @@
 #include "changes/ChangesView.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
+#include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
 #include "completion/CompletionController.h"
@@ -81,6 +82,7 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QTreeView>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -299,7 +301,7 @@ void MainWindow::createWidgets()
     resize(1400, 900);
 }
 
-// Edit mode: side panel (Files / Outline tabs) | editor tabs.
+// Edit mode: side panel (Files / Outline / Claude tabs) | editor tabs.
 QWidget *MainWindow::createEditPage()
 {
     filesPanel_ = new FilesPanel(this);
@@ -366,6 +368,19 @@ QWidget *MainWindow::createEditPage()
         symbolIndex_->refresh();
     });
 
+    claudeConfigView_ = new ClaudeConfigView(this);
+    claudeConfigView_->setSessionSettings(ClaudeLauncher::sessionSettingsPath());
+    connect(claudeConfigView_, &ClaudeConfigView::fileRequested, this, [this](const QString &path, bool readOnly) {
+        editorTabs_->openFile(path);
+        if (EditorWidget *editor = editorTabs_->editorFor(path); editor && readOnly)
+            editor->setReadOnly(true);
+    });
+    connect(claudeConfigView_, &ClaudeConfigView::sendToClaudeRequested, this, &MainWindow::sendToClaude);
+    connect(claudeConfigView_, &ClaudeConfigView::restartSessionRequested, this, &MainWindow::restartClaudeSession);
+    connect(claudeConfigView_, &ClaudeConfigView::statusMessage, this,
+            [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
+    connect(editorTabs_, &EditorTabs::fileSaved, claudeConfigView_, &ClaudeConfigView::scheduleRefresh);
+
     outlineView_ = new OutlineView(this);
     connect(editorTabs_, &QTabWidget::currentChanged, this,
             [this] { outlineView_->setEditor(editorTabs_->currentEditor()); });
@@ -396,11 +411,12 @@ QWidget *MainWindow::createEditPage()
     editorLayout->addWidget(serverNotice_);
     editorLayout->addWidget(editorTabs_, 1);
 
-    // Files and Outline as KDevelop's tool views: vertical tabs at the
+    // Files, Outline and Claude as KDevelop's tool views: vertical tabs at the
     // window's edge, the panel next to them.
     sidebar_ = new SidePanel(this);
     sidebar_->addView(filesPanel_, {}, tr("Files"));
     sidebar_->addView(outlineView_, {}, tr("Outline"));
+    sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
 
     editSplitter_ = new GripSplitter(Qt::Horizontal, this);
     editSplitter_->setChildrenCollapsible(false);
@@ -595,6 +611,11 @@ void MainWindow::createMenus()
     connect(toggleTerminal, &QAction::triggered, this, &MainWindow::toggleTerminalMode);
     view->addSeparator();
     view->addAction(tr("File &Outline"), QKeySequence(tr("Ctrl+Shift+O")), this, &MainWindow::showOutline);
+    view->addAction(tr("&Claude Configuration"), this, [this] {
+        setMode(Mode::Edit);
+        sidebar_->showView(claudeConfigView_);
+        claudeConfigView_->tree()->setFocus();
+    });
 
     // Also folded by clicking its current tab.
     showSidebar_ = view->addAction(tr("&Side Panel"));
@@ -812,6 +833,7 @@ void MainWindow::openFolder(const QString &folder)
     const QString previousFolder = folder_;
     folder_ = QDir(folder).absolutePath();
     fileTree_->setRootPath(folder_);
+    claudeConfigView_->setProjectFolder(folder_);
     claudeTouched_.clear();
     updateClaudeMarks();
     symbolIndex_->setFolder(folder_);
@@ -941,7 +963,7 @@ void MainWindow::chooseFile()
 
 // The Claude session lives in the first terminal tab, which cannot be
 // closed. Opening a folder starts it there, replacing the previous one.
-bool MainWindow::startClaudeSession(QString *error)
+bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArguments)
 {
     if (claudeTerminal_) {
         terminalTabs_->removeTab(terminalTabs_->indexOf(claudeTerminal_));
@@ -950,7 +972,7 @@ bool MainWindow::startClaudeSession(QString *error)
     }
     QString launchError;
     const std::optional<ProcessSpec> spec =
-        ClaudeLauncher::claudeProcess(folder_, hookServer_.serverName(), &launchError);
+        ClaudeLauncher::claudeProcess(folder_, hookServer_.serverName(), &launchError, extraArguments);
     if (!spec) {
         statusBar()->showMessage(tr("Claude session unavailable: %1").arg(launchError));
         if (error)
@@ -993,6 +1015,23 @@ void MainWindow::showClaudeSession()
     setMode(Mode::Terminal);
 }
 
+// Claude reads part of its configuration only when it starts: a new
+// session, which goes on with the last conversation.
+void MainWindow::restartClaudeSession()
+{
+    if (claudeActivity_.state() == ClaudeActivity::State::Working
+        && QMessageBox::question(this, tr("Restart Claude Session"),
+                                 tr("Claude is working. Stop it and restart the session?"))
+               != QMessageBox::Yes)
+        return;
+    QString error;
+    if (!startClaudeSession(&error, {QStringLiteral("--continue")})) {
+        QMessageBox::warning(this, tr("Claude Session"), error);
+        return;
+    }
+    setMode(Mode::Terminal);
+}
+
 void MainWindow::newShell()
 {
     addTerminal(tr("Terminal"), defaultShell(folder_));
@@ -1030,6 +1069,8 @@ void MainWindow::setTheme(const QString &name)
     fileTree_->setSearchHighlight(theme_.findHighlight);
     fileTree_->setDarkIcons(theme_.isDark);
     filesPanel_->setIconColor(theme_.foreground);
+    claudeConfigView_->setDarkIcons(theme_.isDark);
+    claudeConfigView_->setIconColor(theme_.foreground);
     sidebar_->applyTheme(theme_);
     editorTabs_->applyTheme(theme_);
     for (int i = 0; i < terminalTabs_->count(); ++i) {
@@ -1185,6 +1226,7 @@ void MainWindow::onHookReceived(const HookEvent &event)
             updateClaudeMarks();
         }
         fileStatuses_->refresh();
+        claudeConfigView_->scheduleRefresh();
         // A command may have changed any file.
         const QStringList paths =
             event.kind == HookEvent::Kind::FilesEdited ? event.filePaths : editorTabs_->openFilePaths();
@@ -1260,6 +1302,7 @@ void MainWindow::updateTabIcons()
         modeTabs_->setTabIcon(i, UiIcons::icon(QLatin1String(modes[i]), color));
     sidebar_->setViewIcon(filesPanel_, UiIcons::icon(QStringLiteral("files"), color));
     sidebar_->setViewIcon(outlineView_, UiIcons::icon(QStringLiteral("outline"), color));
+    sidebar_->setViewIcon(claudeConfigView_, UiIcons::icon(QStringLiteral("claude"), color));
     newTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     emptyNewTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     for (int i = 0; i < terminalTabs_->count(); ++i) {
@@ -1416,6 +1459,7 @@ void MainWindow::updateServerNotice()
 void MainWindow::updateClaudeMarks()
 {
     fileTree_->setClaudeTouched(claudeTouched_);
+    claudeConfigView_->setClaudeTouched(claudeTouched_);
 }
 
 void MainWindow::selectOpenedFile()
@@ -1446,6 +1490,8 @@ void MainWindow::sendToClaude(const QString &path)
         }
     }
     QString relative = QDir(folder_).relativeFilePath(path);
+    if (relative.startsWith(QLatin1String(".."))) // outside the project (~/.claude...)
+        relative = path;
     if (relative == QLatin1String("."))
         relative = QStringLiteral("./");
     else if (QFileInfo(path).isDir())
@@ -1544,6 +1590,8 @@ void MainWindow::changeEvent(QEvent *event)
     if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow() && trayIcon_)
             trayIcon_->hide();
+        if (isActiveWindow()) // the configuration may have changed elsewhere
+            claudeConfigView_->scheduleRefresh();
         updateClaudeWatched();
     }
 }

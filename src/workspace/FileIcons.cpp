@@ -1,8 +1,10 @@
 #include "FileIcons.h"
 
+#include <QGuiApplication>
 #include <QHash>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPalette>
 
 namespace {
 
@@ -193,6 +195,31 @@ QIcon folder(bool dark)
     if (icon.isNull())
         icon = render(QString(), dark, drawFolder);
     return icon;
+}
+
+QIcon withClaudeDot(const QIcon &icon)
+{
+    static QHash<qint64, QIcon> cache;
+    const qint64 key = icon.cacheKey();
+    if (const auto it = cache.constFind(key); it != cache.cend())
+        return *it;
+    QIcon result;
+    for (const qreal ratio : {1.0, 2.0}) {
+        QPixmap pixmap = icon.pixmap(QSize(16, 16), ratio);
+        if (pixmap.isNull()) {
+            pixmap = QPixmap(QSize(16, 16) * ratio);
+            pixmap.setDevicePixelRatio(ratio);
+            pixmap.fill(Qt::transparent);
+        }
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(QGuiApplication::palette().color(QPalette::Base), 1.2));
+        painter.setBrush(QColor("#d97757"));
+        painter.drawEllipse(QRectF(8.5, 8.5, 7, 7));
+        result.addPixmap(pixmap);
+    }
+    cache.insert(key, result);
+    return result;
 }
 
 } // namespace FileIcons

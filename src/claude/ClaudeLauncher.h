@@ -4,6 +4,7 @@
 
 #include <QByteArray>
 #include <QString>
+#include <QStringList>
 
 #include <optional>
 
@@ -19,6 +20,8 @@ namespace ClaudeLauncher {
 // notifications, end of the response), and a status line that runs
 // `hookCommand statusline`.
 QByteArray sessionSettings(const QString &hookCommand);
+// Where the --settings file is written.
+QString sessionSettingsPath();
 
 // Status line command configured by the user for `projectDir` (user,
 // project and local settings), or an empty string.
@@ -28,8 +31,9 @@ QString userStatusLineCommand(const QString &projectDir);
 QString findClaudeExecutable();
 
 // Process to launch, or nullopt (with `error` set) if `claude` or
-// `duet-hook` cannot be found.
+// `duet-hook` cannot be found. `extraArguments` follow --settings
+// ("--continue" to resume the last conversation).
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName,
-                                         QString *error);
+                                         QString *error, const QStringList &extraArguments = {});
 
 } // namespace ClaudeLauncher

@@ -5,6 +5,7 @@
 #include "ui/TreeMetrics.h"
 
 #include "CommandPalette.h"
+#include "FileIcons.h"
 #include "FileOperations.h"
 #include "ProjectTreeModel.h"
 
@@ -193,7 +194,7 @@ public:
             break;
         case Qt::DecorationRole:
             if (touched_.contains(path))
-                return badged(QSortFilterProxyModel::data(index, role).value<QIcon>());
+                return FileIcons::withClaudeDot(QSortFilterProxyModel::data(index, role).value<QIcon>());
             break;
         case Qt::ToolTipRole: {
             QStringList lines{QDir::toNativeSeparators(path)};
@@ -223,31 +224,6 @@ protected:
     }
 
 private:
-    // The file's icon with an orange dot (Claude's color) in its corner.
-    QIcon badged(const QIcon &icon) const
-    {
-        const qint64 key = icon.cacheKey();
-        if (const auto it = badges_.constFind(key); it != badges_.cend())
-            return *it;
-        QIcon result;
-        for (const qreal ratio : {1.0, 2.0}) {
-            QPixmap pixmap = icon.pixmap(QSize(16, 16), ratio);
-            if (pixmap.isNull()) {
-                pixmap = QPixmap(QSize(16, 16) * ratio);
-                pixmap.setDevicePixelRatio(ratio);
-                pixmap.fill(Qt::transparent);
-            }
-            QPainter painter(&pixmap);
-            painter.setRenderHint(QPainter::Antialiasing);
-            painter.setPen(QPen(QGuiApplication::palette().color(QPalette::Base), 1.2));
-            painter.setBrush(QColor("#d97757"));
-            painter.drawEllipse(QRectF(8.5, 8.5, 7, 7));
-            result.addPixmap(pixmap);
-        }
-        badges_.insert(key, result);
-        return result;
-    }
-
     QString rootPath_;
     QString cut_;
     FileStatusMap statuses_;
@@ -257,7 +233,6 @@ private:
     QSet<QString> touched_;
     std::optional<QSet<QString>> scopeFiles_;
     QSet<QString> scopeAncestors_;
-    mutable QHash<qint64, QIcon> badges_;
 };
 
 // Highlights, during a speed search, the letters that match in each name.

@@ -1,5 +1,7 @@
 #include "ClaudeLauncher.h"
 
+#include "ClaudeConfig.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -39,9 +41,8 @@ QJsonArray commandHook(const QString &command, const QString &matcher = {}, int 
 
 std::optional<QString> writeSettingsFile(const QByteArray &settings)
 {
-    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    QDir().mkpath(directory);
-    const QString path = QDir(directory).filePath(QStringLiteral("claude-hooks.json"));
+    const QString path = sessionSettingsPath();
+    QDir().mkpath(QFileInfo(path).absolutePath());
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly) || file.write(settings) != settings.size() || !file.commit())
         return std::nullopt;
@@ -49,6 +50,12 @@ std::optional<QString> writeSettingsFile(const QByteArray &settings)
 }
 
 } // namespace
+
+QString sessionSettingsPath()
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+        .filePath(QStringLiteral("claude-hooks.json"));
+}
 
 QByteArray sessionSettings(const QString &hookCommand)
 {
@@ -74,9 +81,7 @@ QByteArray sessionSettings(const QString &hookCommand)
 
 QString userStatusLineCommand(const QString &projectDir)
 {
-    const QString configDir = qEnvironmentVariableIsSet("CLAUDE_CONFIG_DIR")
-                                  ? qEnvironmentVariable("CLAUDE_CONFIG_DIR")
-                                  : QDir::home().filePath(QStringLiteral(".claude"));
+    const QString configDir = ClaudeConfig::configDir();
     // From the lowest to the highest precedence.
     const QStringList files{
         QDir(configDir).filePath(QStringLiteral("settings.json")),
@@ -112,7 +117,7 @@ QString findClaudeExecutable()
 }
 
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName,
-                                         QString *error)
+                                         QString *error, const QStringList &extraArguments)
 {
     const QString claude = findClaudeExecutable();
     if (claude.isEmpty()) {
@@ -139,7 +144,7 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
 
     ProcessSpec spec;
     spec.program = claude;
-    spec.arguments = {QStringLiteral("--settings"), *settingsFile};
+    spec.arguments = QStringList{QStringLiteral("--settings"), *settingsFile} + extraArguments;
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
     spec.environment.insert(QStringLiteral("DUET_SOCKET"), hookServerName);

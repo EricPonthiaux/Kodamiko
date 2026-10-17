@@ -1,4 +1,6 @@
 #include "claude/ClaudeActivity.h"
+#include "claude/ClaudeConfig.h"
+#include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
 #include "claude/HookEvent.h"
@@ -8,8 +10,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
-#include <QTemporaryDir>
 #include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QTreeWidget>
 #include <QtTest>
 
 class TestClaude : public QObject {
@@ -261,7 +264,146 @@ private slots:
         QVERIFY(hook.waitForFinished(5000));
         QCOMPARE(hook.exitCode(), 0);
     }
+
+    void listsTheConfigurationByCategoryAndScope()
+    {
+        QTemporaryDir user;
+        QTemporaryDir project;
+        QVERIFY(user.isValid() && project.isValid());
+        qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
+        writeFile(user.filePath("CLAUDE.md"), "# Mine\n");
+        writeFile(user.filePath("skills/review/SKILL.md"),
+                  "---\nname: review-cpp\ndescription: \"Reviews C++ code\"\n---\n\nBody\n");
+        writeFile(user.filePath("agents/tester.md"), "---\nname: tester\ndescription: Runs the tests\n---\n");
+        writeFile(user.filePath("commands/frontend/deploy.md"), "Deploy\n");
+        writeFile(project.filePath("CLAUDE.md"), "# Project\n");
+        writeFile(project.filePath("src/CLAUDE.md"), "# Sources\n");
+        writeFile(project.filePath(".claude/rules/style.md"), "# Style\n");
+        writeFile(project.filePath(".claude/settings.json"), "{}\n");
+        writeFile(QDir(ClaudeConfig::autoMemoryDir(project.path())).filePath("MEMORY.md"), "- index\n");
+
+        const QList<ClaudeConfig::Entry> entries = ClaudeConfig::entries(project.path(), {});
+        qunsetenv("CLAUDE_CONFIG_DIR");
+        const auto find = [&](ClaudeConfig::Category category, const QString &name) -> const ClaudeConfig::Entry * {
+            for (const ClaudeConfig::Entry &entry : entries) {
+                if (entry.category == category && entry.name == name)
+                    return &entry;
+            }
+            return nullptr;
+        };
+        using C = ClaudeConfig::Category;
+        using S = ClaudeConfig::Scope;
+        const ClaudeConfig::Entry *skill = find(C::Skills, "review-cpp");
+        QVERIFY(skill);
+        QCOMPARE(skill->scope, S::User);
+        QCOMPARE(skill->description, QStringLiteral("Reviews C++ code"));
+        QCOMPARE(skill->path, QDir::cleanPath(user.filePath("skills/review/SKILL.md")));
+        QVERIFY(find(C::Agents, "tester"));
+        QVERIFY(find(C::Commands, "/frontend/deploy"));
+        QCOMPARE(find(C::Rules, "style.md")->scope, S::Project);
+        QCOMPARE(find(C::Memory, "src/CLAUDE.md")->scope, S::Subfolder);
+        QCOMPARE(find(C::Memory, "MEMORY.md")->scope, S::Auto);
+        QVERIFY(find(C::Settings, ".claude/settings.json")->exists);
+
+        // Usual files appear before they exist.
+        const ClaudeConfig::Entry *local = find(C::Memory, "CLAUDE.local.md");
+        QVERIFY(local);
+        QVERIFY(!local->exists);
+        QVERIFY(!find(C::Settings, ".claude/settings.local.json")->exists);
+        QVERIFY(!find(C::Mcp, ".mcp.json")->exists);
+
+        // By category, then from the lowest precedence to the highest.
+        for (qsizetype i = 1; i < entries.size(); ++i) {
+            QVERIFY(entries[i - 1].category <= entries[i].category);
+            if (entries[i - 1].category == entries[i].category)
+                QVERIFY(entries[i - 1].scope <= entries[i].scope);
+        }
+    }
+
+    void sessionSettingsAreReadOnly()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        writeFile(dir.filePath("claude-hooks.json"), "{}\n");
+        qputenv("CLAUDE_CONFIG_DIR", dir.filePath("config").toUtf8());
+        const QList<ClaudeConfig::Entry> entries = ClaudeConfig::entries(dir.path(), dir.filePath("claude-hooks.json"));
+        qunsetenv("CLAUDE_CONFIG_DIR");
+        const auto session = std::find_if(entries.begin(), entries.end(), [](const ClaudeConfig::Entry &entry) {
+            return entry.scope == ClaudeConfig::Scope::Session;
+        });
+        QVERIFY(session != entries.end());
+        QVERIFY(session->readOnly);
+        QCOMPARE(session->category, ClaudeConfig::Category::Settings);
+    }
+
+    void autoMemoryFollowsClaudeCodeNaming()
+    {
+        qputenv("CLAUDE_CONFIG_DIR", "/c");
+        QCOMPARE(ClaudeConfig::autoMemoryDir("/home/me/my_app.v2"), QStringLiteral("/c/projects/-home-me-my-app-v2/memory"));
+        qunsetenv("CLAUDE_CONFIG_DIR");
+    }
+
+    void readsFrontMatter()
+    {
+        const QMap<QString, QString> fields =
+            ClaudeConfig::frontMatter("---\nname: x\ndescription: 'Does: things'\ntools:\n  - Read\n---\nname: body\n");
+        QCOMPARE(fields.value("name"), QStringLiteral("x"));
+        QCOMPARE(fields.value("description"), QStringLiteral("Does: things"));
+        QVERIFY(!fields.contains("  - Read"));
+        QVERIFY(ClaudeConfig::frontMatter("# Title\nname: x\n").isEmpty());
+    }
+
+    void viewCreatesItemsAndUsualFiles()
+    {
+        QTemporaryDir user;
+        QTemporaryDir project;
+        QVERIFY(user.isValid() && project.isValid());
+        qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
+        ClaudeConfigView view;
+        view.show();
+        view.setProjectFolder(project.path());
+        QSignalSpy opened(&view, &ClaudeConfigView::fileRequested);
+
+        QVERIFY(!view.createNamed(ClaudeConfig::Category::Skills, ClaudeConfig::Scope::Project, "Bad Name").isEmpty());
+        QCOMPARE(view.createNamed(ClaudeConfig::Category::Skills, ClaudeConfig::Scope::Project, "release-notes"),
+                 QString());
+        const QString skill = project.filePath(".claude/skills/release-notes/SKILL.md");
+        QVERIFY(QFileInfo::exists(skill));
+        QCOMPARE(opened.count(), 1);
+        QCOMPARE(opened.last().at(0).toString(), skill);
+        QCOMPARE(ClaudeConfig::frontMatter(readFile(skill)).value("name"), QStringLiteral("release-notes"));
+        QVERIFY(!view.createNamed(ClaudeConfig::Category::Skills, ClaudeConfig::Scope::Project, "release-notes")
+                     .isEmpty()); // already there
+
+        // A double-click on CLAUDE.local.md, not created yet, creates it.
+        QTreeWidgetItem *local = nullptr;
+        for (QTreeWidgetItemIterator it(view.tree()); *it; ++it) {
+            if (const ClaudeConfig::Entry *entry = view.entryOf(*it); entry && entry->name == "CLAUDE.local.md")
+                local = *it;
+        }
+        QVERIFY(local);
+        QVERIFY(!view.entryOf(local)->exists);
+        view.activate(local);
+        QVERIFY(QFileInfo::exists(project.filePath("CLAUDE.local.md")));
+        QCOMPARE(opened.last().at(0).toString(), QDir::cleanPath(project.filePath("CLAUDE.local.md")));
+        qunsetenv("CLAUDE_CONFIG_DIR");
+    }
+
+private:
+    static void writeFile(const QString &path, const QByteArray &content)
+    {
+        QVERIFY(QDir().mkpath(QFileInfo(path).absolutePath()));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(content);
+    }
+
+    static QByteArray readFile(const QString &path)
+    {
+        QFile file(path);
+        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    }
 };
 
-QTEST_GUILESS_MAIN(TestClaude)
+QTEST_MAIN(TestClaude)
 #include "tst_claude.moc"

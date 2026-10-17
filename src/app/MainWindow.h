@@ -14,6 +14,7 @@
 #include <memory>
 
 class ChangesView;
+class ClaudeConfigView;
 class CodeIntelligence;
 class CodeNavigator;
 class CommandPalette;
@@ -58,7 +59,7 @@ struct Preferences;
 struct ProcessSpec;
 
 // Main window with four full-screen modes, chosen with the tabs at the
-// bottom right: Terminal, Edit (Files / Outline panel | editor
+// bottom right: Terminal, Edit (Files / Outline / Claude panel | editor
 // tabs), Diff (pending changes, commits) and History. Wires up the modules and relays their
 // signals.
 class MainWindow : public QMainWindow {
@@ -104,7 +105,8 @@ private:
     void closeProject();
     // Says when the project lacks tools Duet can download.
     void updateToolsNotice();
-    bool startClaudeSession(QString *error = nullptr);
+    bool startClaudeSession(QString *error = nullptr, const QStringList &extraArguments = {});
+    void restartClaudeSession();
     void showClaudeSession();
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);
@@ -208,6 +210,7 @@ private:
     CodeNavigator *navigator_ = nullptr;
     CodeIntelligence *intelligence_ = nullptr;
     OutlineView *outlineView_ = nullptr;
+    ClaudeConfigView *claudeConfigView_ = nullptr;
     SidePanel *sidebar_ = nullptr;
     QTabWidget *terminalTabs_ = nullptr;
     QToolButton *newTerminalButton_ = nullptr; // "+" at the right of the terminal tabs

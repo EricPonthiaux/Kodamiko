@@ -1,0 +1,375 @@
+#include "ClaudeConfigView.h"
+
+#include "ui/AppFonts.h"
+#include "ui/UiIcons.h"
+#include "workspace/EntryPopups.h"
+#include "workspace/FileIcons.h"
+
+#include <QApplication>
+#include <QClipboard>
+#include <QDesktopServices>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QMenu>
+#include <QScrollBar>
+#include <QToolButton>
+#include <QTreeWidget>
+#include <QUrl>
+#include <QVBoxLayout>
+
+using ClaudeConfig::Category;
+using ClaudeConfig::Entry;
+using ClaudeConfig::Scope;
+
+namespace {
+
+constexpr int refreshDelayMs = 400;
+
+enum ItemRole { EntryRole = Qt::UserRole, CategoryRole };
+
+constexpr Category allCategories[] = {Category::Memory,       Category::Rules,    Category::Skills,
+                                      Category::Agents,       Category::Commands, Category::OutputStyles,
+                                      Category::Settings,     Category::Mcp};
+
+// "skill", "agent"... for the New menus and popups.
+QString itemNoun(Category category)
+{
+    switch (category) {
+    case Category::Skills: return ClaudeConfigView::tr("Skill");
+    case Category::Agents: return ClaudeConfigView::tr("Agent");
+    case Category::Commands: return ClaudeConfigView::tr("Command");
+    case Category::Rules: return ClaudeConfigView::tr("Rule");
+    default: return {};
+    }
+}
+
+bool createFile(const QString &path, const QByteArray &content, QString *error)
+{
+    if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
+        *error = ClaudeConfigView::tr("Cannot create the folder “%1”")
+                     .arg(QDir::toNativeSeparators(QFileInfo(path).absolutePath()));
+        return false;
+    }
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly) || file.write(content) != content.size()) {
+        *error = ClaudeConfigView::tr("Cannot create “%1”: %2").arg(QDir::toNativeSeparators(path), file.errorString());
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
+ClaudeConfigView::ClaudeConfigView(QWidget *parent)
+    : QWidget(parent)
+    , tree_(new QTreeWidget(this))
+{
+    auto *title = new QLabel(tr("Claude Configuration"), this);
+    AppFonts::setInterfaceFont(title, 1);
+
+    // Icons only, all the same size (see setIconColor), as in the Files pane.
+    const auto addButton = [this](const QString &toolTip) {
+        auto *button = new QToolButton(this);
+        button->setToolTip(toolTip);
+        button->setAutoRaise(true);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        button->setIconSize(QSize(16, 16));
+        button->setFixedSize(26, 24);
+        return button;
+    };
+    const QString noIndicator = QStringLiteral("QToolButton::menu-indicator { image: none; width: 0; }");
+    new_ = addButton(tr("New Skill, Agent, Command or Rule"));
+    new_->setPopupMode(QToolButton::InstantPopup);
+    new_->setStyleSheet(noIndicator);
+    auto *newMenu = new QMenu(new_);
+    for (Category category : allCategories) {
+        if (ClaudeConfig::canCreate(category))
+            addNewActions(newMenu->addMenu(itemNoun(category)), category);
+    }
+    new_->setMenu(newMenu);
+    reload_ = addButton(tr("Reload"));
+    connect(reload_, &QToolButton::clicked, this, &ClaudeConfigView::refresh);
+    options_ = addButton(tr("Options"));
+    options_->setPopupMode(QToolButton::InstantPopup);
+    options_->setStyleSheet(noIndicator);
+    auto *optionsMenu = new QMenu(options_);
+    optionsMenu->addAction(tr("Restart Claude Session"), this, &ClaudeConfigView::restartSessionRequested)
+        ->setToolTip(tr("Claude reads some of its configuration only when it starts; the conversation goes on"));
+    optionsMenu->addAction(tr("Open Claude Folder"), this, [] {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(ClaudeConfig::configDir()));
+    });
+    optionsMenu->setToolTipsVisible(true);
+    options_->setMenu(optionsMenu);
+
+    auto *header = new QFrame(this);
+    header->setObjectName(QStringLiteral("viewHeader"));
+    header->setFixedHeight(34);
+    auto *toolbar = new QHBoxLayout(header);
+    toolbar->setContentsMargins(10, 0, 6, 0);
+    toolbar->setSpacing(2);
+    toolbar->addWidget(title);
+    toolbar->addStretch(1);
+    toolbar->addWidget(new_);
+    toolbar->addWidget(reload_);
+    toolbar->addWidget(options_);
+
+    tree_->setColumnCount(2);
+    tree_->header()->hide();
+    tree_->header()->setStretchLastSection(false);
+    tree_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    tree_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    tree_->setUniformRowHeights(true);
+    tree_->setAnimated(false);
+    tree_->setExpandsOnDoubleClick(true);
+    tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(tree_, &QTreeWidget::itemActivated, this, &ClaudeConfigView::activate);
+    connect(tree_, &QTreeWidget::customContextMenuRequested, this, &ClaudeConfigView::showContextMenu);
+    connect(tree_, &QTreeWidget::itemCollapsed, this,
+            [this](QTreeWidgetItem *item) { collapsed_.insert(item->data(0, CategoryRole).toInt()); });
+    connect(tree_, &QTreeWidget::itemExpanded, this,
+            [this](QTreeWidgetItem *item) { collapsed_.remove(item->data(0, CategoryRole).toInt()); });
+
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(header);
+    layout->addWidget(tree_, 1);
+
+    refreshTimer_.setSingleShot(true);
+    refreshTimer_.setInterval(refreshDelayMs);
+    connect(&refreshTimer_, &QTimer::timeout, this, &ClaudeConfigView::refresh);
+}
+
+void ClaudeConfigView::setProjectFolder(const QString &folder)
+{
+    folder_ = folder;
+    refresh();
+}
+
+void ClaudeConfigView::setSessionSettings(const QString &path)
+{
+    sessionSettings_ = path;
+    refresh();
+}
+
+void ClaudeConfigView::setClaudeTouched(const QSet<QString> &paths)
+{
+    touched_ = paths;
+    populate();
+}
+
+void ClaudeConfigView::setDarkIcons(bool dark)
+{
+    darkIcons_ = dark;
+    populate();
+}
+
+void ClaudeConfigView::setIconColor(const QColor &color)
+{
+    new_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
+    reload_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
+    options_->setIcon(UiIcons::icon(QStringLiteral("more"), color));
+}
+
+void ClaudeConfigView::refresh()
+{
+    refreshTimer_.stop();
+    if (!isVisible()) {
+        needsRefresh_ = true;
+        return;
+    }
+    needsRefresh_ = false;
+    entries_ = folder_.isEmpty() ? QList<Entry>() : ClaudeConfig::entries(folder_, sessionSettings_);
+    populate();
+}
+
+void ClaudeConfigView::scheduleRefresh()
+{
+    if (isVisible())
+        refreshTimer_.start();
+    else
+        needsRefresh_ = true;
+}
+
+void ClaudeConfigView::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    if (needsRefresh_)
+        refresh();
+}
+
+const Entry *ClaudeConfigView::entryOf(const QTreeWidgetItem *item) const
+{
+    if (!item)
+        return nullptr;
+    const QVariant index = item->data(0, EntryRole);
+    return index.isValid() && index.toInt() < entries_.size() ? &entries_[index.toInt()] : nullptr;
+}
+
+void ClaudeConfigView::populate()
+{
+    const QString current = entryOf(tree_->currentItem()) ? entryOf(tree_->currentItem())->path : QString();
+    const int scroll = tree_->verticalScrollBar()->value();
+    const QSignalBlocker blocker(tree_);
+    tree_->clear();
+
+    const QPalette palette = tree_->palette();
+    // Room after the scope and the counts, away from the edge.
+    const auto setRightText = [this](QTreeWidgetItem *item, const QString &text) {
+        item->setText(1, text);
+        item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+        item->setSizeHint(1, QSize(tree_->fontMetrics().horizontalAdvance(text) + 18, 0));
+    };
+    const QColor muted = palette.color(QPalette::PlaceholderText);
+    const QColor missing = palette.color(QPalette::Disabled, QPalette::Text);
+    QHash<int, QTreeWidgetItem *> categories;
+    for (Category category : allCategories) {
+        auto *item = new QTreeWidgetItem(tree_);
+        item->setText(0, ClaudeConfig::categoryTitle(category));
+        item->setData(0, CategoryRole, static_cast<int>(category));
+        QFont font = item->font(0);
+        font.setBold(true);
+        item->setFont(0, font);
+        item->setForeground(1, muted);
+        categories.insert(static_cast<int>(category), item);
+    }
+
+    QTreeWidgetItem *currentItem = nullptr;
+    for (qsizetype i = 0; i < entries_.size(); ++i) {
+        const Entry &entry = entries_[i];
+        auto *item = new QTreeWidgetItem(categories.value(static_cast<int>(entry.category)));
+        item->setData(0, EntryRole, int(i));
+        item->setText(0, entry.name);
+        setRightText(item, ClaudeConfig::scopeTitle(entry.scope));
+        item->setForeground(1, muted);
+        const QIcon icon = FileIcons::file(QFileInfo(entry.path).fileName(), darkIcons_);
+        item->setIcon(0, touched_.contains(entry.path) ? FileIcons::withClaudeDot(icon) : icon);
+
+        QStringList tip{QDir::toNativeSeparators(entry.path), ClaudeConfig::scopeDescription(entry.scope)};
+        if (!entry.description.isEmpty())
+            tip.append(entry.description);
+        if (!entry.exists) {
+            QFont font = item->font(0);
+            font.setItalic(true);
+            item->setFont(0, font);
+            item->setForeground(0, missing);
+            tip.append(tr("Not created yet: double-click to create it"));
+        } else if (entry.readOnly) {
+            tip.append(tr("Read-only"));
+        }
+        item->setToolTip(0, tip.join(QLatin1Char('\n')));
+        item->setToolTip(1, ClaudeConfig::scopeDescription(entry.scope));
+        if (entry.path == current)
+            currentItem = item;
+    }
+
+    for (QTreeWidgetItem *item : std::as_const(categories)) {
+        const int count = item->childCount();
+        int created = 0;
+        for (int i = 0; i < count; ++i)
+            created += entryOf(item->child(i))->exists ? 1 : 0;
+        if (created > 0)
+            setRightText(item, QString::number(created));
+        if (count == 0)
+            item->setForeground(0, missing);
+        item->setExpanded(!collapsed_.contains(item->data(0, CategoryRole).toInt()));
+    }
+    if (currentItem)
+        tree_->setCurrentItem(currentItem);
+    tree_->verticalScrollBar()->setValue(scroll);
+}
+
+void ClaudeConfigView::activate(QTreeWidgetItem *item)
+{
+    const Entry *entry = entryOf(item);
+    if (!entry)
+        return;
+    const QString path = entry->path;
+    const bool readOnly = entry->readOnly;
+    if (!entry->exists) {
+        QString error;
+        if (!createFile(path, ClaudeConfig::templateFor(*entry), &error)) {
+            emit statusMessage(error);
+            return;
+        }
+        refresh();
+    }
+    emit fileRequested(path, readOnly);
+}
+
+QString ClaudeConfigView::createNamed(Category category, Scope scope, const QString &name)
+{
+    if (!ClaudeConfig::isValidName(name))
+        return tr("Lowercase letters, digits and hyphens only (“review-cpp”)");
+    const QString path = ClaudeConfig::newEntryPath(category, scope, folder_, name);
+    if (QFileInfo::exists(path))
+        return tr("“%1” already exists").arg(QDir::toNativeSeparators(path));
+    Entry entry;
+    entry.category = category;
+    entry.scope = scope;
+    entry.name = name;
+    QString error;
+    if (!createFile(path, ClaudeConfig::templateFor(entry), &error))
+        return error;
+    collapsed_.remove(static_cast<int>(category));
+    refresh();
+    emit fileRequested(path, false);
+    return {};
+}
+
+void ClaudeConfigView::addNewActions(QMenu *menu, Category category)
+{
+    menu->addAction(tr("In This Project…"), this, [this, category] { askName(category, Scope::Project); });
+    menu->addAction(tr("For All Projects…"), this, [this, category] { askName(category, Scope::User); });
+}
+
+void ClaudeConfigView::askName(Category category, Scope scope)
+{
+    if (folder_.isEmpty())
+        return;
+    const QString path = ClaudeConfig::newEntryPath(category, scope, folder_, QStringLiteral("x"));
+    // The folder the item goes in: skills/, agents/...
+    const QString location = category == Category::Skills ? QFileInfo(QFileInfo(path).absolutePath()).absolutePath()
+                                                          : QFileInfo(path).absolutePath();
+    auto *popup = new NamePopup(tr("New %1").arg(itemNoun(category)),
+                                QDir::toNativeSeparators(location + QLatin1Char('/')),
+                                [this, category, scope](const QString &name) { return createNamed(category, scope, name); },
+                                this);
+    popup->popup();
+}
+
+void ClaudeConfigView::showContextMenu(const QPoint &position)
+{
+    QTreeWidgetItem *item = tree_->itemAt(position);
+    if (!item)
+        return;
+    QMenu menu;
+    const Entry *entry = entryOf(item);
+    if (!entry) {
+        const auto category = static_cast<Category>(item->data(0, CategoryRole).toInt());
+        if (!ClaudeConfig::canCreate(category))
+            return;
+        addNewActions(menu.addMenu(tr("New %1").arg(itemNoun(category))), category);
+        menu.exec(tree_->viewport()->mapToGlobal(position));
+        return;
+    }
+
+    const QString path = entry->path;
+    menu.addAction(entry->exists ? tr("&Open") : tr("&Create"), this, [this, item] { activate(item); });
+    if (entry->exists) {
+        menu.addAction(tr("Send to &Claude"), this, [this, path] { emit sendToClaudeRequested(path); });
+        menu.addSeparator();
+        menu.addAction(tr("Copy &Path"), this,
+                       [path] { QApplication::clipboard()->setText(QDir::toNativeSeparators(path)); });
+        menu.addAction(tr("Open in &File Manager"), this, [path] {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+        });
+    }
+    menu.exec(tree_->viewport()->mapToGlobal(position));
+}

@@ -7,6 +7,8 @@ add_library(duet_core STATIC
     changes/NewBranchPopup.cpp
     changes/SnapshotsPopup.cpp
     claude/ClaudeActivity.cpp
+    claude/ClaudeConfig.cpp
+    claude/ClaudeConfigView.cpp
     claude/ClaudeLauncher.cpp
     claude/ClaudeUsage.cpp
     claude/HookEvent.cpp

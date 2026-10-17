@@ -37,6 +37,20 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   mode tab shows whether Claude is working (amber), waiting for you (blue) or
   has finished while you were elsewhere (green). When the window is in the
   background, the taskbar flashes and a desktop notification appears.
+- **Claude configuration at hand**: the *Claude* tab of the side panel lists
+  everything Claude Code reads for the project, by category (Memory, Rules,
+  Skills, Agents, Commands, Output Styles, Settings, MCP Servers), each file
+  with its scope: *User* (`~/.claude`), *Project* (shared through git),
+  *Local* (not shared), *Folder* (a subfolder's `CLAUDE.md`), *Parent*,
+  *Auto* (the memory Claude writes itself), *Managed* and *Duet* (the hooks
+  Duet passes to its session), the last two read-only. A double-click opens
+  the file in the editor; usual files not created yet (`CLAUDE.local.md`,
+  `.claude/settings.local.json`, `.mcp.json`…) are listed in italics and
+  created on the first double-click. **+** makes a skill, an agent, a command
+  or a rule, in the project or for every project, from a template with its
+  front matter. *Restart Claude Session* (in the pane's options) starts a new
+  session that goes on with the conversation (`--continue`), for the
+  settings Claude reads only when it starts.
 - **Usage in the status bar**: context window used and plan limits (5 hours,
   7 days), with model, session cost and reset times in the tooltip.
 - **Command palette** (Ctrl+Shift+P): every menu command, found by typing a
@@ -175,7 +189,7 @@ then produces an AppImage, a Windows zip and a macOS dmg.
 The window has four full-screen modes, chosen with the tabs at the bottom right:
 
 - **Terminal**: the Claude session (always open) and terminals.
-- **Edit**: side panel (**Files** and **Outline**, vertical tabs at the
+- **Edit**: side panel (**Files**, **Outline** and **Claude**, vertical tabs at the
   window's edge as in KDevelop: clicking the current one folds the panel
   away, clicking it again brings it back) and
   editor tabs.

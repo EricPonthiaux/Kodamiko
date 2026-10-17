@@ -14,5 +14,8 @@ QString kindOf(const QString &fileName);
 
 QIcon file(const QString &fileName, bool dark);
 QIcon folder(bool dark);
+// `icon` with an orange dot (Claude's color) in its corner: a file Claude
+// wrote during the last prompt.
+QIcon withClaudeDot(const QIcon &icon);
 
 } // namespace FileIcons
