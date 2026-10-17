@@ -26,6 +26,7 @@ void ClaudeActivity::handle(const HookEvent &event)
     case HookEvent::Kind::PromptSubmitted:
         setState(State::Working);
         break;
+    case HookEvent::Kind::EditRequested:
     case HookEvent::Kind::FilesEdited:
     case HookEvent::Kind::CommandFinished:
         // A tool ran: the permission, if one was pending, was granted.

@@ -137,6 +137,7 @@ private:
     // can be restored.
     void snapshotBeforePrompt(const QString &prompt);
     void shareEditorContext();
+    void guardUnsavedEdits(const QStringList &paths);
     // Context and plan usage, from the status line data.
     void updateUsage();
     void showCommandPalette();
@@ -210,6 +211,7 @@ private:
     bool closingProject_ = false;
     NoticeBar *serverNotice_ = nullptr;
     QSet<QString> dismissedServerNotices_; // closed by the user, by message
+    NoticeBar *unsavedEditNotice_ = nullptr; // an edit by Claude refused
     CodeNavigator *navigator_ = nullptr;
     CodeIntelligence *intelligence_ = nullptr;
     OutlineView *outlineView_ = nullptr;

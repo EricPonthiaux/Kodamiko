@@ -9,6 +9,7 @@
 #include "claude/EditorContext.h"
 #include "claude/HookEvent.h"
 #include "claude/HookServer.h"
+#include "claude/UnsavedEditGuard.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -78,6 +79,28 @@ private slots:
         QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"Notification"})"));
     }
 
+    void parsesEditRequests()
+    {
+        const auto edit = HookEvent::fromJson(
+            R"({"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/p/a.cpp"}})");
+        QVERIFY(edit);
+        QCOMPARE(edit->kind, HookEvent::Kind::EditRequested);
+        QCOMPARE(edit->message, QStringLiteral("Write"));
+        QCOMPARE(edit->filePaths, QStringList{"/p/a.cpp"});
+        QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}})"));
+    }
+
+    void refusesEditsOverUnsavedChanges()
+    {
+        const QString reason = UnsavedEditGuard::reason({"src/a.cpp", "src/b.h"});
+        QVERIFY(reason.startsWith(QStringLiteral("src/a.cpp, src/b.h have unsaved changes")));
+        QVERIFY(UnsavedEditGuard::reason({"a.cpp"}).startsWith(QStringLiteral("a.cpp has unsaved changes")));
+        const QJsonObject output = UnsavedEditGuard::denyOutput(reason)["hookSpecificOutput"].toObject();
+        QCOMPARE(output["hookEventName"].toString(), QStringLiteral("PreToolUse"));
+        QCOMPARE(output["permissionDecision"].toString(), QStringLiteral("deny"));
+        QCOMPARE(output["permissionDecisionReason"].toString(), reason);
+    }
+
     void ignoresUnknownOrInvalidEvents()
     {
         QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"SessionStart"})"));
@@ -90,8 +113,10 @@ private slots:
         const QJsonObject settings =
             QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"")).object();
         const QJsonObject hooks = settings["hooks"].toObject();
-        QCOMPARE(hooks.keys(), (QStringList{"Notification", "PermissionRequest", "PostToolUse", "Stop", "StopFailure",
-                                            "UserPromptSubmit"}));
+        QCOMPARE(hooks.keys(), (QStringList{"Notification", "PermissionRequest", "PostToolUse", "PreToolUse", "Stop",
+                                            "StopFailure", "UserPromptSubmit"}));
+        QCOMPARE(hooks["PreToolUse"].toArray().first().toObject()["matcher"].toString(),
+                 QStringLiteral("Edit|Write|MultiEdit|NotebookEdit"));
         const QJsonObject postToolUse = hooks["PostToolUse"].toArray().first().toObject();
         QCOMPARE(postToolUse["matcher"].toString(), QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash"));
         const QJsonObject command = postToolUse["hooks"].toArray().first().toObject();

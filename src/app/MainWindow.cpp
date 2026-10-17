@@ -8,6 +8,7 @@
 #include "claude/ClaudeLinter.h"
 #include "claude/EditorContext.h"
 #include "claude/EffectiveSettings.h"
+#include "claude/UnsavedEditGuard.h"
 #include "claude/ClaudeUsage.h"
 #include "completion/CompletionController.h"
 #include "completion/CodeGeneration.h"
@@ -425,6 +426,13 @@ QWidget *MainWindow::createEditPage()
     });
     connect(languageServers_, &LanguageServers::serverFailed, this, &MainWindow::updateServerNotice);
     editorLayout->addWidget(serverNotice_);
+    // Claude was kept from overwriting unsaved changes.
+    unsavedEditNotice_ = new NoticeBar(editorArea);
+    connect(unsavedEditNotice_, &NoticeBar::actionClicked, this, [this] {
+        if (editorTabs_->saveAll())
+            unsavedEditNotice_->hide();
+    });
+    editorLayout->addWidget(unsavedEditNotice_);
     editorLayout->addWidget(editorTabs_, 1);
 
     // Files, Outline and Claude as KDevelop's tool views: vertical tabs at the
@@ -1122,6 +1130,7 @@ void MainWindow::setTheme(const QString &name)
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
     serverNotice_->applyTheme(theme_);
+    unsavedEditNotice_->applyTheme(theme_);
     toolsNotice_->applyTheme(theme_);
     projectSettings_->applyTheme(theme_);
     if (preferencesPopup_)
@@ -1258,6 +1267,9 @@ void MainWindow::onHookReceived(const HookEvent &event)
         snapshotBeforePrompt(event.prompt);
         claudeTouched_.clear(); // the dots show the last prompt's files
         updateClaudeMarks();
+        break;
+    case HookEvent::Kind::EditRequested:
+        guardUnsavedEdits(event.filePaths);
         break;
     case HookEvent::Kind::FilesEdited:
     case HookEvent::Kind::CommandFinished: {
@@ -1456,6 +1468,26 @@ void MainWindow::shareEditorContext()
     const QString description = context.describe();
     if (!description.isEmpty())
         hookServer_.respond(EditorContext::promptHookOutput(description));
+}
+
+void MainWindow::guardUnsavedEdits(const QStringList &paths)
+{
+    QStringList unsaved;
+    for (const QString &path : paths) {
+        if (editorTabs_->hasUnsavedChangesUnder(path)) {
+            const QString relative = QDir(folder_).relativeFilePath(path);
+            unsaved.append(relative.startsWith(QLatin1String("..")) ? path : relative);
+        }
+    }
+    if (unsaved.isEmpty())
+        return;
+    hookServer_.respond(UnsavedEditGuard::denyOutput(UnsavedEditGuard::reason(unsaved)));
+    const QString files = unsaved.join(QStringLiteral(", "));
+    unsavedEditNotice_->showNotice(
+        tr("Claude did not edit %1: it has unsaved changes here. Save or discard them, then ask Claude again.")
+            .arg(files),
+        tr("Save All"));
+    statusBar()->showMessage(tr("Edit by Claude refused, unsaved changes in %1").arg(files), statusMessageMs);
 }
 
 void MainWindow::snapshotBeforePrompt(const QString &prompt)

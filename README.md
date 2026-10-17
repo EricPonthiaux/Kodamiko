@@ -45,6 +45,11 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   so that "fix this" or "why is this line wrong?" needs no `@path`. Claude
   receives it as context, not as part of your prompt; *Claude ▸ Share
   Editor Context With Each Prompt* turns it off.
+- **Your unsaved edits are safe from Claude**: when Claude is about to edit
+  a file that has unsaved changes in the editor, the editor refuses the edit
+  and tells Claude why, so that it asks you to save or discard them instead
+  of overwriting them; a bar above the editor names the files, with *Save
+  All*.
 - **Claude status at a glance**: a dot on the Claude tab and on the Terminal
   mode tab shows whether Claude is working (amber), waiting for you (blue) or
   has finished while you were elsewhere (green). When the window is in the
@@ -295,7 +300,7 @@ soon as you click in a file.
 ## How the editor follows Claude
 
 1. The editor launches `claude --settings <file>` with *hooks* on
-   `UserPromptSubmit`, `PostToolUse` (editing tools and Bash),
+   `UserPromptSubmit`, `PreToolUse` (editing tools), `PostToolUse` (editing tools and Bash),
    `PermissionRequest`, `Notification`, `Stop` and `StopFailure`, and with a
    status line. The user's Claude configuration is not modified.
 2. Each hook runs `duet-hook`, a small program shipped with the
@@ -307,6 +312,8 @@ soon as you click in a file.
    Claude start; *Claude ▸ Snapshot Before Each Prompt* turns this off.
    Its answer adds the editor context (open file, cursor, selection,
    problems, unsaved files) to the prompt.
+   On `PreToolUse`, its answer refuses an edit of a file with unsaved
+   changes in the editor, with the reason for Claude.
 4. On `PostToolUse`, the editor reloads the modified open files (all of them
    after a Bash command). On `PostToolUse` and `Stop`, it recomputes the Diff
    mode from the project's git repository: changes made by shell commands

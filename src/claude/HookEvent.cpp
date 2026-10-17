@@ -18,6 +18,19 @@ bool waitsForUser(const QString &notificationType)
     return types.contains(notificationType);
 }
 
+// The files an editing tool works on.
+QStringList editedFiles(const QJsonObject &event)
+{
+    const QJsonObject input = event.value(QLatin1String("tool_input")).toObject();
+    QStringList paths;
+    for (const char *key : {"file_path", "notebook_path"}) {
+        const QString path = input.value(QLatin1String(key)).toString();
+        if (!path.isEmpty())
+            paths.append(path);
+    }
+    return paths;
+}
+
 } // namespace
 
 std::optional<HookEvent> HookEvent::fromJson(const QByteArray &json)
@@ -62,15 +75,18 @@ std::optional<HookEvent> HookEvent::fromJson(const QByteArray &json)
             event.kind = Kind::CommandFinished;
             return event;
         }
-        const QJsonObject input = object.value(QLatin1String("tool_input")).toObject();
-        for (const char *key : {"file_path", "notebook_path"}) {
-            const QString path = input.value(QLatin1String(key)).toString();
-            if (!path.isEmpty())
-                event.filePaths.append(path);
-        }
+        event.filePaths = editedFiles(object);
         if (event.filePaths.isEmpty())
             return std::nullopt;
         event.kind = Kind::FilesEdited;
+        return event;
+    }
+    if (eventName == QLatin1String("PreToolUse")) {
+        event.filePaths = editedFiles(object);
+        if (event.filePaths.isEmpty())
+            return std::nullopt;
+        event.kind = Kind::EditRequested;
+        event.message = object.value(QLatin1String("tool_name")).toString();
         return event;
     }
     return std::nullopt;

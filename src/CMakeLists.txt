@@ -18,6 +18,7 @@ add_library(duet_core STATIC
     claude/EffectiveSettings.cpp
     claude/HookEvent.cpp
     claude/HookServer.cpp
+    claude/UnsavedEditGuard.cpp
     completion/CodeGeneration.cpp
     completion/CodeScan.cpp
     completion/CompletionController.cpp

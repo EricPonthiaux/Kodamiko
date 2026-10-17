@@ -79,6 +79,9 @@ QByteArray sessionSettings(const QString &hookCommand)
     // The editor takes a snapshot before replying: Claude only starts once
     // the files are saved.
     hooks.insert(QLatin1String("UserPromptSubmit"), commandHook(hookCommand, {}, 30));
+    // The editor refuses an edit that would overwrite unsaved changes.
+    hooks.insert(QLatin1String("PreToolUse"),
+                 commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit"), 30));
     hooks.insert(QLatin1String("PostToolUse"),
                  commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash")));
     hooks.insert(QLatin1String("PermissionRequest"), commandHook(hookCommand));

@@ -12,6 +12,7 @@
 struct HookEvent {
     enum class Kind {
         PromptSubmitted,     // UserPromptSubmit: Claude starts working on a prompt
+        EditRequested,       // PreToolUse on Edit/Write/MultiEdit/NotebookEdit: Claude is about to edit
         FilesEdited,         // PostToolUse on Edit/Write/MultiEdit/NotebookEdit
         CommandFinished,     // PostToolUse on Bash: any file may have changed
         PermissionRequested, // PermissionRequest: Claude waits for an approval
@@ -22,9 +23,9 @@ struct HookEvent {
 
     Kind kind;
     QString sessionId;
-    QStringList filePaths; // FilesEdited, absolute paths
+    QStringList filePaths; // EditRequested, FilesEdited: absolute paths
     QString prompt;        // PromptSubmitted
-    // PermissionRequested: the tool name; NeedsAttention: Claude's message;
+    // EditRequested, PermissionRequested: the tool name; NeedsAttention: Claude's message;
     // ResponseFinished: the error, if any.
     QString message;
     bool failed = false; // ResponseFinished after an API error (StopFailure)
