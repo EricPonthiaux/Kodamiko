@@ -50,6 +50,26 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   and tells Claude why, so that it asks you to save or discard them instead
   of overwriting them; a bar above the editor names the files, with *Save
   All*.
+- **Diagrams**: *File ▸ New Diagram* (or *New Diagram* in the tree's
+  context menu) lists the kinds of diagram available (flowchart, sequence,
+  class, state, data model, C4 architecture, mind map, user journey,
+  product vision, explainer board) and creates a blank one under the name
+  you give. *Drawn by Claude…* (also
+  *Claude ▸ Draw a Diagram…*) asks for the kind, what it should show ("the
+  login flow in src/auth") and the file name: a tab shows Claude at work
+  (the files it reads, the time spent, *Cancel*) until the diagram replaces
+  it. This runs `claude --print` on its own, outside the session, allowed to
+  read the project and to write that one file only.
+- **Claude draws diagrams**: ask for a diagram ("draw the order return
+  process", "the classes of src/billing", "the login exchanges") and Claude
+  writes it in Mermaid, a `.mmd` file (in `docs/diagrams/` unless you name
+  one), that opens in the diagram editor, laid out automatically. How to
+  write each kind comes from a skill in Duet's own plugin for its session
+  (`tools/claude-plugin`, passed with `--plugin-dir`); after each write,
+  Duet reads the file as the editor does and sends back to Claude what it
+  could not read (an unsupported kind, a statement it does not understand…),
+  which Claude fixes at once. When Claude edits a diagram you arranged,
+  your arrangement stays: new elements go beside their neighbors.
 - **Claude status at a glance**: a dot on the Claude tab and on the Terminal
   mode tab shows whether Claude is working (amber), waiting for you (blue) or
   has finished while you were elsewhere (green). When the window is in the
@@ -146,8 +166,36 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   relative images are shown.
 - Image viewer (PNG, JPEG, GIF, BMP, SVG… depending on the Qt plugins):
   fit to the tab, zoom with Ctrl+wheel, Ctrl++ / Ctrl+- and Ctrl+0.
-- Diagram editor for `.flow` files ([Flowboard](#diagrams)), opened in a
-  tab like any file: flowcharts with Mermaid import/export and SVG export.
+- **Diagram editor**, a C++ port of the diagram engine of sidecar (its
+  `shape-board` and its families), opened in a tab like any file and drawn
+  in the editor's theme. It reads Mermaid (`.mmd`, `.mermaid`) for every
+  kind, PlantUML (`.puml`) for class, state and sequence diagrams, explainer
+  boards (`.board`, sidecar's JSON scenes) and Flowboard's `.flow` files.
+  The file stays in its notation: Duet writes the source back, followed by
+  the layout you made (positions, sizes, colors, curves) in comments that
+  other Mermaid tools ignore. Layouts come from Graphviz, as in sidecar:
+  layered for flowcharts, classes and states, radial for mind maps, lanes
+  for sequences, frames as clusters. Beside the diagram, the selection's
+  properties (those of its kind: shape, stereotype, relation, cardinalities,
+  technology…; its color, its line style) and, with nothing selected, the
+  diagram's direction; the **Source** tab shows the diagram's source,
+  editable (*Apply*: elements keep their place by id).
+  Double-click edits a text (Enter validates, Shift+Enter starts a new line;
+  in multi-line texts such as a class's members, Enter is a new line and
+  Ctrl+Enter validates) or, in empty space, offers the kind's elements;
+  dragging from one of a shape's ports links it (with the kind's relations
+  to choose from where it has several), and released in empty space adds
+  the next element, linked. Dragging moves shapes (into and out of frames
+  where the kind has them; aligned on the others' edges and centers on
+  explainer boards, Alt: freely), the corner handle resizes them; dragging
+  in empty space or with the middle button moves the view, Shift+drag
+  selects a rectangle, the wheel zooms. Right-click for the context menus.
+  Ctrl+L lays the diagram out (animated), F fits it to the view, Ctrl+Z /
+  Ctrl+Y undo and redo, Ctrl+C / X / V / D copy, cut, paste (elements, or a
+  source of the same kind) and duplicate, arrows move the selection
+  (Shift: by 10). *More* exports the source, SVG and PNG (in a light,
+  printable palette) and shows or hides the grid and the properties. A
+  Mermaid file Duet does not read (a pie chart) opens as text.
 - Three themes, in *View ▸ Theme*: Dark, **Purple** (deep violet in the
   manner of AI tools: plum background, lavender text, pastel syntax colors,
   violet accents) and Light. All three share the same controls: rounded
@@ -189,17 +237,15 @@ ctest --preset default        # tests
 ./build/bin/duet [project-folder]
 ```
 
-<a id="diagrams"></a>**Diagrams (optional).** The `.flow` diagram editor comes from
-Flowboard's sources. Point `FLOWBOARD_SOURCE_DIR` to them when configuring
-(FreeType is used if installed); without it, `.flow` files open as text:
-
-```sh
-cmake --preset default -DFLOWBOARD_SOURCE_DIR=/path/to/flowboard
-```
+<a id="diagrams"></a>**Diagrams (optional).** The diagram editor lays
+diagrams out with [Graphviz](https://graphviz.org)'s library, found with
+`pkg-config` (`libgraphviz-dev` on Debian and Ubuntu, `graphviz` with
+Homebrew or pacman); its dot and neato engines are linked in. Without it,
+diagram files open as text. Qt's Svg module, when present, adds the SVG
+export.
 
 The diagram tab is saved with Ctrl+S like any file, reloaded when the file
-changes on disk, and asks before closing with unsaved changes. Its own menus
-(in French) cover layout, display, Mermaid import/export and SVG export.
+changes on disk, and asks before closing with unsaved changes.
 
 On Windows, run these commands from a "Developer PowerShell for VS 2022"
 after adding Qt's `bin` folder to the `PATH`.
@@ -312,6 +358,8 @@ soon as you click in a file.
    Claude start; *Claude ▸ Snapshot Before Each Prompt* turns this off.
    Its answer adds the editor context (open file, cursor, selection,
    problems, unsaved files) to the prompt.
+   On `PostToolUse` of a diagram file, its answer lists the problems the
+   diagram editor found in it, and the diagram opens in a tab.
    On `PreToolUse`, its answer refuses an edit of a file with unsaved
    changes in the editor, with the reason for Claude.
 4. On `PostToolUse`, the editor reloads the modified open files (all of them
@@ -336,7 +384,7 @@ src/
   app/        main window, wiring of the modules
   ui/         shared UI foundation: theme, fonts, icons, window frame, popups, splitters
   editor/     QScintilla editor, tabs, file reading/writing, disk watching, find bar, change marks, Markdown preview
-  viewers/    non-text tabs: images, diagrams
+  viewers/    non-text tabs: images, diagrams (diagram/: model, Graphviz layout, canvas, files; families/: one per kind of diagram)
   completion/ code completion: popup, fuzzy matching, snippets with tab stops, postfix and live templates, local and LSP providers, smart and extended completion, Full Line, doc comments, override generation, name suggestions
   lsp/        language server client and server management
   syntax/     highlighting: tree-sitter (highlights.scm queries), QScintilla lexers
@@ -355,6 +403,7 @@ src/
   settings/   preferences and keymap
   setup/      prerequisites check (git, Claude Code) and installation
 tools/duet-hook/   Claude Code hooks → editor relay
+tools/claude-plugin/ Duet's plugin for its Claude session: skills (diagrams)
 tests/                 Qt Test tests (ctest)
 cmake/                 third-party dependencies
 ```

@@ -1,0 +1,247 @@
+#include "SourceText.h"
+
+#include <QRegularExpression>
+
+namespace diagram::source {
+
+QStringList mermaidLines(const QString &source, bool keepIndent)
+{
+    QStringList lines;
+    static const QRegularExpression newline(QStringLiteral("\\r?\\n"));
+    static const QRegularExpression comment(QStringLiteral("%%.*$"));
+    for (QString raw : source.split(newline)) {
+        raw.remove(comment);
+        QString line = keepIndent ? raw : raw.trimmed();
+        if (keepIndent) {
+            while (!line.isEmpty() && line.back().isSpace())
+                line.chop(1);
+        }
+        if (!line.trimmed().isEmpty())
+            lines.append(line);
+    }
+    return lines;
+}
+
+QString mermaidQuote(const QString &text)
+{
+    QString escaped = text;
+    escaped.replace(QLatin1Char('"'), QStringLiteral("#quot;"));
+    escaped.replace(QLatin1Char('\n'), QStringLiteral("<br/>"));
+    return QLatin1Char('"') + escaped + QLatin1Char('"');
+}
+
+QString decodeLabel(const QString &text)
+{
+    QString result = text;
+    static const QRegularExpression br(QStringLiteral("<br\\s*/?>"), QRegularExpression::CaseInsensitiveOption);
+    result.replace(br, QStringLiteral("\n"));
+    result.replace(QStringLiteral("\\n"), QStringLiteral("\n"));
+    static const QRegularExpression numeric(QStringLiteral("&?#(\\d+);"));
+    QString decoded;
+    qsizetype last = 0;
+    for (auto it = numeric.globalMatch(result); it.hasNext();) {
+        const QRegularExpressionMatch m = it.next();
+        decoded += result.mid(last, m.capturedStart() - last);
+        const uint code = m.captured(1).toUInt();
+        decoded += code ? QString::fromUcs4(reinterpret_cast<const char32_t *>(&code), 1) : QString();
+        last = m.capturedEnd();
+    }
+    decoded += result.mid(last);
+    result = decoded;
+    static const QRegularExpression quot(QStringLiteral("&quot;|#quot;"));
+    static const QRegularExpression apos(QStringLiteral("&#39;|&apos;|#39;"));
+    static const QRegularExpression lt(QStringLiteral("&lt;"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression gt(QStringLiteral("&gt;"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression nbsp(QStringLiteral("&nbsp;"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression amp(QStringLiteral("&amp;"), QRegularExpression::CaseInsensitiveOption);
+    result.replace(quot, QStringLiteral("\""));
+    result.replace(apos, QStringLiteral("'"));
+    result.replace(lt, QStringLiteral("<"));
+    result.replace(gt, QStringLiteral(">"));
+    result.replace(nbsp, QStringLiteral(" "));
+    result.replace(amp, QStringLiteral("&"));
+    return result;
+}
+
+QString mermaidUnquote(const QString &text)
+{
+    QString t = text.trimmed();
+    if (t.startsWith(QStringLiteral("\"`")) && t.endsWith(QStringLiteral("`\"")) && t.size() >= 4)
+        t = t.mid(2, t.size() - 4);
+    else if (t.startsWith(QLatin1Char('"')) && t.endsWith(QLatin1Char('"')) && t.size() >= 2)
+        t = t.mid(1, t.size() - 2);
+    return decodeLabel(t);
+}
+
+QString pipeLabel(const QString &text)
+{
+    QString result = text;
+    result.replace(QLatin1Char('|'), QLatin1Char('/'));
+    result.replace(QLatin1Char('\n'), QLatin1Char(' '));
+    return result;
+}
+
+QString plantumlText(const QString &text)
+{
+    QString result = text;
+    result.replace(QStringLiteral("\\n"), QStringLiteral("\n"));
+    return result;
+}
+
+QStringList plantumlLines(const QString &source)
+{
+    static const QRegularExpression block(QStringLiteral("/'[\\s\\S]*?'/"));
+    static const QRegularExpression noise(
+        QStringLiteral("^(?:@startuml|@enduml|title\\b|caption\\b|header\\b|footer\\b|legend\\b|endlegend\\b|hide\\b|"
+                       "show\\b|remove\\b|restore\\b|scale\\b|autonumber\\b|newpage\\b|mainframe\\b|"
+                       "left to right direction|top to bottom direction|allow_mixing\\b|!\\w)"),
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression styleOpen(QStringLiteral("^<style\\b"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression styleClose(QStringLiteral("</style>"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression skinparam(QStringLiteral("^skinparam\\b"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression newline(QStringLiteral("\\r?\\n"));
+    QString text = source;
+    text.remove(block);
+    QStringList lines;
+    int skipBlock = 0;
+    bool inStyle = false;
+    for (const QString &raw : text.split(newline)) {
+        const QString line = raw.trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('\'')))
+            continue;
+        if (styleOpen.match(line).hasMatch()) {
+            inStyle = true;
+            continue;
+        }
+        if (inStyle) {
+            if (styleClose.match(line).hasMatch())
+                inStyle = false;
+            continue;
+        }
+        if (skipBlock > 0) {
+            if (line.contains(QLatin1Char('{')))
+                ++skipBlock;
+            if (line.contains(QLatin1Char('}')))
+                --skipBlock;
+            continue;
+        }
+        if (skinparam.match(line).hasMatch()) {
+            if (line.contains(QLatin1Char('{')) && !line.contains(QLatin1Char('}')))
+                skipBlock = 1;
+            continue;
+        }
+        if (noise.match(line).hasMatch())
+            continue;
+        lines.append(line);
+    }
+    return lines;
+}
+
+QString plantumlName(const QString &text)
+{
+    static const QRegularExpression simple(QStringLiteral("^[\\w.]+$"), QRegularExpression::UseUnicodePropertiesOption);
+    if (simple.match(text).hasMatch())
+        return text;
+    QString quoted = text;
+    quoted.replace(QLatin1Char('"'), QLatin1Char('\''));
+    quoted.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
+    return QLatin1Char('"') + quoted + QLatin1Char('"');
+}
+
+const QList<UmlRelation> &umlRelations()
+{
+    static const QList<UmlRelation> list{
+        {QStringLiteral("<|--"), QStringLiteral("extension"), true},
+        {QStringLiteral("--|>"), QStringLiteral("extension"), false},
+        {QStringLiteral("<|.."), QStringLiteral("realization"), true},
+        {QStringLiteral("..|>"), QStringLiteral("realization"), false},
+        {QStringLiteral("*--"), QStringLiteral("composition"), true},
+        {QStringLiteral("--*"), QStringLiteral("composition"), false},
+        {QStringLiteral("o--"), QStringLiteral("aggregation"), true},
+        {QStringLiteral("--o"), QStringLiteral("aggregation"), false},
+        {QStringLiteral("<--"), QStringLiteral("association"), true},
+        {QStringLiteral("-->"), QStringLiteral("association"), false},
+        {QStringLiteral("<.."), QStringLiteral("dependency"), true},
+        {QStringLiteral("..>"), QStringLiteral("dependency"), false},
+        {QStringLiteral(".."), QStringLiteral("dotted"), false},
+        {QStringLiteral("--"), QStringLiteral("link"), false},
+    };
+    return list;
+}
+
+QString umlRelationPattern()
+{
+    QStringList tokens;
+    for (const UmlRelation &relation : umlRelations())
+        tokens.append(QRegularExpression::escape(relation.token));
+    return tokens.join(QLatin1Char('|'));
+}
+
+QString umlRelationOutput(const QString &kind)
+{
+    static const QHash<QString, QString> output{
+        {QStringLiteral("extension"), QStringLiteral("--|>")},  {QStringLiteral("realization"), QStringLiteral("..|>")},
+        {QStringLiteral("composition"), QStringLiteral("--*")}, {QStringLiteral("aggregation"), QStringLiteral("--o")},
+        {QStringLiteral("association"), QStringLiteral("-->")}, {QStringLiteral("dependency"), QStringLiteral("..>")},
+        {QStringLiteral("dotted"), QStringLiteral("..")},       {QStringLiteral("link"), QStringLiteral("--")},
+    };
+    return output.value(kind, QStringLiteral("-->"));
+}
+
+QString keyFor(const QString &key, const QString &text, QSet<QString> &used)
+{
+    QString base = key;
+    if (base.isEmpty()) {
+        QString slug = text.normalized(QString::NormalizationForm_D);
+        static const QRegularExpression marks(QStringLiteral("[\\x{0300}-\\x{036f}]"));
+        static const QRegularExpression other(QStringLiteral("[^A-Za-z0-9]+"));
+        static const QRegularExpression edges(QStringLiteral("^_+|_+$"));
+        slug.remove(marks);
+        slug.replace(other, QStringLiteral("_"));
+        slug.remove(edges);
+        base = slug.left(24);
+        if (base.isEmpty())
+            base = QStringLiteral("n");
+    }
+    QString unique = base;
+    for (int i = 2; used.contains(unique); ++i)
+        unique = base + QString::number(i);
+    used.insert(unique);
+    return unique;
+}
+
+QStringList splitTop(const QString &text, QChar separator)
+{
+    QStringList parts;
+    int depth = 0;
+    QChar quote;
+    qsizetype start = 0;
+    for (qsizetype i = 0; i < text.size(); ++i) {
+        const QChar c = text[i];
+        if (!quote.isNull()) {
+            if (c == quote)
+                quote = QChar();
+            continue;
+        }
+        if (c == QLatin1Char('"') || c == QLatin1Char('\''))
+            quote = c;
+        else if (c == QLatin1Char('[') || c == QLatin1Char('(') || c == QLatin1Char('{'))
+            ++depth;
+        else if (c == QLatin1Char(']') || c == QLatin1Char(')') || c == QLatin1Char('}'))
+            depth = std::max(0, depth - 1);
+        else if (c == separator && depth == 0) {
+            parts.append(text.mid(start, i - start));
+            start = i + 1;
+        }
+    }
+    parts.append(text.mid(start));
+    QStringList result;
+    for (const QString &part : parts) {
+        const QString trimmed = part.trimmed();
+        if (!trimmed.isEmpty())
+            result.append(trimmed);
+    }
+    return result;
+}
+
+} // namespace diagram::source

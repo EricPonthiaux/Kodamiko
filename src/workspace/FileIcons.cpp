@@ -170,7 +170,8 @@ QString kindOf(const QString &fileName)
         {"svg", "image"}, {"css", "css"}, {"scss", "css"}, {"less", "css"},
         {"toml", "config"}, {"ini", "config"}, {"cfg", "config"}, {"conf", "config"}, {"desktop", "config"},
         {"png", "image"}, {"jpg", "image"}, {"jpeg", "image"}, {"gif", "image"}, {"bmp", "image"},
-        {"webp", "image"}, {"ico", "image"}, {"flow", "diagram"}, {"lock", "lock"},
+        {"webp", "image"}, {"ico", "image"}, {"flow", "diagram"}, {"mmd", "diagram"}, {"mermaid", "diagram"},
+        {"puml", "diagram"}, {"plantuml", "diagram"}, {"board", "diagram"}, {"lock", "lock"},
     };
     const qsizetype dot = name.lastIndexOf(QLatin1Char('.'));
     return dot >= 0 ? extensions.value(name.mid(dot + 1), QStringLiteral("text")) : QStringLiteral("text");

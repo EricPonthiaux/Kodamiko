@@ -1,0 +1,84 @@
+classDiagram
+  class EntryPopup
+  class DiagramRequestPopup {
+    +Apply(kindId, name, description)
+    #accept()
+  }
+  class DiagramKind {
+    +id, title
+    +extension
+    +blank
+  }
+  class DiagramKinds {
+    <<namespace>>
+    +available()
+    +find(id)
+    +withExtension(name, kind)
+  }
+  class DiagramRequest {
+    <<namespace>>
+    +prompt(kindTitle, path, description)
+    +arguments(prompt, path, plugin, hook)
+    +parseLine(line, workDir) Event
+  }
+  class Event {
+    +kind : None, Steps, Finished
+    +steps
+    +failed
+    +text
+  }
+  class DiagramGenerationView {
+    +start()
+    +finished(path, summary)
+    +closeRequested()
+    -readOutput()
+    -onHookReceived(event)
+  }
+  class HookServer
+  class DiagramCheck {
+    <<namespace>>
+    +problems(path, content)
+    +feedbackOutput(file, problems)
+  }
+  class Document {
+    <<namespace>>
+    +problems(path, content)
+  }
+  class MainWindow
+  class DiagramView
+  DiagramRequestPopup --|> EntryPopup
+  MainWindow ..> DiagramRequestPopup : opens
+  DiagramRequestPopup --> "*" DiagramKind : offers
+  DiagramKinds ..> DiagramKind : lists
+  MainWindow ..> DiagramGenerationView : opens in a tab
+  DiagramGenerationView ..> DiagramRequest : builds prompt, reads output
+  DiagramRequest ..> Event : parses into
+  HookServer --* DiagramGenerationView
+  MainWindow ..> DiagramCheck : answers Claude's hooks
+  DiagramCheck ..> Document : reads like the editor
+  MainWindow ..> DiagramView : opens the result
+
+%% Layout kept by Duet (positions, sizes, colors, curves)
+%% duet {"key":"EntryPopup","x":39,"y":448}
+%% duet {"key":"DiagramRequestPopup","x":0,"y":184}
+%% duet {"key":"DiagramKind","x":263,"y":418}
+%% duet {"key":"DiagramKinds","x":271.5,"y":164}
+%% duet {"key":"DiagramRequest","x":951,"y":408}
+%% duet {"key":"Event","x":982.5,"y":642}
+%% duet {"key":"DiagramGenerationView","x":986.5,"y":154}
+%% duet {"key":"HookServer","x":1036,"y":0}
+%% duet {"key":"DiagramCheck","x":508,"y":174}
+%% duet {"key":"Document","x":529.5,"y":428}
+%% duet {"fill":"#1565c0","key":"MainWindow","x":666,"y":0}
+%% duet {"fill":"#1565c0","key":"DiagramView","x":773,"y":204}
+%% duet {"c":[114,300.5,114,340.6,114,393.5,114,432.5],"e":[114,447.8],"link":"DiagramRequestPopup>EntryPopup","n":0}
+%% duet {"c":[665.5,51.8,570.7,70.4,403.8,107.4,267.8,160.3,254.2,165.6,240.3,171.8,226.7,178.3],"e":[215.8,183.6],"link":"MainWindow>DiagramRequestPopup","lp":[403.9,115],"n":0}
+%% duet {"c":[167.7,300.5,197.5,332.9,235,373.8,267.2,408.9],"e":[275.3,417.7],"link":"DiagramRequestPopup>DiagramKind","lp":[262.4,369],"n":0}
+%% duet {"c":[358.4,320.2,355.1,347.4,351.3,378,347.9,405.4],"e":[346.4,417.7],"link":"DiagramKinds>DiagramKind","lp":[370.5,369],"n":0}
+%% duet {"c":[805.3,76.4,853.2,105,919.7,144.6,975.6,178],"e":[986.3,184.3],"link":"MainWindow>DiagramGenerationView","lp":[987.4,115],"n":0}
+%% duet {"c":[1083,330.4,1083,351.5,1083,374.1,1083,395.3],"e":[1083,407.6],"link":"DiagramGenerationView>DiagramRequest","lp":[1167.5,369],"n":0}
+%% duet {"c":[1083,564.3,1083,585.1,1083,607.9,1083,629.4],"e":[1083,641.9],"link":"DiagramRequest>Event","lp":[1120.5,603],"n":0}
+%% duet {"c":[1105.7,76.4,1103.4,93.2,1100.6,113.8,1097.7,134.7],"e":[1095.1,153.9],"link":"HookServer>DiagramGenerationView","n":0}
+%% duet {"c":[718.1,76.4,703.4,100.9,683.9,133.5,666.1,163.3],"e":[659.9,173.7],"link":"MainWindow>DiagramCheck","lp":[701.5,115],"n":0}
+%% duet {"c":[619,310.3,619,343.1,619,382.3,619,415.3],"e":[619,427.7],"link":"DiagramCheck>Document","lp":[681,369],"n":0}
+%% duet {"c":[761.1,76.4,778.5,109.4,803.6,157.3,822.4,193.1],"e":[828,203.8],"link":"MainWindow>DiagramView","lp":[848.7,115],"n":0}

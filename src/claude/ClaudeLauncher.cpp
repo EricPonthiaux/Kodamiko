@@ -120,6 +120,28 @@ QString userStatusLineCommand(const QString &projectDir)
     return command;
 }
 
+// Next to the executable in the build, in share/duet once installed, in the
+// bundle's resources on macOS.
+QString pluginPath()
+{
+    const QDir appDir(QCoreApplication::applicationDirPath());
+    for (const QString &candidate : {QStringLiteral("claude-plugin"), QStringLiteral("../share/duet/claude-plugin"),
+                                     QStringLiteral("../Resources/claude-plugin")}) {
+        const QString path = QDir::cleanPath(appDir.filePath(candidate));
+        if (QFileInfo::exists(path + QStringLiteral("/.claude-plugin/plugin.json")))
+            return path;
+    }
+    return {};
+}
+
+QString hookCommand()
+{
+    const QString hook = hookExecutablePath();
+    // Forward slashes and quotes: the command is valid for both sh and
+    // cmd.exe, even if the path contains spaces.
+    return hook.isEmpty() ? QString() : QLatin1Char('"') + QDir::fromNativeSeparators(hook) + QLatin1Char('"');
+}
+
 QString findClaudeExecutable()
 {
     const QString inPath = QStandardPaths::findExecutable(QStringLiteral("claude"));
@@ -145,17 +167,14 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
                                              "from Help ▸ Check Prerequisites.");
         return std::nullopt;
     }
-    const QString hook = hookExecutablePath();
+    const QString hook = hookCommand();
     if (hook.isEmpty()) {
         *error = QCoreApplication::translate("ClaudeLauncher",
                                              "The duet-hook program is missing from the editor's folder.");
         return std::nullopt;
     }
 
-    // Forward slashes and quotes: the command is valid for both sh and
-    // cmd.exe, even if the path contains spaces.
-    const QString hookCommand = QLatin1Char('"') + QDir::fromNativeSeparators(hook) + QLatin1Char('"');
-    const std::optional<QString> settingsFile = writeSettingsFile(sessionSettings(hookCommand));
+    const std::optional<QString> settingsFile = writeSettingsFile(sessionSettings(hook));
     if (!settingsFile) {
         *error = QCoreApplication::translate("ClaudeLauncher", "Could not write the hooks configuration.");
         return std::nullopt;
@@ -163,7 +182,10 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
 
     ProcessSpec spec;
     spec.program = claude;
-    spec.arguments = QStringList{QStringLiteral("--settings"), *settingsFile} + extraArguments;
+    spec.arguments = QStringList{QStringLiteral("--settings"), *settingsFile};
+    if (const QString plugin = pluginPath(); !plugin.isEmpty())
+        spec.arguments << QStringLiteral("--plugin-dir") << QDir::toNativeSeparators(plugin);
+    spec.arguments += extraArguments;
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
     spec.environment.insert(QStringLiteral("DUET_SOCKET"), hookServerName);

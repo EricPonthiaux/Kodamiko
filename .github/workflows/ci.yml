@@ -30,11 +30,11 @@ jobs:
 
       - name: Linux tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev libfuse2
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev libfuse2 libgraphviz-dev pkg-config
 
       - name: macOS tools
         if: runner.os == 'macOS'
-        run: brew install ninja
+        run: brew install ninja graphviz pkg-config
 
       - name: MSVC environment
         if: runner.os == 'Windows'

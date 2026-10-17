@@ -3,6 +3,7 @@
 #include "EntryPopups.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/TreeMetrics.h"
+#include "viewers/DiagramKinds.h"
 
 #include "CommandPalette.h"
 #include "FileIcons.h"
@@ -476,6 +477,17 @@ void FileTreeView::createFolder()
     createEntry(targetFolder(currentIndex()), true);
 }
 
+void FileTreeView::createDiagram(const QString &kindId)
+{
+    createDiagramIn(targetFolder(currentIndex()), kindId);
+}
+
+void FileTreeView::generateDiagram()
+{
+    if (!rootPath_.isEmpty())
+        emit generateDiagramRequested(targetFolder(currentIndex()));
+}
+
 void FileTreeView::showContextMenu(const QPoint &position)
 {
     if (rootPath_.isEmpty())
@@ -489,6 +501,14 @@ void FileTreeView::showContextMenu(const QPoint &position)
     QMenu menu;
     menu.addAction(tr("New &File…"), this, [this, folder] { createEntry(folder, false); });
     menu.addAction(tr("New F&older…"), this, [this, folder] { createEntry(folder, true); });
+    if (const QList<DiagramKind> kinds = DiagramKinds::available(); !kinds.isEmpty()) {
+        QMenu *diagram = menu.addMenu(tr("New &Diagram"));
+        for (const DiagramKind &kind : kinds)
+            diagram->addAction(kind.title + QStringLiteral("…"), this,
+                               [this, folder, id = kind.id] { createDiagramIn(folder, id); });
+        diagram->addSeparator();
+        diagram->addAction(tr("Drawn by &Claude…"), this, [this, folder] { emit generateDiagramRequested(folder); });
+    }
     menu.addSeparator();
     const QString path = editablePath(index);
     menu.addAction(tr("Cu&t"), QKeySequence::Cut, this, &FileTreeView::cutCurrent)->setEnabled(!path.isEmpty());
@@ -660,7 +680,25 @@ void FileTreeView::createEntry(const QString &folder, bool isFolder)
     popup->popup();
 }
 
-QString FileTreeView::createEntryNamed(const QString &folder, const QString &name, bool isFolder)
+void FileTreeView::createDiagramIn(const QString &folder, const QString &kindId)
+{
+    const DiagramKind kind = DiagramKinds::find(kindId);
+    if (folder.isEmpty() || kind.id.isEmpty())
+        return;
+    const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(folder);
+    auto *popup = new NamePopup(tr("New %1").arg(kind.title), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+                                [this, folder, kind](const QString &name) {
+                                    if (name.isEmpty())
+                                        return tr("Enter a name");
+                                    return createEntryNamed(folder, DiagramKinds::withExtension(name, kind), false,
+                                                            kind.blank);
+                                },
+                                this);
+    popup->popup();
+}
+
+QString FileTreeView::createEntryNamed(const QString &folder, const QString &name, bool isFolder,
+                                       const QByteArray &content)
 {
     const EntryTarget target = resolveNewEntry(rootPath_, folder, name, isFolder);
     if (!target.error.isEmpty())
@@ -671,7 +709,7 @@ QString FileTreeView::createEntryNamed(const QString &folder, const QString &nam
         return tr("Cannot create the folder “%1”").arg(QDir::toNativeSeparators(parent));
     if (!isFolder) {
         QFile file(path);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly))
+        if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly) || file.write(content) != content.size())
             return tr("Cannot create “%1”: %2").arg(QDir::toNativeSeparators(path), file.errorString());
     }
 

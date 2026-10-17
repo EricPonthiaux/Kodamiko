@@ -1,0 +1,201 @@
+classDiagram
+  class Board {
+    +meta
+    +select / copy / paste
+    +addShape(type, props) Shape
+    +addLink(type, from, to) Link
+    +snapshot() / applySnapshot()
+    +undo() / redo()
+    +toJson() / fromJson()
+  }
+  class Inspector {
+    +setCodec(codec)
+    -applySource()
+  }
+  class Camera {
+    +x, y, scale
+    +toScreen(world)
+    +toWorld(screen)
+  }
+  class Style {
+    +palette
+    +tones
+    +fromTheme(theme)$
+    +printed()$
+  }
+  class Shape {
+    <<abstract>>
+    +id, type, key
+    +x, y, w, h
+    +draw(painter, board, state)
+    +measure(board)
+    +ports(board)
+    +properties()
+  }
+  class Link {
+    <<abstract>>
+    +id, type, from, to
+    +label
+    +route(board) Route
+    +draw(painter, board, selected)
+    +properties()
+  }
+  class Spline {
+    +points
+    +start, end
+  }
+  class ShapeType {
+    +name
+    +make() Shape
+  }
+  class LinkType {
+    +name
+    +make() Link
+  }
+  class ElementPreset {
+    +id, label, shapeType
+  }
+  class RelationPreset {
+    +id, label
+  }
+  class Codec {
+    <<abstract>>
+    +id() / language() / title()
+    +family() Family
+    +matches(source) bool
+    +parse(source, model) bool
+    +serialize(board, meta) QString
+    +blank() QString
+  }
+  class Model {
+    +nodes
+    +links
+    +meta
+    +warnings
+  }
+  class Document {
+    <<namespace>>
+    +load(board, path, content, loaded)
+    +save(board, codec)
+    +applySource(board, codec, source)
+    +problems(path, content)
+  }
+  class Loaded {
+    +codec
+    +needsArrange
+    +unplaced
+    +warnings
+  }
+  class Graphviz {
+    <<namespace>>
+    +autoArrange(board, options)
+    +placeNewcomers(board, ids, options)
+    +routeLinks(board)
+  }
+  class ArrangeOptions {
+    +rankdir, engine
+    +clusters, splines
+  }
+  class Canvas {
+    +fitView(animate)
+    +zoomBy(factor)
+    +arrange(animate) bool
+    +settle(loaded, animate)
+    +paintBoard(painter, board)$
+  }
+  class DiagramView {
+    +load(path) bool
+    +save() bool
+    +reloadFromDisk() bool
+    +isModified() bool
+    +exportSvg()
+    +exportPng()
+  }
+  class Family {
+    +id, title
+    +defaultShape, defaultLink
+    +autoArrange(board)
+    +drawUnderlay(painter, board)
+  }
+  Board --* DiagramView
+  Canvas --* DiagramView
+  Inspector --* DiagramView
+  DiagramView --> Codec : current format
+  Canvas --> Board : shows and edits
+  Camera --* Canvas
+  Inspector --> Board
+  Inspector --> Canvas
+  Inspector --> Codec : source text
+  Shape "*" --* Board
+  Link "*" --* Board
+  Style --* Board
+  Board --> Family
+  Spline "0..1" --* Link
+  Link ..> Shape : from / to
+  ShapeType "*" --* Family
+  LinkType "*" --* Family
+  ElementPreset "*" --* Family
+  RelationPreset "*" --* Family
+  ShapeType ..> Shape : makes
+  LinkType ..> Link : makes
+  Codec --> Family
+  Codec ..> Model : parses into
+  Codec ..> Board : serializes
+  Document ..> Codec : picks
+  Document ..> Loaded : fills
+  Document ..> Board : builds
+  Canvas ..> Graphviz : arranges with
+  Graphviz ..> ArrangeOptions
+  Graphviz ..> Board : places shapes, routes links
+
+%% Layout kept by Duet (positions, sizes, colors, curves)
+%% duet {"key":"Board","x":780,"y":782}
+%% duet {"key":"Inspector","x":86,"y":10}
+%% duet {"key":"Camera","x":308,"y":0}
+%% duet {"key":"Style","x":643,"y":518}
+%% duet {"key":"Shape","x":1121.5,"y":488}
+%% duet {"key":"Link","x":1110.5,"y":214}
+%% duet {"key":"Spline","x":1143,"y":10}
+%% duet {"key":"ShapeType","x":1490,"y":254}
+%% duet {"key":"LinkType","x":1868,"y":10}
+%% duet {"key":"ElementPreset","x":1734,"y":1410}
+%% duet {"key":"RelationPreset","x":1931,"y":1410}
+%% duet {"key":"Codec","x":780,"y":1350}
+%% duet {"key":"Model","x":812,"y":1644}
+%% duet {"key":"Document","x":1358,"y":508}
+%% duet {"key":"Loaded","x":1406,"y":812}
+%% duet {"key":"Graphviz","x":342,"y":518}
+%% duet {"key":"ArrangeOptions","x":390,"y":832}
+%% duet {"key":"Canvas","x":283,"y":224}
+%% duet {"key":"DiagramView","x":413,"y":1076}
+%% duet {"key":"Family","x":1634.5,"y":1644}
+%% duet {"c":[779.7,968.6,723,1009.6,653.8,1059.6,598,1099.9],"e":[581.2,1112.1],"link":"Board>DiagramView","n":0}
+%% duet {"c":[345.5,400.5,335.4,427.9,326,458.8,321,488,282.4,712.4,281,788,369,998,377.6,1018.6,389.1,1039,401.7,1058.3],"e":[413.5,1075.6],"link":"Canvas>DiagramView","n":0}
+%% duet {"c":[139.2,126.3,122.8,174.7,103,246.4,103,311,103,311,103,311,103,891,103,1033.8,276.2,1111.2,393,1147.2],"e":[413,1153.1],"link":"Inspector>DiagramView","n":0}
+%% duet {"c":[581.1,1235.8,635.9,1275.4,708,1327.5,768.5,1371.3],"e":[779.6,1379.3],"link":"DiagramView>Codec","lp":[739,1311],"n":0}
+%% duet {"c":[483.5,324.5,585.1,341.8,738.8,384.3,822,488,855.9,530.2,872.5,665.9,880.4,767.8],"e":[881.4,781.6],"link":"Canvas>Board","lp":[926.4,596],"n":0}
+%% duet {"c":[383,136.4,383,157,383,180.1,383,202.7],"e":[383,223.6],"link":"Camera>Canvas","n":0}
+%% duet {"c":[158.3,126.2,155.6,248.9,167.1,539.3,321,704,397.6,785.9,454.4,747.2,561,782,629.1,804.2,705.1,829.2,766.6,849.4],"e":[779.8,853.7],"link":"Inspector>Board","n":0}
+%% duet {"c":[213.6,126.4,237.6,152.5,266.6,184.1,293.8,213.8],"e":[303,223.8],"link":"Inspector>Canvas","n":0}
+%% duet {"c":[95.1,126.2,50.6,171.3,0,238.6,0,311,0,311,0,311,0,1175,0,1333.8,522.9,1415,765.8,1444.1],"e":[779.6,1445.8],"link":"Inspector>Codec","lp":[38,743],"n":0}
+%% duet {"c":[1135.5,704.3,1120.4,721.3,1104.3,738.2,1088,753,1064.7,774.1,1037.9,794.5,1011.6,812.7],"e":[994.4,824.4],"link":"Shape>Board","n":0}
+%% duet {"c":[1148.3,410.2,1131.7,435.1,1114.5,462.1,1100,488,1048.3,580.1,1050.8,610.9,1001,704,990.5,723.6,978.8,744,967,763.8],"e":[956.2,781.7],"link":"Link>Board","n":0}
+%% duet {"c":[765.8,674.5,781.2,701.8,799,733.3,816.1,763.6],"e":[826.4,781.7],"link":"Style>Board","n":0}
+%% duet {"c":[994.2,995.3,1164.2,1160.7,1492.8,1480.4,1650.8,1634.2],"e":[1660.5,1643.6],"link":"Board>Family","n":0}
+%% duet {"c":[1218,126.4,1218,146.5,1218,169.9,1218,193.1],"e":[1218,213.8],"link":"Spline>Link","n":0}
+%% duet {"c":[1218,410.4,1218,430.9,1218,452.8,1218,474.1],"e":[1218,487.9],"link":"Link>Shape","lp":[1248.5,449],"n":0}
+%% duet {"c":[1599.8,370.4,1630,425.8,1669,513.2,1669,595,1669,595,1669,595,1669,1459,1669,1514.9,1684.2,1575.2,1700.6,1623.9],"e":[1707.5,1643.6],"link":"ShapeType>Family","n":0}
+%% duet {"c":[2018.3,116.6,2076.1,159.6,2146,228.6,2146,311,2146,311,2146,311,2146,1459,2146,1594.1,1985.3,1662.9,1866.1,1695.4],"e":[1845.9,1700.6],"link":"LinkType>Family","n":0}
+%% duet {"c":[1798.1,1506.4,1789.3,1539,1777.3,1583.5,1766.4,1623.5],"e":[1761,1643.6],"link":"ElementPreset>Family","n":0}
+%% duet {"c":[1965.4,1506.3,1948.7,1525.2,1928.8,1547,1910,1566,1889,1587.2,1865.7,1609.2,1843.4,1629.8],"e":[1828.1,1643.8],"link":"RelationPreset>Family","n":0}
+%% duet {"c":[1489.8,368,1444.5,401.7,1386.1,446.3,1336,488,1332.5,490.9,1329.1,493.8,1325.5,496.8],"e":[1315,505.9],"link":"ShapeType>Shape","lp":[1415.8,449],"n":0}
+%% duet {"c":[1867.8,90.2,1773.8,117.1,1608.5,165.8,1469,214,1426.2,228.8,1379.8,246.3,1338.7,262.4],"e":[1325.8,267.4],"link":"LinkType>Link","lp":[1635.8,175],"n":0}
+%% duet {"c":[994.4,1545.4,1031.6,1571.4,1074.9,1597.7,1118,1615,1284.4,1681.7,1492.3,1706.4,1620.6,1715.6],"e":[1634.3,1716.5],"link":"Codec>Family","n":0}
+%% duet {"c":[887,1566.3,887,1587.3,887,1609.2,887,1629.6],"e":[887,1643.5],"link":"Codec>Model","lp":[924.5,1605],"n":0}
+%% duet {"c":[887,1349.9,887,1253.8,887,1112.7,887,1012.3],"e":[887,998.5],"link":"Codec>Board","lp":[920,1174],"n":0}
+%% duet {"c":[1424.4,684.3,1364.9,775.5,1268.3,922.2,1182,1047,1113.4,1146.2,1033.4,1257.1,974,1338.6],"e":[965.7,1349.9],"link":"Document>Codec","lp":[1216.2,1037],"n":0}
+%% duet {"c":[1481,684.2,1481,720.1,1481,761.7,1481,798],"e":[1481,811.7],"link":"Document>Loaded","lp":[1497,743],"n":0}
+%% duet {"c":[1369.6,684.3,1358.5,691.4,1347.2,698.1,1336,704,1300.6,722.5,1288.3,718.7,1251,733,1168.7,764.6,1077.4,803.7,1006.9,834.9],"e":[994.4,840.4],"link":"Document>Board","lp":[1274,743],"n":0}
+%% duet {"c":[410.2,400.3,420.6,433.4,432.4,471.2,442.8,504.6],"e":[446.9,517.7],"link":"Canvas>Graphviz","lp":[472,449],"n":0}
+%% duet {"c":[469.4,674.5,468.5,718.9,467.4,774.3,466.5,817.6],"e":[466.2,831.5],"link":"Graphviz>ArrangeOptions","n":0}
+%% duet {"c":[537.5,674.3,562.9,701.1,593.2,730.2,624,753,667.9,785.4,720.7,814.4,767.4,837.1],"e":[779.8,843.1],"link":"Graphviz>Board","lp":[707,743],"n":0}

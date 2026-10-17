@@ -1,0 +1,54 @@
+classDiagram
+    direction TB
+
+    class Shape {
+        <<abstract>>
+        +draw(painter, board, state)
+        +measure(board)
+        +ports(board)
+        +properties()
+    }
+
+    class FlowShape
+    class FlowTextShape
+    class ParticipantShape
+    class ClassShape
+    class StateElement {
+        <<abstract>>
+    }
+    class StateShape
+    class StateContainerShape
+    class RoundShape
+    class ChoiceShape
+    class ForkJoinShape
+    class EntityShape
+    class C4ElementShape
+    class C4BoundaryShape
+    class MindNode
+    class JourneyTaskShape
+    class ProductVisionShape
+    class FreeNodeShape
+    class FreeFrameShape
+    class FreeStrokeShape
+    class FreeAnchorShape
+
+    Shape <|-- FlowShape : flowchart
+    Shape <|-- FlowTextShape : flowchart
+    Shape <|-- ParticipantShape : sequence
+    Shape <|-- ClassShape : classes
+    Shape <|-- StateElement : states
+    StateElement <|-- StateShape
+    StateElement <|-- StateContainerShape
+    StateElement <|-- RoundShape
+    StateElement <|-- ChoiceShape
+    StateElement <|-- ForkJoinShape
+    Shape <|-- EntityShape : data model
+    Shape <|-- C4ElementShape : C4
+    Shape <|-- C4BoundaryShape : C4
+    Shape <|-- MindNode : mind map
+    Shape <|-- JourneyTaskShape : journey
+    Shape <|-- ProductVisionShape : product vision
+    Shape <|-- FreeNodeShape : explainer
+    Shape <|-- FreeFrameShape : explainer
+    Shape <|-- FreeStrokeShape : explainer
+    Shape <|-- FreeAnchorShape : explainer

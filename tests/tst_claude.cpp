@@ -6,6 +6,7 @@
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
 #include "claude/CommitMessage.h"
+#include "claude/DiagramRequest.h"
 #include "claude/EditorContext.h"
 #include "claude/HookEvent.h"
 #include "claude/HookServer.h"
@@ -99,6 +100,62 @@ private slots:
         QCOMPARE(output["hookEventName"].toString(), QStringLiteral("PreToolUse"));
         QCOMPARE(output["permissionDecision"].toString(), QStringLiteral("deny"));
         QCOMPARE(output["permissionDecisionReason"].toString(), reason);
+    }
+
+    void asksClaudeForADiagram()
+    {
+        const QString prompt = DiagramRequest::prompt("Flowchart", "docs/diagrams/returns.mmd", "  How returns work \n");
+        QVERIFY(prompt.startsWith(QStringLiteral("Draw a diagram in the file docs/diagrams/returns.mmd, which does not "
+                                                 "exist yet, following the duet:diagrams skill. Kind of diagram: "
+                                                 "Flowchart.\n")));
+        QVERIFY(prompt.contains(QStringLiteral("<request>\nHow returns work\n</request>")));
+
+        const QStringList arguments =
+            DiagramRequest::arguments(prompt, "docs/diagrams/returns.mmd", "/opt/duet/claude-plugin", "\"/opt/duet-hook\"");
+        QCOMPARE(arguments.first(), prompt); // before the variadic --allowedTools
+        QCOMPARE(arguments.at(arguments.indexOf("--output-format") + 1), QStringLiteral("stream-json"));
+        QVERIFY(arguments.contains("--verbose"));
+        QCOMPARE(arguments.at(arguments.indexOf("--plugin-dir") + 1),
+                 QDir::toNativeSeparators(QStringLiteral("/opt/duet/claude-plugin")));
+        QCOMPARE(arguments.at(arguments.indexOf("--tools") + 1), QStringLiteral("Read,Grep,Glob,Skill,Write,Edit"));
+        QCOMPARE(arguments.mid(arguments.indexOf("--allowedTools") + 1),
+                 (QStringList{"Read", "Grep", "Glob", "Skill", "Edit(./docs/diagrams/returns.mmd)"}));
+        const QJsonObject settings =
+            QJsonDocument::fromJson(arguments.at(arguments.indexOf("--settings") + 1).toUtf8()).object();
+        const QJsonObject check = settings["hooks"].toObject()["PostToolUse"].toArray().first().toObject();
+        QCOMPARE(check["matcher"].toString(), QStringLiteral("Write|Edit|MultiEdit"));
+        QCOMPARE(check["hooks"].toArray().first().toObject()["command"].toString(), QStringLiteral("\"/opt/duet-hook\""));
+
+        const QStringList bare = DiagramRequest::arguments(prompt, "a.flow", {}, {});
+        QVERIFY(!bare.contains("--plugin-dir"));
+        QVERIFY(!bare.contains("--settings"));
+    }
+
+    void followsClaudeDrawing()
+    {
+        using Kind = DiagramRequest::Event::Kind;
+        const auto steps = DiagramRequest::parseLine(
+            R"({"type":"assistant","message":{"content":[{"type":"text","text":"Let me look."},)"
+            R"({"type":"tool_use","name":"Read","input":{"file_path":"/p/src/a.cpp"}},)"
+            R"({"type":"tool_use","name":"Grep","input":{"pattern":"order"}},)"
+            R"({"type":"tool_use","name":"Write","input":{"file_path":"/p/docs/a.flow"}}]}})",
+            "/p");
+        QCOMPARE(steps.kind, Kind::Steps);
+        QCOMPARE(steps.steps, (QStringList{QDir::toNativeSeparators("Reading src/a.cpp"),
+                                           QStringLiteral("Searching for \u201corder\u201d"),
+                                           QDir::toNativeSeparators("Drawing docs/a.flow")}));
+        QCOMPARE(DiagramRequest::parseLine(R"({"type":"assistant","message":{"content":[{"type":"text"}]}})", "/p").kind,
+                 Kind::None);
+        QCOMPARE(DiagramRequest::parseLine(R"({"type":"system","subtype":"init"})", "/p").kind, Kind::None);
+
+        const auto done = DiagramRequest::parseLine(
+            R"({"type":"result","subtype":"success","is_error":false,"result":" The diagram shows returns. "})", "/p");
+        QCOMPARE(done.kind, Kind::Finished);
+        QVERIFY(!done.failed);
+        QCOMPARE(done.text, QStringLiteral("The diagram shows returns."));
+        const auto limit = DiagramRequest::parseLine(R"({"type":"result","subtype":"error_max_turns","is_error":true})", "/p");
+        QVERIFY(limit.failed);
+        QCOMPARE(limit.text, QStringLiteral("error_max_turns"));
     }
 
     void ignoresUnknownOrInvalidEvents()

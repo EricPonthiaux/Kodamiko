@@ -24,10 +24,15 @@ public:
     explicit EditorTabs(const Theme &theme, QWidget *parent = nullptr);
 
     // Opens a text file in an editor (a Markdown file with its preview), an
-    // image in a viewer, or a diagram (.flow) in the diagram editor. Returns
+    // image in a viewer, or a diagram (Mermaid, PlantUML…) in the diagram editor. Returns
     // the tab, or nullptr on failure.
     QWidget *openFile(const QString &path);
     void showDiff(const QString &title, const QString &diffText);
+    // A tab for `page`, which shows no file (Claude drawing a diagram…).
+    void showPage(QWidget *page, const QString &title, const QString &iconName);
+    // Replaces `page` with the file at `path`, at the same place.
+    void replacePage(QWidget *page, const QString &path);
+    void closePage(QWidget *page);
     // A read-only text in the tab named `title`, opened or, if it is open,
     // updated in place; `iconName` is a UiIcons name.
     EditorWidget *showText(const QString &title, const QString &text, const QString &languageId,
@@ -103,7 +108,9 @@ signals:
 
 private:
     QWidget *openImage(const QString &absolutePath);
-    QWidget *openDiagram(const QString &absolutePath);
+    // The diagram editor's tab; null, with `error`, if Duet cannot read the
+    // diagram (the file then opens as text).
+    QWidget *openDiagram(const QString &absolutePath, QString *error);
     bool saveDiagram(DiagramView *view);
     void updateDiagramTabTitle(DiagramView *view);
     QList<DiagramView *> diagramViews() const;

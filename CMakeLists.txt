@@ -55,16 +55,29 @@ endif()
 
 include(cmake/Dependencies.cmake)
 
-# Diagram editor for .flow files (Flowboard, Dear ImGui), built from its
-# sources when they are available. Without it, .flow files open as text.
-set(FLOWBOARD_SOURCE_DIR "" CACHE PATH "Flowboard sources: enables the diagram editor tabs")
-if(FLOWBOARD_SOURCE_DIR)
-    find_package(Qt6 REQUIRED COMPONENTS OpenGL OpenGLWidgets)
-    add_subdirectory(${FLOWBOARD_SOURCE_DIR} flowboard EXCLUDE_FROM_ALL)
+# Diagram editor (Mermaid, PlantUML, explainer boards): its layouts come from
+# Graphviz's library. Without it, diagram files open as text.
+find_package(PkgConfig)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(GRAPHVIZ IMPORTED_TARGET libgvc libcgraph)
 endif()
+if(GRAPHVIZ_FOUND)
+    # The layout and output plugins Duet uses, linked in rather than loaded
+    # from Graphviz's plugin configuration: the same engines everywhere, and
+    # no text measured with system fonts (as in sidecar's WebAssembly build).
+    pkg_get_variable(GRAPHVIZ_LIBDIR libgvc libdir)
+    foreach(plugin core dot_layout neato_layout)
+        find_library(GVPLUGIN_${plugin} gvplugin_${plugin}
+            HINTS ${GRAPHVIZ_LIBDIR} PATH_SUFFIXES graphviz)
+    endforeach()
+else()
+    message(STATUS "Graphviz (libgvc) not found: diagram files open as text")
+endif()
+find_package(Qt6 OPTIONAL_COMPONENTS Svg)
 
 enable_testing()
 
 add_subdirectory(src)
 add_subdirectory(tools/duet-hook)
+add_subdirectory(tools/claude-plugin)
 add_subdirectory(tests)

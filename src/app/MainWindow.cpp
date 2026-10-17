@@ -10,6 +10,7 @@
 #include "claude/EffectiveSettings.h"
 #include "claude/UnsavedEditGuard.h"
 #include "claude/ClaudeUsage.h"
+#include "claude/DiagramRequestPopup.h"
 #include "completion/CompletionController.h"
 #include "completion/CodeGeneration.h"
 #include "completion/CompletionService.h"
@@ -61,6 +62,12 @@
 #include "workspace/FilesPanel.h"
 #include "workspace/FileTreeView.h"
 #include "workspace/SidePanel.h"
+#include "viewers/DiagramKinds.h"
+#ifdef DUET_WITH_DIAGRAMS
+#include "viewers/DiagramCheck.h"
+#include "viewers/DiagramGenerationView.h"
+#include "viewers/DiagramView.h"
+#endif
 
 #include <QActionGroup>
 #include <QApplication>
@@ -68,6 +75,7 @@
 #include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -336,6 +344,7 @@ QWidget *MainWindow::createEditPage()
         symbolIndex_->refresh();
     });
     connect(fileTree_, &FileTreeView::sendToClaudeRequested, this, &MainWindow::sendToClaude);
+    connect(fileTree_, &FileTreeView::generateDiagramRequested, this, &MainWindow::generateDiagram);
     connect(fileTree_, &FileTreeView::openTerminalRequested, this,
             [this](const QString &folder) { addTerminal(QFileInfo(folder).fileName(), defaultShell(folder)); });
     connect(fileTree_, &FileTreeView::showDiffRequested, this, [this](const QString &path) {
@@ -558,6 +567,17 @@ void MainWindow::createMenus()
         setMode(Mode::Edit);
         fileTree_->createFolder();
     });
+    if (const QList<DiagramKind> kinds = DiagramKinds::available(); !kinds.isEmpty()) {
+        QMenu *diagram = file->addMenu(tr("New Dia&gram"));
+        for (const DiagramKind &kind : kinds) {
+            diagram->addAction(kind.title + QStringLiteral("…"), this, [this, id = kind.id] {
+                setMode(Mode::Edit);
+                fileTree_->createDiagram(id);
+            });
+        }
+        diagram->addSeparator();
+        diagram->addAction(tr("Drawn by &Claude…"), this, [this] { fileTree_->generateDiagram(); });
+    }
     file->addAction(tr("Open &Folder…"), QKeySequence(tr("Ctrl+K, Ctrl+O")), this, &MainWindow::chooseFolder);
     file->addAction(tr("&Open File…"), QKeySequence::Open, this, &MainWindow::chooseFile);
     file->addSeparator();
@@ -580,6 +600,8 @@ void MainWindow::createMenus()
     claude->addAction(tr("&Claude Session"), QKeySequence(tr("Ctrl+Shift+L")), this,
                       &MainWindow::showClaudeSession);
     claude->addAction(tr("New &Terminal"), QKeySequence(tr("Ctrl+Shift+T")), this, &MainWindow::newShell);
+    if (!DiagramKinds::available().isEmpty())
+        claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); });
     claude->addSeparator();
     claude->addAction(tr("Restore the State Before a &Prompt…"), this, &MainWindow::showSnapshots);
     QSettings settings;
@@ -1274,6 +1296,7 @@ void MainWindow::onHookReceived(const HookEvent &event)
     case HookEvent::Kind::FilesEdited:
     case HookEvent::Kind::CommandFinished: {
         if (event.kind == HookEvent::Kind::FilesEdited) {
+            followDiagramEdits(event.filePaths);
             recentFiles_.markEditedByClaude(event.filePaths);
             for (const QString &path : event.filePaths)
                 claudeTouched_.insert(QDir::cleanPath(path));
@@ -1488,6 +1511,81 @@ void MainWindow::guardUnsavedEdits(const QStringList &paths)
             .arg(files),
         tr("Save All"));
     statusBar()->showMessage(tr("Edit by Claude refused, unsaved changes in %1").arg(files), statusMessageMs);
+}
+
+void MainWindow::followDiagramEdits(const QStringList &paths)
+{
+#ifdef DUET_WITH_DIAGRAMS
+    for (const QString &path : paths) {
+        if (!DiagramView::isDiagramFile(path))
+            continue;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly))
+            continue;
+        const QStringList problems = DiagramCheck::problems(path, file.readAll());
+        if (!problems.isEmpty()) {
+            const QString relative = QDir(folder_).relativeFilePath(path);
+            hookServer_.respond(DiagramCheck::feedbackOutput(relative, problems));
+            return;
+        }
+        // A diagram Claude has just drawn shows up, laid out.
+        if (!editorTabs_->diagramViewFor(path))
+            editorTabs_->openFile(path);
+    }
+#else
+    Q_UNUSED(paths);
+#endif
+}
+
+void MainWindow::generateDiagram(const QString &folder)
+{
+    const QList<DiagramKind> kinds = DiagramKinds::available();
+    if (kinds.isEmpty() || folder.isEmpty())
+        return;
+    const QString relative = QDir(folder_).relativeFilePath(folder);
+    // At the root, diagrams go with the documentation.
+    const QString initialName = relative == QLatin1String(".") ? QStringLiteral("docs/diagrams/") : QString();
+    const QString location = relative == QLatin1String(".") ? QFileInfo(folder_).fileName() + QLatin1Char('/')
+                                                             : QDir::toNativeSeparators(relative + QLatin1Char('/'));
+    auto *popup = new DiagramRequestPopup(
+        location, kinds, initialName,
+        [this, folder](const QString &kindId, const QString &name, const QString &description) {
+            const DiagramKind kind = DiagramKinds::find(kindId);
+            if (description.isEmpty())
+                return tr("Describe what the diagram should show");
+            if (name.isEmpty() || name.endsWith(QLatin1Char('/')) || name.endsWith(QLatin1Char('\\')))
+                return tr("Enter a file name");
+            const EntryTarget target =
+                resolveNewEntry(folder_, folder, DiagramKinds::withExtension(name, kind), false);
+            if (!target.error.isEmpty())
+                return target.error;
+            drawDiagram(target.path, kind.title, description);
+            return QString();
+        },
+        this);
+    popup->popup();
+}
+
+void MainWindow::drawDiagram(const QString &path, const QString &kindTitle, const QString &description)
+{
+#ifdef DUET_WITH_DIAGRAMS
+    setMode(Mode::Edit);
+    auto *view = new DiagramGenerationView(folder_, path, kindTitle, description);
+    editorTabs_->showPage(view, QFileInfo(path).fileName(), QStringLiteral("claude"));
+    connect(view, &DiagramGenerationView::closeRequested, this, [this, view] { editorTabs_->closePage(view); });
+    connect(view, &DiagramGenerationView::finished, this,
+            [this, view](const QString &drawn, const QString &summary) {
+                editorTabs_->replacePage(view, drawn);
+                statusBar()->showMessage(summary.isEmpty() ? tr("Diagram drawn by Claude")
+                                                           : summary.section(QLatin1Char('\n'), 0, 0),
+                                         statusMessageMs);
+            });
+    view->start();
+#else
+    Q_UNUSED(path);
+    Q_UNUSED(kindTitle);
+    Q_UNUSED(description);
+#endif
 }
 
 void MainWindow::snapshotBeforePrompt(const QString &prompt)

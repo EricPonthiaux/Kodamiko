@@ -18,6 +18,8 @@
 #include <QPointer>
 #include <QTabBar>
 
+#include <algorithm>
+
 EditorTabs::EditorTabs(const Theme &theme, QWidget *parent)
     : QTabWidget(parent)
     , theme_(theme)
@@ -49,8 +51,14 @@ QWidget *EditorTabs::openFile(const QString &path)
         setCurrentWidget(existing);
         return existing;
     }
-    if (DiagramView::isDiagramFile(absolutePath))
-        return openDiagram(absolutePath);
+    if (DiagramView::isDiagramFile(absolutePath)) {
+        // A diagram Duet does not read (a Mermaid pie chart, a source with
+        // errors) is still a text file.
+        QString error;
+        if (QWidget *view = openDiagram(absolutePath, &error))
+            return view;
+        emit statusMessage(tr("%1 opened as text: %2").arg(QFileInfo(absolutePath).fileName(), error));
+    }
 #endif
 
     auto *editor = new EditorWidget(theme_, this);
@@ -108,15 +116,12 @@ QWidget *EditorTabs::openImage(const QString &absolutePath)
     return view;
 }
 
-QWidget *EditorTabs::openDiagram(const QString &absolutePath)
+QWidget *EditorTabs::openDiagram(const QString &absolutePath, QString *error)
 {
 #ifdef DUET_WITH_DIAGRAMS
     auto *view = new DiagramView(theme_, this);
-    QString error;
-    if (!view->load(absolutePath, &error)) {
+    if (!view->load(absolutePath, error)) {
         delete view;
-        QMessageBox::warning(this, tr("Cannot Open File"),
-                             tr("Could not open %1:\n%2").arg(absolutePath, error));
         return nullptr;
     }
 
@@ -130,6 +135,7 @@ QWidget *EditorTabs::openDiagram(const QString &absolutePath)
     return view;
 #else
     Q_UNUSED(absolutePath);
+    Q_UNUSED(error);
     return nullptr;
 #endif
 }
@@ -143,6 +149,29 @@ void EditorTabs::showDiff(const QString &title, const QString &diffText)
     const int index = addTab(view, title);
     updateTabIcon(view);
     setCurrentIndex(index);
+}
+
+void EditorTabs::showPage(QWidget *page, const QString &title, const QString &iconName)
+{
+    page->setProperty("iconName", iconName);
+    const int index = addTab(page, title);
+    updateTabIcon(page);
+    setCurrentIndex(index);
+}
+
+void EditorTabs::replacePage(QWidget *page, const QString &path)
+{
+    const int index = indexOf(page);
+    QWidget *opened = openFile(path);
+    closePage(page);
+    if (opened && index >= 0)
+        tabBar()->moveTab(indexOf(opened), std::min(index, count() - 1));
+}
+
+void EditorTabs::closePage(QWidget *page)
+{
+    if (const int index = indexOf(page); index >= 0)
+        closeTab(index, false);
 }
 
 EditorWidget *EditorTabs::showText(const QString &title, const QString &text, const QString &languageId,

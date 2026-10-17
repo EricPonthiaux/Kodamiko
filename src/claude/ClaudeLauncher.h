@@ -30,6 +30,12 @@ QString userStatusLineCommand(const QString &projectDir);
 // The `claude` program found, or an empty string.
 QString findClaudeExecutable();
 
+// The command that runs duet-hook, quoted for sh and cmd.exe, or an empty
+// string if the program is missing.
+QString hookCommand();
+// Duet's plugin for its Claude sessions (--plugin-dir), or an empty string.
+QString pluginPath();
+
 // Process to launch, or nullopt (with `error` set) if `claude` or
 // `duet-hook` cannot be found. `extraArguments` follow --settings
 // ("--continue" to resume the last conversation).

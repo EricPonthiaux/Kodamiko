@@ -14,6 +14,8 @@ add_library(duet_core STATIC
     claude/ClaudeLauncher.cpp
     claude/ClaudeUsage.cpp
     claude/CommitMessage.cpp
+    claude/DiagramRequest.cpp
+    claude/DiagramRequestPopup.cpp
     claude/EditorContext.cpp
     claude/EffectiveSettings.cpp
     claude/HookEvent.cpp
@@ -119,6 +121,7 @@ add_library(duet_core STATIC
     ui/TreeMetrics.cpp
     ui/UiIcons.cpp
     ui/WindowFrame.cpp
+    viewers/DiagramKinds.cpp
     viewers/ImageView.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
@@ -185,10 +188,26 @@ qt_add_resources(duet_core fonts
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Bold.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-BoldItalic.ttf)
 
-if(TARGET flowboard_ui)
-    target_sources(duet_core PRIVATE viewers/DiagramView.cpp)
-    target_link_libraries(duet_core PRIVATE flowboard_ui PUBLIC Qt6::OpenGLWidgets)
+# The diagram editor: diagram families ported from sidecar, laid out by
+# Graphviz. Without Graphviz, diagram files open as text.
+if(GRAPHVIZ_FOUND)
+    file(GLOB_RECURSE diagram_sources CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/viewers/diagram/*.cpp)
+    target_sources(duet_core PRIVATE
+        viewers/DiagramCheck.cpp
+        viewers/DiagramGenerationView.cpp
+        viewers/DiagramView.cpp
+        ${diagram_sources})
+    target_link_libraries(duet_core PUBLIC PkgConfig::GRAPHVIZ)
     target_compile_definitions(duet_core PUBLIC DUET_WITH_DIAGRAMS)
+    if(GVPLUGIN_core AND GVPLUGIN_dot_layout AND GVPLUGIN_neato_layout)
+        target_link_libraries(duet_core PUBLIC ${GVPLUGIN_core} ${GVPLUGIN_dot_layout} ${GVPLUGIN_neato_layout})
+        target_compile_definitions(duet_core PRIVATE DUET_GRAPHVIZ_PLUGINS)
+    endif()
+    if(TARGET Qt6::Svg)
+        target_link_libraries(duet_core PUBLIC Qt6::Svg)
+        target_compile_definitions(duet_core PRIVATE DUET_WITH_SVG)
+    endif()
 endif()
 
 if(MSVC)
@@ -198,6 +217,9 @@ else()
 endif()
 
 qt_add_executable(duet WIN32 MACOSX_BUNDLE app/main.cpp app/MainWindow.cpp)
+# Installed, it still finds the libraries linked from outside the system's
+# paths (Graphviz's plugins, in a directory of their own).
+set_target_properties(duet PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 # The executable's icon on Windows (Explorer, taskbar).
 if(WIN32)
     target_sources(duet PRIVATE ${PROJECT_SOURCE_DIR}/packaging/windows/duet.rc)
@@ -208,11 +230,14 @@ set_target_properties(duet PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DI
 add_dependencies(duet duet-hook)
 
 # ClaudeLauncher looks for duet-hook next to the executable: on macOS,
-# that is inside the bundle (Duet.app/Contents/MacOS).
+# that is inside the bundle (Duet.app/Contents/MacOS), with Duet's Claude
+# plugin in Contents/Resources.
 if(APPLE)
     set_target_properties(duet PROPERTIES OUTPUT_NAME Duet)
     add_custom_command(TARGET duet POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>)
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/claude-plugin
+                $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin)
 endif()
 
 # "duet" component: the dependencies (libgit2) declare their own

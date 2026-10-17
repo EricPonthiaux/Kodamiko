@@ -56,6 +56,11 @@ public:
     // then opened through fileActivated.
     void createFile();
     void createFolder();
+    // Ask for a name and create a blank diagram of the kind `kindId` (see
+    // DiagramKinds), opened through fileActivated.
+    void createDiagram(const QString &kindId);
+    // Emits generateDiagramRequested() for the folder of the current item.
+    void generateDiagram();
     // Ask for a new name, or for confirmation, for the current item (never
     // the working folder itself). Deleting moves to the trash when possible.
     void renameCurrent();
@@ -109,6 +114,8 @@ signals:
     void statusMessage(const QString &message);
     // Context menu commands handled by the window.
     void sendToClaudeRequested(const QString &path);
+    // A diagram for Claude to draw, in `folder`.
+    void generateDiagramRequested(const QString &folder);
     void openTerminalRequested(const QString &folder);
     void showDiffRequested(const QString &path);
     void stageRequested(const QString &path);
@@ -157,8 +164,11 @@ private:
     QString targetFolder(const QModelIndex &index) const;
     QString pathOf(const QModelIndex &index) const;
     void createEntry(const QString &folder, bool isFolder);
-    // Returns an error message, empty once the entry is created.
-    QString createEntryNamed(const QString &folder, const QString &name, bool isFolder);
+    void createDiagramIn(const QString &folder, const QString &kindId);
+    // Returns an error message, empty once the entry is created. A new file
+    // gets `content`.
+    QString createEntryNamed(const QString &folder, const QString &name, bool isFolder,
+                             const QByteArray &content = {});
     // Path of the item, empty for none or for the working folder.
     QString editablePath(const QModelIndex &index) const;
     void renameEntry(const QString &path);
