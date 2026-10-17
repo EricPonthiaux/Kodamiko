@@ -5,6 +5,7 @@
 #include "claude/EffectiveSettings.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeUsage.h"
+#include "claude/CommitMessage.h"
 #include "claude/HookEvent.h"
 #include "claude/HookServer.h"
 
@@ -391,6 +392,51 @@ private slots:
         qunsetenv("CLAUDE_CONFIG_DIR");
     }
 
+    void viewDeletesItems()
+    {
+        QTemporaryDir user;
+        QTemporaryDir project;
+        QVERIFY(user.isValid() && project.isValid());
+        qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
+        ClaudeConfigView view;
+        view.show();
+        view.setProjectFolder(project.path());
+        QCOMPARE(view.createNamed(ClaudeConfig::Category::Skills, ClaudeConfig::Scope::Project, "doomed"), QString());
+        QCOMPARE(view.createNamed(ClaudeConfig::Category::Agents, ClaudeConfig::Scope::Project, "gone"), QString());
+        const auto find = [&view](const QString &name) -> const ClaudeConfig::Entry * {
+            for (QTreeWidgetItemIterator it(view.tree()); *it; ++it) {
+                if (const ClaudeConfig::Entry *entry = view.entryOf(*it); entry && entry->name == name)
+                    return entry;
+            }
+            return nullptr;
+        };
+        QSignalSpy deleted(&view, &ClaudeConfigView::entryDeleted);
+
+        // A skill goes with its folder.
+        const QString skillDir = project.filePath(".claude/skills/doomed");
+        QVERIFY(find("doomed"));
+        QCOMPARE(ClaudeConfigView::deletionTarget(*find("doomed")), skillDir);
+        QCOMPARE(view.removeTarget(skillDir, true), QString());
+        QVERIFY(!QFileInfo::exists(skillDir));
+        QVERIFY(!find("doomed"));
+        QCOMPARE(deleted.count(), 1);
+
+        const QString agent = project.filePath(".claude/agents/gone.md");
+        QCOMPARE(ClaudeConfigView::deletionTarget(*find("gone")), agent);
+        QCOMPARE(view.removeTarget(agent, true), QString());
+        QVERIFY(!QFileInfo::exists(agent));
+        QVERIFY(!view.removeTarget(agent, true).isEmpty());
+
+        // Nothing to delete in a file not created yet, or a read-only one.
+        QVERIFY(find("CLAUDE.local.md"));
+        QVERIFY(ClaudeConfigView::deletionTarget(*find("CLAUDE.local.md")).isEmpty());
+        ClaudeConfig::Entry readOnly;
+        readOnly.path = project.filePath("x.json");
+        readOnly.readOnly = true;
+        QVERIFY(ClaudeConfigView::deletionTarget(readOnly).isEmpty());
+        qunsetenv("CLAUDE_CONFIG_DIR");
+    }
+
     void mergesSettingsByPrecedence()
     {
         QTemporaryDir user;
@@ -495,6 +541,55 @@ private slots:
         const Diagnostics agent = ClaudeLint::check(K::Agent, "---\ndescription: Runs tests\n---\n");
         QCOMPARE(agent.size(), 1);
         QVERIFY(agent[0].message.contains("name"));
+    }
+
+    void parsesCommitMessageReply()
+    {
+        const auto parse = [](const char *json, QString *error) {
+            return CommitMessage::parseReply(json, error).value_or(QStringLiteral("<none>"));
+        };
+        QString error;
+        QCOMPARE(parse("{\"type\":\"result\",\"is_error\":false,\"result\":\"Add a\\n\\nBody\\n\"}", &error),
+                 QStringLiteral("Add a\n\nBody"));
+        QCOMPARE(parse("{\"is_error\":false,\"result\":\"```text\\nAdd a\\n```\"}", &error), QStringLiteral("Add a"));
+        QCOMPARE(parse("{\"is_error\":false,\"result\":\"\\\"Add a\\\"\"}", &error), QStringLiteral("Add a"));
+
+        QCOMPARE(parse("{\"is_error\":true,\"result\":\"Not logged in\"}", &error), QStringLiteral("<none>"));
+        QCOMPARE(error, QStringLiteral("Not logged in"));
+        error.clear();
+        QCOMPARE(parse("{\"is_error\":false,\"result\":\"  \"}", &error), QStringLiteral("<none>"));
+        QVERIFY(!error.isEmpty());
+        QCOMPARE(parse("Error: no TTY", &error), QStringLiteral("<none>"));
+
+        // The body is wrapped at 72 columns, a list item under its text.
+        const QString word = QStringLiteral("abcdefghi"); // 10 characters with its space
+        const QString summary = QStringList(8, word).join(' ') + " longer";
+        const QString json = QJsonDocument(QJsonObject{{"is_error", false},
+                                                       {"result", summary + "\n\n" + QStringList(10, word).join(' ')
+                                                                      + "\n- " + QStringList(8, word).join(' ')}})
+                                 .toJson();
+        const QString message = CommitMessage::parseReply(json.toUtf8(), &error).value_or(QString());
+        const QString seven = QStringList(7, word).join(' ');
+        QCOMPARE(message.split('\n'), QStringList({summary, "", seven, QStringList(3, word).join(' '),
+                                                   "- " + seven, "  " + word}));
+    }
+
+    void commitMessageInputCutsTheDiff()
+    {
+        CommitMessage::Changes changes;
+        changes.recentSubjects = {"Add b", "Add a"};
+        changes.stat = " a.txt | 2 +-\n";
+        changes.diff = QByteArray(50, 'x');
+        changes.untracked = {"new.txt"};
+        const QByteArray whole = CommitMessage::input(changes);
+        QVERIFY(whole.startsWith("Recent commits:\nAdd b\nAdd a\n"));
+        QVERIFY(whole.contains(" a.txt | 2 +-"));
+        QVERIFY(whole.contains("New files:\nnew.txt\n"));
+        QVERIFY(whole.endsWith(QByteArray(50, 'x')));
+
+        const QByteArray cut = CommitMessage::input(changes, 10);
+        QVERIFY(cut.contains(QByteArray(10, 'x') + "\n[diff truncated]"));
+        QVERIFY(!cut.contains(QByteArray(11, 'x')));
     }
 
 private:

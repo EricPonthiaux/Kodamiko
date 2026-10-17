@@ -9,6 +9,7 @@
 
 #include <optional>
 
+class CommitMessageGenerator;
 class DiffView;
 class GitCommands;
 class QCheckBox;
@@ -42,6 +43,9 @@ public:
     void stageAll();
     void unstageAll();
     void focusCommitMessage();
+    // Has Claude write the commit message from the changes to commit; while
+    // it writes, stops it.
+    void generateCommitMessage();
 
     void applyTheme(const Theme &theme);
     QSplitter *splitter() const { return splitter_; }
@@ -88,6 +92,8 @@ private:
     void showListMenu(const QPoint &position);
 
     void onAmendToggled(bool amend);
+    void onGeneratingChanged(bool generating);
+    void showGeneratedMessage(const QString &message);
     void commit();
     void runCommit(const QString &message, bool amend, bool stageEverything);
 
@@ -114,7 +120,9 @@ private:
     QToolButton *refreshButton_;
     QPlainTextEdit *message_;
     QCheckBox *amend_;
+    QToolButton *generateButton_;
     QPushButton *commitButton_;
+    CommitMessageGenerator *generator_;
 
     // Displayed diff: files of one section.
     Section shownSection_ = Section::Unstaged;

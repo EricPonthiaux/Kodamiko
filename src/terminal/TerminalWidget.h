@@ -104,6 +104,7 @@ private:
     QColor background_;
 
     int scrollOffset_ = 0; // history lines shown above the screen
+    bool updatingScrollBar_ = false; // the bar follows scrollOffset_, not the reverse
     bool selecting_ = false;
     QPoint selectionAnchor_{-1, 0};
     QPoint selectionEnd_{-1, 0};

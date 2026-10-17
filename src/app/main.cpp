@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDir>
+#include <QMenu>
 #include <QProxyStyle>
 #include <QSettings>
 #include <QStyleOption>
@@ -22,6 +23,18 @@ class AppStyle : public QProxyStyle
 {
 public:
     using QProxyStyle::QProxyStyle;
+
+    void polish(QWidget *widget) override
+    {
+        QProxyStyle::polish(widget);
+        // The style sheet rounds the menus: without a transparent window
+        // behind them, its square corners show around the rounded border.
+        if (qobject_cast<QMenu *>(widget)) {
+            widget->setAttribute(Qt::WA_TranslucentBackground);
+            widget->setWindowFlag(Qt::FramelessWindowHint);
+            widget->setWindowFlag(Qt::NoDropShadowWindowHint);
+        }
+    }
 
     int pixelMetric(PixelMetric metric, const QStyleOption *option, const QWidget *widget) const override
     {

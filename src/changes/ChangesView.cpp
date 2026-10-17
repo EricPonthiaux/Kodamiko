@@ -2,6 +2,7 @@
 
 #include "DiffView.h"
 #include "FileChangeDelegate.h"
+#include "claude/CommitMessage.h"
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
@@ -19,6 +20,7 @@
 #include <QPushButton>
 #include <QShortcut>
 #include <QSplitter>
+#include <QTextCursor>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -62,7 +64,9 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     , discardButton_(new QToolButton(this))
     , message_(new QPlainTextEdit(this))
     , amend_(new QCheckBox(tr("Amend last commit"), this))
+    , generateButton_(new QToolButton(this))
     , commitButton_(new QPushButton(tr("Commit"), this))
+    , generator_(new CommitMessageGenerator(this))
 {
     const auto toolButton = [](QToolButton *button, const QString &text, const QString &toolTip) {
         button->setText(text);
@@ -143,9 +147,19 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     connect(amend_, &QCheckBox::toggled, this, &ChangesView::onAmendToggled);
     connect(commitButton_, &QPushButton::clicked, this, &ChangesView::commit);
 
+    toolButton(generateButton_, {}, {});
+    onGeneratingChanged(false);
+    connect(generateButton_, &QToolButton::clicked, this, &ChangesView::generateCommitMessage);
+    connect(generator_, &CommitMessageGenerator::runningChanged, this, &ChangesView::onGeneratingChanged);
+    connect(generator_, &CommitMessageGenerator::finished, this, &ChangesView::showGeneratedMessage);
+    connect(generator_, &CommitMessageGenerator::failed, this, [this](const QString &error) {
+        emit statusMessage(tr("Claude could not write the commit message: %1").arg(error.section(QLatin1Char('\n'), 0, 0)));
+    });
+
     auto *commitRow = new QHBoxLayout;
     commitRow->addWidget(amend_);
     commitRow->addStretch();
+    commitRow->addWidget(generateButton_);
     commitRow->addWidget(commitButton_);
 
     auto *card = new QFrame(this);
@@ -203,6 +217,7 @@ void ChangesView::setFolder(const QString &folder)
     rebuildList();
     showSection(Section::Unstaged);
     summary_->clear();
+    generator_->cancel();
     message_->clear();
     amend_->setChecked(false);
     updateActions();
@@ -680,10 +695,53 @@ void ChangesView::onAmendToggled(bool amend)
         message_->clear();
 }
 
+void ChangesView::generateCommitMessage()
+{
+    if (generator_->isRunning()) {
+        generator_->cancel();
+        emit statusMessage(tr("Commit message not written"));
+        return;
+    }
+    if (!status_)
+        return;
+    const bool amend = amend_->isChecked();
+    // As commit(): with nothing staged, everything will be.
+    const bool stageEverything = status_->staged.isEmpty() && !amend;
+    if (stageEverything && status_->unstaged.isEmpty()) {
+        emit statusMessage(tr("Nothing to commit"));
+        return;
+    }
+    generator_->start(status_->info, amend, stageEverything, folderPathspec());
+    emit statusMessage(tr("Claude is writing the commit message…"));
+}
+
+void ChangesView::onGeneratingChanged(bool generating)
+{
+    generateButton_->setText(generating ? tr("Stop") : tr("Generate"));
+    generateButton_->setToolTip(generating ? tr("Stop writing the commit message")
+                                           : tr("Have Claude write the commit message from the changes to commit "
+                                                "(Ctrl+Alt+G)"));
+    message_->setReadOnly(generating);
+    message_->setPlaceholderText(generating ? tr("Claude is writing the commit message…")
+                                            : tr("Commit message (Ctrl+Enter to commit)"));
+}
+
+void ChangesView::showGeneratedMessage(const QString &message)
+{
+    // Through a cursor, so that Ctrl+Z brings back what was written before.
+    QTextCursor cursor(message_->document());
+    cursor.select(QTextCursor::Document);
+    cursor.insertText(message);
+    message_->setTextCursor(cursor);
+    message_->setFocus();
+    emit statusMessage(tr("Commit message written by Claude: review it, then commit (Ctrl+Enter)"));
+}
+
 void ChangesView::commit()
 {
     if (!status_ || commands_->isBusy())
         return;
+    generator_->cancel();
     const QString message = message_->toPlainText().trimmed();
     const bool amend = amend_->isChecked();
     if (message.isEmpty()) {
@@ -733,4 +791,5 @@ void ChangesView::applyTheme(const Theme &theme)
     unstageButton_->setIcon(UiIcons::icon(QStringLiteral("minus"), color));
     discardButton_->setIcon(UiIcons::icon(QStringLiteral("discard"), color));
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
+    generateButton_->setIcon(UiIcons::icon(QStringLiteral("claude"), color));
 }

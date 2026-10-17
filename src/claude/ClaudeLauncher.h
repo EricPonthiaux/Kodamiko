@@ -36,4 +36,11 @@ QString findClaudeExecutable();
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName,
                                          QString *error, const QStringList &extraArguments = {});
 
+// One-off `claude --print` run, outside the editor's session and without its
+// hooks: `arguments` follow --print. The user's own login and settings apply,
+// as for `claude` typed in a console. Nullopt (with `error` set) if `claude`
+// cannot be found.
+std::optional<ProcessSpec> printProcess(const QString &workingDirectory, const QStringList &arguments,
+                                        QString *error);
+
 } // namespace ClaudeLauncher

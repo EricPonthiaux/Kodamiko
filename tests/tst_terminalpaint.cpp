@@ -2,6 +2,7 @@
 #include "terminal/IPty.h"
 
 #include <QImage>
+#include <QScrollBar>
 #include <QtTest>
 
 // Benchmark of the terminal's painting: a full screen of colored text, as
@@ -10,6 +11,31 @@ class TestTerminalPaint : public QObject {
     Q_OBJECT
 
 private slots:
+    void scrollBarShowsTheHistory()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("Uses a POSIX shell");
+#else
+        TerminalWidget widget;
+        widget.resize(800, 400);
+        widget.show();
+        ProcessSpec spec;
+        spec.environment = terminalEnvironment();
+        spec.program = "/bin/sh";
+        spec.arguments = {"-c", "i=0; while [ $i -lt 200 ]; do echo line $i; i=$((i+1)); done; sleep 30"};
+        QVERIFY(widget.start(spec));
+        QScrollBar *bar = widget.verticalScrollBar();
+        QTRY_VERIFY(bar->maximum() > 100);
+        QTRY_VERIFY(bar->isVisible());
+        QCOMPARE(bar->value(), bar->maximum()); // at the bottom
+
+        // Dragging the bar up shows the history.
+        bar->setValue(0);
+        QCOMPARE(bar->value(), 0);
+        bar->setValue(bar->maximum());
+#endif
+    }
+
     void paintsAFullScreen()
     {
 #ifdef Q_OS_WIN

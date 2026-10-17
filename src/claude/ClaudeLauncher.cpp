@@ -49,6 +49,22 @@ std::optional<QString> writeSettingsFile(const QByteArray &settings)
     return path;
 }
 
+// An npm installation provides claude.cmd, which CreateProcess can only
+// launch through cmd.exe.
+void launchThroughCmd(ProcessSpec &spec)
+{
+#ifdef Q_OS_WIN
+    if (spec.program.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive)
+        || spec.program.endsWith(QLatin1String(".bat"), Qt::CaseInsensitive)) {
+        spec.arguments.prepend(QDir::toNativeSeparators(spec.program));
+        spec.arguments.prepend(QStringLiteral("/c"));
+        spec.program = QStringLiteral("cmd.exe");
+    }
+#else
+    Q_UNUSED(spec);
+#endif
+}
+
 } // namespace
 
 QString sessionSettingsPath()
@@ -157,16 +173,26 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const 
     // would make `claude` believe it is nested in another session.
     spec.environment.remove(QStringLiteral("CLAUDECODE"));
 
-#ifdef Q_OS_WIN
-    // An npm installation provides claude.cmd, which CreateProcess can only
-    // launch through cmd.exe.
-    if (claude.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive)
-        || claude.endsWith(QLatin1String(".bat"), Qt::CaseInsensitive)) {
-        spec.arguments.prepend(QDir::toNativeSeparators(claude));
-        spec.arguments.prepend(QStringLiteral("/c"));
-        spec.program = QStringLiteral("cmd.exe");
+    launchThroughCmd(spec);
+    return spec;
+}
+
+std::optional<ProcessSpec> printProcess(const QString &workingDirectory, const QStringList &arguments, QString *error)
+{
+    const QString claude = findClaudeExecutable();
+    if (claude.isEmpty()) {
+        *error = QCoreApplication::translate("ClaudeLauncher",
+                                             "The \"claude\" command was not found. Install Claude Code "
+                                             "from Help ▸ Check Prerequisites.");
+        return std::nullopt;
     }
-#endif
+    ProcessSpec spec;
+    spec.program = claude;
+    spec.arguments = QStringList{QStringLiteral("--print")} + arguments;
+    spec.workingDirectory = workingDirectory;
+    spec.environment = QProcessEnvironment::systemEnvironment();
+    spec.environment.remove(QStringLiteral("CLAUDECODE"));
+    launchThroughCmd(spec);
     return spec;
 }
 

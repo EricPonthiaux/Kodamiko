@@ -21,6 +21,12 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   per file, a separator per block ("⋯ lines 40–48 · function"), added lines
   on green and removed ones on red without "+" or "-", and the line numbers
   before and after in the margin (History mode shows its diffs the same way).
+  **Generate** (Ctrl+Alt+G, next to *Commit*) has Claude write the commit
+  message from the changes to commit (everything when nothing is staged, the
+  whole commit with *Amend*), in the style of the recent commits: a one-off
+  `claude --print` with Haiku and no tools, outside the session, so it works
+  with your usual Claude Code login, subscription included. The message
+  replaces the text, which Ctrl+Z brings back; *Stop* cancels.
 - **History mode**: the commits of the current branch, filterable by
   message, author or hash, with their branches and tags; for each one, its
   message, its files and its diff. Commits read on two lines, in the manner
@@ -42,15 +48,16 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   Skills, Agents, Commands, Output Styles, Settings, MCP Servers), each file
   with its scope: *User* (`~/.claude`), *Project* (shared through git),
   *Local* (not shared), *Folder* (a subfolder's `CLAUDE.md`), *Parent*,
-  *Auto* (the memory Claude writes itself), *Managed* and *Duet* (the hooks
-  Duet passes to its session), the last two read-only. A double-click opens
+  *Auto* (the memory Claude writes itself) and *Managed* (read-only); the
+  hooks Duet passes to its own session are left out. A double-click opens
   the file in the editor; usual files not created yet (`CLAUDE.local.md`,
   `.claude/settings.local.json`, `.mcp.json`…) are listed in italics and
   created on the first double-click. **+** makes a skill, an agent, a command
   or a rule, in the project or for every project, from a template with its
-  front matter. *Effective Settings* (first under Settings) opens, read-only,
+  front matter; *Delete* (or the Delete key) moves an item to the trash, a
+  skill with its folder. *Effective Settings* (first under Settings) opens, read-only,
   the settings Claude applies once its files are merged (User, Project,
-  Local, Duet's session, Managed): every value followed by the file it comes
+  Local, Managed): every value followed by the file it comes
   from, and by the values it replaced (`// Local, over User: "sonnet"`); the
   tab follows the files as they change. Settings files are checked as you
   type against [SchemaStore](https://www.schemastore.org/)'s schema of

@@ -6,6 +6,7 @@
 #include "workspace/FileIcons.h"
 
 #include <QApplication>
+#include <QAction>
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QDir>
@@ -131,6 +132,11 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     tree_->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(tree_, &QTreeWidget::itemActivated, this, &ClaudeConfigView::activate);
     connect(tree_, &QTreeWidget::customContextMenuRequested, this, &ClaudeConfigView::showContextMenu);
+    auto *deleteAction = new QAction(tree_);
+    deleteAction->setShortcut(QKeySequence::Delete);
+    deleteAction->setShortcutContext(Qt::WidgetShortcut);
+    connect(deleteAction, &QAction::triggered, this, [this] { confirmDelete(tree_->currentItem()); });
+    tree_->addAction(deleteAction);
     connect(tree_, &QTreeWidget::itemCollapsed, this,
             [this](QTreeWidgetItem *item) { collapsed_.insert(item->data(0, CategoryRole).toInt()); });
     connect(tree_, &QTreeWidget::itemExpanded, this,
@@ -150,12 +156,6 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
 void ClaudeConfigView::setProjectFolder(const QString &folder)
 {
     folder_ = folder;
-    refresh();
-}
-
-void ClaudeConfigView::setSessionSettings(const QString &path)
-{
-    sessionSettings_ = path;
     refresh();
 }
 
@@ -186,7 +186,7 @@ void ClaudeConfigView::refresh()
         return;
     }
     needsRefresh_ = false;
-    entries_ = folder_.isEmpty() ? QList<Entry>() : ClaudeConfig::entries(folder_, sessionSettings_);
+    entries_ = folder_.isEmpty() ? QList<Entry>() : ClaudeConfig::entries(folder_, {});
     populate();
     emit refreshed();
 }
@@ -344,6 +344,62 @@ QString ClaudeConfigView::createNamed(Category category, Scope scope, const QStr
     return {};
 }
 
+QString ClaudeConfigView::deletionTarget(const Entry &entry)
+{
+    if (!entry.exists || entry.readOnly)
+        return {};
+    return entry.category == Category::Skills ? QFileInfo(entry.path).absolutePath() : entry.path;
+}
+
+QString ClaudeConfigView::removeTarget(const QString &target, bool permanently)
+{
+    const QFileInfo info(target);
+    if (!info.exists() && !info.isSymLink())
+        return tr("“%1” no longer exists").arg(info.fileName());
+    const bool removed = !permanently ? QFile::moveToTrash(target)
+                         : info.isDir() && !info.isSymLink() ? QDir(target).removeRecursively()
+                                                             : QFile::remove(target);
+    if (!removed)
+        return permanently ? tr("Cannot delete “%1”").arg(info.fileName())
+                           : tr("“%1” cannot be moved to the trash").arg(info.fileName());
+    emit entryDeleted(target);
+    refresh();
+    return {};
+}
+
+void ClaudeConfigView::confirmDelete(QTreeWidgetItem *item)
+{
+    const Entry *entry = entryOf(item);
+    const QString target = entry ? deletionTarget(*entry) : QString();
+    if (target.isEmpty())
+        return;
+    const bool isFolder = QFileInfo(target).isDir();
+    QString message = isFolder ? tr("Delete the skill “%1” and its folder?").arg(entry->name)
+                               : tr("Delete “%1”?").arg(QFileInfo(target).fileName());
+    message += QLatin1Char('\n') + tr("It will be moved to the trash.");
+    if (hasUnsavedChanges_ && hasUnsavedChanges_(target))
+        message += QLatin1Char(' ') + tr("Unsaved changes in the editor will be lost.");
+    auto *popup = new ConfirmPopup(
+        isFolder ? tr("Delete Skill") : tr("Delete File"),
+        QDir::toNativeSeparators(QFileInfo(target).absolutePath() + QLatin1Char('/')), message, tr("Delete"),
+        [this, target, permanently = false](ConfirmPopup *popup) mutable {
+            const QString error = removeTarget(target, permanently);
+            if (error.isEmpty())
+                return true;
+            if (permanently) {
+                popup->showError(error);
+                return false;
+            }
+            permanently = true;
+            popup->setMessage(tr("“%1” cannot be moved to the trash. Delete it permanently? This cannot be undone.")
+                                  .arg(QFileInfo(target).fileName()),
+                              tr("Delete Permanently"));
+            return false;
+        },
+        this);
+    popup->popup();
+}
+
 void ClaudeConfigView::addNewActions(QMenu *menu, Category category)
 {
     menu->addAction(tr("In This Project…"), this, [this, category] { askName(category, Scope::Project); });
@@ -396,6 +452,10 @@ void ClaudeConfigView::showContextMenu(const QPoint &position)
         menu.addAction(tr("Open in &File Manager"), this, [path] {
             QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
         });
+        if (!deletionTarget(*entry).isEmpty()) {
+            menu.addSeparator();
+            menu.addAction(tr("&Delete…"), QKeySequence::Delete, this, [this, item] { confirmDelete(item); });
+        }
     }
     menu.exec(tree_->viewport()->mapToGlobal(position));
 }

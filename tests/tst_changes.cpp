@@ -3,6 +3,7 @@
 #include "changes/FileChangeDelegate.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
+#include "claude/CommitMessage.h"
 #include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
@@ -242,6 +243,88 @@ private slots:
         QCOMPARE(requested.first().at(1).toBool(), false);
         popup.switchToggle()->setChecked(true); // the saved choice back to its default
     }
+
+    void readsTheChangesOfTheNextCommit()
+    {
+        QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "Add a"});
+
+        // Amending the first commit: against the empty tree.
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        CommitMessage::Changes changes = CommitMessage::read(info, true, false, {});
+        QCOMPARE(changes.recentSubjects, QStringList{"Add a"});
+        QVERIFY(changes.diff.contains("+a"));
+
+        write(project, "a.txt", "b\n");
+        write(project, "b.txt", "staged\n");
+        write(project, "new.txt", "n\n");
+        Git::run(project.path(), {"add", "b.txt"});
+
+        changes = CommitMessage::read(info, false, false, {});
+        QVERIFY(changes.diff.contains("+staged"));
+        QVERIFY(!changes.diff.contains("+b"));
+        QVERIFY(changes.stat.contains("b.txt"));
+        QVERIFY(changes.untracked.isEmpty());
+
+        changes = CommitMessage::read(info, false, true, {});
+        QVERIFY(changes.diff.contains("+staged"));
+        QVERIFY(changes.diff.contains("+b"));
+        QCOMPARE(changes.untracked, QStringList{"new.txt"});
+    }
+
+#ifndef Q_OS_WIN
+    // With a stand-in for the `claude` command, found in the PATH.
+    void generatesTheCommitMessage()
+    {
+        QTemporaryDir bin;
+        const QString claude = bin.filePath("claude");
+        QFile script(claude);
+        QVERIFY(script.open(QIODevice::WriteOnly));
+        script.write("#!/bin/sh\n"
+                     "cat > \"$0.input\"\n"
+                     "echo \"$@\" > \"$0.arguments\"\n"
+                     "printf '%s' '{\"type\":\"result\",\"is_error\":false,\"result\":\"Change a\\n\\nBecause.\"}'\n");
+        script.close();
+        script.setPermissions(script.permissions() | QFileDevice::ExeOwner);
+        const QByteArray path = qgetenv("PATH");
+        qputenv("PATH", bin.path().toUtf8() + ':' + path);
+
+        QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "Add a"});
+        write(project, "a.txt", "b\n");
+
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.setFolder(project.path());
+        QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+
+        auto *message = view.findChild<QPlainTextEdit *>();
+        message->setPlainText("mine");
+        view.generateCommitMessage(); // nothing staged: every change
+        QTRY_COMPARE(message->toPlainText(), QString("Change a\n\nBecause."));
+        qputenv("PATH", path);
+
+        QFile input(claude + ".input");
+        QVERIFY(input.open(QIODevice::ReadOnly));
+        const QByteArray sent = input.readAll();
+        QVERIFY(sent.contains("Recent commits:\nAdd a\n"));
+        QVERIFY(sent.contains("+b"));
+        QFile arguments(claude + ".arguments");
+        QVERIFY(arguments.open(QIODevice::ReadOnly));
+        QVERIFY(arguments.readAll().startsWith("--print --model haiku"));
+
+        message->undo(); // what was written before comes back
+        QCOMPARE(message->toPlainText(), QString("mine"));
+    }
+#endif
 
 private:
     QTemporaryFile config_;

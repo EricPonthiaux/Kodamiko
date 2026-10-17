@@ -6,6 +6,8 @@
 #include <QTimer>
 #include <QWidget>
 
+#include <functional>
+
 class QMenu;
 class QToolButton;
 class QTreeWidget;
@@ -16,8 +18,11 @@ class QTreeWidgetItem;
 // grouped by category, each file with its scope (User, Project, Local...).
 // A double-click opens the file in the editor; a usual file not created
 // yet (CLAUDE.local.md...) is created first. New makes a skill, an agent, a
-// command or a rule, in the project or for every project. Under Settings,
+// command or a rule, in the project or for every project; Delete moves an
+// item to the trash (a skill with its folder). Under Settings,
 // Effective Settings shows them merged (see EffectiveSettings).
+//
+// Duet's own hooks (its --settings file) are not listed: Duet needs them.
 //
 // The list is reread when the pane shows, on refresh() and after Claude's
 // edits; only while the pane is visible.
@@ -28,8 +33,6 @@ public:
     explicit ClaudeConfigView(QWidget *parent = nullptr);
 
     void setProjectFolder(const QString &folder);
-    // The --settings file of Duet's Claude session, listed read-only.
-    void setSessionSettings(const QString &path);
     // Files Claude wrote during the last prompt: an orange dot.
     void setClaudeTouched(const QSet<QString> &paths);
     void setDarkIcons(bool dark);
@@ -48,11 +51,22 @@ public:
     // Makes a new item of `category` named `name` in `scope` (Project or
     // User), then opens it: an error message, or an empty string.
     QString createNamed(ClaudeConfig::Category category, ClaudeConfig::Scope scope, const QString &name);
+    // What deleting `entry` removes: its file, or a skill's folder; empty
+    // if it cannot be deleted (not created yet, read-only).
+    static QString deletionTarget(const ClaudeConfig::Entry &entry);
+    // Asks to confirm, then deletes `item`'s file (see deletionTarget).
+    void confirmDelete(QTreeWidgetItem *item);
+    // Moves `target` to the trash, or deletes it for good: an error
+    // message, or an empty string.
+    QString removeTarget(const QString &target, bool permanently);
+    void setUnsavedChangesCheck(std::function<bool(const QString &)> check) { hasUnsavedChanges_ = std::move(check); }
 
 signals:
     void fileRequested(const QString &path, bool readOnly);
     void sendToClaudeRequested(const QString &path);
     void restartSessionRequested();
+    // `path`, a file or a skill's folder, was deleted.
+    void entryDeleted(const QString &path);
     void effectiveSettingsRequested();
     // The configuration was reread.
     void refreshed();
@@ -68,7 +82,6 @@ private:
     void askName(ClaudeConfig::Category category, ClaudeConfig::Scope scope);
 
     QString folder_;
-    QString sessionSettings_;
     QSet<QString> touched_;
     bool darkIcons_ = true;
     QList<ClaudeConfig::Entry> entries_;
@@ -76,6 +89,7 @@ private:
     QSet<int> collapsed_;
     QTimer refreshTimer_;
     bool needsRefresh_ = false;
+    std::function<bool(const QString &)> hasUnsavedChanges_;
 
     QTreeWidget *tree_;
     QToolButton *new_;

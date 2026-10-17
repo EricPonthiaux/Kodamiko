@@ -88,6 +88,8 @@ TerminalWidget::TerminalWidget(QWidget *parent)
     connect(screen_.get(), &VtScreen::titleChanged, this, &TerminalWidget::titleChanged);
     connect(screen_.get(), &VtScreen::bell, this, [] { QApplication::beep(); });
     connect(verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value) {
+        if (updatingScrollBar_)
+            return;
         scrollOffset_ = verticalScrollBar()->maximum() - value;
         viewport()->update();
     });
@@ -184,11 +186,14 @@ void TerminalWidget::updateGridSize()
 
 void TerminalWidget::updateScrollBar()
 {
+    // Not a QSignalBlocker: QAbstractScrollArea shows the bar ("as needed")
+    // on its rangeChanged() signal.
     QScrollBar *bar = verticalScrollBar();
-    const QSignalBlocker blocker(bar);
+    updatingScrollBar_ = true;
     bar->setRange(0, screen_->scrollbackSize());
     bar->setPageStep(screen_->rows());
     bar->setValue(screen_->scrollbackSize() - scrollOffset_);
+    updatingScrollBar_ = false;
 }
 
 void TerminalWidget::scrollToBottom()

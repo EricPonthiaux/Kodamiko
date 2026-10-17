@@ -90,7 +90,7 @@ QToolButton { border-radius: 5px; padding: 2px 5px; }
 QToolButton:hover { background: @button; }
 QToolButton:checked { background: @selection; color: @accentText; }
 QTabWidget::pane { border: none; }
-QTabBar::tab { background: transparent; color: @muted; padding: 5px 14px; border: none; }
+QTabBar::tab { background: transparent; color: @muted; padding: 8px 16px; border: none; }
 QTabBar::tab:hover { color: @text; background: @panel; }
 QTabBar::tab:selected { color: @accentText; background: @base; border-bottom: 2px solid @accent; }
 QTabBar::tab:bottom:selected { border-bottom: none; border-top: 2px solid @accent; }
@@ -153,7 +153,7 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
     const QString cross = crossIcon(QStringLiteral("close-%1.svg").arg(theme.name), theme.mutedText);
     const QString crossHover = crossIcon(QStringLiteral("close-%1-hover.svg").arg(theme.name), Qt::white);
     if (!cross.isEmpty() && !crossHover.isEmpty())
-        sheet += QStringLiteral("QTabBar::close-button { image: url(%1); subcontrol-position: right; border-radius: 4px; margin: 1px; }\n"
+        sheet += QStringLiteral("QTabBar::close-button { image: url(%1); subcontrol-position: right; border-radius: 4px; margin: 1px 0 1px 6px; }\n"
                                 "QTabBar::close-button:hover { image: url(%2); background: %3; }\n")
                      .arg(cross, crossHover, theme.highlight.name());
     return sheet;

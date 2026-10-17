@@ -13,6 +13,7 @@ add_library(duet_core STATIC
     claude/ClaudeLinter.cpp
     claude/ClaudeLauncher.cpp
     claude/ClaudeUsage.cpp
+    claude/CommitMessage.cpp
     claude/EffectiveSettings.cpp
     claude/HookEvent.cpp
     claude/HookServer.cpp

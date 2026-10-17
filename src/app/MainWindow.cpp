@@ -371,13 +371,21 @@ QWidget *MainWindow::createEditPage()
     });
 
     claudeConfigView_ = new ClaudeConfigView(this);
-    claudeConfigView_->setSessionSettings(ClaudeLauncher::sessionSettingsPath());
     connect(claudeConfigView_, &ClaudeConfigView::fileRequested, this, [this](const QString &path, bool readOnly) {
         editorTabs_->openFile(path);
         if (EditorWidget *editor = editorTabs_->editorFor(path); editor && readOnly)
             editor->setReadOnly(true);
     });
     connect(claudeConfigView_, &ClaudeConfigView::sendToClaudeRequested, this, &MainWindow::sendToClaude);
+    claudeConfigView_->setUnsavedChangesCheck(
+        [this](const QString &path) { return editorTabs_->hasUnsavedChangesUnder(path); });
+    connect(claudeConfigView_, &ClaudeConfigView::entryDeleted, this, [this](const QString &path) {
+        editorTabs_->closeFilesUnder(path);
+        recentFiles_.remove(path);
+        fileTree_->setClaudeEdited(recentFiles_.editedByClaude());
+        fileStatuses_->refresh();
+        symbolIndex_->refresh();
+    });
     connect(claudeConfigView_, &ClaudeConfigView::restartSessionRequested, this, &MainWindow::restartClaudeSession);
     connect(claudeConfigView_, &ClaudeConfigView::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
@@ -774,6 +782,10 @@ void MainWindow::createGitMenu()
         setMode(Mode::Diff);
         changesView_->focusCommitMessage();
     });
+    git->addAction(tr("&Generate Commit Message"), QKeySequence(tr("Ctrl+Alt+G")), this, [this] {
+        setMode(Mode::Diff);
+        changesView_->generateCommitMessage();
+    });
     git->addAction(tr("&Stage All"), this, [this] {
         setMode(Mode::Diff);
         changesView_->stageAll();
@@ -1045,7 +1057,7 @@ void MainWindow::showEffectiveSettings(bool open)
     if (!open && !editorTabs_->textView(title))
         return;
     QWidget *current = editorTabs_->currentWidget();
-    const QList<EffectiveSettings::Layer> layers = EffectiveSettings::read(folder_, ClaudeLauncher::sessionSettingsPath());
+    const QList<EffectiveSettings::Layer> layers = EffectiveSettings::read(folder_, {}); // without Duet's hooks: not for the user to see
     editorTabs_->showText(title, EffectiveSettings::render(layers, folder_), QStringLiteral("json"), QStringLiteral("settings"));
     if (open)
         setMode(Mode::Edit);
