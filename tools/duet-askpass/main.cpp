@@ -24,7 +24,7 @@ constexpr int connectTimeoutMs = 2000;
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication app(argc, argv);
+    const QCoreApplication app(argc, argv);
 
     const QString serverName = qEnvironmentVariable("DUET_ASKPASS_SOCKET");
     if (serverName.isEmpty())

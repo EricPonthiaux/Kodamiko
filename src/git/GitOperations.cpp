@@ -21,7 +21,7 @@ QSet<QString> trackedPaths(const RepositoryInfo &repository, const QStringList &
 {
     const QStringList tracked = Git::splitNul(
         Git::run(repository.workDir, withPaths({QStringLiteral("ls-files"), QStringLiteral("-z")}, paths)));
-    return QSet<QString>(tracked.begin(), tracked.end());
+    return {tracked.begin(), tracked.end()};
 }
 
 QString discardReason(const QStringList &paths)

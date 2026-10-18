@@ -30,9 +30,9 @@ enum ItemRole {
 };
 
 struct KindStyle {
-    char letter;
+    char letter{};
     QColor color;
-    const char *description;
+    const char *description{};
 };
 
 KindStyle styleOf(SymbolKind kind)
@@ -70,12 +70,12 @@ KindStyle styleOf(SymbolKind kind)
 QIcon iconFor(SymbolKind kind)
 {
     static QHash<int, QIcon> cache;
-    if (auto it = cache.constFind(static_cast<int>(kind)); it != cache.constEnd())
+    if (const auto it = cache.constFind(static_cast<int>(kind)); it != cache.constEnd())
         return *it;
 
     const KindStyle style = styleOf(kind);
     QIcon icon;
-    for (int size : {16, 32}) {
+    for (const int size : {16, 32}) {
         QPixmap pixmap(size, size);
         pixmap.fill(Qt::transparent);
         QPainter painter(&pixmap);
@@ -325,7 +325,7 @@ void OutlineView::selectSymbolAtCursor()
     editor_->getCursorPosition(&line, &index);
 
     QTreeWidgetItem *found = nullptr;
-    QTreeWidgetItem *parent = tree_->invisibleRootItem();
+    const QTreeWidgetItem *parent = tree_->invisibleRootItem();
     while (parent) {
         QTreeWidgetItem *next = nullptr;
         for (int i = 0; i < parent->childCount(); ++i) {

@@ -127,7 +127,7 @@ void Runner::start(const RunConfiguration &configuration, TerminalWidget *termin
         previous->terminal->terminate();
     }
     const ProcessSpec spec = processSpec(configuration);
-    auto run = std::make_shared<Run>();
+    const auto run = std::make_shared<Run>();
     run->configuration = configuration;
     run->terminal = terminal;
     run->parser = std::make_unique<BuildOutputParser>(spec.workingDirectory, project_.path);

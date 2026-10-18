@@ -59,9 +59,9 @@ void CompletionService::request(const CompletionContext &context, const Update &
 {
     const int generation = ++generation_;
     // Shared by the answers of this request.
-    auto gathered = std::make_shared<QList<CompletionItem>>();
-    auto incomplete = std::make_shared<bool>(false);
-    QPointer<CompletionService> self(this);
+    const auto gathered = std::make_shared<QList<CompletionItem>>();
+    const auto incomplete = std::make_shared<bool>(false);
+    const QPointer<CompletionService> self(this);
     for (const std::shared_ptr<ICompletionProvider> &provider : providers_) {
         if (!provider->handles(context) || provider->servesComments() != context.inDocComment ||
             (context.inModulePath && !provider->servesModulePaths()) ||

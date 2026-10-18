@@ -172,7 +172,7 @@ void EditorStatus::goToLine()
 {
     if (!editor_)
         return;
-    QPointer<EditorWidget> editor = editor_;
+    const QPointer<EditorWidget> editor = editor_;
     auto *popup = new NamePopup(
         tr("Go to Line:Column"), QFileInfo(editor->filePath()).fileName(),
         [editor](const QString &text) -> QString {

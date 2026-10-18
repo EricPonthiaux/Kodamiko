@@ -212,7 +212,7 @@ private slots:
 
     void viewFollowsEditor()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString path = dir.filePath(QStringLiteral("main.cpp"));
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
@@ -249,7 +249,7 @@ private slots:
 
     void viewScrollsLongNamesHorizontally()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString path = dir.filePath(QStringLiteral("main.cpp"));
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
@@ -265,7 +265,7 @@ private slots:
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
         view.setEditor(&editor);
-        QTreeWidget *tree = view.tree();
+        const QTreeWidget *tree = view.tree();
         QCOMPARE(tree->topLevelItemCount(), 2);
 
         // The long name is not truncated: the column overflows, the scrollbar appears.

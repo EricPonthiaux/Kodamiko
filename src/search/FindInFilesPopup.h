@@ -22,7 +22,7 @@ class FindInFilesPopup : public OverlayPopup {
     Q_OBJECT
 
 public:
-    explicit FindInFilesPopup(const Theme &theme, QWidget *parent);
+    explicit FindInFilesPopup(Theme theme, QWidget *parent);
 
     void setFolder(const QString &folder);
     // Text of the files open with unsaved changes, read at each search.

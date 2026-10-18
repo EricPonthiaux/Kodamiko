@@ -111,7 +111,8 @@ QStringList relationLines(const Board &board, const QHash<QString, QString> &key
 {
     QStringList out;
     for (const auto &l : board.links()) {
-        const QString from = keys.value(l->from), to = keys.value(l->to);
+        const QString from = keys.value(l->from);
+        const QString to = keys.value(l->to);
         if (from.isEmpty() || to.isEmpty())
             continue;
         const auto *relation = dynamic_cast<const ClassLink *>(l.get());
@@ -436,7 +437,8 @@ public:
             if (skip.match(stmt).hasMatch())
                 continue;
             if (const QRegularExpressionMatch m = relationPattern.match(canonicalArrows(stmt)); m.hasMatch()) {
-                QString left = m.captured(1), right = m.captured(5);
+                QString left = m.captured(1);
+                QString right = m.captured(5);
                 left.remove(QLatin1Char('"'));
                 right.remove(QLatin1Char('"'));
                 const QString a = cls(left).key;

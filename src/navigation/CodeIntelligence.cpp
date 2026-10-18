@@ -48,7 +48,7 @@ QString withLineEnding(QString text, LineEnding lineEnding)
 }
 
 // Below the cursor of `editor`, in global coordinates.
-QPoint belowCaret(EditorWidget *editor)
+QPoint belowCaret(const EditorWidget *editor)
 {
     const long caret = editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS);
     const long line = editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret);
@@ -208,7 +208,7 @@ void CodeIntelligence::syncOpenEditors(LspClient *client, const QString &languag
     if (!spec)
         return;
     for (const QString &path : tabs_->openFilePaths()) {
-        EditorWidget *editor = tabs_->editorFor(path);
+        const EditorWidget *editor = tabs_->editorFor(path);
         if (!editor || !spec->languages.contains(editor->languageId()))
             continue;
         servers_->syncDocument(client, path, editor->languageId(), editor->utf8Bytes().toByteArray());
@@ -311,7 +311,7 @@ void CodeIntelligence::requestSignatureHelp(EditorWidget *editor, bool explicitR
                                                                                     const QString &) {
             if (generation != signatureGeneration_ || !guard)
                 return;
-            EditorWidget *editor = guard;
+            const EditorWidget *editor = guard;
             const QJsonObject help = result.toObject();
             const QJsonArray signatures = help.value("signatures").toArray();
             if (signatures.isEmpty()) {
@@ -457,7 +457,7 @@ QString CodeIntelligence::describe(const Location &location, QHash<QString, QStr
     if (it == lines.end()) {
         QString text;
         QString error;
-        if (EditorWidget *editor = tabs_->editorFor(location.filePath))
+        if (const EditorWidget *editor = tabs_->editorFor(location.filePath))
             text = editor->text();
         else if (const std::optional<DecodedText> decoded = TextFile::load(location.filePath, &error))
             text = decoded->text;

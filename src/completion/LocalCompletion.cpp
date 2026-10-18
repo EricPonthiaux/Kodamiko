@@ -98,7 +98,7 @@ QStringList DocumentWordsProvider::words(const QByteArray &text, int exclude)
             continue; // the word being typed
         const QByteArrayView word(text.constData() + start, i - start);
         const int d = std::abs(start - exclude);
-        auto it = distance.find(word);
+        const auto it = distance.find(word);
         if (it == distance.end())
             distance.insert(word, d);
         else

@@ -130,7 +130,7 @@ SymbolIndex::ScanResult SymbolIndex::scan(const QString &folder,
     options.maxFiles = maxFiles;
     options.accept = [&providers](const QFileInfo &entry) {
         return entry.size() <= maxFileSize &&
-               providers.count(LanguageRegistry::languageForFile(entry.absoluteFilePath())) > 0;
+               providers.contains(LanguageRegistry::languageForFile(entry.absoluteFilePath()));
     };
     for (const QFileInfo &entry : ProjectFiles::list(folder, options)) {
         const QString path = entry.absoluteFilePath();

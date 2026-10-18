@@ -166,7 +166,7 @@ private slots:
 
     void indexSkipsIgnoredFiles()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("src/Widget.h"), header);
         write(dir.filePath("build/generated.h"), "class Generated {};\n");
         write(dir.filePath(".gitignore"), "build/\n");
@@ -226,7 +226,7 @@ private slots:
 
     void goToPopupFindsFilesSymbolsAndRecentFiles()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("src/Widget.h"), header);
         write(dir.filePath("src/Widget.cpp"), source);
         write(dir.filePath("docs/notes.md"), "# Notes\n");
@@ -287,7 +287,9 @@ private slots:
     void historyGoesBackAndForward()
     {
         NavigationHistory history;
-        const NavigationHistory::Location a{"a", 1}, b{"b", 2}, c{"c", 3};
+        const NavigationHistory::Location a{"a", 1};
+        const NavigationHistory::Location b{"b", 2};
+        const NavigationHistory::Location c{"c", 3};
         history.recordJump(a); // a → b
         history.recordJump(b); // b → c
         QCOMPARE(history.back(c), b);

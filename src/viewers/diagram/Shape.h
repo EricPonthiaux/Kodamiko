@@ -80,7 +80,7 @@ struct Property {
 
 class Shape {
 public:
-    Shape(const QString &type, qreal width = 120, qreal height = 60);
+    Shape(QString type, qreal width = 120, qreal height = 60);
     virtual ~Shape();
 
     // Reads the properties the shape was created with (the JS constructor's
@@ -92,7 +92,7 @@ public:
 
     qreal cy() const { return y + h / 2; }
 
-    QRectF rect() const { return QRectF(x, y, w, h); }
+    QRectF rect() const { return {x, y, w, h}; }
 
     // --- Size
     virtual bool resizable() const { return true; }
@@ -265,7 +265,7 @@ struct GraphvizEndpoint {
 
 class Link {
 public:
-    explicit Link(const QString &type);
+    explicit Link(QString type);
     virtual ~Link();
 
     virtual void load(const QJsonObject &props);
@@ -396,7 +396,7 @@ void fillArrowHead(QPainter &painter,
                    qreal angle,
                    qreal size,
                    const QColor &color,
-                   qreal spread = GraphvizNormalArrowSpread);
+                   qreal spread = graphvizNormalArrowSpread);
 QPointF bezierPoint(QPointF p0, QPointF p1, QPointF p2, QPointF p3, qreal t);
 qreal distanceToSegment(QPointF point, QPointF a, QPointF b);
 QPointF polylineMidpoint(const std::vector<QPointF> &points);

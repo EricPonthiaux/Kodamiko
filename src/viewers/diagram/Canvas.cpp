@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 
 namespace diagram {
 
@@ -47,8 +48,8 @@ qreal easeOut(qreal t)
 
 QRectF lerp(const QRectF &a, const QRectF &b, qreal t)
 {
-    return QRectF(a.x() + (b.x() - a.x()) * t, a.y() + (b.y() - a.y()) * t, a.width() + (b.width() - a.width()) * t,
-                  a.height() + (b.height() - a.height()) * t);
+    return {a.x() + (b.x() - a.x()) * t, a.y() + (b.y() - a.y()) * t, a.width() + (b.width() - a.width()) * t,
+            a.height() + (b.height() - a.height()) * t};
 }
 
 // Keys the canvas handles before the window's shortcuts (Ctrl+Z, Delete…).
@@ -143,19 +144,20 @@ Snap snapAlignment(const QRectF &moving, const std::vector<QRectF> &targets, qre
     Snap snap;
     const qreal movingX[] = {moving.left(), moving.center().x(), moving.right()};
     const qreal movingY[] = {moving.top(), moving.center().y(), moving.bottom()};
-    std::optional<std::pair<qreal, std::pair<qreal, QRectF>>> vertical, horizontal; // delta, value, target
+    std::optional<std::pair<qreal, std::pair<qreal, QRectF>>> vertical;
+    std::optional<std::pair<qreal, std::pair<qreal, QRectF>>> horizontal; // delta, value, target
     for (const QRectF &target : targets) {
         const qreal targetX[] = {target.left(), target.center().x(), target.right()};
         const qreal targetY[] = {target.top(), target.center().y(), target.bottom()};
-        for (qreal source : movingX) {
-            for (qreal value : targetX) {
+        for (const qreal source : movingX) {
+            for (const qreal value : targetX) {
                 const qreal delta = value - source;
                 if (std::abs(delta) <= threshold && (!vertical || std::abs(delta) < std::abs(vertical->first)))
                     vertical = {delta, {value, target}};
             }
         }
-        for (qreal source : movingY) {
-            for (qreal value : targetY) {
+        for (const qreal source : movingY) {
+            for (const qreal value : targetY) {
                 const qreal delta = value - source;
                 if (std::abs(delta) <= threshold && (!horizontal || std::abs(delta) < std::abs(horizontal->first)))
                     horizontal = {delta, {value, target}};
@@ -222,7 +224,8 @@ Canvas::Canvas(Board *board, QWidget *parent)
         if (Shape *s = board_->shape(editShape_)) {
             // A box growing while typed stays anchored where it was: its links
             // do not jump at every character.
-            const QPointF origin(s->x, s->y), center(s->cx(), s->cy());
+            const QPointF origin(s->x, s->y);
+            const QPointF center(s->cx(), s->cy());
             board_->measureShape(*s);
             if (s->editResizeAnchorTopLeft()) {
                 s->x = origin.x();
@@ -265,7 +268,7 @@ Canvas::Canvas(Board *board, QWidget *parent)
                     return;
                 const qreal now = clock_.elapsed();
                 for (const Shape *s : shapes) {
-                    if (std::shared_ptr<Shape> copy = board_->instantiate(s->type, s->toJson()))
+                    if (const std::shared_ptr<Shape> copy = board_->instantiate(s->type, s->toJson()))
                         ghosts_.push_back({copy, {}, {}, now});
                 }
                 for (const Link *l : links) {
@@ -398,9 +401,9 @@ void Canvas::stepAnimation()
         }
     }
     for (auto it = appearing_.begin(); it != appearing_.end();) {
-        if (now - it->start >= it->duration)
+        if (now - it->start >= it->duration) {
             it = appearing_.erase(it);
-        else {
+        } else {
             running = true;
             ++it;
         }
@@ -458,7 +461,7 @@ void Canvas::withVisualGeometry(Fn draw)
     const qreal t = easeOut((clock_.elapsed() - geometryStart_) / geometryMs);
 
     struct Saved {
-        Shape *shape;
+        Shape *shape{};
         QRectF box;
     };
 
@@ -479,7 +482,7 @@ void Canvas::withVisualGeometry(Fn draw)
     // Each final curve is warped with its two ends, so that no arrow ever
     // detaches from its node.
     struct SavedLink {
-        Link *link;
+        Link *link{};
         std::optional<Spline> spline;
         std::optional<Link::ReservedLabel> label;
     };
@@ -654,7 +657,8 @@ void Canvas::drawGrid(QPainter &painter, const QRectF &area) const
     const qreal step = 32 * camera_.scale;
     if (step < 12)
         return;
-    const qreal ox = std::fmod(camera_.x, step), oy = std::fmod(camera_.y, step);
+    const qreal ox = std::fmod(camera_.x, step);
+    const qreal oy = std::fmod(camera_.y, step);
     const qreal r = clamp(step * 0.045, 0.8, 1.6);
     painter.save();
     painter.setPen(Qt::NoPen);
@@ -702,7 +706,7 @@ void Canvas::render(QPainter &painter, const QRectF &area)
             if (appear != appearing_.cend())
                 painter.restore();
             if (state.dropTarget) {
-                QPainterPath halo = roundRect(s.x - 3, s.y - 3, s.w + 6, s.h + 6, style.shape.radius + 3);
+                const QPainterPath halo = roundRect(s.x - 3, s.y - 3, s.w + 6, s.h + 6, style.shape.radius + 3);
                 stroke(painter, halo, style.shape.selectedStroke, 2 / camera_.scale,
                        {6 / camera_.scale, 4 / camera_.scale});
             }
@@ -717,7 +721,8 @@ void Canvas::render(QPainter &painter, const QRectF &area)
             family->drawUnderlay(painter, *board_);
         // Containers first, ordered parents before children and larger
         // before smaller: they never hide a relation.
-        std::vector<const Shape *> background, foreground;
+        std::vector<const Shape *> background;
+        std::vector<const Shape *> foreground;
         for (const auto &s : board_->shapes())
             (s->drawBehindLinks() ? background : foreground).push_back(s.get());
         const auto depth = [this](const Shape *s) {
@@ -734,7 +739,8 @@ void Canvas::render(QPainter &painter, const QRectF &area)
             return value;
         };
         std::stable_sort(background.begin(), background.end(), [&depth](const Shape *a, const Shape *b) {
-            const int da = depth(a), db = depth(b);
+            const int da = depth(a);
+            const int db = depth(b);
             return da != db ? da < db : a->w * a->h > b->w * b->h;
         });
         for (const Shape *s : background)
@@ -767,9 +773,9 @@ void Canvas::render(QPainter &painter, const QRectF &area)
         for (const Ghost &ghost : ghosts_) {
             painter.save();
             painter.setOpacity(1 - clamp((now - ghost.start) / ghostMs, 0, 1));
-            if (ghost.shape)
+            if (ghost.shape) {
                 ghost.shape->draw(painter, *board_, ShapeState{});
-            else if (ghost.line.size() > 1) {
+            } else if (ghost.line.size() > 1) {
                 QPainterPath path;
                 path.moveTo(ghost.line.front());
                 for (size_t i = 1; i < ghost.line.size(); ++i)
@@ -853,7 +859,8 @@ void Canvas::drawPorts(QPainter &painter, const Shape &shape) const
 
 void Canvas::paintBoard(QPainter &painter, const Board &board)
 {
-    std::vector<const Shape *> background, foreground;
+    std::vector<const Shape *> background;
+    std::vector<const Shape *> foreground;
     for (const auto &s : board.shapes())
         (s->drawBehindLinks() ? background : foreground).push_back(s.get());
     std::stable_sort(background.begin(), background.end(),
@@ -875,7 +882,7 @@ QIcon Canvas::presetIcon(const Family &family, const ElementPreset &preset, cons
     Board board;
     board.setFamily(&family);
     board.setStyle(style);
-    Shape *s = board.addShape(preset.shapeType, preset.props);
+    const Shape *s = board.addShape(preset.shapeType, preset.props);
     QPixmap pixmap(QSize(40, 28) * 2);
     pixmap.setDevicePixelRatio(2);
     pixmap.fill(Qt::transparent);
@@ -889,7 +896,7 @@ QIcon Canvas::presetIcon(const Family &family, const ElementPreset &preset, cons
         painter.translate(-box.center());
         s->draw(painter, board, ShapeState{});
     }
-    return QIcon(pixmap);
+    return {pixmap};
 }
 
 QIcon Canvas::relationIcon(const Family &family, const RelationPreset &preset, const Style &style)
@@ -921,7 +928,7 @@ QIcon Canvas::relationIcon(const Family &family, const RelationPreset &preset, c
             l->draw(painter, board, false);
         }
     }
-    return QIcon(pixmap);
+    return {pixmap};
 }
 
 // ---------------------------------------------------------------------------
@@ -930,9 +937,9 @@ QIcon Canvas::relationIcon(const Family &family, const RelationPreset &preset, c
 Shape *Canvas::shapeAt(QPointF point) const
 {
     const auto &shapes = board_->shapes();
-    for (auto it = shapes.rbegin(); it != shapes.rend(); ++it) {
-        if ((*it)->hitTest(point))
-            return it->get();
+    for (const auto &shape : std::views::reverse(shapes)) {
+        if (shape->hitTest(point))
+            return shape.get();
     }
     return nullptr;
 }
@@ -940,9 +947,9 @@ Shape *Canvas::shapeAt(QPointF point) const
 Shape *Canvas::connectionShapeAt(QPointF point) const
 {
     const auto &shapes = board_->shapes();
-    for (auto it = shapes.rbegin(); it != shapes.rend(); ++it) {
-        if ((*it)->connectionHitTest(*board_, point))
-            return it->get();
+    for (const auto &shape : std::views::reverse(shapes)) {
+        if (shape->connectionHitTest(*board_, point))
+            return shape.get();
     }
     return nullptr;
 }
@@ -951,10 +958,10 @@ Link *Canvas::linkAt(QPointF point) const
 {
     const qreal tolerance = 6 / camera_.scale;
     const auto &links = board_->links();
-    for (auto it = links.rbegin(); it != links.rend(); ++it) {
-        const qreal width = (*it)->customWidth.value_or(board_->style().link.width);
-        if ((*it)->hitTest(*board_, point, std::max(tolerance, width / 2)))
-            return it->get();
+    for (const auto &link : std::views::reverse(links)) {
+        const qreal width = link->customWidth.value_or(board_->style().link.width);
+        if (link->hitTest(*board_, point, std::max(tolerance, width / 2)))
+            return link.get();
     }
     return nullptr;
 }
@@ -998,7 +1005,7 @@ void Canvas::updateHover(QPointF screen)
         return;
     }
     const auto port = portAt(p);
-    Shape *s = port ? port->first : shapeAt(p);
+    const Shape *s = port ? port->first : shapeAt(p);
     if (!s)
         s = connectionShapeAt(p);
     const QString hover = s && s->showConnectionPortsOnHover() ? s->id : QString();
@@ -1067,7 +1074,7 @@ void Canvas::mousePressEvent(QMouseEvent *event)
         return;
     }
     const bool shift = event->modifiers() & Qt::ShiftModifier;
-    if (Shape *s = shapeAt(p)) {
+    if (const Shape *s = shapeAt(p)) {
         if (!shift && !board_->selection().contains(s->id))
             board_->selectShape(s->id);
         else
@@ -1093,14 +1100,14 @@ void Canvas::mousePressEvent(QMouseEvent *event)
         dragOffsets_.clear();
         for (const QString &id : moving) {
             if (const Shape *t = board_->shape(id))
-                dragOffsets_.push_back({id, QPointF(p.x() - t->x, p.y() - t->y)});
+                dragOffsets_.emplace_back(id, QPointF(p.x() - t->x, p.y() - t->y));
         }
         dragBase_ = board_->snapshot();
         drag_ = Drag::Move;
         update();
         return;
     }
-    if (Link *l = linkAt(p)) {
+    if (const Link *l = linkAt(p)) {
         board_->selectLink(l->id, shift);
         return;
     }
@@ -1170,7 +1177,7 @@ void Canvas::moveDragged(QPointF p, bool snap)
                 break;
             }
         }
-        dropTarget_ = target;
+        dropTarget_ = std::move(target);
     } else {
         for (const auto &[id, offset] : dragOffsets_) {
             if (Shape *s = board_->shape(id))
@@ -1247,7 +1254,8 @@ void Canvas::mouseReleaseEvent(QMouseEvent *event)
         break;
     case Drag::Trace:
         if (trace_ && std::hypot(p.x() - dragStart_.x(), p.y() - dragStart_.y()) >= 5 / std::max(0.01, camera_.scale)) {
-            const qreal minX = std::min(dragStart_.x(), p.x()), minY = std::min(dragStart_.y(), p.y());
+            const qreal minX = std::min(dragStart_.x(), p.x());
+            const qreal minY = std::min(dragStart_.y(), p.y());
             QJsonObject props = trace_->props;
             props.insert(QStringLiteral("x"), minX);
             props.insert(QStringLiteral("y"), minY);
@@ -1306,10 +1314,10 @@ void Canvas::mouseReleaseEvent(QMouseEvent *event)
 void Canvas::finishConnect(QPointF screen)
 {
     const QPointF p = world(screen);
-    Shape *from = board_->shape(dragShape_);
+    const Shape *from = board_->shape(dragShape_);
     if (!from)
         return;
-    Shape *target = connectionShapeAt(p);
+    const Shape *target = connectionShapeAt(p);
     QJsonObject portProps;
     if (!dragPort_.key.isEmpty())
         portProps.insert(QStringLiteral("fromPort"), dragPort_.key);
@@ -1322,7 +1330,7 @@ void Canvas::finishConnect(QPointF screen)
             return;
         }
         const QByteArray before = dragBase_;
-        if (Link *l = board_->connect(from->id, target->id, portProps)) {
+        if (const Link *l = board_->connect(from->id, target->id, portProps)) {
             emit board_->elementsCreated({}, {l->id});
             board_->selectLink(l->id);
         }
@@ -1628,7 +1636,7 @@ void Canvas::insertSource(const QString &text)
             options.clusters = family->graphvizClusters;
             graphviz::autoArrange(scratch, options);
         }
-        QJsonObject json = scratch.toJson();
+        const QJsonObject json = scratch.toJson();
         if (board_->isEmpty())
             board_->meta = model.meta;
         board_->pasteJson(json, viewCenter());
@@ -1778,7 +1786,7 @@ bool Canvas::eventFilter(QObject *watched, QEvent *event)
             return false;
         }
         if (event->type() == QEvent::KeyPress) {
-            auto *key = static_cast<QKeyEvent *>(event);
+            const auto *key = static_cast<QKeyEvent *>(event);
             if (key->key() == Qt::Key_Escape) {
                 endTextEdit(false);
                 return true;
@@ -1796,11 +1804,10 @@ bool Canvas::eventFilter(QObject *watched, QEvent *event)
                 return true;
             }
         }
-        if (event->type() == QEvent::FocusOut && isEditingText()) {
+        if ((event->type() == QEvent::FocusOut && isEditingText()) &&
+            (static_cast<QFocusEvent *>(event)->reason() != Qt::PopupFocusReason))
             // A context menu opened over the editor keeps the edit.
-            if (static_cast<QFocusEvent *>(event)->reason() != Qt::PopupFocusReason)
-                endTextEdit(true);
-        }
+            endTextEdit(true);
     }
     return QWidget::eventFilter(watched, event);
 }
@@ -1842,7 +1849,7 @@ void Canvas::createElement(const ElementPreset &preset, QPointF point, const QSt
     QJsonObject props = preset.props;
     // Created inside a frame, it joins it.
     if (family && family->nestedCreation) {
-        if (Shape *parent = board_->containerAt(point))
+        if (const Shape *parent = board_->containerAt(point))
             props.insert(QStringLiteral("parentBoundary"), parent->key.isEmpty() ? parent->id : parent->key);
     }
     if (from.isEmpty()) {
@@ -1893,7 +1900,7 @@ void Canvas::chooseRelation(QPointF screen, const QString &from, const QString &
             QJsonObject props = preset.props;
             for (auto it = portProps.begin(); it != portProps.end(); ++it)
                 props.insert(it.key(), it.value());
-            if (Link *l = board_->connect(from, to, props)) {
+            if (const Link *l = board_->connect(from, to, props)) {
                 emit board_->elementsCreated({}, {l->id});
                 board_->selectLink(l->id);
             }
@@ -1910,7 +1917,7 @@ void Canvas::addFillMenu(QMenu *menu)
     for (const QString &color : swatches()) {
         QPixmap swatch(16, 16);
         swatch.fill(QColor::fromString(color));
-        QAction *action = fill->addAction(QIcon(swatch), color);
+        const QAction *action = fill->addAction(QIcon(swatch), color);
         connect(action, &QAction::triggered, this, [this, color] { board_->paintSelection(color); });
     }
     fill->addSeparator();
@@ -2018,8 +2025,8 @@ void Canvas::showContextMenu(QPointF screen)
     const QPointF p = world(screen);
     QMenu menu(this);
     const Family *family = board_->family();
-    Shape *s = shapeAt(p);
-    Link *l = s ? nullptr : linkAt(p);
+    const Shape *s = shapeAt(p);
+    const Link *l = s ? nullptr : linkAt(p);
     if (s && !board_->selection().contains(s->id))
         board_->selectShape(s->id);
     if (l && !board_->linkSelection().contains(l->id))

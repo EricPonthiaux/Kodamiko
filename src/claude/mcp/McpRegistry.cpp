@@ -71,7 +71,7 @@ McpTool McpTool::sensitive(const QString &name,
 
 McpTool::Run McpTool::immediate(std::function<McpResult(const QJsonObject &)> function)
 {
-    return [function = std::move(function)](const QJsonObject &arguments, McpReply reply, McpProgress) {
+    return [function = std::move(function)](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
         reply(function(arguments));
     };
 }

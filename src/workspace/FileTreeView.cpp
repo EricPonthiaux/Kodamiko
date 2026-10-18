@@ -986,7 +986,7 @@ void FileTreeView::setSpeedSearch(const QString &text)
         viewport()->update();
         return;
     }
-    QModelIndex start = currentIndex().isValid() ? currentIndex() : proxy_->index(0, 0, rootIndex());
+    const QModelIndex start = currentIndex().isValid() ? currentIndex() : proxy_->index(0, 0, rootIndex());
     QModelIndex match = findMatch(start, true);
     if (!match.isValid())
         match = findMatch(proxy_->index(0, 0, rootIndex()), true); // wraps around
@@ -1023,7 +1023,7 @@ bool FileTreeView::handleSpeedSearchKey(QKeyEvent *event)
         case Qt::Key_Down: {
             const bool forward = event->key() == Qt::Key_Down;
             const QModelIndex current = currentIndex();
-            QModelIndex match = findMatch(forward ? indexBelow(current) : indexAbove(current), forward);
+            const QModelIndex match = findMatch(forward ? indexBelow(current) : indexAbove(current), forward);
             if (match.isValid()) {
                 setCurrentIndex(match);
                 scrollTo(match);
@@ -1285,7 +1285,7 @@ void FileTreeView::transfer(const QStringList &sources, const QString &folder, b
     if (folder.isEmpty() || sources.isEmpty())
         return;
     if (sources.size() == 1) {
-        const QString source = sources.first();
+        const QString &source = sources.first();
         const QString name = QFileInfo(source).fileName();
         const QString destination = QDir(folder).filePath(name);
         if (move && QDir::cleanPath(QFileInfo(source).absolutePath()) == QDir::cleanPath(folder))

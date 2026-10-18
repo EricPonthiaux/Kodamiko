@@ -103,7 +103,7 @@ QString createSnapshot(const RepositoryInfo &repository,
 {
     // A temporary index, copied from the real one, receives the files' state:
     // the real index is not touched.
-    QTemporaryDir temporary;
+    const QTemporaryDir temporary;
     if (!temporary.isValid())
         throw GitError(QObject::tr("Cannot create a temporary folder for the snapshot"));
     const QString index = temporary.filePath(QStringLiteral("index"));

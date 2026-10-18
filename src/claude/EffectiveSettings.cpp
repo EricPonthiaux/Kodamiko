@@ -104,7 +104,7 @@ void mergeInto(Node &node, const QJsonValue &value, Scope scope)
     QList<std::pair<Scope, QJsonValue>> replaced = node.replaced;
     replaced.prepend({node.scope, toJson(node)});
     node = nodeFrom(value, scope);
-    node.replaced = replaced;
+    node.replaced = std::move(replaced);
 }
 
 Node mergeLayers(const QList<Layer> &layers)

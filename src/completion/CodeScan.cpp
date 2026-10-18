@@ -262,7 +262,7 @@ int headerStart(const QByteArray &blanked, int brace)
     }
     // Preprocessor lines before it belong to no declaration.
     while (start < brace) {
-        int lineEnd = int(blanked.indexOf('\n', start));
+        const int lineEnd = int(blanked.indexOf('\n', start));
         if (lineEnd < 0 || lineEnd >= brace)
             break;
         const QByteArray line = blanked.mid(start, lineEnd - start).trimmed();
@@ -336,11 +336,11 @@ Parameter parseParameter(const QString &text, bool typed)
     int depth = 0;
     for (int i = 0; i < declaration.size(); ++i) {
         const QChar c = declaration[i];
-        if (c == u'(' || c == u'[' || c == u'{' || c == u'<')
+        if (c == u'(' || c == u'[' || c == u'{' || c == u'<') {
             ++depth;
-        else if (c == u')' || c == u']' || c == u'}' || c == u'>')
+        } else if (c == u')' || c == u']' || c == u'}' || c == u'>') {
             --depth;
-        else if (c == u'=' && depth == 0 && (i + 1 >= declaration.size() || declaration[i + 1] != u'=')) {
+        } else if (c == u'=' && depth == 0 && (i + 1 >= declaration.size() || declaration[i + 1] != u'=')) {
             parameter.defaultValue = declaration.mid(i + 1).trimmed();
             declaration = declaration.left(i).trimmed();
             break;
@@ -370,7 +370,7 @@ Parameter parseParameter(const QString &text, bool typed)
     static const QRegularExpression pointer(QStringLiteral("\\(\\s*[*&^]\\s*([A-Za-z_]\\w*)\\s*\\)"));
     if (const QRegularExpressionMatch match = pointer.match(declaration); match.hasMatch()) {
         parameter.name = match.captured(1);
-        parameter.type = declaration;
+        parameter.type = std::move(declaration);
         parameter.type.remove(match.capturedStart(1), match.capturedLength(1));
         return parameter;
     }
@@ -383,7 +383,7 @@ Parameter parseParameter(const QString &text, bool typed)
         arraySuffix.prepend(rest.mid(open));
         rest = rest.left(open).trimmed();
     }
-    int end = int(rest.size());
+    const int end = int(rest.size());
     int start = end;
     while (start > 0 && (rest[start - 1].isLetterOrNumber() || rest[start - 1] == u'_' || rest[start - 1] == u'$'))
         --start;
@@ -394,7 +394,7 @@ Parameter parseParameter(const QString &text, bool typed)
     static const QSet<QString> qualifiersOnly = {"const", "volatile", "struct", "class", "enum", "typename", "final"};
     if (name.isEmpty() || before.isEmpty() || typeWords().contains(name) || qualifiersOnly.contains(before) ||
         before.endsWith(QLatin1String("::"))) {
-        parameter.type = declaration; // a type alone: "int", "const Foo &"
+        parameter.type = std::move(declaration); // a type alone: "int", "const Foo &"
         return parameter;
     }
     parameter.name = name;
@@ -524,7 +524,7 @@ Function parseFunction(const QString &header)
     }
     // An expression, not a declaration: "x = f(y)", "a.f(b)", "return f(x)".
     static const QRegularExpression expression(QStringLiteral("[=+\\-/!%^|?;(){}\"]|\\.(?!\\.\\.)"));
-    QStringList words = before.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    const QStringList words = before.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
     for (const QString &word : words) {
         if (notFunctionWords().contains(word))
             return function;
@@ -543,7 +543,7 @@ Function parseFunction(const QString &header)
             kept.append(word);
     }
     function.returnType = simplifiedType(kept.join(QLatin1Char(' ')));
-    function.name = name;
+    function.name = std::move(name);
     function.parameters = text.mid(open + 1, close - open - 1).trimmed();
     function.trailing = text.mid(close + 1).simplified();
     // "auto f() -> int".
@@ -650,7 +650,7 @@ ClassHeader classAt(const QByteArray &blanked, int brace)
     if (!match.hasMatch())
         return header;
     header.keyword = match.captured(1);
-    QString rest = source.mid(match.capturedEnd());
+    const QString rest = source.mid(match.capturedEnd());
     // Up to the bases.
     static const QRegularExpression basesStart(QStringLiteral(":(?!:)|\\bextends\\b|\\bimplements\\b"));
     const QRegularExpressionMatch bases = basesStart.match(rest);
@@ -746,7 +746,7 @@ QString indentUnit(const QByteArray &text)
     }
     if (tabs > spaced)
         return QStringLiteral("\t");
-    return QString(smallest >= 2 && smallest <= 8 ? smallest : 4, QLatin1Char(' '));
+    return {smallest >= 2 && smallest <= 8 ? smallest : 4, QLatin1Char(' ')};
 }
 
 QString indented(const QString &body, const QString &indent, const QString &unit)

@@ -281,7 +281,7 @@ CompletionItem itemOf(const Template &entry,
     QString detail = Snippet::expand(sample).text.simplified();
     if (detail.size() > 48)
         detail = detail.left(47) + QChar(0x2026);
-    item.detail = detail;
+    item.detail = std::move(detail);
     item.documentation = kindLabel + QStringLiteral("\n\n") + Snippet::expand(snippet).text;
     return item;
 }
@@ -458,7 +458,7 @@ QList<int> PostfixTemplateProvider::expressionStarts(const QByteArray &text, int
         return i;
     };
     while (starts.size() < maxExpressionChoices) {
-        int i = skipBlanks(start);
+        const int i = skipBlanks(start);
         // "!ready.if": the negation too.
         if (i > limit && text[i - 1] == '!' && !(i < text.size() && text[i] == '=')) {
             start = i - 1;

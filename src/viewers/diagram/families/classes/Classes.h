@@ -31,7 +31,7 @@ public:
     // The text edited in place: «stereotype» and name, then `--` before the
     // attributes and before the methods.
     QString editText() const;
-    void setEditText(const QString &text);
+    void setEditText(const QString &value);
 
     QString name;
     QString stereotype; // "interface", "abstract"…; empty for a plain class

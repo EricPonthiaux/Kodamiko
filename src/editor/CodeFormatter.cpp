@@ -91,7 +91,7 @@ std::optional<Command> find(const QString &languageId, const QString &filePath)
         if (program.isEmpty())
             program = QStandardPaths::findExecutable(command.program);
         if (!program.isEmpty()) {
-            command.program = program;
+            command.program = std::move(program);
             return command;
         }
     }
@@ -160,7 +160,7 @@ std::optional<QString> run(const Command &command, const QString &workDir, const
     return resultOf(process, name, text, error);
 }
 
-void start(const Command &command, const QString &workDir, const QString &text, QObject *context, Done done)
+void start(const Command &command, const QString &workDir, const QString &text, QObject *context, const Done &done)
 {
     const QString name = QFileInfo(command.program).completeBaseName();
     auto *process = new QProcess(context);
@@ -168,7 +168,7 @@ void start(const Command &command, const QString &workDir, const QString &text, 
     timer->setSingleShot(true);
 
     // Exactly one outcome: the first one disconnects the others.
-    auto finish = [process, timer, done](const std::optional<QString> &formatted, const QString &error) {
+    const auto finish = [process, timer, done](const std::optional<QString> &formatted, const QString &error) {
         timer->stop();
         QObject::disconnect(process, nullptr, nullptr, nullptr);
         if (process->state() != QProcess::NotRunning) {

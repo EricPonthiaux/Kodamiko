@@ -108,7 +108,7 @@ void HighlightQuery::compilePredicates()
                 continue;
 
             const QString op = stringValue(operatorStep->value_id);
-            auto stringArgument = [&](uint32_t i) { return stringValue(arguments[i].value_id); };
+            const auto stringArgument = [&](uint32_t i) { return stringValue(arguments[i].value_id); };
 
             Predicate predicate;
             predicate.captureId = arguments[0].value_id;

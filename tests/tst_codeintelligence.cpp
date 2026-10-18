@@ -101,7 +101,7 @@ private slots:
 
     void findsTheHeaderOfASource()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("src/widget.cpp"), "");
         write(dir.filePath("src/widget.h"), "");
         write(dir.filePath("src/other.cpp"), "");
@@ -129,7 +129,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())
             QSKIP("clangd is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = dir.path();
         write(root + "/compile_flags.txt", "-std=c++20\n");
         write(root + "/total.h", "#pragma once\nint total(int count, int step);\n");
@@ -198,10 +198,11 @@ private slots:
         // Rename: the open file in its editor (one undo step), the others on disk.
         tabs.closeFilesUnder(root + "/total.cpp"); // renamed on disk
         placeCaret(main, "total(2");
-        QJsonObject params{{"textDocument", QJsonObject{{"uri", uriOf(main->filePath())}}},
-                           {"position", toJson(CodeIntelligence::lspPosition(
-                                            main, int(main->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))))},
-                           {"newName", "product"}};
+        const QJsonObject params{
+            {"textDocument", QJsonObject{{"uri", uriOf(main->filePath())}}},
+            {"position", toJson(CodeIntelligence::lspPosition(
+                             main, int(main->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))))},
+            {"newName", "product"}};
         servers.syncDocument(client, main->filePath(), "cpp", main->utf8Bytes().toByteArray());
         servers.syncDocument(client, root + "/total.h", "cpp",
                              tabs.editorFor(root + "/total.h")->utf8Bytes().toByteArray());
@@ -223,7 +224,7 @@ private slots:
         QVERIFY(main->isModified());
         main->undo();
         QVERIFY(main->text().contains("total(2, 3) + total(4, 5)")); // one step
-        auto *header = tabs.editorFor(root + "/total.h");
+        const auto *header = tabs.editorFor(root + "/total.h");
         QVERIFY(header && header->text().contains("int product(int count"));
         QVERIFY(!tabs.editorFor(root + "/total.cpp"));
         QVERIFY(read(root + "/total.cpp").contains("int product(int count"));
@@ -235,7 +236,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())
             QSKIP("clangd is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = dir.path();
         write(root + "/compile_flags.txt", "-std=c++20\n");
         write(root + "/count.cpp", "int count = 0; // count\n"
@@ -249,7 +250,7 @@ private slots:
         servers.setFolder(root);
         CodeNavigator navigator(&tabs, &index);
         ProblemStore problems(&servers);
-        CodeIntelligence intelligence(&tabs, &servers, &navigator, &problems);
+        const CodeIntelligence intelligence(&tabs, &servers, &navigator, &problems);
         connect(&tabs, &EditorTabs::editorOpened, &intelligence, &CodeIntelligence::attach);
         auto *editor = EditorTabs::editorIn(tabs.openFile(root + "/count.cpp"));
         QVERIFY(editor);

@@ -21,7 +21,7 @@ QString companionPath(const QString &program)
 #ifdef Q_OS_WIN
     const QString name = program + QStringLiteral(".exe");
 #else
-    const QString name = program;
+    const QString &name = program;
 #endif
     const QString path = QDir(QCoreApplication::applicationDirPath()).filePath(name);
     return QFileInfo::exists(path) ? path : QString();
@@ -56,7 +56,7 @@ std::optional<QString> writeSettingsFile(const QByteArray &settings, const QStri
 
 // An npm installation provides claude.cmd, which CreateProcess can only
 // launch through cmd.exe.
-void launchThroughCmd(ProcessSpec &spec)
+void launchThroughCmd(const ProcessSpec &spec)
 {
 #ifdef Q_OS_WIN
     if (spec.program.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive) ||

@@ -53,7 +53,7 @@ QStringList jdkParents()
     QStringList parents{home + QStringLiteral("/.sdkman/candidates/java"), home + QStringLiteral("/.jdks"),
                         home + QStringLiteral("/.asdf/installs/java"),
                         home + QStringLiteral("/.local/share/mise/installs/java")};
-#if defined(Q_OS_WIN)
+#ifdef Q_OS_WIN
     for (const char *variable : {"ProgramFiles", "ProgramW6432"}) {
         const QString programFiles = qEnvironmentVariable(variable);
         if (programFiles.isEmpty())

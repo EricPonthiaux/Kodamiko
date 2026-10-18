@@ -364,7 +364,7 @@ void MainWindow::createWidgets()
     applyFullLine(Preferences::load());
     connect(editorTabs_, &EditorTabs::editorOpened, this, [this](EditorWidget *editor) {
         editor->setFileActions(codeRequestActions_);
-        auto *controller = new CompletionController(editor, completion_);
+        const auto *controller = new CompletionController(editor, completion_);
         // The parameters of the function just chosen.
         connect(controller, &CompletionController::callInserted, this, [this, editor] {
             if (intelligence_)
@@ -643,11 +643,11 @@ QWidget *MainWindow::createEditPage()
     // A language server that cannot run, for the current file's language.
     serverNotice_ = new NoticeBar(editorArea);
     connect(serverNotice_, &NoticeBar::actionClicked, this, [this] {
-        if (EditorWidget *editor = editorTabs_->currentEditor())
+        if (const EditorWidget *editor = editorTabs_->currentEditor())
             languageServers_->retry(editor->languageId());
     });
     connect(serverNotice_, &NoticeBar::dismissed, this, [this] {
-        if (EditorWidget *editor = editorTabs_->currentEditor())
+        if (const EditorWidget *editor = editorTabs_->currentEditor())
             dismissedServerNotices_.insert(languageServers_->failure(editor->languageId()));
     });
     connect(languageServers_, &LanguageServers::serverFailed, this, &MainWindow::updateServerNotice);
@@ -853,7 +853,7 @@ void MainWindow::createMenus()
     createCodeRequestActions(claude);
     claude->addSeparator();
     claude->addAction(tr("Restore the State Before a &Prompt…"), this, &MainWindow::showSnapshots);
-    QSettings settings;
+    const QSettings settings;
     snapshotBeforePrompt_ = claude->addAction(tr("&Snapshot Before Each Prompt"));
     snapshotBeforePrompt_->setCheckable(true);
     snapshotBeforePrompt_->setChecked(settings.value(QStringLiteral("snapshotBeforePrompt"), true).toBool());
@@ -1151,9 +1151,9 @@ void MainWindow::fillRunMenu(QMenu *menu, bool run)
             previous = heading(configuration);
             RunConfigurationMenu::addHeading(menu, previous, theme_);
         }
-        QAction *action = RunConfigurationMenu::addConfiguration(menu, configuration,
-                                                                 selected && selected->name == configuration.name,
-                                                                 runner_->isRunning(configuration.name), theme_);
+        const QAction *action = RunConfigurationMenu::addConfiguration(menu, configuration,
+                                                                       selected && selected->name == configuration.name,
+                                                                       runner_->isRunning(configuration.name), theme_);
         connect(action, &QAction::triggered, this, [this, configuration, run] {
             runner_->select(configuration.name);
             if (run)
@@ -1388,7 +1388,7 @@ void MainWindow::createGitMenu()
 
 void MainWindow::restoreSettings()
 {
-    QSettings settings;
+    const QSettings settings;
     // Before the window first shows: the frame changes the native window.
     {
         const bool system = settings.value(QStringLiteral("systemTitleBar"), false).toBool();
@@ -1955,7 +1955,7 @@ void MainWindow::updateTabIcons()
     cancelGitButton_->setIcon(UiIcons::icon(QStringLiteral("stop"), color));
     emptyNewTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     for (int i = 0; i < terminalTabs_->count(); ++i) {
-        QWidget *terminal = terminalTabs_->widget(i);
+        const QWidget *terminal = terminalTabs_->widget(i);
         if (terminal == claudeTerminal_)
             continue; // its icon shows Claude's state
         // A run's: its kind, colored by its outcome.
@@ -2428,7 +2428,7 @@ void MainWindow::showGoTo(int tab)
 
 void MainWindow::showFindInFiles()
 {
-    EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
+    const EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
     findInFiles_->popup(editor && editor->hasSelectedText() ? editor->selectedText() : QString());
 }
 
@@ -2446,7 +2446,7 @@ void MainWindow::goToChange(bool forward)
 
 void MainWindow::rollbackChange()
 {
-    EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
+    const EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
     if (editor && !editor->changeGutter()->rollbackAtCursor())
         statusBar()->showMessage(tr("No change on this line"), statusMessageMs);
 }
@@ -2599,7 +2599,7 @@ std::optional<QString> MainWindow::askCredentials(const QString &prompt)
     // (yes/no/[fingerprint])?", after the key's fingerprint.
     if (AskpassServer::isConfirmation(prompt)) {
         QMessageBox box(QMessageBox::Question, tr("Unknown Host"), prompt.trimmed(), QMessageBox::Cancel, this);
-        QPushButton *trust = box.addButton(tr("Trust and Connect"), QMessageBox::AcceptRole);
+        const QPushButton *trust = box.addButton(tr("Trust and Connect"), QMessageBox::AcceptRole);
         box.setDefaultButton(QMessageBox::Cancel);
         box.exec();
         return box.clickedButton() == trust ? QStringLiteral("yes") : QStringLiteral("no");
@@ -2626,7 +2626,7 @@ void MainWindow::showPrerequisites()
         prerequisitesDialog_ = new PrerequisitesDialog(this);
         connect(prerequisitesDialog_, &PrerequisitesDialog::installRequested, this,
                 [this](const QString &title, const ProcessSpec &spec) {
-                    TerminalWidget *terminal = addTerminal(title, spec);
+                    const TerminalWidget *terminal = addTerminal(title, spec);
                     connect(terminal, &TerminalWidget::finished, prerequisitesDialog_, [this] {
                         prerequisitesDialog_->recheck();
                         prerequisitesDialog_->show();

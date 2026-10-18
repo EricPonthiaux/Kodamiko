@@ -27,6 +27,8 @@
 #include <QWebEngineScript>
 #include <QWebEngineSettings>
 
+#include <utility>
+
 namespace {
 
 constexpr int updateDelayMs = 250;
@@ -281,10 +283,10 @@ void HtmlPreview::contextMenuEvent(QContextMenuEvent *event)
     menu.exec(event->globalPos());
 }
 
-PreviewPage::PreviewPage(EditorWidget *editor, const Theme &theme, QWidget *parent)
+PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QWidget *parent)
     : QWidget(parent)
     , editor_(editor)
-    , theme_(theme)
+    , theme_(std::move(theme))
     , kind_(LanguageRegistry::languageForFile(editor->filePath()) == QLatin1String("html") ? Kind::Html
                                                                                            : Kind::Markdown)
 {

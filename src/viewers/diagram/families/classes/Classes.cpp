@@ -236,10 +236,10 @@ void ClassShape::onDoubleClick(Board &board)
 void ClassShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, path, fillColor(style.tones.cool), style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     if (state.editing)
         return;
 
@@ -384,11 +384,13 @@ void ClassLink::drawMarker(QPainter &painter,
                            qreal angle,
                            const LinkStyle &style) const
 {
-    const qreal bx = r.b.x(), by = r.b.y();
+    const qreal bx = r.b.x();
+    const qreal by = r.b.y();
     const QColor background = board.style().background;
     if (kind == QLatin1String("extension") || kind == QLatin1String("realization")) {
         // A hollow triangle.
-        const qreal size = 14 * style.markerScale, spread = 0.46;
+        const qreal size = 14 * style.markerScale;
+        const qreal spread = 0.46;
         const QPainterPath head =
             polygon({{bx, by},
                      {bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread)},
@@ -398,7 +400,8 @@ void ClassLink::drawMarker(QPainter &painter,
     } else if (kind == QLatin1String("composition") || kind == QLatin1String("aggregation")) {
         // A diamond, filled for a composition, hollow for an aggregation.
         const qreal size = 9 * style.markerScale;
-        const qreal mx = bx - size * std::cos(angle), my = by - size * std::sin(angle);
+        const qreal mx = bx - size * std::cos(angle);
+        const qreal my = by - size * std::sin(angle);
         const qreal side = size * 0.55;
         const QPainterPath diamond =
             polygon({{bx, by},
@@ -409,7 +412,8 @@ void ClassLink::drawMarker(QPainter &painter,
         stroke(painter, diamond, style.color, style.width);
     } else if (kind == QLatin1String("association") || kind == QLatin1String("dependency")) {
         // An open arrow.
-        const qreal size = (board.style().link.arrow + 2) * style.markerScale, spread = 0.5;
+        const qreal size = (board.style().link.arrow + 2) * style.markerScale;
+        const qreal spread = 0.5;
         QPainterPath head;
         head.moveTo(bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread));
         head.lineTo(bx, by);

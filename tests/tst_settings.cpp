@@ -132,7 +132,7 @@ private slots:
     void keymapListsMenuCommands()
     {
         QMenuBar bar;
-        Menus menus(bar);
+        const Menus menus(bar);
         const QList<Keymap::Command> commands = Keymap::commands(&bar);
         QCOMPARE(commands.size(), 3);
         QVERIFY(commands[2].defaultShortcuts.isEmpty());
@@ -181,7 +181,7 @@ private slots:
     void dialogMovesAShortcutToTheSelectedCommand()
     {
         QMenuBar bar;
-        Menus menus(bar);
+        const Menus menus(bar);
         QWidget window;
         PreferencesPopup dialog(Theme::dark(), &window);
         dialog.load(Preferences(), Keymap::commands(&bar), {});

@@ -51,7 +51,7 @@ QPixmap appIcon(int size, qreal devicePixelRatio)
 QIcon windowIcon()
 {
     QIcon icon;
-    for (int size : {16, 24, 32, 48, 64, 128, 256})
+    for (const int size : {16, 24, 32, 48, 64, 128, 256})
         icon.addPixmap(appIcon(size));
     return icon;
 }

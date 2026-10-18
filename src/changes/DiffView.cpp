@@ -18,16 +18,16 @@ namespace {
 enum Style {
     PlainStyle = 0,
     FileHeaderStyle = 40,
-    FileNameStyle,
-    HunkHeaderStyle,
-    NoteStyle,
-    NumberStyle,
-    AddedNumberStyle,
-    RemovedNumberStyle,
-    AddedStatsStyle,
-    RemovedStatsStyle,
-    FileMarginStyle,
-    HunkMarginStyle
+    FileNameStyle = 41,
+    HunkHeaderStyle = 42,
+    NoteStyle = 43,
+    NumberStyle = 44,
+    AddedNumberStyle = 45,
+    RemovedNumberStyle = 46,
+    AddedStatsStyle = 47,
+    RemovedStatsStyle = 48,
+    FileMarginStyle = 49,
+    HunkMarginStyle = 50
 };
 
 constexpr int firstSyntaxStyle = 64;

@@ -38,7 +38,7 @@ QVersionNumber programVersion(const QString &program)
     return parseVersion(QString::fromUtf8(process.readAllStandardOutput()));
 }
 
-#if defined(Q_OS_LINUX)
+#ifdef Q_OS_LINUX
 QString osReleaseField(const QByteArray &osRelease, const QString &key)
 {
     const QRegularExpression field(QStringLiteral("^%1=\"?([^\"\\n]*)\"?$").arg(key),
@@ -49,7 +49,7 @@ QString osReleaseField(const QByteArray &osRelease, const QString &key)
 
 QString gitInstallCommand()
 {
-#if defined(Q_OS_WIN)
+#ifdef Q_OS_WIN
     return QStringLiteral("winget install --id Git.Git -e --source winget");
 #elif defined(Q_OS_MACOS)
     return QStringLiteral("xcode-select --install");

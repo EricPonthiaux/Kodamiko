@@ -21,7 +21,7 @@ QString tr(const char *text)
 
 QString managedDir()
 {
-#if defined(Q_OS_WIN)
+#ifdef Q_OS_WIN
     return QStringLiteral("C:/Program Files/ClaudeCode");
 #elif defined(Q_OS_MACOS)
     return QStringLiteral("/Library/Application Support/ClaudeCode");

@@ -14,6 +14,7 @@
 #include <QtTest>
 
 #include <functional>
+#include <ranges>
 
 namespace {
 
@@ -108,7 +109,7 @@ private slots:
 
     void statusOutsideARepository()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         write(project, "a.txt", "a\n");
         QVERIFY(!RepositoryStatus::read(project.path()));
         QVERIFY(!RepositoryInfo::read(project.path()));
@@ -116,7 +117,7 @@ private slots:
 
     void statusSeparatesStagedAndUnstaged()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"staged.cpp", "int a;\n"}, {"both.txt", "1\n"}, {"gone.txt", "bye\n"}});
         write(project, "staged.cpp", "int b;\n");
         write(project, "both.txt", "2\n");
@@ -143,7 +144,7 @@ private slots:
 
     void statusOfASubfolderUsesRelativePaths()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"root.txt", "r\n"}, {"sub/file.txt", "f\n"}});
         write(project, "root.txt", "r2\n");
         write(project, "sub/file.txt", "f2\n");
@@ -158,7 +159,7 @@ private slots:
 
     void statusOfARepositoryWithoutCommit()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {});
         write(project, "a.txt", "a\n");
         git(project, {"add", "a.txt"});
@@ -173,7 +174,7 @@ private slots:
 
     void statusOfADetachedHead()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         git(project, {"checkout", "-q", "--detach"});
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
@@ -213,7 +214,7 @@ private slots:
 
     void stageSelectedLines()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"f.txt", "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n"}});
         write(project, "f.txt", "1\nTWO\n3\n4\n5\n6\n7\n8\n9\n10\nELEVEN\n12\nthirteen\n");
 
@@ -238,7 +239,7 @@ private slots:
 
     void unstageSelectedLines()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"f.txt", "a\nb\nc\n"}});
         write(project, "f.txt", "A\nb\nC\nd\n");
         git(project, {"add", "f.txt"});
@@ -255,7 +256,7 @@ private slots:
 
     void partialChangesOfCreatedAndDeletedFiles()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"old.txt", "x\ny\nz\n"}});
         write(project, "new.txt", "1\n2\n3\n");
         QFile::remove(project.filePath("old.txt"));
@@ -292,12 +293,12 @@ private slots:
 
     void stageLinesWithoutFinalNewlineAndCrlf()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"crlf.txt", "a\r\nb\r\nc\r\n"}, {"eof.txt", "a\nb"}});
         write(project, "crlf.txt", "A\r\nb\r\nC\r\n");
         write(project, "eof.txt", "a\nB");
 
-        RepositoryStatus result = status(project);
+        const RepositoryStatus result = status(project);
         const FilePatch crlf = FilePatch::parse(find(result.unstaged, "crlf.txt")->patch);
         GitOperations::applyToIndex(result.info,
                                     crlf.partial(selectLines(crlf,
@@ -316,13 +317,13 @@ private slots:
 
     void stageAndUnstageFiles()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
         write(project, "a.txt", "A\n");
         QFile::remove(project.filePath("b.txt"));
         write(project, "c.txt", "c\n");
 
-        RepositoryInfo info = *RepositoryInfo::read(project.path());
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
         GitOperations::stage(info, {"a.txt", "b.txt", "c.txt"});
         RepositoryStatus result = status(project);
         QCOMPARE(result.staged.size(), 3);
@@ -336,7 +337,7 @@ private slots:
 
     void unstageInARepositoryWithoutCommit()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {});
         write(project, "a.txt", "a\n");
         git(project, {"add", "a.txt"});
@@ -348,7 +349,7 @@ private slots:
 
     void commitAndAmend()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         write(project, "a.txt", "b\n");
         RepositoryInfo info = *RepositoryInfo::read(project.path());
@@ -370,7 +371,7 @@ private slots:
 #ifdef Q_OS_WIN
         QSKIP("hook shell");
 #endif
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         write(project, ".git/hooks/pre-commit", "#!/bin/sh\necho 'rejected by the hook' >&2\nexit 1\n");
         QFile::setPermissions(project.filePath(".git/hooks/pre-commit"),
@@ -388,7 +389,7 @@ private slots:
 
     void discardKeepsASnapshot()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
         write(project, "a.txt", "modified\n");
         write(project, "b.txt", "staged\n");
@@ -422,7 +423,7 @@ private slots:
 
     void discardSelectedLines()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"f.txt", "a\nb\nc\n"}});
         write(project, "f.txt", "A\nb\nC\n");
 
@@ -437,7 +438,7 @@ private slots:
 
     void snapshotsArePruned()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
         for (int i = 0; i < Snapshots::maximumCount + 2; ++i)
@@ -449,7 +450,7 @@ private slots:
 
     void snapshotsOfEnlumineAreAdopted()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
         const QString ref = Snapshots::create(info, "old", {"a.txt"});
@@ -466,7 +467,7 @@ private slots:
 
     void snapshotOfWorkingTreeSkipsUnchangedStates()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
         // A clean working directory is recorded too: it is what a prompt
@@ -495,7 +496,7 @@ private slots:
 
     void snapshotOfWorkingTreeUndoesAPrompt()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}, {"b.txt", "b\n"}, {".gitignore", "*.log\n"}});
         write(project, "a.txt", "pending\n");
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
@@ -530,7 +531,7 @@ private slots:
 
     void snapshotOfWorkingTreeInUnbornRepository()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {});
         write(project, "a.txt", "a\n");
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
@@ -547,7 +548,7 @@ private slots:
         GitCommands commands;
         QSignalSpy succeeded(&commands, &GitCommands::succeeded);
         QSignalSpy failed(&commands, &GitCommands::failed);
-        QSignalSpy busy(&commands, &GitCommands::busyChanged);
+        const QSignalSpy busy(&commands, &GitCommands::busyChanged);
         QStringList order;
         bool callbackRan = false;
         commands.run(
@@ -570,7 +571,7 @@ private slots:
 
     void fileStatusesForTheTree()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project,
                        {{"src/kept.cpp", "k\n"}, {"src/changed.cpp", "c\n"}, {".gitignore", "build/\n*.log\n"}});
         write(project, "src/changed.cpp", "c2\n");
@@ -602,16 +603,16 @@ private slots:
         QCOMPARE(sub.value(root + "/src/changed.cpp"), FileStatus::Modified);
         QVERIFY(!sub.contains(root + "/notes.txt"));
 
-        QTemporaryDir outside;
+        const QTemporaryDir outside;
         QVERIFY(FileStatuses::read(outside.path()).isEmpty());
     }
 
     void fileStatusReaderSignalsChanges()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         FileStatusReader reader;
-        QSignalSpy changed(&reader, &FileStatusReader::statusesChanged);
+        const QSignalSpy changed(&reader, &FileStatusReader::statusesChanged);
         reader.setFolder(project.path());
         write(project, "a.txt", "b\n");
         reader.refresh(); // merged with the read in progress
@@ -661,17 +662,17 @@ private slots:
         for (const QByteArray &current : currents) {
             QByteArray text = current;
             // Undoing the changes one by one, from the last, gives the base back.
-            QList<LineChange> changes = LineChanges::compute(base, text);
+            const QList<LineChange> changes = LineChanges::compute(base, text);
             QVERIFY2(!changes.isEmpty(), current.constData());
-            for (auto it = changes.crbegin(); it != changes.crend(); ++it)
-                text = LineChanges::revert(base, text, *it);
+            for (auto change : std::views::reverse(changes))
+                text = LineChanges::revert(base, text, change);
             QCOMPARE(text, base);
         }
     }
 
     void lineChangesBaseIsTheIndex()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "one\n"}});
         write(project, "a.txt", "two\n");
         QCOMPARE(*LineChanges::indexVersion(project.filePath("a.txt")), QByteArray("one\n"));
@@ -680,7 +681,7 @@ private slots:
 
         write(project, "untracked.txt", "x\n");
         QVERIFY(!LineChanges::indexVersion(project.filePath("untracked.txt")));
-        QTemporaryDir outside;
+        const QTemporaryDir outside;
         write(outside, "b.txt", "x\n");
         QVERIFY(!LineChanges::indexVersion(outside.filePath("b.txt")));
     }
@@ -699,7 +700,7 @@ private slots:
 
     void createBranch()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         write(project, "a.txt", "uncommitted\n");
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
@@ -717,7 +718,7 @@ private slots:
 
     void createBranchWithoutCommits()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
         QVERIFY(info.unborn);

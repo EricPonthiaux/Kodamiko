@@ -111,7 +111,7 @@ bool loadInto(Board &board, const QString &name, const QByteArray &content, docu
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 
@@ -246,7 +246,8 @@ private slots:
             QCOMPARE(texts(again), texts(model));
             QCOMPARE(depths(again), depths(model));
             QCOMPARE(branches(again), branches(model));
-            QStringList keys, keysAgain;
+            QStringList keys;
+            QStringList keysAgain;
             for (const Model::Node &n : model.nodes)
                 keys.append(n.key);
             for (const Model::Node &n : again.nodes)
@@ -264,13 +265,13 @@ private slots:
         const Codec &codec = mindmapCodec();
         Board board;
         board.setFamily(&families::mindmap());
-        Shape *root =
+        const Shape *root =
             board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Root")}, {QStringLiteral("depth"), 0}});
-        Shape *child = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Child (draft)")}});
-        Shape *other = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Another root")}});
-        Shape *empty = board.addShape({}, {{QStringLiteral("text"), QString()}});
-        Shape *a = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Loop A")}});
-        Shape *b = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Loop B")}});
+        const Shape *child = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Child (draft)")}});
+        const Shape *other = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Another root")}});
+        const Shape *empty = board.addShape({}, {{QStringLiteral("text"), QString()}});
+        const Shape *a = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Loop A")}});
+        const Shape *b = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Loop B")}});
         board.addLink({}, root->id, child->id);
         board.addLink({}, other->id, empty->id);
         board.addLink({}, a->id, b->id);
@@ -293,17 +294,20 @@ private slots:
         Board board;
         board.setFamily(&families::mindmap());
         const Font fonts[] = {Font(16, 600), Font(14, 500), Font(13)};
-        const qreal padX[] = {24, 18, 10}, padY[] = {16, 12, 6}, lineHeights[] = {23, 20, 19};
+        const qreal padX[] = {24, 18, 10};
+        const qreal padY[] = {16, 12, 6};
+        const qreal lineHeights[] = {23, 20, 19};
         for (int depth : {0, 1, 2, 5}) {
-            Shape *s = board.addShape(
+            const Shape *s = board.addShape(
                 {}, {{QStringLiteral("text"), QStringLiteral("Idea")}, {QStringLiteral("depth"), depth}});
             const int l = mindmap::level(depth);
             QCOMPARE(s->w, text::width(fonts[l], QStringLiteral("Idea")) + padX[l] * 2);
             QCOMPARE(s->h, lineHeights[l] + padY[l] * 2);
         }
         // A long text wraps at the level's width.
-        Shape *wide = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("word ").repeated(40).trimmed()},
-                                          {QStringLiteral("depth"), 1}});
+        const Shape *wide =
+            board.addShape({}, {{QStringLiteral("text"), QStringLiteral("word ").repeated(40).trimmed()},
+                                {QStringLiteral("depth"), 1}});
         QVERIFY(wide->w <= 190 + 18 * 2 + 0.5);
         QVERIFY(wide->h > 20 + 12 * 2);
     }
@@ -340,7 +344,7 @@ private slots:
         Board board;
         const Codec &codec = mindmapCodec();
         buildBoard(board, codec, parsed(codec, codec.blank()));
-        Shape *path = byKey(board, QStringLiteral("First_path"));
+        const Shape *path = byKey(board, QStringLiteral("First_path"));
         QVERIFY(path);
         // A new idea is a bubble; attached under a leaf, it is a leaf too.
         Shape *created =
@@ -544,8 +548,9 @@ private slots:
         Board board;
         const Codec &codec = visionCodec();
         buildBoard(board, codec, parsed(codec, codec.blank()));
-        const size_t shapes = board.shapes().size(), links = board.links().size();
-        Shape *card = byKey(board, QStringLiteral("problem"));
+        const size_t shapes = board.shapes().size();
+        const size_t links = board.links().size();
+        const Shape *card = byKey(board, QStringLiteral("problem"));
         QVERIFY(!board.removeShape(card->id));
         QVERIFY(!board.removeLink(board.links().front()->id));
         board.selectAll();

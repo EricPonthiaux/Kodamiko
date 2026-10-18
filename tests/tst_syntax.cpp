@@ -103,7 +103,7 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "c", "int main(void) {\n  // note\n  return puts(\"hi\");\n}\n", theme);
+        const auto h = highlight(editor, "c", "int main(void) {\n  // note\n  return puts(\"hi\");\n}\n", theme);
         QCOMPARE(styleOfWord(editor, "int"), styleFor(theme, "type"));
         QCOMPARE(styleOfWord(editor, "main"), styleFor(theme, "function"));
         QCOMPARE(styleOfWord(editor, "// note"), styleFor(theme, "comment"));
@@ -115,7 +115,7 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "cpp", "namespace app { class Foo {}; }\n", theme);
+        const auto h = highlight(editor, "cpp", "namespace app { class Foo {}; }\n", theme);
         QCOMPARE(styleOfWord(editor, "namespace"), styleFor(theme, "keyword"));
         QCOMPARE(styleOfWord(editor, "class"), styleFor(theme, "keyword"));
     }
@@ -124,8 +124,8 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "cpp",
-                           "// éléments\ntemplate <typename T>\nT sum(T a) { T total{}; return total; }\n", theme);
+        const auto h = highlight(
+            editor, "cpp", "// éléments\ntemplate <typename T>\nT sum(T a) { T total{}; return total; }\n", theme);
         const QByteArray text = editor.text().toUtf8();
         for (int i = 0; i < text.size(); ++i)
             if (text[i] == 'T')
@@ -136,7 +136,7 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "java", "public class App { static final int MAX = 3; }\n", theme);
+        const auto h = highlight(editor, "java", "public class App { static final int MAX = 3; }\n", theme);
         QCOMPARE(styleOfWord(editor, "public"), styleFor(theme, "keyword"));
         QCOMPARE(styleOfWord(editor, "MAX"), styleFor(theme, "constant"));
         QCOMPARE(styleOfWord(editor, "3"), styleFor(theme, "number"));
@@ -146,7 +146,7 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "javascript", "const greet = (name) => console.log(`hi ${name}`);\n", theme);
+        const auto h = highlight(editor, "javascript", "const greet = (name) => console.log(`hi ${name}`);\n", theme);
         QCOMPARE(styleOfWord(editor, "const"), styleFor(theme, "keyword"));
         QCOMPARE(styleOfWord(editor, "greet"), styleFor(theme, "function"));
         QCOMPARE(styleOfWord(editor, "console"), styleFor(theme, "variable.builtin"));
@@ -156,7 +156,7 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "c", "int x;\n", theme);
+        const auto h = highlight(editor, "c", "int x;\n", theme);
         QCOMPARE(styleOfWord(editor, "x"), styleFor(theme, "variable"));
 
         editor.insertAt(QStringLiteral("/* "), 0, 0);
@@ -169,29 +169,29 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "json", "{\"key\": \"value\"}\n", theme);
+        const auto h = highlight(editor, "json", "{\"key\": \"value\"}\n", theme);
         QVERIFY(editor.lexer() != nullptr);
     }
 
     void foldsBlocksCommentsAndConditionals()
     {
         QsciScintilla editor;
-        auto h = highlight(editor, "cpp",
-                           "int f(int x) {\n"    // 0
-                           "    if (x) {\n"      // 1
-                           "        return 1;\n" // 2
-                           "    } else {\n"      // 3
-                           "        return 2;\n" // 4
-                           "    }\n"             // 5
-                           "}\n"                 // 6
-                           "/* a\n"              // 7
-                           "   b */\n"           // 8
-                           "#if A\n"             // 9
-                           "int y;\n"            // 10
-                           "#endif\n"            // 11
-                           "int z(int a,\n"      // 12: two lines, nothing to hide
-                           "      int b);\n",
-                           Theme::dark());
+        const auto h = highlight(editor, "cpp",
+                                 "int f(int x) {\n"    // 0
+                                 "    if (x) {\n"      // 1
+                                 "        return 1;\n" // 2
+                                 "    } else {\n"      // 3
+                                 "        return 2;\n" // 4
+                                 "    }\n"             // 5
+                                 "}\n"                 // 6
+                                 "/* a\n"              // 7
+                                 "   b */\n"           // 8
+                                 "#if A\n"             // 9
+                                 "int y;\n"            // 10
+                                 "#endif\n"            // 11
+                                 "int z(int a,\n"      // 12: two lines, nothing to hide
+                                 "      int b);\n",
+                                 Theme::dark());
         const auto depth = [&editor](int line) {
             return static_cast<int>((editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) &
                                      QsciScintillaBase::SC_FOLDLEVELNUMBERMASK) -

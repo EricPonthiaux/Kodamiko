@@ -5,6 +5,8 @@
 
 #include <QScrollBar>
 
+#include <utility>
+
 namespace {
 
 // Indicator of the occurrences (the first ones belong to lexers; the find
@@ -21,11 +23,11 @@ bool isNameStart(char character)
 
 } // namespace
 
-SymbolOccurrences::SymbolOccurrences(EditorWidget *editor, const Theme &theme)
+SymbolOccurrences::SymbolOccurrences(EditorWidget *editor, Theme theme)
     : QObject(editor)
     , editor_(editor)
     , marks_(new ScrollBarMarks(editor->verticalScrollBar()))
-    , theme_(theme)
+    , theme_(std::move(theme))
 {
     settle_.setSingleShot(true);
     settle_.setInterval(settleDelayMs);

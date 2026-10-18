@@ -420,7 +420,7 @@ void ProjectTreeModel::reloadPending()
     // Outer folders first: updating them may replace the inner ones.
     std::sort(toUpdate.begin(), toUpdate.end(), [](Node *a, Node *b) { return a->path.size() < b->path.size(); });
     QStringList updatedPaths;
-    for (Node *node : std::as_const(toUpdate))
+    for (const Node *node : std::as_const(toUpdate))
         updatedPaths.append(node->path);
     for (const QString &path : std::as_const(updatedPaths)) {
         std::function<Node *(Node *)> find = [&](Node *node) -> Node * {

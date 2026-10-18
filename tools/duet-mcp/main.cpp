@@ -151,7 +151,7 @@ private:
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication app(argc, argv);
+    const QCoreApplication app(argc, argv);
     Relay relay;
     // Standard input is read on a thread of its own (no portable way to wait
     // on it in the event loop); each line is handed to the relay.
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
             line += buffer;
             if (line.empty() || line.back() != '\n')
                 continue;
-            QByteArray message = QByteArray::fromStdString(line).trimmed();
+            const QByteArray message = QByteArray::fromStdString(line).trimmed();
             line.clear();
             if (message.isEmpty())
                 continue;
@@ -172,5 +172,5 @@ int main(int argc, char *argv[])
         QMetaObject::invokeMethod(qApp, &QCoreApplication::quit, Qt::QueuedConnection);
     });
     reader.detach();
-    return app.exec();
+    return QCoreApplication::exec();
 }

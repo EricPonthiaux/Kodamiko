@@ -66,7 +66,7 @@ PrerequisitesDialog::PrerequisitesDialog(QWidget *parent)
     rowsLayout_->setSpacing(12);
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
-    QPushButton *checkAgain = buttons->addButton(tr("Check Again"), QDialogButtonBox::ActionRole);
+    const QPushButton *checkAgain = buttons->addButton(tr("Check Again"), QDialogButtonBox::ActionRole);
     connect(checkAgain, &QPushButton::clicked, this, &PrerequisitesDialog::recheck);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
@@ -98,7 +98,7 @@ void PrerequisitesDialog::recheck()
 
 void PrerequisitesDialog::rebuild()
 {
-    while (QLayoutItem *item = rowsLayout_->takeAt(0)) {
+    while (const QLayoutItem *item = rowsLayout_->takeAt(0)) {
         delete item->widget();
         delete item;
     }

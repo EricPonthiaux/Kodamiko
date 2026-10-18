@@ -308,7 +308,8 @@ public:
         // around them.
         QList<Fragment> active;
         for (const MessageLink *l : messagesOf(board)) {
-            const QString from = keys.value(l->from), to = keys.value(l->to);
+            const QString from = keys.value(l->from);
+            const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
             active = syncFragments(out, active, l->fragments, QStringLiteral("  "), true, mermaidText);
@@ -538,7 +539,8 @@ public:
                 continue;
             }
             const ArrowKind arrow = classifyArrow(msg.captured(2));
-            const QString a = unquote(msg.captured(1)), b = unquote(msg.captured(3));
+            const QString a = unquote(msg.captured(1));
+            const QString b = unquote(msg.captured(3));
             participant(a, QStringLiteral("participant"));
             participant(b, QStringLiteral("participant"));
             const QString shortcut = msg.captured(4);
@@ -576,7 +578,8 @@ public:
         }
         QList<Fragment> active;
         for (const MessageLink *l : messagesOf(board)) {
-            const QString from = keys.value(l->from), to = keys.value(l->to);
+            const QString from = keys.value(l->from);
+            const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
             active = syncFragments(out, active, l->fragments, {}, false, plantumlEscape);

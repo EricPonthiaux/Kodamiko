@@ -30,6 +30,9 @@
 #include <QVBoxLayout>
 #include <QWindow>
 
+#include <ranges>
+#include <utility>
+
 namespace {
 
 constexpr int pathRole = Qt::UserRole;
@@ -47,15 +50,15 @@ QListWidget#welcomeProjects { background: transparent; border: none; outline: no
 // set up for on the right.
 class ProjectDelegate : public QStyledItemDelegate {
 public:
-    ProjectDelegate(const Theme &theme, QObject *parent)
+    ProjectDelegate(Theme theme, QObject *parent)
         : QStyledItemDelegate(parent)
-        , theme_(theme)
+        , theme_(std::move(theme))
     {
     }
 
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &) const override
     {
-        return QSize(option.rect.width(), option.fontMetrics.height() * 2 + 22);
+        return {option.rect.width(), option.fontMetrics.height() * 2 + 22};
     }
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
@@ -86,15 +89,15 @@ public:
         const QStringList chips = missing               ? QStringList{QObject::tr("Folder not found")}
                                   : languages.isEmpty() ? QStringList{QObject::tr("Not set up")}
                                                         : languages;
-        for (auto it = chips.crbegin(); it != chips.crend(); ++it) {
-            const int width = smallMetrics.horizontalAdvance(*it) + 14;
+        for (const auto &it : std::views::reverse(chips)) {
+            const int width = smallMetrics.horizontalAdvance(it) + 14;
             const QRectF chip(right - width, text.top() + (text.height() - smallMetrics.height() - 6) / 2.0, width,
                               smallMetrics.height() + 6);
             painter->setPen(QPen(theme_.line, 1));
             painter->setBrush(Qt::NoBrush);
             painter->drawRoundedRect(chip, chip.height() / 2, chip.height() / 2);
             painter->setPen(languages.isEmpty() || missing ? theme_.mutedText : theme_.foreground);
-            painter->drawText(chip, Qt::AlignCenter, *it);
+            painter->drawText(chip, Qt::AlignCenter, it);
             right -= width + 6;
         }
 
@@ -348,7 +351,7 @@ bool WelcomeWindow::eventFilter(QObject *watched, QEvent *event)
 {
     // The empty parts of the window move it, like a title bar.
     if (event->type() == QEvent::MouseButtonPress && watched != search_) {
-        auto *mouse = static_cast<QMouseEvent *>(event);
+        const auto *mouse = static_cast<QMouseEvent *>(event);
         if (mouse->button() == Qt::LeftButton && windowHandle() && frame_->isFrameless()) {
             windowHandle()->startSystemMove();
             return true;

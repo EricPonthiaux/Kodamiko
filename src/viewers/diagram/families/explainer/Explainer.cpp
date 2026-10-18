@@ -166,22 +166,25 @@ QJsonObject FreeNodeShape::toJson() const
 QRectF FreeNodeShape::textRect() const
 {
     if (shape == QLatin1String("circle")) {
-        const qreal width = safeTextWidth_.value_or(std::min(w, h) / std::sqrt(2.0));
+        const qreal width = safeTextWidth_.value_or(std::min(w, h) / std::numbers::sqrt2);
         const qreal height = safeTextHeight_.value_or(width);
         return {cx() - width / 2, cy() - height / 2, width, height};
     }
     if (shape == QLatin1String("ellipse")) {
-        const qreal width = w / std::sqrt(2.0), height = h / std::sqrt(2.0);
+        const qreal width = w / std::sqrt(2.0);
+        const qreal height = h / std::sqrt(2.0);
         return {cx() - width / 2, cy() - height / 2, width, height};
     }
     if (shape == QLatin1String("triangle")) {
-        const qreal width = w / 2.25, height = h / 2.2;
+        const qreal width = w / 2.25;
+        const qreal height = h / 2.2;
         return {cx() - width / 2, labelCenterY() - height / 2, width, height};
     }
     if (shape == QLatin1String("diamond"))
         return {cx() - w / 4, cy() - h / 4, w / 2, h / 2};
     if (shape == QLatin1String("hexagon")) {
-        const qreal width = w / 1.5, height = h / 1.5;
+        const qreal width = w / 1.5;
+        const qreal height = h / 1.5;
         return {cx() - width / 2, cy() - height / 2, width, height};
     }
     return {x + pad, y + pad, std::max<qreal>(20, w - pad * 2), std::max(lineHeight, h - pad * 2)};
@@ -195,7 +198,8 @@ qreal FreeNodeShape::labelCenterY() const
 
 QList<QPointF> FreeNodeShape::polygonPoints() const
 {
-    const qreal r = x + w, b = y + h;
+    const qreal r = x + w;
+    const qreal b = y + h;
     if (shape == QLatin1String("triangle"))
         return {{cx(), y}, {r, b}, {x, b}};
     if (shape == QLatin1String("diamond"))
@@ -218,7 +222,7 @@ QPainterPath FreeNodeShape::outline() const
         return polygon(points);
     // Every box of a diagram carries the same corner, whatever the family: a
     // free board is not the place to invent a second one.
-    return roundRect(x, y, w, h, ShapeRadiusSm);
+    return roundRect(x, y, w, h, shapeRadiusSm);
 }
 
 QPointF FreeNodeShape::borderPoint(QPointF toward) const
@@ -270,7 +274,8 @@ void FreeNodeShape::measure(const Board &)
     // The outline grows with its text and keeps that room (the current size
     // is a floor) until it is explicitly resized; each geometry reserves the
     // area its text box needs inside it.
-    const qreal currentWidth = w, currentHeight = h;
+    const qreal currentWidth = w;
+    const qreal currentHeight = h;
     const QStringList probe = text::wrap(font, label, maxTextWidth);
     const qreal safeWidth = std::max<qreal>(28, text::widest(font, probe) + pad * 2);
     const qreal safeHeight = std::max(lineHeight + pad * 2, probe.size() * lineHeight + pad * 2);
@@ -287,7 +292,7 @@ void FreeNodeShape::measure(const Board &)
         minHeight_ = minWidth_;
         w = h = std::max({currentWidth, currentHeight, minWidth_});
     } else if (shape == QLatin1String("ellipse")) {
-        grow(std::max(140.0, safeWidth * std::sqrt(2.0)), std::max(78.0, safeHeight * std::sqrt(2.0)));
+        grow(std::max(140.0, safeWidth * std::numbers::sqrt2), std::max(78.0, safeHeight * std::numbers::sqrt2));
     } else if (shape == QLatin1String("triangle")) {
         grow(std::max(124.0, safeWidth * 2.25), std::max(108.0, safeHeight * 2.2));
     } else if (shape == QLatin1String("diamond")) {
@@ -335,7 +340,7 @@ void FreeNodeShape::draw(QPainter &painter, const Board &board, const ShapeState
     if (!bare) {
         shadowFill(painter, path, fillColor(toneFill(board, tone)), style);
         stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.shape.stroke),
-               state.selected ? 2 : ShapeBorderWidth);
+               state.selected ? 2 : shapeBorderWidth);
     }
     if (state.editing)
         return;
@@ -512,7 +517,7 @@ void FreeFrameShape::draw(QPainter &painter, const Board &board, const ShapeStat
     // A frame about to take the drag turns solid: the dashed outline says
     // "this is a grouping", the solid one says "let go and it lands here".
     const bool dropTarget = state.dropTarget;
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     painter.save();
     painter.setOpacity(painter.opacity() * (dropTarget ? 0.5 : 0.3));
     shadowFill(painter, path, fillColor(toneFill(board, tone)), style);
@@ -625,7 +630,10 @@ void FreeStrokeShape::syncBounds()
 {
     if (points.empty())
         points = {{0, 0}, {120, 0}};
-    qreal minX = points.front().x(), maxX = minX, minY = points.front().y(), maxY = minY;
+    qreal minX = points.front().x();
+    qreal maxX = minX;
+    qreal minY = points.front().y();
+    qreal maxY = minY;
     for (const QPointF &p : points) {
         minX = std::min(minX, p.x());
         maxX = std::max(maxX, p.x());
@@ -697,6 +705,7 @@ void FreeStrokeShape::onDoubleClick(Board &board)
 std::vector<QPointF> FreeStrokeShape::shaft() const
 {
     std::vector<QPointF> world;
+    world.reserve(points.size());
     for (const QPointF &p : points)
         world.push_back(p + QPointF(x, y));
     // Very short arrows keep their direction and collapse only the shaft:
@@ -721,8 +730,10 @@ void FreeStrokeShape::draw(QPainter &painter, const Board &board, const ShapeSta
     path.moveTo(body.front());
     for (size_t i = 1; i < body.size(); ++i)
         path.lineTo(body[i]);
-    const QPointF first = points[0] + QPointF(x, y), second = points[1] + QPointF(x, y);
-    const QPointF last = points.back() + QPointF(x, y), beforeLast = points[points.size() - 2] + QPointF(x, y);
+    const QPointF first = points[0] + QPointF(x, y);
+    const QPointF second = points[1] + QPointF(x, y);
+    const QPointF last = points.back() + QPointF(x, y);
+    const QPointF beforeLast = points[points.size() - 2] + QPointF(x, y);
     const bool start = arrow == QLatin1String("start") || arrow == QLatin1String("both");
     const bool end = arrow == QLatin1String("end") || arrow == QLatin1String("both");
     const auto paint = [&](const QColor &ink, QPointF offset) {

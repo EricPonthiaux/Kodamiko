@@ -46,7 +46,7 @@ private slots:
 
     void tellsServersTheProjectSetup()
     {
-        LanguageSetup cpp{"cpp", true, "c++23", {}, "clangd", "23.1.0"};
+        const LanguageSetup cpp{"cpp", true, "c++23", {}, "clangd", "23.1.0"};
         QCOMPARE(LanguageServers::optionsFor("clangd", cpp, {}, {}).initialization.value("fallbackFlags").toArray(),
                  (QJsonArray{"-std=c++23"}));
 
@@ -67,7 +67,7 @@ private slots:
                      .toString(),
                  QString("JavaSE-1.8"));
 
-        LanguageSetup python{"python", true, "3.12", "/p/.venv/bin/python", "pyright", "1.1.414"};
+        const LanguageSetup python{"python", true, "3.12", "/p/.venv/bin/python", "pyright", "1.1.414"};
         QCOMPARE(LspClient::settingAt(
                      LanguageServers::optionsFor("pyright", python, "/p/.venv/bin", "/p/.venv/bin/python").settings,
                      "python.pythonPath")
@@ -90,7 +90,7 @@ private slots:
         QVERIFY(LspClient::settingAt(jdtls.settings, "java.configuration.runtimes").isNull());
         QCOMPARE(jdtls.initialization.value("settings").toObject(), jdtls.settings);
         // With one: the runtime as well.
-        LanguageSetup java{"java", true, "21", {}, "jdtls", "1.62.0"};
+        const LanguageSetup java{"java", true, "21", {}, "jdtls", "1.62.0"};
         const LanguageServers::Options project = LanguageServers::optionsFor("jdtls", java, "/jdk21", {});
         QVERIFY(!LspClient::settingAt(project.settings, "java.configuration.runtimes").isNull());
         QVERIFY(LspClient::settingAt(project.settings, "java.completion.chain.enabled").toBool());
@@ -132,7 +132,7 @@ private slots:
 
     void usesTheProjectsServer()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         Toolchains toolchains(dir.filePath("toolchains"), false);
         // A clangd downloaded by Duet.
         const QString folder = toolchains.installFolder("clangd", "23.1.0");
@@ -218,7 +218,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())
             QSKIP("clangd is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QByteArray text = "struct Point {\n  int x;\n  const char *name;\n  void move(int dx);\n};\n"
                                 "void take(const char *label);\n"
                                 "int main() {\n  Point p;\n  take(p.\n}\n";
@@ -255,7 +255,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())
             QSKIP("clangd is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QByteArray text = "struct Point {\n  int x;\n  int y;\n  void move(int dx);\n};\n"
                                 "int main() {\n  Point p;\n  p.\n}\n";
         QFile file(dir.filePath("a.cpp"));
@@ -303,7 +303,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("jdtls").isEmpty())
             QSKIP("jdtls is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QDir().mkpath(dir.filePath("src"));
         const QByteArray text = "public class Main {\n"
                                 "    int count;\n"
@@ -325,7 +325,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("jdtls").isEmpty())
             QSKIP("jdtls is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QDir().mkpath(dir.filePath("src"));
         const QByteArray text = "public class Main {\n"
                                 "    void f() {\n"
@@ -355,7 +355,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("jdtls").isEmpty())
             QSKIP("jdtls is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QDir().mkpath(dir.filePath("src"));
         // Collectors' static members, offered without their class.
         const QByteArray text = "import java.util.List;\n"

@@ -207,11 +207,11 @@ void Inspector::rebuild()
         section_->hide();
         section_->deleteLater();
     }
-    if (board_->selectedShape())
+    if (board_->selectedShape()) {
         section_ = buildShapeSection();
-    else if (board_->selectedLink())
+    } else if (board_->selectedLink()) {
         section_ = buildLinkSection();
-    else if (board_->hasSelection()) {
+    } else if (board_->hasSelection()) {
         section_ = new QWidget(properties_);
         auto *layout = new QVBoxLayout(section_);
         layout->setContentsMargins(0, 0, 0, 0);
@@ -307,7 +307,7 @@ void addPropertyFields(QWidget *section,
 
 QWidget *Inspector::buildShapeSection()
 {
-    Shape *shape = board_->selectedShape();
+    const Shape *shape = board_->selectedShape();
     auto *section = new QWidget(properties_);
     auto *layout = new QVBoxLayout(section);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -362,7 +362,7 @@ QWidget *Inspector::buildShapeSection()
 
 QWidget *Inspector::buildLinkSection()
 {
-    Link *link = board_->selectedLink();
+    const Link *link = board_->selectedLink();
     auto *section = new QWidget(properties_);
     auto *layout = new QVBoxLayout(section);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -417,14 +417,14 @@ QWidget *Inspector::buildLinkSection()
     });
     layout->addWidget(line);
     layout->addWidget(fieldLabel(tr("Line color"), section));
-    QStringList colors = lineColors();
+    const QStringList &colors = lineColors();
     layout->addWidget(swatchGrid(colors, section, [this](const QString &color) {
         board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customColor"), color}});
     }));
     layout->addWidget(fieldLabel(tr("Line width"), section));
     auto *width = new QComboBox(section);
     width->addItem(tr("Default"), 0);
-    for (int value : {1, 2, 3, 4, 6, 8})
+    for (const int value : {1, 2, 3, 4, 6, 8})
         width->addItem(QString::number(value), value);
     width->setCurrentIndex(std::max(0, width->findData(int(link->customWidth.value_or(0)))));
     connect(width, &QComboBox::activated, this, [this, width](int index) {

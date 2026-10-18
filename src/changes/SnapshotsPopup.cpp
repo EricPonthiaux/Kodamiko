@@ -268,7 +268,7 @@ void SnapshotsPopup::applyTheme(const Theme &theme)
     const qreal ratio = devicePixelRatioF();
     headerIcon_->setPixmap(iconTile(QStringLiteral("history"), theme, 40, ratio));
     emptyIcon_->setPixmap(iconTile(QStringLiteral("history"), theme, 64, ratio));
-    QFont mono = AppFonts::codeFont(font().pointSizeF() * 0.9);
+    const QFont mono = AppFonts::codeFont(font().pointSizeF() * 0.9);
     commit_->setFont(mono);
     if (auto *delegate = dynamic_cast<SnapshotDelegate *>(list_->itemDelegate()))
         delegate->theme = theme;

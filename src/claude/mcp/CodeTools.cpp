@@ -23,6 +23,7 @@
 #include <QTimer>
 
 #include <memory>
+#include <utility>
 
 namespace DuetTools {
 
@@ -80,7 +81,7 @@ LspClient *serverFor(const DuetToolContext &context, const QString &path, QStrin
         *sent = changed;
     if (const std::optional<LanguageServerSpec> spec = context.languageServers->specFor(languageId)) {
         for (const QString &open : context.tabs->openFilePaths()) {
-            EditorWidget *editor = context.tabs->editorFor(open);
+            const EditorWidget *editor = context.tabs->editorFor(open);
             if (editor && open != path && spec->languages.contains(editor->languageId()))
                 context.languageServers->syncDocument(client, open, editor->languageId(),
                                                       editor->utf8Bytes().toByteArray());
@@ -178,11 +179,12 @@ QJsonArray buildProblemsJson(const DuetToolContext &context, const QString &path
 
 // Problems an editor shows that do not come from a server (Claude's
 // configuration files).
-QJsonArray editorProblems(EditorWidget *editor)
+QJsonArray editorProblems(const EditorWidget *editor)
 {
     QJsonArray array;
     for (const Diagnostic &diagnostic : editor->diagnostics()) {
-        int line = 0, index = 0;
+        int line = 0;
+        int index = 0;
         editor->lineIndexFromPosition(diagnostic.start, &line, &index);
         array.append(QJsonObject{{QStringLiteral("line"), line + 1},
                                  {QStringLiteral("column"), index + 1},
@@ -265,8 +267,8 @@ void positionalRequest(const DuetToolContext &context,
                        const QJsonObject &arguments,
                        const QString &method,
                        const QJsonObject &extraParams,
-                       McpReply reply,
-                       std::function<McpResult(const QJsonValue &)> convert)
+                       const McpReply &reply,
+                       const std::function<McpResult(const QJsonValue &)> &convert)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     QString error;
@@ -286,7 +288,7 @@ void positionalRequest(const DuetToolContext &context,
 // The code actions at a position, for a list or to apply one.
 void requestCodeActions(const DuetToolContext &context,
                         const QJsonObject &arguments,
-                        std::function<void(LspClient *, QList<QJsonObject>, const QString &)> done)
+                        const std::function<void(LspClient *, QList<QJsonObject>, const QString &)> &done)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     QString error;
@@ -335,7 +337,7 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
                        "edits compile."),
         object({{QStringLiteral("paths"),
                  array(string(QStringLiteral("File")), QStringLiteral("Files to check (optional)"))}}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             QStringList paths;
             for (const QJsonValue &value : arguments.value(QStringLiteral("paths")).toArray())
                 paths.append(context.absolute(value.toString()));
@@ -365,8 +367,8 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("find_definition"), QStringLiteral("Definition"),
         QStringLiteral("Where the symbol at a position is defined, according to the file's language server (types "
                        "and overloads resolved, unlike a text search)."),
-        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
-            positionalRequest(context, arguments, QStringLiteral("textDocument/definition"), {}, reply,
+        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
+            positionalRequest(context, arguments, QStringLiteral("textDocument/definition"), {}, std::move(reply),
                               [context](const QJsonValue &result) {
                                   return McpResult::json(QJsonObject{
                                       {QStringLiteral("definitions"), locationsJson(context, parseLocations(result))}});
@@ -380,12 +382,12 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         positionSchema({{QStringLiteral("includeDeclaration"), boolean(QStringLiteral("Include the declaration "
                                                                                       "(default true)"))}},
                        {QStringLiteral("includeDeclaration")}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             positionalRequest(context, arguments, QStringLiteral("textDocument/references"),
                               {{QStringLiteral("context"),
                                 QJsonObject{{QStringLiteral("includeDeclaration"),
                                              arguments.value(QStringLiteral("includeDeclaration")).toBool(true)}}}},
-                              reply, [context](const QJsonValue &result) {
+                              std::move(reply), [context](const QJsonValue &result) {
                                   const QList<Location> locations = parseLocations(result);
                                   return McpResult::json(
                                       QJsonObject{{QStringLiteral("references"), locationsJson(context, locations)},
@@ -397,8 +399,8 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("get_symbol_info"), QStringLiteral("Symbol information"),
         QStringLiteral("The type, signature and documentation of the symbol at a position, as the language "
                        "server's hover gives them."),
-        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
-            positionalRequest(context, arguments, QStringLiteral("textDocument/hover"), {}, reply,
+        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
+            positionalRequest(context, arguments, QStringLiteral("textDocument/hover"), {}, std::move(reply),
                               [](const QJsonValue &result) {
                                   const QJsonValue contents = result.toObject().value(QStringLiteral("contents"));
                                   QStringList parts;
@@ -426,7 +428,7 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
                        "real refactoring, not a text replacement). Open files change in their editor (one step "
                        "the user can undo, unsaved), the others on disk."),
         positionSchema({{QStringLiteral("newName"), string(QStringLiteral("The new name"))}}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             const QString newName = arguments.value(QStringLiteral("newName")).toString().trimmed();
             if (newName.isEmpty()) {
                 reply(McpResult::error(QStringLiteral("The new name is empty")));
@@ -454,9 +456,9 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("get_code_actions"), QStringLiteral("Quick fixes"),
         QStringLiteral("The quick fixes and refactorings the language server offers at a position (for the "
                        "problems on its line): their titles, to apply one with apply_code_action."),
-        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        positionSchema(), [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             requestCodeActions(
-                context, arguments, [reply](LspClient *, QList<QJsonObject> actions, const QString &error) {
+                context, arguments, [reply](LspClient *, const QList<QJsonObject> &actions, const QString &error) {
                     if (!error.isEmpty()) {
                         reply(McpResult::error(error));
                         return;
@@ -479,11 +481,11 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("Applies the quick fix or refactoring of that title at a position (see get_code_actions). "
                        "Open files change in their editor, unsaved."),
         positionSchema({{QStringLiteral("title"), string(QStringLiteral("The action's title"))}}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             const QString title = arguments.value(QStringLiteral("title")).toString();
             requestCodeActions(
                 context, arguments,
-                [context, reply, title](LspClient *server, QList<QJsonObject> actions, const QString &error) {
+                [context, reply, title](LspClient *server, const QList<QJsonObject> &actions, const QString &error) {
                     if (!error.isEmpty()) {
                         reply(McpResult::error(error));
                         return;
@@ -528,7 +530,7 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
                        "in its editor, unsaved; a closed one on disk."),
         object({{QStringLiteral("path"), string(QStringLiteral("File, relative to the project or absolute"))}},
                {QStringLiteral("path")}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             const std::optional<CodeFormatter::Command> command =
                 CodeFormatter::find(LanguageRegistry::languageForFile(path), path);

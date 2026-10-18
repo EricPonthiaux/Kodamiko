@@ -94,17 +94,17 @@ struct Style {
 };
 
 // Constants shared by the families (shape-board.js).
-constexpr qreal ShapeRadiusSm = 4;
-constexpr qreal ShapeBorderWidth = 1;
-constexpr qreal LabelGutter = 8;
-constexpr qreal ClusterLabelFontPx = 14;
-constexpr qreal ClusterMargin = 24;
-constexpr qreal LinkWidthMin = 1;
-constexpr qreal LinkWidthMax = 8;
+constexpr qreal shapeRadiusSm = 4;
+constexpr qreal shapeBorderWidth = 1;
+constexpr qreal labelGutter = 8;
+constexpr qreal clusterLabelFontPx = 14;
+constexpr qreal clusterMargin = 24;
+constexpr qreal linkWidthMin = 1;
+constexpr qreal linkWidthMax = 8;
 // Graphviz `arrowhead=normal`: a base 70 % as wide as the head is long.
-extern const qreal GraphvizNormalArrowSpread;
+extern const qreal graphvizNormalArrowSpread;
 // Distance from an arrow's tip to the middle of its base.
-qreal arrowBaseInset(qreal size, qreal spread = GraphvizNormalArrowSpread);
+qreal arrowBaseInset(qreal size, qreal spread = graphvizNormalArrowSpread);
 
 // ---------------------------------------------------------------------------
 // Text
@@ -120,11 +120,11 @@ struct Font {
 
     Font() = default;
 
-    constexpr Font(qreal px_, int weight_ = 400, bool italic_ = false, bool mono_ = false)
-        : px(px_)
-        , weight(weight_)
-        , italic(italic_)
-        , mono(mono_)
+    constexpr Font(qreal px, int weight = 400, bool italic = false, bool mono = false)
+        : px(px)
+        , weight(weight)
+        , italic(italic)
+        , mono(mono)
     {
     }
 };
@@ -146,24 +146,24 @@ enum class Baseline {
 namespace text {
 
 QFont referenceFont(const Font &font);
-qreal width(const Font &font, const QString &text);
+qreal width(const Font &font, const QString &value);
 qreal ascent(const Font &font);
 qreal descent(const Font &font);
 // Lines that fit `maxWidth`, honoring explicit newlines; a word longer than
 // the width is cut at the longest prefix that fits (wrapText).
-QStringList wrap(const Font &font, const QString &text, qreal maxWidth);
+QStringList wrap(const Font &font, const QString &value, qreal maxWidth);
 // Widest of these lines.
 qreal widest(const Font &font, const QStringList &lines);
 // fillText: `text` at `position`, aligned and on the baseline given.
 void draw(QPainter &painter,
           const Font &font,
-          const QString &text,
+          const QString &value,
           QPointF position,
           const QColor &color,
           Align align = Align::Left,
           Baseline baseline = Baseline::Alphabetic);
 // The ellipsized text that fits `maxWidth`.
-QString elided(const Font &font, const QString &text, qreal maxWidth);
+QString elided(const Font &font, const QString &value, qreal maxWidth);
 
 } // namespace text
 

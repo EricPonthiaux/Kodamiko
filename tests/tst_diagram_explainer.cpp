@@ -279,7 +279,8 @@ private slots:
     void creationPalette()
     {
         const Family &family = families::explainer();
-        QStringList ids, traced;
+        QStringList ids;
+        QStringList traced;
         for (const ElementPreset &preset : family.elements) {
             ids.append(preset.id);
             if (preset.trace) {
@@ -353,7 +354,7 @@ private slots:
     // free-shape connection handles exist only while the shape is selected
     void portsOnlyWhenSelected()
     {
-        FreeNodeShape shape;
+        const FreeNodeShape shape;
         QVERIFY(!shape.showConnectionPorts());
         QVERIFY(!shape.showConnectionPortsOnHover());
     }
@@ -419,8 +420,8 @@ private slots:
                    element(R"({"id":"e","type":"edge","from":"outside","to":"n1"})")})));
         QString error;
         QVERIFY2(graphviz::autoArrange(board, familyOptions(), &error), qPrintable(error));
-        Shape *frame = byKey(board, QStringLiteral("frame"));
-        Shape *child = byKey(board, QStringLiteral("child"));
+        const Shape *frame = byKey(board, QStringLiteral("frame"));
+        const Shape *child = byKey(board, QStringLiteral("child"));
         // A component visibly placed in a frame recovers its missing parent.
         QCOMPARE(child->parentBoundary, QStringLiteral("frame"));
         QVERIFY(inside(*frame->childBounds(board), child->rect()));
@@ -444,7 +445,7 @@ private slots:
     {
         Board board;
         board.setFamily(&families::explainer());
-        auto *frame = static_cast<FreeFrameShape *>(board.addShape(
+        const auto *frame = static_cast<FreeFrameShape *>(board.addShape(
             QStringLiteral("freeFrame"), {{QStringLiteral("w"), 220},
                                           {QStringLiteral("h"), 140},
                                           {QStringLiteral("title"), QStringLiteral("Title ").repeated(100)}}));
@@ -453,7 +454,7 @@ private slots:
             QVERIFY(text::width(Font(14, 600), line) <= frame->w - 28);
         QVERIFY(frame->h >= frame->titleHeight() + 40);
 
-        auto *stroke = static_cast<FreeStrokeShape *>(board.addShape(
+        const auto *stroke = static_cast<FreeStrokeShape *>(board.addShape(
             QStringLiteral("freeStroke"), {{QStringLiteral("x"), 20},
                                            {QStringLiteral("y"), 30},
                                            {QStringLiteral("points"), QJsonArray{QJsonArray{0, 0}, QJsonArray{80, 0}}},
@@ -466,10 +467,10 @@ private slots:
     // visual-explanation arrow shafts stop at the base of their heads
     void arrowShaftsStopAtTheirHeads()
     {
-        const qreal inset = 11 * std::cos(GraphvizNormalArrowSpread);
+        const qreal inset = 11 * std::cos(graphvizNormalArrowSpread);
         Board board;
         board.setFamily(&families::explainer());
-        auto *stroke = static_cast<FreeStrokeShape *>(board.addShape(
+        const auto *stroke = static_cast<FreeStrokeShape *>(board.addShape(
             QStringLiteral("freeStroke"), {{QStringLiteral("x"), 10},
                                            {QStringLiteral("y"), 20},
                                            {QStringLiteral("points"), QJsonArray{QJsonArray{0, 0}, QJsonArray{100, 0}}},
@@ -480,19 +481,19 @@ private slots:
         QCOMPARE(shaft.front().y(), 20.0);
 
         // A blocked edge stays straight until Graphviz has routed it.
-        Shape *from = board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("x"), 0},
-                                                                  {QStringLiteral("y"), 200},
-                                                                  {QStringLiteral("w"), 40},
-                                                                  {QStringLiteral("h"), 40}});
+        const Shape *from = board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("x"), 0},
+                                                                        {QStringLiteral("y"), 200},
+                                                                        {QStringLiteral("w"), 40},
+                                                                        {QStringLiteral("h"), 40}});
         board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("x"), 130},
                                                     {QStringLiteral("y"), 180},
                                                     {QStringLiteral("w"), 80},
                                                     {QStringLiteral("h"), 80}});
-        Shape *to = board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("x"), 300},
-                                                                {QStringLiteral("y"), 200},
-                                                                {QStringLiteral("w"), 40},
-                                                                {QStringLiteral("h"), 40}});
-        Link *edge = board.addLink(QStringLiteral("freeEdge"), from->id, to->id, {});
+        const Shape *to = board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("x"), 300},
+                                                                      {QStringLiteral("y"), 200},
+                                                                      {QStringLiteral("w"), 40},
+                                                                      {QStringLiteral("h"), 40}});
+        const Link *edge = board.addLink(QStringLiteral("freeEdge"), from->id, to->id, {});
         QVERIFY(edge);
         const std::optional<Route> straight = edge->route(board);
         QVERIFY(straight && straight->curve.empty() && straight->points.empty());
@@ -569,15 +570,16 @@ private slots:
             {"ellipse", "ellipse"}, {"triangle", "triangle"}, {"diamond", "diamond"}, {"hexagon", "hexagon"},
         };
         for (auto it = expected.begin(); it != expected.end(); ++it) {
-            Shape *node = board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("shape"), it.key()},
-                                                                      {QStringLiteral("label"), QStringLiteral("A")}});
+            const Shape *node =
+                board.addShape(QStringLiteral("freeNode"),
+                               {{QStringLiteral("shape"), it.key()}, {QStringLiteral("label"), QStringLiteral("A")}});
             QVERIFY2(node->graphvizNodeAttributes(board, QStringLiteral("TB"), node->w, node->h)
                          .contains(QStringLiteral("shape=") + it.value()),
                      qPrintable(it.key()));
         }
         // Graphviz fills only the top three quarters of a node box with its
         // triangle: the box reserved for one is a third taller than drawn.
-        Shape *triangle =
+        const Shape *triangle =
             board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("shape"), QStringLiteral("triangle")},
                                                         {QStringLiteral("w"), 124},
                                                         {QStringLiteral("h"), 108},
@@ -595,12 +597,12 @@ private slots:
         }
 
         // Border points lie on the outline drawn.
-        auto *circle = static_cast<FreeNodeShape *>(board.addShape(
+        const auto *circle = static_cast<FreeNodeShape *>(board.addShape(
             QStringLiteral("freeNode"),
             {{QStringLiteral("shape"), QStringLiteral("circle")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 0}}));
         const QPointF p = circle->borderPoint(QPointF(500, 500));
         QCOMPARE(std::hypot(p.x() - circle->cx(), p.y() - circle->cy()), circle->w / 2);
-        auto *diamond = static_cast<FreeNodeShape *>(
+        const auto *diamond = static_cast<FreeNodeShape *>(
             board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("shape"), QStringLiteral("diamond")},
                                                         {QStringLiteral("x"), 0},
                                                         {QStringLiteral("y"), 0}}));
@@ -713,7 +715,7 @@ private slots:
         QCOMPARE(int(reloaded.shapes().size()), int(board.shapes().size()));
         QCOMPARE(int(reloaded.links().size()), 1);
         for (const auto &s : board.shapes()) {
-            Shape *other = byKey(reloaded, s->key);
+            const Shape *other = byKey(reloaded, s->key);
             QVERIFY2(other, qPrintable(s->key));
             QCOMPARE(other->type, s->type);
             QCOMPARE(other->rect(), s->rect());
@@ -750,7 +752,7 @@ private slots:
                     QVERIFY2(!a->rect().intersects(b->rect()), qPrintable(a->key + QStringLiteral(" / ") + b->key));
             }
         }
-        Shape *frame = byKey(board, QStringLiteral("f"));
+        const Shape *frame = byKey(board, QStringLiteral("f"));
         QVERIFY(inside(*frame->childBounds(board), byKey(board, QStringLiteral("d"))->rect()));
         // Once saved, the places are source data.
         Board reloaded;

@@ -132,7 +132,7 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result,
     // Only a server that resolves items is asked to.
     const bool resolves =
         client && client->capabilities().value("completionProvider").toObject().value("resolveProvider").toBool();
-    QPointer<LspClient> server(client);
+    const QPointer<LspClient> server(client);
     QJsonArray list;
     *incomplete = false;
     if (result.isArray()) {

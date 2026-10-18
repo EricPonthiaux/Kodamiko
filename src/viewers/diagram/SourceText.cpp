@@ -47,7 +47,7 @@ QString decodeLabel(const QString &text)
         last = m.capturedEnd();
     }
     decoded += result.mid(last);
-    result = decoded;
+    result = std::move(decoded);
     static const QRegularExpression quot(QStringLiteral("&quot;|#quot;"));
     static const QRegularExpression apos(QStringLiteral("&#39;|&apos;|#39;"));
     static const QRegularExpression lt(QStringLiteral("&lt;"), QRegularExpression::CaseInsensitiveOption);
@@ -224,13 +224,13 @@ QStringList splitTop(const QString &text, QChar separator)
                 quote = QChar();
             continue;
         }
-        if (c == QLatin1Char('"') || c == QLatin1Char('\''))
+        if (c == QLatin1Char('"') || c == QLatin1Char('\'')) {
             quote = c;
-        else if (c == QLatin1Char('[') || c == QLatin1Char('(') || c == QLatin1Char('{'))
+        } else if (c == QLatin1Char('[') || c == QLatin1Char('(') || c == QLatin1Char('{')) {
             ++depth;
-        else if (c == QLatin1Char(']') || c == QLatin1Char(')') || c == QLatin1Char('}'))
+        } else if (c == QLatin1Char(']') || c == QLatin1Char(')') || c == QLatin1Char('}')) {
             depth = std::max(0, depth - 1);
-        else if (c == separator && depth == 0) {
+        } else if (c == separator && depth == 0) {
             parts.append(text.mid(start, i - start));
             start = i + 1;
         }

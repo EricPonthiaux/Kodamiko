@@ -12,6 +12,7 @@
 #include <QVersionNumber>
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -130,8 +131,8 @@ QList<RuntimeInstall> machinePythons()
 
 } // namespace
 
-Toolchains::Toolchains(const QString &root, bool lookOnMachine)
-    : root_(root)
+Toolchains::Toolchains(QString root, bool lookOnMachine)
+    : root_(std::move(root))
     , lookOnMachine_(lookOnMachine)
 {
 }
@@ -195,7 +196,7 @@ QList<RuntimeInstall> Toolchains::machineRuntimes(const QString &tool) const
 {
     if (!lookOnMachine_)
         return {};
-    auto it = machine_.find(tool);
+    const auto it = machine_.find(tool);
     if (it != machine_.end())
         return it.value();
     // Probing runs programs ("node --version"...): its result is shared by

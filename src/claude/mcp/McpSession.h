@@ -33,7 +33,7 @@ signals:
 private:
     void readLines();
     void send(const QJsonObject &message);
-    void result(const QJsonValue &id, const QJsonObject &result);
+    void result(const QJsonValue &id, const QJsonObject &value);
     void error(const QJsonValue &id, int code, const QString &message);
     void callTool(const QJsonValue &id, const QJsonObject &params);
     void readResource(const QJsonValue &id, const QJsonObject &params);

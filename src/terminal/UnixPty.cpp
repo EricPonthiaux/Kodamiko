@@ -14,7 +14,7 @@
 #include <csignal>
 #include <cstring>
 
-#if defined(Q_OS_MACOS)
+#ifdef Q_OS_MACOS
 #include <util.h>
 #elif defined(Q_OS_FREEBSD)
 #include <libutil.h>
@@ -85,7 +85,7 @@ bool UnixPty::start(const ProcessSpec &spec, QSize cells)
     CStringArray envp(spec.environment.toStringList());
     const QByteArray programPath = program.toLocal8Bit();
     const QByteArray workingDirectory = spec.workingDirectory.toLocal8Bit();
-    winsize size = windowSize(cells);
+    const winsize size = windowSize(cells);
 
     const pid_t pid = ::forkpty(&masterFd_, nullptr, nullptr, &size);
     if (pid < 0) {

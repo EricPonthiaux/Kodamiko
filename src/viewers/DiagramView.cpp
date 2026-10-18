@@ -277,7 +277,7 @@ struct Printed {
 
 bool DiagramView::exportImage(const QString &path, QString *error) const
 {
-    Printed printed(*board_);
+    const Printed printed(*board_);
     if (QFileInfo(path).suffix().compare(QStringLiteral("svg"), Qt::CaseInsensitive) == 0) {
 #ifdef DUET_WITH_SVG
         QSvgGenerator generator;

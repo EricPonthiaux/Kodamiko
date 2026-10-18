@@ -37,7 +37,8 @@ NodeText parseText(const QString &body)
     const QRegularExpressionMatch m = split.match(trimmed);
     const QString rest = m.captured(2).trimmed();
     for (const auto &[openText, closeText] : delimiters) {
-        const QString open = QString::fromLatin1(openText), close = QString::fromLatin1(closeText);
+        const QString open = QString::fromLatin1(openText);
+        const QString close = QString::fromLatin1(closeText);
         if (rest.startsWith(open) && rest.endsWith(close) && rest.size() > open.size() + close.size() - 1) {
             QString text = rest.mid(open.size(), rest.size() - open.size() - close.size()).trimmed();
             if (text.size() >= 2 && text.startsWith(QLatin1Char('"')) && text.endsWith(QLatin1Char('"')))

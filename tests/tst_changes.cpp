@@ -144,11 +144,11 @@ private slots:
 
     void outsideARepository()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         GitCommands commands;
         ChangesView view(Theme::dark(), &commands);
         view.setFolder(project.path());
-        QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
         const auto *list = view.findChild<QTreeWidget *>();
@@ -158,7 +158,7 @@ private slots:
 
     void stageAllThenCommit()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         write(project, "a.txt", "a\n");
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         Git::run(project.path(), {"add", "-A"});
@@ -170,7 +170,7 @@ private slots:
         ChangesView view(Theme::dark(), &commands);
         view.show();
         view.setFolder(project.path());
-        QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh(); // off the UI thread
         QTRY_COMPARE(refreshed.size(), 1);
         const auto *list = view.findChild<QTreeWidget *>();
@@ -201,7 +201,7 @@ private slots:
 
     void snapshotsPopupListsAndRestores()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         write(project, "a.txt", "a\n");
         Git::run(project.path(), {"add", "-A"});
@@ -220,7 +220,7 @@ private slots:
         QCOMPARE(popup.files()->count(), 1);
         QCOMPARE(popup.files()->item(0)->text(), QString("a.txt"));
 
-        QSignalSpy succeeded(&commands, &GitCommands::succeeded);
+        const QSignalSpy succeeded(&commands, &GitCommands::succeeded);
         popup.restoreSelected();
         QTRY_COMPARE(succeeded.count(), 1);
         QFile file(project.filePath("a.txt"));
@@ -230,7 +230,7 @@ private slots:
 
     void snapshotsPopupWithoutSnapshots()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         QWidget window;
         GitCommands commands;
@@ -344,7 +344,7 @@ private slots:
 
     void operationBarDuringAMerge()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         write(project, "a.txt", "a\n");
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         Git::run(project.path(), {"add", "-A"});
@@ -362,7 +362,7 @@ private slots:
         view.show();
         view.setFolder(project.path());
         QVERIFY(!view.operationBar()->isVisible());
-        QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
         QVERIFY(view.operationBar()->isVisible());
@@ -374,7 +374,7 @@ private slots:
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 2);
         QVERIFY(view.continueButton()->isEnabled());
-        QSignalSpy continued(&view, &ChangesView::continueRequested);
+        const QSignalSpy continued(&view, &ChangesView::continueRequested);
         view.continueButton()->click();
         QCOMPARE(continued.size(), 1);
 
@@ -386,7 +386,7 @@ private slots:
 
     void readsTheChangesOfTheNextCommit()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         write(project, "a.txt", "a\n");
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         Git::run(project.path(), {"add", "-A"});
@@ -419,7 +419,7 @@ private slots:
     // With a stand-in for the `claude` command, found in the PATH.
     void generatesTheCommitMessage()
     {
-        QTemporaryDir bin;
+        const QTemporaryDir bin;
         const QString claude = bin.filePath("claude");
         QFile script(claude);
         QVERIFY(script.open(QIODevice::WriteOnly));
@@ -432,7 +432,7 @@ private slots:
         const QByteArray path = qgetenv("PATH");
         qputenv("PATH", bin.path().toUtf8() + ':' + path);
 
-        QTemporaryDir project;
+        const QTemporaryDir project;
         write(project, "a.txt", "a\n");
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         Git::run(project.path(), {"add", "-A"});
@@ -442,7 +442,7 @@ private slots:
         GitCommands commands;
         ChangesView view(Theme::dark(), &commands);
         view.setFolder(project.path());
-        QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
 

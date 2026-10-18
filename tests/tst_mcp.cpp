@@ -11,6 +11,8 @@
 #include <QSignalSpy>
 #include <QtTest>
 
+#include <utility>
+
 namespace {
 
 // A registry with a few tools of every kind.
@@ -32,7 +34,7 @@ void fill(McpRegistry &registry)
                       true,
                       false,
                       {},
-                      [](const QJsonObject &arguments, McpReply reply, McpProgress progress) {
+                      [](const QJsonObject &arguments, const McpReply &reply, const McpProgress &progress) {
                           progress(1, 2, QStringLiteral("halfway"));
                           QString text = arguments.value(QStringLiteral("text"))
                                              .toString()
@@ -51,7 +53,7 @@ void fill(McpRegistry &registry)
                       false,
                       true,
                       [](const QJsonObject &) { return QStringLiteral("erase it all"); },
-                      [](const QJsonObject &, McpReply reply, McpProgress) {
+                      [](const QJsonObject &, const McpReply &reply, const McpProgress &) {
                           reply(McpResult::message(QStringLiteral("erased")));
                       }});
     registry.addResource({QStringLiteral("duet://test/state"), false, QStringLiteral("state"), QStringLiteral("State"),
@@ -333,7 +335,7 @@ private slots:
                  QStringLiteral("hé"));
 
         // Hooks still work on the same socket meanwhile.
-        QSignalSpy hooks(&server, &HookServer::hookReceived);
+        const QSignalSpy hooks(&server, &HookServer::hookReceived);
         QProcess hook;
         hook.setProcessEnvironment(environment);
         hook.start(QStringLiteral(DUET_HOOK_PATH), {});
@@ -377,17 +379,18 @@ private slots:
     {
         McpRegistry registry;
         McpReply held;
-        registry.addTool({QStringLiteral("slow"),
-                          {},
-                          QStringLiteral("Never answers"),
-                          {},
-                          {},
-                          true,
-                          false,
-                          false,
-                          false,
-                          {},
-                          [&held](const QJsonObject &, McpReply reply, McpProgress) { held = reply; }});
+        registry.addTool(
+            {QStringLiteral("slow"),
+             {},
+             QStringLiteral("Never answers"),
+             {},
+             {},
+             true,
+             false,
+             false,
+             false,
+             {},
+             [&held](const QJsonObject &, McpReply reply, const McpProgress &) { held = std::move(reply); }});
         auto *server = new HookServer;
         QVERIFY(server->listen());
         server->setMcpRegistry(&registry);

@@ -118,7 +118,7 @@ public:
     QByteArray snapshot(bool routes = true) const;
     // Records a change: the snapshot taken before it, if the model moved.
     void pushHistory(const QByteArray &before);
-    void applySnapshot(const QByteArray &snapshot);
+    void applySnapshot(const QByteArray &data);
 
     bool canUndo() const { return !undo_.empty(); }
 

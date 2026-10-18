@@ -26,7 +26,7 @@ QNetworkRequest requestFor(const QUrl &url)
     return request;
 }
 
-QString replyError(QNetworkReply *reply)
+QString replyError(const QNetworkReply *reply)
 {
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (reply->error() == QNetworkReply::NoError && status < 400)

@@ -232,7 +232,7 @@ bool TerminalWidget::isModeShortcut(const QKeyEvent &event)
     if (event.key() >= Qt::Key_1 && event.key() <= Qt::Key_4)
         return true;
     // Keys 1 to 4 of the top row, whatever the layout.
-#if defined(Q_OS_MACOS)
+#ifdef Q_OS_MACOS
     const quint32 code = event.nativeVirtualKey(); // kVK_ANSI_1..4
     return code >= 0x12 && code <= 0x15;
 #elif defined(Q_OS_WIN)
@@ -380,7 +380,7 @@ void TerminalWidget::paintRow(QPainter &painter, int row)
     int runFont = 0;
     QRgb runPen = 0;
     runText_.clear();
-    auto flush = [&] {
+    const auto flush = [&] {
         if (!isDecorated(runFont)) {
             while (runText_.endsWith(QLatin1Char(' ')))
                 runText_.chop(1);
@@ -538,7 +538,7 @@ QPoint TerminalWidget::cellAt(const QPoint &widgetPosition) const
 {
     const int column = std::clamp(widgetPosition.x() / cellSize_.width(), 0, screen_->columns() - 1);
     const int row = std::clamp(widgetPosition.y() / cellSize_.height(), 0, screen_->rows() - 1);
-    return QPoint(column, row - scrollOffset_);
+    return {column, row - scrollOffset_};
 }
 
 void TerminalWidget::mousePressEvent(QMouseEvent *event)

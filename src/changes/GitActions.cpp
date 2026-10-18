@@ -87,7 +87,7 @@ void GitActions::runRemote(const QString &title,
 bool GitActions::confirm(const QString &title, const QString &question, const QString &action)
 {
     QMessageBox box(QMessageBox::Question, title, question, QMessageBox::Cancel, window_);
-    QPushButton *accept = box.addButton(action, QMessageBox::AcceptRole);
+    const QPushButton *accept = box.addButton(action, QMessageBox::AcceptRole);
     box.setDefaultButton(QMessageBox::Cancel);
     box.exec();
     return box.clickedButton() == accept;
@@ -130,7 +130,7 @@ bool GitActions::onPullFailed(const GitError &error)
     box.setInformativeText(tr("Rebase replays your own commits on top of %1; merge joins both with a merge commit.")
                                .arg(current->upstream));
     QPushButton *rebaseButton = box.addButton(tr("Rebase"), QMessageBox::AcceptRole);
-    QPushButton *mergeButton = box.addButton(tr("Merge"), QMessageBox::AcceptRole);
+    const QPushButton *mergeButton = box.addButton(tr("Merge"), QMessageBox::AcceptRole);
     box.setDefaultButton(rebaseButton);
     box.exec();
     if (box.clickedButton() == rebaseButton)
@@ -148,7 +148,7 @@ bool GitActions::onPushFailed(const GitError &error)
     box.setInformativeText(tr("Pull brings their commits in first. Overwriting deletes them from the remote, "
                               "unless someone pushed others since the last fetch."));
     QPushButton *pullButton = box.addButton(tr("Pull"), QMessageBox::AcceptRole);
-    QPushButton *forceButton = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole);
+    const QPushButton *forceButton = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole);
     box.setDefaultButton(pullButton);
     box.exec();
     if (box.clickedButton() == pullButton) {

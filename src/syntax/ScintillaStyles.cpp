@@ -11,7 +11,7 @@
 
 namespace ScintillaStyles {
 
-void applyDefaultStyle(QsciScintilla &editor, const Theme &theme)
+void applyDefaultStyle(const QsciScintilla &editor, const Theme &theme)
 {
     // With the ligatures if the editor's are on (the highlighters style
     // the editors).
@@ -26,7 +26,7 @@ void applyDefaultStyle(QsciScintilla &editor, const Theme &theme)
     editor.SendScintilla(QsciScintillaBase::SCI_STYLECLEARALL);
 }
 
-void applySyntaxStyles(QsciScintilla &editor, const Theme &theme)
+void applySyntaxStyles(const QsciScintilla &editor, const Theme &theme)
 {
     const int count = std::min<int>(theme.syntaxStyles.size(), maxSyntaxStyles);
     for (int i = 0; i < count; ++i) {
@@ -39,7 +39,7 @@ void applySyntaxStyles(QsciScintilla &editor, const Theme &theme)
     }
 }
 
-void applyTypography(QsciScintilla &editor, const QFont &font, qreal lineHeight)
+void applyTypography(const QsciScintilla &editor, const QFont &font, qreal lineHeight)
 {
     const qreal fontPixels = QFontInfo(font).pixelSize();
     const int extra = std::max(0, qRound(fontPixels * lineHeight - QFontMetricsF(font).height()));

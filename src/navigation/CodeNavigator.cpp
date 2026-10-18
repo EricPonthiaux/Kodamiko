@@ -145,7 +145,7 @@ void CodeNavigator::goForward()
 
 std::optional<NavigationHistory::Location> CodeNavigator::currentLocation() const
 {
-    EditorWidget *editor = tabs_->currentEditor();
+    const EditorWidget *editor = tabs_->currentEditor();
     if (!editor || editor->filePath().isEmpty())
         return std::nullopt;
     return NavigationHistory::Location{editor->filePath(),

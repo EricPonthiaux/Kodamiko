@@ -101,11 +101,11 @@ void MindNode::draw(QPainter &painter, const Board &board, const ShapeState &sta
     const Style &style = board.style();
     // Every bubble is rounded-sm, like the states and the rest of the board:
     // no fully rounded stadium for the root and the first level.
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     if (!customFill.isEmpty()) {
         shadowFill(painter, path, fillColor(style.palette.fill), style);
         stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.shape.stroke),
-               state.selected ? 2 : ShapeBorderWidth);
+               state.selected ? 2 : shapeBorderWidth);
     } else if (depth == 0) {
         shadowFill(painter, path, style.palette.solid, style);
         if (state.selected)
@@ -113,7 +113,7 @@ void MindNode::draw(QPainter &painter, const Board &board, const ShapeState &sta
     } else if (depth == 1) {
         shadowFill(painter, path, style.tones.sage, style);
         stroke(painter, path, state.selected ? style.shape.selectedStroke : style.shape.stroke,
-               state.selected ? 2 : ShapeBorderWidth);
+               state.selected ? 2 : shapeBorderWidth);
     } else {
         // A leaf: no box, a fine underline carries the text (Mermaid's
         // deepest level). The selection still outlines the hit box so that it
@@ -126,7 +126,7 @@ void MindNode::draw(QPainter &painter, const Board &board, const ShapeState &sta
         stroker.setCapStyle(Qt::RoundCap);
         shadowFill(painter, stroker.createStroke(underline), style.palette.lifeline, style);
         if (state.selected)
-            stroke(painter, roundRect(x - 2, y - 2, w + 4, h + 4, ShapeRadiusSm), style.shape.selectedStroke, 1.5);
+            stroke(painter, roundRect(x - 2, y - 2, w + 4, h + 4, shapeRadiusSm), style.shape.selectedStroke, 1.5);
     }
 
     if (state.editing)
@@ -174,10 +174,12 @@ void MindLink::draw(QPainter &painter, const Board &board, bool selected) const
     const std::optional<Route> r = route(board);
     if (!r)
         return;
-    const QPointF a = r->a, b = r->b;
+    const QPointF a = r->a;
+    const QPointF b = r->b;
     // Control point: the midpoint pushed slightly aside, an organic bow.
     const QPointF m = (a + b) / 2;
-    const qreal dx = b.x() - a.x(), dy = b.y() - a.y();
+    const qreal dx = b.x() - a.x();
+    const qreal dy = b.y() - a.y();
     const qreal length = std::hypot(dx, dy) > 0 ? std::hypot(dx, dy) : 1;
     const qreal bow = std::min<qreal>(length * 0.12, 26);
     const QPointF control(m.x() - (dy / length) * bow, m.y() + (dx / length) * bow);

@@ -76,7 +76,7 @@ private slots:
     {
         VtScreen screen(5, 20);
         screen.takeDamage();
-        QSignalSpy changed(&screen, &VtScreen::screenChanged);
+        const QSignalSpy changed(&screen, &VtScreen::screenChanged);
         screen.feed("ab\x1b[1mcd\x1b[0m\r\nef");
         QCOMPARE(changed.size(), 1);
         const QRect damage = screen.takeDamage();
@@ -171,7 +171,7 @@ private slots:
         QVERIFY(shortcut(Qt::Key_2, QStringLiteral("2"), 0, 0));
         QVERIFY(!shortcut(Qt::Key_W, QStringLiteral("w"), 0, 0));
         // AZERTY: the 2 key produces "é" without Shift.
-#if defined(Q_OS_MACOS)
+#ifdef Q_OS_MACOS
         QVERIFY(shortcut(Qt::Key_Eacute, QStringLiteral("é"), 0, 0x13));
 #elif defined(Q_OS_WIN)
         QVERIFY(shortcut(Qt::Key_Eacute, QStringLiteral("é"), 0x03, 0));

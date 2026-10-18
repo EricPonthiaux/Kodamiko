@@ -16,6 +16,8 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include <utility>
+
 namespace {
 
 // Claude may read a good part of the project first.
@@ -70,16 +72,16 @@ QString errorColor(const QPalette &palette)
 
 } // namespace
 
-DiagramGenerationView::DiagramGenerationView(const QString &workDir,
-                                             const QString &path,
-                                             const QString &kindTitle,
-                                             const QString &description,
+DiagramGenerationView::DiagramGenerationView(QString workDir,
+                                             QString path,
+                                             QString kindTitle,
+                                             QString description,
                                              QWidget *parent)
     : QWidget(parent)
-    , workDir_(workDir)
-    , path_(path)
-    , kindTitle_(kindTitle)
-    , description_(description)
+    , workDir_(std::move(workDir))
+    , path_(std::move(path))
+    , kindTitle_(std::move(kindTitle))
+    , description_(std::move(description))
     , clock_(new QTimer(this))
     , spinner_(new Spinner(this))
     , title_(new QLabel(this))
@@ -227,7 +229,7 @@ void DiagramGenerationView::stop()
 void DiagramGenerationView::readOutput()
 {
     pending_ += process_->readAllStandardOutput();
-    qsizetype newline;
+    qsizetype newline = 0;
     while ((newline = pending_.indexOf('\n')) >= 0) {
         const QByteArray line = pending_.left(newline);
         pending_.remove(0, newline + 1);

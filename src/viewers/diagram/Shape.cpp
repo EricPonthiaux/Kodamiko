@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 namespace diagram {
 
@@ -89,8 +90,8 @@ QJsonArray toJsonArray(const QStringList &values)
 // ---------------------------------------------------------------------------
 // Shape
 
-Shape::Shape(const QString &type_, qreal width, qreal height)
-    : type(type_)
+Shape::Shape(QString type, qreal width, qreal height)
+    : type(std::move(type))
     , w(width)
     , h(height)
 {
@@ -183,7 +184,8 @@ bool Shape::hitTest(QPointF point) const
 
 QPointF Shape::borderPoint(QPointF toward) const
 {
-    const qreal dx = toward.x() - cx(), dy = toward.y() - cy();
+    const qreal dx = toward.x() - cx();
+    const qreal dy = toward.y() - cy();
     if (!dx && !dy)
         return {cx(), cy()};
     const qreal inf = std::numeric_limits<qreal>::infinity();
@@ -255,7 +257,7 @@ QColor Shape::strokeColor(const QColor &fallback) const
     const QColor custom = parseColor(customFill);
     if (!custom.isValid())
         return fallback;
-    return QColor(qRound(custom.red() * 0.75), qRound(custom.green() * 0.75), qRound(custom.blue() * 0.75));
+    return {qRound(custom.red() * 0.75), qRound(custom.green() * 0.75), qRound(custom.blue() * 0.75)};
 }
 
 QColor Shape::textColor(const QColor &fallback) const
@@ -293,14 +295,19 @@ void measureShape(const Board &board, Shape &shape, const QJsonObject *props)
 QPointF bezierPoint(QPointF p0, QPointF p1, QPointF p2, QPointF p3, qreal t)
 {
     const qreal u = 1 - t;
-    const qreal a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+    const qreal a = u * u * u;
+    const qreal b = 3 * u * u * t;
+    const qreal c = 3 * u * t * t;
+    const qreal d = t * t * t;
     return {a * p0.x() + b * p1.x() + c * p2.x() + d * p3.x(), a * p0.y() + b * p1.y() + c * p2.y() + d * p3.y()};
 }
 
 qreal distanceToSegment(QPointF p, QPointF a, QPointF b)
 {
-    const qreal vx = b.x() - a.x(), vy = b.y() - a.y();
-    const qreal wx = p.x() - a.x(), wy = p.y() - a.y();
+    const qreal vx = b.x() - a.x();
+    const qreal vy = b.y() - a.y();
+    const qreal wx = p.x() - a.x();
+    const qreal wy = p.y() - a.y();
     const qreal len2 = vx * vx + vy * vy;
     const qreal t = len2 ? clamp((wx * vx + wy * vy) / len2, 0, 1) : 0;
     return std::hypot(p.x() - (a.x() + t * vx), p.y() - (a.y() + t * vy));
@@ -343,7 +350,7 @@ std::vector<QPointF> trimPolyline(const std::vector<QPointF> &points, qreal trim
     const qreal scale = requested > total ? total / requested : 1;
 
     struct At {
-        size_t index;
+        size_t index{};
         QPointF point;
     };
 
@@ -369,18 +376,22 @@ std::vector<QPointF> trimPolyline(const std::vector<QPointF> &points, qreal trim
 
 QPointF polygonBorderPoint(QPointF center, QPointF toward, const QList<QPointF> &points)
 {
-    const qreal dx = toward.x() - center.x(), dy = toward.y() - center.y();
+    const qreal dx = toward.x() - center.x();
+    const qreal dy = toward.y() - center.y();
     if (!dx && !dy)
         return center;
     bool found = false;
     qreal best = 0;
     for (qsizetype i = 0; i < points.size(); ++i) {
-        const QPointF a = points[i], b = points[(i + 1) % points.size()];
-        const qreal ex = b.x() - a.x(), ey = b.y() - a.y();
+        const QPointF a = points[i];
+        const QPointF b = points[(i + 1) % points.size()];
+        const qreal ex = b.x() - a.x();
+        const qreal ey = b.y() - a.y();
         const qreal denominator = dx * ey - dy * ex;
         if (std::abs(denominator) < 1e-9)
             continue;
-        const qreal ax = a.x() - center.x(), ay = a.y() - center.y();
+        const qreal ax = a.x() - center.x();
+        const qreal ay = a.y() - center.y();
         const qreal t = (ax * ey - ay * ex) / denominator;
         const qreal u = (ax * dy - ay * dx) / denominator;
         if (t >= 0 && u >= -1e-9 && u <= 1 + 1e-9 && (!found || t < best)) {
@@ -393,7 +404,8 @@ QPointF polygonBorderPoint(QPointF center, QPointF toward, const QList<QPointF> 
 
 QPointF ellipseBorderPoint(QPointF center, QPointF toward, qreal rx, qreal ry)
 {
-    const qreal dx = toward.x() - center.x(), dy = toward.y() - center.y();
+    const qreal dx = toward.x() - center.x();
+    const qreal dy = toward.y() - center.y();
     if ((!dx && !dy) || rx <= 0 || ry <= 0)
         return center;
     const qreal t = 1 / std::hypot(dx / rx, dy / ry);
@@ -470,8 +482,8 @@ std::optional<Spline> Spline::fromJson(const QJsonValue &value)
 // ---------------------------------------------------------------------------
 // Link
 
-Link::Link(const QString &type_)
-    : type(type_)
+Link::Link(QString type)
+    : type(std::move(type))
 {
 }
 
@@ -493,7 +505,7 @@ void Link::load(const QJsonObject &props)
     const QString color = jsonString(props, QStringLiteral("customColor"));
     customColor = isHexColor(color) ? color.toLower() : QString();
     const QJsonValue width = props.value(QStringLiteral("customWidth"));
-    if (width.isDouble() && width.toDouble() >= LinkWidthMin && width.toDouble() <= LinkWidthMax)
+    if (width.isDouble() && width.toDouble() >= linkWidthMin && width.toDouble() <= linkWidthMax)
         customWidth = width.toDouble();
     else
         customWidth.reset();
@@ -569,7 +581,8 @@ std::optional<Route> Link::route(const Board &board) const
     QPointF pb = b->borderPoint(QPointF(a->cx(), a->cy()));
     const qreal spread = parallelSpread(board);
     if (spread) {
-        const qreal dx = pb.x() - pa.x(), dy = pb.y() - pa.y();
+        const qreal dx = pb.x() - pa.x();
+        const qreal dy = pb.y() - pa.y();
         const qreal len = std::hypot(dx, dy) ? std::hypot(dx, dy) : 1;
         // Perpendicular in the pair's canonical frame (independent of the
         // link's direction), so that every parallel shares the same axis.
@@ -644,16 +657,18 @@ std::optional<QPointF> Link::labelShift(const Route &r, const Board &board) cons
     const ParallelGroup group = parallelGroup(board);
     if (group.count < 2)
         return std::nullopt;
-    const qreal dx = r.b.x() - r.a.x(), dy = r.b.y() - r.a.y();
+    const qreal dx = r.b.x() - r.a.x();
+    const qreal dy = r.b.y() - r.a.y();
     const qreal length = std::hypot(dx, dy);
     if (!length)
         return std::nullopt;
-    const qreal nx = dy / length, ny = -dx / length;
+    const qreal nx = dy / length;
+    const qreal ny = -dx / length;
     const LabelBox box = labelBox(board);
     // The box's thickness seen along the perpendicular: its width on a
     // vertical route, its height on a horizontal one.
     const qreal extent = std::abs(nx) * box.width + std::abs(ny) * box.height;
-    const qreal step = extent + LabelGutter;
+    const qreal step = extent + labelGutter;
     const qreal flip = from < to ? 1 : -1;
     const qreal shift = (group.index - (group.count - 1) / 2.0) * step * flip;
     return QPointF(nx * shift, ny * shift);
@@ -666,7 +681,7 @@ std::optional<QPointF> Link::reservedLabelPoint(const Route &r, const Board &boa
     // The place Graphviz reserved holds for the curve it computed: kept only
     // while it lies along the line drawn.
     const LabelBox box = labelBox(board);
-    const qreal reach = std::max(box.width, box.height) + LabelGutter;
+    const qreal reach = std::max(box.width, box.height) + labelGutter;
     return distanceToRoute(r, *r.labelPoint) <= reach ? r.labelPoint : std::nullopt;
 }
 
@@ -688,7 +703,8 @@ void Link::strokeBody(QPainter &painter, const Route &r, const BodyOptions &o) c
     QPainterPath path;
     if (!r.curve.empty()) {
         std::vector<QPointF> pts = r.curve;
-        const qreal startAngle = departureAngle(r), endAngle = arrivalAngle(r);
+        const qreal startAngle = departureAngle(r);
+        const qreal endAngle = arrivalAngle(r);
         const QPointF start(r.a.x() + o.trimStart * std::cos(startAngle), r.a.y() + o.trimStart * std::sin(startAngle));
         const QPointF end(r.b.x() - o.trim * std::cos(endAngle), r.b.y() - o.trim * std::sin(endAngle));
         // Each end moves its neighboring control point along, which keeps the
@@ -716,14 +732,14 @@ void Link::strokeBody(QPainter &painter, const Route &r, const BodyOptions &o) c
 
 qreal Link::arrivalAngle(const Route &r) const
 {
-    QPointF from_ = r.a;
+    QPointF from = r.a;
     if (!r.curve.empty()) {
         const QPointF last = r.curve.back();
-        from_ = std::hypot(r.b.x() - last.x(), r.b.y() - last.y()) > 0.5 ? last : r.curve[r.curve.size() - 2];
+        from = std::hypot(r.b.x() - last.x(), r.b.y() - last.y()) > 0.5 ? last : r.curve[r.curve.size() - 2];
     } else if (r.points.size() > 1) {
-        from_ = r.points[r.points.size() - 2];
+        from = r.points[r.points.size() - 2];
     }
-    return std::atan2(r.b.y() - from_.y(), r.b.x() - from_.x());
+    return std::atan2(r.b.y() - from.y(), r.b.x() - from.x());
 }
 
 qreal Link::departureAngle(const Route &r) const

@@ -11,6 +11,8 @@
 #include <QPainterPath>
 #include <QWidgetAction>
 
+#include <utility>
+
 namespace {
 
 constexpr int rowHeight = 46;
@@ -41,14 +43,14 @@ public:
                      const RunConfiguration &configuration,
                      bool selected,
                      bool running,
-                     const Theme &theme)
+                     Theme theme)
         : QWidget(menu)
         , action_(action)
         , menu_(menu)
         , configuration_(configuration)
         , selected_(selected)
         , running_(running)
-        , theme_(theme)
+        , theme_(std::move(theme))
     {
         setMouseTracking(true);
         setFixedHeight(rowHeight);
@@ -94,7 +96,7 @@ protected:
             painter.fillPath(path, gradient);
         }
         const QColor text = highlighted ? QColor(Qt::white) : theme_.foreground;
-        QColor muted = highlighted ? QColor(255, 255, 255, 190) : theme_.mutedText;
+        const QColor muted = highlighted ? QColor(255, 255, 255, 190) : theme_.mutedText;
 
         // The kind, on a rounded tile.
         const QRectF tile(10, (height() - tileSize) / 2.0, tileSize, tileSize);

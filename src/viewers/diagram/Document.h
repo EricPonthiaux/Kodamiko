@@ -43,7 +43,7 @@ QByteArray save(const Board &board, const Codec &codec);
 QString source(const Board &board, const Codec &codec);
 // Replaces the board's content with `source` in the same notation, keeping
 // the layout by key; `laidOut` tells whether new elements need a layout.
-bool applySource(Board &board, const Codec &codec, const QString &source, Loaded &loaded, QString *error);
+bool applySource(Board &board, const Codec &codec, const QString &text, Loaded &loaded, QString *error);
 // A new file of a family, in its default notation (empty if unknown).
 QByteArray blank(const QString &familyId);
 // The file extension of a family's files ("mmd").

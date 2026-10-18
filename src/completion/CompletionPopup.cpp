@@ -481,7 +481,7 @@ void CompletionPopup::resolveDocumentation()
         return;
     entry.documentationRequested = true;
     const QString label = entry.item.label;
-    QPointer<CompletionPopup> self(this);
+    const QPointer<CompletionPopup> self(this);
     entry.item.resolveDocumentation([self, row, label](const QString &text) {
         // The list may have changed meanwhile: only the same candidate.
         if (!self || row >= self->count() || self->model_->entries[size_t(row)].item.label != label)

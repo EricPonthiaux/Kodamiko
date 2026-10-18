@@ -21,7 +21,7 @@ std::vector<OutlineSymbol> build(std::vector<RangedSymbol> &flat,
 {
     std::vector<OutlineSymbol> result;
     result.reserve(indices.size());
-    for (size_t index : indices) {
+    for (const size_t index : indices) {
         OutlineSymbol symbol = std::move(flat[index].symbol);
         symbol.children = build(flat, children, children[index]);
         result.push_back(std::move(symbol));

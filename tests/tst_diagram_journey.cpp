@@ -50,7 +50,7 @@ bool loadInto(Board &board, const QByteArray &content, document::Loaded *loaded 
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 
@@ -146,7 +146,7 @@ private slots:
     {
         Board board;
         board.setFamily(&families::journey());
-        auto *shape = dynamic_cast<JourneyTaskShape *>(board.addShape(
+        const auto *shape = dynamic_cast<JourneyTaskShape *>(board.addShape(
             QStringLiteral("journey"),
             QJsonObject{
                 {QStringLiteral("text"),

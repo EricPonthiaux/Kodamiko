@@ -284,7 +284,7 @@ QChar CompletionController::docCommentTrigger(QChar typed, int position) const
         if (start > 0) {
             const char before = static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, start - 1));
             if (before == '@' || (before == '\\' && doxygen))
-                return QChar(before);
+                return {before};
         }
     }
     return {};
@@ -416,7 +416,7 @@ void CompletionController::start(bool explicitRequest, QChar triggerCharacter, M
     if (mode == Mode::Extended) {
         // The words of the other open files of the language.
         qsizetype total = 0;
-        for (EditorWidget *other : editor_->window()->findChildren<EditorWidget *>()) {
+        for (const EditorWidget *other : editor_->window()->findChildren<EditorWidget *>()) {
             if (other == editor_ || other->languageId() != context.languageId)
                 continue;
             QByteArray text = other->utf8Bytes().toByteArray();
@@ -502,13 +502,13 @@ void CompletionController::refilter()
 
 void CompletionController::showPopup()
 {
-    QWidget *viewport = editor_->viewport();
+    const QWidget *viewport = editor_->viewport();
     const int x = static_cast<int>(
         editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
     const int y = static_cast<int>(
         editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
     const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line_));
-    QWidget *parent = popup_->parentWidget();
+    const QWidget *parent = popup_->parentWidget();
     // Aligned with the identifier's text: the badge's width to the left.
     const QPoint below = viewport->mapTo(parent, QPoint(x - 34, y + lineHeight + 2));
     const QPoint top = viewport->mapTo(parent, QPoint(x, y - 2));
@@ -741,7 +741,7 @@ void CompletionController::accept(bool replaceWord)
 
     if (item.additionalEdits.isEmpty() && item.resolveEdits) {
         // Known once chosen (jdtls): applied when the server answers.
-        QPointer<CompletionController> self(this);
+        const QPointer<CompletionController> self(this);
         const int inserted = int(text.size());
         const int replaced = end - start;
         item.resolveEdits([self, start, inserted, replaced](const QList<TextEdit> &edits) {
@@ -906,7 +906,7 @@ void CompletionController::requestFullLine()
     if (to < text.size())
         to = std::max(int(text.lastIndexOf('\n', to)), position);
     const int generation = ++fullLineGeneration_;
-    QPointer<CompletionController> self(this);
+    const QPointer<CompletionController> self(this);
     model->suggest(QString::fromUtf8(text.mid(from, position - from)),
                    QString::fromUtf8(text.mid(position, to - position)), editor_->languageId(),
                    [self, generation, position](const QString &suggestion) {

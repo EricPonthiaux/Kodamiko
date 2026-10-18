@@ -20,7 +20,7 @@ qreal clamp(qreal value, qreal low, qreal high)
     return std::max(low, std::min(value, high));
 }
 
-QJsonArray sortedById(QJsonArray items)
+QJsonArray sortedById(const QJsonArray &items)
 {
     std::vector<QJsonObject> list;
     for (const QJsonValue &item : items)
@@ -171,7 +171,8 @@ Link *Board::addLink(const QString &requestedType, const QString &from, const QS
 {
     if (!shape(from) || !shape(to))
         return nullptr;
-    bool allowSelf = false, allowMulti = false;
+    bool allowSelf = false;
+    bool allowMulti = false;
     QString type = requestedType.isEmpty() ? (family_ ? family_->defaultLink : QString()) : requestedType;
     std::unique_ptr<Link> created = makeLink(type, &allowSelf, &allowMulti);
     if (!created && family_) {
@@ -189,7 +190,7 @@ Link *Board::addLink(const QString &requestedType, const QString &from, const QS
         }
     }
     created->load(props);
-    created->type = type;
+    created->type = std::move(type);
     created->from = from;
     created->to = to;
     if (created->id.isEmpty() || linkIndex_.contains(created->id) || shapeIndex_.contains(created->id))
@@ -273,7 +274,7 @@ bool Board::removeLink(const QString &id)
 
 void Board::bringToFront(const QString &id)
 {
-    auto it = std::find_if(shapes_.begin(), shapes_.end(), [&id](const auto &s) { return s->id == id; });
+    const auto it = std::find_if(shapes_.begin(), shapes_.end(), [&id](const auto &s) { return s->id == id; });
     if (it == shapes_.end() || it + 1 == shapes_.end())
         return;
     std::unique_ptr<Shape> moved = std::move(*it);
@@ -495,7 +496,8 @@ QByteArray Board::snapshot(bool routes) const
 {
     // Sorted by id, so that bringing a clicked shape to the top never counts
     // as a change.
-    QJsonArray shapes, links;
+    QJsonArray shapes;
+    QJsonArray links;
     for (const auto &s : shapes_)
         shapes.append(s->toJson());
     for (const auto &l : links_) {
@@ -591,7 +593,8 @@ void Board::edit(const std::function<void()> &change)
 
 QJsonObject Board::selectionJson() const
 {
-    QJsonArray shapes, links;
+    QJsonArray shapes;
+    QJsonArray links;
     for (const auto &s : shapes_) {
         if (selection_.contains(s->id))
             shapes.append(s->toJson());
@@ -650,7 +653,8 @@ void Board::addClipboardContent(const QJsonArray &shapes, const QJsonArray &link
     QHash<QString, QString> idMap;
     QHash<QString, Shape *> byReference;
     QList<std::pair<QJsonObject, Shape *>> pasted;
-    QStringList createdShapes, createdLinks;
+    QStringList createdShapes;
+    QStringList createdLinks;
     selection_.clear();
     linkSelection_.clear();
     for (const QJsonValue &value : shapes) {
@@ -681,7 +685,7 @@ void Board::addClipboardContent(const QJsonArray &shapes, const QJsonArray &link
         const QString parent = original.value(QStringLiteral("parentBoundary")).toString();
         if (parent.isEmpty())
             continue;
-        if (Shape *copied = byReference.value(parent))
+        if (const Shape *copied = byReference.value(parent))
             s->parentBoundary = copied->key.isEmpty() ? copied->id : copied->key;
         else
             s->parentBoundary = parent;
@@ -696,7 +700,7 @@ void Board::addClipboardContent(const QJsonArray &shapes, const QJsonArray &link
         props.remove(QStringLiteral("id"));
         props.remove(QStringLiteral("spline"));
         props.remove(QStringLiteral("key"));
-        if (Link *l = addLink(props.value(QStringLiteral("type")).toString(), from, to, props))
+        if (const Link *l = addLink(props.value(QStringLiteral("type")).toString(), from, to, props))
             createdLinks.append(l->id);
     }
     emit elementsCreated(createdShapes, createdLinks);
@@ -798,7 +802,7 @@ bool Board::styleSelectedLinks(const QJsonObject &patch)
         }
         if (patch.contains(QStringLiteral("customWidth"))) {
             const QJsonValue width = patch.value(QStringLiteral("customWidth"));
-            if (width.isDouble() && width.toDouble() >= LinkWidthMin && width.toDouble() <= LinkWidthMax)
+            if (width.isDouble() && width.toDouble() >= linkWidthMin && width.toDouble() <= linkWidthMax)
                 l->customWidth = width.toDouble();
             else
                 l->customWidth.reset();
@@ -814,7 +818,8 @@ bool Board::styleSelectedLinks(const QJsonObject &patch)
 
 QJsonObject Board::toJson() const
 {
-    QJsonArray shapes, links;
+    QJsonArray shapes;
+    QJsonArray links;
     for (const auto &s : shapes_)
         shapes.append(s->toJson());
     for (const auto &l : links_)

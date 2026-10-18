@@ -66,7 +66,7 @@ QString operationName(int state)
 
 // The branch `head` tracks, and how far apart they are. A branch without
 // upstream, or whose upstream is gone (deleted on the remote), has none.
-void readUpstream(git_repository *repository, git_reference *head, RepositoryInfo &info)
+void readUpstream(git_repository *repository, const git_reference *head, RepositoryInfo &info)
 {
     git_reference *upstream = nullptr;
     if (git_branch_upstream(&upstream, head) != 0)

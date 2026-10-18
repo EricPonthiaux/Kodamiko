@@ -27,15 +27,15 @@ inline QColor changeKindColor(ChangeKind kind)
 {
     switch (kind) {
     case ChangeKind::Added:
-        return QColor("#3fa34d");
+        return {"#3fa34d"};
     case ChangeKind::Modified:
-        return QColor("#d19a1f");
+        return {"#d19a1f"};
     case ChangeKind::Deleted:
-        return QColor("#d14b4b");
+        return {"#d14b4b"};
     case ChangeKind::Renamed:
-        return QColor("#4b8bd1");
+        return {"#4b8bd1"};
     case ChangeKind::Conflicted:
-        return QColor("#b65fd1");
+        return {"#b65fd1"};
     }
     return {};
 }

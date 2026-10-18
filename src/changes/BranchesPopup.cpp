@@ -98,7 +98,7 @@ public:
         const QFontMetrics titleMetrics(title);
         const qreal lineHeight = option.fontMetrics.height();
         const qreal top = text.center().y() - lineHeight - 1;
-        QString name =
+        const QString name =
             titleMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideMiddle, int(text.width()));
         painter->setFont(title);
         painter->setPen(selected ? theme.accentText : theme.foreground);

@@ -12,6 +12,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <ranges>
 
 namespace {
 
@@ -330,9 +331,9 @@ void FindBar::selectFrom(long position, bool forward)
         }
         select(matches_.first()); // wraps around
     } else {
-        for (auto it = matches_.crbegin(); it != matches_.crend(); ++it) {
-            if (it->end <= position) {
-                select(*it);
+        for (auto matche : std::views::reverse(matches_)) {
+            if (matche.end <= position) {
+                select(matche);
                 return;
             }
         }
@@ -412,8 +413,9 @@ void FindBar::replaceAll()
     editor_->SendScintilla(QsciScintillaBase::SCI_SETSEARCHFLAGS, searchFlags());
     editor_->beginUndoAction();
     // From the end: the positions of the remaining matches do not move.
-    for (auto it = matches_.crbegin(); it != matches_.crend(); ++it) {
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(it->start), it->end);
+    for (auto matche : std::views::reverse(matches_)) {
+        editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(matche.start),
+                               matche.end);
         if (editor_->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET, static_cast<unsigned long>(pattern.size()),
                                    pattern.constData()) >= 0)
             editor_->SendScintilla(message, static_cast<unsigned long>(replacement.size()), replacement.constData());

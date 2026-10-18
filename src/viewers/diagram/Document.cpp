@@ -112,7 +112,7 @@ QString linkKey(const Board &board, const Link &l)
 
 // Gives the built board's elements their saved place, size, color and
 // curve. Returns the shapes left without a place.
-QStringList restore(Board &board, const SavedLayout &layout)
+QStringList restore(const Board &board, const SavedLayout &layout)
 {
     QStringList unplaced;
     for (const auto &s : board.shapes()) {
@@ -142,7 +142,7 @@ QStringList restore(Board &board, const SavedLayout &layout)
         if (rank >= candidates.size())
             continue;
         taken.insert(key, rank + 1);
-        const QJsonObject saved = candidates[rank];
+        const QJsonObject &saved = candidates[rank];
         const QString line = saved.value(QStringLiteral("style")).toString();
         if (line == QLatin1String("solid") || line == QLatin1String("dashed") || line == QLatin1String("dotted"))
             l->customLineStyle = line;
@@ -150,7 +150,7 @@ QStringList restore(Board &board, const SavedLayout &layout)
         if (isHexColor(color))
             l->customColor = color.toLower();
         const qreal width = saved.value(QStringLiteral("width")).toDouble();
-        if (width >= LinkWidthMin && width <= LinkWidthMax)
+        if (width >= linkWidthMin && width <= linkWidthMax)
             l->customWidth = width;
         const Shape *a = board.shape(l->from);
         const Shape *b = board.shape(l->to);

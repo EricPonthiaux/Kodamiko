@@ -44,7 +44,7 @@ QString wrapBody(const QString &message)
     QStringList lines = message.split(QLatin1Char('\n'));
     QStringList wrapped;
     for (qsizetype i = 0; i < lines.size(); ++i) {
-        QString line = lines[i];
+        const QString &line = lines.at(i);
         if (i == 0 || line.size() <= width || line.startsWith(QLatin1Char(' ')) || line.startsWith(QLatin1Char('\t'))) {
             wrapped.append(line);
             continue;

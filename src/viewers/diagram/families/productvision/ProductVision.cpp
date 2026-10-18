@@ -109,7 +109,8 @@ QString ProductVisionShape::displayText() const
 
 qreal ProductVisionShape::layoutText()
 {
-    const bool root = isRoot(), featured = isFeatured();
+    const bool root = isRoot();
+    const bool featured = isFeatured();
     const qreal inner = w - padX * 2;
     titleLines_ = text::wrap(root ? rootTitleFont : sectionTitleFont, displayText(), inner);
     const Font &body = root ? rootBodyFont : featured ? momentumBodyFont : sectionBodyFont;
@@ -161,7 +162,8 @@ void ProductVisionShape::onDoubleClick(Board &board)
 
 void ProductVisionShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
-    const bool root = isRoot(), featured = isFeatured();
+    const bool root = isRoot();
+    const bool featured = isFeatured();
     const Style &style = board.style();
     const Tones &tones = style.tones;
     const QHash<QString, QColor> fills{
@@ -171,10 +173,10 @@ void ProductVisionShape::draw(QPainter &painter, const Board &board, const Shape
         {QStringLiteral("unknowns"), tones.rose},
     };
     const QColor nativeFill = root ? tones.strong : fills.value(role, tones.sage);
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, path, fillColor(nativeFill), style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     if (state.editing)
         return;
 

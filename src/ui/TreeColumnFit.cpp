@@ -23,7 +23,7 @@ TreeColumnFit::TreeColumnFit(QTreeView *tree)
 
     connect(tree, &QTreeView::expanded, this, &TreeColumnFit::refit);
     connect(tree, &QTreeView::collapsed, this, &TreeColumnFit::refit);
-    QAbstractItemModel *model = tree->model();
+    const QAbstractItemModel *model = tree->model();
     connect(model, &QAbstractItemModel::rowsInserted, this, &TreeColumnFit::refit);
     connect(model, &QAbstractItemModel::rowsRemoved, this, &TreeColumnFit::refit);
     connect(model, &QAbstractItemModel::modelReset, this, &TreeColumnFit::refit);

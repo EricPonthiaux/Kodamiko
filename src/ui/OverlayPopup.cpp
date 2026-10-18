@@ -180,7 +180,7 @@ void OverlayPopup::onWatchedEvent(QObject *watched, QEvent *event)
     } else if (event->type() == QEvent::MouseButtonPress && watched->isWidgetType()) {
         // A click in the window, outside the panel and its edges: closes it.
         // Menus and other windows do not count.
-        auto *widget = static_cast<QWidget *>(watched);
+        const auto *widget = static_cast<QWidget *>(watched);
         if (widget->window() == parentWidget()->window() && widget != this && !isAncestorOf(widget))
             dismiss();
     }

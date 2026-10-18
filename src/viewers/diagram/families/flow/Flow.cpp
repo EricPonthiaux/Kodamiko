@@ -76,8 +76,8 @@ QString typeOf(const QString &variant)
 // ---------------------------------------------------------------------------
 // FlowShape
 
-FlowShape::FlowShape(const QString &type_)
-    : Shape(type_, 150, 70)
+FlowShape::FlowShape(const QString &type)
+    : Shape(type, 150, 70)
 {
     if (type == QLatin1String("decision")) {
         w = 170;
@@ -212,7 +212,8 @@ void FlowShape::onDoubleClick(Board &board)
 
 QList<QPointF> FlowShape::points() const
 {
-    const qreal r = x + w, b = y + h;
+    const qreal r = x + w;
+    const qreal b = y + h;
     if (type == QLatin1String("decision")) {
         if (variant == QLatin1String("hexagon")) {
             const qreal inset = std::min<qreal>(28, w * .2);
@@ -256,7 +257,7 @@ QPainterPath FlowShape::outline() const
         return path;
     }
     if (variant.isEmpty() || isOneOf(variant, {"square", "subroutine"}))
-        return roundRect(x, y, w, h, ShapeRadiusSm);
+        return roundRect(x, y, w, h, shapeRadiusSm);
     return polygon(points());
 }
 
@@ -293,7 +294,8 @@ QPointF FlowShape::borderPoint(QPointF toward) const
 {
     const QPointF center(cx(), cy());
     if (type == QLatin1String("terminator")) {
-        const qreal dx = toward.x() - cx(), dy = toward.y() - cy();
+        const qreal dx = toward.x() - cx();
+        const qreal dy = toward.y() - cy();
         if (!dx && !dy)
             return center;
         if (variant == QLatin1String("stadium") && w > h) {
@@ -359,7 +361,7 @@ void FlowShape::draw(QPainter &painter, const Board &board, const ShapeState &st
     const QPainterPath path = outline();
     shadowFill(painter, path, fillColor(nativeFill), style);
     const QColor line = strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border);
-    const qreal width = state.selected ? 2 : ShapeBorderWidth;
+    const qreal width = state.selected ? 2 : shapeBorderWidth;
     stroke(painter, path, line, width);
     drawDetails(painter, line, width);
     if (state.editing)
@@ -368,8 +370,8 @@ void FlowShape::draw(QPainter &painter, const Board &board, const ShapeState &st
     painter.setClipPath(path, Qt::IntersectClip);
     const QColor ink = textColor(style.palette.ink);
     qreal ty = labelCenterY() - ((lines_.size() - 1) * lineHeight) / 2;
-    for (const QString &line_ : lines_) {
-        text::draw(painter, font, line_, QPointF(cx(), ty), ink, Align::Center, Baseline::Middle);
+    for (const QString &line : lines_) {
+        text::draw(painter, font, line, QPointF(cx(), ty), ink, Align::Center, Baseline::Middle);
         ty += lineHeight;
     }
     painter.restore();
@@ -425,7 +427,7 @@ QJsonObject FlowTextShape::toJson() const
 
 QRectF FlowTextShape::textRect() const
 {
-    return QRectF(x + pad, y + pad, std::max<qreal>(20, w - pad * 2), std::max(lineHeight, h - pad * 2));
+    return {x + pad, y + pad, std::max<qreal>(20, w - pad * 2), std::max(lineHeight, h - pad * 2)};
 }
 
 void FlowTextShape::measure(const Board &)
@@ -476,7 +478,7 @@ void FlowTextShape::draw(QPainter &painter, const Board &board, const ShapeState
         ty += lineHeight;
     }
     if (state.selected) {
-        QPen pen(withAlpha(board.style().shape.selectedStroke, 0.5), 1, Qt::DashLine);
+        const QPen pen(withAlpha(board.style().shape.selectedStroke, 0.5), 1, Qt::DashLine);
         painter.save();
         painter.setPen(pen);
         painter.setBrush(Qt::NoBrush);
@@ -530,12 +532,11 @@ LinkStyle FlowLink::drawStyle(const Board &board, bool selected) const
 
 void FlowLink::draw(QPainter &painter, const Board &board, bool selected) const
 {
-    if (line == QLatin1String("invisible")) {
+    if ((line == QLatin1String("invisible")) && (!selected))
         // Invisible in the diagram; a faint dash keeps it findable when
         // selected.
-        if (!selected)
-            return;
-    }
+        return;
+
     const std::optional<Route> r = route(board);
     if (!r)
         return;

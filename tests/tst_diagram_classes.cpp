@@ -82,7 +82,7 @@ bool loadInto(Board &board, const QString &name, const QByteArray &content, docu
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 

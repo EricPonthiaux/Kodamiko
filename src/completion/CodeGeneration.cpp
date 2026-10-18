@@ -285,10 +285,10 @@ void CodeGenerationProvider::addOverrides(const CompletionContext &context,
                 pure ? QStringLiteral("\t$0") : QStringLiteral("\t") + Snippet::escape(call) + QStringLiteral("$0");
             QString code;
             if (java) {
-                QString visibility = interface || specifiers.contains(QStringLiteral("public"))
-                                         ? QStringLiteral("public ")
-                                     : specifiers.contains(QStringLiteral("protected")) ? QStringLiteral("protected ")
-                                                                                        : QString();
+                const QString visibility =
+                    interface || specifiers.contains(QStringLiteral("public")) ? QStringLiteral("public ")
+                    : specifiers.contains(QStringLiteral("protected"))         ? QStringLiteral("protected ")
+                                                                               : QString();
                 const QString qualifiers = function.qualifiers();
                 code = QStringLiteral("@Override\n") + visibility +
                        Snippet::escape(function.returnType + QLatin1Char(' ') + function.name + QLatin1Char('(') +

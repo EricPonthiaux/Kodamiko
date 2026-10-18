@@ -20,10 +20,10 @@ class DiagramGenerationView : public QWidget {
 public:
     // Claude draws a `kindTitle` in `path`, inside `workDir`, showing
     // `description`.
-    DiagramGenerationView(const QString &workDir,
-                          const QString &path,
-                          const QString &kindTitle,
-                          const QString &description,
+    DiagramGenerationView(QString workDir,
+                          QString path,
+                          QString kindTitle,
+                          QString description,
                           QWidget *parent = nullptr);
     ~DiagramGenerationView() override;
 

@@ -41,11 +41,11 @@ signals:
 private:
     struct Card {
         QString family;
-        QLabel *evidence;
-        ToggleSwitch *enabled;
-        QComboBox *runtime;
-        QComboBox *server;
-        QComboBox *serverVersion;
+        QLabel *evidence{};
+        ToggleSwitch *enabled{};
+        QComboBox *runtime{};
+        QComboBox *server{};
+        QComboBox *serverVersion{};
         QList<QWidget *> rows; // hidden when turned off
     };
 

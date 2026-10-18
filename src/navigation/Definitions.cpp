@@ -69,7 +69,7 @@ Result resolve(const Request &request, QList<SymbolLocation> matches, const QLis
         return symbol.filePath == request.filePath && symbol.position == request.position;
     });
     if (current != matches.cend()) {
-        const SymbolLocation here = *current;
+        const SymbolLocation &here = *current;
         matches.removeIf([&](const SymbolLocation &symbol) {
             return (symbol.filePath == here.filePath && symbol.position == here.position) ||
                    symbol.container != here.container || isType(symbol.kind) != isType(here.kind) ||

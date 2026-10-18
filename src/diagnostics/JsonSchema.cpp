@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <utility>
 
 namespace {
 
@@ -195,8 +196,8 @@ struct JsonSchema::Result {
     }
 };
 
-JsonSchema::JsonSchema(const QJsonObject &schema)
-    : root_(schema)
+JsonSchema::JsonSchema(QJsonObject schema)
+    : root_(std::move(schema))
 {
 }
 
@@ -467,7 +468,7 @@ QString JsonSchema::description(const QStringList &path) const
     const std::function<QJsonValue(const QJsonValue &, const QString &, int)> child =
         [&](const QJsonValue &schemaValue, const QString &key, int depth) -> QJsonValue {
         if (depth > 8)
-            return QJsonValue(QJsonValue::Undefined);
+            return {QJsonValue::Undefined};
         const QJsonObject schema = resolve(schemaValue);
         const QJsonObject properties = schema.value(QLatin1String("properties")).toObject();
         if (properties.contains(key))
@@ -489,7 +490,7 @@ QString JsonSchema::description(const QStringList &path) const
                     return found;
             }
         }
-        return QJsonValue(QJsonValue::Undefined);
+        return {QJsonValue::Undefined};
     };
 
     QJsonValue schema = root_;

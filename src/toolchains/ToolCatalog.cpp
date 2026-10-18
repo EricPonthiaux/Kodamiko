@@ -164,7 +164,7 @@ QString defaultRuntimeVersion(const QString &family)
 Platform currentPlatform()
 {
     Platform platform;
-#if defined(Q_OS_WIN)
+#ifdef Q_OS_WIN
     platform.os = QStringLiteral("windows");
 #elif defined(Q_OS_MACOS)
     platform.os = QStringLiteral("mac");
@@ -179,12 +179,12 @@ Platform currentPlatform()
 QUrl metadataUrl(const QString &id, const QString &version)
 {
     if (id == jdkId) // Adoptium's Temurin builds, as GitHub releases
-        return QUrl(
-            QStringLiteral("https://api.github.com/repos/adoptium/temurin%1-binaries/releases/latest").arg(version));
+        return {
+            QStringLiteral("https://api.github.com/repos/adoptium/temurin%1-binaries/releases/latest").arg(version)};
     if (id == nodeId) // to know the latest release of the major version
-        return QUrl(QStringLiteral("https://nodejs.org/dist/index.json"));
+        return {QStringLiteral("https://nodejs.org/dist/index.json")};
     if (id == QLatin1String("jdtls")) // the name of the milestone's archive
-        return QUrl(QStringLiteral("https://download.eclipse.org/jdtls/milestones/%1/latest.txt").arg(version));
+        return {QStringLiteral("https://download.eclipse.org/jdtls/milestones/%1/latest.txt").arg(version)};
     return {};
 }
 

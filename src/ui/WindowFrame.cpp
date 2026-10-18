@@ -107,7 +107,7 @@ void WindowFrame::paint()
     const int maxAlpha = theme_.isDark ? 70 : 38;
     for (int i = shadowWidth; i > 0; --i) {
         const qreal share = 1.0 - qreal(i) / shadowWidth;
-        QColor shadow(0, 0, 0, qRound(maxAlpha * share * share / 3.0));
+        const QColor shadow(0, 0, 0, qRound(maxAlpha * share * share / 3.0));
         painter.setBrush(shadow);
         painter.drawRoundedRect(content.adjusted(-i, -i + 2, i, i + 2), cornerRadius + i, cornerRadius + i);
     }

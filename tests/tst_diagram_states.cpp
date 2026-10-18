@@ -134,7 +134,7 @@ bool load(Board &board, const QString &name, const QByteArray &content, document
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 
@@ -210,7 +210,7 @@ private slots:
             const ElementPreset &preset = families::states().elements[i];
             QJsonObject props = preset.props;
             props.insert("key", keys[i]);
-            Shape *s = board.addShape(preset.shapeType, props);
+            const Shape *s = board.addShape(preset.shapeType, props);
             QVERIFY(s);
             ids.append(s->id);
         }
@@ -268,7 +268,8 @@ private slots:
             QCOMPARE(nodeBy(reparsed, "sourceKey", "Ready")->props.value("parentBoundary").toString(),
                      nodeBy(reparsed, "sourceKey", "Nested")->key);
             // The same keys: the layout kept by key still applies.
-            QStringList before, after;
+            QStringList before;
+            QStringList after;
             for (const Model::Node &node : model.nodes)
                 before.append(node.key);
             for (const Model::Node &node : reparsed.nodes)
@@ -368,11 +369,11 @@ private slots:
         board.containShape(*idle);
         QVERIFY(active->childBounds(board)->contains(idle->rect()));
         // Moving a composite carries its descendants.
-        QList<Shape *> carried = board.descendantShapes(active);
+        const QList<Shape *> carried = board.descendantShapes(active);
         QVERIFY(carried.contains(ready));
         QVERIFY(carried.contains(byKey(board, "Active.Nested")));
         // A shape created in a composite joins it and stays in it.
-        Shape *created =
+        const Shape *created =
             board.createShapeAt(QPointF(active->cx(), active->y + active->h - 4), "state",
                                 QJsonObject{{"text", "New state"}, {"parentBoundary", active->key}}, false);
         QVERIFY(created);
@@ -411,7 +412,7 @@ private slots:
         QCOMPARE(spec.align, Align::Center);
 
         // An empty choice is the bare UML diamond.
-        Shape *bare = board.addShape("choice", {});
+        const Shape *bare = board.addShape("choice", {});
         QCOMPARE(bare->w, 36.0);
         QCOMPARE(bare->h, 36.0);
     }
@@ -447,8 +448,8 @@ private slots:
         Board board;
         board.setStyle(Style::printed());
         board.setFamily(&families::states());
-        Shape *a = board.addShape("state", QJsonObject{{"x", 0}, {"y", 100}, {"text", "Active"}});
-        Shape *b = board.addShape("state", QJsonObject{{"x", 330}, {"y", 100}, {"text", "Done"}});
+        const Shape *a = board.addShape("state", QJsonObject{{"x", 0}, {"y", 100}, {"text", "Active"}});
+        const Shape *b = board.addShape("state", QJsonObject{{"x", 330}, {"y", 100}, {"text", "Done"}});
         Link *ab1 = board.addLink({}, a->id, b->id, QJsonObject{{"label", "Validate"}});
         Link *ab2 = board.addLink({}, a->id, b->id, QJsonObject{{"label", "Cancel"}});
         Link *loop1 = board.addLink({}, a->id, a->id, QJsonObject{{"label", "Retry"}});
@@ -464,8 +465,8 @@ private slots:
         QVERIFY(!overlapsVertically(box(ab1), box(ab2)));
         QVERIFY(!overlapsVertically(box(loop1), box(loop2)));
         // The second loop is drawn outside the first.
-        auto *t1 = static_cast<TransitionLink *>(loop1);
-        auto *t2 = static_cast<TransitionLink *>(loop2);
+        const auto *t1 = static_cast<TransitionLink *>(loop1);
+        const auto *t2 = static_cast<TransitionLink *>(loop2);
         QVERIFY(t2->selfOffset(board) > t1->selfOffset(board));
         const auto top = [&](Link *l) {
             qreal y = 1e9;
@@ -506,7 +507,7 @@ private slots:
         }
         board.resolveLabels();
         QList<QRectF> boxes;
-        for (Link *l : {ac, bc}) {
+        for (const Link *l : {ac, bc}) {
             const Route r = *l->route(board);
             const QPointF p = l->labelPos(r, board);
             QVERIFY2(l->distanceToRoute(r, p) < 1e-6, "a label's center stays exactly on its curve");
@@ -515,7 +516,7 @@ private slots:
         }
         QCOMPARE(overlapArea(boxes[0], boxes[1]), 0.0);
         for (const QRectF &labelBox : boxes) {
-            for (Shape *s : {a, b, c})
+            for (const Shape *s : {a, b, c})
                 QCOMPARE(overlapArea(labelBox, s->rect()), 0.0);
         }
         // Moving an end drops the placement with the curve.
@@ -530,13 +531,13 @@ private slots:
         Board board;
         board.setStyle(Style::printed());
         board.setFamily(&families::states());
-        Shape *container =
+        const Shape *container =
             board.addShape("stateContainer", QJsonObject{{"key", "Active"}, {"text", "Active"}, {"x", 0}, {"y", 0}});
-        Shape *child = board.addShape(
+        const Shape *child = board.addShape(
             "state",
             QJsonObject{{"key", "Active.Idle"}, {"sourceKey", "Idle"}, {"text", "Idle"}, {"parentBoundary", "Active"}});
-        Shape *outside = board.addShape("state", QJsonObject{{"key", "Done"}, {"text", "Done"}});
-        Link *exit = board.addLink({}, container->id, outside->id);
+        const Shape *outside = board.addShape("state", QJsonObject{{"key", "Done"}, {"text", "Done"}});
+        const Link *exit = board.addLink({}, container->id, outside->id);
         QVERIFY(graphviz::autoArrange(board, {QStringLiteral("LR"), {}, {}, true}));
         QVERIFY(container->rect().contains(child->rect()));
         QVERIFY(!container->rect().intersects(outside->rect()));
@@ -595,7 +596,7 @@ private slots:
             QCOMPARE(again.shapes().size(), board.shapes().size());
             QCOMPARE(again.links().size(), board.links().size());
             for (const auto &s : board.shapes()) {
-                Shape *copy = byKey(again, s->key);
+                const Shape *copy = byKey(again, s->key);
                 QVERIFY2(copy, qPrintable(s->key));
                 QCOMPARE(copy->type, s->type);
                 QCOMPARE(copy->displayText(), s->displayText());
@@ -606,7 +607,8 @@ private slots:
                     qPrintable(
                         QStringLiteral("%1 %2x%3 %4x%5").arg(s->key).arg(s->w).arg(s->h).arg(copy->w).arg(copy->h)));
             }
-            QStringList labels, labelsAgain;
+            QStringList labels;
+            QStringList labelsAgain;
             for (const auto &l : board.links())
                 labels.append(board.shape(l->from)->key + ">" + board.shape(l->to)->key + ":" + l->label);
             for (const auto &l : again.links())
@@ -631,10 +633,10 @@ private slots:
         });
         board.undo();
         QCOMPARE(board.snapshot(), before);
-        auto *waiting = static_cast<StateShape *>(byKey(board, "Waiting"));
+        const auto *waiting = static_cast<StateShape *>(byKey(board, "Waiting"));
         QCOMPARE(waiting->desc, (QStringList{"order placed", "reminder after 24 h"}));
         QCOMPARE(waiting->sourceKey, QStringLiteral("Waiting"));
-        Shape *packed = byKey(board, "Shipping.Packed");
+        const Shape *packed = byKey(board, "Shipping.Packed");
         QVERIFY(packed);
         QCOMPARE(packed->parentBoundary, QStringLiteral("Shipping"));
     }
@@ -647,7 +649,7 @@ private slots:
         build(board, mermaid(), QString::fromUtf8(kNestedMermaid));
         board.selectShape(byKey(board, "Active.Idle")->id);
         board.duplicateSelection();
-        Shape *copy = board.selectedShape();
+        const Shape *copy = board.selectedShape();
         QVERIFY(copy && copy->key != QStringLiteral("Active.Idle"));
         const QString source = mermaid().serialize(board, board.meta);
         const Model model = parsed(mermaid(), source);

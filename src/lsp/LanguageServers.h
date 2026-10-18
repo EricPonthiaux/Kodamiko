@@ -78,7 +78,7 @@ public:
 
     // How every server, started now or later, answers the requests of
     // `method` it sends ("workspace/applyEdit").
-    void setRequestHandler(const QString &method, LspClient::RequestHandler handler);
+    void setRequestHandler(const QString &method, const LspClient::RequestHandler &handler);
 
     // Sends `text` as the content of `path` to `client`: didOpen the first
     // time, didChange when it changed since.

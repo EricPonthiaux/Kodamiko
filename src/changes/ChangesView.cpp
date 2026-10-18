@@ -45,7 +45,7 @@ bool confirmDiscard(QWidget *parent, const QString &question, const QString &det
 {
     QMessageBox box(QMessageBox::Warning, QObject::tr("Discard Changes"), question, QMessageBox::NoButton, parent);
     box.setInformativeText(details.isEmpty() ? discardHint() : details + QLatin1Char(' ') + discardHint());
-    QPushButton *discard = box.addButton(QObject::tr("Discard"), QMessageBox::DestructiveRole);
+    const QPushButton *discard = box.addButton(QObject::tr("Discard"), QMessageBox::DestructiveRole);
     box.setDefaultButton(box.addButton(QObject::tr("Keep"), QMessageBox::RejectRole));
     box.exec();
     return box.clickedButton() == discard;
@@ -164,7 +164,8 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     commitButton_->setDefault(true);
     commitButton_->setToolTip(tr("Commit the staged changes (Ctrl+Enter)"));
     for (const int key : {Qt::Key_Return, Qt::Key_Enter}) {
-        auto *shortcut = new QShortcut(QKeySequence(Qt::CTRL | key), message_, nullptr, nullptr, Qt::WidgetShortcut);
+        const auto *shortcut =
+            new QShortcut(QKeySequence(Qt::CTRL | key), message_, nullptr, nullptr, Qt::WidgetShortcut);
         connect(shortcut, &QShortcut::activated, this, &ChangesView::commit);
     }
     connect(amend_, &QCheckBox::toggled, this, &ChangesView::onAmendToggled);

@@ -132,10 +132,10 @@ void JourneyTaskShape::draw(QPainter &painter, const Board &board, const ShapeSt
     const QColor nativeFill = style.tones.colorful ? scoreTones[score - 1] : QColor(legacyScore[score - 1]);
     const QColor ink = textColor(style.palette.ink);
     const QColor muted = textColor(style.palette.inkMuted);
-    const QPainterPath outline = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath outline = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, outline, fillColor(nativeFill), style);
     stroke(painter, outline, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     if (state.editing)
         return;
     const TextLayout layout = textLayout(w - innerPad * 2);

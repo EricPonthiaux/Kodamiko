@@ -167,7 +167,8 @@ QStringList serializeStates(const Board &board, QStringList out)
         const Shape *b = board.shape(l.to);
         if (!a || !b)
             return std::nullopt;
-        const Shape *pa = parentOf(a), *pb = parentOf(b);
+        const Shape *pa = parentOf(a);
+        const Shape *pb = parentOf(b);
         return pa == pb ? pa : nullptr;
     };
     const auto escaped = [](QString value) {
@@ -226,7 +227,8 @@ QStringList serializeStates(const Board &board, QStringList out)
             const std::optional<const Shape *> scope = scopeOf(*l);
             if (!scope || *scope != parent)
                 continue;
-            const QString from = keys.value(l->from), to = keys.value(l->to);
+            const QString from = keys.value(l->from);
+            const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
             out.append(

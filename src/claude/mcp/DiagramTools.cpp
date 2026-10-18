@@ -109,7 +109,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         object({{QStringLiteral("path"), pathArgument()}}, {QStringLiteral("path")}),
         McpTool::immediate([context](const QJsonObject &arguments) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
-            if (DiagramView *view = context.tabs->diagramViewFor(path)) {
+            if (const DiagramView *view = context.tabs->diagramViewFor(path)) {
                 QJsonObject json = boardJson(*view->board(), *view->codec());
                 json.insert(QStringLiteral("open"), true);
                 json.insert(QStringLiteral("unsaved"), view->isModified());
@@ -136,7 +136,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         McpTool::immediate([context](const QJsonObject &arguments) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             QByteArray content;
-            if (DiagramView *view = context.tabs->diagramViewFor(path)) {
+            if (const DiagramView *view = context.tabs->diagramViewFor(path)) {
                 content = view->content();
             } else {
                 QFile file(path);
@@ -161,7 +161,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         McpTool::immediate([context](const QJsonObject &arguments) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             QString error;
-            DiagramView *view = openDiagram(context, path, &error);
+            const DiagramView *view = openDiagram(context, path, &error);
             if (!view)
                 return McpResult::error(error);
             diagram::document::Loaded loaded;
@@ -189,7 +189,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         McpTool::immediate([context](const QJsonObject &arguments) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             QString error;
-            DiagramView *view = openDiagram(context, path, &error);
+            const DiagramView *view = openDiagram(context, path, &error);
             if (!view)
                 return McpResult::error(error);
             if (arguments.contains(QStringLiteral("direction")))
@@ -211,7 +211,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         McpTool::immediate([context](const QJsonObject &arguments) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             QString error;
-            DiagramView *view = openDiagram(context, path, &error);
+            const DiagramView *view = openDiagram(context, path, &error);
             if (!view)
                 return McpResult::error(error);
             diagram::Board *board = view->board();
@@ -239,7 +239,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             const QString output = context.absolute(arguments.value(QStringLiteral("output")).toString());
             QString error;
-            DiagramView *view = openDiagram(context, path, &error);
+            const DiagramView *view = openDiagram(context, path, &error);
             if (!view)
                 return McpResult::error(error);
             if (!view->exportImage(output, &error))
@@ -275,7 +275,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("text/plain"),
         [context](const QString &uri) -> std::optional<QString> {
             const QString path = context.absolute(uri.mid(QStringLiteral("duet://diagram/").size()));
-            if (DiagramView *view = context.tabs->diagramViewFor(path))
+            if (const DiagramView *view = context.tabs->diagramViewFor(path))
                 return diagram::document::source(*view->board(), *view->codec());
             QFile file(path);
             if (!file.open(QIODevice::ReadOnly))

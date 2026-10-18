@@ -11,7 +11,7 @@ const QList<const Family *> &allFamilies()
 {
     // A family without shapes is not ported yet: it is left out.
     static const QList<const Family *> list = [] {
-        QList<const Family *> all{
+        const QList<const Family *> all{
             &families::flowchart(),     &families::sequence(),  &families::classes(), &families::states(),
             &families::dataModel(),     &families::c4(),        &families::mindmap(), &families::journey(),
             &families::productVision(), &families::explainer(),
@@ -144,8 +144,8 @@ QJsonObject buildBoard(Board &board, const Codec &codec, const Model &model)
             byKey.insert(node.key, s);
     }
     for (const Model::Edge &edge : model.links) {
-        Shape *a = byKey.value(edge.from);
-        Shape *b = byKey.value(edge.to);
+        const Shape *a = byKey.value(edge.from);
+        const Shape *b = byKey.value(edge.to);
         if (a && b)
             board.addLink(edge.type, a->id, b->id, edge.props);
     }

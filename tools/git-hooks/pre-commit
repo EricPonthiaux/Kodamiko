@@ -1,0 +1,22 @@
+#!/bin/sh
+# Refuses a commit whose staged C++ sources are not formatted as
+# .clang-format says. Enable it with:
+#   git config core.hooksPath tools/git-hooks
+
+if ! command -v clang-format >/dev/null 2>&1; then
+    echo "pre-commit: clang-format not found, formatting not checked" >&2
+    exit 0
+fi
+
+status=0
+for file in $(git diff --cached --name-only --diff-filter=ACMR -- '*.cpp' '*.h'); do
+    case "$file" in
+    third_party/* | build*/*) continue ;;
+    esac
+    # The staged content, not the working tree's.
+    if ! git show ":$file" | clang-format --dry-run --Werror --assume-filename="$file" >/dev/null 2>&1; then
+        echo "pre-commit: $file is not formatted (cmake --build build --target format)" >&2
+        status=1
+    fi
+done
+exit $status

@@ -14,7 +14,7 @@
 // read from the command's folder, then from the project's.
 class BuildOutputParser {
 public:
-    BuildOutputParser(const QString &workingDirectory, const QString &projectFolder);
+    BuildOutputParser(QString workingDirectory, QString projectFolder);
 
     // Raw bytes of the program's output.
     void feed(QByteArrayView data);

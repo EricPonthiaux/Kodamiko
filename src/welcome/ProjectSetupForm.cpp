@@ -84,7 +84,7 @@ void ProjectSetupForm::build(Card &card)
         combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     }
     // The description of the first row says why it was found (set by fill).
-    QWidget *enabledRow =
+    const QWidget *enabledRow =
         settings->addRow(tr("Use %1").arg(ProjectLanguages::title(card.family)), QStringLiteral(" "), card.enabled);
     card.evidence = enabledRow->findChild<QLabel *>(QStringLiteral("settingsDescription"));
     card.rows = {

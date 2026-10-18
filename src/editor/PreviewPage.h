@@ -118,7 +118,7 @@ public:
     };
 
     // Takes `editor`, which holds the file.
-    PreviewPage(EditorWidget *editor, const Theme &theme, QWidget *parent = nullptr);
+    PreviewPage(EditorWidget *editor, Theme theme, QWidget *parent = nullptr);
 
     EditorWidget *editor() const { return editor_; }
 
@@ -161,7 +161,7 @@ private:
     MarkdownPreview *markdown_ = nullptr;
     HtmlPreview *html_ = nullptr;
     QSplitter *splitter_;
-    QToolButton *buttons_[3];
+    QToolButton *buttons_[3]{};
     Mode mode_ = Mode::Preview;
     QTimer updateTimer_;
 };

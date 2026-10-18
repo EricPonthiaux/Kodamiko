@@ -78,7 +78,7 @@ void ProvisioningView::onProgress(int index, qint64 received, qint64 total)
 {
     if (index >= lines_.size())
         return;
-    Line &line = lines_[index];
+    const Line &line = lines_[index];
     if (total <= 0) {
         // npm: no size known.
         line.bar->setRange(0, 0);
@@ -94,7 +94,7 @@ void ProvisioningView::onStepFinished(int index, const QString &error)
 {
     if (index >= lines_.size())
         return;
-    Line &line = lines_[index];
+    const Line &line = lines_[index];
     line.bar->setRange(0, 100);
     if (error.isEmpty()) {
         line.bar->setValue(100);

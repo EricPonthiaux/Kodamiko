@@ -24,6 +24,7 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <utility>
 
 namespace DuetTools {
 
@@ -107,7 +108,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
                                                                    "\"!\" excludes"))},
                 {QStringLiteral("limit"), integer(QStringLiteral("Most matches returned (default 200)"))}},
                {QStringLiteral("text")}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             FindQuery query;
             query.text = arguments.value(QStringLiteral("text")).toString();
             query.regularExpression = arguments.value(QStringLiteral("regex")).toBool();
@@ -147,7 +148,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
         object({{QStringLiteral("query"), string(QStringLiteral("Part of a file name or path"))},
                 {QStringLiteral("limit"), integer(QStringLiteral("Most files returned (default 50)"))}},
                {QStringLiteral("query")}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString query = arguments.value(QStringLiteral("query")).toString();
             const int limit = std::clamp(arguments.value(QStringLiteral("limit")).toInt(50), 1, 1000);
@@ -173,7 +174,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
                     return McpResult::json(
                         QJsonObject{{QStringLiteral("files"), files}, {QStringLiteral("total"), int(scored.size())}});
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::reading(
@@ -276,7 +277,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
         QStringLiteral("get_project_info"), QStringLiteral("Project information"),
         QStringLiteral("The project Duet has open: its folder, the languages detected (with runtime versions and "
                        "the files that tell), and the state of the language servers."),
-        object({}), [context](const QJsonObject &, McpReply reply, McpProgress) {
+        object({}), [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QStringList servers = context.languageServers ? context.languageServers->describe() : QStringList();
             inBackground(
@@ -292,7 +293,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
                                     {QStringLiteral("languages"), languages},
                                     {QStringLiteral("languageServers"), QJsonArray::fromStringList(servers)}});
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::acting(

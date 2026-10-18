@@ -315,7 +315,7 @@ QString ofParameter(const QString &label, const QString &languageId)
         const int colon = int(label.indexOf(QLatin1Char(':')));
         if (colon < 0)
             return {};
-        QString type = label.mid(colon + 1);
+        const QString type = label.mid(colon + 1);
         const int equals = int(type.indexOf(QLatin1Char('=')));
         return (equals >= 0 ? type.left(equals) : type).trimmed();
     }

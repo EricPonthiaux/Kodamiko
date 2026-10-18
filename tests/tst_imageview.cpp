@@ -13,7 +13,7 @@ private slots:
 
     void opensImagesInAViewer()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString imagePath = dir.filePath(QStringLiteral("logo.png"));
         QImage image(40, 20, QImage::Format_ARGB32);
         image.fill(Qt::red);
@@ -31,7 +31,7 @@ private slots:
 
     void opensTextFilesInAnEditor()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString textPath = dir.filePath(QStringLiteral("main.c"));
         QFile file(textPath);
         QVERIFY(file.open(QIODevice::WriteOnly));

@@ -16,6 +16,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 
+#include <utility>
+
 namespace DuetTools {
 
 namespace {
@@ -73,7 +75,7 @@ QJsonObject commitJson(const CommitSummary &commit)
 
 // Runs a git job with the editor's other git work (one at a time, off the
 // UI thread), then tells the editor the repository changed.
-void runGit(const DuetToolContext &context, GitCommands::Job job, McpReply reply)
+void runGit(const DuetToolContext &context, GitCommands::Job job, const McpReply &reply)
 {
     const auto done = [context, reply](const QString &message, const QString &error) {
         if (context.repositoryChanged)
@@ -92,7 +94,7 @@ void runGit(const DuetToolContext &context, GitCommands::Job job, McpReply reply
 
 // Same for a job that talks to a remote: git may ask the user for
 // credentials (see AskpassServer).
-void runRemoteGit(const DuetToolContext &context, GitCommands::LongJob job, McpReply reply)
+void runRemoteGit(const DuetToolContext &context, GitCommands::LongJob job, const McpReply &reply)
 {
     const auto done = [context, reply](const QString &message, const QString &error) {
         if (context.repositoryChanged)
@@ -141,7 +143,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                        "commit, operation in progress, staged and unstaged changes (untracked files included), "
                        "optionally with their patches."),
         object({{QStringLiteral("patches"), boolean(QStringLiteral("Include each file's unified diff"))}}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const bool patches = arguments.value(QStringLiteral("patches")).toBool();
             inBackground(
@@ -160,7 +162,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                     addTracking(json, info);
                     return McpResult::json(json);
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::reading(
@@ -169,7 +171,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                        "mode shows them."),
         object({{QStringLiteral("path"), string(QStringLiteral("File or folder (optional): its commits only"))},
                 {QStringLiteral("limit"), integer(QStringLiteral("Most commits (default 30)"))}}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString path =
                 arguments.contains(QStringLiteral("path"))
@@ -187,7 +189,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                     return McpResult::json(QJsonObject{{QStringLiteral("commits"), commits},
                                                        {QStringLiteral("truncated"), log->truncated}});
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::reading(
@@ -196,7 +198,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
         object({{QStringLiteral("id"), string(QStringLiteral("Commit id (abbreviated or full)"))},
                 {QStringLiteral("patches"), boolean(QStringLiteral("Include each file's unified diff"))}},
                {QStringLiteral("id")}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString id = arguments.value(QStringLiteral("id")).toString();
             const bool patches = arguments.value(QStringLiteral("patches")).toBool();
@@ -209,14 +211,14 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                     json.insert(QStringLiteral("files"), diffsJson(details.files, patches));
                     return McpResult::json(json);
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::reading(
         QStringLiteral("list_snapshots"), QStringLiteral("Snapshots"),
         QStringLiteral("Duet's snapshots of the working directory, newest first: taken before each prompt and on "
                        "request, they can bring files back to an earlier state (restore_snapshot)."),
-        object({}), [context](const QJsonObject &, McpReply reply, McpProgress) {
+        object({}), [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             inBackground(
                 [folder] {
@@ -230,7 +232,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                                         {QStringLiteral("files"), QJsonArray::fromStringList(snapshot.paths)}});
                     return McpResult::json(QJsonObject{{QStringLiteral("snapshots"), snapshots}});
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addResource({
@@ -263,7 +265,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                        "back to them later with restore_snapshot: before a risky change."),
         object({{QStringLiteral("reason"), string(QStringLiteral("What the snapshot is before, shown to the user"))}},
                {QStringLiteral("reason")}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString reason = arguments.value(QStringLiteral("reason")).toString();
             runGit(
@@ -273,7 +275,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                     return id.isEmpty() ? QStringLiteral("Nothing to record: the files are as committed")
                                         : QStringLiteral("Snapshot %1 taken").arg(id.left(10));
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -286,7 +288,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
             return QStringLiteral("restore the files of snapshot %1")
                 .arg(arguments.value(QStringLiteral("id")).toString());
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString id = arguments.value(QStringLiteral("id")).toString();
             runGit(
@@ -300,7 +302,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                     }
                     throw GitError(QStringLiteral("No snapshot %1 (see list_snapshots)").arg(id));
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::acting(
@@ -329,7 +331,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                                                    : QStringLiteral("stage"),
                                                pathsArgument(context, arguments).join(QStringLiteral(", ")));
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QStringList paths = pathsArgument(context, arguments);
             const bool unstage = arguments.value(QStringLiteral("unstage")).toBool();
@@ -345,7 +347,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                         .arg(paths.size())
                         .arg(unstage ? QStringLiteral("unstaged") : QStringLiteral("staged"));
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -361,14 +363,14 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                                                                        : QStringLiteral("commit"),
                      arguments.value(QStringLiteral("message")).toString().section(QLatin1Char('\n'), 0, 0));
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString message = arguments.value(QStringLiteral("message")).toString();
             const bool amend = arguments.value(QStringLiteral("amend")).toBool();
             runGit(
                 context,
                 [folder, message, amend] { return GitOperations::commit(repositoryOf(folder), message, amend); },
-                reply);
+                std::move(reply));
         }));
 
     registerBranchTools(registry, context);
@@ -381,7 +383,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("The local branches, then the remote ones as of the last fetch: for each, whether it is the "
                        "current one, the remote branch it tracks, how many commits it has that its upstream lacks "
                        "(ahead) and the reverse (behind), and its last commit."),
-        object({}), [context](const QJsonObject &, McpReply reply, McpProgress) {
+        object({}), [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             inBackground(
                 [folder] {
@@ -402,14 +404,14 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                     }
                     return McpResult::json(QJsonObject{{QStringLiteral("branches"), branches}});
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::reading(
         QStringLiteral("list_stashes"), QStringLiteral("Stashes"),
         QStringLiteral("The changes put aside with git stash, newest first (index 0), optionally with their patches."),
         object({{QStringLiteral("patches"), boolean(QStringLiteral("Include each stash's unified diff"))}}),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const bool patches = arguments.value(QStringLiteral("patches")).toBool();
             inBackground(
@@ -432,19 +434,19 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                     }
                     return McpResult::json(QJsonObject{{QStringLiteral("stashes"), stashes}});
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::acting(
         QStringLiteral("fetch"), QStringLiteral("Fetch"),
         QStringLiteral("Updates the remote branches from every remote (git fetch --all --prune), without touching "
                        "the local branches or the files: then get_git_status tells how far behind the branch is."),
-        object({}), [context](const QJsonObject &, McpReply reply, McpProgress) {
+        object({}), [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             runRemoteGit(
                 context,
                 [folder](const Git::Feedback &feedback) { return Remotes::fetch(repositoryOf(folder), feedback); },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -454,12 +456,12 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                        "commits: then merge_branch or rebase). The user is asked first."),
         object({}),
         [](const QJsonObject &) { return QStringLiteral("pull the upstream's commits into the current branch"); },
-        [context](const QJsonObject &, McpReply reply, McpProgress) {
+        [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             runRemoteGit(
                 context,
                 [folder](const Git::Feedback &feedback) { return Remotes::pull(repositoryOf(folder), feedback); },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -478,12 +480,12 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
             }
             return QStringLiteral("push %1").arg(branch.isEmpty() ? QStringLiteral("the current branch") : branch);
         },
-        [context](const QJsonObject &, McpReply reply, McpProgress) {
+        [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             runRemoteGit(
                 context,
                 [folder](const Git::Feedback &feedback) { return Remotes::push(repositoryOf(folder), feedback); },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -501,7 +503,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                                                    : QStringLiteral("switch to"),
                                                arguments.value(QStringLiteral("name")).toString());
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString name = arguments.value(QStringLiteral("name")).toString();
             const bool create = arguments.value(QStringLiteral("create")).toBool();
@@ -527,7 +529,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                     Branches::switchTo(repository, name, remote);
                     return QStringLiteral("Switched to %1").arg(remote ? Branches::nameOnRemote(name) : name);
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -545,7 +547,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                                                    : QStringLiteral("merge into the current branch"),
                                                arguments.value(QStringLiteral("branch")).toString());
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString branch = arguments.value(QStringLiteral("branch")).toString();
             const bool rebase = arguments.value(QStringLiteral("rebase")).toBool();
@@ -557,7 +559,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                         rebase ? Integration::rebase(repository, branch) : Integration::merge(repository, branch);
                     return output.isEmpty() ? QStringLiteral("Done") : output;
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -565,7 +567,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("Goes on with the merge, rebase, cherry-pick or revert in progress once its conflicts are "
                        "resolved and staged, committing the result. The user is asked first."),
         object({}), [](const QJsonObject &) { return QStringLiteral("continue the operation in progress"); },
-        [context](const QJsonObject &, McpReply reply, McpProgress) {
+        [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             runGit(
                 context,
@@ -574,7 +576,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                     Integration::continueOperation(repository);
                     return QStringLiteral("The %1 went on").arg(repository.operation);
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -582,7 +584,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("Gives up the merge, rebase, cherry-pick or revert in progress: the branch and the files go "
                        "back to how they were before it. The user is asked first."),
         object({}), [](const QJsonObject &) { return QStringLiteral("abort the operation in progress"); },
-        [context](const QJsonObject &, McpReply reply, McpProgress) {
+        [context](const QJsonObject &, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             runGit(
                 context,
@@ -591,7 +593,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                     Integration::abortOperation(repository);
                     return QStringLiteral("The %1 was aborted").arg(repository.operation);
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -605,7 +607,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
             return message.isEmpty() ? QStringLiteral("stash the uncommitted changes")
                                      : QStringLiteral("stash the uncommitted changes as \u201c%1\u201d").arg(message);
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const QString message = arguments.value(QStringLiteral("message")).toString();
             const bool includeUntracked = !arguments.value(QStringLiteral("keepNewFiles")).toBool();
@@ -615,7 +617,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                     Stashes::push(repositoryOf(folder), message, includeUntracked);
                     return QStringLiteral("Changes stashed");
                 },
-                reply);
+                std::move(reply));
         }));
 
     registry.addTool(McpTool::sensitive(
@@ -629,7 +631,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                 .arg(arguments.value(QStringLiteral("keep")).toBool() ? QStringLiteral("apply") : QStringLiteral("pop"))
                 .arg(arguments.value(QStringLiteral("index")).toInt());
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, McpReply reply, const McpProgress &) {
             const QString folder = context.folder();
             const int index = arguments.value(QStringLiteral("index")).toInt();
             const bool keep = arguments.value(QStringLiteral("keep")).toBool();
@@ -643,7 +645,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
                         Stashes::pop(repository, index);
                     return keep ? QStringLiteral("Stash applied") : QStringLiteral("Stash applied and dropped");
                 },
-                reply);
+                std::move(reply));
         }));
 }
 

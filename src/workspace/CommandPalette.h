@@ -37,7 +37,7 @@ protected:
 private:
     struct Command {
         QString name; // "Git: Stage All"
-        QAction *action;
+        QAction *action{};
     };
 
     void filter();

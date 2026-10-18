@@ -25,7 +25,7 @@ QBrush checkerboard(const QColor &background)
     QPainter painter(&tile);
     painter.fillRect(0, 0, 8, 8, other);
     painter.fillRect(8, 8, 8, 8, other);
-    return QBrush(tile);
+    return {tile};
 }
 
 } // namespace

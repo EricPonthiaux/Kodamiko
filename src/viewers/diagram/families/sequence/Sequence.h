@@ -130,7 +130,7 @@ private:
 // The family's own layout (arrangeSequence): participants on one row, in
 // their current left-to-right order, spaced so that each message label fits
 // between its lifelines; lanes compacted.
-void arrange(Board &board);
+void arrange(const Board &board);
 // The fragments' frames, headers and branch separators.
 void drawFragments(QPainter &painter, const Board &board);
 

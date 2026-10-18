@@ -179,7 +179,8 @@ public:
             out.append(QStringLiteral("  }"));
         }
         for (const auto &l : board.links()) {
-            const QString from = keys.value(l->from), to = keys.value(l->to);
+            const QString from = keys.value(l->from);
+            const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
             const auto *relationship = dynamic_cast<const RelationshipLink *>(l.get());

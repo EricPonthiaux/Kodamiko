@@ -21,7 +21,7 @@ class EditorTabs : public QTabWidget {
     Q_OBJECT
 
 public:
-    explicit EditorTabs(const Theme &theme, QWidget *parent = nullptr);
+    explicit EditorTabs(Theme theme, QWidget *parent = nullptr);
 
     // Opens a text file in an editor (a Markdown or HTML file with its preview), an
     // image in a viewer, or a diagram (Mermaid, PlantUML…) in the diagram editor. Returns
@@ -51,7 +51,7 @@ public:
     QWidget *pageOf(EditorWidget *editor) const;
     // A Markdown or HTML tab in Preview mode shows its editor too: to display a
     // position or a search in it.
-    void revealEditor(EditorWidget *editor);
+    void revealEditor(EditorWidget *editor) const;
     EditorWidget *editorFor(const QString &path) const;
     ImageView *imageViewFor(const QString &path) const;
     DiagramView *diagramViewFor(const QString &path) const;
@@ -88,7 +88,7 @@ public:
     // Call when a file may have changed on disk.
     void syncWithDisk(const QString &path);
     // Rereads the git index versions the change marks compare with.
-    void reloadChangeBases();
+    void reloadChangeBases() const;
 
     // Whether a file open under `path` (the file itself, or one in that
     // folder) has unsaved changes.

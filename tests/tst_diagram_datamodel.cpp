@@ -63,7 +63,7 @@ bool loadInto(Board &board, const QByteArray &content, document::Loaded *loaded 
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 
@@ -227,7 +227,7 @@ private slots:
 
         Board board;
         board.setFamily(&families::dataModel());
-        EntityShape *table =
+        const EntityShape *table =
             addTable(board, QStringLiteral("t"), 0, 0, QStringLiteral("CUSTOMER"),
                      {QStringLiteral("uuid id PK"), QStringLiteral("varchar(255) email UK \"Adresse de connexion\""),
                       QStringLiteral("uuid account_id FK")});
@@ -240,7 +240,7 @@ private slots:
         QCOMPARE(table->h, 48 + 25 + 3 * 31 + 1.0);
 
         // A table without columns keeps one empty row.
-        EntityShape *empty = addTable(board, QStringLiteral("e"), 0, 400, QStringLiteral("EMPTY"), {});
+        const EntityShape *empty = addTable(board, QStringLiteral("e"), 0, 400, QStringLiteral("EMPTY"), {});
         QCOMPARE(empty->h, 48 + 25 + 31 + 1.0);
         QCOMPARE(empty->connectionPorts(board).size(), 4); // the four sides
 
@@ -252,7 +252,7 @@ private slots:
     // The relations join the PK and FK columns.
     void joinsTheKeyColumns()
     {
-        CustomerOrder f;
+        const CustomerOrder f;
         QVERIFY(f.relation);
         const std::optional<RelationshipLink::ColumnEndpoints> ends = f.relation->columnEndpoints(f.board);
         QVERIFY(ends);
@@ -327,7 +327,8 @@ private slots:
     void routesThroughTheColumnsWithGraphviz()
     {
         CustomerOrder f;
-        const QPointF customer(f.customer->x, f.customer->y), order(f.order->x, f.order->y);
+        const QPointF customer(f.customer->x, f.customer->y);
+        const QPointF order(f.order->x, f.order->y);
         QVERIFY(graphviz::routeLinks(f.board));
         QCOMPARE(QPointF(f.customer->x, f.customer->y), customer);
         QCOMPARE(QPointF(f.order->x, f.order->y), order);
@@ -344,11 +345,11 @@ private slots:
     {
         Board board;
         board.setFamily(&families::dataModel());
-        EntityShape *source = addTable(board, QStringLiteral("source"), 0, 0, QStringLiteral("SOURCE"),
-                                       {QStringLiteral("uuid id PK"), QStringLiteral("uuid owner_id FK")});
-        EntityShape *target = addTable(board, QStringLiteral("target"), 500, 0, QStringLiteral("TARGET"),
-                                       {QStringLiteral("uuid id PK"), QStringLiteral("uuid public_id UK")});
-        auto *relation = dynamic_cast<RelationshipLink *>(
+        const EntityShape *source = addTable(board, QStringLiteral("source"), 0, 0, QStringLiteral("SOURCE"),
+                                             {QStringLiteral("uuid id PK"), QStringLiteral("uuid owner_id FK")});
+        const EntityShape *target = addTable(board, QStringLiteral("target"), 500, 0, QStringLiteral("TARGET"),
+                                             {QStringLiteral("uuid id PK"), QStringLiteral("uuid public_id UK")});
+        const auto *relation = dynamic_cast<RelationshipLink *>(
             board.addLink(QStringLiteral("relationship"), source->id, target->id,
                           QJsonObject{{QStringLiteral("fromPort"), QStringLiteral("owner_id")},
                                       {QStringLiteral("toPort"), QStringLiteral("public_id")}}));
@@ -362,7 +363,7 @@ private slots:
         EntityShape *line =
             addTable(board, QStringLiteral("line"), 0, 300, QStringLiteral("order_lines"),
                      {QStringLiteral("uuid id PK"), QStringLiteral("uuid product FK \"references target.public_id\"")});
-        auto *reference =
+        const auto *reference =
             dynamic_cast<RelationshipLink *>(board.addLink(QStringLiteral("relationship"), target->id, line->id, {}));
         const RelationshipLink::Endpoints referenced = reference->relationshipEndpoints(*target, *line);
         QCOMPARE(referenced.fromShape, line);
@@ -372,7 +373,7 @@ private slots:
 
     void exposesItsProperties()
     {
-        CustomerOrder f;
+        const CustomerOrder f;
         QStringList ids;
         for (const Property &p : f.relation->properties())
             ids.append(p.id);

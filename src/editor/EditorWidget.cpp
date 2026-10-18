@@ -61,13 +61,13 @@ QImage foldChevron(const QColor &color, bool open)
     return image;
 }
 
-bool isBlankLine(QsciScintilla &editor, int line)
+bool isBlankLine(const QsciScintilla &editor, int line)
 {
     return editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line) ==
            editor.SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line);
 }
 
-int lineIndentation(QsciScintilla &editor, int line)
+int lineIndentation(const QsciScintilla &editor, int line)
 {
     return static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTATION, line));
 }
@@ -436,7 +436,8 @@ void EditorWidget::paintCurrentLineNumber(QPainter &painter, const QRect &dirty)
 
 void EditorWidget::followCaretLine()
 {
-    int line = 0, index = 0;
+    int line = 0;
+    int index = 0;
     getCursorPosition(&line, &index);
     const ActiveGuide guide = activeGuide(*this, line);
     if (guide != activeGuide_) {

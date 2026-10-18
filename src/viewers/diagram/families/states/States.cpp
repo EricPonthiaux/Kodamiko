@@ -52,8 +52,8 @@ QPainterPath circle(QPointF center, qreal radius)
 // ---------------------------------------------------------------------------
 // StateElement
 
-StateElement::StateElement(const QString &type_, qreal width, qreal height)
-    : Shape(type_, width, height)
+StateElement::StateElement(const QString &type, qreal width, qreal height)
+    : Shape(type, width, height)
 {
 }
 
@@ -153,10 +153,10 @@ void StateShape::draw(QPainter &painter, const Board &board, const ShapeState &s
     const Style &style = board.style();
     const QColor own = parseColor(fill);
     const QColor nativeFill = !own.isValid() || own == QColor(Qt::white) ? style.tones.sage : own;
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, path, fillColor(nativeFill), style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     if (state.editing)
         return;
     painter.save();
@@ -318,13 +318,13 @@ void StateContainerShape::onDoubleClick(Board &board)
 void StateContainerShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     painter.save();
     painter.setOpacity(painter.opacity() * (customFill.isEmpty() ? 0.72 : 0.55));
     shadowFill(painter, path, fillColor(style.tones.group.isValid() ? style.tones.group : style.tones.sage), style);
     painter.restore();
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     strokeLine(painter, QPointF(x, y + containerTitleHeight), QPointF(x + w, y + containerTitleHeight),
                style.palette.separator, 1);
     if (state.editing)
@@ -336,20 +336,22 @@ void StateContainerShape::draw(QPainter &painter, const Board &board, const Shap
 // ---------------------------------------------------------------------------
 // RoundShape
 
-RoundShape::RoundShape(const QString &type_, qreal size)
-    : StateElement(type_, size, size)
+RoundShape::RoundShape(const QString &type, qreal size)
+    : StateElement(type, size, size)
 {
 }
 
 bool RoundShape::hitTest(QPointF p) const
 {
-    const qreal dx = p.x() - cx(), dy = p.y() - cy();
+    const qreal dx = p.x() - cx();
+    const qreal dy = p.y() - cy();
     return dx * dx + dy * dy <= (w / 2) * (w / 2);
 }
 
 QPointF RoundShape::borderPoint(QPointF toward) const
 {
-    const qreal dx = toward.x() - cx(), dy = toward.y() - cy();
+    const qreal dx = toward.x() - cx();
+    const qreal dy = toward.y() - cy();
     if (!dx && !dy)
         return {cx(), cy()};
     const qreal t = (w / 2) / std::hypot(dx, dy);
@@ -369,7 +371,7 @@ void RoundShape::draw(QPainter &painter, const Board &board, const ShapeState &s
     if (type == QLatin1String("initial")) {
         shadowFill(painter, outer, fillColor(state.selected ? style.shape.selectedStroke : style.palette.solid), style);
         if (!customFill.isEmpty())
-            stroke(painter, outer, strokeColor(style.palette.solid), ShapeBorderWidth);
+            stroke(painter, outer, strokeColor(style.palette.solid), shapeBorderWidth);
         return;
     }
     // The final state: a ring around a bullet.
@@ -436,7 +438,8 @@ void ChoiceShape::onDoubleClick(Board &board)
 
 QPointF ChoiceShape::borderPoint(QPointF toward) const
 {
-    const qreal dx = toward.x() - cx(), dy = toward.y() - cy();
+    const qreal dx = toward.x() - cx();
+    const qreal dy = toward.y() - cy();
     if (!dx && !dy)
         return {cx(), cy()};
     const qreal t = 1 / (std::abs(dx) / (w / 2) + std::abs(dy) / (h / 2));
@@ -466,7 +469,7 @@ void ChoiceShape::draw(QPainter &painter, const Board &board, const ShapeState &
     const QPainterPath path = outline();
     shadowFill(painter, path, fillColor(style.tones.warm), style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     if (state.editing || text.isEmpty())
         return;
     painter.save();
@@ -484,8 +487,8 @@ void ChoiceShape::draw(QPainter &painter, const Board &board, const ShapeState &
 // ---------------------------------------------------------------------------
 // ForkJoinShape
 
-ForkJoinShape::ForkJoinShape(const QString &type_)
-    : StateElement(type_, 100, 12)
+ForkJoinShape::ForkJoinShape(const QString &type)
+    : StateElement(type, 100, 12)
 {
 }
 
@@ -497,10 +500,10 @@ QString ForkJoinShape::displayText() const
 void ForkJoinShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, path, fillColor(state.selected ? style.shape.selectedStroke : style.palette.solid), style);
     if (!customFill.isEmpty())
-        stroke(painter, path, strokeColor(style.palette.solid), ShapeBorderWidth);
+        stroke(painter, path, strokeColor(style.palette.solid), shapeBorderWidth);
 }
 
 QList<Property> ForkJoinShape::properties() const
@@ -692,7 +695,7 @@ std::optional<QPointF> pointOnPolyline(const std::vector<QPointF> &points, qreal
 
 } // namespace
 
-void resolveLabels(Board &board)
+void resolveLabels(const Board &board)
 {
     std::vector<TransitionLink *> links;
     for (const auto &l : board.links()) {

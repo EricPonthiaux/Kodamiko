@@ -67,7 +67,7 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     QStyleOptionViewItem item = option;
     initStyleOption(&item, index);
     const QWidget *widget = option.widget;
-    QStyle *style = widget ? widget->style() : QApplication::style();
+    const QStyle *style = widget ? widget->style() : QApplication::style();
     const bool selected = option.state & QStyle::State_Selected;
     // Selected in the active window, the row is on the accent: white text.
     // Otherwise its background is a soft gray and the text keeps its colors.

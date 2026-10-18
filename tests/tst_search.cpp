@@ -78,7 +78,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("git").isEmpty())
             QSKIP("git unavailable");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("src/a.cpp"), "int needle = 1;\n");
         write(dir.filePath("src/b.h"), "// needle needle\n");
         write(dir.filePath("build/out.cpp"), "needle\n");
@@ -94,7 +94,7 @@ private slots:
         query.text = "needle";
         search.start(dir.path(), query, {{dir.filePath("open.txt"), "unsaved needle\n"}});
         QVERIFY(finished.wait());
-        auto matches = finished.first().at(0).value<QList<FindMatch>>();
+        const auto matches = finished.first().at(0).value<QList<FindMatch>>();
         QSet<QString> files;
         for (const FindMatch &match : matches)
             files.insert(QDir(dir.path()).relativeFilePath(match.filePath));
@@ -109,7 +109,7 @@ private slots:
 
     void popupListsAndOpensMatches()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "first\n    second needle here\n");
         QWidget window;
         window.resize(1000, 800);

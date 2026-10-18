@@ -52,7 +52,7 @@ QString categoryForLexerStyle(const QString &description)
         return QStringLiteral("variable.builtin");
     if (mentions({"emphasis", "strong", "link", "url"}))
         return QStringLiteral("function");
-    return QString();
+    return {};
 }
 
 } // namespace

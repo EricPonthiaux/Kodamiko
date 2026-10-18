@@ -32,7 +32,7 @@ void collect(const QMenu *menu, const QString &prefix, QList<QPair<QString, QAct
         if (action->isSeparator() || !action->isVisible() || !action->isEnabled())
             continue;
         const QString name = withoutMnemonic(action->text());
-        if (QMenu *submenu = action->menu())
+        if (const QMenu *submenu = action->menu())
             collect(submenu, prefix + name + QStringLiteral(": "), commands);
         else
             commands.append({prefix + name, action});
@@ -74,8 +74,8 @@ void CommandPalette::popup(const QMenuBar *menuBar)
 {
     commands_.clear();
     QList<QPair<QString, QAction *>> found;
-    for (QAction *action : menuBar->actions()) {
-        if (QMenu *menu = action->menu())
+    for (const QAction *action : menuBar->actions()) {
+        if (const QMenu *menu = action->menu())
             collect(menu, withoutMnemonic(action->text()) + QStringLiteral(": "), found);
     }
     for (const auto &[name, action] : found)

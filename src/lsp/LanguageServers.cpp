@@ -244,7 +244,7 @@ std::optional<LanguageServers::Launch> LanguageServers::jdtlsLaunch(const QStrin
                                       .entryList({QStringLiteral("org.eclipse.equinox.launcher_*.jar"),
                                                   QStringLiteral("org.eclipse.equinox.launcher.jar")},
                                                  QDir::Files);
-#if defined(Q_OS_WIN)
+#ifdef Q_OS_WIN
     QString config = QStringLiteral("config_win");
 #elif defined(Q_OS_MACOS)
     QString config = QStringLiteral("config_mac");
@@ -502,16 +502,15 @@ LanguageServers::Options LanguageServers::optionsFor(const QString &server,
     } else if (server == QLatin1String("pyright")) {
         if (!runtimeExecutable.isEmpty())
             options.settings = QJsonObject{{"python", QJsonObject{{"pythonPath", runtimeExecutable}}}};
-    } else if (server == QLatin1String("pylsp")) {
-        if (!runtimeExecutable.isEmpty())
-            options.settings = QJsonObject{
-                {"pylsp",
-                 QJsonObject{{"plugins", QJsonObject{{"jedi", QJsonObject{{"environment", runtimeExecutable}}}}}}}};
-    }
+    } else if ((server == QLatin1String("pylsp")) && (!runtimeExecutable.isEmpty()))
+        options.settings = QJsonObject{
+            {"pylsp",
+             QJsonObject{{"plugins", QJsonObject{{"jedi", QJsonObject{{"environment", runtimeExecutable}}}}}}}};
+
     return options;
 }
 
-void LanguageServers::setRequestHandler(const QString &method, LspClient::RequestHandler handler)
+void LanguageServers::setRequestHandler(const QString &method, const LspClient::RequestHandler &handler)
 {
     requestHandlers_.insert(method, handler);
     for (LspClient *client : std::as_const(clients_))
@@ -526,7 +525,7 @@ bool LanguageServers::syncDocument(LspClient *client,
     const QString server = clients_.key(client);
     const QString uri = QUrl::fromLocalFile(path).toString();
     const size_t hash = qHash(text);
-    auto it = documents_.find(path);
+    const auto it = documents_.find(path);
     if (it == documents_.end() || it.value().server != server) {
         documents_.insert(path, {server, 1, hash});
         client->notify(QStringLiteral("textDocument/didOpen"),

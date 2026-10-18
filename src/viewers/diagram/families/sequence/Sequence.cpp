@@ -244,7 +244,8 @@ QList<Fragment> syncFragments(QStringList &out,
         out.append(indent + f.kind + (f.label.isEmpty() ? QString() : QLatin1Char(' ') + text(f.label)));
     }
     for (qsizetype i = 0; i < common; ++i) {
-        const Fragment &before = active[i], &after = next[i];
+        const Fragment &before = active[i];
+        const Fragment &after = next[i];
         if (sameBranch(before, after))
             continue;
         const QString keyword = !after.branchKeyword.isEmpty()                           ? after.branchKeyword
@@ -405,7 +406,7 @@ void ParticipantShape::draw(QPainter &painter, const Board &board, const ShapeSt
         figure.lineTo(cx() - 11, y + 50);
         figure.moveTo(cx(), y + 38);
         figure.lineTo(cx() + 11, y + 50);
-        const qreal width = state.selected ? 2 : ShapeBorderWidth;
+        const qreal width = state.selected ? 2 : shapeBorderWidth;
         // sidecar's small shadow under the silhouette.
         stroke(painter, figure.translated(0, 2), style.palette.shadow, width + 1);
         stroke(painter, figure, strokeColor(color), width);
@@ -421,10 +422,10 @@ void ParticipantShape::draw(QPainter &painter, const Board &board, const ShapeSt
 
     const QColor own = parseColor(fill);
     const QColor nativeFill = !own.isValid() || own == QColor(Qt::white) ? style.tones.cool : own;
-    const QPainterPath path = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, path, fillColor(nativeFill), style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     if (state.editing)
         return;
     const QColor ink = textColor(style.palette.ink);
@@ -448,16 +449,16 @@ QList<Property> ParticipantShape::properties() const
     return {{QStringLiteral("kind"), tr("Kind"), Property::Kind::Choice, kindChoices()}};
 }
 
-QVariant ParticipantShape::propertyValue(const QString &id_) const
+QVariant ParticipantShape::propertyValue(const QString &id) const
 {
-    if (id_ == QLatin1String("kind"))
+    if (id == QLatin1String("kind"))
         return kind;
     return {};
 }
 
-void ParticipantShape::setPropertyValue(const QString &id_, const QVariant &value)
+void ParticipantShape::setPropertyValue(const QString &id, const QVariant &value)
 {
-    if (id_ != QLatin1String("kind"))
+    if (id != QLatin1String("kind"))
         return;
     kind = value.toString().isEmpty() ? QStringLiteral("participant") : value.toString();
     // An actor's silhouette is taller than a header box.
@@ -583,7 +584,8 @@ void MessageLink::drawHead(QPainter &painter,
     if (kind == QLatin1String("arrow")) {
         fillArrowHead(painter, tip, angle, style.arrow, style.color);
     } else if (kind == QLatin1String("open")) {
-        const qreal spread = 0.5, length = (board.style().link.arrow + 2) * style.markerScale;
+        const qreal spread = 0.5;
+        const qreal length = (board.style().link.arrow + 2) * style.markerScale;
         QPainterPath path;
         path.moveTo(tip.x() - length * std::cos(angle - spread), tip.y() - length * std::sin(angle - spread));
         path.lineTo(tip);
@@ -624,28 +626,28 @@ QList<Property> MessageLink::properties() const
     };
 }
 
-QVariant MessageLink::propertyValue(const QString &id_) const
+QVariant MessageLink::propertyValue(const QString &id) const
 {
-    if (id_ == QLatin1String("line"))
+    if (id == QLatin1String("line"))
         return line;
-    if (id_ == QLatin1String("head"))
+    if (id == QLatin1String("head"))
         return head;
-    if (id_ == QLatin1String("startHead"))
+    if (id == QLatin1String("startHead"))
         return startHead;
-    if (id_ == QLatin1String("activation"))
+    if (id == QLatin1String("activation"))
         return activation;
     return {};
 }
 
-void MessageLink::setPropertyValue(const QString &id_, const QVariant &value)
+void MessageLink::setPropertyValue(const QString &id, const QVariant &value)
 {
-    if (id_ == QLatin1String("line"))
+    if (id == QLatin1String("line"))
         line = value.toString();
-    else if (id_ == QLatin1String("head"))
+    else if (id == QLatin1String("head"))
         head = value.toString();
-    else if (id_ == QLatin1String("startHead"))
+    else if (id == QLatin1String("startHead"))
         startHead = value.toString().isEmpty() ? QStringLiteral("none") : value.toString();
-    else if (id_ == QLatin1String("activation"))
+    else if (id == QLatin1String("activation"))
         activation = value.toString();
 }
 
@@ -657,7 +659,7 @@ void MessageLink::setPropertyValue(const QString &id_, const QVariant &value)
 // left-to-right order, lifelines spaced so that every message label fits
 // between its two ends, and the lanes are compacted (the gaps left by
 // deletions disappear).
-void arrange(Board &board)
+void arrange(const Board &board)
 {
     const QList<ParticipantShape *> parts = participants(board);
     if (parts.isEmpty())
@@ -688,7 +690,8 @@ void arrange(Board &board)
     for (const MessageLink *l : bySpan) {
         if (!index.contains(l->from) || !index.contains(l->to))
             continue;
-        const int i = index.value(l->from), j = index.value(l->to);
+        const int i = index.value(l->from);
+        const int j = index.value(l->to);
         const qreal labelWidth =
             l->label.isEmpty() ? 0 : text::width(labelFont, l->label.section(QLatin1Char('\n'), 0, 0)) + 30;
         if (i == j) {
@@ -697,7 +700,8 @@ void arrange(Board &board)
                 gaps[i] = std::max(gaps[i], need);
             continue;
         }
-        const int lo = std::min(i, j), hi = std::max(i, j);
+        const int lo = std::min(i, j);
+        const int hi = std::max(i, j);
         qreal centerDistance = 0;
         for (int k = lo; k < hi; ++k)
             centerDistance += parts[k]->w / 2 + gaps[k] + parts[k + 1]->w / 2;
@@ -731,7 +735,7 @@ void drawFragments(QPainter &painter, const Board &board)
         const qreal width = std::max<qreal>(80, right - left - inset * 2);
         const qreal top = messageY(board, span.startOrder) - 44;
         const qreal bottom = messageY(board, span.endOrder) + 22;
-        stroke(painter, roundRect(x, top, width, bottom - top, ShapeRadiusSm), style.palette.separator, 1.25);
+        stroke(painter, roundRect(x, top, width, bottom - top, shapeRadiusSm), style.palette.separator, 1.25);
 
         const QString heading = joined(span.fragment.kind, span.fragment.label);
         if (!heading.isEmpty()) {

@@ -22,21 +22,22 @@
 #include <QTabBar>
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
 // The mark shown when no file is open: a fraction of the area's short side,
 // within bounds so it stays a discreet watermark.
-constexpr qreal EmptyMarkShare = 0.22;
-constexpr qreal EmptyMarkMinimumSize = 48;
-constexpr qreal EmptyMarkMaximumSize = 160;
-constexpr qreal EmptyMarkOpacity = 0.35;
+constexpr qreal emptyMarkShare = 0.22;
+constexpr qreal emptyMarkMinimumSize = 48;
+constexpr qreal emptyMarkMaximumSize = 160;
+constexpr qreal emptyMarkOpacity = 0.35;
 
 } // namespace
 
-EditorTabs::EditorTabs(const Theme &theme, QWidget *parent)
+EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     : QTabWidget(parent)
-    , theme_(theme)
+    , theme_(std::move(theme))
 {
     setTabsClosable(true);
     setMovable(true);
@@ -65,7 +66,7 @@ void EditorTabs::paintEvent(QPaintEvent *event)
 void EditorTabs::paintEmptyMark()
 {
     const qreal shortSide = std::min(width(), height());
-    const qreal size = std::clamp(shortSide * EmptyMarkShare, EmptyMarkMinimumSize, EmptyMarkMaximumSize);
+    const qreal size = std::clamp(shortSide * emptyMarkShare, emptyMarkMinimumSize, emptyMarkMaximumSize);
     QRectF area(0, 0, size, size);
     area.moveCenter(QRectF(rect()).center());
 
@@ -73,7 +74,7 @@ void EditorTabs::paintEmptyMark()
     // would vanish on a light background.
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setOpacity(EmptyMarkOpacity);
+    painter.setOpacity(emptyMarkOpacity);
     BrandMark::paint(&painter, area, theme_.mutedText, theme_.accent);
 }
 
@@ -210,7 +211,7 @@ void EditorTabs::showPage(QWidget *page, const QString &title, const QString &ic
 void EditorTabs::replacePage(QWidget *page, const QString &path)
 {
     const int index = indexOf(page);
-    QWidget *opened = openFile(path);
+    const QWidget *opened = openFile(path);
     closePage(page);
     if (opened && index >= 0)
         tabBar()->moveTab(indexOf(opened), std::min(index, count() - 1));
@@ -261,7 +262,7 @@ EditorWidget *EditorTabs::currentEditor() const
 
 EditorWidget *EditorTabs::editorIn(QWidget *page)
 {
-    if (auto *previewed = qobject_cast<PreviewPage *>(page))
+    if (const auto *previewed = qobject_cast<PreviewPage *>(page))
         return previewed->editor();
     return qobject_cast<EditorWidget *>(page);
 }
@@ -275,7 +276,7 @@ QWidget *EditorTabs::pageOf(EditorWidget *editor) const
     return nullptr;
 }
 
-void EditorTabs::revealEditor(EditorWidget *editor)
+void EditorTabs::revealEditor(EditorWidget *editor) const
 {
     if (auto *previewed = qobject_cast<PreviewPage *>(pageOf(editor)))
         previewed->revealEditor();
@@ -330,12 +331,12 @@ QList<DiagramView *> EditorTabs::diagramViews() const
 
 QString EditorTabs::filePathOf(QWidget *page) const
 {
-    if (auto *editor = editorIn(page))
+    if (const auto *editor = editorIn(page))
         return editor->filePath();
-    if (auto *image = qobject_cast<ImageView *>(page))
+    if (const auto *image = qobject_cast<ImageView *>(page))
         return image->filePath();
 #ifdef DUET_WITH_DIAGRAMS
-    if (auto *diagram = qobject_cast<DiagramView *>(page))
+    if (const auto *diagram = qobject_cast<DiagramView *>(page))
         return diagram->filePath();
 #endif
     return {};
@@ -356,10 +357,10 @@ QList<QWidget *> EditorTabs::pagesUnder(const QString &path) const
 bool EditorTabs::hasUnsavedChangesUnder(const QString &path) const
 {
     for (QWidget *page : pagesUnder(path)) {
-        if (auto *editor = editorIn(page); editor && editor->isModified())
+        if (const auto *editor = editorIn(page); editor && editor->isModified())
             return true;
 #ifdef DUET_WITH_DIAGRAMS
-        if (auto *diagram = qobject_cast<DiagramView *>(page); diagram && diagram->isModified())
+        if (const auto *diagram = qobject_cast<DiagramView *>(page); diagram && diagram->isModified())
             return true;
 #endif
     }
@@ -368,7 +369,7 @@ bool EditorTabs::hasUnsavedChangesUnder(const QString &path) const
 
 void EditorTabs::closeFilesUnder(const QString &path)
 {
-    for (QWidget *page : pagesUnder(path))
+    for (const QWidget *page : pagesUnder(path))
         closeTab(indexOf(page), false);
 }
 
@@ -381,8 +382,10 @@ void EditorTabs::followRename(const QString &oldPath, const QString &newPath)
     for (QWidget *page : pagesUnder(oldAbsolute)) {
         const int index = indexOf(page);
         const QString renamed = newAbsolute + filePathOf(page).mid(oldAbsolute.size());
-        int line = 0, column = 0, firstLine = 0;
-        auto *editor = editorIn(page);
+        int line = 0;
+        int column = 0;
+        int firstLine = 0;
+        const auto *editor = editorIn(page);
         if (editor) {
             editor->getCursorPosition(&line, &column);
             firstLine = editor->firstVisibleLine();
@@ -417,12 +420,12 @@ QStringList EditorTabs::openFilePaths() const
 
 QString EditorTabs::currentFilePath() const
 {
-    if (auto *editor = editorIn(currentWidget()))
+    if (const auto *editor = editorIn(currentWidget()))
         return editor->filePath();
-    if (auto *image = qobject_cast<ImageView *>(currentWidget()))
+    if (const auto *image = qobject_cast<ImageView *>(currentWidget()))
         return image->filePath();
 #ifdef DUET_WITH_DIAGRAMS
-    if (auto *diagram = qobject_cast<DiagramView *>(currentWidget()))
+    if (const auto *diagram = qobject_cast<DiagramView *>(currentWidget()))
         return diagram->filePath();
 #endif
     return {};
@@ -431,7 +434,7 @@ QString EditorTabs::currentFilePath() const
 QHash<QString, QString> EditorTabs::unsavedTexts() const
 {
     QHash<QString, QString> texts;
-    for (EditorWidget *editor : editors()) {
+    for (const EditorWidget *editor : editors()) {
         if (editor->isModified() && !editor->filePath().isEmpty())
             texts.insert(editor->filePath(), editor->text());
     }
@@ -521,7 +524,7 @@ void EditorTabs::applyFormatted(EditorWidget *editor,
 // milliseconds to seconds: it runs while the editor stays responsive.
 void EditorTabs::formatEditor(EditorWidget *editor, bool quiet, bool saveAfter)
 {
-    if (auto running = formatting_.find(editor); running != formatting_.end()) {
+    if (const auto running = formatting_.find(editor); running != formatting_.end()) {
         *running = *running || saveAfter; // the running formatter saves when it ends
         return;
     }
@@ -648,7 +651,7 @@ bool EditorTabs::closeTab(int index, bool askToSave)
 #endif
     if (editor && !editor->filePath().isEmpty())
         watcher_.unwatch(editor->filePath());
-    if (auto *image = qobject_cast<ImageView *>(widget(index)))
+    if (const auto *image = qobject_cast<ImageView *>(widget(index)))
         watcher_.unwatch(image->filePath());
     QWidget *page = widget(index);
     removeTab(index);
@@ -668,7 +671,7 @@ bool EditorTabs::closeAll()
 bool EditorTabs::closeTabs(const QList<QWidget *> &pages)
 {
     // Indexes shift with each close, so work from the pages.
-    for (QWidget *page : pages) {
+    for (const QWidget *page : pages) {
         const int index = indexOf(page);
         if (index >= 0 && !closeTab(index))
             return false;
@@ -683,7 +686,9 @@ void EditorTabs::showTabContextMenu(const QPoint &pos)
         return;
     QWidget *clickedPage = widget(clicked);
 
-    QList<QWidget *> left, right, others;
+    QList<QWidget *> left;
+    QList<QWidget *> right;
+    QList<QWidget *> others;
     for (int i = 0; i < count(); ++i) {
         if (i < clicked)
             left.append(widget(i));
@@ -778,9 +783,9 @@ void EditorTabs::syncWithDisk(const QString &path)
         emit statusMessage(tr("Could not reload %1: %2").arg(name, error));
 }
 
-void EditorTabs::reloadChangeBases()
+void EditorTabs::reloadChangeBases() const
 {
-    for (EditorWidget *editor : editors()) {
+    for (const EditorWidget *editor : editors()) {
         if (!editor->filePath().isEmpty())
             editor->changeGutter()->reloadBase();
     }

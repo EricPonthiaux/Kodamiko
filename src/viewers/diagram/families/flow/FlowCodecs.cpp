@@ -287,7 +287,8 @@ Node *parseNodeRef(const QString &ref, Nodes &nodes, const QStringList &quoted)
     bool delimited = false;
     if (!rest.isEmpty()) {
         for (const Delimiter &d : delimiters) {
-            const QString open = QString::fromLatin1(d.open), close = QString::fromLatin1(d.close);
+            const QString open = QString::fromLatin1(d.open);
+            const QString close = QString::fromLatin1(d.close);
             if (rest.startsWith(open) && rest.endsWith(close) && rest.size() > open.size() + close.size() - 1) {
                 variant = QString::fromLatin1(d.variant);
                 label = mermaidUnquote(
@@ -398,7 +399,7 @@ public:
             const auto refs = [&](const QString &group) {
                 QList<QString> keys;
                 for (const QString &ref : splitTop(group, QLatin1Char('&'))) {
-                    if (Node *node = parseNodeRef(ref, nodes, quoted))
+                    if (const Node *node = parseNodeRef(ref, nodes, quoted))
                         keys.append(node->key);
                 }
                 return keys;
@@ -453,7 +454,8 @@ public:
             out.append(QStringLiteral("  ") + key + open + mermaidQuote(s->displayText()) + close);
         }
         for (const auto &l : board.links()) {
-            const QString from = keys.value(l->from), to = keys.value(l->to);
+            const QString from = keys.value(l->from);
+            const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
             const auto *flowLink = dynamic_cast<const FlowLink *>(l.get());
@@ -567,12 +569,13 @@ public:
                 const QJsonValue v = l.value(QLatin1String(name));
                 return keyOf.value(v.isDouble() ? QString::number(v.toDouble()) : v.toString());
             };
-            const QString from = end("from"), to = end("to");
+            const QString from = end("from");
+            const QString to = end("to");
             if (from.isEmpty() || to.isEmpty()) {
                 model.warnings.append(QStringLiteral("A link has a missing end"));
                 continue;
             }
-            QJsonObject props{
+            const QJsonObject props{
                 {QStringLiteral("label"), l.value(QStringLiteral("label")).toString()},
                 {QStringLiteral("line"), l.value(QStringLiteral("line")).toString(QStringLiteral("solid"))},
                 {QStringLiteral("head"), l.value(QStringLiteral("head")).toString(QStringLiteral("arrow"))}};
@@ -585,7 +588,8 @@ public:
 
     QString serialize(const Board &board, const QJsonObject &meta) const override
     {
-        QJsonArray shapes, links;
+        QJsonArray shapes;
+        QJsonArray links;
         QHash<QString, int> ids;
         int next = 1;
         for (const auto &s : board.shapes()) {

@@ -203,7 +203,7 @@ public:
             const bool opens = !c.captured(3).isEmpty();
 
             if (isBoundary(macro) && !args.value(0).isEmpty()) {
-                const QString key = args[0];
+                const QString &key = args[0];
                 QJsonObject props{{QStringLiteral("name"), args.value(1).isEmpty() ? key : args[1]},
                                   {QStringLiteral("boundaryKind"), macro.startsWith(QLatin1String("Node"))
                                                                        ? QStringLiteral("Deployment_Node")
@@ -330,7 +330,8 @@ public:
             write(shape, 1);
 
         for (const auto &l : board.links()) {
-            const QString from = keys.value(l->from), to = keys.value(l->to);
+            const QString from = keys.value(l->from);
+            const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
             const auto *relation = dynamic_cast<const C4RelationLink *>(l.get());

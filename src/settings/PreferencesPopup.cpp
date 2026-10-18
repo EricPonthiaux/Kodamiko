@@ -285,7 +285,7 @@ QWidget *PreferencesPopup::createAppearancePage()
             continue;
         }
         fontFamily_->addItem(tr("%1 — not installed").arg(font.name));
-        if (auto *model = qobject_cast<QStandardItemModel *>(fontFamily_->model()))
+        if (const auto *model = qobject_cast<QStandardItemModel *>(fontFamily_->model()))
             model->item(fontFamily_->count() - 1)->setEnabled(false);
         if (missing.isEmpty() || missing.last().first != font.url)
             missing.append({font.url, {}});

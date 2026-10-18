@@ -13,6 +13,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <ranges>
+
 namespace {
 
 enum Marker {
@@ -229,9 +231,9 @@ bool ChangeGutter::goTo(bool forward)
         if (!target)
             target = &all.first();
     } else {
-        for (auto it = all.crbegin(); it != all.crend(); ++it) {
-            if (markerLine(*it) < line && !it->covers(line, lineCount)) {
-                target = &*it;
+        for (const auto &it : std::views::reverse(all)) {
+            if (markerLine(it) < line && !it.covers(line, lineCount)) {
+                target = &it;
                 break;
             }
         }
@@ -303,11 +305,11 @@ void ChangeGutter::showChangeAt(int line)
     auto *toolbar = new QHBoxLayout;
     toolbar->setContentsMargins(0, 0, 0, 0);
     toolbar->setSpacing(2);
-    QToolButton *previous = addButton(toolbar, QStringLiteral("↑"), tr("Previous Change (Ctrl+Alt+Shift+Up)"));
-    QToolButton *next = addButton(toolbar, QStringLiteral("↓"), tr("Next Change (Ctrl+Alt+Shift+Down)"));
+    const QToolButton *previous = addButton(toolbar, QStringLiteral("↑"), tr("Previous Change (Ctrl+Alt+Shift+Up)"));
+    const QToolButton *next = addButton(toolbar, QStringLiteral("↓"), tr("Next Change (Ctrl+Alt+Shift+Down)"));
     QToolButton *rollbackButton = addButton(toolbar, tr("Rollback"), tr("Rollback Lines (Ctrl+Alt+Z)"));
     rollbackButton->setEnabled(!editor_->isReadOnly());
-    QToolButton *showDiff = addButton(toolbar, tr("Show Diff"), tr("Show this change in a diff tab"));
+    const QToolButton *showDiff = addButton(toolbar, tr("Show Diff"), tr("Show this change in a diff tab"));
     toolbar->addStretch();
     const int lines = change.kind() == LineChange::Kind::Deleted ? change.baseCount : change.count;
     QString summary;

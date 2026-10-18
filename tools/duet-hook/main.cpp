@@ -116,14 +116,14 @@ int statusLine(const QByteArray &input)
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication app(argc, argv);
+    const QCoreApplication app(argc, argv);
 
     QFile input;
     if (!input.open(stdin, QIODevice::ReadOnly))
         return 0;
     const QByteArray json = input.readAll();
 
-    if (app.arguments().value(1) == QLatin1String("statusline"))
+    if (QCoreApplication::arguments().value(1) == QLatin1String("statusline"))
         return statusLine(json);
 
     const QJsonDocument event = QJsonDocument::fromJson(json);

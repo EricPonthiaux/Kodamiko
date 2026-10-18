@@ -121,7 +121,8 @@ public:
             {"problem", "capabilities"}, {"users", "journeys"},   {"value", "unknowns"},
         };
         for (const auto &[fromText, toText] : arrows) {
-            const QString from = QString::fromLatin1(fromText), to = QString::fromLatin1(toText);
+            const QString from = QString::fromLatin1(fromText);
+            const QString to = QString::fromLatin1(toText);
             if (visible.contains(from) && visible.contains(to))
                 model.links.append({QStringLiteral("productVisionLink"), from, to, QJsonObject{}});
         }

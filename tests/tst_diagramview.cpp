@@ -65,7 +65,7 @@ bool loadInto(Board &board, const QString &name, const QByteArray &content, docu
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 
@@ -83,16 +83,16 @@ private slots:
         QVERIFY(loadInto(board, QStringLiteral("a.mmd"), kMermaid));
         QCOMPARE(board.shapes().size(), size_t(2));
         QCOMPARE(board.links().size(), size_t(1));
-        Shape *a = byKey(board, QStringLiteral("A"));
+        const Shape *a = byKey(board, QStringLiteral("A"));
         QVERIFY(a);
         QCOMPARE(a->type, QStringLiteral("terminator"));
         QCOMPARE(a->displayText(), QStringLiteral("Début"));
         const QString aId = a->id; // shapes are rebuilt by undo: kept by id
 
-        Shape *c = board.createShapeAt(QPointF(300, 0), QStringLiteral("decision"),
-                                       QJsonObject{{QStringLiteral("text"), QStringLiteral("Valid?")},
-                                                   {QStringLiteral("variant"), QStringLiteral("diamond")}},
-                                       false);
+        const Shape *c = board.createShapeAt(QPointF(300, 0), QStringLiteral("decision"),
+                                             QJsonObject{{QStringLiteral("text"), QStringLiteral("Valid?")},
+                                                         {QStringLiteral("variant"), QStringLiteral("diamond")}},
+                                             false);
         QVERIFY(c);
         QCOMPARE(board.shapes().size(), size_t(3));
         QCOMPARE(board.selection(), QSet<QString>{c->id});
@@ -125,8 +125,8 @@ private slots:
         QVERIFY(loadInto(board, QStringLiteral("a.mmd"), kMermaid, &loaded));
         QVERIFY(loaded.needsArrange); // nothing placed yet
         QVERIFY(graphviz::autoArrange(board, {}));
-        Shape *a = byKey(board, QStringLiteral("A"));
-        Shape *b = byKey(board, QStringLiteral("B"));
+        const Shape *a = byKey(board, QStringLiteral("A"));
+        const Shape *b = byKey(board, QStringLiteral("B"));
         QVERIFY(b->y > a->y + a->h); // B below A, not on top of it
         QVERIFY(board.links().front()->spline);
 
@@ -147,7 +147,7 @@ private slots:
         Board edited;
         QVERIFY(loadInto(edited, QStringLiteral("a.mmd"), saved + "  B --> C{\"Done?\"}\n", &reloaded));
         QVERIFY(!reloaded.needsArrange);
-        Shape *c = byKey(edited, QStringLiteral("C"));
+        const Shape *c = byKey(edited, QStringLiteral("C"));
         QCOMPARE(c->type, QStringLiteral("decision"));
         QCOMPARE(reloaded.unplaced, QStringList{c->id});
         graphviz::placeNewcomers(edited, reloaded.unplaced, {});
@@ -221,7 +221,7 @@ private slots:
     // The gestures, with the mouse and the keyboard.
     void editsWithTheMouseAndKeyboard()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         Board placed;
         document::Loaded loaded;
         QVERIFY(loadInto(placed, QStringLiteral("a.mmd"), kMermaid, &loaded));
@@ -238,7 +238,7 @@ private slots:
         Board *board = view.board();
         canvas->fitView(false);
         const auto screen = [&](QPointF world) { return canvas->camera().toScreen(world).toPoint(); };
-        Shape *a = byKey(*board, QStringLiteral("A"));
+        const Shape *a = byKey(*board, QStringLiteral("A"));
         const QString aId = a->id;
         const qreal ax = a->x;
         const QString bId = byKey(*board, QStringLiteral("B"))->id;
@@ -260,7 +260,7 @@ private slots:
 
         // Link B to A from B's east port (ports show on the selection).
         board->selectShape(bId);
-        Shape *b = board->shape(bId);
+        const Shape *b = board->shape(bId);
         const QList<Port> ports = b->connectionPorts(*board);
         const QPoint port = screen(QPointF(ports[1].x, ports[1].y));
         a = board->shape(aId);
@@ -346,7 +346,7 @@ private slots:
 
     void opensDiagramFilesInTheDiagramEditor()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString path = writeFile(dir, QStringLiteral("process.mmd"), kMermaid);
         QVERIFY(DiagramView::isDiagramFile(path));
         QVERIFY(DiagramView::isDiagramFile(dir.filePath(QStringLiteral("old.flow"))));
@@ -365,7 +365,7 @@ private slots:
 
     void refusesInvalidDiagrams()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         DiagramView view(Theme::dark());
         QString error;
         QVERIFY(!view.load(writeFile(dir, QStringLiteral("broken.flow"), "{ not json"), &error));
@@ -384,7 +384,7 @@ private slots:
 
     void savesAndRecognisesItsOwnWrites()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString path = writeFile(dir, QStringLiteral("process.mmd"), kMermaid);
         DiagramView view(Theme::dark());
         QString error;
@@ -409,7 +409,7 @@ private slots:
 
     void opensAnEmptyFileAsABlankDiagram()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString path = writeFile(dir, QStringLiteral("new.mmd"), QByteArray());
         DiagramView view(Theme::dark());
         QString error;
@@ -423,7 +423,7 @@ private slots:
 
     void severalDiagramsCanBeOpenAtOnce()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString first = writeFile(dir, QStringLiteral("a.mmd"), kMermaid);
         const QString second = writeFile(dir, QStringLiteral("b.flow"), kFlowboard);
         EditorTabs tabs(Theme::dark());

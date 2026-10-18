@@ -92,7 +92,7 @@ bool load(Board &board, const QString &name, const QByteArray &content, document
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 
@@ -203,8 +203,8 @@ private slots:
                 kinds.append(node.props.value(QStringLiteral("kind")).toString());
             QCOMPARE(kinds, (QStringList{QStringLiteral("participant"), QStringLiteral("actor")}));
         }
-        ParticipantShape *actor = participant(board, {{QStringLiteral("kind"), QStringLiteral("actor")},
-                                                      {QStringLiteral("text"), QStringLiteral("Client")}});
+        const ParticipantShape *actor = participant(board, {{QStringLiteral("kind"), QStringLiteral("actor")},
+                                                            {QStringLiteral("text"), QStringLiteral("Client")}});
         QVERIFY(actor->h >= 80);
     }
 
@@ -220,7 +220,8 @@ private slots:
                                               "    end");
         const Model model = parse(mermaid(), source);
         QCOMPARE(model.links.size(), 2);
-        const QJsonObject first = model.links[0].props, second = model.links[1].props;
+        const QJsonObject first = model.links[0].props;
+        const QJsonObject second = model.links[1].props;
         QCOMPARE(first.value(QStringLiteral("startHead")).toString(), QStringLiteral("arrow"));
         QCOMPARE(first.value(QStringLiteral("activation")).toString(), QStringLiteral("+"));
         QCOMPARE(
@@ -442,16 +443,16 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *api = participant(board, {{QStringLiteral("text"), QStringLiteral("API")},
-                                                    {QStringLiteral("x"), 0},
-                                                    {QStringLiteral("y"), 20},
-                                                    {QStringLiteral("w"), 150},
-                                                    {QStringLiteral("h"), 44}});
+        const ParticipantShape *api = participant(board, {{QStringLiteral("text"), QStringLiteral("API")},
+                                                          {QStringLiteral("x"), 0},
+                                                          {QStringLiteral("y"), 20},
+                                                          {QStringLiteral("w"), 150},
+                                                          {QStringLiteral("h"), 44}});
         QCOMPARE(api->w, 150.0);
         // One line of text needs 48 px (sidecar's test leaves the shape
         // unmeasured at 44): the lanes start under the measured header.
         QCOMPARE(api->h, 48.0);
-        MessageLink *self = message(board, api->id, api->id, {{QStringLiteral("order"), 0}});
+        const MessageLink *self = message(board, api->id, api->id, {{QStringLiteral("order"), 0}});
         QVERIFY(self);
         const std::optional<Route> r = self->route(board);
         QVERIFY(r);
@@ -466,11 +467,11 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(board, {{QStringLiteral("x"), 20}, {QStringLiteral("y"), 20}});
-        ParticipantShape *b = participant(board, {{QStringLiteral("x"), 260}, {QStringLiteral("y"), 20}});
-        MessageLink *call = message(board, a->id, b->id,
-                                    {{QStringLiteral("order"), 0}, {QStringLiteral("label"), QStringLiteral("Call")}});
-        MessageLink *back = message(
+        const ParticipantShape *a = participant(board, {{QStringLiteral("x"), 20}, {QStringLiteral("y"), 20}});
+        const ParticipantShape *b = participant(board, {{QStringLiteral("x"), 260}, {QStringLiteral("y"), 20}});
+        const MessageLink *call = message(
+            board, a->id, b->id, {{QStringLiteral("order"), 0}, {QStringLiteral("label"), QStringLiteral("Call")}});
+        const MessageLink *back = message(
             board, a->id, a->id, {{QStringLiteral("order"), 1}, {QStringLiteral("label"), QStringLiteral("Callback")}});
         const Route r = *call->route(board);
         QCOMPARE(call->labelPos(r, board), QPointF((r.a.x() + r.b.x()) / 2, r.a.y()));
@@ -487,13 +488,13 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(
+        const ParticipantShape *a = participant(
             board,
             {{QStringLiteral("text"), QStringLiteral("Actor")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
-        ParticipantShape *b = participant(board, {{QStringLiteral("text"), QStringLiteral("System")},
-                                                  {QStringLiteral("kind"), QStringLiteral("actor")},
-                                                  {QStringLiteral("x"), 220},
-                                                  {QStringLiteral("y"), 20}});
+        const ParticipantShape *b = participant(board, {{QStringLiteral("text"), QStringLiteral("System")},
+                                                        {QStringLiteral("kind"), QStringLiteral("actor")},
+                                                        {QStringLiteral("x"), 220},
+                                                        {QStringLiteral("y"), 20}});
         for (int order = 0; order < 8; ++order)
             message(board, a->id, b->id,
                     {{QStringLiteral("order"), order},
@@ -521,10 +522,10 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(
+        const ParticipantShape *a = participant(
             board,
             {{QStringLiteral("kind"), QStringLiteral("actor")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
-        ParticipantShape *b = participant(board, {{QStringLiteral("x"), 220}, {QStringLiteral("y"), 20}});
+        const ParticipantShape *b = participant(board, {{QStringLiteral("x"), 220}, {QStringLiteral("y"), 20}});
         const QList<Port> ports = a->connectionPorts(board);
         QCOMPARE(ports.size(), 1);
         QCOMPARE(QPointF(ports[0].x, ports[0].y), QPointF(a->cx(), messageY(board, 0)));
@@ -538,11 +539,11 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(board, {{QStringLiteral("x"), 0}});
-        ParticipantShape *b = participant(board, {{QStringLiteral("x"), 220}});
+        const ParticipantShape *a = participant(board, {{QStringLiteral("x"), 0}});
+        const ParticipantShape *b = participant(board, {{QStringLiteral("x"), 220}});
         message(board, a->id, b->id, {{QStringLiteral("order"), 0}});
-        Link *drawn = board.connect(b->id, a->id);
-        Link *again = board.connect(b->id, a->id);
+        const Link *drawn = board.connect(b->id, a->id);
+        const Link *again = board.connect(b->id, a->id);
         QVERIFY(drawn && again && drawn != again);
         QCOMPARE(drawn->route(board)->a.y(), messageY(board, 1));
         QCOMPARE(again->route(board)->a.y(), messageY(board, 2));
@@ -568,10 +569,10 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(
+        const ParticipantShape *a = participant(
             board,
             {{QStringLiteral("text"), QStringLiteral("A")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
-        ParticipantShape *b = participant(
+        const ParticipantShape *b = participant(
             board,
             {{QStringLiteral("text"), QStringLiteral("B")}, {QStringLiteral("x"), 220}, {QStringLiteral("y"), 20}});
         const auto fragment = [](const char *keyword, const char *label) {
@@ -592,8 +593,8 @@ private slots:
 
     void fragmentStatementsFollowTheStack()
     {
-        Fragment loop{QStringLiteral("f1"), QStringLiteral("loop"), QStringLiteral("again"), 0, {}, {}};
-        Fragment par{QStringLiteral("f2"), QStringLiteral("par"), QStringLiteral("one"), 1, {}, {}};
+        const Fragment loop{QStringLiteral("f1"), QStringLiteral("loop"), QStringLiteral("again"), 0, {}, {}};
+        const Fragment par{QStringLiteral("f2"), QStringLiteral("par"), QStringLiteral("one"), 1, {}, {}};
         Fragment parBranch = par;
         parBranch.branchLabel = QStringLiteral("two");
         QStringList out;
@@ -697,7 +698,8 @@ private slots:
                 QVERIFY(std::abs(copy->y - s->y) <= 0.05);
                 QCOMPARE(copy->customFill, s->customFill);
             }
-            const QList<MessageLink *> before = messagesOf(board), after = messagesOf(again);
+            const QList<MessageLink *> before = messagesOf(board);
+            const QList<MessageLink *> after = messagesOf(again);
             for (int i = 0; i < before.size(); ++i) {
                 QCOMPARE(again.shape(after[i]->from)->key, board.shape(before[i]->from)->key);
                 QCOMPARE(again.shape(after[i]->to)->key, board.shape(before[i]->to)->key);
@@ -771,8 +773,8 @@ private slots:
         // Every head and start head, selected or not.
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(board, {{QStringLiteral("x"), 0}});
-        ParticipantShape *b = participant(board, {{QStringLiteral("x"), 220}});
+        const ParticipantShape *a = participant(board, {{QStringLiteral("x"), 0}});
+        const ParticipantShape *b = participant(board, {{QStringLiteral("x"), 220}});
         int order = 0;
         for (const char *head : {"arrow", "open", "cross", "none"}) {
             message(board, a->id, b->id,

@@ -75,7 +75,7 @@ EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFo
     };
 
     EditorContext context;
-    if (EditorWidget *editor = tabs.currentEditor(); editor && !editor->filePath().isEmpty()) {
+    if (const EditorWidget *editor = tabs.currentEditor(); editor && !editor->filePath().isEmpty()) {
         context.filePath = relative(editor->filePath());
         int line = 0;
         int index = 0;
@@ -83,7 +83,10 @@ EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFo
         context.line = line + 1;
         context.column = index + 1;
         if (editor->hasSelectedText()) {
-            int lineFrom = 0, indexFrom = 0, lineTo = 0, indexTo = 0;
+            int lineFrom = 0;
+            int indexFrom = 0;
+            int lineTo = 0;
+            int indexTo = 0;
             editor->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
             // Whole lines selected end at the start of the next one.
             if (indexTo == 0 && lineTo > lineFrom)

@@ -38,7 +38,7 @@ public:
     static QList<TextEdit> parseEdits(const QJsonArray &edits);
     // The type of the active parameter in a "textDocument/signatureHelp"
     // result, empty if none. Public for tests.
-    static QString activeParameterType(const QJsonValue &help, const QString &languageId);
+    static QString activeParameterType(const QJsonValue &result, const QString &languageId);
 
 private:
     void request(LspClient *client,

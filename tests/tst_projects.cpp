@@ -103,7 +103,7 @@ private slots:
 
     void detectsTheLanguagesOfAFolder()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("backend/pom.xml"), "<maven.compiler.release>17</maven.compiler.release>");
         write(dir.filePath("web/package.json"), "{}");
         write(dir.filePath(".nvmrc"), "v20.11.0\n");
@@ -127,7 +127,7 @@ private slots:
 
     void findsAPythonEnvironment()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("pyproject.toml"), "requires-python = \">=3.9\"");
         write(dir.filePath(".venv/pyvenv.cfg"), "home = /usr/bin\nversion = 3.12.3\n");
 #ifdef Q_OS_WIN
@@ -215,7 +215,7 @@ private slots:
 
     void plansWhatIsMissing()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const Toolchains toolchains(dir.path(), false);
         ProjectConfig config;
         config.languages.append({"java", true, "17", {}, "jdtls", "1.62.0"});
@@ -237,7 +237,7 @@ private slots:
 
     void completesASetup()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const Toolchains toolchains(dir.path(), false);
         LanguageSetup setup;
         setup.language = "java";
@@ -314,7 +314,7 @@ private slots:
 
     void editsASetup()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         Toolchains toolchains(dir.filePath("toolchains"), false);
         ProjectSetupForm form(&toolchains);
         ProjectConfig project;
@@ -332,7 +332,7 @@ private slots:
 
     void listsTheProjects()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QDir(dir.path()).mkpath("alpha");
         QDir(dir.path()).mkpath("beta");
         ProjectConfig alpha = ProjectStore::touch(dir.filePath("alpha"));
@@ -358,7 +358,7 @@ private slots:
     {
         if (qEnvironmentVariableIsEmpty("DUET_NETWORK_TESTS"))
             QSKIP("Set DUET_NETWORK_TESTS=1 to download from the Internet");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         Toolchains toolchains(dir.filePath("toolchains"), false);
         ProjectConfig project;
         project.languages.append({"python", true, "3.12", {}, "pyright", "1.1.414"});

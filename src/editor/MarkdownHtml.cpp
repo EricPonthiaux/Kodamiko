@@ -12,6 +12,7 @@
 #include <cmark-gfm.h>
 
 #include <cstdlib>
+#include <ranges>
 #include <vector>
 
 namespace {
@@ -283,9 +284,9 @@ QString body(const QString &markdown, CodeColorizer *colorizer)
             break;
         }
     }
-    for (auto it = quotes.rbegin(); it != quotes.rend(); ++it) {
-        if (const QString html = alertHtml(*it, extensions); !html.isEmpty())
-            replaceWithHtml(*it, html);
+    for (auto &quote : std::views::reverse(quotes)) {
+        if (const QString html = alertHtml(quote, extensions); !html.isEmpty())
+            replaceWithHtml(quote, html);
     }
 
     QString html = render(document, extensions);

@@ -4,6 +4,8 @@
 #include <QFileInfo>
 #include <QRegularExpression>
 
+#include <utility>
+
 namespace {
 
 using Severity = Diagnostic::Severity;
@@ -34,9 +36,9 @@ int number(const QString &text, int fallback = 0)
 
 } // namespace
 
-BuildOutputParser::BuildOutputParser(const QString &workingDirectory, const QString &projectFolder)
-    : workingDirectory_(workingDirectory)
-    , projectFolder_(projectFolder)
+BuildOutputParser::BuildOutputParser(QString workingDirectory, QString projectFolder)
+    : workingDirectory_(std::move(workingDirectory))
+    , projectFolder_(std::move(projectFolder))
 {
 }
 
@@ -206,7 +208,7 @@ bool BuildOutputParser::continuePending(const QString &line)
         if (const QRegularExpressionMatch match = frame.match(line); match.hasMatch()) {
             // The deepest frame in the project's own code.
             const QString path = resolve(match.captured(1));
-            if (!path.isEmpty() && (path.startsWith(projectFolder_ + QLatin1Char('/')))) {
+            if (!path.isEmpty() && path.startsWith(projectFolder_ + QLatin1Char('/'))) {
                 pythonPath_ = path;
                 pythonLine_ = number(match.captured(2));
             }

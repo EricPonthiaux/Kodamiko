@@ -7,6 +7,9 @@
 #include <QTimer>
 #include <QUrl>
 
+#include <ranges>
+#include <utility>
+
 namespace {
 
 // What Duet understands of the protocol: completion with snippets (the
@@ -63,10 +66,10 @@ QJsonObject clientCapabilities()
 
 } // namespace
 
-LspClient::LspClient(const QString &program, const QStringList &arguments, const QString &rootFolder, QObject *parent)
+LspClient::LspClient(QString program, QStringList arguments, const QString &rootFolder, QObject *parent)
     : QObject(parent)
-    , program_(program)
-    , arguments_(arguments)
+    , program_(std::move(program))
+    , arguments_(std::move(arguments))
     , rootFolder_(rootFolder)
     , process_(new QProcess(this))
 {
@@ -110,8 +113,8 @@ QString LspClient::lastError() const
     // The last line that says something ("Exception: jdtls requires at
     // least Java 21"), not a stack frame.
     const QStringList lines = QString::fromUtf8(errors_).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-    for (auto it = lines.crbegin(); it != lines.crend(); ++it) {
-        const QString line = it->trimmed();
+    for (const auto &it : std::views::reverse(lines)) {
+        const QString line = it.trimmed();
         if (!line.isEmpty() && !line.startsWith(QLatin1String("at ")) && !line.startsWith(QLatin1String("File \"")) &&
             !line.startsWith(QLatin1Char('^')) && !line.startsWith(QLatin1Char('~')))
             return line.left(240);

@@ -34,7 +34,7 @@ void write(const QString &path, const QByteArray &content)
     file.write(content);
 }
 
-QString selected(EditorWidget &editor)
+QString selected(const EditorWidget &editor)
 {
     return editor.selectedText();
 }
@@ -124,7 +124,7 @@ private slots:
 
     void statusDescribesTheFile()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("crlf.txt"), "été\r\n\tx = 1\r\n");
         EditorWidget editor(Theme::dark());
         QString error;
@@ -160,7 +160,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("git").isEmpty())
             QSKIP("git unavailable");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\ntwo\nthree\nfour\n");
         Git::run(dir.path(), {"init", "-q"});
         Git::run(dir.path(), {"add", "a.txt"});
@@ -184,7 +184,8 @@ private slots:
 
         editor.setCursorPosition(0, 0);
         QVERIFY(gutter->goToNext());
-        int line = 0, index = 0;
+        int line = 0;
+        int index = 0;
         editor.getCursorPosition(&line, &index);
         QCOMPARE(line, 1);
         QVERIFY(gutter->goToNext());
@@ -214,7 +215,7 @@ private slots:
 
     void gutterWithoutRepositoryHasNoMarks()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\n");
         EditorWidget editor(Theme::dark());
         QString error;
@@ -229,7 +230,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("git").isEmpty())
             QSKIP("git unavailable");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\n");
         Git::run(dir.path(), {"init", "-q"});
         Git::run(dir.path(), {"add", "a.txt"});
@@ -245,7 +246,7 @@ private slots:
 
     void contextMenuOffersTheFileActionsOnlyForAFile()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\n");
         QAction explain(QStringLiteral("Explain This Code"));
         EditorWidget editor(Theme::dark());
@@ -268,7 +269,7 @@ private slots:
         // Whole words, the comment's too, but not "counter".
         using Range = SymbolOccurrences::Range;
         QCOMPARE(occurrences->occurrences(), (QList<Range>{{4, 9}, {15, 20}, {30, 35}}));
-        auto *marks = editor.verticalScrollBar()->findChild<ScrollBarMarks *>();
+        const auto *marks = editor.verticalScrollBar()->findChild<ScrollBarMarks *>();
         QVERIFY(marks);
         QCOMPARE(marks->marks().size(), 3);
     }
@@ -324,7 +325,7 @@ private slots:
 
     void showsTheMarkOnlyWhenNoFileIsOpen()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("empty.txt"), "");
         EditorTabs tabs(Theme::dark());
         tabs.resize(600, 400);
@@ -428,7 +429,7 @@ private slots:
 
     void markdownTabsShowEditorAndPreview()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("README.md"), "# Hello\n");
         QSettings().setValue("markdown/mode", 2); // Preview
         EditorTabs tabs(Theme::dark());
@@ -464,11 +465,11 @@ private slots:
 
     void htmlTabsShowThePage()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("index.html"), "<html><head><title>Page</title></head>"
                                           "<body><h1>Hello</h1><script>document.title = 'ran';</script></body></html>");
         EditorTabs tabs(Theme::dark());
-        auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("index.html")));
+        const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("index.html")));
         QVERIFY(page);
         QCOMPARE(page->kind(), PreviewPage::Kind::Html);
         QCOMPARE(page->mode(), PreviewPage::Mode::Split); // the code beside the page
@@ -476,7 +477,7 @@ private slots:
         QVERIFY(!page->htmlPreview());
         tabs.show();
         QTRY_VERIFY(page->htmlPreview());
-        HtmlPreview *preview = page->htmlPreview();
+        const HtmlPreview *preview = page->htmlPreview();
         QTRY_VERIFY(preview->isReady());
         const auto pageText = [preview] {
             QString text;
@@ -517,7 +518,7 @@ private slots:
 
     void formatterCandidatesDependOnTheLanguage()
     {
-        auto programs = [](const QString &languageId) {
+        const auto programs = [](const QString &languageId) {
             QStringList names;
             for (const CodeFormatter::Command &command : CodeFormatter::candidates(languageId, "/p/file"))
                 names.append(command.program);
@@ -551,13 +552,13 @@ private slots:
     {
         if (QStandardPaths::findExecutable("clang-format").isEmpty())
             QSKIP("clang-format is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath(".clang-format"), "IndentWidth: 3\nColumnLimit: 90\n");
         write(dir.filePath("main.cpp"), "int main()\n{\n}\n");
         write(dir.filePath("notes.txt"), "text\n");
         EditorTabs tabs(Theme::dark());
         tabs.openFile(dir.filePath("main.cpp"));
-        EditorWidget *code = tabs.currentEditor();
+        const EditorWidget *code = tabs.currentEditor();
         QTRY_COMPARE(code->tabWidth(), 3);
         QVERIFY(!code->indentationsUseTabs());
         QCOMPARE(code->edgeColumn(), 90);
@@ -578,7 +579,7 @@ private slots:
 
     void formattedTextKeepsLineEndingAndUndoesAtOnce()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("a.cpp"), "int  x;\r\nint y;\r\n");
         EditorWidget editor(Theme::dark());
         QVERIFY(editor.load(dir.filePath("a.cpp"), nullptr));
@@ -601,7 +602,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("clang-format").isEmpty())
             QSKIP("clang-format is not installed");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath(".clang-format"), "BasedOnStyle: LLVM\nIndentWidth: 4\n");
         write(dir.filePath("a.cpp"), "int f(){return 1;}\n");
         EditorTabs tabs(Theme::dark());
@@ -620,7 +621,7 @@ private slots:
         // Format on save: the file on disk is the formatted text.
         tabs.currentEditor()->setText("int g(){return 2;}\n");
         tabs.setFormatOnSave(true);
-        QSignalSpy saved(&tabs, &EditorTabs::fileSaved);
+        const QSignalSpy saved(&tabs, &EditorTabs::fileSaved);
         QVERIFY(tabs.saveCurrent());
         QTRY_COMPARE(saved.size(), 1);
         QFile file(dir.filePath("a.cpp"));
@@ -638,7 +639,7 @@ private slots:
 
     void formatDocumentReportsAMissingFormatter()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("notes.txt"), "text\n");
         EditorTabs tabs(Theme::dark());
         QVERIFY(tabs.openFile(dir.filePath("notes.txt")));
@@ -649,7 +650,7 @@ private slots:
 
     void foldsTheBlockAroundTheCursor()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("a.cpp"), "int f() {\n    int a;\n    int b;\n}\nint g() {\n    int c;\n    int d;\n}\n");
         EditorWidget editor(Theme::dark());
         QVERIFY(editor.load(dir.filePath("a.cpp"), nullptr));
@@ -710,7 +711,7 @@ private:
 int main(int argc, char *argv[])
 {
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-    QApplication app(argc, argv);
+    const QApplication app(argc, argv);
     TestEditor test;
     return QTest::qExec(&test, argc, argv);
 }

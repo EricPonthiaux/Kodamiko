@@ -29,7 +29,7 @@ public:
     };
 
     // Highlights in `editor`, which owns it.
-    SymbolOccurrences(EditorWidget *editor, const Theme &theme);
+    SymbolOccurrences(EditorWidget *editor, Theme theme);
 
     void applyTheme(const Theme &theme);
 

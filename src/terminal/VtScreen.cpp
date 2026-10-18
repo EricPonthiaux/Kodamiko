@@ -330,7 +330,7 @@ QColor VtScreen::toQColor(VTermColor color, bool isForeground) const
     if (!isForeground && VTERM_COLOR_IS_DEFAULT_BG(&color))
         return defaultBackground_;
     vterm_screen_convert_color_to_rgb(screen_, &color);
-    return QColor(color.rgb.red, color.rgb.green, color.rgb.blue);
+    return {color.rgb.red, color.rgb.green, color.rgb.blue};
 }
 
 QRgb VtScreen::toRgb(VTermColor color, bool isForeground) const

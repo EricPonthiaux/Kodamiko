@@ -75,13 +75,13 @@ private slots:
 
     void logOutsideARepository()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QVERIFY(!CommitLog::read(dir.path()));
     }
 
     void logOfAnEmptyRepository()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         const CommitLog log = readLog(dir.path());
         QVERIFY(log.info.unborn);
@@ -90,7 +90,7 @@ private slots:
 
     void logNewestFirstWithRefs()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "a\n"}});
         commit(dir, "second\n\nmessage body", {{"a.txt", "b\n"}});
@@ -112,7 +112,7 @@ private slots:
 
     void logMarksADetachedHead()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "a\n"}});
         commit(dir, "second", {{"a.txt", "b\n"}});
@@ -125,7 +125,7 @@ private slots:
 
     void logIsLimited()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         for (int i = 0; i < 4; ++i)
             commit(dir, QString::number(i), {{"a.txt", QByteArray::number(i)}});
@@ -136,7 +136,7 @@ private slots:
 
     void logOfASubfolderKeepsItsCommits()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "root", {{"README", "r\n"}});
         commit(dir, "src created", {{"src/a.cpp", "a\n"}});
@@ -150,7 +150,7 @@ private slots:
 
     void logOfAFileKeepsItsCommits()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "a created", {{"src/a.cpp", "a\n"}});
         commit(dir, "b created", {{"src/b.cpp", "b\n"}});
@@ -163,7 +163,7 @@ private slots:
 
     void detailsOfACommit()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "one\n"}, {"old.txt", "content long enough for a rename\n"}});
         QVERIFY(QFile::remove(dir.filePath("old.txt")));
@@ -189,7 +189,7 @@ private slots:
 
     void detailsOfASubfolderAreRelative()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "everything", {{"src/a.cpp", "a\n"}, {"README", "r\n"}});
 
@@ -201,21 +201,21 @@ private slots:
 
     void viewRevealsCommitThenFile()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "a\n"}});
         commit(dir, "second", {{"a.txt", "b\n"}, {"b.txt", "b\n"}});
 
         HistoryView view(Theme::dark());
         view.setFolder(dir.path());
-        QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.refresh(); // off the UI thread
         QTRY_COMPARE(refreshed.size(), 1);
         QCOMPARE(view.findChildren<QTreeWidget *>().size(), 2);
         auto *commits = view.findChild<QTreeWidget *>("commits");
         auto *files = view.findChild<QTreeWidget *>("files");
         QVERIFY(commits && files);
-        auto *diff = view.findChild<DiffView *>();
+        const auto *diff = view.findChild<DiffView *>();
 
         // Initially, the list alone, with no commit chosen.
         QCOMPARE(commits->topLevelItemCount(), 2);

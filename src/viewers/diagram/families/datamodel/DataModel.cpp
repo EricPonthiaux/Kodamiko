@@ -56,7 +56,7 @@ QSet<QString> tableIdentifiers(const EntityShape &table)
 {
     const QString raw = table.name.split(QLatin1Char('.')).constLast();
     static const QRegularExpression separators(QStringLiteral("[^a-z0-9]+"));
-    QStringList words = raw.toLower().split(separators, Qt::SkipEmptyParts);
+    const QStringList words = raw.toLower().split(separators, Qt::SkipEmptyParts);
     const QString joined = normalizedIdentifier(raw);
     const QString last = words.isEmpty() ? joined : words.constLast();
     QSet<QString> result;
@@ -89,7 +89,8 @@ std::optional<Reference> referencedColumn(const QString &comment)
 // the grid stays recognizable at the header's small size.
 void drawTableIcon(QPainter &painter, qreal cx, qreal cy, const QColor &color)
 {
-    const qreal x = cx - 9, y = cy - 8;
+    const qreal x = cx - 9;
+    const qreal y = cy - 8;
     stroke(painter, roundRect(x, y, 18, 16, 1.75), color, 1.4);
     QPainterPath grid;
     grid.moveTo(x, y + 5.5);
@@ -424,10 +425,10 @@ void EntityShape::draw(QPainter &painter, const Board &board, const ShapeState &
     const Palette &palette = style.palette;
     const QColor bodyInk = textColor(palette.ink);
     const QColor mutedInk = textColor(palette.inkMuted);
-    const QPainterPath outline = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath outline = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, outline, fillColor(palette.fill), style);
     stroke(painter, outline, strokeColor(state.selected ? style.shape.selectedStroke : palette.border),
-           state.selected ? 2 : ShapeBorderWidth);
+           state.selected ? 2 : shapeBorderWidth);
     if (state.editing)
         return;
 
@@ -653,7 +654,8 @@ std::optional<Route> RelationshipLink::route(const Board &board) const
             closeTo(layout->b, ends->to.point))
             return layout;
     }
-    const QPointF a = ends->from.point, b = ends->to.point;
+    const QPointF a = ends->from.point;
+    const QPointF b = ends->to.point;
     const qreal middleX = (a.x() + b.x()) / 2;
     Route r;
     r.a = a;

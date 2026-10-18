@@ -86,7 +86,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &, McpReply reply, McpProgress) {
+        [context](const QJsonObject &, const McpReply &reply, const McpProgress &) {
             const QString folder = context.folder ? context.folder() : QString();
             reply(McpResult::json(EditorContext::of(*context.tabs, folder).toJson()));
         },
@@ -104,7 +104,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &, McpReply reply, McpProgress) {
+        [context](const QJsonObject &, const McpReply &reply, const McpProgress &) {
             const QHash<QString, QString> unsaved = context.tabs->unsavedTexts();
             const QString current = context.tabs->currentFilePath();
             QJsonArray files;
@@ -131,7 +131,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             bool unsaved = false;
             const std::optional<QString> text = fileText(context, path, &unsaved);
@@ -168,7 +168,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
             if (!QFileInfo(path).isFile()) {
                 reply(McpResult::error(QStringLiteral("No file %1").arg(context.relative(path))));
@@ -200,7 +200,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             const QJsonArray paths = arguments.value(QStringLiteral("paths")).toArray();
             if (paths.isEmpty()) {
                 const bool saved = context.tabs->saveAll();
@@ -240,7 +240,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         false,
         false,
         {},
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
             context.tabs->showDiff(arguments.value(QStringLiteral("title")).toString(),
                                    arguments.value(QStringLiteral("diff")).toString());
             reply(McpResult::message(QStringLiteral("Shown")));

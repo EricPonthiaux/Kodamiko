@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 {
     // Required by Qt WebEngine (Markdown preview), before the application exists.
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-    QApplication app(argc, argv);
+    const QApplication app(argc, argv);
     // libgit2 stays initialized for the whole run: each read (change marks
     // while typing, file statuses) would otherwise set up and tear down its
     // global state.
@@ -175,5 +175,5 @@ int main(int argc, char *argv[])
         showWelcome();
     else
         openProject(QDir(arguments.first()).absolutePath());
-    return app.exec();
+    return QApplication::exec();
 }

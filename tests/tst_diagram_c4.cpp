@@ -76,7 +76,7 @@ bool load(Board &board, const QByteArray &content, document::Loaded *loaded = nu
     if (!ok)
         qWarning() << error;
     if (loaded)
-        *loaded = result;
+        *loaded = std::move(result);
     return ok;
 }
 
@@ -142,9 +142,9 @@ private slots:
             QVERIFY(board.addShape(preset.shapeType, preset.props));
 
         // A relation always says what it does.
-        Shape *a = board.addShape({}, {});
-        Shape *b = board.addShape({}, {});
-        Link *l = board.addLink(QStringLiteral("c4relation"), a->id, b->id, {});
+        const Shape *a = board.addShape({}, {});
+        const Shape *b = board.addShape({}, {});
+        const Link *l = board.addLink(QStringLiteral("c4relation"), a->id, b->id, {});
         QVERIFY(l);
         QCOMPARE(l->label, QStringLiteral("Uses"));
     }
@@ -165,7 +165,9 @@ private slots:
         QCOMPARE(model.meta.value(QStringLiteral("family")).toString(), QStringLiteral("C4Container"));
         QCOMPARE(model.meta.value(QStringLiteral("rankdir")).toString(), QStringLiteral("LR"));
         QCOMPARE(model.links[1].props.value(QStringLiteral("technology")).toString(), QStringLiteral("JSON"));
-        bool boundary = false, database = false, externalQueue = false;
+        bool boundary = false;
+        bool database = false;
+        bool externalQueue = false;
         for (const Model::Node &node : model.nodes) {
             boundary = boundary || node.type == QLatin1String("c4boundary");
             database = database || node.props.value(QStringLiteral("variant")).toString() == QLatin1String("database");
@@ -253,7 +255,7 @@ private slots:
         Board edited;
         edited.setFamily(&families::c4());
         Shape *a = edited.addShape({}, {{QStringLiteral("key"), QStringLiteral("a")}});
-        Shape *b = edited.addShape({}, {{QStringLiteral("key"), QStringLiteral("b")}});
+        const Shape *b = edited.addShape({}, {{QStringLiteral("key"), QStringLiteral("b")}});
         edited.addLink(QStringLiteral("c4relation"), a->id, b->id,
                        {{QStringLiteral("label"), QStringLiteral("Calls")},
                         {QStringLiteral("description"), QStringLiteral("Every night")}});
@@ -333,7 +335,7 @@ private slots:
         QVERIFY(!editor->enterCommits);
         QCOMPARE(editor->get(), QStringLiteral("Transactions\n\n"));
         editor->set(QStringLiteral("  Ledger \n PostgreSQL\nAll the money\nmoves"));
-        auto *element = static_cast<C4ElementShape *>(shape);
+        const auto *element = static_cast<C4ElementShape *>(shape);
         QCOMPARE(element->name, QStringLiteral("Ledger"));
         QCOMPARE(element->technology, QStringLiteral("PostgreSQL"));
         QCOMPARE(element->description, QStringLiteral("All the money\nmoves"));
@@ -362,7 +364,7 @@ private slots:
         QVERIFY(boundary->layoutMinimumSize()->width() >= 340);
         QCOMPARE(boundary->layoutMinimumSize()->height(), 220.0);
         // A fresh boundary has room for its title, never less than 340 × 220.
-        Shape *small =
+        const Shape *small =
             board.addShape(QStringLiteral("c4boundary"), {{QStringLiteral("w"), 10}, {QStringLiteral("h"), 10}});
         QVERIFY(small->w >= 340 && small->h >= 220);
     }
@@ -371,8 +373,8 @@ private slots:
     {
         Board board;
         board.setFamily(&families::c4());
-        Shape *a = board.addShape({}, {});
-        Shape *b = board.addShape({}, {});
+        const Shape *a = board.addShape({}, {});
+        const Shape *b = board.addShape({}, {});
         Link *l = board.addLink(
             QStringLiteral("c4relation"), a->id, b->id,
             {{QStringLiteral("label"), QStringLiteral("Publishes the domain events on the message bus for everyone")},

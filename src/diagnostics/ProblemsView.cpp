@@ -34,7 +34,7 @@ QIcon severityIcon(Diagnostic::Severity severity)
     QIcon &icon = severity == Diagnostic::Severity::Error ? error : warning;
     if (!icon.isNull())
         return icon;
-    for (int size : {16, 32}) {
+    for (const int size : {16, 32}) {
         QPixmap pixmap(size, size);
         pixmap.fill(Qt::transparent);
         QPainter painter(&pixmap);

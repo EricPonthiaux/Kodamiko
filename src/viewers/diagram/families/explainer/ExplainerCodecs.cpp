@@ -165,7 +165,8 @@ QJsonArray strokePoint(const QJsonValue &raw, const QString &strokeId, int index
     }
     if (raw.isObject()) {
         const QJsonObject point = raw.toObject();
-        const QJsonValue x = point.value(QStringLiteral("x")), y = point.value(QStringLiteral("y"));
+        const QJsonValue x = point.value(QStringLiteral("x"));
+        const QJsonValue y = point.value(QStringLiteral("y"));
         if (!x.isUndefined() && !x.isNull() && !y.isUndefined() && !y.isNull())
             return {number(x, name + QStringLiteral(".x")), number(y, name + QStringLiteral(".y"))};
     }

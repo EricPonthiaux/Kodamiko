@@ -85,7 +85,7 @@ private:
     QTreeWidgetItem *sectionItem(Section section) const;
     // Files selected in the list; a section title stands for all its files.
     QList<FileRef> selectedFiles() const;
-    QStringList repoPaths(const QList<FileRef> &files) const;
+    QStringList repoPaths(const QList<FileRef> &refs) const;
     // Path of the open folder within the repository, to stage or unstage "everything".
     QString folderPathspec() const;
 
@@ -98,9 +98,9 @@ private:
     void updateActions();
     void showOperation();
 
-    void stageFiles(const QList<FileRef> &files);
-    void unstageFiles(const QList<FileRef> &files);
-    void discardFiles(const QList<FileRef> &files);
+    void stageFiles(const QList<FileRef> &refs);
+    void unstageFiles(const QList<FileRef> &refs);
+    void discardFiles(const QList<FileRef> &refs);
 
     // Lines selected in the displayed diff, per file: the selection, or the
     // hunk under `line` without a selection. `lines` tells which of the two.

@@ -217,13 +217,13 @@ QPainterPath C4ElementShape::boxPath() const
         path.closeSubpath();
         return path;
     }
-    return roundRect(x, y, w, h, ShapeRadiusSm);
+    return roundRect(x, y, w, h, shapeRadiusSm);
 }
 
 void C4ElementShape::drawPerson(QPainter &painter, const QColor &ink) const
 {
     const qreal headY = y + 43;
-    QPainterPath head = ellipse(QPointF(cx(), headY - 14), 14, 14);
+    const QPainterPath head = ellipse(QPointF(cx(), headY - 14), 14, 14);
     painter.fillPath(head, ink);
     // The shoulders: the upper half of a circle, closed by a flat base.
     QPainterPath body;
@@ -242,7 +242,7 @@ void C4ElementShape::draw(QPainter &painter, const Board &board, const ShapeStat
     const QPainterPath path = boxPath();
     shadowFill(painter, path, body.fill, style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : body.stroke),
-           state.selected ? 2 : ShapeBorderWidth, external ? QList<qreal>{7, 4} : QList<qreal>{});
+           state.selected ? 2 : shapeBorderWidth, external ? QList<qreal>{7, 4} : QList<qreal>{});
 
     if (variant == QLatin1String("database")) {
         stroke(painter, ellipse(QPointF(cx(), y + 13), w / 2, 13), body.stroke, 1.25);
@@ -393,7 +393,8 @@ bool C4BoundaryShape::hitTest(QPointF point) const
     // outline and its title select it, so that a double-click in the free
     // space can create a child there.
     constexpr qreal tolerance = 9;
-    const qreal wx = point.x(), wy = point.y();
+    const qreal wx = point.x();
+    const qreal wy = point.y();
     const bool inside = wx >= x && wx <= x + w && wy >= y && wy <= y + h;
     if (!inside)
         return wx >= x + 14 && wx <= x + std::max<qreal>(80, labelWidth_) && wy >= y - 15 && wy <= y + 15;
@@ -403,18 +404,18 @@ bool C4BoundaryShape::hitTest(QPointF point) const
 void C4BoundaryShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QPainterPath frame = roundRect(x, y, w, h, ShapeRadiusSm);
+    const QPainterPath frame = roundRect(x, y, w, h, shapeRadiusSm);
     painter.save();
     // A painted boundary stays translucent: what it holds remains legible.
     painter.setOpacity(painter.opacity() * (customFill.isEmpty() ? 1 : 0.58));
     shadowFill(painter, frame, fillColor(style.tones.group), style);
     painter.restore();
     stroke(painter, frame, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : ShapeBorderWidth, {9, 6});
+           state.selected ? 2 : shapeBorderWidth, {9, 6});
 
     const QString label = title();
     const qreal width = text::width(boundaryFont, label) + 22;
-    const QPainterPath pill = roundRect(x + 18, y - 12, width, 25, ShapeRadiusSm);
+    const QPainterPath pill = roundRect(x + 18, y - 12, width, 25, shapeRadiusSm);
     painter.fillPath(pill, fillColor(style.palette.labelBg));
     stroke(painter, pill, strokeColor(style.palette.border), 1);
     if (state.editing)

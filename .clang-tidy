@@ -33,6 +33,9 @@ Checks: >
   -modernize-use-trailing-return-type,
   -modernize-use-nodiscard,
   -modernize-use-designated-initializers,
+  -modernize-raw-string-literal,
+  -modernize-use-integer-sign-comparison,
+  -modernize-use-ranges,
   performance-*,
   -performance-enum-size,
   readability-*,
@@ -61,6 +64,12 @@ Checks: >
 #   QRegularExpression throws only when memory runs out.
 # - math-missing-parentheses: `a * b + c` reads as it computes.
 # - named-parameter: an override does not name what it does not use.
+# - raw-string-literal: moc misreads some raw strings and then skips the
+#   whole file's classes; lupdate does not extract them either.
+# - use-integer-sign-comparison: `row >= int(list.size())` reads better than
+#   std::cmp_greater_equal(row, list.size()).
+# - use-ranges: std::sort(list.begin(), list.end()) is as clear, and the
+#   rewrite breaks comparators that compare two types.
 # - enum-size: an enum class's int is no cost worth a uint8_t everywhere.
 # - pointer arithmetic, reinterpret_cast, varargs: Scintilla, libgit2 and
 #   libvterm are C APIs.
@@ -101,4 +110,9 @@ CheckOptions:
   readability-identifier-naming.ProtectedMemberCase: camelBack
   readability-identifier-naming.ProtectedMemberSuffix: '_'
   readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  # Qt Test finds the data of `test()` in `test_data()`; C libraries
+  # (tree-sitter grammars, Graphviz plugins) name their symbols themselves.
+  readability-identifier-naming.MethodIgnoredRegexp: '^[a-z][A-Za-z0-9]*_data$'
+  readability-identifier-naming.FunctionIgnoredRegexp: '^tree_sitter_[a-z_]+$'
+  readability-identifier-naming.VariableIgnoredRegexp: '^gvplugin_[a-z_]+_LTX_library$'
 ...

@@ -196,6 +196,6 @@ private:
 // The family's last layout pass (sidecar's resolveStateLabels): a label
 // never leaves its transition; among points sampled along it, the one that
 // overlaps the states and the other labels least is kept.
-void resolveLabels(Board &board);
+void resolveLabels(const Board &board);
 
 } // namespace diagram::states

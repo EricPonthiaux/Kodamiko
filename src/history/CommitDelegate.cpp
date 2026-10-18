@@ -113,12 +113,12 @@ QPixmap CommitDelegate::drawAvatar(const QString &name, int size, qreal ratio)
 QColor CommitDelegate::refColor(const QString &name)
 {
     if (name == QLatin1String("HEAD"))
-        return QColor("#c25b6b");
+        return {"#c25b6b"};
     if (name.contains(QLatin1Char('/')))
-        return QColor("#7d879a"); // remote branch
+        return {"#7d879a"}; // remote branch
     if (name.startsWith(QLatin1Char('v')) && name.size() > 1 && name.at(1).isDigit())
-        return QColor("#b0813a"); // version tag
-    return QColor("#3f8f5a");
+        return {"#b0813a"}; // version tag
+    return {"#3f8f5a"};
 }
 
 QSize CommitDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
@@ -132,7 +132,7 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     QStyleOptionViewItem item = option;
     initStyleOption(&item, index);
     const QWidget *widget = option.widget;
-    QStyle *style = widget ? widget->style() : QApplication::style();
+    const QStyle *style = widget ? widget->style() : QApplication::style();
     // Selected in the active window, the row is on the accent: white text.
     // Otherwise its background is a soft gray and the text keeps its colors.
     const bool selected = (option.state & QStyle::State_Selected) && (option.state & QStyle::State_Active);

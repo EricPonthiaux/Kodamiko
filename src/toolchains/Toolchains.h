@@ -24,7 +24,7 @@ struct RuntimeInstall {
 class Toolchains {
 public:
     // `lookOnMachine` false: only Duet's own installs (tests).
-    explicit Toolchains(const QString &root = defaultRoot(), bool lookOnMachine = true);
+    explicit Toolchains(QString root = defaultRoot(), bool lookOnMachine = true);
     // <application data>/toolchains.
     static QString defaultRoot();
 

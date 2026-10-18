@@ -204,7 +204,7 @@ private slots:
 
     void findsTheUserStatusLine()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         QVERIFY(project.isValid());
         QVERIFY(QDir(project.path()).mkdir(".claude"));
         QFile local(project.filePath(".claude/settings.local.json"));
@@ -238,7 +238,7 @@ private slots:
     void activityFollowsTheResponse()
     {
         ClaudeActivity activity;
-        QSignalSpy attention(&activity, &ClaudeActivity::attentionRequested);
+        const QSignalSpy attention(&activity, &ClaudeActivity::attentionRequested);
         HookEvent event{};
 
         event.kind = HookEvent::Kind::PromptSubmitted;
@@ -269,7 +269,7 @@ private slots:
     void watchedActivityDoesNotAlert()
     {
         ClaudeActivity activity;
-        QSignalSpy attention(&activity, &ClaudeActivity::attentionRequested);
+        const QSignalSpy attention(&activity, &ClaudeActivity::attentionRequested);
         activity.setWatched(true);
         HookEvent event{};
         event.kind = HookEvent::Kind::PromptSubmitted;
@@ -365,7 +365,7 @@ private slots:
 
     void codeRequestNamesTheSelectedLines()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         QDir(project.path()).mkpath("src");
         const QString path = project.filePath("src/a.cpp");
         writeFile(path, "int a;\nint b;\nint c;\nint d;\n");
@@ -384,7 +384,7 @@ private slots:
 
     void codeRequestWithoutSelectionNamesTheSymbol()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         const QString path = project.filePath("a.cpp");
         writeFile(path, "int parse();\n");
         EditorWidget editor(Theme::dark());
@@ -402,7 +402,7 @@ private slots:
 
     void codeRequestWarnsOfUnsavedChanges()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         const QString path = project.filePath("a.cpp");
         writeFile(path, "int a;\n");
         EditorWidget editor(Theme::dark());
@@ -504,8 +504,8 @@ private slots:
 
     void listsTheConfigurationByCategoryAndScope()
     {
-        QTemporaryDir user;
-        QTemporaryDir project;
+        const QTemporaryDir user;
+        const QTemporaryDir project;
         QVERIFY(user.isValid() && project.isValid());
         qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
         writeFile(user.filePath("CLAUDE.md"), "# Mine\n");
@@ -559,7 +559,7 @@ private slots:
 
     void sessionSettingsAreReadOnly()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QVERIFY(dir.isValid());
         writeFile(dir.filePath("claude-hooks.json"), "{}\n");
         qputenv("CLAUDE_CONFIG_DIR", dir.filePath("config").toUtf8());
@@ -593,8 +593,8 @@ private slots:
 
     void viewCreatesItemsAndUsualFiles()
     {
-        QTemporaryDir user;
-        QTemporaryDir project;
+        const QTemporaryDir user;
+        const QTemporaryDir project;
         QVERIFY(user.isValid() && project.isValid());
         qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
         ClaudeConfigView view;
@@ -629,8 +629,8 @@ private slots:
 
     void viewDeletesItems()
     {
-        QTemporaryDir user;
-        QTemporaryDir project;
+        const QTemporaryDir user;
+        const QTemporaryDir project;
         QVERIFY(user.isValid() && project.isValid());
         qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
         ClaudeConfigView view;
@@ -645,7 +645,7 @@ private slots:
             }
             return nullptr;
         };
-        QSignalSpy deleted(&view, &ClaudeConfigView::entryDeleted);
+        const QSignalSpy deleted(&view, &ClaudeConfigView::entryDeleted);
 
         // A skill goes with its folder.
         const QString skillDir = project.filePath(".claude/skills/doomed");
@@ -674,8 +674,8 @@ private slots:
 
     void mergesSettingsByPrecedence()
     {
-        QTemporaryDir user;
-        QTemporaryDir project;
+        const QTemporaryDir user;
+        const QTemporaryDir project;
         QVERIFY(user.isValid() && project.isValid());
         qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
         writeFile(

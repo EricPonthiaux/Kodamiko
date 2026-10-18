@@ -79,7 +79,7 @@ struct Editor {
 #ifdef DUET_WITH_DIAGRAMS
         DuetTools::registerDiagramTools(registry, context);
 #endif
-        registry.setConfirmer([this](const QString &, const QString &what, std::function<void(bool)> answer) {
+        registry.setConfirmer([this](const QString &, const QString &what, const std::function<void(bool)> &answer) {
             asked.append(what);
             answer(allow);
         });
@@ -141,7 +141,7 @@ private slots:
         Editor editor;
         write(editor.folder, QStringLiteral("src/a.cpp"), "int one()\n{\n    return 1;\n}\n");
         write(editor.folder, QStringLiteral("notes.md"), "# Notes\n");
-        auto *page = editor.tabs.openFile(editor.folder.filePath(QStringLiteral("src/a.cpp")));
+        const auto *page = editor.tabs.openFile(editor.folder.filePath(QStringLiteral("src/a.cpp")));
         QVERIFY(page);
         EditorWidget *a = editor.tabs.currentEditor();
         a->setText(QStringLiteral("int one()\n{\n    return 2;\n}\n"));
@@ -159,7 +159,7 @@ private slots:
         QVERIFY(files.first().toObject().value(QStringLiteral("unsaved")).toBool());
 
         // The unsaved text, not the disk's; a range of lines.
-        QJsonObject file = structured(
+        const QJsonObject file = structured(
             editor.call(QStringLiteral("get_file_text"), {{QStringLiteral("path"), QStringLiteral("src/a.cpp")},
                                                           {QStringLiteral("startLine"), 3},
                                                           {QStringLiteral("endLine"), 3}}));
@@ -289,7 +289,7 @@ private slots:
         for (const char *name : {"GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"})
             qputenv(name, "t");
 
-        QTemporaryDir bare;
+        const QTemporaryDir bare;
         Git::run(bare.path(), {"init", "-q", "--bare", "-b", "main"});
         Editor editor;
         write(editor.folder, QStringLiteral("a.txt"), "one\n");
@@ -393,7 +393,7 @@ private slots:
         editor.call(QStringLiteral("select_diagram_elements"),
                     {{QStringLiteral("path"), QStringLiteral("flow.mmd")},
                      {QStringLiteral("keys"), QJsonArray{QStringLiteral("B")}}});
-        DiagramView *view = editor.tabs.diagramViewFor(editor.folder.filePath(QStringLiteral("flow.mmd")));
+        const DiagramView *view = editor.tabs.diagramViewFor(editor.folder.filePath(QStringLiteral("flow.mmd")));
         QVERIFY(view);
         diagram = structured(
             editor.call(QStringLiteral("get_diagram"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")}}));

@@ -87,7 +87,7 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
         [](const QJsonObject &arguments) {
             return QStringLiteral("run “%1” in a terminal").arg(arguments.value(QStringLiteral("command")).toString());
         },
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress progress) {
+        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &progress) {
             if (!context.addTerminal) {
                 reply(McpResult::error(QStringLiteral("Duet cannot open terminals here")));
                 return;
@@ -103,7 +103,7 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
             const int timeout = std::max(0, arguments.value(QStringLiteral("timeoutSeconds")).toInt(300));
             const QPointer<TerminalWidget> guard(terminal);
             // Answered once: when it ends, or at the timeout.
-            auto answered = std::make_shared<bool>(false);
+            const auto answered = std::make_shared<bool>(false);
             const auto answer = [guard, reply, answered](bool finished, int exitCode) {
                 if (*answered)
                     return;

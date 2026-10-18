@@ -26,12 +26,13 @@ extern gvplugin_library_t gvplugin_neato_layout_LTX_library;
 #include <cmath>
 #include <functional>
 #include <map>
+#include <ranges>
 
 namespace diagram::graphviz {
 
 namespace {
 
-constexpr qreal PT = 72;
+constexpr qreal pointsPerInch = 72;
 const char *const metricFont = "Arial";
 
 QString number(qreal value, int decimals = 3)
@@ -142,7 +143,8 @@ std::optional<Spline> parseEdgePos(const QString &pos, qreal height)
     static const QRegularExpression spaces(QStringLiteral("\\s+"));
     for (const QString &token : pos.trimmed().split(spaces, Qt::SkipEmptyParts)) {
         const QStringList parts = token.split(QLatin1Char(','));
-        bool okX = false, okY = false;
+        bool okX = false;
+        bool okY = false;
         if (parts.size() == 3 && (parts[0] == QLatin1String("e") || parts[0] == QLatin1String("s"))) {
             const QPointF p(parts[1].toDouble(&okX), height - parts[2].toDouble(&okY));
             if (!okX || !okY)
@@ -168,11 +170,13 @@ std::vector<QPointF> spreadCurve(const std::vector<QPointF> &points, qreal offse
     const size_t last = points.size() - 1;
     if (points.size() < 2 || !offset)
         return points;
-    const qreal dx = points[last].x() - points[0].x(), dy = points[last].y() - points[0].y();
+    const qreal dx = points[last].x() - points[0].x();
+    const qreal dy = points[last].y() - points[0].y();
     const qreal length = std::hypot(dx, dy);
     if (!length)
         return points;
-    const qreal nx = dy / length, ny = -dx / length;
+    const qreal nx = dy / length;
+    const qreal ny = -dx / length;
     std::vector<QPointF> result;
     for (size_t i = 0; i < points.size(); ++i) {
         const qreal taper = std::sin(M_PI * qreal(i) / qreal(last));
@@ -184,8 +188,8 @@ std::vector<QPointF> spreadCurve(const std::vector<QPointF> &points, qreal offse
 QSizeF layoutSize(const Shape &shape)
 {
     const std::optional<QSizeF> declared = shape.graphvizLayoutSize();
-    return QSizeF(std::max<qreal>(1, declared ? declared->width() : shape.w),
-                  std::max<qreal>(1, declared ? declared->height() : shape.h));
+    return {std::max<qreal>(1, declared ? declared->width() : shape.w),
+            std::max<qreal>(1, declared ? declared->height() : shape.h)};
 }
 
 // The scale fitView() would give a layout of this bounding box.
@@ -309,8 +313,8 @@ bool routeLinks(Board &board)
         QStringList attrs = s->graphvizNodeAttributes(board, QStringLiteral("TB"), size.width(), size.height());
         if (attrs.isEmpty())
             attrs = {QStringLiteral("label=\"\""), QStringLiteral("margin=0"),
-                     QStringLiteral("width=") + number(size.width() / PT),
-                     QStringLiteral("height=") + number(size.height() / PT)};
+                     QStringLiteral("width=") + number(size.width() / pointsPerInch),
+                     QStringLiteral("height=") + number(size.height() / pointsPerInch)};
         attrs.append(QStringLiteral("pos=\"%1,%2!\"")
                          .arg(number(s->x + size.width() / 2, 2), number(flip - (s->y + size.height() / 2), 2)));
         dot += QStringLiteral("  \"%1\" [%2];\n").arg(dotEscape(s->id), attrs.join(QLatin1Char(' ')));
@@ -435,7 +439,7 @@ void placeNewcomers(Board &board, const QStringList &ids, const ArrangeOptions &
             Shape *s = board.shape(id);
             if (!s)
                 continue;
-            Shape *anchor = nullptr;
+            const Shape *anchor = nullptr;
             for (const auto &l : board.links()) {
                 const QString other = l->from == id ? l->to : l->to == id ? l->from : QString();
                 if (!other.isEmpty() && other != id && placed.contains(other)) {
@@ -500,7 +504,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
     const qreal edgeWidth = std::max(0.1, style.link.width);
     const qreal arrowScale = std::max(0.1, style.link.arrow) / 10;
     const qreal scale = fontScale();
-    const QString clusterFontSize = dotFontSize(ClusterLabelFontPx, scale);
+    const QString clusterFontSize = dotFontSize(clusterLabelFontPx, scale);
     const QString edgeFontSize = dotFontSize(style.linkLabel.fontPx, scale);
     QString dot = QStringLiteral("digraph {\n  rankdir=%1;\n  nodesep=0.60;\n  ranksep=0.80;\n").arg(rankdir) +
                   QStringLiteral("  graph [fontname=\"%1\" fontsize=%2];\n").arg(metricFont, clusterFontSize) +
@@ -565,7 +569,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
                 continue;
             const bool isCandidate =
                 std::find(clusterCandidates.begin(), clusterCandidates.end(), s.get()) != clusterCandidates.end();
-            Shape *parent = nullptr;
+            const Shape *parent = nullptr;
             for (Shape *boundary : clusterCandidates) {
                 if (boundary == s.get() || descendsFrom(boundary, s.get()))
                     continue;
@@ -606,7 +610,8 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
         if (occupied.contains(boundary->id) || (!boundary->key.isEmpty() && occupied.contains(boundary->key)))
             boundaryShapes.push_back(boundary);
     }
-    QHash<QString, Shape *> boundariesById, boundariesByKey;
+    QHash<QString, Shape *> boundariesById;
+    QHash<QString, Shape *> boundariesByKey;
     for (Shape *boundary : boundaryShapes) {
         boundariesById.insert(boundary->id, boundary);
         boundariesByKey.insert(boundary->id, boundary);
@@ -629,7 +634,8 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
             dot += QStringLiteral("%1\"%2\" [%3];\n").arg(indent, dotEscape(s->id), custom.join(QLatin1Char(' ')));
         else
             dot += QStringLiteral("%1\"%2\" [label=\"\" margin=0 width=%3 height=%4];\n")
-                       .arg(indent, dotEscape(s->id), number(size.width() / PT), number(size.height() / PT));
+                       .arg(indent, dotEscape(s->id), number(size.width() / pointsPerInch),
+                            number(size.height() / pointsPerInch));
     };
     const auto parentOf = [&](const Shape *s) { return boundariesByKey.value(s->parentBoundary); };
     QSet<QString> emittedClusters;
@@ -639,17 +645,17 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
         emittedClusters.insert(boundary->id);
         dot +=
             QStringLiteral("%1subgraph \"%2\" {\n").arg(indent, dotEscape(QStringLiteral("cluster_") + boundary->id));
-        const qreal labelPx = boundary->layoutLabelFontPx() > 0 ? boundary->layoutLabelFontPx() : ClusterLabelFontPx;
+        const qreal labelPx = boundary->layoutLabelFontPx() > 0 ? boundary->layoutLabelFontPx() : clusterLabelFontPx;
         dot += QStringLiteral("%1  label=\"%2\"; fontsize=%3; margin=%4;\n")
                    .arg(indent, dotEscape(boundary->layoutLabel()), dotFontSize(labelPx, scale),
-                        QString::number(ClusterMargin));
+                        QString::number(clusterMargin));
         dot += QStringLiteral("%1  \"%2\" [shape=point width=0 height=0 label=\"\" style=invis];\n")
                    .arg(indent, dotEscape(clusterAnchor(boundary)));
         for (Shape *child : boundaryShapes) {
             if (parentOf(child) == boundary)
                 emitCluster(child, indent + QStringLiteral("  "));
         }
-        for (Shape *child : ordinaryShapes) {
+        for (const Shape *child : ordinaryShapes) {
             if (parentOf(child) == boundary)
                 emitNode(child, indent + QStringLiteral("  "));
         }
@@ -659,7 +665,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
         dot += QStringLiteral("  compound=true;\n");
         // A frame's inner margin is taken from the rank separation: it is
         // given back, so that neighboring frames stay apart.
-        const qreal clusterGap = (2 * ClusterMargin) / PT;
+        const qreal clusterGap = (2 * clusterMargin) / pointsPerInch;
         dot += QStringLiteral("  nodesep=%1;\n").arg(number(0.60 + clusterGap));
         dot += QStringLiteral("  ranksep=%1;\n").arg(number(0.80 + clusterGap));
         for (Shape *boundary : boundaryShapes) {
@@ -702,7 +708,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
         auto ends = l->graphvizEndpoints(board, rankdir);
         const auto clusterEndpoint = [&](const QString &shapeId, std::optional<GraphvizEndpoint> end) {
             const QString endpointId = end && !end->id.isEmpty() ? end->id : shapeId;
-            Shape *boundary = boundariesById.value(endpointId);
+            const Shape *boundary = boundariesById.value(endpointId);
             if (!boundary)
                 return end;
             GraphvizEndpoint result = end.value_or(GraphvizEndpoint{});
@@ -732,7 +738,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
                 rankable.push_back(s);
         }
         QHash<QString, QString> roots;
-        for (Shape *s : rankable)
+        for (const Shape *s : rankable)
             roots.insert(s->id, s->id);
         const std::function<QString(QString)> find = [&](QString id) {
             while (roots.value(id) != id)
@@ -740,7 +746,8 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
             return id;
         };
         const auto unite = [&](const QString &left, const QString &right) {
-            const QString a = find(left), b = find(right);
+            const QString a = find(left);
+            const QString b = find(right);
             if (a != b)
                 roots.insert(a, b);
         };
@@ -764,7 +771,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
             return boundary;
         };
         QHash<QString, QString> byBoundary;
-        for (Shape *s : rankable) {
+        for (const Shape *s : rankable) {
             const Shape *boundary = outermost(s);
             if (!boundary)
                 continue;
@@ -777,12 +784,13 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
         QStringList order;
         for (Shape *s : rankable) {
             const QString r = find(s->id);
-            if (!groups.count(r))
+            if (!groups.contains(r))
                 order.append(r);
             groups[r].push_back(s);
         }
         if (groups.size() > 1) {
-            QSet<QString> incoming, outgoing;
+            QSet<QString> incoming;
+            QSet<QString> outgoing;
             for (const auto &l : board.links()) {
                 if (!roots.contains(l->from) || !roots.contains(l->to))
                     continue;
@@ -802,7 +810,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
                 std::sort(members.begin(), members.end(),
                           [](const Shape *a, const Shape *b) { return a->y != b->y ? a->y < b->y : a->x < b->x; });
                 Group group{members.front()->y, members.front()->x, members.front(), members.back()};
-                for (Shape *s : members) {
+                for (const Shape *s : members) {
                     group.top = std::min(group.top, s->y);
                     group.left = std::min(group.left, s->x);
                 }
@@ -812,9 +820,9 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
                         break;
                     }
                 }
-                for (auto it = members.rbegin(); it != members.rend(); ++it) {
-                    if (!outgoing.contains((*it)->id)) {
-                        group.exit = *it;
+                for (auto &member : std::views::reverse(members)) {
+                    if (!outgoing.contains(member->id)) {
+                        group.exit = member;
                         break;
                     }
                 }
@@ -831,7 +839,7 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
     dot += QStringLiteral("}\n");
 
     const QByteArray engineName = engine.toLatin1();
-    QByteArray output = layout(dot.toUtf8(), engineName.constData(), error);
+    const QByteArray output = layout(dot.toUtf8(), engineName.constData(), error);
     if (output.isEmpty())
         return false;
     QJsonObject g = QJsonDocument::fromJson(output).object();

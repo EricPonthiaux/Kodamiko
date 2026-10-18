@@ -6,6 +6,7 @@
 #include <QObject>
 
 #include <algorithm>
+#include <ranges>
 
 namespace {
 
@@ -26,9 +27,9 @@ QString runtimeVersionFor(const QString &tool, int minimum)
     const QString preferred = ToolCatalog::defaultRuntimeVersion(spec->family);
     if (preferred.toInt() >= minimum)
         return preferred;
-    for (auto it = spec->versions.crbegin(); it != spec->versions.crend(); ++it) {
-        if (it->toInt() >= minimum)
-            return *it;
+    for (const auto &version : std::views::reverse(spec->versions)) {
+        if (version.toInt() >= minimum)
+            return version;
     }
     return spec->versions.value(0);
 }

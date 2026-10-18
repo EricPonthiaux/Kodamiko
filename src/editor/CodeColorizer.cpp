@@ -10,8 +10,8 @@ namespace {
 // Scintilla colors are 0xBBGGRR.
 QColor fromScintilla(long color)
 {
-    return QColor(static_cast<int>(color & 0xff), static_cast<int>((color >> 8) & 0xff),
-                  static_cast<int>((color >> 16) & 0xff));
+    return {static_cast<int>(color & 0xff), static_cast<int>((color >> 8) & 0xff),
+            static_cast<int>((color >> 16) & 0xff)};
 }
 
 // UTF-8 length of the character at `index`, a surrogate pair counting once.

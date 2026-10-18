@@ -84,7 +84,7 @@ private slots:
 
     void longNamesScrollHorizontally()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString name = QString(120, QLatin1Char('n')) + QStringLiteral(".txt");
         QFile file(dir.filePath(name));
         QVERIFY(file.open(QIODevice::WriteOnly));
@@ -103,7 +103,7 @@ private slots:
 
     void shortNamesFillTheView()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QFile file(dir.filePath(QStringLiteral("a.txt")));
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.close();
@@ -123,11 +123,11 @@ private slots:
         // A custom delegate stays (its view relies on it); a plain one gets
         // the row height.
         FileTreeView tree;
-        QAbstractItemDelegate *custom = tree.itemDelegate();
+        const QAbstractItemDelegate *custom = tree.itemDelegate();
         applyTreeMetrics(&tree, QApplication::font());
         QVERIFY(tree.itemDelegate() == custom);
         QTreeView plain;
-        QAbstractItemDelegate *standard = plain.itemDelegate();
+        const QAbstractItemDelegate *standard = plain.itemDelegate();
         applyTreeMetrics(&plain, QApplication::font());
         QVERIFY(plain.itemDelegate() != standard);
     }
@@ -226,7 +226,7 @@ private slots:
         layout->addWidget(panel, 1);
         window.resize(600, 400);
         window.show();
-        QSignalSpy visibility(panel, &SidePanel::panelVisibilityChanged);
+        const QSignalSpy visibility(panel, &SidePanel::panelVisibilityChanged);
         QTabBar *tabs = panel->tabBar();
         QCOMPARE(tabs->shape(), QTabBar::RoundedWest); // vertical tabs
         QVERIFY(panel->isPanelVisible());
@@ -284,7 +284,7 @@ private slots:
         titleBar->setProject("duet", "/p/duet", project);
         titleBar->setClaudeState({}, "Claude is working", "details");
         QStringList texts;
-        for (QToolButton *button : titleBar->findChildren<QToolButton *>())
+        for (const QToolButton *button : titleBar->findChildren<QToolButton *>())
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
         QVERIFY(texts.contains("duet  ▾"));
@@ -313,7 +313,7 @@ private slots:
 
     void modelSortsCompactsAndNests()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = QDir::cleanPath(dir.filePath("project"));
         write(root + "/src/main/java/App.java");
         write(root + "/src/main/java/Util.java");
@@ -354,7 +354,7 @@ private slots:
     {
         if (QStandardPaths::findExecutable("git").isEmpty())
             QSKIP("git unavailable");
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = QDir::cleanPath(dir.filePath("project"));
         write(root + "/build/out.o");
         write(root + "/main.cpp");
@@ -375,7 +375,7 @@ private slots:
 
     void modelFollowsTheDiskKeepingRows()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = QDir::cleanPath(dir.filePath("project"));
         write(root + "/src/a.cpp");
         write(root + "/src/b.cpp");
@@ -406,7 +406,7 @@ private slots:
     // that stay keep pointing at the same files.
     void modelUpdatesRunsOfRows()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = QDir::cleanPath(dir.filePath("project"));
         for (int i = 0; i < 100; i += 2)
             write(root + QStringLiteral("/f%1.txt").arg(i, 3, 10, QLatin1Char('0')));
@@ -459,7 +459,7 @@ private slots:
 
     void fileOperationsNeverOverwrite()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = QDir::cleanPath(dir.path());
         write(root + "/src/a.cpp");
         write(root + "/src/deep/b.cpp");
@@ -484,7 +484,7 @@ private slots:
 
     void treeCutCopyAndPaste()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = QDir::cleanPath(dir.filePath("project"));
         write(root + "/src/a.cpp");
         write(root + "/lib/keep.txt");
@@ -492,7 +492,7 @@ private slots:
         tree.setRootPath(root);
         tree.show();
         QSignalSpy renamed(&tree, &FileTreeView::entryRenamed);
-        QSignalSpy created(&tree, &FileTreeView::entryCreated);
+        const QSignalSpy created(&tree, &FileTreeView::entryCreated);
 
         // Copy, then paste into another folder.
         QVERIFY(tree.select(root + "/src/a.cpp"));
@@ -508,7 +508,7 @@ private slots:
         QTest::keyClick(&tree, Qt::Key_X, Qt::ControlModifier);
         QVERIFY(tree.select(root + "/lib/keep.txt"));           // a file: its folder
         QTest::keyClick(&tree, Qt::Key_V, Qt::ControlModifier); // name taken: a popup asks
-        QPointer<NamePopup> popup = tree.findChild<NamePopup *>();
+        const QPointer<NamePopup> popup = tree.findChild<NamePopup *>();
         QVERIFY(popup);
         QCOMPARE(popup->field()->text(), QString("a (2).cpp"));
         QTest::keyClick(popup->field(), Qt::Key_Return);
@@ -524,7 +524,7 @@ private slots:
 
     void treeDuplicatesUnderANewName()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         const QString root = QDir::cleanPath(dir.filePath("project"));
         write(root + "/Widget.cpp");
         FileTreeView tree;
@@ -532,7 +532,7 @@ private slots:
         tree.show();
         QVERIFY(tree.select(root + "/Widget.cpp"));
         QTest::keyClick(&tree, Qt::Key_F5);
-        QPointer<NamePopup> popup = tree.findChild<NamePopup *>();
+        const QPointer<NamePopup> popup = tree.findChild<NamePopup *>();
         QVERIFY(popup);
         QCOMPARE(popup->field()->text(), QString("Widget_copy.cpp"));
         QCOMPARE(popup->field()->selectedText(), QString("Widget_copy"));
@@ -542,7 +542,7 @@ private slots:
 
     void treeColorsFilesByGitState()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("src/a.cpp"));
         write(dir.filePath("b.txt"));
         const QString root = QDir::cleanPath(dir.path());
@@ -569,7 +569,7 @@ private slots:
 
     void scopesShowOnlyTheirFiles()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("src/deep/changed.cpp"));
         write(dir.filePath("src/same.cpp"));
         write(dir.filePath("other/claude.md"));
@@ -603,7 +603,7 @@ private slots:
 
     void speedSearchSelectsMatchingNames()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         // A root whose name matches none of the letters typed.
         const QString root = QDir::cleanPath(dir.filePath("project"));
         write(root + "/alpha.cpp");
@@ -630,7 +630,7 @@ private slots:
         QTest::keyClick(&tree, Qt::Key_Escape);
         QVERIFY(tree.speedSearch().isEmpty());
 
-        QSignalSpy activated(&tree, &FileTreeView::fileActivated);
+        const QSignalSpy activated(&tree, &FileTreeView::fileActivated);
         QTest::keyClicks(&tree, "alp");
         QCOMPARE(tree.currentPath(), root + "/alpha.cpp");
         QTest::keyClick(&tree, Qt::Key_Return);
@@ -640,7 +640,7 @@ private slots:
 
     void treeCopiesPathsAndSendsToClaude()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.filePath("src/a.cpp"));
         const QString root = QDir::cleanPath(dir.path());
         FileTreeView tree;
@@ -659,7 +659,7 @@ private slots:
 
     void newEntryNamesAreChecked()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QVERIFY(QDir(dir.path()).mkpath("src"));
         QFile file(dir.filePath("src/a.txt"));
         QVERIFY(file.open(QIODevice::WriteOnly));
@@ -691,7 +691,7 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(&window));
 
         QStringList applied;
-        QPointer<NamePopup> popup = new NamePopup(
+        const QPointer<NamePopup> popup = new NamePopup(
             "New File", "project/",
             [&applied](const QString &name) {
                 applied << name;
@@ -721,7 +721,7 @@ private slots:
         window.show();
         QVERIFY(QTest::qWaitForWindowExposed(&window));
         bool applied = false;
-        QPointer<NamePopup> popup = new NamePopup(
+        const QPointer<NamePopup> popup = new NamePopup(
             "New Folder", "project/",
             [&applied](const QString &) {
                 applied = true;
@@ -737,7 +737,7 @@ private slots:
 
     void renameNamesAreChecked()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         for (const char *name : {"a.txt", "b.txt"}) {
             QFile file(dir.filePath(name));
             QVERIFY(file.open(QIODevice::WriteOnly));
@@ -809,7 +809,7 @@ private slots:
 
     void tabsFollowARenamedFolder()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         QVERIFY(QDir(dir.path()).mkpath("src"));
         for (const char *name : {"src/a.txt", "b.txt"}) {
             QFile file(dir.filePath(name));
@@ -831,7 +831,8 @@ private slots:
         QVERIFY(QDir().rename(dir.filePath("src"), dir.filePath("lib")));
         tabs.followRename(dir.filePath("src"), dir.filePath("lib"));
         QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("lib/a.txt"), dir.filePath("b.txt")}));
-        int line = 0, column = 0;
+        int line = 0;
+        int column = 0;
         tabs.editorFor(dir.filePath("lib/a.txt"))->getCursorPosition(&line, &column);
         QCOMPARE(line, 2);
         QCOMPARE(column, 1);

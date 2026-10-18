@@ -22,6 +22,8 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <utility>
+
 namespace {
 
 constexpr int searchDelayMs = 300;
@@ -113,9 +115,9 @@ public:
 
 } // namespace
 
-FindInFilesPopup::FindInFilesPopup(const Theme &theme, QWidget *parent)
+FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
     : OverlayPopup(QStringLiteral("findInFiles"), QSizeF(0.72, 0.8), QSize(760, 520), parent)
-    , theme_(theme)
+    , theme_(std::move(theme))
 {
     auto *title = new QLabel(tr("Find in Files"), this);
     AppFonts::setInterfaceFont(title, 1);

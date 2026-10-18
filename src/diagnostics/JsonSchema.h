@@ -19,7 +19,7 @@
 // name ("modle" for "model"), is reported on the key.
 class JsonSchema {
 public:
-    explicit JsonSchema(const QJsonObject &schema);
+    explicit JsonSchema(QJsonObject schema);
 
     Diagnostics validate(const JsonNode &root) const;
     // The schema's description of the value at `path` (keys, and "0"...

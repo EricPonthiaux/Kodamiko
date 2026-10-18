@@ -65,7 +65,7 @@ struct Remote {
 
     Remote()
     {
-        QTemporaryDir seed;
+        const QTemporaryDir seed;
         git(seed, {"init", "-q", "-b", "main"});
         commit(seed, "a.txt", "a\n", "init");
         git(bare, {"init", "-q", "--bare", "-b", "main"});
@@ -97,7 +97,7 @@ private slots:
 
     void fetchCountsAheadAndBehind()
     {
-        Remote remote;
+        const Remote remote;
         QCOMPARE(info(remote.mine).upstream, QString("origin/main"));
         QCOMPARE(info(remote.mine).behind, 0);
 
@@ -117,7 +117,7 @@ private slots:
 
     void pullFastForwardsOnly()
     {
-        Remote remote;
+        const Remote remote;
         commit(remote.theirs, "b.txt", "b\n", "theirs");
         git(remote.theirs, {"push", "-q"});
         Remotes::fetch(info(remote.mine), {});
@@ -141,7 +141,7 @@ private slots:
 
     void pullFollowsTheUsersChoice()
     {
-        Remote remote;
+        const Remote remote;
         commit(remote.theirs, "b.txt", "b\n", "theirs");
         git(remote.theirs, {"push", "-q"});
         commit(remote.mine, "c.txt", "c\n", "mine");
@@ -157,7 +157,7 @@ private slots:
 
     void pushPublishesANewBranch()
     {
-        Remote remote;
+        const Remote remote;
         Branches::create(info(remote.mine), "feature", true);
         commit(remote.mine, "f.txt", "f\n", "feature");
         QVERIFY(info(remote.mine).upstream.isEmpty());
@@ -170,7 +170,7 @@ private slots:
 
     void rejectedPushCanBeForced()
     {
-        Remote remote;
+        const Remote remote;
         commit(remote.theirs, "b.txt", "b\n", "theirs");
         git(remote.theirs, {"push", "-q"});
         commit(remote.mine, "c.txt", "c\n", "mine");
@@ -187,7 +187,7 @@ private slots:
 
     void syncPullsThenPushes()
     {
-        Remote remote;
+        const Remote remote;
         git(remote.mine, {"config", "pull.rebase", "true"});
         commit(remote.theirs, "b.txt", "b\n", "theirs");
         git(remote.theirs, {"push", "-q"});
@@ -200,7 +200,7 @@ private slots:
 
     void noRemote()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         QVERIFY_THROWS_EXCEPTION(GitError, Remotes::fetch(info(project), {}));
@@ -212,7 +212,7 @@ private slots:
 
     void listBranches()
     {
-        Remote remote;
+        const Remote remote;
         git(remote.theirs, {"switch", "-qc", "topic"});
         commit(remote.theirs, "t.txt", "t\n", "topic work");
         git(remote.theirs, {"push", "-q", "-u", "origin", "topic"});
@@ -234,7 +234,7 @@ private slots:
 
     void switchBranches()
     {
-        Remote remote;
+        const Remote remote;
         git(remote.theirs, {"switch", "-qc", "topic"});
         commit(remote.theirs, "t.txt", "t\n", "topic work");
         git(remote.theirs, {"push", "-q", "-u", "origin", "topic"});
@@ -261,7 +261,7 @@ private slots:
 
     void switchOverConflictingChanges()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         git(project, {"switch", "-qc", "other"});
@@ -286,7 +286,7 @@ private slots:
 
     void stashAndSwitchBringsChangesAlong()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         commit(project, "b.txt", "b\n", "b");
@@ -300,7 +300,7 @@ private slots:
 
     void renameAndDeleteBranches()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         git(project, {"switch", "-qc", "work"});
@@ -321,7 +321,7 @@ private slots:
 
     void detachAtACommit()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         const QString first = QString::fromUtf8(git(project, {"rev-parse", "--short", "HEAD"})).trimmed();
@@ -333,7 +333,7 @@ private slots:
 
     void removeRemoteBranchAndSetUpstream()
     {
-        Remote remote;
+        const Remote remote;
         git(remote.mine, {"push", "-q", "origin", "main:gone"});
         Remotes::fetch(info(remote.mine), {});
         Branches::create(info(remote.mine), "local", false);
@@ -349,7 +349,7 @@ private slots:
 
     void stashes()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         QVERIFY_THROWS_EXCEPTION(GitError, Stashes::push(info(project), "nothing", true));
@@ -381,7 +381,7 @@ private slots:
 
     void mergeConflictThenAbort()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         git(project, {"switch", "-qc", "other"});
@@ -406,7 +406,7 @@ private slots:
 
     void mergeConflictThenContinue()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         git(project, {"switch", "-qc", "other"});
@@ -424,7 +424,7 @@ private slots:
 
     void mergeAndRebaseWithoutConflicts()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         commit(project, "a.txt", "a\n", "init");
         git(project, {"switch", "-qc", "other"});
@@ -444,7 +444,7 @@ private slots:
 
     void runReportsProgressAndCancels()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         std::atomic_bool cancel = false;
         Git::RunOptions options;
@@ -473,11 +473,11 @@ private slots:
 
     void commandsReportProgressAndCancel()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});
         GitCommands commands;
-        QSignalSpy progress(&commands, &GitCommands::progress);
-        QSignalSpy failed(&commands, &GitCommands::failed);
+        const QSignalSpy progress(&commands, &GitCommands::progress);
+        const QSignalSpy failed(&commands, &GitCommands::failed);
         bool handled = false;
         commands.runLong(
             "Slow",

@@ -13,7 +13,7 @@
 
 namespace diagram {
 
-const qreal GraphvizNormalArrowSpread = std::asin(0.35);
+const qreal graphvizNormalArrowSpread = std::asin(0.35);
 
 qreal arrowBaseInset(qreal size, qreal spread)
 {
@@ -24,7 +24,7 @@ namespace {
 
 QColor rgb(uint32_t hex)
 {
-    return QColor(int((hex >> 16) & 0xff), int((hex >> 8) & 0xff), int(hex & 0xff));
+    return {int((hex >> 16) & 0xff), int((hex >> 8) & 0xff), int(hex & 0xff)};
 }
 
 qreal channelLuminance(qreal v)
@@ -203,7 +203,9 @@ QStringList wrap(const Font &font, const QString &value, qreal maxWidth)
                 // longest prefix that really fits instead of overflowing.
                 QString rest = token;
                 while (!rest.isEmpty()) {
-                    int lo = 1, hi = int(rest.size()), fit = 1;
+                    int lo = 1;
+                    int hi = int(rest.size());
+                    int fit = 1;
                     while (lo <= hi) {
                         const int mid = (lo + hi) / 2;
                         if (width(font, rest.left(mid)) <= maxWidth) {
@@ -354,7 +356,7 @@ QPen pen(const QColor &color, qreal width, const QList<qreal> &dash)
         // Qt dashes are in line widths; setLineDash() lengths are in units.
         // Round caps would lengthen each dash by a width: flat caps instead.
         QList<qreal> pattern;
-        for (qreal length : dash)
+        for (const qreal length : dash)
             pattern.append(std::max<qreal>(0.01, length / width));
         if (pattern.size() % 2)
             pattern += pattern;

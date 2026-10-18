@@ -91,7 +91,7 @@ private slots:
 
     void detectsCMakePresets()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/CMakeLists.txt", "project(x)\n");
         write(dir.path() + "/CMakePresets.json", R"({
             "version": 3,
@@ -108,7 +108,7 @@ private slots:
 
     void detectsCMakeWithoutPresets()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/CMakeLists.txt", "project(x)\n");
         const QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
         QCOMPARE(names(found), (QStringList{"CMake: build", "CTest"}));
@@ -117,7 +117,7 @@ private slots:
 
     void detectsPackageScripts()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/package.json", R"({"scripts": {"dev": "vite", "build": "vite build",
             "prebuild": "rimraf dist", "test": "vitest", "lint": "eslint ."}})");
         write(dir.path() + "/pnpm-lock.yaml", "");
@@ -131,7 +131,7 @@ private slots:
 
     void detectsJavaBuilds()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/pom.xml", "<project/>");
         write(dir.path() + "/mvnw", "#!/bin/sh\n");
         QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
@@ -142,7 +142,7 @@ private slots:
         QCOMPARE(named(found, "Maven: test")->command, QString("./mvnw test"));
 #endif
 
-        QTemporaryDir gradle;
+        const QTemporaryDir gradle;
         write(gradle.path() + "/build.gradle.kts", "plugins { application }\n");
         found = RunConfigurations::detect(gradle.path());
         QCOMPARE(names(found), (QStringList{"Gradle: build", "Gradle: test", "Gradle: run"}));
@@ -151,14 +151,14 @@ private slots:
 
     void detectsMakeTargets()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/Makefile", "CC := gcc\nall: main\n\ntest: all\n\t./run-tests\n");
         QCOMPARE(names(RunConfigurations::detect(dir.path())), (QStringList{"make", "make test"}));
     }
 
     void runJsonReplacesDetectedConfigurations()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/CMakeLists.txt", "project(x)\n");
         write(dir.path() + "/.duet/run.json",
               R"({"configurations": [{"name": "CTest", "kind": "test", "command": "ctest -j8"},
@@ -183,7 +183,7 @@ private slots:
 
     void readsCompilerErrors()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/src/main.cpp", "int main() {}\n");
         write(dir.path() + "/src/App.java", "class App {}\n");
         write(dir.path() + "/web/a.ts", "let a = 1;\n");
@@ -225,7 +225,7 @@ private slots:
 
     void readsMultiLineProblems()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/src/main.rs", "fn main() {}\n");
         write(dir.path() + "/CMakeLists.txt", "project(x)\n");
         write(dir.path() + "/app/run.py", "main()\n");
@@ -274,11 +274,11 @@ private slots:
 
     void readsOutputInPieces()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/é.c", "int x;\n");
         BuildOutputParser parser(dir.path(), dir.path());
         const QByteArray output = "\xc3\xa9.c:2:3: error: split\n\xc3\xa9.c:4:1: warning: last line";
-        for (char byte : output)
+        for (const char byte : output)
             parser.feed(QByteArrayView(&byte, 1)); // UTF-8 cut in the middle too
         QCOMPARE(parser.problems().size(), 1);
         parser.finish();
@@ -289,7 +289,7 @@ private slots:
     void keepsBuildProblemsBySource()
     {
         ProblemStore store(nullptr);
-        QSignalSpy changed(&store, &ProblemStore::changed);
+        const QSignalSpy changed(&store, &ProblemStore::changed);
         Problem a;
         a.path = "/p/a.cpp";
         a.line = 3;
@@ -315,7 +315,7 @@ private slots:
 #ifndef Q_OS_WIN
     void runsAConfigurationAndReadsItsProblems()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/main.c", "int main() {}\n");
         ProjectConfig project;
         project.path = dir.path();
@@ -363,7 +363,7 @@ private slots:
 
     void stopsARun()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         ProjectConfig project;
         project.path = dir.path();
         ProblemStore store(nullptr);
@@ -393,7 +393,7 @@ private slots:
 
     void remembersTheChosenConfiguration()
     {
-        QTemporaryDir dir;
+        const QTemporaryDir dir;
         write(dir.path() + "/Cargo.toml", "[package]\n");
         ProjectConfig project;
         project.path = dir.path();
