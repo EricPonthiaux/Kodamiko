@@ -32,8 +32,9 @@ const JsonSchema &settingsSchema()
 
 bool isClaudeFolder(const QDir &dir)
 {
-    return dir.dirName() == QLatin1String(".claude")
-           || QDir::cleanPath(dir.absolutePath()) == QDir::cleanPath(QFileInfo(ClaudeConfig::configDir()).absoluteFilePath());
+    return dir.dirName() == QLatin1String(".claude") ||
+           QDir::cleanPath(dir.absolutePath()) ==
+               QDir::cleanPath(QFileInfo(ClaudeConfig::configDir()).absoluteFilePath());
 }
 
 Diagnostics checkSettings(QByteArrayView text)
@@ -82,7 +83,8 @@ Diagnostics checkFrontMatter(Kind kind, QByteArrayView text)
     if (lines.isEmpty() || lineText(0).trimmed() != QLatin1String("---"))
         return {warning(0, lines.isEmpty() ? 0 : lines[0].second,
                         tr("No front matter: Claude knows a %1 by the name and description between two “---” "
-                           "lines at the top").arg(what))};
+                           "lines at the top")
+                            .arg(what))};
     QHash<QString, Field> fields;
     qsizetype closing = -1;
     for (qsizetype i = 1; i < lines.size(); ++i) {
@@ -99,8 +101,9 @@ Diagnostics checkFrontMatter(Kind kind, QByteArrayView text)
         field.lineEnd = lines[i].second;
         const QString rest = line.mid(colon + 1);
         field.value = rest.trimmed();
-        if (field.value.size() >= 2 && (field.value.front() == QLatin1Char('"') || field.value.front() == QLatin1Char('\''))
-            && field.value.back() == field.value.front())
+        if (field.value.size() >= 2 &&
+            (field.value.front() == QLatin1Char('"') || field.value.front() == QLatin1Char('\'')) &&
+            field.value.back() == field.value.front())
             field.value = field.value.mid(1, field.value.size() - 2);
         qsizetype leading = 0;
         while (leading < rest.size() && rest[leading].isSpace())
@@ -123,11 +126,13 @@ Diagnostics checkFrontMatter(Kind kind, QByteArrayView text)
     }
     const auto description = fields.constFind(QStringLiteral("description"));
     if (description == fields.cend() || description->value.isEmpty()) {
-        const QString message = kind == Kind::Skill
-                                    ? tr("Missing “description”: Claude reads it to decide when to use the skill")
-                                    : tr("Missing “description”: Claude reads it to decide when to hand a task to the agent");
-        diagnostics.append(description == fields.cend() ? warning(opening.first, opening.second, message)
-                                                        : warning(description->lineStart, description->lineEnd, message));
+        const QString message =
+            kind == Kind::Skill
+                ? tr("Missing “description”: Claude reads it to decide when to use the skill")
+                : tr("Missing “description”: Claude reads it to decide when to hand a task to the agent");
+        diagnostics.append(description == fields.cend()
+                               ? warning(opening.first, opening.second, message)
+                               : warning(description->lineStart, description->lineEnd, message));
     } else if (kind == Kind::Skill && description->value.size() > 1024) {
         diagnostics.append(warning(description->valueStart, description->lineEnd,
                                    tr("At most 1024 characters: Claude may cut a longer description")));
@@ -148,8 +153,8 @@ Kind kindOf(const QString &path)
         return Kind::Settings;
     if (name == QLatin1String("SKILL.md") && QFileInfo(dir.absolutePath()).dir().dirName() == QLatin1String("skills"))
         return Kind::Skill;
-    if (info.suffix() == QLatin1String("md") && dir.dirName() == QLatin1String("agents")
-        && isClaudeFolder(QFileInfo(dir.absolutePath()).dir()))
+    if (info.suffix() == QLatin1String("md") && dir.dirName() == QLatin1String("agents") &&
+        isClaudeFolder(QFileInfo(dir.absolutePath()).dir()))
         return Kind::Agent;
     return Kind::None;
 }
@@ -157,10 +162,13 @@ Kind kindOf(const QString &path)
 Diagnostics check(Kind kind, QByteArrayView text)
 {
     switch (kind) {
-    case Kind::Settings: return checkSettings(text);
+    case Kind::Settings:
+        return checkSettings(text);
     case Kind::Skill:
-    case Kind::Agent: return checkFrontMatter(kind, text);
-    case Kind::None: break;
+    case Kind::Agent:
+        return checkFrontMatter(kind, text);
+    case Kind::None:
+        break;
     }
     return {};
 }

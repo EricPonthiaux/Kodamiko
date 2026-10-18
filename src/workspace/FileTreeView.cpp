@@ -15,11 +15,11 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
+#include <QDrag>
+#include <QDragEnterEvent>
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QKeyEvent>
-#include <QDrag>
-#include <QDragEnterEvent>
 #include <QLabel>
 #include <QMenu>
 #include <QMimeData>
@@ -48,11 +48,16 @@ QColor statusColor(FileStatus status, bool dark)
 {
     switch (status) {
     case FileStatus::Modified:
-    case FileStatus::Renamed: return QColor::fromRgb(dark ? 0x6897bb : 0x0032a0);
-    case FileStatus::Added: return QColor::fromRgb(dark ? 0x629755 : 0x067d17);
-    case FileStatus::Untracked: return QColor::fromRgb(dark ? 0xd1675a : 0x993300);
-    case FileStatus::Conflicted: return QColor::fromRgb(dark ? 0xd5756c : 0xc00000);
-    case FileStatus::Ignored: return QColor::fromRgb(dark ? 0x848504 : 0x808000);
+    case FileStatus::Renamed:
+        return QColor::fromRgb(dark ? 0x6897bb : 0x0032a0);
+    case FileStatus::Added:
+        return QColor::fromRgb(dark ? 0x629755 : 0x067d17);
+    case FileStatus::Untracked:
+        return QColor::fromRgb(dark ? 0xd1675a : 0x993300);
+    case FileStatus::Conflicted:
+        return QColor::fromRgb(dark ? 0xd5756c : 0xc00000);
+    case FileStatus::Ignored:
+        return QColor::fromRgb(dark ? 0x848504 : 0x808000);
     }
     return {};
 }
@@ -60,12 +65,18 @@ QColor statusColor(FileStatus status, bool dark)
 QString statusName(FileStatus status)
 {
     switch (status) {
-    case FileStatus::Modified: return FileTreeView::tr("modified");
-    case FileStatus::Renamed: return FileTreeView::tr("renamed");
-    case FileStatus::Added: return FileTreeView::tr("added");
-    case FileStatus::Untracked: return FileTreeView::tr("not tracked by git");
-    case FileStatus::Conflicted: return FileTreeView::tr("in conflict");
-    case FileStatus::Ignored: return FileTreeView::tr("ignored by git");
+    case FileStatus::Modified:
+        return FileTreeView::tr("modified");
+    case FileStatus::Renamed:
+        return FileTreeView::tr("renamed");
+    case FileStatus::Added:
+        return FileTreeView::tr("added");
+    case FileStatus::Untracked:
+        return FileTreeView::tr("not tracked by git");
+    case FileStatus::Conflicted:
+        return FileTreeView::tr("in conflict");
+    case FileStatus::Ignored:
+        return FileTreeView::tr("ignored by git");
     }
     return {};
 }
@@ -74,12 +85,18 @@ QString statusName(FileStatus status)
 QString statusLetter(FileStatus status)
 {
     switch (status) {
-    case FileStatus::Modified: return QStringLiteral("M");
-    case FileStatus::Renamed: return QStringLiteral("R");
-    case FileStatus::Added: return QStringLiteral("A");
-    case FileStatus::Untracked: return QStringLiteral("U");
-    case FileStatus::Conflicted: return QStringLiteral("C");
-    case FileStatus::Ignored: return {};
+    case FileStatus::Modified:
+        return QStringLiteral("M");
+    case FileStatus::Renamed:
+        return QStringLiteral("R");
+    case FileStatus::Added:
+        return QStringLiteral("A");
+    case FileStatus::Untracked:
+        return QStringLiteral("U");
+    case FileStatus::Conflicted:
+        return QStringLiteral("C");
+    case FileStatus::Ignored:
+        return {};
     }
     return {};
 }
@@ -125,7 +142,8 @@ public:
     {
         statuses_ = statuses;
         folderStatuses_ = FileStatuses::folderStatuses(statuses, rootPath_);
-        hasIgnored_ = std::any_of(statuses.cbegin(), statuses.cend(), [](FileStatus s) { return s == FileStatus::Ignored; });
+        hasIgnored_ =
+            std::any_of(statuses.cbegin(), statuses.cend(), [](FileStatus s) { return s == FileStatus::Ignored; });
         inIgnored_.clear();
     }
     void setTouched(const QSet<QString> &paths) { touched_ = paths; }
@@ -175,8 +193,8 @@ public:
 
     QVariant data(const QModelIndex &index, int role) const override
     {
-        if (index.column() != 0 || (role != Qt::ForegroundRole && role != Qt::DecorationRole && role != Qt::ToolTipRole
-                                    && role != pathRole && role != statusLetterRole))
+        if (index.column() != 0 || (role != Qt::ForegroundRole && role != Qt::DecorationRole &&
+                                    role != Qt::ToolTipRole && role != pathRole && role != statusLetterRole))
             return QSortFilterProxyModel::data(index, role);
         const auto *model = static_cast<ProjectTreeModel *>(sourceModel());
         const QModelIndex source = mapToSource(index);
@@ -201,7 +219,8 @@ public:
             QStringList lines{QDir::toNativeSeparators(path)};
             if (status) {
                 // A folder colored by the files it contains.
-                const bool contains = model->isDir(source) && !statuses_.contains(path) && *status != FileStatus::Ignored;
+                const bool contains =
+                    model->isDir(source) && !statuses_.contains(path) && *status != FileStatus::Ignored;
                 lines.append(contains ? FileTreeView::tr("contains changes") : statusName(*status));
             }
             if (touched_.contains(path))
@@ -466,7 +485,6 @@ void FileTreeView::expandPending()
     pendingExpansions_ += remaining;
 }
 
-
 void FileTreeView::createFile()
 {
     createEntry(targetFolder(currentIndex()), false);
@@ -528,13 +546,13 @@ void FileTreeView::showContextMenu(const QPoint &position)
                     [this, clicked] { copyPath(clicked, false); });
     copy->addAction(tr("Path From &Project Root"), QKeySequence(tr("Ctrl+Alt+Shift+C")), this,
                     [this, clicked] { copyPath(clicked, true); });
-    copy->addAction(tr("File &Name"), this, [clicked] { QApplication::clipboard()->setText(QFileInfo(clicked).fileName()); });
+    copy->addAction(tr("File &Name"), this,
+                    [clicked] { QApplication::clipboard()->setText(QFileInfo(clicked).fileName()); });
     menu.addAction(tr("Send to &Claude"), QKeySequence(tr("Ctrl+Alt+K")), this,
                    [this, clicked] { emit sendToClaudeRequested(clicked); });
     QMenu *open = menu.addMenu(tr("Open &In"));
     open->addAction(tr("&Terminal"), this, [this, folder] { emit openTerminalRequested(folder); });
-    open->addAction(tr("&File Manager"), this,
-                    [folder] { QDesktopServices::openUrl(QUrl::fromLocalFile(folder)); });
+    open->addAction(tr("&File Manager"), this, [folder] { QDesktopServices::openUrl(QUrl::fromLocalFile(folder)); });
     if (inRepository_)
         addGitMenu(&menu, clicked);
     menu.exec(viewport()->mapToGlobal(position));
@@ -562,15 +580,16 @@ void FileTreeView::confirmRollback(const QString &path)
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(info.absolutePath());
     const QString message = (info.isDir() ? tr("Restore the files of “%1” to their state in the git index?")
                                           : tr("Restore “%1” to its state in the git index?"))
-                                .arg(path == rootPath_ ? QDir::toNativeSeparators(rootPath_) : info.fileName())
-        + QLatin1Char('\n') + tr("A snapshot is taken first: Git ▸ Restore a Snapshot brings the changes back.");
-    auto *popup = new ConfirmPopup(tr("Rollback"), QDir::toNativeSeparators(relative + QLatin1Char('/')), message,
-                                   tr("Rollback"),
-                                   [this, path](ConfirmPopup *) {
-                                       emit rollbackRequested(path);
-                                       return true;
-                                   },
-                                   this);
+                                .arg(path == rootPath_ ? QDir::toNativeSeparators(rootPath_) : info.fileName()) +
+                            QLatin1Char('\n') +
+                            tr("A snapshot is taken first: Git ▸ Restore a Snapshot brings the changes back.");
+    auto *popup = new ConfirmPopup(
+        tr("Rollback"), QDir::toNativeSeparators(relative + QLatin1Char('/')), message, tr("Rollback"),
+        [this, path](ConfirmPopup *) {
+            emit rollbackRequested(path);
+            return true;
+        },
+        this);
     popup->popup();
 }
 
@@ -671,12 +690,9 @@ void FileTreeView::createEntry(const QString &folder, bool isFolder)
     if (folder.isEmpty())
         return;
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(folder);
-    auto *popup = new NamePopup(isFolder ? tr("New Folder") : tr("New File"),
-                                    QDir::toNativeSeparators(relative + QLatin1Char('/')),
-                                    [this, folder, isFolder](const QString &name) {
-                                        return createEntryNamed(folder, name, isFolder);
-                                    },
-                                    this);
+    auto *popup = new NamePopup(
+        isFolder ? tr("New Folder") : tr("New File"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+        [this, folder, isFolder](const QString &name) { return createEntryNamed(folder, name, isFolder); }, this);
     popup->popup();
 }
 
@@ -686,14 +702,14 @@ void FileTreeView::createDiagramIn(const QString &folder, const QString &kindId)
     if (folder.isEmpty() || kind.id.isEmpty())
         return;
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(folder);
-    auto *popup = new NamePopup(tr("New %1").arg(kind.title), QDir::toNativeSeparators(relative + QLatin1Char('/')),
-                                [this, folder, kind](const QString &name) {
-                                    if (name.isEmpty())
-                                        return tr("Enter a name");
-                                    return createEntryNamed(folder, DiagramKinds::withExtension(name, kind), false,
-                                                            kind.blank);
-                                },
-                                this);
+    auto *popup = new NamePopup(
+        tr("New %1").arg(kind.title), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+        [this, folder, kind](const QString &name) {
+            if (name.isEmpty())
+                return tr("Enter a name");
+            return createEntryNamed(folder, DiagramKinds::withExtension(name, kind), false, kind.blank);
+        },
+        this);
     popup->popup();
 }
 
@@ -725,9 +741,9 @@ void FileTreeView::renameEntry(const QString &path)
     const QFileInfo info(path);
     const bool isFolder = info.isDir() && !info.isSymLink();
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(info.absolutePath());
-    auto *popup = new NamePopup(isFolder ? tr("Rename Folder") : tr("Rename File"),
-                                QDir::toNativeSeparators(relative + QLatin1Char('/')),
-                                [this, path](const QString &name) { return renameEntryTo(path, name); }, this);
+    auto *popup = new NamePopup(
+        isFolder ? tr("Rename Folder") : tr("Rename File"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+        [this, path](const QString &name) { return renameEntryTo(path, name); }, this);
     popup->setName(info.fileName(), isFolder);
     popup->popup();
 }
@@ -770,13 +786,13 @@ void FileTreeView::deleteEntry(const QString &path)
         for (QDirIterator it(path, QDir::Files | QDir::Hidden | QDir::System, QDirIterator::Subdirectories);
              it.hasNext() && files <= countLimit; it.next())
             ++files;
-        message = files == 0 ? tr("Delete the empty folder “%1”?").arg(info.fileName())
-                  : files > countLimit
-                      ? tr("Delete the folder “%1” and the more than %2 files it contains?")
-                            .arg(info.fileName())
-                            .arg(countLimit)
-                      : tr("Delete the folder “%1” and the %n file(s) it contains?", nullptr, files)
-                            .arg(info.fileName());
+        message =
+            files == 0 ? tr("Delete the empty folder “%1”?").arg(info.fileName())
+            : files > countLimit
+                ? tr("Delete the folder “%1” and the more than %2 files it contains?")
+                      .arg(info.fileName())
+                      .arg(countLimit)
+                : tr("Delete the folder “%1” and the %n file(s) it contains?", nullptr, files).arg(info.fileName());
     } else {
         message = tr("Delete “%1”?").arg(info.fileName());
     }
@@ -852,8 +868,7 @@ bool FileTreeView::select(const QString &path)
     const QString cleanPath = QDir::cleanPath(path);
     if (rootPath_.isEmpty() || !(cleanPath == rootPath_ || cleanPath.startsWith(rootPath_ + QLatin1Char('/'))))
         return false;
-    if (scope_ == Scope::ChangedFiles
-        && statuses_.value(cleanPath, FileStatus::Ignored) == FileStatus::Ignored)
+    if (scope_ == Scope::ChangedFiles && statuses_.value(cleanPath, FileStatus::Ignored) == FileStatus::Ignored)
         return false;
     if (scope_ == Scope::EditedByClaude && !claudeEdited_.contains(cleanPath))
         return false;
@@ -1086,8 +1101,8 @@ QList<QPersistentModelIndex> FileTreeView::computeStickyRows() const
              folder = folder.parent())
             chain.prepend(folder);
         // A folder whose own row is cut by the top is pinned too.
-        if (below != workingFolder && isExpanded(below) && model()->hasChildren(below)
-            && visualRect(below).top() < int(rows.size()) * height)
+        if (below != workingFolder && isExpanded(below) && model()->hasChildren(below) &&
+            visualRect(below).top() < int(rows.size()) * height)
             chain.append(below);
         if (chain.size() <= rows.size())
             break;
@@ -1246,17 +1261,17 @@ void FileTreeView::duplicateCurrent()
     const QFileInfo info(path);
     const bool isFolder = info.isDir() && !info.isSymLink();
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(info.absolutePath());
-    auto *popup = new NamePopup(isFolder ? tr("Copy Folder") : tr("Copy File"),
-                                QDir::toNativeSeparators(relative + QLatin1Char('/')),
-                                [this, path](const QString &name) {
-                                    const EntryTarget target = resolveRename(path, name);
-                                    if (!target.error.isEmpty())
-                                        return target.error;
-                                    if (target.path == path)
-                                        return tr("A file with the name “%1” already exists").arg(name);
-                                    return transferOne(path, target.path, false);
-                                },
-                                this);
+    auto *popup = new NamePopup(
+        isFolder ? tr("Copy Folder") : tr("Copy File"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+        [this, path](const QString &name) {
+            const EntryTarget target = resolveRename(path, name);
+            if (!target.error.isEmpty())
+                return target.error;
+            if (target.path == path)
+                return tr("A file with the name “%1” already exists").arg(name);
+            return transferOne(path, target.path, false);
+        },
+        this);
     popup->setName(FileOperations::copyName(info.absolutePath(), info.fileName()), isFolder);
     popup->popup();
 }
@@ -1284,14 +1299,15 @@ void FileTreeView::transfer(const QStringList &sources, const QString &folder, b
         const QFileInfo info(source);
         const bool isFolder = info.isDir() && !info.isSymLink();
         const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(folder);
-        auto *popup = new NamePopup(move ? tr("Move") : tr("Copy"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
-                                    [this, source, folder, move](const QString &newName) {
-                                        const EntryTarget target = resolveNewEntry(rootPath_, folder, newName, false);
-                                        if (!target.error.isEmpty())
-                                            return target.error;
-                                        return transferOne(source, target.path, move);
-                                    },
-                                    this);
+        auto *popup = new NamePopup(
+            move ? tr("Move") : tr("Copy"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+            [this, source, folder, move](const QString &newName) {
+                const EntryTarget target = resolveNewEntry(rootPath_, folder, newName, false);
+                if (!target.error.isEmpty())
+                    return target.error;
+                return transferOne(source, target.path, move);
+            },
+            this);
         const QString suggested = QDir::cleanPath(info.absolutePath()) == QDir::cleanPath(folder)
                                       ? FileOperations::copyName(folder, name)
                                       : FileOperations::freeName(folder, name);
@@ -1302,7 +1318,8 @@ void FileTreeView::transfer(const QStringList &sources, const QString &folder, b
     }
     QStringList errors;
     for (const QString &source : sources) {
-        const QString destination = QDir(folder).filePath(FileOperations::freeName(folder, QFileInfo(source).fileName()));
+        const QString destination =
+            QDir(folder).filePath(FileOperations::freeName(folder, QFileInfo(source).fileName()));
         if (const QString error = transferOne(source, destination, move); !error.isEmpty())
             errors.append(error);
     }
@@ -1357,11 +1374,11 @@ void FileTreeView::dragMoveEvent(QDragMoveEvent *event)
     const QString folder = dropFolder(event->position().toPoint());
     const bool internal = event->source() == this;
     const bool copy = !internal || (event->modifiers() & Qt::ControlModifier);
-    const bool valid = !folder.isEmpty() && !sources.isEmpty()
-        && std::none_of(sources.begin(), sources.end(), [&](const QString &source) {
-               return FileOperations::isInside(folder, source)
-                   || (!copy && QDir::cleanPath(QFileInfo(source).absolutePath()) == folder);
-           });
+    const bool valid = !folder.isEmpty() && !sources.isEmpty() &&
+                       std::none_of(sources.begin(), sources.end(), [&](const QString &source) {
+                           return FileOperations::isInside(folder, source) ||
+                                  (!copy && QDir::cleanPath(QFileInfo(source).absolutePath()) == folder);
+                       });
     if (!valid) {
         event->ignore();
         return;
@@ -1388,12 +1405,13 @@ void FileTreeView::dropEvent(QDropEvent *event)
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(folder);
     const QString what = sources.size() == 1 ? tr("“%1”").arg(QFileInfo(sources.first()).fileName())
                                              : tr("%1 items").arg(sources.size());
-    auto *popup = new ConfirmPopup(tr("Move"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
-                                   tr("Move %1 to “%2”?").arg(what, QDir::toNativeSeparators(relative)), tr("Move"),
-                                   [this, sources, folder](ConfirmPopup *) {
-                                       transfer(sources, folder, true);
-                                       return true;
-                                   },
-                                   this);
+    auto *popup = new ConfirmPopup(
+        tr("Move"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+        tr("Move %1 to “%2”?").arg(what, QDir::toNativeSeparators(relative)), tr("Move"),
+        [this, sources, folder](ConfirmPopup *) {
+            transfer(sources, folder, true);
+            return true;
+        },
+        this);
     popup->popup();
 }

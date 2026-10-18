@@ -125,9 +125,9 @@ bool ConPty::start(const ProcessSpec &spec, QSize cells)
     InitializeProcThreadAttributeList(nullptr, 1, 0, &attributeListSize);
     std::vector<char> attributeListBuffer(attributeListSize);
     auto attributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributeListBuffer.data());
-    if (!InitializeProcThreadAttributeList(attributeList, 1, 0, &attributeListSize)
-        || !UpdateProcThreadAttribute(attributeList, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, pseudoConsole_,
-                                      sizeof(HPCON), nullptr, nullptr)) {
+    if (!InitializeProcThreadAttributeList(attributeList, 1, 0, &attributeListSize) ||
+        !UpdateProcThreadAttribute(attributeList, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, pseudoConsole_, sizeof(HPCON),
+                                   nullptr, nullptr)) {
         setError(tr("Preparing the process"));
         return false;
     }
@@ -142,8 +142,7 @@ bool ConPty::start(const ProcessSpec &spec, QSize cells)
 
     PROCESS_INFORMATION processInfo{};
     const BOOL launched = CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE,
-                                         EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
-                                         environment.data(),
+                                         EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, environment.data(),
                                          workingDirectory.empty() ? nullptr : workingDirectory.c_str(),
                                          &startupInfo.StartupInfo, &processInfo);
     DeleteProcThreadAttributeList(attributeList);

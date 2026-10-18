@@ -34,9 +34,8 @@ QJsonObject clientCapabilities()
                                                           "refactor.inline", "refactor.rewrite", "source"}}}}}},
     };
     const QJsonObject signatureHelp{
-        {"signatureInformation",
-         QJsonObject{{"documentationFormat", QJsonArray{"plaintext"}},
-                     {"parameterInformation", QJsonObject{{"labelOffsetSupport", true}}}}},
+        {"signatureInformation", QJsonObject{{"documentationFormat", QJsonArray{"plaintext"}},
+                                             {"parameterInformation", QJsonObject{{"labelOffsetSupport", true}}}}},
     };
     const QJsonObject textDocument{
         {"completion", completion},
@@ -63,8 +62,7 @@ QJsonObject clientCapabilities()
 
 } // namespace
 
-LspClient::LspClient(const QString &program, const QStringList &arguments, const QString &rootFolder,
-                     QObject *parent)
+LspClient::LspClient(const QString &program, const QStringList &arguments, const QString &rootFolder, QObject *parent)
     : QObject(parent)
     , program_(program)
     , arguments_(arguments)
@@ -113,8 +111,8 @@ QString LspClient::lastError() const
     const QStringList lines = QString::fromUtf8(errors_).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
     for (auto it = lines.crbegin(); it != lines.crend(); ++it) {
         const QString line = it->trimmed();
-        if (!line.isEmpty() && !line.startsWith(QLatin1String("at ")) && !line.startsWith(QLatin1String("File \""))
-            && !line.startsWith(QLatin1Char('^')) && !line.startsWith(QLatin1Char('~')))
+        if (!line.isEmpty() && !line.startsWith(QLatin1String("at ")) && !line.startsWith(QLatin1String("File \"")) &&
+            !line.startsWith(QLatin1Char('^')) && !line.startsWith(QLatin1Char('~')))
             return line.left(240);
     }
     return {};
@@ -153,9 +151,8 @@ void LspClient::start()
         {"processId", QCoreApplication::applicationPid()},
         {"clientInfo", QJsonObject{{"name", "Duet"}}},
         {"rootUri", QUrl::fromLocalFile(rootFolder_).toString()},
-        {"workspaceFolders",
-         QJsonArray{QJsonObject{{"uri", QUrl::fromLocalFile(rootFolder_).toString()},
-                                {"name", QFileInfo(rootFolder_).fileName()}}}},
+        {"workspaceFolders", QJsonArray{QJsonObject{{"uri", QUrl::fromLocalFile(rootFolder_).toString()},
+                                                    {"name", QFileInfo(rootFolder_).fileName()}}}},
         {"capabilities", clientCapabilities()},
     };
     if (!initializationOptions_.isEmpty())
@@ -240,8 +237,7 @@ QList<QJsonObject> LspClient::takeMessages(QByteArray &buffer)
             qsizetype lineEnd = buffer.indexOf('\n', lineStart);
             if (lineEnd < 0 || lineEnd > headerEnd)
                 lineEnd = headerEnd;
-            const QByteArrayView header =
-                QByteArrayView(buffer.constData() + lineStart, lineEnd - lineStart).trimmed();
+            const QByteArrayView header = QByteArrayView(buffer.constData() + lineStart, lineEnd - lineStart).trimmed();
             if (header.size() >= 15 && header.first(15).compare("content-length:", Qt::CaseInsensitive) == 0)
                 length = header.sliced(15).trimmed().toLongLong();
             lineStart = lineEnd + 1;

@@ -15,7 +15,6 @@
 #include <QToolButton>
 #include <QWindow>
 
-
 namespace {
 
 constexpr int barHeight = 40;
@@ -65,7 +64,8 @@ void WindowButton::paintEvent(QPaintEvent *)
     QColor color = theme_.foreground;
     if (hovered_ || isDown()) {
         // Closing turns red, as everywhere.
-        const QColor background = kind_ == Kind::Close ? QColor("#e81123") : theme_.hover.lighter(theme_.isDark ? 140 : 97);
+        const QColor background =
+            kind_ == Kind::Close ? QColor("#e81123") : theme_.hover.lighter(theme_.isDark ? 140 : 97);
         painter.fillRect(rect(), isDown() ? background.darker(115) : background);
         if (kind_ == Kind::Close)
             color = Qt::white;
@@ -81,7 +81,8 @@ void WindowButton::paintEvent(QPaintEvent *)
     case Kind::Maximize:
         if (window()->isMaximized()) {
             // Restore: two overlapping squares.
-            painter.drawRoundedRect(QRectF(center.x() - half, center.y() - half + 2, 2 * half - 2, 2 * half - 2), 1.5, 1.5);
+            painter.drawRoundedRect(QRectF(center.x() - half, center.y() - half + 2, 2 * half - 2, 2 * half - 2), 1.5,
+                                    1.5);
             QPainterPath back;
             back.moveTo(center.x() - half + 2, center.y() - half + 2);
             back.lineTo(center.x() - half + 2, center.y() - half);
@@ -274,9 +275,12 @@ void TitleBar::setLeadingSpace(int pixels)
 WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const
 {
     switch (kind) {
-    case WindowButton::Kind::Minimize: return minimize_;
-    case WindowButton::Kind::Maximize: return maximize_;
-    case WindowButton::Kind::Close: break;
+    case WindowButton::Kind::Minimize:
+        return minimize_;
+    case WindowButton::Kind::Maximize:
+        return maximize_;
+    case WindowButton::Kind::Close:
+        break;
     }
     return close_;
 }

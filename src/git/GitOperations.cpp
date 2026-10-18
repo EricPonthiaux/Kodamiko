@@ -26,9 +26,9 @@ QSet<QString> trackedPaths(const RepositoryInfo &repository, const QStringList &
 
 QString discardReason(const QStringList &paths)
 {
-    return paths.size() == 1 ? QObject::tr("Before discarding changes to %1").arg(paths.first())
-                             : QObject::tr("Before discarding changes to %n file(s)", nullptr,
-                                           static_cast<int>(paths.size()));
+    return paths.size() == 1
+               ? QObject::tr("Before discarding changes to %1").arg(paths.first())
+               : QObject::tr("Before discarding changes to %n file(s)", nullptr, static_cast<int>(paths.size()));
 }
 
 } // namespace
@@ -48,10 +48,9 @@ void unstage(const RepositoryInfo &repository, const QStringList &paths)
     // Without commits, there is no version to put back in the index: the
     // files are simply removed from it.
     if (repository.unborn)
-        Git::run(repository.workDir,
-                 withPaths({QStringLiteral("rm"), QStringLiteral("--cached"), QStringLiteral("-r"), QStringLiteral("-q"),
-                            QStringLiteral("--ignore-unmatch")},
-                           paths));
+        Git::run(repository.workDir, withPaths({QStringLiteral("rm"), QStringLiteral("--cached"), QStringLiteral("-r"),
+                                                QStringLiteral("-q"), QStringLiteral("--ignore-unmatch")},
+                                               paths));
     else
         Git::run(repository.workDir, withPaths({QStringLiteral("restore"), QStringLiteral("--staged")}, paths));
 }
@@ -90,8 +89,8 @@ void discardPatch(const RepositoryInfo &repository, const QStringList &paths, co
     if (patch.isEmpty())
         return;
     Snapshots::create(repository, discardReason(paths), paths);
-    Git::run(repository.workDir, {QStringLiteral("apply"), QStringLiteral("--recount"), QStringLiteral("-R"), QStringLiteral("-")},
-             patch);
+    Git::run(repository.workDir,
+             {QStringLiteral("apply"), QStringLiteral("--recount"), QStringLiteral("-R"), QStringLiteral("-")}, patch);
 }
 
 QString commit(const RepositoryInfo &repository, const QString &message, bool amend)
@@ -101,7 +100,8 @@ QString commit(const RepositoryInfo &repository, const QString &message, bool am
     if (amend)
         arguments << QStringLiteral("--amend");
     Git::run(repository.workDir, arguments, message.toUtf8());
-    return QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("rev-parse"), QStringLiteral("--short"), QStringLiteral("HEAD")}))
+    return QString::fromUtf8(Git::run(repository.workDir,
+                                      {QStringLiteral("rev-parse"), QStringLiteral("--short"), QStringLiteral("HEAD")}))
         .trimmed();
 }
 

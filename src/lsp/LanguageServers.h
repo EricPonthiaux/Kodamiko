@@ -17,10 +17,10 @@ class Toolchains;
 
 // A language server Duet knows how to run.
 struct LanguageServerSpec {
-    QString name;       // "clangd"
-    QString program;    // looked up in the PATH
+    QString name;    // "clangd"
+    QString program; // looked up in the PATH
     QStringList arguments;
-    QStringList languages; // LanguageRegistry identifiers it serves
+    QStringList languages;     // LanguageRegistry identifiers it serves
     QString triggerCharacters; // characters after which it completes members
 };
 
@@ -138,17 +138,17 @@ private:
     ProjectConfig project_;
     Toolchains *toolchains_ = nullptr;
     bool enabled_ = true;
-    QHash<QString, LspClient *> clients_; // by server name
+    QHash<QString, LspClient *> clients_;                       // by server name
     QHash<QString, LspClient::RequestHandler> requestHandlers_; // by method
-    QHash<QString, QString> failures_;    // by server name
+    QHash<QString, QString> failures_;                          // by server name
     struct Document {
         QString server;
         int version = 0;
         size_t hash = 0;
     };
-    QHash<QString, Document> documents_; // by path
-    QHash<QString, QJsonArray> diagnostics_; // by path
-    QSet<QString> warmed_; // servers already asked a completion, by name
+    QHash<QString, Document> documents_;           // by path
+    QHash<QString, QJsonArray> diagnostics_;       // by path
+    QSet<QString> warmed_;                         // servers already asked a completion, by name
     mutable QHash<QString, QString> programPaths_; // lookups in the PATH
     // specFor() by language: asked at every typed character (trigger
     // characters), and it looks for programs on disk.

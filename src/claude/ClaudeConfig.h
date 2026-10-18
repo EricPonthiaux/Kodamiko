@@ -13,18 +13,27 @@
 // templateFor()) and edited in the editor like any file.
 namespace ClaudeConfig {
 
-enum class Category { Memory, Rules, Skills, Agents, Commands, OutputStyles, Settings, Mcp };
+enum class Category {
+    Memory,
+    Rules,
+    Skills,
+    Agents,
+    Commands,
+    OutputStyles,
+    Settings,
+    Mcp
+};
 
 // From the lowest precedence to the highest, Duet's session settings last.
 enum class Scope {
-    Managed, // set by the administrator, read-only
-    User, // ~/.claude, for every project
-    Parent, // CLAUDE.md of a folder above the project
-    Auto, // memory Claude writes itself, per project
-    Project, // in the project, shared through git
+    Managed,   // set by the administrator, read-only
+    User,      // ~/.claude, for every project
+    Parent,    // CLAUDE.md of a folder above the project
+    Auto,      // memory Claude writes itself, per project
+    Project,   // in the project, shared through git
     Subfolder, // CLAUDE.md of a folder in the project, read when Claude works there
-    Local, // in the project, not shared
-    Session, // what Duet passes with --settings, read-only
+    Local,     // in the project, not shared
+    Session,   // what Duet passes with --settings, read-only
 };
 
 struct Entry {
@@ -33,9 +42,9 @@ struct Entry {
     // Shown in the panel: "CLAUDE.md", "release-notes", "/deploy",
     // "src/CLAUDE.md"...
     QString name;
-    QString path; // absolute; for a skill, its SKILL.md
+    QString path;        // absolute; for a skill, its SKILL.md
     QString description; // from the front matter, for skills, agents...
-    bool exists = true; // false: a usual file not created yet
+    bool exists = true;  // false: a usual file not created yet
     bool readOnly = false;
 };
 

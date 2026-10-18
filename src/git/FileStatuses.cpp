@@ -22,7 +22,8 @@ std::optional<FileStatus> statusOf(unsigned int flags)
         return FileStatus::Added;
     if (flags & GIT_STATUS_WT_NEW)
         return FileStatus::Untracked;
-    if (flags & (GIT_STATUS_INDEX_MODIFIED | GIT_STATUS_WT_MODIFIED | GIT_STATUS_INDEX_TYPECHANGE | GIT_STATUS_WT_TYPECHANGE))
+    if (flags &
+        (GIT_STATUS_INDEX_MODIFIED | GIT_STATUS_WT_MODIFIED | GIT_STATUS_INDEX_TYPECHANGE | GIT_STATUS_WT_TYPECHANGE))
         return FileStatus::Modified;
     return std::nullopt; // deleted, or unchanged
 }
@@ -30,12 +31,18 @@ std::optional<FileStatus> statusOf(unsigned int flags)
 int severity(FileStatus status)
 {
     switch (status) {
-    case FileStatus::Conflicted: return 5;
-    case FileStatus::Modified: return 4;
-    case FileStatus::Renamed: return 3;
-    case FileStatus::Added: return 2;
-    case FileStatus::Untracked: return 1;
-    case FileStatus::Ignored: return 0;
+    case FileStatus::Conflicted:
+        return 5;
+    case FileStatus::Modified:
+        return 4;
+    case FileStatus::Renamed:
+        return 3;
+    case FileStatus::Added:
+        return 2;
+    case FileStatus::Untracked:
+        return 1;
+    case FileStatus::Ignored:
+        return 0;
     }
     return 0;
 }
@@ -63,9 +70,9 @@ FileStatusMap read(const QString &folder)
     git_status_options options;
     git_status_options_init(&options, GIT_STATUS_OPTIONS_VERSION);
     options.show = GIT_STATUS_SHOW_INDEX_AND_WORKDIR;
-    options.flags = GIT_STATUS_OPT_INCLUDE_UNTRACKED | GIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS
-                    | GIT_STATUS_OPT_INCLUDE_IGNORED | GIT_STATUS_OPT_RENAMES_HEAD_TO_INDEX
-                    | GIT_STATUS_OPT_EXCLUDE_SUBMODULES;
+    options.flags = GIT_STATUS_OPT_INCLUDE_UNTRACKED | GIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS |
+                    GIT_STATUS_OPT_INCLUDE_IGNORED | GIT_STATUS_OPT_RENAMES_HEAD_TO_INDEX |
+                    GIT_STATUS_OPT_EXCLUDE_SUBMODULES;
     QByteArray pathspec;
     char *pathspecs[1];
     if (prefix != QLatin1String(".") && !prefix.startsWith(QLatin1String(".."))) {

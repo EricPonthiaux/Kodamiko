@@ -143,8 +143,8 @@ QString runtimeOf(const QString &family)
 QStringList runtimeVersions(const QString &family)
 {
     if (family == QLatin1String("cpp"))
-        return {QStringLiteral("c++26"), QStringLiteral("c++23"), QStringLiteral("c++20"), QStringLiteral("c++17"),
-                QStringLiteral("c++14"), QStringLiteral("c++11")};
+        return {QStringLiteral("c++26"), QStringLiteral("c++23"), QStringLiteral("c++20"),
+                QStringLiteral("c++17"), QStringLiteral("c++14"), QStringLiteral("c++11")};
     if (const ToolSpec *runtime = find(runtimeOf(family)))
         return runtime->versions;
     return {};
@@ -179,7 +179,8 @@ Platform currentPlatform()
 QUrl metadataUrl(const QString &id, const QString &version)
 {
     if (id == jdkId) // Adoptium's Temurin builds, as GitHub releases
-        return QUrl(QStringLiteral("https://api.github.com/repos/adoptium/temurin%1-binaries/releases/latest").arg(version));
+        return QUrl(
+            QStringLiteral("https://api.github.com/repos/adoptium/temurin%1-binaries/releases/latest").arg(version));
     if (id == nodeId) // to know the latest release of the major version
         return QUrl(QStringLiteral("https://nodejs.org/dist/index.json"));
     if (id == QLatin1String("jdtls")) // the name of the milestone's archive
@@ -187,8 +188,7 @@ QUrl metadataUrl(const QString &id, const QString &version)
     return {};
 }
 
-DownloadSource source(const QString &id, const QString &version, const Platform &platform,
-                      const QByteArray &metadata)
+DownloadSource source(const QString &id, const QString &version, const Platform &platform, const QByteArray &metadata)
 {
     const bool windows = platform.os == QLatin1String("windows");
     DownloadSource source;
@@ -221,10 +221,11 @@ DownloadSource source(const QString &id, const QString &version, const Platform 
         }
         if (release.isEmpty())
             return failure(QObject::tr("No Node.js %1 release found").arg(version));
-        const QString os = windows ? QStringLiteral("win")
+        const QString os = windows                               ? QStringLiteral("win")
                            : platform.os == QLatin1String("mac") ? QStringLiteral("darwin")
                                                                  : QStringLiteral("linux");
-        const QString arch = platform.arch == QLatin1String("aarch64") ? QStringLiteral("arm64") : QStringLiteral("x64");
+        const QString arch =
+            platform.arch == QLatin1String("aarch64") ? QStringLiteral("arm64") : QStringLiteral("x64");
         source.fileName = QStringLiteral("node-%1-%2-%3%4")
                               .arg(release, os, arch, windows ? QStringLiteral(".zip") : QStringLiteral(".tar.gz"));
         source.url = QUrl(QStringLiteral("https://nodejs.org/dist/%1/%2").arg(release, source.fileName));
@@ -239,8 +240,8 @@ DownloadSource source(const QString &id, const QString &version, const Platform 
             return failure(QObject::tr("clangd publishes no build for %1 %2: install it with your package manager")
                                .arg(platform.os, platform.arch));
         source.fileName = QStringLiteral("clangd-%1-%2.zip").arg(platform.os, version);
-        source.url = QUrl(QStringLiteral("https://github.com/clangd/clangd/releases/download/%1/%2")
-                              .arg(version, source.fileName));
+        source.url = QUrl(
+            QStringLiteral("https://github.com/clangd/clangd/releases/download/%1/%2").arg(version, source.fileName));
         source.format = ArchiveFormat::Zip;
         return source;
     }

@@ -19,8 +19,7 @@ inline const QColor blockColor{0x4f, 0x7c, 0xf0};
 inline const QColor tileColor{0x1f, 0x23, 0x2c};
 
 // The two shapes, fitted in the square `area`.
-void paint(QPainter *painter, const QRectF &area, const QColor &caret = caretColor,
-           const QColor &block = blockColor);
+void paint(QPainter *painter, const QRectF &area, const QColor &caret = caretColor, const QColor &block = blockColor);
 // The app icon in the square `area`: the mark on its rounded dark tile.
 void paintAppIcon(QPainter *painter, const QRectF &area);
 // The app icon, `size` pixels square.

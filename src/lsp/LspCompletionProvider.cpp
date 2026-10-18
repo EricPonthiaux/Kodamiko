@@ -39,22 +39,36 @@ CompletionItem::Kind kindOf(int lspKind)
 {
     using Kind = CompletionItem::Kind;
     switch (lspKind) {
-    case 2: return Kind::Method;
+    case 2:
+        return Kind::Method;
     case 3:
-    case 4: return Kind::Function; // function, constructor
-    case 5: return Kind::Field;
-    case 6: return Kind::Variable;
-    case 7: return Kind::Class;
-    case 8: return Kind::Interface;
-    case 9: return Kind::Module;
-    case 10: return Kind::Property;
-    case 13: return Kind::Enum;
-    case 14: return Kind::Keyword;
-    case 15: return Kind::Snippet;
+    case 4:
+        return Kind::Function; // function, constructor
+    case 5:
+        return Kind::Field;
+    case 6:
+        return Kind::Variable;
+    case 7:
+        return Kind::Class;
+    case 8:
+        return Kind::Interface;
+    case 9:
+        return Kind::Module;
+    case 10:
+        return Kind::Property;
+    case 13:
+        return Kind::Enum;
+    case 14:
+        return Kind::Keyword;
+    case 15:
+        return Kind::Snippet;
     case 20:
-    case 21: return Kind::Constant; // enum member, constant
-    case 22: return Kind::Struct;
-    case 25: return Kind::Type; // type parameter
+    case 21:
+        return Kind::Constant; // enum member, constant
+    case 22:
+        return Kind::Struct;
+    case 25:
+        return Kind::Type; // type parameter
     }
     return Kind::Text;
 }
@@ -72,8 +86,9 @@ int editStart(const QJsonObject &edit, const CompletionContext &context)
     if (column >= context.column)
         return -1;
     const int lineStart = int(context.text.lastIndexOf('\n', context.position - 1)) + 1;
-    const int at = lineStart
-                 + int(QString::fromUtf8(context.text.mid(lineStart, context.position - lineStart)).left(column).toUtf8().size());
+    const int at =
+        lineStart +
+        int(QString::fromUtf8(context.text.mid(lineStart, context.position - lineStart)).left(column).toUtf8().size());
     return at < context.prefixStart ? at : -1;
 }
 
@@ -135,9 +150,8 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, boo
     order.reserve(list.size());
     for (int i = 0; i < list.size(); ++i)
         order.push_back({list[i].toObject().value("sortText").toString(), i});
-    std::stable_sort(order.begin(), order.end(), [](const Ranked &a, const Ranked &b) {
-        return a.sortText < b.sortText;
-    });
+    std::stable_sort(order.begin(), order.end(),
+                     [](const Ranked &a, const Ranked &b) { return a.sortText < b.sortText; });
 
     QList<CompletionItem> items;
     items.reserve(list.size());
@@ -265,8 +279,9 @@ void LspCompletionProvider::complete(const CompletionContext &context, const Cal
         return;
     }
     servers_->syncDocument(client, context.filePath, context.languageId, context.text);
-    if (context.mode != CompletionContext::Mode::Smart || !context.expectedType.isEmpty()
-        || CodeScan::enclosingParenthesis(CodeScan::blank(context.text.left(context.prefixStart)), context.prefixStart) < 0) {
+    if (context.mode != CompletionContext::Mode::Smart || !context.expectedType.isEmpty() ||
+        CodeScan::enclosingParenthesis(CodeScan::blank(context.text.left(context.prefixStart)), context.prefixStart) <
+            0) {
         request(client, context, context.expectedType, done);
         return;
     }
@@ -275,15 +290,15 @@ void LspCompletionProvider::complete(const CompletionContext &context, const Cal
         {"textDocument", QJsonObject{{"uri", QUrl::fromLocalFile(context.filePath).toString()}}},
         {"position", QJsonObject{{"line", context.line}, {"character", context.column}}},
     };
-    client->request(QStringLiteral("textDocument/signatureHelp"), params,
-                    [this, context, done, server = QPointer<LspClient>(client)](const QJsonValue &result,
-                                                                                const QString &) {
-                        if (!server) {
-                            done({}, false);
-                            return;
-                        }
-                        request(server, context, activeParameterType(result, context.languageId), done);
-                    });
+    client->request(
+        QStringLiteral("textDocument/signatureHelp"), params,
+        [this, context, done, server = QPointer<LspClient>(client)](const QJsonValue &result, const QString &) {
+            if (!server) {
+                done({}, false);
+                return;
+            }
+            request(server, context, activeParameterType(result, context.languageId), done);
+        });
 }
 
 void LspCompletionProvider::request(LspClient *client, const CompletionContext &context, const QString &expectedType,
@@ -302,8 +317,8 @@ void LspCompletionProvider::request(LspClient *client, const CompletionContext &
     int before = context.prefixStart;
     while (before > 0 && context.text[before - 1] == ' ')
         --before;
-    const bool afterNew = before >= 3 && context.text.mid(before - 3, 3) == "new"
-                       && (before == 3 || !CodeScan::isIdentifierByte(context.text[before - 4]));
+    const bool afterNew = before >= 3 && context.text.mid(before - 3, 3) == "new" &&
+                          (before == 3 || !CodeScan::isIdentifierByte(context.text[before - 4]));
     client->request(QStringLiteral("textDocument/completion"), params,
                     [done, smart, expectedType, afterNew, context,
                      server = QPointer<LspClient>(client)](const QJsonValue &result, const QString &error) {

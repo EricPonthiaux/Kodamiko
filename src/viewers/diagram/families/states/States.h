@@ -41,8 +41,8 @@ public:
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
 
-    QString text;      // the display name
-    QStringList desc;  // internal description lines ("id : desc")
+    QString text;     // the display name
+    QStringList desc; // internal description lines ("id : desc")
     QString fill = QStringLiteral("#ffffff");
 
 private:

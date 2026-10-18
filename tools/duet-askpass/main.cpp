@@ -37,8 +37,7 @@ int main(int argc, char *argv[])
     const QString prompt = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
     socket.write(QJsonDocument(QJsonObject{{QLatin1String("prompt"), prompt}}).toJson(QJsonDocument::Compact) + '\n');
     socket.waitForBytesWritten(connectTimeoutMs);
-    while (!socket.canReadLine() && socket.waitForReadyRead(-1)) {
-    }
+    while (!socket.canReadLine() && socket.waitForReadyRead(-1)) { }
     if (!socket.canReadLine())
         return 1;
 

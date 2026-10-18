@@ -156,8 +156,8 @@ void PrerequisitesDialog::rebuild()
                 commandRow->addWidget(install);
                 cardLayout->addLayout(commandRow);
             }
-            auto *guide = new QLabel(tr("<a href=\"%1\">Installation guide</a>").arg(prerequisite.helpUrl.toString()),
-                                     card);
+            auto *guide =
+                new QLabel(tr("<a href=\"%1\">Installation guide</a>").arg(prerequisite.helpUrl.toString()), card);
             guide->setOpenExternalLinks(true);
             cardLayout->addWidget(guide);
         }

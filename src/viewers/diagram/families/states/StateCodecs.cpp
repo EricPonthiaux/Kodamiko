@@ -90,7 +90,8 @@ public:
     {
         const QString from = endpoint(fromName, true, parent).key;
         const QString to = endpoint(toName, false, parent).key;
-        links_.append({QStringLiteral("transition"), from, to, QJsonObject{{QStringLiteral("label"), label.trimmed()}}});
+        links_.append(
+            {QStringLiteral("transition"), from, to, QJsonObject{{QStringLiteral("label"), label.trimmed()}}});
     }
 
     void result(Model &model, const QString &rankdir) const
@@ -101,8 +102,8 @@ public:
                 props.insert(QStringLiteral("sourceKey"), node.sourceKey);
             if (!node.parentBoundary.isEmpty())
                 props.insert(QStringLiteral("parentBoundary"), node.parentBoundary);
-            if (node.type != QLatin1String("initial") && node.type != QLatin1String("final")
-                && node.type != QLatin1String("fork") && node.type != QLatin1String("join"))
+            if (node.type != QLatin1String("initial") && node.type != QLatin1String("final") &&
+                node.type != QLatin1String("fork") && node.type != QLatin1String("join"))
                 props.insert(QStringLiteral("text"), node.text);
             if (node.type == QLatin1String("state"))
                 props.insert(QStringLiteral("desc"), toJsonArray(node.desc));
@@ -148,8 +149,8 @@ QStringList serializeStates(const Board &board, QStringList out)
         const auto *element = dynamic_cast<const StateElement *>(s.get());
         const QString sourceKey = element ? element->sourceKey : QString();
         QString preferred;
-        if (!sourceKey.isEmpty()
-            && (s->key.isEmpty() || s->key == StateModel::scopedKey(sourceKey, s->parentBoundary))) {
+        if (!sourceKey.isEmpty() &&
+            (s->key.isEmpty() || s->key == StateModel::scopedKey(sourceKey, s->parentBoundary))) {
             preferred = sourceKey;
         } else if (!s->key.isEmpty()) {
             preferred = s->key;
@@ -199,7 +200,8 @@ QStringList serializeStates(const Board &board, QStringList out)
             out.append(indent + QLatin1Char('}'));
             return;
         }
-        if (s->type == QLatin1String("choice") || s->type == QLatin1String("fork") || s->type == QLatin1String("join")) {
+        if (s->type == QLatin1String("choice") || s->type == QLatin1String("fork") ||
+            s->type == QLatin1String("join")) {
             if (s->type == QLatin1String("choice") && named)
                 out.append(QStringLiteral("%1state \"%2\" as %3").arg(indent, escaped(text), key));
             out.append(QStringLiteral("%1state %2 <<%3>>").arg(indent, key, s->type));
@@ -228,8 +230,9 @@ QStringList serializeStates(const Board &board, QStringList out)
             const QString from = keys.value(l->from), to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
-            out.append(QStringLiteral("%1%2 --> %3%4")
-                           .arg(indent, from, to, l->label.isEmpty() ? QString() : QStringLiteral(" : ") + escaped(l->label)));
+            out.append(
+                QStringLiteral("%1%2 --> %3%4")
+                    .arg(indent, from, to, l->label.isEmpty() ? QString() : QStringLiteral(" : ") + escaped(l->label)));
         }
     };
     emitScope(nullptr, 1);
@@ -271,12 +274,13 @@ public:
         static const QRegularExpression endNote = caseless(QStringLiteral("^end note$"));
         static const QRegularExpression note = caseless(QStringLiteral("^note\\b"));
         static const QRegularExpression direction = caseless(QStringLiteral("^direction\\s+(TB|BT|RL|LR)"));
-        static const QRegularExpression composite = caseless(
-            QStringLiteral("^state\\s+(?:\"([^\"]*)\"\\s+as\\s+([^\\s:{]+)|([^\\s:{]+))\\s*\\{\\s*(\\})?$"));
+        static const QRegularExpression composite =
+            caseless(QStringLiteral("^state\\s+(?:\"([^\"]*)\"\\s+as\\s+([^\\s:{]+)|([^\\s:{]+))\\s*\\{\\s*(\\})?$"));
         static const QRegularExpression cssClass(QStringLiteral(":::[\\w-]+"));
         static const QRegularExpression transition(
             QStringLiteral("^(\\[\\*\\]|[^\\s:{]+)\\s*-->\\s*(\\[\\*\\]|[^\\s:{]+)\\s*(?::\\s*(.*))?$"));
-        static const QRegularExpression described = caseless(QStringLiteral("^state\\s+\"([^\"]*)\"\\s+as\\s+([^\\s:{]+)"));
+        static const QRegularExpression described =
+            caseless(QStringLiteral("^state\\s+\"([^\"]*)\"\\s+as\\s+([^\\s:{]+)"));
         static const QRegularExpression special =
             caseless(QStringLiteral("^state\\s+([^\\s:{]+)\\s*(?:<<(choice|fork|join)>>)?$"));
         static const QRegularExpression descLine(QStringLiteral("^([^\\s:{]+)\\s*:\\s*(.+)$"));
@@ -358,7 +362,8 @@ public:
 
     QString blank() const override
     {
-        return QStringLiteral("stateDiagram-v2\n  [*] --> Draft\n  Draft --> Validated : validate\n  Validated --> [*]");
+        return QStringLiteral(
+            "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Validated : validate\n  Validated --> [*]");
     }
 };
 
@@ -388,7 +393,8 @@ public:
     // `-up->`, `-[#DD00AA]->`, `-left[#yellow]->`… come down to `-->`.
     static QString canonicalArrows(QString stmt)
     {
-        static const QRegularExpression styled = caseless(QStringLiteral("-(?:left|right|up|down|le?|ri?|u|d)?\\[[^\\]]*\\]-?"));
+        static const QRegularExpression styled =
+            caseless(QStringLiteral("-(?:left|right|up|down|le?|ri?|u|d)?\\[[^\\]]*\\]-?"));
         static const QRegularExpression directed = caseless(QStringLiteral("-(?:left|right|up|down|le?|ri?|u|d)-"));
         static const QRegularExpression longer(QStringLiteral("-{3,}"));
         stmt.replace(styled, QStringLiteral("--"));
@@ -403,10 +409,11 @@ public:
         static const QRegularExpression endNote = caseless(QStringLiteral("^end\\s+note$"));
         static const QRegularExpression note = caseless(QStringLiteral("^note\\b"));
         static const QRegularExpression color(QStringLiteral("#\\S+$"));
-        static const QRegularExpression composite = caseless(QStringLiteral(
-            "^state\\s+(?:\"([^\"]*)\"\\s+as\\s+([\\w.]+)|([\\w.]+)\\s+as\\s+\"([^\"]*)\"|([\\w.]+))\\s*\\{\\s*(\\})?$"));
-        static const QRegularExpression transition(QStringLiteral(
-            "^(\\[\\*\\]|[\\w.]+)\\s*(<--?|--?>?-?>)\\s*(\\[\\*\\]|[\\w.]+)\\s*(?::\\s*(.*))?$"));
+        static const QRegularExpression composite =
+            caseless(QStringLiteral("^state\\s+(?:\"([^\"]*)\"\\s+as\\s+([\\w.]+)|([\\w.]+)\\s+as\\s+\"([^\"]*)\"|(["
+                                    "\\w.]+))\\s*\\{\\s*(\\})?$"));
+        static const QRegularExpression transition(
+            QStringLiteral("^(\\[\\*\\]|[\\w.]+)\\s*(<--?|--?>?-?>)\\s*(\\[\\*\\]|[\\w.]+)\\s*(?::\\s*(.*))?$"));
         static const QRegularExpression described =
             caseless(QStringLiteral("^state\\s+(?:\"([^\"]+)\"\\s+as\\s+([\\w.]+)|([\\w.]+)\\s+as\\s+\"([^\"]+)\")"));
         static const QRegularExpression special =
@@ -437,8 +444,9 @@ public:
             }
             stmt = canonicalArrows(stmt).remove(color).trimmed();
             if (const QRegularExpressionMatch m = composite.match(stmt); m.hasMatch()) {
-                const QString sourceKey =
-                    m.hasCaptured(2) ? m.captured(2) : m.hasCaptured(3) ? m.captured(3) : m.captured(5);
+                const QString sourceKey = m.hasCaptured(2)   ? m.captured(2)
+                                          : m.hasCaptured(3) ? m.captured(3)
+                                                             : m.captured(5);
                 std::optional<QString> label;
                 if (m.hasCaptured(1))
                     label = plantumlText(m.captured(1));

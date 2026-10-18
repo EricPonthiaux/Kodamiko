@@ -1,6 +1,7 @@
 #include "EditorTabs.h"
 
 #include "ChangeGutter.h"
+#include "ClangFormatStyle.h"
 #include "CodeFormatter.h"
 #include "EditorWidget.h"
 #include "PreviewPage.h"
@@ -80,10 +81,10 @@ QWidget *EditorTabs::openFile(const QString &path)
     QString error;
     if (!editor->load(absolutePath, &error)) {
         delete editor;
-        QMessageBox::warning(this, tr("Cannot Open File"),
-                             tr("Could not open %1:\n%2").arg(absolutePath, error));
+        QMessageBox::warning(this, tr("Cannot Open File"), tr("Could not open %1:\n%2").arg(absolutePath, error));
         return nullptr;
     }
+    applyFormatterStyle(editor);
     emit editorOpened(editor);
 
     // A Markdown or HTML file opens with its preview.
@@ -111,8 +112,7 @@ QWidget *EditorTabs::openImage(const QString &absolutePath)
     QString error;
     if (!view->load(absolutePath, &error)) {
         delete view;
-        QMessageBox::warning(this, tr("Cannot Open File"),
-                             tr("Could not open %1:\n%2").arg(absolutePath, error));
+        QMessageBox::warning(this, tr("Cannot Open File"), tr("Could not open %1:\n%2").arg(absolutePath, error));
         return nullptr;
     }
 
@@ -158,8 +158,7 @@ void EditorTabs::showDiff(const QString &title, const QString &diffText)
 {
     auto *view = new EditorWidget(theme_, this);
     view->setOptions(editorOptions_);
-    view->showReadOnlyText(diffText.isEmpty() ? tr("(no textual differences)") : diffText,
-                           QStringLiteral("diff"));
+    view->showReadOnlyText(diffText.isEmpty() ? tr("(no textual differences)") : diffText, QStringLiteral("diff"));
     const int index = addTab(view, title);
     updateTabIcon(view);
     setCurrentIndex(index);
@@ -311,8 +310,7 @@ QList<QWidget *> EditorTabs::pagesUnder(const QString &path) const
     QList<QWidget *> pages;
     for (int i = 0; i < count(); ++i) {
         const QString filePath = filePathOf(widget(i));
-        if (!filePath.isEmpty()
-            && (filePath == absolutePath || filePath.startsWith(absolutePath + QLatin1Char('/'))))
+        if (!filePath.isEmpty() && (filePath == absolutePath || filePath.startsWith(absolutePath + QLatin1Char('/'))))
             pages.append(widget(i));
     }
     return pages;
@@ -461,9 +459,8 @@ std::optional<CodeFormatter::Command> EditorTabs::formatterFor(EditorWidget *edi
     if (!command && !quiet) {
         const QString name = QFileInfo(path).fileName();
         const QString candidates = CodeFormatter::describeCandidates(editor->languageId(), path);
-        emit statusMessage(candidates.isEmpty()
-                               ? tr("No formatter for %1").arg(name)
-                               : tr("Cannot format %1: install %2").arg(name, candidates));
+        emit statusMessage(candidates.isEmpty() ? tr("No formatter for %1").arg(name)
+                                                : tr("Cannot format %1: install %2").arg(name, candidates));
     }
     return command;
 }
@@ -498,19 +495,18 @@ void EditorTabs::formatEditor(EditorWidget *editor, bool quiet, bool saveAfter)
 
     formatting_.insert(editor, saveAfter);
     const QString text = editor->text();
-    CodeFormatter::start(
-        *command, QFileInfo(editor->filePath()).absolutePath(), text, this,
-        [this, editor, guard = QPointer<EditorWidget>(editor), text, quiet](const std::optional<QString> &formatted,
-                                                                             const QString &error) {
-            const bool save = formatting_.take(editor);
-            if (!guard)
-                return; // tab closed meanwhile
-            // Typed while the formatter ran: the result no longer applies.
-            if (editor->text() == text)
-                applyFormatted(editor, formatted, error, quiet);
-            if (save)
-                writeEditor(editor);
-        });
+    CodeFormatter::start(*command, QFileInfo(editor->filePath()).absolutePath(), text, this,
+                         [this, editor, guard = QPointer<EditorWidget>(editor), text,
+                          quiet](const std::optional<QString> &formatted, const QString &error) {
+                             const bool save = formatting_.take(editor);
+                             if (!guard)
+                                 return; // tab closed meanwhile
+                             // Typed while the formatter ran: the result no longer applies.
+                             if (editor->text() == text)
+                                 applyFormatted(editor, formatted, error, quiet);
+                             if (save)
+                                 writeEditor(editor);
+                         });
 }
 
 bool EditorTabs::saveEditor(EditorWidget *editor)
@@ -534,15 +530,34 @@ bool EditorTabs::startSaving(EditorWidget *editor)
     return true;
 }
 
+void EditorTabs::applyFormatterStyle(EditorWidget *editor)
+{
+    if (editor->filePath().isEmpty() || !ClangFormatStyle::appliesTo(editor->languageId()))
+        return;
+    // The editor receives the answer: closed meanwhile, it gets none.
+    ClangFormatStyle::load(editor->filePath(), editor, [editor](std::optional<ClangFormatStyle::Style> style) {
+        if (!style)
+            return; // clang-format missing: the default indentation stays
+        editor->setIndentationStyle(style->useTabs, style->useTabs ? style->tabWidth : style->indentWidth);
+        editor->showColumnLimit(style->columnLimit);
+    });
+}
+
 bool EditorTabs::writeEditor(EditorWidget *editor)
 {
     QString error;
     if (!editor->save(&error)) {
-        QMessageBox::warning(this, tr("Cannot Save File"),
-                             tr("Could not save %1:\n%2").arg(editor->filePath(), error));
+        QMessageBox::warning(this, tr("Cannot Save File"), tr("Could not save %1:\n%2").arg(editor->filePath(), error));
         return false;
     }
-    emit statusMessage(tr("%1 saved").arg(QFileInfo(editor->filePath()).fileName()));
+    const QString fileName = QFileInfo(editor->filePath()).fileName();
+    emit statusMessage(tr("%1 saved").arg(fileName));
+    const bool isClangFormatConfig =
+        fileName == QLatin1String(".clang-format") || fileName == QLatin1String("_clang-format");
+    if (isClangFormatConfig) {
+        for (EditorWidget *other : editors())
+            applyFormatterStyle(other);
+    }
     emit fileSaved(editor->filePath());
     return true;
 }
@@ -552,8 +567,7 @@ bool EditorTabs::saveDiagram(DiagramView *view)
 #ifdef DUET_WITH_DIAGRAMS
     QString error;
     if (!view->save(&error)) {
-        QMessageBox::warning(this, tr("Cannot Save File"),
-                             tr("Could not save %1:\n%2").arg(view->filePath(), error));
+        QMessageBox::warning(this, tr("Cannot Save File"), tr("Could not save %1:\n%2").arg(view->filePath(), error));
         return false;
     }
     emit statusMessage(tr("%1 saved").arg(QFileInfo(view->filePath()).fileName()));
@@ -576,8 +590,7 @@ bool EditorTabs::closeTab(int index, bool askToSave)
     auto *editor = editorIn(widget(index));
     if (askToSave && editor && editor->isModified()) {
         const auto answer = QMessageBox::question(
-            this, tr("Unsaved Changes"),
-            tr("Save changes to %1?").arg(QFileInfo(editor->filePath()).fileName()),
+            this, tr("Unsaved Changes"), tr("Save changes to %1?").arg(QFileInfo(editor->filePath()).fileName()),
             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
         if (answer == QMessageBox::Cancel || (answer == QMessageBox::Save && !saveEditor(editor)))
             return false;
@@ -586,8 +599,7 @@ bool EditorTabs::closeTab(int index, bool askToSave)
     if (auto *diagram = qobject_cast<DiagramView *>(widget(index))) {
         if (askToSave && diagram->isModified()) {
             const auto answer = QMessageBox::question(
-                this, tr("Unsaved Changes"),
-                tr("Save changes to %1?").arg(QFileInfo(diagram->filePath()).fileName()),
+                this, tr("Unsaved Changes"), tr("Save changes to %1?").arg(QFileInfo(diagram->filePath()).fileName()),
                 QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
             if (answer == QMessageBox::Cancel || (answer == QMessageBox::Save && !saveDiagram(diagram)))
                 return false;
@@ -644,11 +656,9 @@ void EditorTabs::showTabContextMenu(const QPoint &pos)
 
     QMenu menu(this);
     menu.addAction(tr("Close"), this, [this, clickedPage] { closeTabs({clickedPage}); });
-    menu.addAction(tr("Close Other Tabs"), this, [this, others] { closeTabs(others); })
-        ->setEnabled(!others.isEmpty());
+    menu.addAction(tr("Close Other Tabs"), this, [this, others] { closeTabs(others); })->setEnabled(!others.isEmpty());
     menu.addSeparator();
-    menu.addAction(tr("Close Tabs to the Left"), this, [this, left] { closeTabs(left); })
-        ->setEnabled(!left.isEmpty());
+    menu.addAction(tr("Close Tabs to the Left"), this, [this, left] { closeTabs(left); })->setEnabled(!left.isEmpty());
     menu.addAction(tr("Close Tabs to the Right"), this, [this, right] { closeTabs(right); })
         ->setEnabled(!right.isEmpty());
     menu.addSeparator();
@@ -679,12 +689,11 @@ void EditorTabs::syncWithDisk(const QString &path)
             return; // our own save, or identical content
         if (diagram->isModified()) {
             pathsBeingResolved_.insert(diagram->filePath());
-            const auto answer = QMessageBox::question(
-                this, tr("File Modified on Disk"),
-                tr("%1 was modified on disk, but you have unsaved changes.\n\n"
-                   "Reload the file? Your changes will be lost.")
-                    .arg(name),
-                QMessageBox::Yes | QMessageBox::No);
+            const auto answer = QMessageBox::question(this, tr("File Modified on Disk"),
+                                                      tr("%1 was modified on disk, but you have unsaved changes.\n\n"
+                                                         "Reload the file? Your changes will be lost.")
+                                                          .arg(name),
+                                                      QMessageBox::Yes | QMessageBox::No);
             pathsBeingResolved_.remove(diagram->filePath());
             if (answer != QMessageBox::Yes)
                 return;
@@ -712,12 +721,12 @@ void EditorTabs::syncWithDisk(const QString &path)
 
     if (editor->isModified()) {
         pathsBeingResolved_.insert(editor->filePath());
-        const auto answer = QMessageBox::question(
-            this, tr("File Modified on Disk"),
-            tr("%1 was modified on disk, but you have unsaved changes.\n\n"
-               "Reload the file? Your changes will be lost (Ctrl+Z brings them back).")
-                .arg(name),
-            QMessageBox::Yes | QMessageBox::No);
+        const auto answer =
+            QMessageBox::question(this, tr("File Modified on Disk"),
+                                  tr("%1 was modified on disk, but you have unsaved changes.\n\n"
+                                     "Reload the file? Your changes will be lost (Ctrl+Z brings them back).")
+                                      .arg(name),
+                                  QMessageBox::Yes | QMessageBox::No);
         pathsBeingResolved_.remove(editor->filePath());
         if (answer != QMessageBox::Yes)
             return;
@@ -768,9 +777,9 @@ void EditorTabs::updateTabIcon(QWidget *page)
         return;
     const QString path = filePathOf(page);
     const QString iconName = page->property("iconName").toString();
-    setTabIcon(index, !path.isEmpty() ? FileIcons::file(QFileInfo(path).fileName(), theme_.isDark)
-                                      : UiIcons::icon(iconName.isEmpty() ? QStringLiteral("diff") : iconName,
-                                                      theme_.mutedText));
+    setTabIcon(index, !path.isEmpty()
+                          ? FileIcons::file(QFileInfo(path).fileName(), theme_.isDark)
+                          : UiIcons::icon(iconName.isEmpty() ? QStringLiteral("diff") : iconName, theme_.mutedText));
 }
 
 void EditorTabs::applyTheme(const Theme &theme)

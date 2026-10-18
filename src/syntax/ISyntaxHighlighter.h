@@ -17,5 +17,5 @@ public:
 
     // Brings work deferred after an edit (fold levels) up to date, before
     // a command that relies on it.
-    virtual void flush() {}
+    virtual void flush() { }
 };

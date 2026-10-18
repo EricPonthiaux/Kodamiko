@@ -61,7 +61,8 @@ QString nameError(const QString &name)
         if (c == QLatin1Char(' '))
             return QObject::tr("A branch name cannot contain spaces.");
         if (isForbidden(c))
-            return QObject::tr("A branch name cannot contain \"%1\".").arg(c.unicode() < 0x20 ? QStringLiteral("\\t") : QString(c));
+            return QObject::tr("A branch name cannot contain \"%1\".")
+                .arg(c.unicode() < 0x20 ? QStringLiteral("\\t") : QString(c));
     }
     if (name.startsWith(QLatin1Char('-')))
         return QObject::tr("A branch name cannot start with \"-\".");
@@ -103,18 +104,19 @@ QString sanitizedName(const QString &typed)
 
 QStringList local(const QString &workDir)
 {
-    const QByteArray output = Git::run(
-        workDir, {QStringLiteral("for-each-ref"), QStringLiteral("--format=%(refname:short)"), QStringLiteral("refs/heads")});
+    const QByteArray output =
+        Git::run(workDir, {QStringLiteral("for-each-ref"), QStringLiteral("--format=%(refname:short)"),
+                           QStringLiteral("refs/heads")});
     return QString::fromUtf8(output).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
 }
 
 QList<BranchInfo> list(const QString &workDir)
 {
-    const QByteArray output = Git::run(
-        workDir, {QStringLiteral("for-each-ref"),
-                  QStringLiteral("--format=%(refname)%00%(refname:short)%00%(HEAD)%00%(upstream:short)%00"
-                                 "%(upstream:track,nobracket)%00%(committerdate:unix)%00%(contents:subject)"),
-                  QStringLiteral("refs/heads"), QStringLiteral("refs/remotes")});
+    const QByteArray output =
+        Git::run(workDir, {QStringLiteral("for-each-ref"),
+                           QStringLiteral("--format=%(refname)%00%(refname:short)%00%(HEAD)%00%(upstream:short)%00"
+                                          "%(upstream:track,nobracket)%00%(committerdate:unix)%00%(contents:subject)"),
+                           QStringLiteral("refs/heads"), QStringLiteral("refs/remotes")});
     QList<BranchInfo> branches;
     for (const QByteArray &line : output.split('\n')) {
         const QList<QByteArray> fields = line.split('\0');
@@ -173,15 +175,17 @@ void detach(const RepositoryInfo &repository, const QString &id)
 
 void rename(const RepositoryInfo &repository, const QString &name, const QString &newName)
 {
-    Git::run(repository.workDir, {QStringLiteral("branch"), QStringLiteral("--move"), QStringLiteral("--"), name, newName});
+    Git::run(repository.workDir,
+             {QStringLiteral("branch"), QStringLiteral("--move"), QStringLiteral("--"), name, newName});
 }
 
 void remove(const RepositoryInfo &repository, const QString &name, bool force)
 {
     try {
-        Git::run(repository.workDir,
-                 {QStringLiteral("branch"), force ? QStringLiteral("-D") : QStringLiteral("-d"), QStringLiteral("--"), name},
-                 {}, Git::englishMessages());
+        Git::run(
+            repository.workDir,
+            {QStringLiteral("branch"), force ? QStringLiteral("-D") : QStringLiteral("-d"), QStringLiteral("--"), name},
+            {}, Git::englishMessages());
     } catch (const GitError &error) {
         if (error.message().contains(QLatin1String("not fully merged"))) {
             throw GitError(QObject::tr("The branch %1 has commits that are in no other branch").arg(name),
@@ -194,7 +198,8 @@ void remove(const RepositoryInfo &repository, const QString &name, bool force)
 void removeRemote(const RepositoryInfo &repository, const QString &name, const Git::Feedback &feedback)
 {
     Git::run(repository.workDir,
-             {QStringLiteral("push"), QStringLiteral("--progress"), remoteOf(name), QStringLiteral("--delete"), nameOnRemote(name)},
+             {QStringLiteral("push"), QStringLiteral("--progress"), remoteOf(name), QStringLiteral("--delete"),
+              nameOnRemote(name)},
              Git::RunOptions{{}, {}, feedback});
 }
 

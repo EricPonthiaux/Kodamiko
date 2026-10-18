@@ -22,8 +22,7 @@ QFont interfaceFont();
 // and spaced by `letterSpacing` pixels; and again whenever the application
 // font changes (Preferences ▸ Appearance), which a font set once would not
 // follow.
-void setInterfaceFont(QWidget *widget, qreal scale, QFont::Weight weight = QFont::DemiBold,
-                      qreal letterSpacing = 0);
+void setInterfaceFont(QWidget *widget, qreal scale, QFont::Weight weight = QFont::DemiBold, qreal letterSpacing = 0);
 
 // The code font at `pointSize`, without programming ligatures.
 QFont codeFont(qreal pointSize);
@@ -50,9 +49,9 @@ constexpr qreal maximumLineHeight = 2.2;
 // Code fonts that read well, offered first in Preferences ▸ Appearance;
 // none is embedded.
 struct RecommendedFont {
-    QString name;          // as shown
-    QStringList families;  // the names it is installed under
-    QString url;           // where to get it
+    QString name;         // as shown
+    QStringList families; // the names it is installed under
+    QString url;          // where to get it
 };
 QList<RecommendedFont> recommendedFonts();
 // The family `font` is installed under, or an empty string.

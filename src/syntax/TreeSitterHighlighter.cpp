@@ -58,8 +58,7 @@ void TreeSitterHighlighter::attach(QsciScintilla *editor)
     // of the deleted text can no longer be computed.
     const long eventMask = editor_->SendScintilla(QsciScintillaBase::SCI_GETMODEVENTMASK);
     editor_->SendScintilla(QsciScintillaBase::SCI_SETMODEVENTMASK,
-                           eventMask | QsciScintillaBase::SC_MOD_INSERTTEXT
-                               | QsciScintillaBase::SC_MOD_BEFOREDELETE);
+                           eventMask | QsciScintillaBase::SC_MOD_INSERTTEXT | QsciScintillaBase::SC_MOD_BEFOREDELETE);
 
     connect(editor_, &QsciScintillaBase::SCN_MODIFIED, this, &TreeSitterHighlighter::onModified);
     connect(editor_, &QsciScintillaBase::SCN_STYLENEEDED, this, &TreeSitterHighlighter::onStyleNeeded);
@@ -81,8 +80,8 @@ void TreeSitterHighlighter::applyTheme(const Theme &theme)
     editor_->recolor();
 }
 
-void TreeSitterHighlighter::onModified(int position, int modificationType, const char *, int length, int,
-                                       int, int, int, int, int)
+void TreeSitterHighlighter::onModified(int position, int modificationType, const char *, int length, int, int, int, int,
+                                       int, int)
 {
     // Without a tree, the next parse will be a full one: nothing to apply.
     if (!tree_)
@@ -199,8 +198,7 @@ void TreeSitterHighlighter::styleRange(int start, int end)
         const char style = styleOfCapture_[capture.index];
         if (style == 0 || !query.matchSatisfiesPredicates(match, text))
             continue;
-        spans.push_back({ts_node_start_byte(capture.node), ts_node_end_byte(capture.node), match.pattern_index,
-                         style});
+        spans.push_back({ts_node_start_byte(capture.node), ts_node_end_byte(capture.node), match.pattern_index, style});
     }
 
     std::stable_sort(spans.begin(), spans.end(), [](const StyledSpan &a, const StyledSpan &b) {
@@ -232,8 +230,7 @@ TSPoint TreeSitterHighlighter::pointAt(int position) const
 const char *TreeSitterHighlighter::documentText() const
 {
     // The pointer stays valid until the next modification of the text.
-    return static_cast<const char *>(
-        editor_->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
+    return static_cast<const char *>(editor_->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
 }
 
 int TreeSitterHighlighter::documentLength() const

@@ -1,5 +1,5 @@
-#include "terminal/TerminalWidget.h"
 #include "terminal/IPty.h"
+#include "terminal/TerminalWidget.h"
 
 #include <QImage>
 #include <QScrollBar>
@@ -57,7 +57,8 @@ private slots:
         QTest::qWait(500);
 
         QImage image(widget.viewport()->size(), QImage::Format_ARGB32_Premultiplied);
-        QBENCHMARK {
+        QBENCHMARK
+        {
             widget.viewport()->render(&image);
         }
 #endif

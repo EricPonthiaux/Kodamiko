@@ -70,10 +70,12 @@ bool loadInto(Board &board, const QByteArray &content, document::Loaded *loaded 
 EntityShape *addTable(Board &board, const QString &id, qreal x, qreal y, const QString &name,
                       const QStringList &attributes)
 {
-    Shape *s = board.addShape(QStringLiteral("entity"),
-                              QJsonObject{{QStringLiteral("id"), id}, {QStringLiteral("x"), x}, {QStringLiteral("y"), y},
-                                          {QStringLiteral("name"), name},
-                                          {QStringLiteral("attributes"), toJsonArray(attributes)}});
+    Shape *s =
+        board.addShape(QStringLiteral("entity"), QJsonObject{{QStringLiteral("id"), id},
+                                                             {QStringLiteral("x"), x},
+                                                             {QStringLiteral("y"), y},
+                                                             {QStringLiteral("name"), name},
+                                                             {QStringLiteral("attributes"), toJsonArray(attributes)}});
     return dynamic_cast<EntityShape *>(s);
 }
 
@@ -90,14 +92,14 @@ struct CustomerOrder {
         board.setFamily(&families::dataModel());
         customer = addTable(board, QStringLiteral("customer"), 10, 20, QStringLiteral("CUSTOMER"),
                             {QStringLiteral("uuid id PK"), QStringLiteral("string email UK")});
-        order = addTable(board, QStringLiteral("order"), 500, 70, QStringLiteral("ORDER"),
-                         {QStringLiteral("uuid id PK"), QStringLiteral("uuid customer_id FK"),
-                          QStringLiteral("decimal total")});
-        relation = dynamic_cast<RelationshipLink *>(board.addLink(
-            QStringLiteral("relationship"), customer->id, order->id,
-            QJsonObject{{QStringLiteral("fromCard"), QStringLiteral("||")},
-                        {QStringLiteral("toCard"), QStringLiteral("o{")},
-                        {QStringLiteral("label"), QStringLiteral("passe")}}));
+        order = addTable(
+            board, QStringLiteral("order"), 500, 70, QStringLiteral("ORDER"),
+            {QStringLiteral("uuid id PK"), QStringLiteral("uuid customer_id FK"), QStringLiteral("decimal total")});
+        relation = dynamic_cast<RelationshipLink *>(
+            board.addLink(QStringLiteral("relationship"), customer->id, order->id,
+                          QJsonObject{{QStringLiteral("fromCard"), QStringLiteral("||")},
+                                      {QStringLiteral("toCard"), QStringLiteral("o{")},
+                                      {QStringLiteral("label"), QStringLiteral("passe")}}));
     }
 };
 
@@ -140,7 +142,8 @@ private slots:
         QVERIFY(model.warnings.isEmpty());
         QVERIFY(jsonStrings(model.nodes[0].props, QStringLiteral("attributes"))
                     .contains(QStringLiteral("string email UK \"Adresse de connexion\"")));
-        QVERIFY(jsonStrings(model.nodes[1].props, QStringLiteral("attributes")).contains(QStringLiteral("uuid customer_id FK")));
+        QVERIFY(jsonStrings(model.nodes[1].props, QStringLiteral("attributes"))
+                    .contains(QStringLiteral("uuid customer_id FK")));
         QCOMPARE(model.meta.value(QStringLiteral("rankdir")).toString(), QStringLiteral("LR"));
 
         Board board;
@@ -163,7 +166,8 @@ private slots:
         QStringList keys;
         for (const Model::Node &node : model.nodes)
             keys.append(node.key);
-        QCOMPARE(keys, (QStringList{QStringLiteral("ÉTABLISSEMENT"), QStringLiteral("CLIENT"), QStringLiteral("COMMANDE")}));
+        QCOMPARE(keys,
+                 (QStringList{QStringLiteral("ÉTABLISSEMENT"), QStringLiteral("CLIENT"), QStringLiteral("COMMANDE")}));
         QCOMPARE(jsonStrings(model.nodes[0].props, QStringLiteral("attributes")),
                  (QStringList{QStringLiteral("uuid id PK"), QStringLiteral("string nom")}));
         QStringList links;
@@ -180,7 +184,8 @@ private slots:
                                                  "  CUSTOMER |o..|{ ORDER : \"may place\"\n  this is nonsense\n"));
         QCOMPARE(model.nodes.size(), 4);
         QCOMPARE(model.nodes[0].props.value(QStringLiteral("name")).toString(), QStringLiteral("Customer account"));
-        QCOMPARE(jsonStrings(model.nodes[3].props, QStringLiteral("attributes")), QStringList{QStringLiteral("uuid id PK")});
+        QCOMPARE(jsonStrings(model.nodes[3].props, QStringLiteral("attributes")),
+                 QStringList{QStringLiteral("uuid id PK")});
         QCOMPARE(model.links.size(), 1);
         const QJsonObject link = model.links[0].props;
         QCOMPARE(link.value(QStringLiteral("fromCard")).toString(), QStringLiteral("|o"));
@@ -217,10 +222,10 @@ private slots:
 
         Board board;
         board.setFamily(&families::dataModel());
-        EntityShape *table = addTable(board, QStringLiteral("t"), 0, 0, QStringLiteral("CUSTOMER"),
-                                      {QStringLiteral("uuid id PK"),
-                                       QStringLiteral("varchar(255) email UK \"Adresse de connexion\""),
-                                       QStringLiteral("uuid account_id FK")});
+        EntityShape *table =
+            addTable(board, QStringLiteral("t"), 0, 0, QStringLiteral("CUSTOMER"),
+                     {QStringLiteral("uuid id PK"), QStringLiteral("varchar(255) email UK \"Adresse de connexion\""),
+                      QStringLiteral("uuid account_id FK")});
         QVERIFY(table);
         const QList<Field> &fields = table->databaseFields();
         QCOMPARE(fields[1].constraints, QStringList{QStringLiteral("UK")});
@@ -248,7 +253,7 @@ private slots:
         QVERIFY(ends);
         QCOMPARE(ends->from.column, QStringLiteral("customer_id"));
         QCOMPARE(ends->to.column, QStringLiteral("id"));
-        QCOMPARE(ends->fromShape, f.order);   // the FK column is the source
+        QCOMPARE(ends->fromShape, f.order);  // the FK column is the source
         QCOMPARE(ends->toShape, f.customer); // the head reaches the referenced table
         QCOMPARE(ends->from.point, *f.order->columnAnchor(QStringLiteral("customer_id"), true));
         QCOMPARE(ends->to.point, *f.customer->columnAnchor(QStringLiteral("id"), false));
@@ -334,12 +339,10 @@ private slots:
     {
         Board board;
         board.setFamily(&families::dataModel());
-        EntityShape *source =
-            addTable(board, QStringLiteral("source"), 0, 0, QStringLiteral("SOURCE"),
-                     {QStringLiteral("uuid id PK"), QStringLiteral("uuid owner_id FK")});
-        EntityShape *target =
-            addTable(board, QStringLiteral("target"), 500, 0, QStringLiteral("TARGET"),
-                     {QStringLiteral("uuid id PK"), QStringLiteral("uuid public_id UK")});
+        EntityShape *source = addTable(board, QStringLiteral("source"), 0, 0, QStringLiteral("SOURCE"),
+                                       {QStringLiteral("uuid id PK"), QStringLiteral("uuid owner_id FK")});
+        EntityShape *target = addTable(board, QStringLiteral("target"), 500, 0, QStringLiteral("TARGET"),
+                                       {QStringLiteral("uuid id PK"), QStringLiteral("uuid public_id UK")});
         auto *relation = dynamic_cast<RelationshipLink *>(
             board.addLink(QStringLiteral("relationship"), source->id, target->id,
                           QJsonObject{{QStringLiteral("fromPort"), QStringLiteral("owner_id")},
@@ -351,10 +354,11 @@ private slots:
         QCOMPARE(relation->toJson().value(QStringLiteral("toColumn")).toString(), QStringLiteral("public_id"));
 
         // The FK comment names the referenced column.
-        EntityShape *line = addTable(board, QStringLiteral("line"), 0, 300, QStringLiteral("order_lines"),
-                                     {QStringLiteral("uuid id PK"), QStringLiteral("uuid product FK \"references target.public_id\"")});
-        auto *reference = dynamic_cast<RelationshipLink *>(
-            board.addLink(QStringLiteral("relationship"), target->id, line->id, {}));
+        EntityShape *line =
+            addTable(board, QStringLiteral("line"), 0, 300, QStringLiteral("order_lines"),
+                     {QStringLiteral("uuid id PK"), QStringLiteral("uuid product FK \"references target.public_id\"")});
+        auto *reference =
+            dynamic_cast<RelationshipLink *>(board.addLink(QStringLiteral("relationship"), target->id, line->id, {}));
         const RelationshipLink::Endpoints referenced = reference->relationshipEndpoints(*target, *line);
         QCOMPARE(referenced.fromShape, line);
         QCOMPARE(referenced.fromColumn, QStringLiteral("product"));
@@ -367,7 +371,8 @@ private slots:
         QStringList ids;
         for (const Property &p : f.relation->properties())
             ids.append(p.id);
-        QCOMPARE(ids, (QStringList{QStringLiteral("fromCard"), QStringLiteral("toCard"), QStringLiteral("identifying")}));
+        QCOMPARE(ids,
+                 (QStringList{QStringLiteral("fromCard"), QStringLiteral("toCard"), QStringLiteral("identifying")}));
         f.relation->setPropertyValue(QStringLiteral("toCard"), QStringLiteral("|{"));
         f.relation->setPropertyValue(QStringLiteral("identifying"), false);
         QCOMPARE(f.relation->propertyValue(QStringLiteral("toCard")).toString(), QStringLiteral("|{"));
@@ -463,7 +468,8 @@ private slots:
 
         // Undo and redo rebuild the shapes from their JSON.
         const QString before = document::source(third, codec());
-        third.edit([&] { dynamic_cast<EntityShape *>(byKey(third, QStringLiteral("ORDER")))->attributes.append("int n"); });
+        third.edit(
+            [&] { dynamic_cast<EntityShape *>(byKey(third, QStringLiteral("ORDER")))->attributes.append("int n"); });
         QVERIFY(document::source(third, codec()) != before);
         third.undo();
         QCOMPARE(document::source(third, codec()), before);

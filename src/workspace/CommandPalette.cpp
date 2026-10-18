@@ -44,7 +44,6 @@ void collect(const QMenu *menu, const QString &prefix, QList<QPair<QString, QAct
 CommandPalette::CommandPalette(QWidget *parent)
     : OverlayPopup(QStringLiteral("commandPalette"), QSizeF(0.45, 0.55), QSize(560, 360), parent)
 {
-
     search_ = new QLineEdit(this);
     search_->setPlaceholderText(tr("Type a command"));
     search_->setClearButtonEnabled(true);
@@ -125,7 +124,8 @@ void CommandPalette::filter()
     list_->clear();
     for (const auto &[score, index] : matches) {
         const Command &command = commands_[index];
-        auto *item = new QTreeWidgetItem(list_, {command.name, command.action->shortcut().toString(QKeySequence::NativeText)});
+        auto *item =
+            new QTreeWidgetItem(list_, {command.name, command.action->shortcut().toString(QKeySequence::NativeText)});
         item->setData(0, Qt::UserRole, QVariant::fromValue(index));
         item->setForeground(1, palette().brush(QPalette::Disabled, QPalette::Text));
         item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);

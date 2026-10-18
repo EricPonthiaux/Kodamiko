@@ -8,8 +8,8 @@ namespace {
 
 QByteArray hunkHeader(int oldStart, int oldCount, int newStart, int newCount, const QByteArray &heading)
 {
-    return "@@ -" + QByteArray::number(oldStart) + ',' + QByteArray::number(oldCount) + " +"
-           + QByteArray::number(newStart) + ',' + QByteArray::number(newCount) + " @@" + heading;
+    return "@@ -" + QByteArray::number(oldStart) + ',' + QByteArray::number(oldCount) + " +" +
+           QByteArray::number(newStart) + ',' + QByteArray::number(newCount) + " @@" + heading;
 }
 
 // First line number of one side of a hunk: git writes the preceding line
@@ -167,7 +167,8 @@ QByteArray FilePatch::partial(const PatchSelection &selection, PatchDirection di
     // The side the patch applies to (the old one forward, the new one in
     // reverse) is kept as is; only the other side changes.
     const auto hasLine = [this](const char *start) {
-        return std::any_of(header.begin(), header.end(), [start](const QByteArray &line) { return line.startsWith(start); });
+        return std::any_of(header.begin(), header.end(),
+                           [start](const QByteArray &line) { return line.startsWith(start); });
     };
     const bool fileMustStay = !complete && (forward ? hasLine("deleted file mode") : hasLine("new file mode"));
     QList<QByteArray> out = fileMustStay ? keepFileHeader(header) : header;
@@ -176,8 +177,9 @@ QByteArray FilePatch::partial(const PatchSelection &selection, PatchDirection di
     for (int i = 0; i < hunks.size(); ++i) {
         const DiffHunk &hunk = hunks[i];
         const QSet<int> chosen = selection.value(i);
-        const bool hasChange = std::any_of(chosen.begin(), chosen.end(),
-                                           [&hunk](int line) { return line < hunk.lines.size() && hunk.isChange(line); });
+        const bool hasChange = std::any_of(chosen.begin(), chosen.end(), [&hunk](int line) {
+            return line < hunk.lines.size() && hunk.isChange(line);
+        });
         if (!hasChange)
             continue;
 

@@ -26,10 +26,11 @@ QString writeIcon(const QString &name, const QString &svg)
 
 QString crossIcon(const QString &name, const QColor &color)
 {
-    return writeIcon(name, QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'>"
-                                          "<path d='M4.5 4.5l7 7M11.5 4.5l-7 7' stroke='%1' stroke-width='1.6' "
-                                          "stroke-linecap='round'/></svg>")
-                               .arg(color.name()));
+    return writeIcon(
+        name, QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'>"
+                             "<path d='M4.5 4.5l7 7M11.5 4.5l-7 7' stroke='%1' stroke-width='1.6' "
+                             "stroke-linecap='round'/></svg>")
+                  .arg(color.name()));
 }
 
 } // namespace
@@ -132,20 +133,13 @@ QComboBox::drop-down { border: none; width: 18px; }
 QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; selection-background-color: @highlight; outline: 0; }
 )");
     const QList<std::pair<QString, QColor>> colors = {
-        {"@accentText", theme.accentText},
-        {"@accent", theme.accent},
-        {"@text", theme.foreground},
-        {"@muted", theme.mutedText},
-        {"@window", theme.window},
-        {"@panel", theme.alternateBase},
-        {"@base", theme.background},
-        {"@button", theme.button},
-        {"@border", theme.border},
-        {"@line", theme.line},
-        {"@hover", theme.hover},
-        {"@selection", theme.selection},
-        {"@highlight", theme.highlight},
-        {"@grad1", theme.gradientStart},
+        {"@accentText", theme.accentText}, {"@accent", theme.accent},
+        {"@text", theme.foreground},       {"@muted", theme.mutedText},
+        {"@window", theme.window},         {"@panel", theme.alternateBase},
+        {"@base", theme.background},       {"@button", theme.button},
+        {"@border", theme.border},         {"@line", theme.line},
+        {"@hover", theme.hover},           {"@selection", theme.selection},
+        {"@highlight", theme.highlight},   {"@grad1", theme.gradientStart},
         {"@grad2", theme.gradientEnd},
     };
     for (const auto &[name, color] : colors)
@@ -154,7 +148,8 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
     const QString cross = crossIcon(QStringLiteral("close-%1.svg").arg(theme.name), theme.mutedText);
     const QString crossHover = crossIcon(QStringLiteral("close-%1-hover.svg").arg(theme.name), Qt::white);
     if (!cross.isEmpty() && !crossHover.isEmpty())
-        sheet += QStringLiteral("QTabBar::close-button { image: url(%1); subcontrol-position: right; border-radius: 4px; margin: 1px 0 1px 6px; }\n"
+        sheet += QStringLiteral("QTabBar::close-button { image: url(%1); subcontrol-position: right; border-radius: "
+                                "4px; margin: 1px 0 1px 6px; }\n"
                                 "QTabBar::close-button:hover { image: url(%2); background: %3; }\n")
                      .arg(cross, crossHover, theme.highlight.name());
     return sheet;

@@ -48,9 +48,9 @@ QStringList normalizedItems(const QStringList &values)
 
 const QStringList &sections()
 {
-    static const QStringList list{QStringLiteral("emotions"),     QStringLiteral("problem"),  QStringLiteral("users"),
-                                  QStringLiteral("value"),        QStringLiteral("capabilities"),
-                                  QStringLiteral("journeys"),     QStringLiteral("unknowns")};
+    static const QStringList list{
+        QStringLiteral("emotions"),     QStringLiteral("problem"),  QStringLiteral("users"),   QStringLiteral("value"),
+        QStringLiteral("capabilities"), QStringLiteral("journeys"), QStringLiteral("unknowns")};
     return list;
 }
 
@@ -165,8 +165,8 @@ void ProductVisionShape::draw(QPainter &painter, const Board &board, const Shape
     const Style &style = board.style();
     const Tones &tones = style.tones;
     const QHash<QString, QColor> fills{
-        {QStringLiteral("problem"), tones.warm},  {QStringLiteral("emotions"), tones.rose},
-        {QStringLiteral("users"), tones.cool},    {QStringLiteral("value"), tones.sage},
+        {QStringLiteral("problem"), tones.warm},      {QStringLiteral("emotions"), tones.rose},
+        {QStringLiteral("users"), tones.cool},        {QStringLiteral("value"), tones.sage},
         {QStringLiteral("capabilities"), tones.cool}, {QStringLiteral("journeys"), tones.sage},
         {QStringLiteral("unknowns"), tones.rose},
     };
@@ -234,8 +234,7 @@ void ProductVisionLink::draw(QPainter &painter, const Board &board, bool selecte
     // The arrows stay in the background of the cards, the central one less
     // so; a color chosen by the user is shown as is.
     painter.save();
-    painter.setOpacity(painter.opacity()
-                       * (!customColor.isEmpty() ? 1 : selected ? .9 : isCentral(board) ? .72 : .38));
+    painter.setOpacity(painter.opacity() * (!customColor.isEmpty() ? 1 : selected ? .9 : isCentral(board) ? .72 : .38));
     Link::draw(painter, board, selected);
     painter.restore();
 }

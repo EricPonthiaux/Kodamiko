@@ -34,7 +34,11 @@ public:
 
 private:
     struct Predicate {
-        enum class Kind { Equals, Matches, AnyOf };
+        enum class Kind {
+            Equals,
+            Matches,
+            AnyOf
+        };
         Kind kind;
         bool negated = false;
         uint32_t captureId = 0;

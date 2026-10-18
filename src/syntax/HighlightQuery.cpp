@@ -5,13 +5,20 @@ namespace {
 QString errorTypeName(TSQueryError error)
 {
     switch (error) {
-    case TSQueryErrorSyntax: return QStringLiteral("syntax");
-    case TSQueryErrorNodeType: return QStringLiteral("unknown node type");
-    case TSQueryErrorField: return QStringLiteral("unknown field");
-    case TSQueryErrorCapture: return QStringLiteral("unknown capture");
-    case TSQueryErrorStructure: return QStringLiteral("impossible structure");
-    case TSQueryErrorLanguage: return QStringLiteral("incompatible language version");
-    default: return QStringLiteral("error");
+    case TSQueryErrorSyntax:
+        return QStringLiteral("syntax");
+    case TSQueryErrorNodeType:
+        return QStringLiteral("unknown node type");
+    case TSQueryErrorField:
+        return QStringLiteral("unknown field");
+    case TSQueryErrorCapture:
+        return QStringLiteral("unknown capture");
+    case TSQueryErrorStructure:
+        return QStringLiteral("impossible structure");
+    case TSQueryErrorLanguage:
+        return QStringLiteral("incompatible language version");
+    default:
+        return QStringLiteral("error");
     }
 }
 
@@ -37,8 +44,7 @@ HighlightQuery::HighlightQuery(const TSLanguage *language, const QByteArray &sou
 {
     uint32_t errorOffset = 0;
     TSQueryError errorType = TSQueryErrorNone;
-    query_ = ts_query_new(language, source.constData(), static_cast<uint32_t>(source.size()), &errorOffset,
-                          &errorType);
+    query_ = ts_query_new(language, source.constData(), static_cast<uint32_t>(source.size()), &errorOffset, &errorType);
     if (!query_) {
         const QByteArray context = source.mid(errorOffset, 60);
         errorMessage_ = QStringLiteral("%1 at byte %2: %3")
@@ -97,8 +103,8 @@ void HighlightQuery::compilePredicates()
             const TSQueryPredicateStep *arguments = operatorStep + 1;
             first = done + 1;
 
-            if (operatorStep->type != TSQueryPredicateStepTypeString || argumentCount < 2
-                || arguments[0].type != TSQueryPredicateStepTypeCapture)
+            if (operatorStep->type != TSQueryPredicateStepTypeString || argumentCount < 2 ||
+                arguments[0].type != TSQueryPredicateStepTypeCapture)
                 continue;
 
             const QString op = stringValue(operatorStep->value_id);
@@ -139,8 +145,7 @@ bool HighlightQuery::matchSatisfiesPredicates(const TSQueryMatch &match, const c
     return true;
 }
 
-bool HighlightQuery::isSatisfied(const Predicate &predicate, const TSQueryMatch &match,
-                                 const char *documentText) const
+bool HighlightQuery::isSatisfied(const Predicate &predicate, const TSQueryMatch &match, const char *documentText) const
 {
     const std::optional<TSNode> node = capturedNode(match, predicate.captureId);
     if (!node)

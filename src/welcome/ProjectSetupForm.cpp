@@ -87,10 +87,10 @@ void ProjectSetupForm::build(Card &card)
     QWidget *enabledRow =
         settings->addRow(tr("Use %1").arg(ProjectLanguages::title(card.family)), QStringLiteral(" "), card.enabled);
     card.evidence = enabledRow->findChild<QLabel *>(QStringLiteral("settingsDescription"));
-    card.rows = {settings->addRow(runtimeLabel(card.family), runtimeDescription(card.family), card.runtime),
-                 settings->addRow(tr("Language server"), tr("Completes members, imports, signatures."), card.server),
-                 settings->addRow(tr("Server version"), tr("Downloaded by Duet, or the one in your PATH."),
-                                  card.serverVersion)};
+    card.rows = {
+        settings->addRow(runtimeLabel(card.family), runtimeDescription(card.family), card.runtime),
+        settings->addRow(tr("Language server"), tr("Completes members, imports, signatures."), card.server),
+        settings->addRow(tr("Server version"), tr("Downloaded by Duet, or the one in your PATH."), card.serverVersion)};
     layout_->addWidget(settings);
 
     const QString family = card.family;
@@ -189,7 +189,8 @@ void ProjectSetupForm::fillRuntimes(Card &card, const LanguageSetup &setup)
     int selected = -1;
     if (card.family == QLatin1String("cpp")) {
         for (const QString &standard : ToolCatalog::runtimeVersions(card.family))
-            card.runtime->addItem(QString(standard).replace(QLatin1String("c++"), QLatin1String("C++")), item(standard));
+            card.runtime->addItem(QString(standard).replace(QLatin1String("c++"), QLatin1String("C++")),
+                                  item(standard));
         selected = card.runtime->findData(item(setup.runtimeVersion));
     } else if (card.family == QLatin1String("python")) {
         QList<RuntimeInstall> pythons = toolchains_->runtimes(QStringLiteral("python"));
@@ -197,8 +198,8 @@ void ProjectSetupForm::fillRuntimes(Card &card, const LanguageSetup &setup)
             return python.executable == setup.runtimePath;
         });
         if (!setup.runtimePath.isEmpty() && !listed)
-            pythons.prepend({QStringLiteral("python"), setup.runtimeVersion, QFileInfo(setup.runtimePath).absolutePath(),
-                             setup.runtimePath, false});
+            pythons.prepend({QStringLiteral("python"), setup.runtimeVersion,
+                             QFileInfo(setup.runtimePath).absolutePath(), setup.runtimePath, false});
         for (const RuntimeInstall &python : std::as_const(pythons)) {
             QString where = QDir::toNativeSeparators(python.executable);
             if (!project_.path.isEmpty() && python.executable.startsWith(project_.path + QLatin1Char('/')))
@@ -231,7 +232,7 @@ void ProjectSetupForm::fillRuntimes(Card &card, const LanguageSetup &setup)
                   [](const QString &a, const QString &b) { return a.toInt() > b.toInt(); });
         for (const QString &version : std::as_const(versions)) {
             const std::optional<RuntimeInstall> found = toolchains_->runtime(tool, version);
-            const QString state = !found       ? tr("will download")
+            const QString state = !found           ? tr("will download")
                                   : found->managed ? tr("downloaded")
                                                    : tr("on this machine");
             card.runtime->addItem(tr("%1 %2 — %3").arg(spec ? spec->title : tool, version, state), item(version));

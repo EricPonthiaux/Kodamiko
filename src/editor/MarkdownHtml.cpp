@@ -33,9 +33,8 @@ QString octicon(const QString &name, const QString &classes)
     if (it == icons.constEnd())
         it = icons.insert(name, resource(QStringLiteral(":/markdown/octicons/%1-16.svg").arg(name)).trimmed());
     QString svg = it.value();
-    svg.replace(QLatin1String("<svg "),
-                QStringLiteral("<svg class=\"octicon octicon-%1%2\" aria-hidden=\"true\" ")
-                    .arg(name, classes.isEmpty() ? QString() : QLatin1Char(' ') + classes));
+    svg.replace(QLatin1String("<svg "), QStringLiteral("<svg class=\"octicon octicon-%1%2\" aria-hidden=\"true\" ")
+                                            .arg(name, classes.isEmpty() ? QString() : QLatin1Char(' ') + classes));
     return svg;
 }
 
@@ -82,7 +81,8 @@ QString highlightedCode(const QString &code, const QString &languageId, CodeColo
         if (pl.isEmpty())
             continue;
         html += code.mid(position, span.start - position).toHtmlEscaped();
-        html += QStringLiteral("<span class=\"%1\">%2</span>").arg(pl, code.mid(span.start, span.length).toHtmlEscaped());
+        html +=
+            QStringLiteral("<span class=\"%1\">%2</span>").arg(pl, code.mid(span.start, span.length).toHtmlEscaped());
         position = span.start + span.length;
     }
     return html + code.mid(position).toHtmlEscaped();
@@ -115,9 +115,10 @@ QString headingHtml(cmark_node *node, cmark_llist *extensions, QHash<QString, in
         anchor += QStringLiteral("-%1").arg(seen);
     QString html = render(node, extensions);
     static const QRegularExpression opening(QStringLiteral("^<h([1-6])>"));
-    html.replace(opening, QStringLiteral("<h\\1 dir=\"auto\"><a id=\"%1\" class=\"anchor\" aria-hidden=\"true\" tabindex=\"-1\" "
-                                         "href=\"#%1\">%2</a>")
-                              .arg(anchor.toHtmlEscaped(), octicon(QStringLiteral("link"), {})));
+    html.replace(opening,
+                 QStringLiteral("<h\\1 dir=\"auto\"><a id=\"%1\" class=\"anchor\" aria-hidden=\"true\" tabindex=\"-1\" "
+                                "href=\"#%1\">%2</a>")
+                     .arg(anchor.toHtmlEscaped(), octicon(QStringLiteral("link"), {})));
     return html;
 }
 
@@ -146,7 +147,8 @@ QString alertHtml(cmark_node *node, cmark_llist *extensions)
         return {};
     // The marker alone on its line.
     cmark_node *after = cmark_node_next(marker);
-    if (after && cmark_node_get_type(after) != CMARK_NODE_SOFTBREAK && cmark_node_get_type(after) != CMARK_NODE_LINEBREAK)
+    if (after && cmark_node_get_type(after) != CMARK_NODE_SOFTBREAK &&
+        cmark_node_get_type(after) != CMARK_NODE_LINEBREAK)
         return {};
     const QString text = QString::fromUtf8(cmark_node_get_literal(marker)).trimmed();
     const Alert *alert = nullptr;
@@ -174,7 +176,8 @@ QString alertHtml(cmark_node *node, cmark_llist *extensions)
 // cmark-gfm writes task items plainly; GitHub adds classes its style sheet uses.
 void addTaskListClasses(QString &html)
 {
-    static const QRegularExpression item(QStringLiteral("<li><input type=\"checkbox\"( checked=\"\")? disabled=\"\" />"));
+    static const QRegularExpression item(
+        QStringLiteral("<li><input type=\"checkbox\"( checked=\"\")? disabled=\"\" />"));
     html.replace(item, QStringLiteral("<li class=\"task-list-item\"><input type=\"checkbox\" "
                                       "class=\"task-list-item-checkbox\"\\1 disabled=\"\" />"));
     static const QRegularExpression list(QStringLiteral("<ul>(\\s*<li class=\"task-list-item\">)"));
@@ -257,8 +260,8 @@ QString body(const QString &markdown, CodeColorizer *colorizer)
     for (cmark_event_type event; (event = cmark_iter_next(iter)) != CMARK_EVENT_DONE;) {
         cmark_node *node = cmark_iter_get_node(iter);
         const cmark_node_type type = cmark_node_get_type(node);
-        if (event == CMARK_EVENT_ENTER
-            && (type == CMARK_NODE_CODE_BLOCK || type == CMARK_NODE_HEADING || type == CMARK_NODE_BLOCK_QUOTE))
+        if (event == CMARK_EVENT_ENTER &&
+            (type == CMARK_NODE_CODE_BLOCK || type == CMARK_NODE_HEADING || type == CMARK_NODE_BLOCK_QUOTE))
             nodes.push_back(node);
     }
     cmark_iter_free(iter);
@@ -301,12 +304,12 @@ QString page(const QString &body, bool dark)
     const QString css = resource(dark ? QStringLiteral(":/markdown/github-markdown-css/github-markdown-dark.css")
                                       : QStringLiteral(":/markdown/github-markdown-css/github-markdown-light.css"));
     // The layout github-markdown-css recommends, on GitHub's page color.
-    const QString layout = QStringLiteral(
-                               "html, body { margin: 0; background-color: %1; }\n"
-                               ".markdown-body { box-sizing: border-box; min-width: 200px; max-width: 980px; "
-                               "margin: 0 auto; padding: 45px; }\n"
-                               "@media (max-width: 767px) { .markdown-body { padding: 15px; } }\n")
-                               .arg(pageColor(dark));
+    const QString layout =
+        QStringLiteral("html, body { margin: 0; background-color: %1; }\n"
+                       ".markdown-body { box-sizing: border-box; min-width: 200px; max-width: 980px; "
+                       "margin: 0 auto; padding: 45px; }\n"
+                       "@media (max-width: 767px) { .markdown-body { padding: 15px; } }\n")
+            .arg(pageColor(dark));
     return QStringLiteral("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\">\n"
                           "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; "
                           "img-src file: data: https: http:; style-src 'unsafe-inline'; font-src file: data:\">\n"

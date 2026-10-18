@@ -39,9 +39,9 @@ const QHash<QString, QString> &snapshotIdentity()
 
 QStringList refsNewestFirst(const RepositoryInfo &repository)
 {
-    return QString::fromUtf8(Git::run(repository.workDir,
-                                      {QStringLiteral("for-each-ref"), QStringLiteral("--sort=-refname"),
-                                       QStringLiteral("--format=%(refname)"), refPrefix}))
+    return QString::fromUtf8(
+               Git::run(repository.workDir, {QStringLiteral("for-each-ref"), QStringLiteral("--sort=-refname"),
+                                             QStringLiteral("--format=%(refname)"), refPrefix}))
         .split(QLatin1Char('\n'), Qt::SkipEmptyParts);
 }
 
@@ -56,9 +56,10 @@ void prune(const RepositoryInfo &repository)
 // addition).
 QStringList changedPaths(const RepositoryInfo &repository)
 {
-    const QStringList fields = Git::splitNul(Git::run(
-        repository.workDir, {QStringLiteral("--no-optional-locks"), QStringLiteral("status"), QStringLiteral("--porcelain=v1"), QStringLiteral("-z"),
-                             QStringLiteral("--untracked-files=all"), QStringLiteral("--no-renames")}));
+    const QStringList fields = Git::splitNul(
+        Git::run(repository.workDir,
+                 {QStringLiteral("--no-optional-locks"), QStringLiteral("status"), QStringLiteral("--porcelain=v1"),
+                  QStringLiteral("-z"), QStringLiteral("--untracked-files=all"), QStringLiteral("--no-renames")}));
     QStringList paths;
     for (const QString &field : fields) {
         if (field.size() > 3)
@@ -113,7 +114,8 @@ QString createSnapshot(const RepositoryInfo &repository, const QString &reason, 
     if (!paths.isEmpty()) {
         const QSet<QString> tracked = [&] {
             const QStringList list = Git::splitNul(
-                Git::run(repository.workDir, QStringList{QStringLiteral("ls-files"), QStringLiteral("-z"), QStringLiteral("--")} + paths,
+                Git::run(repository.workDir,
+                         QStringList{QStringLiteral("ls-files"), QStringLiteral("-z"), QStringLiteral("--")} + paths,
                          {}, environment));
             return QSet<QString>(list.begin(), list.end());
         }();
@@ -123,17 +125,19 @@ QString createSnapshot(const RepositoryInfo &repository, const QString &reason, 
                 existing.append(path);
         }
         if (!existing.isEmpty())
-            Git::run(repository.workDir, QStringList{QStringLiteral("add"), QStringLiteral("-A"), QStringLiteral("--")} + existing,
-                     {}, environment);
+            Git::run(repository.workDir,
+                     QStringList{QStringLiteral("add"), QStringLiteral("-A"), QStringLiteral("--")} + existing, {},
+                     environment);
     }
-    const QString tree = QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("write-tree")}, {}, environment)).trimmed();
+    const QString tree =
+        QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("write-tree")}, {}, environment)).trimmed();
 
     if (skipIfUnchanged) {
         const QStringList refs = refsNewestFirst(repository);
         if (!refs.isEmpty()) {
-            const QString previous = QString::fromUtf8(Git::run(repository.workDir,
-                                                                {QStringLiteral("log"), QStringLiteral("-1"),
-                                                                 QStringLiteral("--format=%T%n%B"), refs.first()}));
+            const QString previous =
+                QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("log"), QStringLiteral("-1"),
+                                                                QStringLiteral("--format=%T%n%B"), refs.first()}));
             const QString previousTree = previous.section(QLatin1Char('\n'), 0, 0);
             Snapshot last;
             parseMessage(previous.section(QLatin1Char('\n'), 1), last);
@@ -181,9 +185,9 @@ void adoptLegacySnapshots(git_repository *repository)
             continue;
         const Ptr<git_reference> referenceGuard(reference);
         git_reference *renamed = nullptr;
-        if (git_reference_rename(&renamed, reference, (refPrefix + name.mid(legacyRefPrefix.size())).toUtf8().constData(),
-                                 0, "Snapshot of Enlumine, renamed Duet")
-            == 0)
+        if (git_reference_rename(&renamed, reference,
+                                 (refPrefix + name.mid(legacyRefPrefix.size())).toUtf8().constData(), 0,
+                                 "Snapshot of Enlumine, renamed Duet") == 0)
             git_reference_free(renamed);
     }
 }
@@ -194,14 +198,14 @@ void restorePaths(const RepositoryInfo &repository, const QString &commitId, con
 {
     if (paths.isEmpty())
         return;
-    const QStringList inSnapshot = Git::splitNul(Git::run(
-        repository.workDir, QStringList{QStringLiteral("ls-tree"), QStringLiteral("-r"), QStringLiteral("-z"),
-                                        QStringLiteral("--name-only"), commitId, QStringLiteral("--")}
-                                + paths));
+    const QStringList inSnapshot = Git::splitNul(
+        Git::run(repository.workDir, QStringList{QStringLiteral("ls-tree"), QStringLiteral("-r"), QStringLiteral("-z"),
+                                                 QStringLiteral("--name-only"), commitId, QStringLiteral("--")} +
+                                         paths));
     if (!inSnapshot.isEmpty())
         Git::run(repository.workDir, QStringList{QStringLiteral("restore"), QStringLiteral("--worktree"),
-                                                 QStringLiteral("--source=") + commitId, QStringLiteral("--")}
-                                         + inSnapshot);
+                                                 QStringLiteral("--source=") + commitId, QStringLiteral("--")} +
+                                         inSnapshot);
     for (const QString &path : paths) {
         if (!inSnapshot.contains(path))
             GitOperations::removeFile(repository.workDir, path);
@@ -264,15 +268,14 @@ QList<Snapshot> list(const QString &folder)
         parseMessage(QString::fromUtf8(git_commit_message(commit)), snapshot);
         snapshots.append(snapshot);
     }
-    std::sort(snapshots.begin(), snapshots.end(),
-              [](const Snapshot &a, const Snapshot &b) { return a.ref > b.ref; });
+    std::sort(snapshots.begin(), snapshots.end(), [](const Snapshot &a, const Snapshot &b) { return a.ref > b.ref; });
     return snapshots;
 }
 
 int restore(const RepositoryInfo &repository, const Snapshot &snapshot)
 {
-    const QString reason = QObject::tr("Before restoring the snapshot of %1")
-                               .arg(QLocale().toString(snapshot.date, QLocale::ShortFormat));
+    const QString reason =
+        QObject::tr("Before restoring the snapshot of %1").arg(QLocale().toString(snapshot.date, QLocale::ShortFormat));
     if (!snapshot.wholeWorkingTree) {
         if (snapshot.paths.isEmpty())
             return 0;
@@ -284,13 +287,12 @@ int restore(const RepositoryInfo &repository, const Snapshot &snapshot)
     // The current state, recorded whole so that the restore can be undone,
     // gives the files to put back: those that differ from the snapshot.
     const QString current = createSnapshot(repository, reason, changedPaths(repository), true, false);
-    const QStringList paths = Git::splitNul(
-        Git::run(repository.workDir, {QStringLiteral("diff-tree"), QStringLiteral("-r"), QStringLiteral("-z"),
-                                      QStringLiteral("--name-only"), QStringLiteral("--no-renames"),
-                                      snapshot.commitId, current}));
+    const QStringList paths =
+        Git::splitNul(Git::run(repository.workDir, {QStringLiteral("diff-tree"), QStringLiteral("-r"),
+                                                    QStringLiteral("-z"), QStringLiteral("--name-only"),
+                                                    QStringLiteral("--no-renames"), snapshot.commitId, current}));
     restorePaths(repository, snapshot.commitId, paths);
     return static_cast<int>(paths.size());
 }
 
 } // namespace Snapshots
-

@@ -1,8 +1,8 @@
 #include "WelcomeWindow.h"
 
-#include "projects/ProjectStore.h"
 #include "ProjectSetupForm.h"
 #include "ProjectSetupPanel.h"
+#include "projects/ProjectStore.h"
 #include "settings/Preferences.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
@@ -83,7 +83,7 @@ public:
         const QFontMetrics smallMetrics(small);
         painter->setFont(small);
         int right = text.right();
-        const QStringList chips = missing ? QStringList{QObject::tr("Folder not found")}
+        const QStringList chips = missing               ? QStringList{QObject::tr("Folder not found")}
                                   : languages.isEmpty() ? QStringList{QObject::tr("Not set up")}
                                                         : languages;
         for (auto it = chips.crbegin(); it != chips.crend(); ++it) {
@@ -104,9 +104,9 @@ public:
         bold.setWeight(QFont::DemiBold);
         painter->setFont(bold);
         painter->setPen(missing ? theme_.mutedText : theme_.foreground);
-        painter->drawText(QRect(names.left(), names.top(), names.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
-                          QFontMetrics(bold).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight,
-                                                        names.width()));
+        painter->drawText(
+            QRect(names.left(), names.top(), names.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
+            QFontMetrics(bold).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, names.width()));
         painter->setFont(option.font);
         painter->setPen(theme_.mutedText);
         painter->drawText(QRect(names.left(), names.top() + lineHeight + 4, names.width(), lineHeight),
@@ -199,8 +199,8 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     connect(list_, &QListWidget::itemActivated, this,
             [this](QListWidgetItem *item) { open(item->data(pathRole).toString()); });
     connect(list_, &QWidget::customContextMenuRequested, this, &WelcomeWindow::showContextMenu);
-    auto *footer = new QLabel(tr("Enter to open · Delete to remove from the list · right-click for the settings"),
-                              projects);
+    auto *footer =
+        new QLabel(tr("Enter to open · Delete to remove from the list · right-click for the settings"), projects);
     footer->setObjectName(QStringLiteral("footerHint"));
     auto *projectsLayout = new QVBoxLayout(projects);
     projectsLayout->setContentsMargins(24, 20, 16, 14);
@@ -270,8 +270,8 @@ void WelcomeWindow::filter(const QString &text)
     QListWidgetItem *firstShown = nullptr;
     for (int i = 0; i < list_->count(); ++i) {
         QListWidgetItem *item = list_->item(i);
-        const bool shown = text.isEmpty() || item->text().contains(text, Qt::CaseInsensitive)
-                           || item->data(pathRole).toString().contains(text, Qt::CaseInsensitive);
+        const bool shown = text.isEmpty() || item->text().contains(text, Qt::CaseInsensitive) ||
+                           item->data(pathRole).toString().contains(text, Qt::CaseInsensitive);
         item->setHidden(!shown);
         if (shown && !firstShown)
             firstShown = item;
@@ -357,13 +357,13 @@ bool WelcomeWindow::eventFilter(QObject *watched, QEvent *event)
     // From the search field, the arrows move in the list.
     if (event->type() == QEvent::KeyPress && watched == search_) {
         auto *key = static_cast<QKeyEvent *>(event);
-        if (key->key() == Qt::Key_Down || key->key() == Qt::Key_Up || key->key() == Qt::Key_PageDown
-            || key->key() == Qt::Key_PageUp) {
+        if (key->key() == Qt::Key_Down || key->key() == Qt::Key_Up || key->key() == Qt::Key_PageDown ||
+            key->key() == Qt::Key_PageUp) {
             QApplication::sendEvent(list_, key);
             return true;
         }
-        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && list_->currentItem()
-            && !list_->currentItem()->isHidden()) {
+        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && list_->currentItem() &&
+            !list_->currentItem()->isHidden()) {
             open(list_->currentItem()->data(pathRole).toString());
             return true;
         }

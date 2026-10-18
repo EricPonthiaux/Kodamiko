@@ -101,9 +101,11 @@ FilesPanel::FilesPanel(QWidget *parent)
         });
         return action;
     };
-    compactFolders_ = addOption(tr("Compact Middle Folders"), tr("“src/main/java” on one row when the folders between hold nothing else"));
+    compactFolders_ = addOption(tr("Compact Middle Folders"),
+                                tr("“src/main/java” on one row when the folders between hold nothing else"));
     nestFiles_ = addOption(tr("File Nesting"), tr("Foo.h under Foo.cpp, package-lock.json under package.json…"));
-    showIgnored_ = addOption(tr("Show Ignored Files"), tr("Files and folders ignored by git (build/, node_modules…), grayed"));
+    showIgnored_ =
+        addOption(tr("Show Ignored Files"), tr("Files and folders ignored by git (build/, node_modules…), grayed"));
     menu->setToolTipsVisible(true);
     setTreeOptions(tree_->treeOptions());
     options->setMenu(menu);

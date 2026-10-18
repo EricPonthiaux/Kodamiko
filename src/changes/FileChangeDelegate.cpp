@@ -128,7 +128,8 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     const QFontMetrics metrics(option.font);
     const int iconSize = 16;
     int x = rect.left();
-    FileIcons::file(name, isDark(option.palette)).paint(painter, QRect(x, rect.center().y() - iconSize / 2, iconSize, iconSize));
+    FileIcons::file(name, isDark(option.palette))
+        .paint(painter, QRect(x, rect.center().y() - iconSize / 2, iconSize, iconSize));
     x += iconSize + 8;
 
     // The badge at the right: a soft tile of the change's color.
@@ -165,7 +166,8 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
                 continue;
             const int width = statsMetrics.horizontalAdvance(text);
             painter->setPen(onAccent ? option.palette.color(QPalette::HighlightedText) : color);
-            painter->drawText(QRect(right - width, rect.top(), width, rect.height()), Qt::AlignRight | Qt::AlignVCenter, text);
+            painter->drawText(QRect(right - width, rect.top(), width, rect.height()), Qt::AlignRight | Qt::AlignVCenter,
+                              text);
             right -= width + 6;
         }
         right -= 4;

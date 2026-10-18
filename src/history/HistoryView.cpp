@@ -1,8 +1,8 @@
 #include "HistoryView.h"
 
+#include "CommitDelegate.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
-#include "CommitDelegate.h"
 #include "git/ChangeKindStyle.h"
 #include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
@@ -10,9 +10,9 @@
 
 #include <QApplication>
 #include <QClipboard>
-#include <QFileInfo>
 #include <QDataStream>
 #include <QDir>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -279,8 +279,8 @@ void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
         hidePanes();
         return;
     }
-    QString summary = log_->info.unborn ? tr("No commits")
-                      : log_->truncated  ? tr("Last %1 commits").arg(log_->commits.size())
+    QString summary = log_->info.unborn           ? tr("No commits")
+                      : log_->truncated           ? tr("Last %1 commits").arg(log_->commits.size())
                       : log_->commits.size() == 1 ? tr("1 commit")
                                                   : tr("%1 commits").arg(log_->commits.size());
     if (!pathFilter_.isEmpty())
@@ -326,10 +326,10 @@ void HistoryView::applyFilter()
     for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
         QTreeWidgetItem *item = commits_->topLevelItem(i);
         const CommitSummary &commit = log_->commits.at(i);
-        const bool match = text.isEmpty() || commit.summary.contains(text, Qt::CaseInsensitive)
-                           || commit.author.contains(text, Qt::CaseInsensitive)
-                           || commit.email.contains(text, Qt::CaseInsensitive) || commit.id.startsWith(text, Qt::CaseInsensitive)
-                           || commit.refs.contains(text, Qt::CaseInsensitive);
+        const bool match =
+            text.isEmpty() || commit.summary.contains(text, Qt::CaseInsensitive) ||
+            commit.author.contains(text, Qt::CaseInsensitive) || commit.email.contains(text, Qt::CaseInsensitive) ||
+            commit.id.startsWith(text, Qt::CaseInsensitive) || commit.refs.contains(text, Qt::CaseInsensitive);
         item->setHidden(!match);
     }
 }
@@ -427,22 +427,26 @@ void HistoryView::showDetails()
     message_->document()->addResource(QTextDocument::ImageResource, QUrl(QStringLiteral("avatar://author")),
                                       CommitDelegate::avatar(commit.author, 32, ratio).toImage());
     const QString body = details.message.section(QLatin1Char('\n'), 1).trimmed();
-    QString html = QStringLiteral("<table cellspacing='0' cellpadding='0'><tr>"
-                                  "<td style='padding-right:10px'><img src='avatar://author' width='32' height='32'></td>"
-                                  "<td><b>%1</b><br><span style='color:%2'>%3 · %4</span></td></tr></table>")
-                       .arg(commit.author.toHtmlEscaped(), muted, CommitDelegate::relativeDate(commit.date),
-                            formatDate(commit.date));
-    html += QStringLiteral("<p style='font-size:large; font-weight:600; margin-top:14px'>%1</p>").arg(commit.summary.toHtmlEscaped());
+    QString html =
+        QStringLiteral("<table cellspacing='0' cellpadding='0'><tr>"
+                       "<td style='padding-right:10px'><img src='avatar://author' width='32' height='32'></td>"
+                       "<td><b>%1</b><br><span style='color:%2'>%3 · %4</span></td></tr></table>")
+            .arg(commit.author.toHtmlEscaped(), muted, CommitDelegate::relativeDate(commit.date),
+                 formatDate(commit.date));
+    html += QStringLiteral("<p style='font-size:large; font-weight:600; margin-top:14px'>%1</p>")
+                .arg(commit.summary.toHtmlEscaped());
     if (!body.isEmpty())
         html += QStringLiteral("<p style='white-space:pre-wrap; margin-top:6px'>%1</p>").arg(body.toHtmlEscaped());
     html += QStringLiteral("<p style='color:%1; margin-top:12px'>").arg(muted);
     html += QStringLiteral("<span style='font-family:monospace'>%1</span> · %2")
                 .arg(commit.id.left(10), commit.email.toHtmlEscaped());
     if (!details.committer.isEmpty())
-        html += QStringLiteral("<br>") + tr("Committed by %1 on %2").arg(details.committer.toHtmlEscaped(), formatDate(details.commitDate));
+        html += QStringLiteral("<br>") +
+                tr("Committed by %1 on %2").arg(details.committer.toHtmlEscaped(), formatDate(details.commitDate));
     if (details.parentIds.size() > 1)
-        html += QStringLiteral("<br>")
-                + tr("Merge of %1 — diff against %2").arg(details.parentIds.join(QStringLiteral(", ")), details.parentIds.first());
+        html +=
+            QStringLiteral("<br>") + tr("Merge of %1 — diff against %2")
+                                         .arg(details.parentIds.join(QStringLiteral(", ")), details.parentIds.first());
     html += QStringLiteral("</p>");
     if (!commit.refs.isEmpty()) {
         html += QStringLiteral("<p>");
@@ -462,13 +466,14 @@ void HistoryView::showDetails()
         removed += patches.last().removedLines();
     }
     const bool dark = palette().color(QPalette::Base).lightness() < 128;
-    html += QStringLiteral("<p style='margin-top:12px'><span style='color:%1'>%2</span>&nbsp;&nbsp; "
-                           "<span style='color:%3; font-weight:600'>+%4</span>&nbsp; "
-                           "<span style='color:%5; font-weight:600'>−%6</span></p>")
-                .arg(muted,
-                     details.files.size() == 1 ? tr("1 file changed") : tr("%1 files changed").arg(details.files.size()),
-                     dark ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37"), QString::number(added),
-                     dark ? QStringLiteral("#f85149") : QStringLiteral("#cf222e"), QString::number(removed));
+    html +=
+        QStringLiteral("<p style='margin-top:12px'><span style='color:%1'>%2</span>&nbsp;&nbsp; "
+                       "<span style='color:%3; font-weight:600'>+%4</span>&nbsp; "
+                       "<span style='color:%5; font-weight:600'>−%6</span></p>")
+            .arg(muted,
+                 details.files.size() == 1 ? tr("1 file changed") : tr("%1 files changed").arg(details.files.size()),
+                 dark ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37"), QString::number(added),
+                 dark ? QStringLiteral("#f85149") : QStringLiteral("#cf222e"), QString::number(removed));
     message_->setHtml(html);
     // Once the pane is laid out.
     QTimer::singleShot(0, this, &HistoryView::fitMessage);
@@ -503,8 +508,7 @@ void HistoryView::showCommitMenu(const QPoint &position)
     const CommitSummary &commit = log_->commits.at(commits_->indexOfTopLevelItem(item));
     QMenu menu;
     menu.addAction(tr("Copy ID"), this, [id = commit.id] { QApplication::clipboard()->setText(id); });
-    menu.addAction(tr("Copy Short ID"), this,
-                   [id = commit.shortId] { QApplication::clipboard()->setText(id); });
+    menu.addAction(tr("Copy Short ID"), this, [id = commit.shortId] { QApplication::clipboard()->setText(id); });
     menu.addAction(tr("Copy Summary"), this,
                    [summary = commit.summary] { QApplication::clipboard()->setText(summary); });
     menu.addSeparator();

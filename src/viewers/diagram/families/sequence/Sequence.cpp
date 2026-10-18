@@ -22,11 +22,11 @@ constexpr qreal lineHeight = 20;
 constexpr qreal pad = 14;
 constexpr qreal maxWidth = 320;
 
-constexpr qreal messageStep = 44;   // vertical distance between consecutive messages
-constexpr qreal lifelineTail = 28;  // lifeline overshoot below the last message
-constexpr qreal selfLoopWidth = 56; // horizontal reach of a self-message loop
+constexpr qreal messageStep = 44;    // vertical distance between consecutive messages
+constexpr qreal lifelineTail = 28;   // lifeline overshoot below the last message
+constexpr qreal selfLoopWidth = 56;  // horizontal reach of a self-message loop
 constexpr qreal selfLoopHeight = 18; // vertical drop of a self-message loop
-constexpr qreal portAnchorGap = 14; // the link handle right under the header
+constexpr qreal portAnchorGap = 14;  // the link handle right under the header
 constexpr qreal fragmentHeader = 24; // room a fragment's header reserves
 constexpr qreal branchHeader = 22;   // room a branch separator reserves
 
@@ -242,10 +242,11 @@ QList<Fragment> syncFragments(QStringList &out, const QList<Fragment> &active, c
         const Fragment &before = active[i], &after = next[i];
         if (sameBranch(before, after))
             continue;
-        const QString keyword = !after.branchKeyword.isEmpty() ? after.branchKeyword
+        const QString keyword = !after.branchKeyword.isEmpty()                           ? after.branchKeyword
                                 : parallelBranches && after.kind == QLatin1String("par") ? QStringLiteral("and")
-                                                                                          : QStringLiteral("else");
-        out.append(indent + keyword + (after.branchLabel.isEmpty() ? QString() : QLatin1Char(' ') + text(after.branchLabel)));
+                                                                                         : QStringLiteral("else");
+        out.append(indent + keyword +
+                   (after.branchLabel.isEmpty() ? QString() : QLatin1Char(' ') + text(after.branchLabel)));
     }
     return next;
 }
@@ -387,7 +388,9 @@ void ParticipantShape::draw(QPainter &painter, const Board &board, const ShapeSt
 
     if (isActor()) {
         const QColor custom = parseColor(customFill);
-        const QColor color = state.selected ? style.shape.selectedStroke : custom.isValid() ? custom : style.palette.border;
+        const QColor color = state.selected     ? style.shape.selectedStroke
+                             : custom.isValid() ? custom
+                                                : style.palette.border;
         QPainterPath figure = ellipse(QPointF(cx(), y + 11), 7, 7);
         figure.moveTo(cx(), y + 18);
         figure.lineTo(cx(), y + 38);
@@ -518,8 +521,8 @@ std::optional<Route> MessageLink::route(const Board &board) const
     r.a = QPointF(a->cx(), lane);
     if (from == to) {
         r.b = QPointF(a->cx(), lane + selfLoopHeight);
-        r.points = {r.a, QPointF(a->cx() + selfLoopWidth, lane), QPointF(a->cx() + selfLoopWidth, lane + selfLoopHeight),
-                    r.b};
+        r.points = {r.a, QPointF(a->cx() + selfLoopWidth, lane),
+                    QPointF(a->cx() + selfLoopWidth, lane + selfLoopHeight), r.b};
         return r;
     }
     r.b = QPointF(b->cx(), lane);
@@ -669,9 +672,7 @@ void arrange(Board &board)
     const Font labelFont(board.style().linkLabel.fontPx);
     constexpr qreal minGap = 70;
     QList<qreal> gaps(std::max<qsizetype>(parts.size() - 1, 0), minGap);
-    const auto spanOf = [&](const MessageLink *l) {
-        return std::abs(index.value(l->from, 0) - index.value(l->to, 0));
-    };
+    const auto spanOf = [&](const MessageLink *l) { return std::abs(index.value(l->from, 0) - index.value(l->to, 0)); };
     QList<const MessageLink *> bySpan = list;
     std::stable_sort(bySpan.begin(), bySpan.end(),
                      [&](const MessageLink *a, const MessageLink *b) { return spanOf(a) < spanOf(b); });
@@ -679,7 +680,8 @@ void arrange(Board &board)
         if (!index.contains(l->from) || !index.contains(l->to))
             continue;
         const int i = index.value(l->from), j = index.value(l->to);
-        const qreal labelWidth = l->label.isEmpty() ? 0 : text::width(labelFont, l->label.section(QLatin1Char('\n'), 0, 0)) + 30;
+        const qreal labelWidth =
+            l->label.isEmpty() ? 0 : text::width(labelFont, l->label.section(QLatin1Char('\n'), 0, 0)) + 30;
         if (i == j) {
             const qreal need = selfLoopWidth + labelWidth + 20;
             if (i < gaps.size())
@@ -768,8 +770,12 @@ const Family &sequence()
         f.autoArrange = arrange;
         f.drawUnderlay = drawFragments;
         const auto preset = [](const char *id, const QString &label, const QString &text, const char *kind) {
-            return ElementPreset{QString::fromLatin1(id), label, {}, QStringLiteral("participant"),
-                                 QJsonObject{{QStringLiteral("text"), text}, {QStringLiteral("kind"), QLatin1String(kind)}}};
+            return ElementPreset{
+                QString::fromLatin1(id),
+                label,
+                {},
+                QStringLiteral("participant"),
+                QJsonObject{{QStringLiteral("text"), text}, {QStringLiteral("kind"), QLatin1String(kind)}}};
         };
         f.elements = {
             preset("sequence-participant", tr("Participant"), tr("New participant"), "participant"),

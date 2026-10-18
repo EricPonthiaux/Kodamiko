@@ -170,8 +170,9 @@ QString databaseFieldText(const Field &field)
 {
     // Mermaid separates several keys with commas (`PK, FK`).
     QStringList parts;
-    for (const QString &part : {field.type, field.name, field.constraints.join(QStringLiteral(", ")),
-                                field.comment.isEmpty() ? QString() : QLatin1Char('"') + field.comment + QLatin1Char('"')}) {
+    for (const QString &part :
+         {field.type, field.name, field.constraints.join(QStringLiteral(", ")),
+          field.comment.isEmpty() ? QString() : QLatin1Char('"') + field.comment + QLatin1Char('"')}) {
         if (!part.isEmpty())
             parts.append(part);
     }
@@ -194,9 +195,11 @@ EntityShape::EntityShape()
 void EntityShape::load(const QJsonObject &props)
 {
     Shape::load(props);
-    name = jsonString(props, QStringLiteral("name"), jsonString(props, QStringLiteral("text"), QStringLiteral("TABLE")));
-    const QStringList raw = props.contains(QStringLiteral("attributes")) ? jsonStrings(props, QStringLiteral("attributes"))
-                                                                         : jsonStrings(props, QStringLiteral("fields"));
+    name =
+        jsonString(props, QStringLiteral("name"), jsonString(props, QStringLiteral("text"), QStringLiteral("TABLE")));
+    const QStringList raw = props.contains(QStringLiteral("attributes"))
+                                ? jsonStrings(props, QStringLiteral("attributes"))
+                                : jsonStrings(props, QStringLiteral("fields"));
     attributes.clear();
     for (const QString &line : raw)
         attributes.append(databaseFieldText(line));
@@ -328,7 +331,8 @@ std::optional<Port> EntityShape::connectionPortAt(const Board &, QPointF point) 
     if (fields.isEmpty())
         return std::nullopt;
     const qreal top = y + headerH + columnsH;
-    const qsizetype index = std::clamp<qsizetype>(qsizetype(std::floor((point.y() - top) / rowH)), 0, fields.size() - 1);
+    const qsizetype index =
+        std::clamp<qsizetype>(qsizetype(std::floor((point.y() - top) / rowH)), 0, fields.size() - 1);
     const Field &field = fields[index];
     const QPointF anchor = *columnAnchor(field.name, point.x() < cx());
     return Port{anchor.x(), anchor.y(), field.name};
@@ -442,7 +446,8 @@ void EntityShape::draw(QPainter &painter, const Board &board, const ShapeState &
     const qreal keysX = typeX + typeW_;
     painter.fillRect(QRectF(x, y + headerH, w, columnsH), fillColor(style.tones.data));
     const qreal headerMiddle = y + headerH + columnsH / 2;
-    text::draw(painter, headerFont, tr("COLUMN"), QPointF(nameX, headerMiddle), mutedInk, Align::Left, Baseline::Middle);
+    text::draw(painter, headerFont, tr("COLUMN"), QPointF(nameX, headerMiddle), mutedInk, Align::Left,
+               Baseline::Middle);
     text::draw(painter, headerFont, tr("TYPE"), QPointF(typeX, headerMiddle), mutedInk, Align::Left, Baseline::Middle);
     text::draw(painter, headerFont, tr("KEYS"), QPointF(keysX, headerMiddle), mutedInk, Align::Left, Baseline::Middle);
     for (const qreal sx : {typeX - 8, keysX - 8})
@@ -582,9 +587,8 @@ RelationshipLink::Endpoints RelationshipLink::relationshipEndpoints(const Entity
     if (selectedTo && fromForeignKey)
         return endpoint(fromShape, toShape, *fromForeignKey->field, selectedTo);
 
-    const bool useFromForeignKey =
-        fromForeignKey
-        && (!toForeignKey || fromForeignKey->score > toForeignKey->score || fromCard.contains(QLatin1Char('}')));
+    const bool useFromForeignKey = fromForeignKey && (!toForeignKey || fromForeignKey->score > toForeignKey->score ||
+                                                      fromCard.contains(QLatin1Char('}')));
     if (useFromForeignKey)
         return endpoint(fromShape, toShape, *fromForeignKey->field, nullptr);
     if (toForeignKey)
@@ -609,7 +613,8 @@ std::optional<RelationshipLink::ColumnEndpoints> RelationshipLink::columnEndpoin
     const std::optional<QPointF> b = relationship.toShape->columnAnchor(relationship.toColumn, leftToRight);
     if (!a || !b)
         return std::nullopt;
-    return ColumnEndpoints{relationship.fromShape, relationship.toShape,
+    return ColumnEndpoints{relationship.fromShape,
+                           relationship.toShape,
                            {relationship.fromColumn, !leftToRight, *a},
                            {relationship.toColumn, leftToRight, *b}};
 }
@@ -627,8 +632,9 @@ RelationshipLink::graphvizEndpoints(const Board &board, const QString &rankdir) 
     if (fromPort.isEmpty() || toPort.isEmpty())
         return std::nullopt;
     const bool reverse = rankdir == QLatin1String("RL");
-    return std::pair{GraphvizEndpoint{relationship.fromShape->id, fromPort, reverse ? QStringLiteral("w") : QStringLiteral("e")},
-                     GraphvizEndpoint{relationship.toShape->id, toPort, reverse ? QStringLiteral("e") : QStringLiteral("w")}};
+    return std::pair{
+        GraphvizEndpoint{relationship.fromShape->id, fromPort, reverse ? QStringLiteral("w") : QStringLiteral("e")},
+        GraphvizEndpoint{relationship.toShape->id, toPort, reverse ? QStringLiteral("e") : QStringLiteral("w")}};
 }
 
 std::optional<Route> RelationshipLink::route(const Board &board) const
@@ -642,7 +648,8 @@ std::optional<Route> RelationshipLink::route(const Board &board) const
     if (spline) {
         const std::optional<Route> layout = Link::route(board);
         const auto closeTo = [](QPointF p, QPointF q) { return std::hypot(p.x() - q.x(), p.y() - q.y()) <= 2; };
-        if (layout && !layout->curve.empty() && closeTo(layout->a, ends->from.point) && closeTo(layout->b, ends->to.point))
+        if (layout && !layout->curve.empty() && closeTo(layout->a, ends->from.point) &&
+            closeTo(layout->b, ends->to.point))
             return layout;
     }
     const QPointF a = ends->from.point, b = ends->to.point;
@@ -723,8 +730,8 @@ const Family &dataModel()
         f.id = QStringLiteral("datamodel");
         f.title = tr("Data model");
         f.shapes = {{QStringLiteral("entity"), [] { return std::unique_ptr<Shape>(new EntityShape); }}};
-        f.links = {{QStringLiteral("relationship"), [] { return std::unique_ptr<Link>(new RelationshipLink); }, false,
-                    true}};
+        f.links = {
+            {QStringLiteral("relationship"), [] { return std::unique_ptr<Link>(new RelationshipLink); }, false, true}};
         f.defaultShape = QStringLiteral("entity");
         f.defaultLink = QStringLiteral("relationship");
         f.cardinalities = true;

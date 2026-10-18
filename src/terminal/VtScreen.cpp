@@ -29,23 +29,39 @@ VTermModifier toVTermModifier(Qt::KeyboardModifiers modifiers)
 VTermKey toVTermKey(int key)
 {
     switch (key) {
-    case Qt::Key_Return: return VTERM_KEY_ENTER;
-    case Qt::Key_Enter: return VTERM_KEY_KP_ENTER;
+    case Qt::Key_Return:
+        return VTERM_KEY_ENTER;
+    case Qt::Key_Enter:
+        return VTERM_KEY_KP_ENTER;
     case Qt::Key_Tab:
-    case Qt::Key_Backtab: return VTERM_KEY_TAB;
-    case Qt::Key_Backspace: return VTERM_KEY_BACKSPACE;
-    case Qt::Key_Escape: return VTERM_KEY_ESCAPE;
-    case Qt::Key_Up: return VTERM_KEY_UP;
-    case Qt::Key_Down: return VTERM_KEY_DOWN;
-    case Qt::Key_Left: return VTERM_KEY_LEFT;
-    case Qt::Key_Right: return VTERM_KEY_RIGHT;
-    case Qt::Key_Insert: return VTERM_KEY_INS;
-    case Qt::Key_Delete: return VTERM_KEY_DEL;
-    case Qt::Key_Home: return VTERM_KEY_HOME;
-    case Qt::Key_End: return VTERM_KEY_END;
-    case Qt::Key_PageUp: return VTERM_KEY_PAGEUP;
-    case Qt::Key_PageDown: return VTERM_KEY_PAGEDOWN;
-    default: break;
+    case Qt::Key_Backtab:
+        return VTERM_KEY_TAB;
+    case Qt::Key_Backspace:
+        return VTERM_KEY_BACKSPACE;
+    case Qt::Key_Escape:
+        return VTERM_KEY_ESCAPE;
+    case Qt::Key_Up:
+        return VTERM_KEY_UP;
+    case Qt::Key_Down:
+        return VTERM_KEY_DOWN;
+    case Qt::Key_Left:
+        return VTERM_KEY_LEFT;
+    case Qt::Key_Right:
+        return VTERM_KEY_RIGHT;
+    case Qt::Key_Insert:
+        return VTERM_KEY_INS;
+    case Qt::Key_Delete:
+        return VTERM_KEY_DEL;
+    case Qt::Key_Home:
+        return VTERM_KEY_HOME;
+    case Qt::Key_End:
+        return VTERM_KEY_END;
+    case Qt::Key_PageUp:
+        return VTERM_KEY_PAGEUP;
+    case Qt::Key_PageDown:
+        return VTERM_KEY_PAGEDOWN;
+    default:
+        break;
     }
     if (key >= Qt::Key_F1 && key <= Qt::Key_F35)
         return static_cast<VTermKey>(VTERM_KEY_FUNCTION(key - Qt::Key_F1 + 1));
@@ -74,8 +90,8 @@ VTermScreenCell blankCell()
 
 bool isBlank(const VTermScreenCell &cell)
 {
-    return cell.chars[0] == 0 && VTERM_COLOR_IS_DEFAULT_BG(&cell.bg) && !cell.attrs.reverse
-        && cell.attrs.underline == VTERM_UNDERLINE_OFF && !cell.attrs.strike;
+    return cell.chars[0] == 0 && VTERM_COLOR_IS_DEFAULT_BG(&cell.bg) && !cell.attrs.reverse &&
+           cell.attrs.underline == VTERM_UNDERLINE_OFF && !cell.attrs.strike;
 }
 
 } // namespace

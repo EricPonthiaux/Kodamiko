@@ -38,7 +38,8 @@ void collect(const QMenu *menu, const QStringList &path, QList<Command> &result)
             continue;
         }
         if (!action->property(defaultProperty).isValid())
-            action->setProperty(defaultProperty, QKeySequence::listToString(action->shortcuts(), QKeySequence::PortableText));
+            action->setProperty(defaultProperty,
+                                QKeySequence::listToString(action->shortcuts(), QKeySequence::PortableText));
         result.append({actionPath.join(QLatin1Char('/')), actionPath.join(QStringLiteral(" ▸ ")), action,
                        parse(action->property(defaultProperty).toString())});
     }

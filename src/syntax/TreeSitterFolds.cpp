@@ -25,8 +25,8 @@ bool isBracketed(TSNode node)
         return false;
     const TSNode first = ts_node_child(node, 0);
     const TSNode last = ts_node_child(node, count - 1);
-    return (isAnonymous(first, "{") && isAnonymous(last, "}")) || (isAnonymous(first, "[") && isAnonymous(last, "]"))
-        || (isAnonymous(first, "(") && isAnonymous(last, ")"));
+    return (isAnonymous(first, "{") && isAnonymous(last, "}")) || (isAnonymous(first, "[") && isAnonymous(last, "]")) ||
+           (isAnonymous(first, "(") && isAnonymous(last, ")"));
 }
 
 bool isPreprocessorConditional(TSNode node)
@@ -84,8 +84,8 @@ std::vector<int> levels(TSNode root, int lineCount)
     int depth = 0;
     for (int line = 0; line < lineCount; ++line) {
         depth += depthChange[line];
-        result[line] = (QsciScintillaBase::SC_FOLDLEVELBASE + depth)
-                     | (isHeader[line] ? QsciScintillaBase::SC_FOLDLEVELHEADERFLAG : 0);
+        result[line] = (QsciScintillaBase::SC_FOLDLEVELBASE + depth) |
+                       (isHeader[line] ? QsciScintillaBase::SC_FOLDLEVELHEADERFLAG : 0);
     }
     return result;
 }

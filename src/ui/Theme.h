@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QColor>
 #include "AppFonts.h"
+#include <QColor>
 
 #include <QFont>
 #include <QList>
@@ -22,7 +22,7 @@ struct TextStyle {
 // Categories are named after tree-sitter captures ("keyword",
 // "string.special", "function.method"...).
 struct Theme {
-    QString name; // "duet", "dark", "purple", "light"
+    QString name;  // "duet", "dark", "purple", "light"
     QString title; // as shown in View ▸ Theme
     bool isDark = true;
     // The code font, without ligatures; its weight is the user's choice.
@@ -43,21 +43,21 @@ struct Theme {
     QColor currentLineNumber; // the caret's line, brighter than the others
     QColor braceMatch;
     QColor findHighlight; // occurrences of a search
-    QColor error;   // diagnostics' squiggles, unmatched braces
+    QColor error;         // diagnostics' squiggles, unmatched braces
     QColor warning;
 
     // Interface around the editor: the application's palette and the
     // controls' style sheet (see ThemeStyle).
-    QColor window;     // panels, menu bar, status bar
+    QColor window; // panels, menu bar, status bar
     QColor button;
     QColor alternateBase;
-    QColor highlight;  // selection in lists
-    QColor accent;     // focus, current tab, links
-    QColor accentText; // text of the current tab, of checked buttons
-    QColor mutedText;  // inactive tabs, headers, status bar
-    QColor border;     // fields, buttons, menus, scroll bar handles
-    QColor line;       // separators
-    QColor hover;      // rows under the mouse
+    QColor highlight;     // selection in lists
+    QColor accent;        // focus, current tab, links
+    QColor accentText;    // text of the current tab, of checked buttons
+    QColor mutedText;     // inactive tabs, headers, status bar
+    QColor border;        // fields, buttons, menus, scroll bar handles
+    QColor line;          // separators
+    QColor hover;         // rows under the mouse
     QColor gradientStart; // selected menu items and rows, default buttons
     QColor gradientEnd;
 

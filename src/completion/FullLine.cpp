@@ -96,12 +96,8 @@ void LocalFullLineModel::suggest(const QString &before, const QString &after, co
     } else {
         url.setPath(path + QStringLiteral("/infill"));
         body = {
-            {"input_prefix", before},
-            {"input_suffix", after},
-            {"n_predict", maxTokens},
-            {"temperature", 0},
-            {"stop", QJsonArray{"\n"}},
-            {"cache_prompt", true},
+            {"input_prefix", before}, {"input_suffix", after},    {"n_predict", maxTokens},
+            {"temperature", 0},       {"stop", QJsonArray{"\n"}}, {"cache_prompt", true},
         };
     }
     QNetworkRequest request(url);

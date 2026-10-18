@@ -162,8 +162,7 @@ void DiagramGenerationView::start()
     answer_.clear();
     answerFailed_ = false;
     pending_.clear();
-    title_->setText(
-        tr("Claude is drawing %1").arg(QDir::toNativeSeparators(QDir(workDir_).relativeFilePath(path_))));
+    title_->setText(tr("Claude is drawing %1").arg(QDir::toNativeSeparators(QDir(workDir_).relativeFilePath(path_))));
     error_->hide();
     retry_->hide();
     close_->hide();
@@ -252,7 +251,7 @@ void DiagramGenerationView::onProcessFinished()
     }
     QString error = answerFailed_ ? answer_ : QString();
     if (error.isEmpty())
-        error = !answer_.isEmpty() ? tr("Claude did not write the diagram: %1").arg(answer_)
+        error = !answer_.isEmpty()       ? tr("Claude did not write the diagram: %1").arg(answer_)
                 : !errorOutput.isEmpty() ? errorOutput
                                          : tr("Claude did not write the diagram.");
     fail(error);
@@ -270,8 +269,7 @@ void DiagramGenerationView::onHookReceived(const HookEvent &event)
             continue;
         const QStringList problems = DiagramCheck::problems(path, file.readAll());
         if (!problems.isEmpty()) {
-            hookServer_.respond(
-                DiagramCheck::feedbackOutput(QDir(workDir_).relativeFilePath(path), problems));
+            hookServer_.respond(DiagramCheck::feedbackOutput(QDir(workDir_).relativeFilePath(path), problems));
             addSteps({tr("Fixing what the diagram editor could not read")});
         }
     }

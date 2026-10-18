@@ -75,8 +75,8 @@ QString familyOf(const QString &languageId)
 {
     if (languageId == QLatin1String("c") || languageId == QLatin1String("cpp"))
         return QStringLiteral("cpp");
-    if (languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript")
-        || languageId == QLatin1String("tsx"))
+    if (languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript") ||
+        languageId == QLatin1String("tsx"))
         return QStringLiteral("javascript");
     if (languageId == QLatin1String("java") || languageId == QLatin1String("python"))
         return languageId;

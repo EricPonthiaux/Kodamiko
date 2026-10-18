@@ -1,0 +1,58 @@
+# clang-format and clang-tidy for Duet's own code (src/, tests/, tools/),
+# configured by .clang-format and .clang-tidy at the root of the project.
+#
+#   cmake --build build --target format        reformats the sources
+#   cmake --build build --target format-check  fails if a source is not formatted
+#   cmake --build build --target tidy          analyzes every source
+#
+# -DDUET_CLANG_TIDY=ON also analyzes each source as it is compiled. Include
+# this file after the dependencies: they must not be analyzed.
+
+find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format)
+find_program(CLANG_TIDY_EXECUTABLE NAMES clang-tidy)
+find_program(RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy run-clang-tidy.py)
+
+file(GLOB_RECURSE duet_formatted_sources CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/src/*.h
+    ${CMAKE_SOURCE_DIR}/tests/*.cpp ${CMAKE_SOURCE_DIR}/tests/*.h
+    ${CMAKE_SOURCE_DIR}/tools/*.cpp ${CMAKE_SOURCE_DIR}/tools/*.h)
+
+if(CLANG_FORMAT_EXECUTABLE)
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXECUTABLE} -i ${duet_formatted_sources}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Formatting the sources with clang-format"
+        VERBATIM)
+    add_custom_target(format-check
+        COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror ${duet_formatted_sources}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Checking the formatting of the sources"
+        VERBATIM)
+else()
+    message(STATUS "clang-format not found: no format targets")
+endif()
+
+if(RUN_CLANG_TIDY_EXECUTABLE AND CLANG_TIDY_EXECUTABLE)
+    add_custom_target(tidy
+        COMMAND ${RUN_CLANG_TIDY_EXECUTABLE} -quiet
+            -clang-tidy-binary ${CLANG_TIDY_EXECUTABLE}
+            -p ${CMAKE_BINARY_DIR}
+            "^${CMAKE_SOURCE_DIR}/(src|tests|tools)/"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Analyzing the sources with clang-tidy"
+        VERBATIM)
+else()
+    message(STATUS "clang-tidy or run-clang-tidy not found: no tidy target")
+endif()
+
+option(DUET_CLANG_TIDY "Analyze each source with clang-tidy as it is compiled" OFF)
+if(DUET_CLANG_TIDY)
+    if(NOT CLANG_TIDY_EXECUTABLE)
+        message(FATAL_ERROR "DUET_CLANG_TIDY is ON but clang-tidy was not found")
+    endif()
+    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXECUTABLE})
+    # Files generated in the build directory (moc, rcc) are compiled too:
+    # clang-tidy reads the closest .clang-tidy, this one, and checks nothing
+    # that could fire there.
+    file(WRITE ${CMAKE_BINARY_DIR}/.clang-tidy "Checks: '-*,misc-definitions-in-headers'\n")
+endif()

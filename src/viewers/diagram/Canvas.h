@@ -113,7 +113,16 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
-    enum class Drag { None, Pan, Move, Resize, Connect, Rubber, Trace, RightPending };
+    enum class Drag {
+        None,
+        Pan,
+        Move,
+        Resize,
+        Connect,
+        Rubber,
+        Trace,
+        RightPending
+    };
     struct Guide {
         bool vertical;
         qreal value, from, to;
@@ -157,7 +166,8 @@ private:
     QHash<QString, QRectF> captureGeometry() const;
     void animateGeometry(const QHash<QString, QRectF> &before, const Camera *cameraTo = nullptr);
     // Paints with the shapes where the animation shows them.
-    template <typename Fn> void withVisualGeometry(Fn draw);
+    template <typename Fn>
+    void withVisualGeometry(Fn draw);
 
     void beginTextEdit(Shape *shape, Link *link, const TextEditSpec &spec);
     void endTextEdit(bool commit);
@@ -184,7 +194,7 @@ private:
 
     // The gesture in progress.
     Drag drag_ = Drag::None;
-    QPointF dragStart_;       // world
+    QPointF dragStart_; // world
     QPointF dragStartScreen_;
     Camera panStart_;
     bool moved_ = false;

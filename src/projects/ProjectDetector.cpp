@@ -16,14 +16,13 @@ namespace {
 // project's own sources.
 bool skipped(const QString &name)
 {
-    static const QStringList names{QStringLiteral("node_modules"), QStringLiteral("target"),
-                                   QStringLiteral("out"),          QStringLiteral("dist"),
-                                   QStringLiteral("venv"),         QStringLiteral("__pycache__"),
-                                   QStringLiteral("vendor"),       QStringLiteral("third_party"),
-                                   QStringLiteral("_deps"),        QStringLiteral("bin"),
-                                   QStringLiteral("obj")};
-    return name.startsWith(QLatin1Char('.')) || name.startsWith(QLatin1String("build"))
-           || names.contains(name, Qt::CaseInsensitive);
+    static const QStringList names{
+        QStringLiteral("node_modules"), QStringLiteral("target"),      QStringLiteral("out"),
+        QStringLiteral("dist"),         QStringLiteral("venv"),        QStringLiteral("__pycache__"),
+        QStringLiteral("vendor"),       QStringLiteral("third_party"), QStringLiteral("_deps"),
+        QStringLiteral("bin"),          QStringLiteral("obj")};
+    return name.startsWith(QLatin1Char('.')) || name.startsWith(QLatin1String("build")) ||
+           names.contains(name, Qt::CaseInsensitive);
 }
 
 // Files deeper than this are not looked at.
@@ -134,13 +133,12 @@ QString javaVersionFromPom(const QByteArray &pom)
 {
     const QString text = QString::fromUtf8(pom);
     const auto tag = [&text](const QString &name) {
-        const QRegularExpression expression(QStringLiteral("<%1>\\s*([^<\\s]+)\\s*</%1>")
-                                                .arg(QRegularExpression::escape(name)));
+        const QRegularExpression expression(
+            QStringLiteral("<%1>\\s*([^<\\s]+)\\s*</%1>").arg(QRegularExpression::escape(name)));
         return expression.match(text).captured(1);
     };
     for (const QString &name : {QStringLiteral("maven.compiler.release"), QStringLiteral("maven.compiler.source"),
-                                QStringLiteral("release"), QStringLiteral("java.version"),
-                                QStringLiteral("source")}) {
+                                QStringLiteral("release"), QStringLiteral("java.version"), QStringLiteral("source")}) {
         QString value = tag(name);
         // A property: ${java.version}.
         for (int i = 0; i < 3 && value.startsWith(QLatin1String("${")) && value.endsWith(QLatin1Char('}')); ++i)
@@ -158,7 +156,8 @@ QString javaVersionFromGradle(const QByteArray &script)
     static const QList<QRegularExpression> expressions{
         QRegularExpression(QStringLiteral(R"(JavaLanguageVersion\s*\.\s*of\s*\(\s*['"]?(\d+))")),
         QRegularExpression(QStringLiteral(R"(jvmToolchain\s*\(?\s*(\d+))")),
-        QRegularExpression(QStringLiteral(R"((?:source|target)Compatibility\s*=?\s*JavaVersion\s*\.\s*VERSION_(\d+(?:_\d+)?))")),
+        QRegularExpression(
+            QStringLiteral(R"((?:source|target)Compatibility\s*=?\s*JavaVersion\s*\.\s*VERSION_(\d+(?:_\d+)?))")),
         QRegularExpression(QStringLiteral(R"((?:source|target)Compatibility\s*=?\s*['"]?(\d+(?:\.\d+)?))")),
     };
     for (const QRegularExpression &expression : expressions) {
@@ -272,7 +271,8 @@ QList<DetectedLanguage> detect(const QString &folder)
         const int ts = count(scan, {QStringLiteral("ts"), QStringLiteral("tsx"), QStringLiteral("mts")});
         const int js = count(scan, {QStringLiteral("js"), QStringLiteral("jsx"), QStringLiteral("mjs")});
         if (javascript.evidence.isEmpty() && ts + js >= minimumSources)
-            javascript.evidence = ts >= js ? filesEvidence(ts, QStringLiteral("ts")) : filesEvidence(js, QStringLiteral("js"));
+            javascript.evidence =
+                ts >= js ? filesEvidence(ts, QStringLiteral("ts")) : filesEvidence(js, QStringLiteral("js"));
         if (!javascript.evidence.isEmpty())
             found.append(javascript);
     }
@@ -301,7 +301,8 @@ QList<DetectedLanguage> detect(const QString &folder)
         DetectedLanguage python{QStringLiteral("python"), {}, {}, {}};
         detectVirtualEnvironment(folder, python);
         if (!python.runtimePath.isEmpty())
-            python.evidence = relative(QDir::cleanPath(QFileInfo(python.runtimePath).absolutePath() + QStringLiteral("/..")));
+            python.evidence =
+                relative(QDir::cleanPath(QFileInfo(python.runtimePath).absolutePath() + QStringLiteral("/..")));
         if (const QString version = marker(QStringLiteral(".python-version")); !version.isEmpty()) {
             if (python.runtimeVersion.isEmpty())
                 python.runtimeVersion = pythonMinor(firstLine(version));

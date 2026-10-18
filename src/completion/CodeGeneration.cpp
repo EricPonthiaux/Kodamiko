@@ -91,8 +91,8 @@ CompletionItem itemOf(const QString &label, const QString &detail, const QString
 // names = new ArrayList<>(), others;" gives "names" and "others".
 QList<CodeGenerationProvider::Field> fieldsIn(const QByteArray &blanked, int brace)
 {
-    static const QSet<QString> modifiers = {"public", "protected", "private", "static", "final", "transient",
-                                            "volatile"};
+    static const QSet<QString> modifiers = {"public", "protected", "private", "static",
+                                            "final",  "transient", "volatile"};
     static const QRegularExpression annotation(QStringLiteral("@[\\w.]+(?:\\s*\\([^()]*\\))?"));
     static const QRegularExpression identifier(QStringLiteral("^[A-Za-z_$][\\w$]*$"));
     QList<CodeGenerationProvider::Field> fields;
@@ -169,8 +169,8 @@ CodeGenerationProvider::ClassSource CodeGenerationProvider::findClass(const QStr
     if (source.body >= 0 || !index_)
         return source;
     for (const SymbolLocation &symbol : index_->lookup(name)) {
-        if (symbol.kind != SymbolKind::Class && symbol.kind != SymbolKind::Struct
-            && symbol.kind != SymbolKind::Interface)
+        if (symbol.kind != SymbolKind::Class && symbol.kind != SymbolKind::Struct &&
+            symbol.kind != SymbolKind::Interface)
             continue;
         if (symbol.filePath == context.filePath)
             continue; // read above, unsaved changes included
@@ -217,9 +217,8 @@ void CodeGenerationProvider::complete(const CompletionContext &context, const Ca
     if (typedStart != context.prefixStart) {
         // Only the functions of the class typed.
         const QString scope = QString::fromUtf8(context.text.mid(typedStart, context.prefixStart - 2 - typedStart));
-        items.removeIf([&scope](const CompletionItem &item) {
-            return !item.detail.startsWith(scope + QStringLiteral("::"));
-        });
+        items.removeIf(
+            [&scope](const CompletionItem &item) { return !item.detail.startsWith(scope + QStringLiteral("::")); });
     }
     done(items, false);
 }
@@ -259,17 +258,17 @@ void CodeGenerationProvider::addOverrides(const CompletionContext &context, int 
         const bool interface = baseHeader.keyword == QLatin1String("interface");
         for (const CodeScan::Declaration &declaration : CodeScan::declarationsIn(source.blanked, source.body)) {
             const CodeScan::Function function = CodeScan::parseFunction(declaration.text);
-            if (function.name.isEmpty() || function.name == base || function.name.startsWith(QLatin1Char('~'))
-                || function.deleted || function.returnType.isEmpty())
+            if (function.name.isEmpty() || function.name == base || function.name.startsWith(QLatin1Char('~')) ||
+                function.deleted || function.returnType.isEmpty())
                 continue;
             const QStringList &specifiers = function.specifiers;
             if (java) {
-                if (specifiers.contains(QStringLiteral("static")) || specifiers.contains(QStringLiteral("private"))
-                    || specifiers.contains(QStringLiteral("final")))
+                if (specifiers.contains(QStringLiteral("static")) || specifiers.contains(QStringLiteral("private")) ||
+                    specifiers.contains(QStringLiteral("final")))
                     continue;
             } else {
-                const bool overridable = specifiers.contains(QStringLiteral("virtual"))
-                                      || function.trailing.contains(QLatin1String("override"));
+                const bool overridable = specifiers.contains(QStringLiteral("virtual")) ||
+                                         function.trailing.contains(QLatin1String("override"));
                 if (!overridable || function.trailing.contains(QLatin1String("final")))
                     continue;
             }
@@ -278,27 +277,29 @@ void CodeGenerationProvider::addOverrides(const CompletionContext &context, int 
                 continue;
             declared.insert(key); // once, from the nearest base
             const bool pure = function.pure || interface;
-            const QString call = (function.returnsValue() ? QStringLiteral("return ") : QString())
-                               + (java ? QStringLiteral("super.") : base + QStringLiteral("::")) + function.name
-                               + QLatin1Char('(') + argumentsOf(function, true) + QStringLiteral(");");
-            const QString body = pure ? QStringLiteral("\t$0") : QStringLiteral("\t") + Snippet::escape(call) + QStringLiteral("$0");
+            const QString call = (function.returnsValue() ? QStringLiteral("return ") : QString()) +
+                                 (java ? QStringLiteral("super.") : base + QStringLiteral("::")) + function.name +
+                                 QLatin1Char('(') + argumentsOf(function, true) + QStringLiteral(");");
+            const QString body =
+                pure ? QStringLiteral("\t$0") : QStringLiteral("\t") + Snippet::escape(call) + QStringLiteral("$0");
             QString code;
             if (java) {
-                QString visibility = interface || specifiers.contains(QStringLiteral("public")) ? QStringLiteral("public ")
-                                   : specifiers.contains(QStringLiteral("protected"))       ? QStringLiteral("protected ")
-                                                                                             : QString();
+                QString visibility = interface || specifiers.contains(QStringLiteral("public"))
+                                         ? QStringLiteral("public ")
+                                     : specifiers.contains(QStringLiteral("protected")) ? QStringLiteral("protected ")
+                                                                                        : QString();
                 const QString qualifiers = function.qualifiers();
-                code = QStringLiteral("@Override\n") + visibility
-                     + Snippet::escape(function.returnType + QLatin1Char(' ') + function.name + QLatin1Char('(')
-                                       + parametersOf(function) + QLatin1Char(')')
-                                       + (qualifiers.isEmpty() ? QString() : QLatin1Char(' ') + qualifiers))
-                     + QStringLiteral(" {\n") + body + QStringLiteral("\n}");
+                code = QStringLiteral("@Override\n") + visibility +
+                       Snippet::escape(function.returnType + QLatin1Char(' ') + function.name + QLatin1Char('(') +
+                                       parametersOf(function) + QLatin1Char(')') +
+                                       (qualifiers.isEmpty() ? QString() : QLatin1Char(' ') + qualifiers)) +
+                       QStringLiteral(" {\n") + body + QStringLiteral("\n}");
             } else {
                 const QString qualifiers = function.qualifiers();
-                const QString signature = function.returnType + QLatin1Char(' ') + function.name + QLatin1Char('(')
-                                        + parametersOf(function) + QLatin1Char(')')
-                                        + (qualifiers.isEmpty() ? QString() : QLatin1Char(' ') + qualifiers)
-                                        + QStringLiteral(" override");
+                const QString signature = function.returnType + QLatin1Char(' ') + function.name + QLatin1Char('(') +
+                                          parametersOf(function) + QLatin1Char(')') +
+                                          (qualifiers.isEmpty() ? QString() : QLatin1Char(' ') + qualifiers) +
+                                          QStringLiteral(" override");
                 code = definition ? Snippet::escape(signature) + QStringLiteral("\n{\n") + body + QStringLiteral("\n}")
                                   : Snippet::escape(signature) + QStringLiteral(";$0");
             }
@@ -318,9 +319,9 @@ void CodeGenerationProvider::addOverrides(const CompletionContext &context, int 
             {"hashCode", "@Override\npublic int hashCode() {\n\treturn super.hashCode();$0\n}"},
         };
         for (const auto &[name, code] : object) {
-            const QString key = QString::fromLatin1(name) + (QLatin1String(name) == QLatin1String("equals")
-                                                                   ? QStringLiteral("/1")
-                                                                   : QStringLiteral("/0"));
+            const QString key =
+                QString::fromLatin1(name) +
+                (QLatin1String(name) == QLatin1String("equals") ? QStringLiteral("/1") : QStringLiteral("/0"));
             if (declared.contains(key))
                 continue;
             items.append(itemOf(QString::fromLatin1(name), QObject::tr("override Object"),
@@ -338,13 +339,14 @@ void CodeGenerationProvider::addAccessors(const QByteArray &blanked, int brace, 
     for (const Field &field : fieldsIn(blanked, brace)) {
         // "isEnabled" for a boolean, as IntelliJ names them.
         const QString capitalized = field.name.left(1).toUpper() + field.name.mid(1);
-        const QString getter = (field.type == QLatin1String("boolean") ? QStringLiteral("is") : QStringLiteral("get"))
-                             + capitalized;
+        const QString getter =
+            (field.type == QLatin1String("boolean") ? QStringLiteral("is") : QStringLiteral("get")) + capitalized;
         const QString modifiers = field.isStatic ? QStringLiteral("public static ") : QStringLiteral("public ");
         if (!declared.contains(getter + QStringLiteral("/0"))) {
-            const QString code = Snippet::escape(modifiers + field.type + QLatin1Char(' ') + getter + QStringLiteral("() {\n\treturn ")
-                                                 + field.name + QStringLiteral(";\n}"))
-                               + QStringLiteral("$0");
+            const QString code =
+                Snippet::escape(modifiers + field.type + QLatin1Char(' ') + getter + QStringLiteral("() {\n\treturn ") +
+                                field.name + QStringLiteral(";\n}")) +
+                QStringLiteral("$0");
             CompletionItem item = itemOf(getter, QObject::tr("getter · %1 %2").arg(field.type, field.name),
                                          CodeScan::indented(code, indent, unit), getterTitle);
             item.type = field.type;
@@ -354,10 +356,10 @@ void CodeGenerationProvider::addAccessors(const QByteArray &blanked, int brace, 
         if (field.isFinal || declared.contains(setter + QStringLiteral("/1")))
             continue;
         const QString target = (field.isStatic ? className : QStringLiteral("this")) + QLatin1Char('.') + field.name;
-        const QString code = Snippet::escape(modifiers + QStringLiteral("void ") + setter + QLatin1Char('(') + field.type
-                                             + QLatin1Char(' ') + field.name + QStringLiteral(") {\n\t") + target
-                                             + QStringLiteral(" = ") + field.name + QStringLiteral(";\n}"))
-                           + QStringLiteral("$0");
+        const QString code = Snippet::escape(modifiers + QStringLiteral("void ") + setter + QLatin1Char('(') +
+                                             field.type + QLatin1Char(' ') + field.name + QStringLiteral(") {\n\t") +
+                                             target + QStringLiteral(" = ") + field.name + QStringLiteral(";\n}")) +
+                             QStringLiteral("$0");
         items.append(itemOf(setter, QObject::tr("setter · %1 %2").arg(field.type, field.name),
                             CodeScan::indented(code, indent, unit), setterTitle));
     }
@@ -400,8 +402,10 @@ void CodeGenerationProvider::addImplementations(const CompletionContext &context
     // namespaces.
     std::function<void(int, const QString &)> walk = [&](int open, const QString &scope) {
         for (const CodeScan::Declaration &declaration : CodeScan::declarationsIn(header, open)) {
-            if (declaration.text.startsWith(QLatin1String("template")) || declaration.text.startsWith(QLatin1String("friend"))
-                || declaration.access.contains(QLatin1String("signals")) || declaration.access.contains(QLatin1String("SIGNALS")))
+            if (declaration.text.startsWith(QLatin1String("template")) ||
+                declaration.text.startsWith(QLatin1String("friend")) ||
+                declaration.access.contains(QLatin1String("signals")) ||
+                declaration.access.contains(QLatin1String("SIGNALS")))
                 continue;
             if (declaration.hasBody) {
                 const CodeScan::ClassHeader nested = CodeScan::classAt(header, declaration.body);
@@ -412,18 +416,19 @@ void CodeGenerationProvider::addImplementations(const CompletionContext &context
                 continue;
             }
             const CodeScan::Function function = CodeScan::parseFunction(declaration.text);
-            if (function.name.isEmpty() || function.pure || function.deleted
-                || !function.templateParameters.isEmpty() || function.specifiers.contains(QStringLiteral("inline"))
-                || function.specifiers.contains(QStringLiteral("constexpr"))
-                || function.specifiers.contains(QStringLiteral("friend")))
+            if (function.name.isEmpty() || function.pure || function.deleted ||
+                !function.templateParameters.isEmpty() || function.specifiers.contains(QStringLiteral("inline")) ||
+                function.specifiers.contains(QStringLiteral("constexpr")) ||
+                function.specifiers.contains(QStringLiteral("friend")))
                 continue;
             if (defined.contains(scope + QStringLiteral("::") + signatureKey(function)))
                 continue;
             const QString qualified = scope.isEmpty() ? function.name : scope + QStringLiteral("::") + function.name;
             const QString qualifiers = function.qualifiers();
-            const QString signature = (function.returnType.isEmpty() ? QString() : function.returnType + QLatin1Char(' '))
-                                    + qualified + QLatin1Char('(') + parametersOf(function) + QLatin1Char(')')
-                                    + (qualifiers.isEmpty() ? QString() : QLatin1Char(' ') + qualifiers);
+            const QString signature =
+                (function.returnType.isEmpty() ? QString() : function.returnType + QLatin1Char(' ')) + qualified +
+                QLatin1Char('(') + parametersOf(function) + QLatin1Char(')') +
+                (qualifiers.isEmpty() ? QString() : QLatin1Char(' ') + qualifiers);
             const QString code = Snippet::escape(signature) + QStringLiteral("\n{\n\t$0\n}");
             // Matched by its name ("~" left out), the class in the detail.
             QString name = function.name;

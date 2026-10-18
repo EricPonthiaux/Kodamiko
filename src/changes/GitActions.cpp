@@ -106,7 +106,8 @@ void GitActions::pull()
 void GitActions::push()
 {
     runRemote(
-        tr("Push"), [](const RepositoryInfo &repository, const Git::Feedback &feedback) {
+        tr("Push"),
+        [](const RepositoryInfo &repository, const Git::Feedback &feedback) {
             return Remotes::push(repository, feedback);
         },
         [this](const GitError &error) { return onPushFailed(error); });
@@ -114,9 +115,8 @@ void GitActions::push()
 
 void GitActions::sync()
 {
-    runRemote(tr("Sync"), &Remotes::sync, [this](const GitError &error) {
-        return onPullFailed(error) || onPushFailed(error);
-    });
+    runRemote(tr("Sync"), &Remotes::sync,
+              [this](const GitError &error) { return onPullFailed(error) || onPushFailed(error); });
 }
 
 bool GitActions::onPullFailed(const GitError &error)
@@ -176,8 +176,8 @@ bool GitActions::onSwitchFailed(const GitError &error, const QString &name, bool
 {
     if (error.kind() != GitError::Kind::LocalChanges)
         return false;
-    QMessageBox box(QMessageBox::Question, tr("Switch branch"),
-                    tr("Your changes conflict with %1.").arg(name), QMessageBox::Cancel, window_);
+    QMessageBox box(QMessageBox::Question, tr("Switch branch"), tr("Your changes conflict with %1.").arg(name),
+                    QMessageBox::Cancel, window_);
     box.setInformativeText(tr("They can be put aside in a stash, then brought back on %1: the conflicts are "
                               "then left for you to resolve.")
                                .arg(name));
@@ -196,10 +196,10 @@ bool GitActions::onSwitchFailed(const GitError &error, const QString &name, bool
 
 void GitActions::checkoutCommit(const QString &id)
 {
-    if (!confirm(tr("Check Out Commit"),
-                 tr("Check out %1 without a branch? Commits made there belong to no branch until you create one.")
-                     .arg(id),
-                 tr("Check Out")))
+    if (!confirm(
+            tr("Check Out Commit"),
+            tr("Check out %1 without a branch? Commits made there belong to no branch until you create one.").arg(id),
+            tr("Check Out")))
         return;
     run(
         tr("Check out"),
@@ -210,9 +210,9 @@ void GitActions::checkoutCommit(const QString &id)
         [this, id](const GitError &error) {
             if (error.kind() != GitError::Kind::LocalChanges)
                 return false;
-            QMessageBox::warning(window_, tr("Check out"),
-                                 tr("Your changes conflict with %1: commit or stash them first.\n\n%2")
-                                     .arg(id, error.message()));
+            QMessageBox::warning(
+                window_, tr("Check out"),
+                tr("Your changes conflict with %1: commit or stash them first.\n\n%2").arg(id, error.message()));
             return true;
         });
 }
@@ -261,7 +261,8 @@ void GitActions::deleteBranch(const QString &name, bool remote)
             if (error.kind() != GitError::Kind::Unmerged)
                 return false;
             if (confirm(tr("Delete Branch"),
-                        tr("%1. Delete it anyway? Its commits will only be reachable from the reflog.").arg(error.message()),
+                        tr("%1. Delete it anyway? Its commits will only be reachable from the reflog.")
+                            .arg(error.message()),
                         tr("Delete"))) {
                 run(tr("Delete branch"), [name](const RepositoryInfo &repository) {
                     Branches::remove(repository, name, true);
@@ -354,8 +355,8 @@ void GitActions::stashChanges()
     dialog.resize(440, dialog.sizeHint().height());
     if (dialog.exec() != QDialog::Accepted)
         return;
-    run(tr("Stash"), [text = message->text().trimmed(), includeUntracked = untracked->isChecked()](
-                         const RepositoryInfo &repository) {
+    run(tr("Stash"), [text = message->text().trimmed(),
+                      includeUntracked = untracked->isChecked()](const RepositoryInfo &repository) {
         Stashes::push(repository, text, includeUntracked);
         return QObject::tr("Changes stashed");
     });
@@ -375,9 +376,9 @@ void GitActions::applyStash(int index, bool drop)
         [this](const GitError &error) {
             if (error.kind() != GitError::Kind::LocalChanges)
                 return false;
-            QMessageBox::warning(window_, tr("Stash"),
-                                 tr("Your changes conflict with the stash: commit or stash them first.\n\n%1")
-                                     .arg(error.message()));
+            QMessageBox::warning(
+                window_, tr("Stash"),
+                tr("Your changes conflict with the stash: commit or stash them first.\n\n%1").arg(error.message()));
             return true;
         });
 }

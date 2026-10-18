@@ -9,14 +9,14 @@
 #include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeLinter.h"
-#include "claude/EditorContext.h"
-#include "claude/mcp/DuetTools.h"
-#include "claude/EffectiveSettings.h"
-#include "claude/UnsavedEditGuard.h"
 #include "claude/ClaudeUsage.h"
 #include "claude/DiagramRequestPopup.h"
-#include "completion/CompletionController.h"
+#include "claude/EditorContext.h"
+#include "claude/EffectiveSettings.h"
+#include "claude/UnsavedEditGuard.h"
+#include "claude/mcp/DuetTools.h"
 #include "completion/CodeGeneration.h"
+#include "completion/CompletionController.h"
 #include "completion/CompletionService.h"
 #include "completion/DocComments.h"
 #include "completion/FullLine.h"
@@ -63,17 +63,18 @@
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
+#include "ui/TrailingLayout.h"
 #include "ui/TrailingTabButton.h"
 #include "ui/TreeMetrics.h"
 #include "ui/UiIcons.h"
 #include "ui/WindowFrame.h"
+#include "viewers/DiagramKinds.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "welcome/ProjectSetupForm.h"
 #include "workspace/CommandPalette.h"
-#include "workspace/FilesPanel.h"
 #include "workspace/FileTreeView.h"
+#include "workspace/FilesPanel.h"
 #include "workspace/SidePanel.h"
-#include "viewers/DiagramKinds.h"
 #ifdef DUET_WITH_DIAGRAMS
 #include "viewers/DiagramCheck.h"
 #include "viewers/DiagramGenerationView.h"
@@ -84,9 +85,10 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QDebug>
 #include <QDir>
-#include <QFileDialog>
 #include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -113,6 +115,8 @@
 #include <QWidgetAction>
 
 #include <algorithm>
+#include <array>
+#include <ranges>
 
 namespace {
 
@@ -154,6 +158,118 @@ QIcon activityIcon(ClaudeActivity::State state, const Theme &theme)
     return icon;
 }
 
+// The folder asked for, else the last one opened, else the home folder.
+QString startFolder(const QString &requested)
+{
+    if (!requested.isEmpty())
+        return requested;
+    QString lastFolder = QSettings().value(QStringLiteral("lastFolder")).toString();
+    if (!lastFolder.isEmpty())
+        return lastFolder;
+    return QDir::homePath();
+}
+
+QLatin1String runKindIconName(RunConfiguration::Kind kind)
+{
+    switch (kind) {
+    case RunConfiguration::Kind::Build:
+        return QLatin1String("build");
+    case RunConfiguration::Kind::Run:
+        return QLatin1String("run");
+    case RunConfiguration::Kind::Test:
+        return QLatin1String("test");
+    }
+    return QLatin1String("run");
+}
+
+// Exit code -1: stopped, no outcome color.
+QColor runOutcomeColor(int exitCode)
+{
+    if (exitCode == -1)
+        return {};
+    return exitCode == 0 ? QColor("#4fa36b") : QColor("#e5534b");
+}
+
+QString runFinishedMessage(const RunConfiguration &configuration, int exitCode, int errors, int warnings)
+{
+    if (exitCode == -1)
+        return MainWindow::tr("“%1” stopped").arg(configuration.name);
+    QStringList found;
+    if (errors > 0)
+        found.append(MainWindow::tr("%n error(s)", nullptr, errors));
+    if (warnings > 0)
+        found.append(MainWindow::tr("%n warning(s)", nullptr, warnings));
+    const QString foundList = found.join(QStringLiteral(", "));
+    if (exitCode == 0) {
+        return found.isEmpty() ? MainWindow::tr("“%1” finished").arg(configuration.name)
+                               : MainWindow::tr("“%1” finished: %2").arg(configuration.name, foundList);
+    }
+    if (!found.isEmpty())
+        return MainWindow::tr("“%1” failed: %2").arg(configuration.name, foundList);
+    return MainWindow::tr("“%1” failed (exit code %2): F11 shows its output").arg(configuration.name).arg(exitCode);
+}
+
+// `sorted` by start, not empty; past the last problem, around to the first.
+const Diagnostic &problemAfter(const Diagnostics &sorted, int cursor)
+{
+    const auto found =
+        std::ranges::find_if(sorted, [cursor](const Diagnostic &problem) { return problem.start > cursor; });
+    return found != sorted.end() ? *found : sorted.first();
+}
+
+// `sorted` by start, not empty; before the first problem, around to the last.
+const Diagnostic &problemBefore(const Diagnostics &sorted, int cursor)
+{
+    const auto reversed = sorted | std::views::reverse;
+    const auto found =
+        std::ranges::find_if(reversed, [cursor](const Diagnostic &problem) { return problem.start < cursor; });
+    return found != reversed.end() ? *found : sorted.last();
+}
+
+// Usage of the Claude plan: red from 90%, amber from 75%, none below.
+const char *usageWarningColor(double highestPercent, bool dark)
+{
+    if (highestPercent >= 90)
+        return dark ? "#e06c75" : "#e45649";
+    if (highestPercent >= 75)
+        return dark ? "#e5c07b" : "#c18401";
+    return nullptr;
+}
+
+QColor problemsIconColor(int errorCount, int warningCount, const QColor &noProblemColor)
+{
+    if (errorCount > 0)
+        return {"#e5534b"};
+    if (warningCount > 0)
+        return {"#d4a72c"};
+    return noProblemColor;
+}
+
+// The changed files git knows under `path`, as repository paths: untracked
+// and ignored files stay.
+QStringList trackedChangesUnder(const QString &path, const FileStatusMap &statuses, const RepositoryInfo &info,
+                                const QDir &folder)
+{
+    QStringList paths;
+    for (auto it = statuses.cbegin(); it != statuses.cend(); ++it) {
+        const bool isTracked = it.value() != FileStatus::Untracked && it.value() != FileStatus::Ignored;
+        const bool isUnderPath = it.key() == path || it.key().startsWith(path + QLatin1Char('/'));
+        if (isTracked && isUnderPath)
+            paths.append(info.repoPath(folder.relativeFilePath(it.key())));
+    }
+    return paths;
+}
+
+// `path` as git names it; the project's own folder is its prefix in the
+// repository, or "." at its root.
+QString repositoryPathOf(const QString &path, const RepositoryInfo &info, const QDir &folder)
+{
+    const QString relative = folder.relativeFilePath(path);
+    if (relative != QLatin1String("."))
+        return info.repoPath(relative);
+    return info.prefix.isEmpty() ? QStringLiteral(".") : info.prefix;
+}
+
 } // namespace
 
 MainWindow::MainWindow(const QString &folder, QWidget *parent)
@@ -176,8 +292,7 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
     if (!hookServer_.listen())
         statusBar()->showMessage(tr("Claude tracking unavailable: %1").arg(hookServer_.errorString()));
 
-    const QString lastFolder = QSettings().value(QStringLiteral("lastFolder")).toString();
-    openFolder(!folder.isEmpty() ? folder : !lastFolder.isEmpty() ? lastFolder : QDir::homePath());
+    openFolder(startFolder(folder));
     setMode(static_cast<Mode>(
         std::clamp(QSettings().value(QStringLiteral("viewMode"), static_cast<int>(Mode::Edit)).toInt(), 0, 3)));
 
@@ -271,44 +386,7 @@ void MainWindow::createWidgets()
     connect(navigator_, &CodeNavigator::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
 
-    // Git operations: result in the status bar, errors (hook output
-    // included) in a dialog box.
-    gitCommands_ = new GitCommands(this);
-    connect(gitCommands_, &GitCommands::succeeded, this, [this](const QString &, const QString &message) {
-        if (!message.isEmpty())
-            statusBar()->showMessage(message, statusMessageMs);
-        updateRepositoryInfo();
-    });
-    connect(gitCommands_, &GitCommands::failed, this, [this](const QString &title, const QString &error) {
-        QMessageBox::warning(this, tr("%1: failed").arg(title), error);
-        updateRepositoryInfo();
-    });
-    // A fetch, pull or push: its progress in the status bar, with a button
-    // to stop it, until the queue is done.
-    connect(gitCommands_, &GitCommands::progress, this, [this](const QString &title, const QString &line) {
-        gitProgress_ = line.isEmpty() ? tr("%1…").arg(title) : tr("%1: %2").arg(title, line);
-        statusBar()->showMessage(gitProgress_);
-        cancelGitButton_->show();
-    });
-    connect(gitCommands_, &GitCommands::busyChanged, this, [this](bool busy) {
-        if (busy)
-            return;
-        cancelGitButton_->hide();
-        // Failed or cancelled: no success message took its place.
-        if (!gitProgress_.isEmpty() && statusBar()->currentMessage() == gitProgress_)
-            statusBar()->clearMessage();
-        gitProgress_.clear();
-    });
-    // git and ssh ask for credentials through duet-askpass.
-    askpass_ = new AskpassServer([this](const QString &prompt) { return askCredentials(prompt); }, this);
-    if (askpass_->listen())
-        gitCommands_->setRemoteEnvironment(askpass_->environment());
-    gitActions_ = new GitActions(gitCommands_, this, [this] { return folder_; }, this);
-    connect(gitActions_, &GitActions::changed, this, &MainWindow::onRepositoryChanged);
-    connect(gitActions_, &GitActions::statusMessage, this,
-            [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
-    repositoryWatcher_ = new RepositoryWatcher(this);
-    connect(repositoryWatcher_, &RepositoryWatcher::changed, this, &MainWindow::onRepositoryChanged);
+    createGitServices();
 
     changesView_ = new ChangesView(theme_, gitCommands_, this);
     connect(changesView_, &ChangesView::openFileRequested, this, [this](const QString &relativePath) {
@@ -359,7 +437,57 @@ void MainWindow::createWidgets()
     setCentralWidget(central);
     createModeTabs();
     commandPalette_ = new CommandPalette(this);
+    createPopups();
 
+    applyTreeFont(Preferences::load().treeFont());
+
+    resize(1400, 900);
+}
+
+void MainWindow::createGitServices()
+{
+    // Git operations: result in the status bar, errors (hook output
+    // included) in a dialog box.
+    gitCommands_ = new GitCommands(this);
+    connect(gitCommands_, &GitCommands::succeeded, this, [this](const QString &, const QString &message) {
+        if (!message.isEmpty())
+            statusBar()->showMessage(message, statusMessageMs);
+        updateRepositoryInfo();
+    });
+    connect(gitCommands_, &GitCommands::failed, this, [this](const QString &title, const QString &error) {
+        QMessageBox::warning(this, tr("%1: failed").arg(title), error);
+        updateRepositoryInfo();
+    });
+    // A fetch, pull or push: its progress in the status bar, with a button
+    // to stop it, until the queue is done.
+    connect(gitCommands_, &GitCommands::progress, this, [this](const QString &title, const QString &line) {
+        gitProgress_ = line.isEmpty() ? tr("%1…").arg(title) : tr("%1: %2").arg(title, line);
+        statusBar()->showMessage(gitProgress_);
+        cancelGitButton_->show();
+    });
+    connect(gitCommands_, &GitCommands::busyChanged, this, [this](bool busy) {
+        if (busy)
+            return;
+        cancelGitButton_->hide();
+        // Failed or cancelled: no success message took its place.
+        if (!gitProgress_.isEmpty() && statusBar()->currentMessage() == gitProgress_)
+            statusBar()->clearMessage();
+        gitProgress_.clear();
+    });
+    // git and ssh ask for credentials through duet-askpass.
+    askpass_ = new AskpassServer([this](const QString &prompt) { return askCredentials(prompt); }, this);
+    if (askpass_->listen())
+        gitCommands_->setRemoteEnvironment(askpass_->environment());
+    gitActions_ = new GitActions(gitCommands_, this, [this] { return folder_; }, this);
+    connect(gitActions_, &GitActions::changed, this, &MainWindow::onRepositoryChanged);
+    connect(gitActions_, &GitActions::statusMessage, this,
+            [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
+    repositoryWatcher_ = new RepositoryWatcher(this);
+    connect(repositoryWatcher_, &RepositoryWatcher::changed, this, &MainWindow::onRepositoryChanged);
+}
+
+void MainWindow::createPopups()
+{
     goToPopup_ = new GoToPopup(symbolIndex_, &recentFiles_, this);
     connect(goToPopup_, &GoToPopup::fileChosen, this, [this](const QString &path, int line) {
         setMode(Mode::Edit);
@@ -387,10 +515,6 @@ void MainWindow::createWidgets()
                 setMode(Mode::Edit);
                 navigator_->goToLine(path, line, column, length);
             });
-
-    applyTreeFont(Preferences::load().treeFont());
-
-    resize(1400, 900);
 }
 
 // Edit mode: side panel (Files / Outline / Claude tabs) | editor tabs.
@@ -445,7 +569,8 @@ QWidget *MainWindow::createEditPage()
     fileStatuses_ = new FileStatusReader(this);
     connect(fileStatuses_, &FileStatusReader::statusesChanged, this,
             [this] { fileTree_->setStatuses(fileStatuses_->statuses(), inRepository_); });
-    fileTree_->setUnsavedChangesCheck([this](const QString &path) { return editorTabs_->hasUnsavedChangesUnder(path); });
+    fileTree_->setUnsavedChangesCheck(
+        [this](const QString &path) { return editorTabs_->hasUnsavedChangesUnder(path); });
     connect(fileTree_, &FileTreeView::entryRenamed, this, [this](const QString &oldPath, const QString &newPath) {
         editorTabs_->followRename(oldPath, newPath);
         recentFiles_.rename(oldPath, newPath);
@@ -483,7 +608,8 @@ QWidget *MainWindow::createEditPage()
     connect(editorTabs_, &EditorTabs::fileSaved, claudeConfigView_, &ClaudeConfigView::scheduleRefresh);
     // Settings, skills and agents checked as they are edited.
     connect(editorTabs_, &EditorTabs::editorOpened, new ClaudeLinter(this), &ClaudeLinter::attach);
-    connect(claudeConfigView_, &ClaudeConfigView::effectiveSettingsRequested, this, [this] { showEffectiveSettings(true); });
+    connect(claudeConfigView_, &ClaudeConfigView::effectiveSettingsRequested, this,
+            [this] { showEffectiveSettings(true); });
     // An open Effective Settings tab follows the files.
     connect(claudeConfigView_, &ClaudeConfigView::refreshed, this, [this] { showEffectiveSettings(false); });
 
@@ -612,6 +738,11 @@ void MainWindow::createModeTabs()
     modeTabs_->setDrawBase(false);
     modeTabs_->setExpanding(false);
     modeTabs_->setFocusPolicy(Qt::NoFocus);
+    modeTabs_->setShape(QTabBar::RoundedSouth);
+    // The status bar always gives the tabs their full width: no scroll
+    // arrows, no elided titles.
+    modeTabs_->setUsesScrollButtons(false);
+    modeTabs_->setElideMode(Qt::ElideNone);
     modeTabs_->addTab(tr("Terminal"));
     modeTabs_->addTab(tr("Edit"));
     modeTabs_->addTab(tr("Diff"));
@@ -621,26 +752,23 @@ void MainWindow::createModeTabs()
     modeTabs_->setTabToolTip(2, tr("Pending changes, staging and commit (Ctrl+3)"));
     modeTabs_->setTabToolTip(3, tr("Past commits, their files and their diffs (Ctrl+4)"));
     connect(modeTabs_, &QTabBar::currentChanged, this, [this](int index) { setMode(static_cast<Mode>(index)); });
+    createStatusBar();
+}
 
-    // Status bar messages stay displayed to the left of the
-    // branch and the tabs.
-    modeTabs_->setShape(QTabBar::RoundedSouth);
-    editorStatus_ = new EditorStatus(this);
-    statusBar()->addPermanentWidget(editorStatus_);
-    usageLabel_ = new QLabel(this);
-    usageLabel_->setContentsMargins(8, 0, 8, 0);
-    usageLabel_->hide();
-    statusBar()->addPermanentWidget(usageLabel_);
-    // Stops the fetch, pull or push that is running.
-    cancelGitButton_ = new QToolButton(this);
-    cancelGitButton_->setAutoRaise(true);
-    cancelGitButton_->setFocusPolicy(Qt::NoFocus);
-    cancelGitButton_->setToolTip(tr("Stop the git operation"));
-    cancelGitButton_->hide();
-    connect(cancelGitButton_, &QToolButton::clicked, gitCommands_, &GitCommands::cancel);
-    statusBar()->addPermanentWidget(cancelGitButton_);
-    // The branch and how far it is from its upstream, at the bottom; a
-    // click opens the Branches popup. Next to it, Sync.
+// The bottom bar, built from the right edge leftwards: mode tabs, Sync,
+// branch, stop of the git operation, Claude usage, then the editor's
+// cursor, line ending, encoding and indentation. On a narrow window the
+// widgets furthest left give up their place first, whole; the status
+// messages take what is left on the left.
+void MainWindow::createStatusBar()
+{
+    syncButton_ = new QToolButton(this);
+    syncButton_->setAutoRaise(true);
+    syncButton_->setFocusPolicy(Qt::NoFocus);
+    syncButton_->hide();
+    connect(syncButton_, &QToolButton::clicked, gitActions_, &GitActions::sync);
+    // The branch and how far it is from its upstream; a click opens the
+    // Branches popup.
     branchButton_ = new QToolButton(this);
     branchButton_->setObjectName(QStringLiteral("chip"));
     branchButton_->setAutoRaise(true);
@@ -648,23 +776,27 @@ void MainWindow::createModeTabs()
     branchButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     branchButton_->hide();
     connect(branchButton_, &QToolButton::clicked, this, &MainWindow::showBranches);
-    statusBar()->addPermanentWidget(branchButton_);
-    syncButton_ = new QToolButton(this);
-    syncButton_->setAutoRaise(true);
-    syncButton_->setFocusPolicy(Qt::NoFocus);
-    syncButton_->hide();
-    connect(syncButton_, &QToolButton::clicked, gitActions_, &GitActions::sync);
-    statusBar()->addPermanentWidget(syncButton_);
-    // On a narrow window the mode tabs keep their full width, without
-    // scroll arrows or elided titles: the other widgets give up their
-    // space first and get clipped.
-    modeTabs_->setUsesScrollButtons(false);
-    modeTabs_->setElideMode(Qt::ElideNone);
-    modeTabs_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-    for (QWidget *widget : {static_cast<QWidget *>(editorStatus_), static_cast<QWidget *>(usageLabel_),
-                            static_cast<QWidget *>(branchButton_), static_cast<QWidget *>(syncButton_)})
-        widget->setMinimumWidth(1);
-    statusBar()->addPermanentWidget(modeTabs_);
+    // Stops the fetch, pull or push that is running.
+    cancelGitButton_ = new QToolButton(this);
+    cancelGitButton_->setAutoRaise(true);
+    cancelGitButton_->setFocusPolicy(Qt::NoFocus);
+    cancelGitButton_->setToolTip(tr("Stop the git operation"));
+    cancelGitButton_->hide();
+    connect(cancelGitButton_, &QToolButton::clicked, gitCommands_, &GitCommands::cancel);
+    usageLabel_ = new QLabel(this);
+    usageLabel_->setContentsMargins(8, 0, 8, 0);
+    usageLabel_->hide();
+    editorStatus_ = new EditorStatus(this);
+
+    auto *trailing = new QWidget(this);
+    auto *layout = new TrailingLayout(trailing);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(4);
+    for (QWidget *widget : {static_cast<QWidget *>(modeTabs_), static_cast<QWidget *>(syncButton_),
+                            static_cast<QWidget *>(branchButton_), static_cast<QWidget *>(cancelGitButton_),
+                            static_cast<QWidget *>(usageLabel_), static_cast<QWidget *>(editorStatus_)})
+        layout->addWidget(widget);
+    statusBar()->addPermanentWidget(trailing);
 }
 
 void MainWindow::createMenus()
@@ -708,8 +840,7 @@ void MainWindow::createMenus()
     createEditMenu();
 
     QMenu *claude = titleBar_->menuBar()->addMenu(tr("&Claude"));
-    claude->addAction(tr("&Claude Session"), QKeySequence(tr("Ctrl+Shift+L")), this,
-                      &MainWindow::showClaudeSession);
+    claude->addAction(tr("&Claude Session"), QKeySequence(tr("Ctrl+Shift+L")), this, &MainWindow::showClaudeSession);
     claude->addAction(tr("New &Terminal"), QKeySequence(tr("Ctrl+Shift+T")), this, &MainWindow::newShell);
     if (!DiagramKinds::available().isEmpty())
         claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); });
@@ -719,13 +850,15 @@ void MainWindow::createMenus()
     snapshotBeforePrompt_ = claude->addAction(tr("&Snapshot Before Each Prompt"));
     snapshotBeforePrompt_->setCheckable(true);
     snapshotBeforePrompt_->setChecked(settings.value(QStringLiteral("snapshotBeforePrompt"), true).toBool());
-    snapshotBeforePrompt_->setToolTip(tr("Keep a copy of the working directory before Claude works on a prompt, to undo its changes"));
+    snapshotBeforePrompt_->setToolTip(
+        tr("Keep a copy of the working directory before Claude works on a prompt, to undo its changes"));
     connect(snapshotBeforePrompt_, &QAction::toggled, this,
             [](bool checked) { QSettings().setValue(QStringLiteral("snapshotBeforePrompt"), checked); });
     shareEditorContext_ = claude->addAction(tr("Share &Editor Context With Each Prompt"));
     shareEditorContext_->setCheckable(true);
     shareEditorContext_->setChecked(settings.value(QStringLiteral("shareEditorContext"), true).toBool());
-    shareEditorContext_->setToolTip(tr("Tell Claude the open file, the cursor, the selection, the problems shown and the unsaved files"));
+    shareEditorContext_->setToolTip(
+        tr("Tell Claude the open file, the cursor, the selection, the problems shown and the unsaved files"));
     connect(shareEditorContext_, &QAction::toggled, this,
             [](bool checked) { QSettings().setValue(QStringLiteral("shareEditorContext"), checked); });
     exposeTools_ = claude->addAction(tr("E&xpose Duet's Tools to Claude"));
@@ -836,14 +969,12 @@ void MainWindow::createEditMenu()
     });
     edit->addSeparator();
     edit->addAction(tr("&Complete Code"), QKeySequence(tr("Ctrl+Space")), this, [this] {
-        if (EditorWidget *editor = editorTabs_->currentEditor(); editor && mode_ == Mode::Edit)
-            if (CompletionController *completion = CompletionController::of(editor))
-                completion->complete();
+        if (CompletionController *completion = CompletionController::of(editorInEditMode()))
+            completion->complete();
     });
     edit->addAction(tr("S&mart Complete Code"), QKeySequence(tr("Ctrl+Shift+Space")), this, [this] {
-        if (EditorWidget *editor = editorTabs_->currentEditor(); editor && mode_ == Mode::Edit)
-            if (CompletionController *completion = CompletionController::of(editor))
-                completion->completeSmart();
+        if (CompletionController *completion = CompletionController::of(editorInEditMode()))
+            completion->completeSmart();
     });
     const auto inCode = [this](void (CodeIntelligence::*command)()) {
         return [this, command] {
@@ -851,7 +982,8 @@ void MainWindow::createEditMenu()
                 (intelligence_->*command)();
         };
     };
-    edit->addAction(tr("&Parameter Info"), QKeySequence(tr("Ctrl+P")), this, inCode(&CodeIntelligence::showParameterInfo));
+    edit->addAction(tr("&Parameter Info"), QKeySequence(tr("Ctrl+P")), this,
+                    inCode(&CodeIntelligence::showParameterInfo));
     edit->addAction(tr("&Quick Documentation"), QKeySequence(tr("Ctrl+Q")), this,
                     inCode(&CodeIntelligence::showDocumentation));
     edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
@@ -863,7 +995,7 @@ void MainWindow::createEditMenu()
     });
     formatOnSave_ = edit->addAction(tr("Format on Sa&ve"));
     formatOnSave_->setCheckable(true);
-    formatOnSave_->setChecked(QSettings().value(QStringLiteral("formatOnSave"), false).toBool());
+    formatOnSave_->setChecked(QSettings().value(QStringLiteral("formatOnSave"), true).toBool());
     formatOnSave_->setToolTip(tr("Format each file with its language's formatter before saving it"));
     editorTabs_->setFormatOnSave(formatOnSave_->isChecked());
     connect(formatOnSave_, &QAction::toggled, this, [this](bool checked) {
@@ -871,9 +1003,17 @@ void MainWindow::createEditMenu()
         QSettings().setValue(QStringLiteral("formatOnSave"), checked);
     });
     edit->addSeparator();
+    createFoldingMenu(edit);
+    edit->addSeparator();
+    findInFilesAction_ =
+        edit->addAction(tr("Find in F&iles…"), QKeySequence(tr("Ctrl+Shift+F")), this, &MainWindow::showFindInFiles);
+}
+
+void MainWindow::createFoldingMenu(QMenu *edit)
+{
     const auto inEditor = [this](void (EditorWidget::*fold)(bool), bool folds) {
         return [this, fold, folds] {
-            if (EditorWidget *editor = editorTabs_->currentEditor(); editor && mode_ == Mode::Edit)
+            if (EditorWidget *editor = editorInEditMode())
                 (editor->*fold)(folds);
         };
     };
@@ -885,9 +1025,11 @@ void MainWindow::createEditMenu()
                        inEditor(&EditorWidget::foldEverything, true));
     folding->addAction(tr("Unfold A&ll"), this, inEditor(&EditorWidget::foldEverything, false))
         ->setShortcuts({QKeySequence(tr("Ctrl+Shift+=")), QKeySequence(tr("Ctrl+Shift++"))});
-    edit->addSeparator();
-    findInFilesAction_ =
-        edit->addAction(tr("Find in F&iles…"), QKeySequence(tr("Ctrl+Shift+F")), this, &MainWindow::showFindInFiles);
+}
+
+EditorWidget *MainWindow::editorInEditMode() const
+{
+    return mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
 }
 
 void MainWindow::createNavigateMenu()
@@ -923,7 +1065,8 @@ void MainWindow::createNavigateMenu()
     navigate->addAction(tr("&Back"), QKeySequence(tr("Alt+Left")), navigator_, &CodeNavigator::goBack);
     navigate->addAction(tr("&Forward"), QKeySequence(tr("Alt+Right")), navigator_, &CodeNavigator::goForward);
     navigate->addSeparator();
-    navigate->addAction(tr("&Next Change"), QKeySequence(tr("Ctrl+Alt+Shift+Down")), this, [this] { goToChange(true); });
+    navigate->addAction(tr("&Next Change"), QKeySequence(tr("Ctrl+Alt+Shift+Down")), this,
+                        [this] { goToChange(true); });
     navigate->addAction(tr("&Previous Change"), QKeySequence(tr("Ctrl+Alt+Shift+Up")), this,
                         [this] { goToChange(false); });
     navigate->addAction(tr("R&ollback Lines"), QKeySequence(tr("Ctrl+Alt+Z")), this, &MainWindow::rollbackChange);
@@ -946,8 +1089,8 @@ void MainWindow::createRunMenu()
         auto *menu = new QMenu(this);
         menu->setAttribute(Qt::WA_DeleteOnClose);
         fillRunMenu(menu, true);
-        menu->popup(titleBar_->mapToGlobal(QPoint(titleBar_->width() / 2 - menu->sizeHint().width() / 2,
-                                                  titleBar_->height())));
+        menu->popup(titleBar_->mapToGlobal(
+            QPoint((titleBar_->width() / 2) - (menu->sizeHint().width() / 2), titleBar_->height())));
     });
     buildAction_ = run->addAction(tr("&Build Project"), QKeySequence(tr("Ctrl+F9")), this, &MainWindow::buildProject);
     stopAction_ = run->addAction(tr("&Stop"), QKeySequence(tr("Ctrl+F2")), this, &MainWindow::stopRun);
@@ -986,9 +1129,12 @@ void MainWindow::fillRunMenu(QMenu *menu, bool run)
         if (!configuration.detected)
             return tr("Project");
         switch (configuration.kind) {
-        case RunConfiguration::Kind::Build: return tr("Build");
-        case RunConfiguration::Kind::Test: return tr("Test");
-        case RunConfiguration::Kind::Run: break;
+        case RunConfiguration::Kind::Build:
+            return tr("Build");
+        case RunConfiguration::Kind::Test:
+            return tr("Test");
+        case RunConfiguration::Kind::Run:
+            break;
         }
         return tr("Run");
     };
@@ -998,9 +1144,9 @@ void MainWindow::fillRunMenu(QMenu *menu, bool run)
             previous = heading(configuration);
             RunConfigurationMenu::addHeading(menu, previous, theme_);
         }
-        QAction *action = RunConfigurationMenu::addConfiguration(
-            menu, configuration, selected && selected->name == configuration.name,
-            runner_->isRunning(configuration.name), theme_);
+        QAction *action = RunConfigurationMenu::addConfiguration(menu, configuration,
+                                                                 selected && selected->name == configuration.name,
+                                                                 runner_->isRunning(configuration.name), theme_);
         connect(action, &QAction::triggered, this, [this, configuration, run] {
             runner_->select(configuration.name);
             if (run)
@@ -1033,10 +1179,8 @@ void MainWindow::updateRunWidgets()
                                        runChooser_, false);
         return;
     }
-    const char *icons[] = {"build", "run", "test"};
     const bool running = runner_->isRunning(selected->name);
-    runAction_->setText(running ? tr("&Rerun “%1”").arg(selected->name)
-                                : tr("&Run “%1”").arg(selected->name));
+    runAction_->setText(running ? tr("&Rerun “%1”").arg(selected->name) : tr("&Run “%1”").arg(selected->name));
     // stopRun() ends the selected configuration first.
     stopAction_->setText(running ? tr("&Stop “%1”").arg(selected->name) : tr("&Stop"));
     QString toolTip = selected->command;
@@ -1045,8 +1189,8 @@ void MainWindow::updateRunWidgets()
     if (running)
         toolTip += tr("\nRunning");
     titleBar_->setRunConfiguration(
-        UiIcons::icon(QLatin1String(icons[static_cast<int>(selected->kind)]), running ? QColor("#4fa36b") : theme_.foreground),
-        selected->name, toolTip, runChooser_, running);
+        UiIcons::icon(runKindIconName(selected->kind), running ? QColor("#4fa36b") : theme_.foreground), selected->name,
+        toolTip, runChooser_, running);
 }
 
 void MainWindow::runSelected()
@@ -1084,10 +1228,10 @@ void MainWindow::runConfiguration(const RunConfiguration &configuration)
         index = terminalTabs_->addTab(terminal, configuration.name);
     }
     terminalTabs_->setTabToolTip(index, configuration.command);
-    const char *icons[] = {"build", "run", "test"};
-    setRunTabIcon(terminal, QLatin1String(icons[static_cast<int>(configuration.kind)]), {});
+    setRunTabIcon(terminal, runKindIconName(configuration.kind), {});
     // Closing the tab ends the run.
-    connect(terminal, &QObject::destroyed, this, [this] { QTimer::singleShot(0, this, &MainWindow::updateRunWidgets); });
+    connect(terminal, &QObject::destroyed, this,
+            [this] { QTimer::singleShot(0, this, &MainWindow::updateRunWidgets); });
 
     // The run's terminal comes to the front, whatever its kind.
     terminalTabs_->setCurrentIndex(index);
@@ -1108,32 +1252,15 @@ void MainWindow::setRunTabIcon(TerminalWidget *terminal, const QString &iconName
 void MainWindow::onRunFinished(const RunConfiguration &configuration, int exitCode, int errors, int warnings)
 {
     TerminalWidget *terminal = runner_->terminal(configuration.name);
-    const char *icons[] = {"build", "run", "test"};
-    const QString iconName = QLatin1String(icons[static_cast<int>(configuration.kind)]);
-    const bool failed = exitCode != 0;
     if (terminal)
-        setRunTabIcon(terminal, iconName, exitCode == -1 ? QColor() : failed ? QColor("#e5534b") : QColor("#4fa36b"));
+        setRunTabIcon(terminal, runKindIconName(configuration.kind), runOutcomeColor(exitCode));
+    statusBar()->showMessage(runFinishedMessage(configuration, exitCode, errors, warnings), statusMessageMs);
 
-    QStringList found;
-    if (errors > 0)
-        found.append(tr("%n error(s)", nullptr, errors));
-    if (warnings > 0)
-        found.append(tr("%n warning(s)", nullptr, warnings));
-    QString message;
-    if (exitCode == -1)
-        message = tr("“%1” stopped").arg(configuration.name);
-    else if (!failed)
-        message = found.isEmpty() ? tr("“%1” finished").arg(configuration.name)
-                                  : tr("“%1” finished: %2").arg(configuration.name, found.join(QStringLiteral(", ")));
-    else if (!found.isEmpty())
-        message = tr("“%1” failed: %2").arg(configuration.name, found.join(QStringLiteral(", ")));
-    else
-        message = tr("“%1” failed (exit code %2): F11 shows its output").arg(configuration.name).arg(exitCode);
-    statusBar()->showMessage(message, statusMessageMs);
-
+    const bool failed = exitCode != 0;
     if (exitCode != -1 && configuration.kind != RunConfiguration::Kind::Run) {
         // A build or tests that went on out of sight.
-        if (mode_ == Mode::Edit && (errors > 0 || (failed && warnings > 0)))
+        const bool hasProblemsToShow = errors > 0 || (failed && warnings > 0);
+        if (mode_ == Mode::Edit && hasProblemsToShow)
             sidebar_->showView(problemsView_);
         else if (failed && terminal && mode_ != Mode::Terminal)
             terminalTabs_->setCurrentWidget(terminal); // F11 shows it
@@ -1194,42 +1321,22 @@ void MainWindow::editRunConfigurations()
 
 void MainWindow::goToProblem(bool forward)
 {
-    EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
+    EditorWidget *editor = editorInEditMode();
     if (!editor || editor->diagnostics().isEmpty()) {
         statusBar()->showMessage(tr("No problems in this file"), statusMessageMs);
         return;
     }
     Diagnostics problems = editor->diagnostics();
-    std::sort(problems.begin(), problems.end(),
-              [](const Diagnostic &a, const Diagnostic &b) { return a.start < b.start; });
-    const int cursor = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const Diagnostic *target = nullptr;
-    if (forward) {
-        for (const Diagnostic &problem : problems) {
-            if (problem.start > cursor) {
-                target = &problem;
-                break;
-            }
-        }
-        if (!target)
-            target = &problems.first(); // around to the first
-    } else {
-        for (auto it = problems.crbegin(); it != problems.crend(); ++it) {
-            if (it->start < cursor) {
-                target = &*it;
-                break;
-            }
-        }
-        if (!target)
-            target = &problems.last();
-    }
+    std::ranges::sort(problems, {}, &Diagnostic::start);
+    const auto cursor = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const Diagnostic &target = forward ? problemAfter(problems, cursor) : problemBefore(problems, cursor);
     int line = 0;
     int index = 0;
-    editor->lineIndexFromPosition(target->start, &line, &index);
+    editor->lineIndexFromPosition(target.start, &line, &index);
     editor->setCursorPosition(line, index);
     editor->ensureLineVisible(line);
     editor->setFocus();
-    statusBar()->showMessage(target->message, statusMessageMs);
+    statusBar()->showMessage(target.message, statusMessageMs);
 }
 
 void MainWindow::createGitMenu()
@@ -1444,9 +1551,9 @@ void MainWindow::updateToolsNotice()
         toolsNotice_->hide();
         return;
     }
-    toolsNotice_->showNotice(tr("This project's setup needs tools Duet has not downloaded yet: %1")
-                                 .arg(InstallPlan::summary(steps)),
-                             tr("Download"));
+    toolsNotice_->showNotice(
+        tr("This project's setup needs tools Duet has not downloaded yet: %1").arg(InstallPlan::summary(steps)),
+        tr("Download"));
 }
 
 void MainWindow::chooseFile()
@@ -1466,15 +1573,14 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
         claudeTerminal_ = nullptr;
     }
     QString launchError;
-    const std::optional<ProcessSpec> spec =
-        ClaudeLauncher::claudeProcess(folder_, hookServer_.serverName(), &launchError, extraArguments,
-                                      exposeTools_->isChecked()
-                                          ? std::optional(mcpRegistry_.readOnlyToolPermissions(QStringLiteral("duet")))
-                                          : std::nullopt);
+    const std::optional<ProcessSpec> spec = ClaudeLauncher::claudeProcess(
+        folder_, hookServer_.serverName(), &launchError, extraArguments,
+        exposeTools_->isChecked() ? std::optional(mcpRegistry_.readOnlyToolPermissions(QStringLiteral("duet")))
+                                  : std::nullopt);
     if (!spec) {
         statusBar()->showMessage(tr("Claude session unavailable: %1").arg(launchError));
         if (error)
-            *error = launchError;
+            *error = std::move(launchError);
         updateTerminalPage();
         return false;
     }
@@ -1517,10 +1623,9 @@ void MainWindow::showClaudeSession()
 // session, which goes on with the last conversation.
 void MainWindow::restartClaudeSession()
 {
-    if (claudeActivity_.state() == ClaudeActivity::State::Working
-        && QMessageBox::question(this, tr("Restart Claude Session"),
-                                 tr("Claude is working. Stop it and restart the session?"))
-               != QMessageBox::Yes)
+    if (claudeActivity_.state() == ClaudeActivity::State::Working &&
+        QMessageBox::question(this, tr("Restart Claude Session"),
+                              tr("Claude is working. Stop it and restart the session?")) != QMessageBox::Yes)
         return;
     QString error;
     if (!startClaudeSession(&error, {QStringLiteral("--continue")})) {
@@ -1536,8 +1641,10 @@ void MainWindow::showEffectiveSettings(bool open)
     if (!open && !editorTabs_->textView(title))
         return;
     QWidget *current = editorTabs_->currentWidget();
-    const QList<EffectiveSettings::Layer> layers = EffectiveSettings::read(folder_, {}); // without Duet's hooks: not for the user to see
-    editorTabs_->showText(title, EffectiveSettings::render(layers, folder_), QStringLiteral("json"), QStringLiteral("settings"));
+    const QList<EffectiveSettings::Layer> layers =
+        EffectiveSettings::read(folder_, {}); // without Duet's hooks: not for the user to see
+    editorTabs_->showText(title, EffectiveSettings::render(layers, folder_), QStringLiteral("json"),
+                          QStringLiteral("settings"));
     if (open)
         setMode(Mode::Edit);
     else
@@ -1630,8 +1737,9 @@ void MainWindow::showPreferences()
 
 void MainWindow::applyFullLine(const Preferences &preferences)
 {
-    fullLineModel_->configure(preferences.fullLineServer == QLatin1String("llama.cpp") ? LocalFullLineModel::Server::LlamaCpp
-                                                                                       : LocalFullLineModel::Server::Ollama,
+    fullLineModel_->configure(preferences.fullLineServer == QLatin1String("llama.cpp")
+                                  ? LocalFullLineModel::Server::LlamaCpp
+                                  : LocalFullLineModel::Server::Ollama,
                               QUrl(preferences.fullLineEndpoint), preferences.fullLineModel);
     completion_->setFullLineModel(preferences.fullLineCompletion ? fullLineModel_ : nullptr);
 }
@@ -1642,8 +1750,8 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     preferences.save();
     if (preferences.interfaceFont() != previous.interfaceFont())
         QApplication::setFont(preferences.interfaceFont());
-    if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont()
-        || preferences.codeLineHeight != previous.codeLineHeight || preferences.ligatures != previous.ligatures)
+    if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont() ||
+        preferences.codeLineHeight != previous.codeLineHeight || preferences.ligatures != previous.ligatures)
         setTheme(preferences.theme);
     if (preferences.treeFont() != previous.treeFont())
         applyTreeFont(preferences.treeFont());
@@ -1806,7 +1914,8 @@ void MainWindow::updateProjectMenu()
         if (project.path == folder_ || !QFileInfo(project.path).isDir() || listed == 10)
             continue;
         const QString folder = project.path;
-        QAction *action = projectMenu_->addAction(QFileInfo(folder).fileName(), this, [this, folder] { openFolder(folder); });
+        QAction *action =
+            projectMenu_->addAction(QFileInfo(folder).fileName(), this, [this, folder] { openFolder(folder); });
         action->setToolTip(QDir::toNativeSeparators(folder));
         ++listed;
     }
@@ -1822,16 +1931,18 @@ void MainWindow::updateProjectMenu()
 void MainWindow::updateTabIcons()
 {
     const QColor color = theme_.mutedText;
-    const char *modes[] = {"terminal", "code", "diff", "history"};
-    for (int i = 1; i < 4; ++i)
-        modeTabs_->setTabIcon(i, UiIcons::icon(QLatin1String(modes[i]), color));
+    constexpr std::array<const char *, 4> modes{"terminal", "code", "diff", "history"};
+    for (std::size_t i = 1; i < modes.size(); ++i)
+        modeTabs_->setTabIcon(static_cast<int>(i), UiIcons::icon(QLatin1String(modes.at(i)), color));
+    // Hidden, QTabBar does not report that its icons widened it: the status
+    // bar would keep its old width and cut the last tabs.
+    modeTabs_->updateGeometry();
     sidebar_->setViewIcon(filesPanel_, UiIcons::icon(QStringLiteral("files"), color));
     sidebar_->setViewIcon(outlineView_, UiIcons::icon(QStringLiteral("outline"), color));
     sidebar_->setViewIcon(claudeConfigView_, UiIcons::icon(QStringLiteral("claude"), color));
     sidebar_->setViewIcon(problemsView_, UiIcons::icon(QStringLiteral("problems"),
-                                                       problemsView_->errorCount() > 0     ? QColor("#e5534b")
-                                                       : problemsView_->warningCount() > 0 ? QColor("#d4a72c")
-                                                                                           : color));
+                                                       problemsIconColor(problemsView_->errorCount(),
+                                                                         problemsView_->warningCount(), color)));
     newTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     syncButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
     cancelGitButton_->setIcon(UiIcons::icon(QStringLiteral("stop"), color));
@@ -1862,14 +1973,23 @@ void MainWindow::updateClaudeIndicator()
         terminalTabs_->setTabToolTip(index, description);
     }
     modeTabs_->setTabIcon(0, idle ? UiIcons::icon(QStringLiteral("terminal"), theme_.mutedText) : icon);
+    modeTabs_->updateGeometry(); // see updateTabIcons()
     QString label;
     switch (state) {
-    case ClaudeActivity::State::Working: label = tr("Claude is working"); break;
-    case ClaudeActivity::State::NeedsInput: label = tr("Claude needs you"); break;
-    case ClaudeActivity::State::Done: label = tr("Claude has finished"); break;
-    case ClaudeActivity::State::Idle: break;
+    case ClaudeActivity::State::Working:
+        label = tr("Claude is working");
+        break;
+    case ClaudeActivity::State::NeedsInput:
+        label = tr("Claude needs you");
+        break;
+    case ClaudeActivity::State::Done:
+        label = tr("Claude has finished");
+        break;
+    case ClaudeActivity::State::Idle:
+        break;
     }
-    titleBar_->setClaudeState(icon, label, description + QLatin1Char('\n') + tr("Show the Claude session (Ctrl+Shift+L)"));
+    titleBar_->setClaudeState(icon, label,
+                              description + QLatin1Char('\n') + tr("Show the Claude session (Ctrl+Shift+L)"));
     const QString modeHint = tr("Full-screen terminals (Ctrl+1)");
     modeTabs_->setTabToolTip(0, state == ClaudeActivity::State::Idle ? modeHint
                                                                      : description + QLatin1Char('\n') + modeHint);
@@ -1877,8 +1997,8 @@ void MainWindow::updateClaudeIndicator()
 
 void MainWindow::updateClaudeWatched()
 {
-    claudeActivity_.setWatched(claudeTerminal_ && isActiveWindow() && mode_ == Mode::Terminal
-                               && terminalTabs_->currentWidget() == claudeTerminal_);
+    claudeActivity_.setWatched(claudeTerminal_ && isActiveWindow() && mode_ == Mode::Terminal &&
+                               terminalTabs_->currentWidget() == claudeTerminal_);
 }
 
 void MainWindow::notify(const QString &title, const QString &message)
@@ -2039,7 +2159,7 @@ void MainWindow::generateDiagram(const QString &folder)
     // At the root, diagrams go with the documentation.
     const QString initialName = relative == QLatin1String(".") ? QStringLiteral("docs/diagrams/") : QString();
     const QString location = relative == QLatin1String(".") ? QFileInfo(folder_).fileName() + QLatin1Char('/')
-                                                             : QDir::toNativeSeparators(relative + QLatin1Char('/'));
+                                                            : QDir::toNativeSeparators(relative + QLatin1Char('/'));
     auto *popup = new DiagramRequestPopup(
         location, kinds, initialName,
         [this, folder](const QString &kindId, const QString &name, const QString &description) {
@@ -2048,8 +2168,7 @@ void MainWindow::generateDiagram(const QString &folder)
                 return tr("Describe what the diagram should show");
             if (name.isEmpty() || name.endsWith(QLatin1Char('/')) || name.endsWith(QLatin1Char('\\')))
                 return tr("Enter a file name");
-            const EntryTarget target =
-                resolveNewEntry(folder_, folder, DiagramKinds::withExtension(name, kind), false);
+            const EntryTarget target = resolveNewEntry(folder_, folder, DiagramKinds::withExtension(name, kind), false);
             if (!target.error.isEmpty())
                 return target.error;
             drawDiagram(target.path, kind.title, description);
@@ -2066,13 +2185,12 @@ void MainWindow::drawDiagram(const QString &path, const QString &kindTitle, cons
     auto *view = new DiagramGenerationView(folder_, path, kindTitle, description);
     editorTabs_->showPage(view, QFileInfo(path).fileName(), QStringLiteral("claude"));
     connect(view, &DiagramGenerationView::closeRequested, this, [this, view] { editorTabs_->closePage(view); });
-    connect(view, &DiagramGenerationView::finished, this,
-            [this, view](const QString &drawn, const QString &summary) {
-                editorTabs_->replacePage(view, drawn);
-                statusBar()->showMessage(summary.isEmpty() ? tr("Diagram drawn by Claude")
-                                                           : summary.section(QLatin1Char('\n'), 0, 0),
-                                         statusMessageMs);
-            });
+    connect(view, &DiagramGenerationView::finished, this, [this, view](const QString &drawn, const QString &summary) {
+        editorTabs_->replacePage(view, drawn);
+        statusBar()->showMessage(summary.isEmpty() ? tr("Diagram drawn by Claude")
+                                                   : summary.section(QLatin1Char('\n'), 0, 0),
+                                 statusMessageMs);
+    });
     view->start();
 #else
     Q_UNUSED(path);
@@ -2088,8 +2206,8 @@ void MainWindow::snapshotBeforePrompt(const QString &prompt)
     QString summary = prompt.section(QLatin1Char('\n'), 0, 0).simplified();
     if (summary.size() > snapshotPromptLength)
         summary = summary.left(snapshotPromptLength - 1) + QStringLiteral("…");
-    const QString reason = summary.isEmpty() ? tr("Before a Claude prompt")
-                                             : tr("Before the Claude prompt \u201c%1\u201d").arg(summary);
+    const QString reason =
+        summary.isEmpty() ? tr("Before a Claude prompt") : tr("Before the Claude prompt \u201c%1\u201d").arg(summary);
     // A dozen git commands in a large repository: they run off the UI
     // thread, and Claude waits for the snapshot before touching any file.
     gitCommands_->runQuietly(
@@ -2114,12 +2232,11 @@ void MainWindow::updateUsage()
     const QString summary = usage.summary();
     usageLabel_->setVisible(!summary.isEmpty());
     usageLabel_->setToolTip(usage.details());
-    const bool dark = theme_.isDark;
-    const double highest = usage.highestPercent();
-    const char *warning = highest >= 90 ? (dark ? "#e06c75" : "#e45649") : highest >= 75 ? (dark ? "#e5c07b" : "#c18401") : nullptr;
-    usageLabel_->setText(warning ? QStringLiteral("<span style=\"color:%1\">%2</span>")
-                                       .arg(QLatin1String(warning), summary.toHtmlEscaped())
-                                 : summary);
+    const char *warning = usageWarningColor(usage.highestPercent(), theme_.isDark);
+    usageLabel_->setText(
+        warning
+            ? QStringLiteral("<span style=\"color:%1\">%2</span>").arg(QLatin1String(warning), summary.toHtmlEscaped())
+            : summary);
 }
 
 void MainWindow::showCommandPalette()
@@ -2224,23 +2341,10 @@ void MainWindow::runGitOnTree(const QString &title, const QString &path, bool ro
     if (!info)
         return;
     const QDir folder(folder_);
-    QStringList paths;
-    if (rollback) {
-        // The changed files git knows, under `path`: untracked files stay.
-        const FileStatusMap statuses = fileStatuses_->statuses();
-        for (auto it = statuses.cbegin(); it != statuses.cend(); ++it) {
-            if (it.value() == FileStatus::Untracked || it.value() == FileStatus::Ignored)
-                continue;
-            if (it.key() == path || it.key().startsWith(path + QLatin1Char('/')))
-                paths.append(info->repoPath(folder.relativeFilePath(it.key())));
-        }
-        if (paths.isEmpty())
-            return;
-    } else {
-        const QString relative = folder.relativeFilePath(path);
-        paths.append(relative == QLatin1String(".") ? (info->prefix.isEmpty() ? QStringLiteral(".") : info->prefix)
-                                                    : info->repoPath(relative));
-    }
+    const QStringList paths = rollback ? trackedChangesUnder(path, fileStatuses_->statuses(), *info, folder)
+                                       : QStringList{repositoryPathOf(path, *info, folder)};
+    if (paths.isEmpty())
+        return;
     const int count = static_cast<int>(paths.size());
     gitCommands_->run(title, [info = *info, paths, rollback, count] {
         if (rollback) {
@@ -2282,9 +2386,8 @@ void MainWindow::goToChange(bool forward)
     editorTabs_->revealEditor(editor);
     ChangeGutter *gutter = editor->changeGutter();
     if (!(forward ? gutter->goToNext() : gutter->goToPrevious()))
-        statusBar()->showMessage(gutter->hasBase() ? tr("No changes in this file")
-                                                   : tr("This file is not tracked by git"),
-                                 statusMessageMs);
+        statusBar()->showMessage(
+            gutter->hasBase() ? tr("No changes in this file") : tr("This file is not tracked by git"), statusMessageMs);
 }
 
 void MainWindow::rollbackChange()
@@ -2308,8 +2411,8 @@ void MainWindow::changeEvent(QEvent *event)
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == claudeTerminal_ && event->type() == QEvent::KeyPress) {
-        const auto *key = static_cast<QKeyEvent *>(event);
+    const auto *key = event->type() == QEvent::KeyPress ? dynamic_cast<const QKeyEvent *>(event) : nullptr;
+    if (watched == claudeTerminal_ && key) {
 #ifdef Q_OS_MACOS
         const Qt::KeyboardModifiers control = Qt::MetaModifier; // the Control key; Cmd+C copies
 #else
@@ -2333,8 +2436,9 @@ void MainWindow::updateRepositoryInfo()
     std::optional<RepositoryInfo> info;
     try {
         info = RepositoryInfo::read(folder_);
-    } catch (const GitError &) {
+    } catch (const GitError &error) {
         // An unreadable repository: no branch shown.
+        qDebug() << "Repository of" << folder_ << "unreadable:" << error.what();
     }
     repositoryWatcher_->setGitDir(info ? info->gitDir : QString());
     if (inRepository_ != info.has_value()) {
@@ -2362,9 +2466,10 @@ void MainWindow::updateRepositoryInfo()
     if (!operation.isEmpty())
         text += tr(" — %1 in progress").arg(operation);
     branchButton_->setText(text);
-    QString tooltip = info->unborn ? tr("Repository %1").arg(info->workDir)
-                                   : tr("Repository %1\nLast commit %2: %3")
-                                         .arg(info->workDir, info->headId, info->headMessage.section(QLatin1Char('\n'), 0, 0));
+    QString tooltip = info->unborn
+                          ? tr("Repository %1").arg(info->workDir)
+                          : tr("Repository %1\nLast commit %2: %3")
+                                .arg(info->workDir, info->headId, info->headMessage.section(QLatin1Char('\n'), 0, 0));
     if (!info->upstream.isEmpty())
         tooltip += tr("\nTracking %1: %2 ahead, %3 behind as of the last fetch")
                        .arg(info->upstream)
@@ -2374,16 +2479,15 @@ void MainWindow::updateRepositoryInfo()
     branchButton_->show();
 
     syncButton_->setVisible(!info->detached && !info->unborn);
-    syncButton_->setToolTip(info->upstream.isEmpty()
-                                ? tr("Publish %1 to the remote").arg(info->branch)
-                                : tr("Sync with %1: fetch, pull, then push").arg(info->upstream));
+    syncButton_->setToolTip(info->upstream.isEmpty() ? tr("Publish %1 to the remote").arg(info->branch)
+                                                     : tr("Sync with %1: fetch, pull, then push").arg(info->upstream));
 }
 
 void MainWindow::onRepositoryChanged()
 {
     mcpRegistry_.notifyResourceUpdated(QStringLiteral("duet://git/status"));
     updateRepositoryInfo();
-    symbolIndex_->refresh(); // branch switch, pull…
+    symbolIndex_->refresh();          // branch switch, pull…
     editorTabs_->reloadChangeBases(); // staging, commit…
     if (mode_ == Mode::Diff && !gitCommands_->isBusy())
         changesView_->refresh();
@@ -2449,8 +2553,8 @@ std::optional<QString> MainWindow::askCredentials(const QString &prompt)
     // A user name is shown as typed; passwords and passphrases are not.
     const bool secret = !prompt.startsWith(QLatin1String("Username"), Qt::CaseInsensitive);
     bool accepted = false;
-    const QString answer = QInputDialog::getText(this, tr("Git Credentials"), prompt.trimmed(),
-                                                 secret ? QLineEdit::Password : QLineEdit::Normal, {}, &accepted);
+    QString answer = QInputDialog::getText(this, tr("Git Credentials"), prompt.trimmed(),
+                                           secret ? QLineEdit::Password : QLineEdit::Normal, {}, &accepted);
     if (!accepted)
         return std::nullopt;
     return answer;

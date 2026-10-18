@@ -65,7 +65,8 @@ void Runner::select(const QString &name)
 
 std::optional<RunConfiguration> Runner::buildConfiguration() const
 {
-    if (const std::optional<RunConfiguration> chosen = selected(); chosen && chosen->kind == RunConfiguration::Kind::Build)
+    if (const std::optional<RunConfiguration> chosen = selected();
+        chosen && chosen->kind == RunConfiguration::Kind::Build)
         return chosen;
     for (const RunConfiguration &configuration : configurations()) {
         if (configuration.kind == RunConfiguration::Kind::Build)
@@ -80,8 +81,8 @@ ProcessSpec Runner::processSpec(const RunConfiguration &configuration) const
     spec.workingDirectory = QDir::cleanPath(QDir(project_.path).filePath(configuration.folder));
     spec.environment = terminalEnvironment();
     const auto prependPath = [&spec](const QString &folder) {
-        spec.environment.insert(QStringLiteral("PATH"), QDir::toNativeSeparators(folder) + QDir::listSeparator()
-                                                            + spec.environment.value(QStringLiteral("PATH")));
+        spec.environment.insert(QStringLiteral("PATH"), QDir::toNativeSeparators(folder) + QDir::listSeparator() +
+                                                            spec.environment.value(QStringLiteral("PATH")));
     };
     // The runtimes the project was set up with come first.
     if (toolchains_) {
@@ -98,7 +99,8 @@ ProcessSpec Runner::processSpec(const RunConfiguration &configuration) const
                 const QString bin = QFileInfo(runtime->executable).absolutePath();
                 prependPath(bin);
                 // A virtual environment, as its activate script sets it.
-                if (runtime->tool == QLatin1String("python") && QFileInfo::exists(bin + QStringLiteral("/../pyvenv.cfg")))
+                if (runtime->tool == QLatin1String("python") &&
+                    QFileInfo::exists(bin + QStringLiteral("/../pyvenv.cfg")))
                     spec.environment.insert(QStringLiteral("VIRTUAL_ENV"),
                                             QDir::toNativeSeparators(QDir::cleanPath(bin + QStringLiteral("/.."))));
             }
@@ -120,8 +122,8 @@ ProcessSpec Runner::processSpec(const RunConfiguration &configuration) const
 void Runner::start(const RunConfiguration &configuration, TerminalWidget *terminal)
 {
     const QString name = configuration.name;
-    if (const std::shared_ptr<Run> previous = runs_.value(name); previous && previous->terminal
-        && previous->terminal != terminal && previous->terminal->isRunning()) {
+    if (const std::shared_ptr<Run> previous = runs_.value(name);
+        previous && previous->terminal && previous->terminal != terminal && previous->terminal->isRunning()) {
         previous->terminal->terminate();
     }
     const ProcessSpec spec = processSpec(configuration);

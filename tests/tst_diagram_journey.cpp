@@ -147,11 +147,12 @@ private slots:
         board.setFamily(&families::journey());
         auto *shape = dynamic_cast<JourneyTaskShape *>(board.addShape(
             QStringLiteral("journey"),
-            QJsonObject{{QStringLiteral("text"),
-                         QStringLiteral("Compare les différentes offres disponibles avant de poursuivre l'inscription")},
-                        {QStringLiteral("section"), QStringLiteral("Découverte et comparaison des solutions")},
-                        {QStringLiteral("actors"), QJsonArray{QStringLiteral("Responsable des achats internationaux"),
-                                                              QStringLiteral("Administrateur de la plateforme")}}}));
+            QJsonObject{
+                {QStringLiteral("text"),
+                 QStringLiteral("Compare les différentes offres disponibles avant de poursuivre l'inscription")},
+                {QStringLiteral("section"), QStringLiteral("Découverte et comparaison des solutions")},
+                {QStringLiteral("actors"), QJsonArray{QStringLiteral("Responsable des achats internationaux"),
+                                                      QStringLiteral("Administrateur de la plateforme")}}}));
         QVERIFY(shape);
         QCOMPARE(shape->score, 3);
         const qreal inner = shape->w - 32;
@@ -169,7 +170,8 @@ private slots:
         QVERIFY(shape->w <= 240);
 
         // A short step keeps the minimum card.
-        Shape *small = board.addShape(QStringLiteral("journey"), QJsonObject{{QStringLiteral("text"), QStringLiteral("Go")}});
+        Shape *small =
+            board.addShape(QStringLiteral("journey"), QJsonObject{{QStringLiteral("text"), QStringLiteral("Go")}});
         QCOMPARE(small->w, 170.0);
         QCOMPARE(small->h, 96.0);
         QCOMPARE(dynamic_cast<JourneyTaskShape *>(small)->section, QStringLiteral("Journey"));
@@ -193,7 +195,8 @@ private slots:
         QCOMPARE(shape->score, 5);
         const QJsonObject json = shape->toJson();
         QCOMPARE(json.value(QStringLiteral("score")).toInt(), 5);
-        QCOMPARE(jsonStrings(json, QStringLiteral("actors")), (QStringList{QStringLiteral("Ana"), QStringLiteral("Bo")}));
+        QCOMPARE(jsonStrings(json, QStringLiteral("actors")),
+                 (QStringList{QStringLiteral("Ana"), QStringLiteral("Bo")}));
     }
 
     void savesAndLoadsDocuments()
@@ -218,7 +221,8 @@ private slots:
         QVERIFY(!overlaps(board));
         // Left to right, in order.
         for (int i = 1; i < 5; ++i)
-            QVERIFY(step(board, QStringLiteral("step%1").arg(i + 1))->x > step(board, QStringLiteral("step%1").arg(i))->x);
+            QVERIFY(step(board, QStringLiteral("step%1").arg(i + 1))->x >
+                    step(board, QStringLiteral("step%1").arg(i))->x);
 
         const QByteArray saved = document::save(board, codec());
         QVERIFY(saved.startsWith(source.trimmed()));

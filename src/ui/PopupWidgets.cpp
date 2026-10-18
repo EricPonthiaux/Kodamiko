@@ -10,8 +10,8 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
-#include <QVariantAnimation>
 #include <QVBoxLayout>
+#include <QVariantAnimation>
 
 namespace {
 
@@ -38,8 +38,8 @@ public:
 protected:
     bool eventFilter(QObject *, QEvent *event) override
     {
-        if (event->type() == QEvent::MouseButtonRelease
-            && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton && button_->isEnabled()) {
+        if (event->type() == QEvent::MouseButtonRelease &&
+            static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton && button_->isEnabled()) {
             button_->click();
             return true;
         }
@@ -62,9 +62,9 @@ QScrollArea#pageScroll, QWidget#pageContent { background: transparent; border: n
 QFrame#popupFooter { border: none; border-top: 1px solid @line; }
 )") + extra;
     const QList<std::pair<QString, QColor>> colors = {
-        {"@accentText", theme.accentText}, {"@accent", theme.accent},       {"@text", theme.foreground},
-        {"@muted", theme.mutedText},       {"@window", theme.window},       {"@panel", theme.alternateBase},
-        {"@base", theme.background},       {"@line", theme.line},           {"@hover", theme.hover},
+        {"@accentText", theme.accentText}, {"@accent", theme.accent}, {"@text", theme.foreground},
+        {"@muted", theme.mutedText},       {"@window", theme.window}, {"@panel", theme.alternateBase},
+        {"@base", theme.background},       {"@line", theme.line},     {"@hover", theme.hover},
         {"@selection", theme.selection},
     };
     for (const auto &[name, color] : colors)
@@ -270,7 +270,8 @@ void ThemeCard::paintEvent(QPaintEvent *)
         painter.setBrush(accent);
         painter.drawEllipse(center, 8, 8);
         painter.setPen(QPen(Qt::white, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawPolyline(QPolygonF({center + QPointF(-3.5, 0), center + QPointF(-1, 2.6), center + QPointF(3.6, -2.4)}));
+        painter.drawPolyline(
+            QPolygonF({center + QPointF(-3.5, 0), center + QPointF(-1, 2.6), center + QPointF(3.6, -2.4)}));
     }
 
     // The border: the accent when chosen or under the mouse.
@@ -389,15 +390,23 @@ QList<QStringList> KeycapDelegate::keysOf(const QKeySequence &shortcut)
         const Qt::KeyboardModifiers modifiers = combination.keyboardModifiers();
         QStringList keys;
 #ifdef Q_OS_MACOS
-        if (modifiers & Qt::MetaModifier) keys.append(QStringLiteral("⌃"));
-        if (modifiers & Qt::AltModifier) keys.append(QStringLiteral("⌥"));
-        if (modifiers & Qt::ShiftModifier) keys.append(QStringLiteral("⇧"));
-        if (modifiers & Qt::ControlModifier) keys.append(QStringLiteral("⌘"));
+        if (modifiers & Qt::MetaModifier)
+            keys.append(QStringLiteral("⌃"));
+        if (modifiers & Qt::AltModifier)
+            keys.append(QStringLiteral("⌥"));
+        if (modifiers & Qt::ShiftModifier)
+            keys.append(QStringLiteral("⇧"));
+        if (modifiers & Qt::ControlModifier)
+            keys.append(QStringLiteral("⌘"));
 #else
-        if (modifiers & Qt::ControlModifier) keys.append(QStringLiteral("Ctrl"));
-        if (modifiers & Qt::AltModifier) keys.append(QStringLiteral("Alt"));
-        if (modifiers & Qt::ShiftModifier) keys.append(QStringLiteral("Shift"));
-        if (modifiers & Qt::MetaModifier) keys.append(QStringLiteral("Meta"));
+        if (modifiers & Qt::ControlModifier)
+            keys.append(QStringLiteral("Ctrl"));
+        if (modifiers & Qt::AltModifier)
+            keys.append(QStringLiteral("Alt"));
+        if (modifiers & Qt::ShiftModifier)
+            keys.append(QStringLiteral("Shift"));
+        if (modifiers & Qt::MetaModifier)
+            keys.append(QStringLiteral("Meta"));
 #endif
         keys.append(QKeySequence(combination.key()).toString(QKeySequence::NativeText));
         chords.append(keys);
@@ -464,7 +473,8 @@ void KeycapDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
                 painter->drawRoundedRect(cap.adjusted(0.5, 0.5, -0.5, -0.5), 4, 4);
                 // The key's lower edge, slightly thicker.
                 painter->setPen(QPen(capBorder, 1.5));
-                painter->drawLine(QPointF(cap.left() + 3, cap.bottom() - 0.5), QPointF(cap.right() - 3, cap.bottom() - 0.5));
+                painter->drawLine(QPointF(cap.left() + 3, cap.bottom() - 0.5),
+                                  QPointF(cap.right() - 3, cap.bottom() - 0.5));
                 painter->setPen(text);
                 painter->drawText(cap, Qt::AlignCenter, key);
                 x += width + 3;

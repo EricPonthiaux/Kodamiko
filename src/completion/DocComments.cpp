@@ -9,7 +9,12 @@
 
 namespace {
 
-enum class Style { None, Doxygen, Javadoc, JsDoc };
+enum class Style {
+    None,
+    Doxygen,
+    Javadoc,
+    JsDoc
+};
 
 Style styleOf(const QString &languageId)
 {
@@ -17,8 +22,8 @@ Style styleOf(const QString &languageId)
         return Style::Doxygen;
     if (languageId == QLatin1String("java"))
         return Style::Javadoc;
-    if (languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript")
-        || languageId == QLatin1String("tsx"))
+    if (languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript") ||
+        languageId == QLatin1String("tsx"))
         return Style::JsDoc;
     return Style::None;
 }
@@ -31,41 +36,93 @@ struct Tag {
 const QList<Tag> &tagsOf(Style style)
 {
     static const QList<Tag> doxygen = {
-        {"brief", "summary"},          {"param", "a parameter"},     {"tparam", "a template parameter"},
-        {"return", "the result"},      {"returns", "the result"},    {"retval", "a returned value"},
-        {"throws", "an exception"},    {"exception", "an exception"}, {"note", "a note"},
-        {"warning", "a warning"},      {"see", "a reference"},       {"sa", "see also"},
-        {"details", "the description"}, {"pre", "a precondition"},   {"post", "a postcondition"},
-        {"invariant", "an invariant"}, {"deprecated", "why"},        {"since", "a version"},
-        {"todo", "work left"},         {"code", "a code block"},     {"endcode", "end of the code block"},
-        {"p", "a parameter's name"},   {"a", "in italics"},          {"c", "as code"},
-        {"ref", "a link"},             {"file", "the file"},         {"author", "an author"},
-        {"version", "a version"},      {"copydoc", "copy a documentation"}, {"internal", "not public"},
-        {"attention", "a remark"},     {"example", "an example"},    {"overload", "an overload"},
+        {"brief", "summary"},
+        {"param", "a parameter"},
+        {"tparam", "a template parameter"},
+        {"return", "the result"},
+        {"returns", "the result"},
+        {"retval", "a returned value"},
+        {"throws", "an exception"},
+        {"exception", "an exception"},
+        {"note", "a note"},
+        {"warning", "a warning"},
+        {"see", "a reference"},
+        {"sa", "see also"},
+        {"details", "the description"},
+        {"pre", "a precondition"},
+        {"post", "a postcondition"},
+        {"invariant", "an invariant"},
+        {"deprecated", "why"},
+        {"since", "a version"},
+        {"todo", "work left"},
+        {"code", "a code block"},
+        {"endcode", "end of the code block"},
+        {"p", "a parameter's name"},
+        {"a", "in italics"},
+        {"c", "as code"},
+        {"ref", "a link"},
+        {"file", "the file"},
+        {"author", "an author"},
+        {"version", "a version"},
+        {"copydoc", "copy a documentation"},
+        {"internal", "not public"},
+        {"attention", "a remark"},
+        {"example", "an example"},
+        {"overload", "an overload"},
     };
     static const QList<Tag> javadoc = {
-        {"param", "a parameter"},    {"return", "the result"},       {"throws", "an exception"},
-        {"exception", "an exception"}, {"see", "a reference"},       {"since", "a version"},
-        {"deprecated", "why"},       {"author", "an author"},        {"version", "a version"},
-        {"link", "a link"},          {"linkplain", "a plain link"},  {"code", "as code"},
-        {"inheritDoc", "the overridden method's"}, {"literal", "as text"}, {"value", "a constant's value"},
-        {"serial", "a serialized field"}, {"apiNote", "a note"},     {"implNote", "an implementation note"},
+        {"param", "a parameter"},
+        {"return", "the result"},
+        {"throws", "an exception"},
+        {"exception", "an exception"},
+        {"see", "a reference"},
+        {"since", "a version"},
+        {"deprecated", "why"},
+        {"author", "an author"},
+        {"version", "a version"},
+        {"link", "a link"},
+        {"linkplain", "a plain link"},
+        {"code", "as code"},
+        {"inheritDoc", "the overridden method's"},
+        {"literal", "as text"},
+        {"value", "a constant's value"},
+        {"serial", "a serialized field"},
+        {"apiNote", "a note"},
+        {"implNote", "an implementation note"},
     };
     static const QList<Tag> jsdoc = {
-        {"param", "a parameter"},     {"returns", "the result"},     {"type", "the type"},
-        {"typedef", "a type"},        {"property", "a property"},    {"example", "an example"},
-        {"throws", "an exception"},   {"deprecated", "why"},         {"see", "a reference"},
-        {"link", "a link"},           {"async", "asynchronous"},     {"template", "a type parameter"},
-        {"private", "not public"},    {"public", "public"},          {"override", "an override"},
-        {"default", "the default value"}, {"since", "a version"},    {"author", "an author"},
-        {"callback", "a callback type"}, {"fires", "an event"},      {"module", "the module"},
+        {"param", "a parameter"},
+        {"returns", "the result"},
+        {"type", "the type"},
+        {"typedef", "a type"},
+        {"property", "a property"},
+        {"example", "an example"},
+        {"throws", "an exception"},
+        {"deprecated", "why"},
+        {"see", "a reference"},
+        {"link", "a link"},
+        {"async", "asynchronous"},
+        {"template", "a type parameter"},
+        {"private", "not public"},
+        {"public", "public"},
+        {"override", "an override"},
+        {"default", "the default value"},
+        {"since", "a version"},
+        {"author", "an author"},
+        {"callback", "a callback type"},
+        {"fires", "an event"},
+        {"module", "the module"},
     };
     static const QList<Tag> none;
     switch (style) {
-    case Style::Doxygen: return doxygen;
-    case Style::Javadoc: return javadoc;
-    case Style::JsDoc: return jsdoc;
-    case Style::None: break;
+    case Style::Doxygen:
+        return doxygen;
+    case Style::Javadoc:
+        return javadoc;
+    case Style::JsDoc:
+        return jsdoc;
+    case Style::None:
+        break;
     }
     return none;
 }
@@ -115,7 +172,8 @@ Documented documentedAt(const QByteArray &text, int position, Style style)
     if (header.isEmpty())
         return result;
     const bool typed = style != Style::JsDoc;
-    static const QRegularExpression templateHead(QStringLiteral("^\\s*template\\s*<(.*?)>\\s*(?:class|struct|union|using)\\b"));
+    static const QRegularExpression templateHead(
+        QStringLiteral("^\\s*template\\s*<(.*?)>\\s*(?:class|struct|union|using)\\b"));
     if (const QRegularExpressionMatch match = templateHead.match(header); match.hasMatch()) {
         // A class template: its parameters only.
         for (const QString &part : CodeScan::splitTopLevel(match.captured(1)))
@@ -127,7 +185,8 @@ Documented documentedAt(const QByteArray &text, int position, Style style)
     CodeScan::Function function = CodeScan::parseFunction(header);
     if (function.name.isEmpty() && style == Style::JsDoc) {
         // "const f = (a, b) =>", "f = async function (a)".
-        static const QRegularExpression arrow(QStringLiteral("=\\s*(?:async\\s+)?(?:function\\s*\\w*\\s*)?\\(([^()]*)\\)"));
+        static const QRegularExpression arrow(
+            QStringLiteral("=\\s*(?:async\\s+)?(?:function\\s*\\w*\\s*)?\\(([^()]*)\\)"));
         if (const QRegularExpressionMatch match = arrow.match(header); match.hasMatch()) {
             function.name = QStringLiteral("function");
             function.parameters = match.captured(1);
@@ -146,8 +205,8 @@ Documented documentedAt(const QByteArray &text, int position, Style style)
     }
     if (style == Style::JsDoc) {
         // TypeScript: "f(): Type".
-        result.returnsValue = function.trailing.startsWith(QLatin1Char(':'))
-                           && !function.trailing.contains(QLatin1String("void"));
+        result.returnsValue =
+            function.trailing.startsWith(QLatin1Char(':')) && !function.trailing.contains(QLatin1String("void"));
     } else {
         // Not a constructor (no type) nor a destructor.
         result.returnsValue = function.returnsValue() && !function.name.startsWith(QLatin1Char('~'));
@@ -185,8 +244,8 @@ int commentStart(const QByteArray &text, int position, const QString &languageId
     int first = lineStart;
     while (first < position && (text[first] == ' ' || text[first] == '\t'))
         ++first;
-    if (position >= first + 3 && (text.mid(first, 3) == "///" || text.mid(first, 3) == "//!")
-        && text.mid(first, 4) != "////")
+    if (position >= first + 3 && (text.mid(first, 3) == "///" || text.mid(first, 3) == "//!") &&
+        text.mid(first, 4) != "////")
         return first;
     const int open = int(text.lastIndexOf("/*", position - 2));
     if (open < 0 || open + 2 >= text.size())
@@ -212,15 +271,15 @@ QString stub(const QByteArray &text, int position, const QString &languageId, co
     QStringList tags;
     int stop = 2;
     for (const QString &name : documented.templateParameters)
-        tags.append(QStringLiteral(" @%1 %2 ${%3}").arg(style == Style::JsDoc ? QStringLiteral("template")
-                                                                                : QStringLiteral("tparam"),
-                                                         Snippet::escape(name))
+        tags.append(QStringLiteral(" @%1 %2 ${%3}")
+                        .arg(style == Style::JsDoc ? QStringLiteral("template") : QStringLiteral("tparam"),
+                             Snippet::escape(name))
                         .arg(stop++));
     for (const QString &name : documented.parameters)
         tags.append(QStringLiteral(" @param %1 ${%2}").arg(Snippet::escape(name)).arg(stop++));
     if (documented.returnsValue)
-        tags.append(QStringLiteral(" @%1 ${%2}").arg(style == Style::JsDoc ? QStringLiteral("returns")
-                                                                             : QStringLiteral("return"))
+        tags.append(QStringLiteral(" @%1 ${%2}")
+                        .arg(style == Style::JsDoc ? QStringLiteral("returns") : QStringLiteral("return"))
                         .arg(stop++));
     for (const QString &exception : documented.exceptions)
         tags.append(QStringLiteral(" @throws %1 ${%2}").arg(Snippet::escape(exception)).arg(stop++));
@@ -252,9 +311,9 @@ void DocCommentProvider::complete(const CompletionContext &context, const Callba
     const Style style = styleOf(context.languageId);
     const char before = text[context.prefixStart - 1];
     if (before == '@' || (before == '\\' && style == Style::Doxygen)) {
-        const QString kind = style == Style::Doxygen ? QObject::tr("Doxygen command")
-                           : style == Style::Javadoc ? QObject::tr("Javadoc tag")
-                                                     : QObject::tr("JSDoc tag");
+        const QString kind = style == Style::Doxygen   ? QObject::tr("Doxygen command")
+                             : style == Style::Javadoc ? QObject::tr("Javadoc tag")
+                                                       : QObject::tr("JSDoc tag");
         const QList<Tag> &tags = tagsOf(style);
         for (int i = 0; i < tags.size(); ++i) {
             CompletionItem item;
@@ -288,8 +347,8 @@ void DocCommentProvider::complete(const CompletionContext &context, const Callba
     // Those documented already, elsewhere in the comment.
     const QString comment = QString::fromUtf8(text.mid(start, after - start));
     const int prefixInComment = int(QString::fromUtf8(text.mid(start, context.prefixStart - start)).size());
-    static const QRegularExpression documentedTag(
-        QStringLiteral("[@\\\\](?:param|arg|argument|tparam|template)(?:\\[[^\\]]*\\])?\\s+(?:\\{[^}]*\\}\\s*)?([\\w$]+)"));
+    static const QRegularExpression documentedTag(QStringLiteral(
+        "[@\\\\](?:param|arg|argument|tparam|template)(?:\\[[^\\]]*\\])?\\s+(?:\\{[^}]*\\}\\s*)?([\\w$]+)"));
     QSet<QString> documentedNames;
     for (QRegularExpressionMatchIterator it = documentedTag.globalMatch(comment); it.hasNext();) {
         const QRegularExpressionMatch match = it.next();

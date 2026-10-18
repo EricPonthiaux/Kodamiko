@@ -99,7 +99,8 @@ QString move(const QString &source, const QString &destination)
         return error;
     const bool removed = QFileInfo(source).isDir() && !QFileInfo(source).isSymLink() ? QDir(source).removeRecursively()
                                                                                      : QFile::remove(source);
-    return removed ? QString() : translate("“%1” was copied but could not be deleted").arg(QFileInfo(source).fileName());
+    return removed ? QString()
+                   : translate("“%1” was copied but could not be deleted").arg(QFileInfo(source).fileName());
 }
 
 QString copyName(const QString &folder, const QString &name)

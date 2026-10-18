@@ -211,9 +211,10 @@ void NamePopup::focusContent()
 void NamePopup::errorChanged(bool shown)
 {
     // The outline only: the field keeps the style's look otherwise.
-    field_->setStyleSheet(shown ? QStringLiteral("QLineEdit { border: 1px solid %1; border-radius: 3px; padding: 2px; }")
-                                      .arg(errorColor(palette()))
-                                : QString());
+    field_->setStyleSheet(shown
+                              ? QStringLiteral("QLineEdit { border: 1px solid %1; border-radius: 3px; padding: 2px; }")
+                                    .arg(errorColor(palette()))
+                              : QString());
 }
 
 ConfirmPopup::ConfirmPopup(const QString &title, const QString &location, const QString &message,

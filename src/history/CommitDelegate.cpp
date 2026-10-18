@@ -90,8 +90,9 @@ QPixmap CommitDelegate::drawAvatar(const QString &name, int size, qreal ratio)
     static const QColor colors[] = {QColor("#7c6cf0"), QColor("#4c9be8"), QColor("#2fae8f"), QColor("#e07b53"),
                                     QColor("#d65d8f"), QColor("#9a7d4f"), QColor("#5a8f3c"), QColor("#c55bd8")};
     // Claude in its own orange.
-    const QColor color = name.startsWith(QLatin1String("Claude")) ? QColor("#d97757")
-                                                                  : colors[qHash(name) % (sizeof(colors) / sizeof(colors[0]))];
+    const QColor color = name.startsWith(QLatin1String("Claude"))
+                             ? QColor("#d97757")
+                             : colors[qHash(name) % (sizeof(colors) / sizeof(colors[0]))];
     QPixmap pixmap(QSize(size, size) * ratio);
     pixmap.setDevicePixelRatio(ratio);
     pixmap.fill(Qt::transparent);
@@ -184,9 +185,9 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     detailFont.setPointSizeF(option.font.pointSizeF() * 0.92);
     painter->setFont(detailFont);
     painter->setPen(dimmed(option, selected));
-    const QString details = QStringLiteral("%1  ·  %2  ·  %3")
-                                .arg(author, relativeDate(index.data(DateRole).toDateTime()),
-                                     index.data(ShortIdRole).toString());
+    const QString details =
+        QStringLiteral("%1  ·  %2  ·  %3")
+            .arg(author, relativeDate(index.data(DateRole).toDateTime()), index.data(ShortIdRole).toString());
     const QFontMetrics detailMetrics(detailFont);
     painter->drawText(QRect(left, rect.center().y() + 3, rect.right() - left, detailMetrics.height()),
                       Qt::AlignLeft | Qt::AlignVCenter,

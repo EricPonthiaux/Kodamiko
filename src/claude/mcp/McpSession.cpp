@@ -21,9 +21,9 @@ QJsonObject toolDeclaration(const McpTool &tool)
 {
     QJsonObject declaration{{QLatin1String("name"), tool.name},
                             {QLatin1String("description"), tool.description},
-                            {QLatin1String("inputSchema"), tool.inputSchema.isEmpty()
-                                                               ? QJsonObject{{QLatin1String("type"), QLatin1String("object")}}
-                                                               : tool.inputSchema}};
+                            {QLatin1String("inputSchema"),
+                             tool.inputSchema.isEmpty() ? QJsonObject{{QLatin1String("type"), QLatin1String("object")}}
+                                                        : tool.inputSchema}};
     if (!tool.title.isEmpty())
         declaration.insert(QLatin1String("title"), tool.title);
     if (!tool.outputSchema.isEmpty())
@@ -47,9 +47,8 @@ QJsonObject toolResult(const McpResult &result)
                                      ? QJsonDocument(result.structured.toObject()).toJson(QJsonDocument::Compact)
                                      : QJsonDocument(result.structured.toArray()).toJson(QJsonDocument::Compact));
     }
-    QJsonObject object{{QLatin1String("content"),
-                        QJsonArray{QJsonObject{{QLatin1String("type"), QLatin1String("text")},
-                                               {QLatin1String("text"), text}}}},
+    QJsonObject object{{QLatin1String("content"), QJsonArray{QJsonObject{{QLatin1String("type"), QLatin1String("text")},
+                                                                         {QLatin1String("text"), text}}}},
                        {QLatin1String("isError"), result.isError}};
     if (result.structured.isObject())
         object.insert(QLatin1String("structuredContent"), result.structured);
@@ -115,17 +114,16 @@ void McpSession::send(const QJsonObject &message)
 
 void McpSession::result(const QJsonValue &id, const QJsonObject &value)
 {
-    send(QJsonObject{{QLatin1String("jsonrpc"), QLatin1String("2.0")},
-                     {QLatin1String("id"), id},
-                     {QLatin1String("result"), value}});
+    send(QJsonObject{
+        {QLatin1String("jsonrpc"), QLatin1String("2.0")}, {QLatin1String("id"), id}, {QLatin1String("result"), value}});
 }
 
 void McpSession::error(const QJsonValue &id, int code, const QString &message)
 {
-    send(QJsonObject{{QLatin1String("jsonrpc"), QLatin1String("2.0")},
-                     {QLatin1String("id"), id},
-                     {QLatin1String("error"),
-                      QJsonObject{{QLatin1String("code"), code}, {QLatin1String("message"), message}}}});
+    send(QJsonObject{
+        {QLatin1String("jsonrpc"), QLatin1String("2.0")},
+        {QLatin1String("id"), id},
+        {QLatin1String("error"), QJsonObject{{QLatin1String("code"), code}, {QLatin1String("message"), message}}}});
 }
 
 void McpSession::handleMessage(const QJsonObject &message)
@@ -248,7 +246,7 @@ void McpSession::callTool(const QJsonValue &id, const QJsonObject &params)
         if (self)
             self->result(id, toolResult(outcome));
     };
-    McpProgress progress = [](double, double, const QString &) {};
+    McpProgress progress = [](double, double, const QString &) { };
     const QJsonValue token = params.value(QLatin1String("_meta")).toObject().value(QLatin1String("progressToken"));
     if (!token.isUndefined() && !token.isNull()) {
         progress = [self, token](double done, double total, const QString &message) {
@@ -289,10 +287,10 @@ void McpSession::readResource(const QJsonValue &id, const QJsonObject &params)
         error(id, resourceNotFound, QStringLiteral("No resource %1").arg(uri));
         return;
     }
-    result(id, QJsonObject{{QLatin1String("contents"),
-                            QJsonArray{QJsonObject{{QLatin1String("uri"), uri},
-                                                   {QLatin1String("mimeType"), resource->mimeType},
-                                                   {QLatin1String("text"), *content}}}}});
+    result(id, QJsonObject{
+                   {QLatin1String("contents"), QJsonArray{QJsonObject{{QLatin1String("uri"), uri},
+                                                                      {QLatin1String("mimeType"), resource->mimeType},
+                                                                      {QLatin1String("text"), *content}}}}});
 }
 
 void McpSession::getPrompt(const QJsonValue &id, const QJsonObject &params)

@@ -67,7 +67,7 @@ void HookServer::onReadyRead(QLocalSocket *socket)
 std::function<void()> HookServer::deferReply()
 {
     if (!receiving_)
-        return [] {};
+        return [] { };
     replyDeferred_ = true;
     return [socket = QPointer<QLocalSocket>(receiving_)] {
         if (socket)

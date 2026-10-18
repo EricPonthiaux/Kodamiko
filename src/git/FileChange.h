@@ -4,7 +4,13 @@
 
 #include <stdexcept>
 
-enum class ChangeKind { Added, Modified, Deleted, Renamed, Conflicted };
+enum class ChangeKind {
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+    Conflicted
+};
 
 // File changed between two states of the repository (last commit, index, disk).
 // Paths relative to the project root, "/" separators.

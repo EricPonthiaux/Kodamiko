@@ -71,10 +71,9 @@ QString endpoint(const QString &id, const GraphvizEndpoint *end)
     QString result = QLatin1Char('"') + dotEscape(end && !end->id.isEmpty() ? end->id : id) + QLatin1Char('"');
     if (end && !end->port.isEmpty())
         result += QStringLiteral(":\"") + dotEscape(end->port) + QLatin1Char('"');
-    static const QSet<QString> compasses{QStringLiteral("n"),  QStringLiteral("ne"), QStringLiteral("e"),
-                                         QStringLiteral("se"), QStringLiteral("s"),  QStringLiteral("sw"),
-                                         QStringLiteral("w"),  QStringLiteral("nw"), QStringLiteral("c"),
-                                         QStringLiteral("_")};
+    static const QSet<QString> compasses{
+        QStringLiteral("n"),  QStringLiteral("ne"), QStringLiteral("e"),  QStringLiteral("se"), QStringLiteral("s"),
+        QStringLiteral("sw"), QStringLiteral("w"),  QStringLiteral("nw"), QStringLiteral("c"),  QStringLiteral("_")};
     if (end && compasses.contains(end->compass))
         result += QLatin1Char(':') + end->compass;
     return result;
@@ -328,13 +327,13 @@ bool routeLinks(Board &board)
         if (ends) {
             const Shape *routeFrom = board.shape(ends->first.id.isEmpty() ? l->from : ends->first.id);
             const Shape *routeTo = board.shape(ends->second.id.isEmpty() ? l->to : ends->second.id);
-            const QString rankdir = routeFrom && routeTo && routeTo->cx() < routeFrom->cx() ? QStringLiteral("RL")
-                                                                                            : QStringLiteral("LR");
+            const QString rankdir =
+                routeFrom && routeTo && routeTo->cx() < routeFrom->cx() ? QStringLiteral("RL") : QStringLiteral("LR");
             ends = l->graphvizEndpoints(board, rankdir);
         }
         dot += QStringLiteral("  %1 -> %2 [%3];\n")
-                   .arg(endpoint(l->from, ends ? &ends->first : nullptr), endpoint(l->to, ends ? &ends->second : nullptr),
-                        attrs.join(QLatin1Char(' ')));
+                   .arg(endpoint(l->from, ends ? &ends->first : nullptr),
+                        endpoint(l->to, ends ? &ends->second : nullptr), attrs.join(QLatin1Char(' ')));
         routable.insert(l->id, l.get());
     }
     dot += QStringLiteral("}\n");
@@ -465,8 +464,8 @@ void placeNewcomers(Board &board, const QStringList &ids, const ArrangeOptions &
             const auto overlaps = [&](const Shape *candidate) {
                 const QRectF box = candidate->rect().adjusted(-12, -12, 12, 12);
                 for (const auto &other : board.shapes()) {
-                    if (other.get() != candidate && placed.contains(other->id) && !other->drawBehindLinks()
-                        && box.intersects(other->rect()))
+                    if (other.get() != candidate && placed.contains(other->id) && !other->drawBehindLinks() &&
+                        box.intersects(other->rect()))
                         return true;
                 }
                 return false;
@@ -503,14 +502,14 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
     const qreal scale = fontScale();
     const QString clusterFontSize = dotFontSize(ClusterLabelFontPx, scale);
     const QString edgeFontSize = dotFontSize(style.linkLabel.fontPx, scale);
-    QString dot = QStringLiteral("digraph {\n  rankdir=%1;\n  nodesep=0.60;\n  ranksep=0.80;\n").arg(rankdir)
-                  + QStringLiteral("  graph [fontname=\"%1\" fontsize=%2];\n").arg(metricFont, clusterFontSize)
-                  + QStringLiteral("  node [shape=box fixedsize=true fontname=\"%1\"];\n").arg(metricFont)
-                  + QStringLiteral("  edge [fontname=\"%1\" fontsize=%2 labelfloat=false penwidth=%3 arrowsize=%4];\n")
-                        .arg(metricFont, edgeFontSize, number(edgeWidth), number(arrowScale));
-    static const QSet<QString> splineModes{QStringLiteral("none"),  QStringLiteral("line"),
+    QString dot = QStringLiteral("digraph {\n  rankdir=%1;\n  nodesep=0.60;\n  ranksep=0.80;\n").arg(rankdir) +
+                  QStringLiteral("  graph [fontname=\"%1\" fontsize=%2];\n").arg(metricFont, clusterFontSize) +
+                  QStringLiteral("  node [shape=box fixedsize=true fontname=\"%1\"];\n").arg(metricFont) +
+                  QStringLiteral("  edge [fontname=\"%1\" fontsize=%2 labelfloat=false penwidth=%3 arrowsize=%4];\n")
+                      .arg(metricFont, edgeFontSize, number(edgeWidth), number(arrowScale));
+    static const QSet<QString> splineModes{QStringLiteral("none"),     QStringLiteral("line"),
                                            QStringLiteral("polyline"), QStringLiteral("ortho"),
-                                           QStringLiteral("curved"), QStringLiteral("spline")};
+                                           QStringLiteral("curved"),   QStringLiteral("spline")};
     if (splineModes.contains(options.splines))
         dot += QStringLiteral("  splines=%1;\n").arg(options.splines);
     QString root = options.root;
@@ -572,8 +571,8 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
                     continue;
                 if (isCandidate && !(boundary->w * boundary->h > s->w * s->h))
                     continue;
-                if (s->cx() < boundary->x || s->cx() > boundary->x + boundary->w || s->cy() < boundary->y
-                    || s->cy() > boundary->y + boundary->h)
+                if (s->cx() < boundary->x || s->cx() > boundary->x + boundary->w || s->cy() < boundary->y ||
+                    s->cy() > boundary->y + boundary->h)
                     continue;
                 if (!parent || boundary->w * boundary->h < parent->w * parent->h)
                     parent = boundary;
@@ -638,7 +637,8 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
         if (emittedClusters.contains(boundary->id))
             return;
         emittedClusters.insert(boundary->id);
-        dot += QStringLiteral("%1subgraph \"%2\" {\n").arg(indent, dotEscape(QStringLiteral("cluster_") + boundary->id));
+        dot +=
+            QStringLiteral("%1subgraph \"%2\" {\n").arg(indent, dotEscape(QStringLiteral("cluster_") + boundary->id));
         const qreal labelPx = boundary->layoutLabelFontPx() > 0 ? boundary->layoutLabelFontPx() : ClusterLabelFontPx;
         dot += QStringLiteral("%1  label=\"%2\"; fontsize=%3; margin=%4;\n")
                    .arg(indent, dotEscape(boundary->layoutLabel()), dotFontSize(labelPx, scale),
@@ -835,14 +835,15 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
     QJsonObject g = QJsonDocument::fromJson(output).object();
     // For families with no prescribed reading direction (C4): the better
     // framed of the two complete layouts.
-    if (options.adaptiveDirection && engine == QLatin1String("dot")
-        && (rankdir == QLatin1String("LR") || rankdir == QLatin1String("TB"))) {
+    if (options.adaptiveDirection && engine == QLatin1String("dot") &&
+        (rankdir == QLatin1String("LR") || rankdir == QLatin1String("TB"))) {
         const qreal current = fitScale(numbers(g.value(QStringLiteral("bb")).toString()), options.viewSize,
                                        std::min(style.maxScale, style.fitMaxScale));
         if (current > 0 && current < 1) {
             const QString other = rankdir == QLatin1String("LR") ? QStringLiteral("TB") : QStringLiteral("LR");
             QString alternativeDot = dot;
-            alternativeDot.replace(QStringLiteral("rankdir=%1;").arg(rankdir), QStringLiteral("rankdir=%1;").arg(other));
+            alternativeDot.replace(QStringLiteral("rankdir=%1;").arg(rankdir),
+                                   QStringLiteral("rankdir=%1;").arg(other));
             const QByteArray alternative = layout(alternativeDot.toUtf8(), engineName.constData());
             if (!alternative.isEmpty()) {
                 const QJsonObject candidate = QJsonDocument::fromJson(alternative).object();
@@ -959,8 +960,8 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
         const auto expected = layoutEndpointsById.value(l->id);
         const int tail = edge.value(QStringLiteral("tail")).toInt(-1);
         const int head = edge.value(QStringLiteral("head")).toInt(-1);
-        if (tail < 0 || head < 0 || tail >= names.size() || head >= names.size() || names[tail] != expected.first
-            || names[head] != expected.second)
+        if (tail < 0 || head < 0 || tail >= names.size() || head >= names.size() || names[tail] != expected.first ||
+            names[head] != expected.second)
             continue;
         l->spline.reset();
         const Shape *a = board.shape(l->from);

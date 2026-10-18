@@ -59,8 +59,8 @@ std::optional<QString> writeSettingsFile(const QByteArray &settings, const QStri
 void launchThroughCmd(ProcessSpec &spec)
 {
 #ifdef Q_OS_WIN
-    if (spec.program.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive)
-        || spec.program.endsWith(QLatin1String(".bat"), Qt::CaseInsensitive)) {
+    if (spec.program.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive) ||
+        spec.program.endsWith(QLatin1String(".bat"), Qt::CaseInsensitive)) {
         spec.arguments.prepend(QDir::toNativeSeparators(spec.program));
         spec.arguments.prepend(QStringLiteral("/c"));
         spec.program = QStringLiteral("cmd.exe");
@@ -179,27 +179,26 @@ QString findClaudeExecutable()
     // When launched from the desktop, the editor does not always inherit the
     // shell's PATH: try the usual installation locations.
     const QString home = QDir::homePath();
-    return QStandardPaths::findExecutable(QStringLiteral("claude"),
-                                          {home + QStringLiteral("/.local/bin"),
-                                           home + QStringLiteral("/.claude/local"),
-                                           home + QStringLiteral("/.npm-global/bin")});
+    return QStandardPaths::findExecutable(QStringLiteral("claude"), {home + QStringLiteral("/.local/bin"),
+                                                                     home + QStringLiteral("/.claude/local"),
+                                                                     home + QStringLiteral("/.npm-global/bin")});
 }
 
-std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName,
-                                         QString *error, const QStringList &extraArguments,
+std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName, QString *error,
+                                         const QStringList &extraArguments,
                                          const std::optional<QStringList> &mcpReadOnlyTools)
 {
     const QString claude = findClaudeExecutable();
     if (claude.isEmpty()) {
-        *error = QCoreApplication::translate("ClaudeLauncher",
-                                             "The \"claude\" command was not found. Install Claude Code "
-                                             "from Help ▸ Check Prerequisites.");
+        *error =
+            QCoreApplication::translate("ClaudeLauncher", "The \"claude\" command was not found. Install Claude Code "
+                                                          "from Help ▸ Check Prerequisites.");
         return std::nullopt;
     }
     const QString hook = hookCommand();
     if (hook.isEmpty()) {
-        *error = QCoreApplication::translate("ClaudeLauncher",
-                                             "The duet-hook program is missing from the editor's folder.");
+        *error =
+            QCoreApplication::translate("ClaudeLauncher", "The duet-hook program is missing from the editor's folder.");
         return std::nullopt;
     }
 
@@ -244,9 +243,9 @@ std::optional<ProcessSpec> printProcess(const QString &workingDirectory, const Q
 {
     const QString claude = findClaudeExecutable();
     if (claude.isEmpty()) {
-        *error = QCoreApplication::translate("ClaudeLauncher",
-                                             "The \"claude\" command was not found. Install Claude Code "
-                                             "from Help ▸ Check Prerequisites.");
+        *error =
+            QCoreApplication::translate("ClaudeLauncher", "The \"claude\" command was not found. Install Claude Code "
+                                                          "from Help ▸ Check Prerequisites.");
         return std::nullopt;
     }
     ProcessSpec spec;

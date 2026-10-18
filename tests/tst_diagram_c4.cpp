@@ -96,8 +96,8 @@ graphviz::ArrangeOptions familyOptions(const Board &board)
 
 bool contains(const QRectF &outer, const QRectF &inner)
 {
-    return inner.left() >= outer.left() - 0.5 && inner.top() >= outer.top() - 0.5
-           && inner.right() <= outer.right() + 0.5 && inner.bottom() <= outer.bottom() + 0.5;
+    return inner.left() >= outer.left() - 0.5 && inner.top() >= outer.top() - 0.5 &&
+           inner.right() <= outer.right() + 0.5 && inner.bottom() <= outer.bottom() + 0.5;
 }
 
 } // namespace
@@ -120,8 +120,8 @@ private slots:
             ids.insert(preset.id);
         for (const char *id : {"person", "person-external", "system", "system-database", "system-queue", "container",
                                "container-database", "container-queue", "component", "component-database",
-                               "component-queue", "component-queue-external", "enterprise-boundary",
-                               "system-boundary", "container-boundary", "deployment-boundary"})
+                               "component-queue", "component-queue-external", "enterprise-boundary", "system-boundary",
+                               "container-boundary", "deployment-boundary"})
             QVERIFY2(ids.contains(QString::fromLatin1(id)), id);
         QCOMPARE(f.elements.size(), 24);
         QCOMPARE(ids.size(), 24);
@@ -168,9 +168,9 @@ private slots:
         for (const Model::Node &node : model.nodes) {
             boundary = boundary || node.type == QLatin1String("c4boundary");
             database = database || node.props.value(QStringLiteral("variant")).toString() == QLatin1String("database");
-            externalQueue = externalQueue
-                            || (node.props.value(QStringLiteral("variant")).toString() == QLatin1String("queue")
-                                && node.props.value(QStringLiteral("external")).toBool());
+            externalQueue =
+                externalQueue || (node.props.value(QStringLiteral("variant")).toString() == QLatin1String("queue") &&
+                                  node.props.value(QStringLiteral("external")).toBool());
             if (node.key == QLatin1String("web")) {
                 QCOMPARE(node.props.value(QStringLiteral("parentBoundary")).toString(), QStringLiteral("platform"));
                 QCOMPARE(node.props.value(QStringLiteral("technology")).toString(), QStringLiteral("JavaScript"));
@@ -227,7 +227,8 @@ private slots:
         QVERIFY(serialized.contains(
             QStringLiteral("  Rel(api, events, \"Publishes\", \"AMQP\", \"Order placed and shipped\")")));
         QVERIFY(serialized.contains(QStringLiteral("  Person_Ext(support, \"Support agent\", \"Helps customers\")")));
-        QVERIFY(serialized.contains(QStringLiteral("ContainerQueue(events, \"Events\", \"Kafka\", \"Domain events\")")));
+        QVERIFY(
+            serialized.contains(QStringLiteral("ContainerQueue(events, \"Events\", \"Kafka\", \"Domain events\")")));
 
         // Parsed again, the same model.
         Model again;
@@ -288,11 +289,14 @@ private slots:
         QCOMPARE(shape->typeLines(), QStringList{QStringLiteral("[Container]")});
 
         // A saved, too small size is measured again without moving it.
-        auto *saved = static_cast<C4ElementShape *>(board.addShape(
-            QStringLiteral("c4"),
-            {{QStringLiteral("x"), 240}, {QStringLiteral("y"), 90}, {QStringLiteral("w"), 80}, {QStringLiteral("h"), 40},
-             {QStringLiteral("name"), shape->name}, {QStringLiteral("kind"), QStringLiteral("container")},
-             {QStringLiteral("description"), shape->description}}));
+        auto *saved = static_cast<C4ElementShape *>(
+            board.addShape(QStringLiteral("c4"), {{QStringLiteral("x"), 240},
+                                                  {QStringLiteral("y"), 90},
+                                                  {QStringLiteral("w"), 80},
+                                                  {QStringLiteral("h"), 40},
+                                                  {QStringLiteral("name"), shape->name},
+                                                  {QStringLiteral("kind"), QStringLiteral("container")},
+                                                  {QStringLiteral("description"), shape->description}}));
         QCOMPARE(saved->x, 240.0);
         QCOMPARE(saved->y, 90.0);
         QVERIFY(saved->w > 80);
@@ -357,8 +361,8 @@ private slots:
         QVERIFY(boundary->layoutMinimumSize()->width() >= 340);
         QCOMPARE(boundary->layoutMinimumSize()->height(), 220.0);
         // A fresh boundary has room for its title, never less than 340 × 220.
-        Shape *small = board.addShape(QStringLiteral("c4boundary"),
-                                      {{QStringLiteral("w"), 10}, {QStringLiteral("h"), 10}});
+        Shape *small =
+            board.addShape(QStringLiteral("c4boundary"), {{QStringLiteral("w"), 10}, {QStringLiteral("h"), 10}});
         QVERIFY(small->w >= 340 && small->h >= 220);
     }
 
@@ -433,8 +437,18 @@ private slots:
             QCOMPARE(t->displayText(), s->displayText());
             QCOMPARE(t->parentBoundary, s->parentBoundary);
             QCOMPARE(t->customFill, s->customFill);
-            QVERIFY2(std::abs(t->x - s->x) <= 0.06 && std::abs(t->y - s->y) <= 0.06 && std::abs(t->w - s->w) <= 0.06 && std::abs(t->h - s->h) <= 0.06,
-                     qPrintable(QStringLiteral("%1 %2,%3 %4x%5 -> %6,%7 %8x%9").arg(s->key).arg(s->x).arg(s->y).arg(s->w).arg(s->h).arg(t->x).arg(t->y).arg(t->w).arg(t->h)));
+            QVERIFY2(std::abs(t->x - s->x) <= 0.06 && std::abs(t->y - s->y) <= 0.06 && std::abs(t->w - s->w) <= 0.06 &&
+                         std::abs(t->h - s->h) <= 0.06,
+                     qPrintable(QStringLiteral("%1 %2,%3 %4x%5 -> %6,%7 %8x%9")
+                                    .arg(s->key)
+                                    .arg(s->x)
+                                    .arg(s->y)
+                                    .arg(s->w)
+                                    .arg(s->h)
+                                    .arg(t->x)
+                                    .arg(t->y)
+                                    .arg(t->w)
+                                    .arg(t->h)));
             QCOMPARE(t->toJson().value(QStringLiteral("technology")), s->toJson().value(QStringLiteral("technology")));
             QCOMPARE(t->toJson().value(QStringLiteral("description")),
                      s->toJson().value(QStringLiteral("description")));

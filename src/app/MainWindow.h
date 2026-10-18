@@ -9,8 +9,8 @@
 #include "ui/Theme.h"
 
 #include <QJsonObject>
-#include <QSet>
 #include <QMainWindow>
+#include <QSet>
 
 #include <memory>
 #include <optional>
@@ -76,7 +76,12 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    enum class Mode { Terminal, Edit, Diff, History };
+    enum class Mode {
+        Terminal,
+        Edit,
+        Diff,
+        History
+    };
 
     explicit MainWindow(const QString &folder, QWidget *parent = nullptr);
     ~MainWindow() override;
@@ -93,12 +98,18 @@ protected:
 
 private:
     void createWidgets();
+    void createGitServices();
+    void createPopups();
     QWidget *createEditPage();
     QWidget *createTerminalPage();
     void createModeTabs();
+    void createStatusBar();
     void createMenus();
     void createGitMenu();
     void createEditMenu();
+    void createFoldingMenu(QMenu *edit);
+    // The current editor in Edit mode, null otherwise.
+    EditorWidget *editorInEditMode() const;
     void createNavigateMenu();
     void createRunMenu();
     void createHelpMenu();
@@ -258,7 +269,7 @@ private:
     NoticeBar *toolsNotice_ = nullptr;
     bool closingProject_ = false;
     NoticeBar *serverNotice_ = nullptr;
-    QSet<QString> dismissedServerNotices_; // closed by the user, by message
+    QSet<QString> dismissedServerNotices_;   // closed by the user, by message
     NoticeBar *unsavedEditNotice_ = nullptr; // an edit by Claude refused
     // Claude asks to run a sensitive tool (restore a snapshot, commit…):
     // above every mode, one request at a time.
@@ -281,7 +292,7 @@ private:
     ClaudeConfigView *claudeConfigView_ = nullptr;
     SidePanel *sidebar_ = nullptr;
     QTabWidget *terminalTabs_ = nullptr;
-    QToolButton *newTerminalButton_ = nullptr; // "+" at the right of the terminal tabs
+    QToolButton *newTerminalButton_ = nullptr;      // "+" at the right of the terminal tabs
     QToolButton *emptyNewTerminalButton_ = nullptr; // the same, when no terminal is open
     TerminalWidget *claudeTerminal_ = nullptr;
     QStackedWidget *terminalPage_ = nullptr;
@@ -292,11 +303,11 @@ private:
     AskpassServer *askpass_ = nullptr;
     RepositoryWatcher *repositoryWatcher_ = nullptr;
     TitleBar *titleBar_ = nullptr;
-    QToolButton *branchButton_ = nullptr; // status bar: branch, Branches popup
-    QToolButton *syncButton_ = nullptr;   // status bar: fetch, pull, push
+    QToolButton *branchButton_ = nullptr;    // status bar: branch, Branches popup
+    QToolButton *syncButton_ = nullptr;      // status bar: fetch, pull, push
     QToolButton *cancelGitButton_ = nullptr; // status bar: stops a fetch, push…
-    QString gitProgress_; // the status bar message of a fetch, push… in progress
-    QAction *continueAction_ = nullptr; // Git menu: the operation in progress
+    QString gitProgress_;                    // the status bar message of a fetch, push… in progress
+    QAction *continueAction_ = nullptr;      // Git menu: the operation in progress
     QAction *skipAction_ = nullptr;
     QAction *abortAction_ = nullptr;
     WindowFrame *frame_ = nullptr;

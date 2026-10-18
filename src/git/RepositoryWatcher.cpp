@@ -27,7 +27,8 @@ void RepositoryWatcher::setGitDir(const QString &gitDir)
     // refs/remotes and its folders, the remote branches a fetch updates.
     const auto refsDirectories = [](const QString &folder) {
         const QDir refs(QDir(folder).filePath(QStringLiteral("refs")));
-        QStringList directories{refs.path(), refs.filePath(QStringLiteral("heads")), refs.filePath(QStringLiteral("remotes"))};
+        QStringList directories{refs.path(), refs.filePath(QStringLiteral("heads")),
+                                refs.filePath(QStringLiteral("remotes"))};
         const QDir remotes(refs.filePath(QStringLiteral("remotes")));
         for (const QString &remote : remotes.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
             directories.append(remotes.filePath(remote));

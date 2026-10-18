@@ -38,7 +38,7 @@ struct ElementPreset {
     QString id;
     QString label;
     QString help;
-    QString shapeType;  // empty: the family's default
+    QString shapeType; // empty: the family's default
     QJsonObject props;
     // Created by a press-drag-release gesture (an arrow, a line).
     bool trace = false;
@@ -62,9 +62,9 @@ struct Family {
 
     QList<ElementPreset> elements;
     QList<RelationPreset> relations;
-    bool cardinalities = false;    // relations carry multiplicities (UML, ER)
-    QStringList technologies;      // C4 relations' technologies
-    bool nestedCreation = false;   // elements created in a frame join it
+    bool cardinalities = false;  // relations carry multiplicities (UML, ER)
+    QStringList technologies;    // C4 relations' technologies
+    bool nestedCreation = false; // elements created in a frame join it
 
     bool allowDeletion = true;
     bool alignmentGuides = false;

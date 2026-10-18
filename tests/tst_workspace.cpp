@@ -12,32 +12,32 @@
 #include "workspace/EntryPopups.h"
 #include "workspace/FileIcons.h"
 #include "workspace/FileOperations.h"
-#include "workspace/FilesPanel.h"
 #include "workspace/FileTreeView.h"
+#include "workspace/FilesPanel.h"
 #include "workspace/ProjectTreeModel.h"
 #include "workspace/SidePanel.h"
 
 #include <QClipboard>
-#include <QSignalSpy>
 #include <QComboBox>
 #include <QFile>
 #include <QHBoxLayout>
-#include <QMainWindow>
-#include <QTabBar>
-#include <QSettings>
-#include <QSizeGrip>
-#include <QMenu>
-#include <QMenuBar>
-#include <QToolButton>
-#include <QMimeData>
-#include <QStandardPaths>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPushButton>
+#include <QMainWindow>
+#include <QMenu>
+#include <QMenuBar>
+#include <QMimeData>
 #include <QPointer>
+#include <QPushButton>
 #include <QScrollBar>
+#include <QSettings>
+#include <QSignalSpy>
+#include <QSizeGrip>
+#include <QStandardPaths>
+#include <QTabBar>
 #include <QTemporaryDir>
+#include <QToolButton>
 #include <QtTest>
 
 namespace {
@@ -77,8 +77,8 @@ private slots:
         QCOMPARE(CommandPalette::matchScore("Git: Stage All", "llats"), -1);
         QCOMPARE(CommandPalette::matchScore("View: Diff Mode", ""), 0);
         // Word starts and consecutive letters rank first.
-        QVERIFY(CommandPalette::matchScore("File: Save All", "save")
-                > CommandPalette::matchScore("Navigate: Go to Definition", "save"));
+        QVERIFY(CommandPalette::matchScore("File: Save All", "save") >
+                CommandPalette::matchScore("Navigate: Go to Definition", "save"));
     }
 
     void longNamesScrollHorizontally()
@@ -168,8 +168,9 @@ private slots:
         // Dragging the right edge widens it; the size is kept.
         const QPoint edge(popup.width() - 3, popup.height() / 2);
         QTest::mousePress(&popup, Qt::LeftButton, {}, edge);
-        QMouseEvent move(QEvent::MouseMove, QPointF(edge + QPoint(100, 0)), popup.mapToGlobal(QPointF(edge + QPoint(100, 0))),
-                         Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent move(QEvent::MouseMove, QPointF(edge + QPoint(100, 0)),
+                         popup.mapToGlobal(QPointF(edge + QPoint(100, 0))), Qt::NoButton, Qt::LeftButton,
+                         Qt::NoModifier);
         QApplication::sendEvent(&popup, &move);
         QTest::mouseRelease(&popup, Qt::LeftButton, {}, edge + QPoint(100, 0));
         QCOMPARE(popup.width(), (1000 - 48) / 2 + 2 * shadow + 100);
@@ -504,7 +505,7 @@ private slots:
         // Cut, then paste: a move the editor tabs can follow.
         QVERIFY(tree.select(root + "/src/a.cpp"));
         QTest::keyClick(&tree, Qt::Key_X, Qt::ControlModifier);
-        QVERIFY(tree.select(root + "/lib/keep.txt")); // a file: its folder
+        QVERIFY(tree.select(root + "/lib/keep.txt"));           // a file: its folder
         QTest::keyClick(&tree, Qt::Key_V, Qt::ControlModifier); // name taken: a popup asks
         QPointer<NamePopup> popup = tree.findChild<NamePopup *>();
         QVERIFY(popup);
@@ -720,7 +721,12 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(&window));
         bool applied = false;
         QPointer<NamePopup> popup = new NamePopup(
-            "New Folder", "project/", [&applied](const QString &) { applied = true; return QString(); }, &window);
+            "New Folder", "project/",
+            [&applied](const QString &) {
+                applied = true;
+                return QString();
+            },
+            &window);
         popup->popup();
         QVERIFY(QTest::qWaitForWindowExposed(popup));
         QTest::keyClick(popup->field(), Qt::Key_Escape);
@@ -789,8 +795,9 @@ private slots:
         QTRY_VERIFY(!popup);
 
         bool applied = false;
-        popup = new ConfirmPopup("Delete File", "project/", "Delete?", "Delete",
-                                 [&applied](ConfirmPopup *) { return applied = true; }, &window);
+        popup = new ConfirmPopup(
+            "Delete File", "project/", "Delete?", "Delete", [&applied](ConfirmPopup *) { return applied = true; },
+            &window);
         popup->popup();
         QVERIFY(QTest::qWaitForWindowExposed(popup));
         popup->cancelButton()->setFocus();

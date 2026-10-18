@@ -13,7 +13,8 @@ namespace {
 
 QString describe(const SymbolLocation &target, const QString &folder)
 {
-    const QString name = target.container.isEmpty() ? target.name : target.container + QLatin1String("::") + target.name;
+    const QString name =
+        target.container.isEmpty() ? target.name : target.container + QLatin1String("::") + target.name;
     QString path = QDir(folder).relativeFilePath(target.filePath);
     if (path.startsWith(QLatin1String("..")))
         path = target.filePath;
@@ -52,7 +53,8 @@ void CodeNavigator::goToDefinition()
     request.line = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, start));
 
     // "Foo::bar", "x.bar", "x->bar": what precedes the word on the line.
-    const int lineStart = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, request.line));
+    const int lineStart =
+        static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, request.line));
     const QString before = editor->text(lineStart, start);
     static const QRegularExpression qualified(QStringLiteral("(\\w+)\\s*::\\s*$"));
     static const QRegularExpression member(QStringLiteral("(\\.|->)\\s*$"));
@@ -87,8 +89,8 @@ void CodeNavigator::chooseTarget(EditorWidget *editor, const QList<SymbolLocatio
     const int caret = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
     const int line = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret));
     const QPoint point(static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
-                       static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret))
-                           + static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
+                       static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret)) +
+                           static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
     menu.exec(editor->viewport()->mapToGlobal(point));
 }
 

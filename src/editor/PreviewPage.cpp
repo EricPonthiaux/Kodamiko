@@ -39,7 +39,7 @@ QWebEngineProfile *previewProfile()
         QWebEngineSettings *settings = created->settings();
         settings->setAttribute(QWebEngineSettings::JavascriptEnabled, false); // the page's own scripts
         settings->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
-        settings->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true); // images
+        settings->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);   // images
         settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true); // badges
         settings->setAttribute(QWebEngineSettings::PluginsEnabled, false);
         settings->setAttribute(QWebEngineSettings::ErrorPageEnabled, false);
@@ -68,9 +68,8 @@ protected:
         if (type != NavigationTypeLinkClicked || !isMainFrame)
             return true; // the page itself
         // "#heading": within the page.
-        if (url.hasFragment()
-            && (url.adjusted(QUrl::RemoveFragment) == this->url().adjusted(QUrl::RemoveFragment)
-                || url.adjusted(QUrl::RemoveFragment) == address_))
+        if (url.hasFragment() && (url.adjusted(QUrl::RemoveFragment) == this->url().adjusted(QUrl::RemoveFragment) ||
+                                  url.adjusted(QUrl::RemoveFragment) == address_))
             return true;
         if (url.isLocalFile()) {
             const QString path = QDir::cleanPath(url.toLocalFile());
@@ -176,7 +175,8 @@ void MarkdownPreview::applyTheme(const Theme &theme)
     if (folder_.isEmpty() && body_.isEmpty())
         return;
     // Another style sheet: the page is reloaded, at the same place.
-    page()->runJavaScript(QString::fromLatin1(scrollRatioScript), QWebEngineScript::ApplicationWorld, [this](const QVariant &ratio) {
+    page()->runJavaScript(QString::fromLatin1(scrollRatioScript), QWebEngineScript::ApplicationWorld,
+                          [this](const QVariant &ratio) {
                               pendingRatio_ = ratio.toDouble();
                               loadPage();
                           });
@@ -277,8 +277,7 @@ void HtmlPreview::contextMenuEvent(QContextMenuEvent *event)
     menu.addSeparator();
     menu.addAction(pageAction(QWebEnginePage::SelectAll));
     menu.addSeparator();
-    menu.addAction(tr("Open in Browser"), this,
-                   [this] { QDesktopServices::openUrl(QUrl::fromLocalFile(filePath_)); });
+    menu.addAction(tr("Open in Browser"), this, [this] { QDesktopServices::openUrl(QUrl::fromLocalFile(filePath_)); });
     menu.exec(event->globalPos());
 }
 
@@ -286,7 +285,8 @@ PreviewPage::PreviewPage(EditorWidget *editor, const Theme &theme, QWidget *pare
     : QWidget(parent)
     , editor_(editor)
     , theme_(theme)
-    , kind_(LanguageRegistry::languageForFile(editor->filePath()) == QLatin1String("html") ? Kind::Html : Kind::Markdown)
+    , kind_(LanguageRegistry::languageForFile(editor->filePath()) == QLatin1String("html") ? Kind::Html
+                                                                                           : Kind::Markdown)
 {
     editor_->setParent(this);
 

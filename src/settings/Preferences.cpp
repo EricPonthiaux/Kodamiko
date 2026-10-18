@@ -14,13 +14,14 @@ Preferences Preferences::load()
     if (settings.contains(QStringLiteral("theme")))
         preferences.theme = settings.value(QStringLiteral("theme")).toString();
     else if (settings.contains(QStringLiteral("darkTheme"))) // before the theme menu: a "Dark Theme" checkbox
-        preferences.theme = settings.value(QStringLiteral("darkTheme")).toBool() ? QStringLiteral("dark")
-                                                                                 : QStringLiteral("light");
+        preferences.theme =
+            settings.value(QStringLiteral("darkTheme")).toBool() ? QStringLiteral("dark") : QStringLiteral("light");
     preferences.codeFontFamily = settings.value(QStringLiteral("codeFont/family")).toString();
-    preferences.codeFontSize = std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(),
-                                          minimumFontSize, maximumFontSize);
-    preferences.codeFontWeight = std::clamp(settings.value(QStringLiteral("codeFont/weight"), int(QFont::Normal)).toInt(),
-                                            int(QFont::Thin), int(QFont::Black));
+    preferences.codeFontSize =
+        std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(), minimumFontSize, maximumFontSize);
+    preferences.codeFontWeight =
+        std::clamp(settings.value(QStringLiteral("codeFont/weight"), int(QFont::Normal)).toInt(), int(QFont::Thin),
+                   int(QFont::Black));
     preferences.codeLineHeight =
         std::clamp(settings.value(QStringLiteral("codeFont/lineHeight"), AppFonts::defaultLineHeight).toDouble(),
                    AppFonts::minimumLineHeight, AppFonts::maximumLineHeight);
@@ -46,13 +47,15 @@ Preferences Preferences::load()
                    int(AutoCompletion::Off), int(AutoCompletion::Eager)));
     preferences.editor.completionAcceptsEnter =
         settings.value(QStringLiteral("editor/completionAcceptsEnter"), true).toBool();
-    preferences.formatOnSave = settings.value(QStringLiteral("formatOnSave"), false).toBool();
+    preferences.formatOnSave = settings.value(QStringLiteral("formatOnSave"), true).toBool();
     preferences.languageServers = settings.value(QStringLiteral("editor/languageServers"), true).toBool();
     preferences.fullLineCompletion = settings.value(QStringLiteral("editor/fullLine"), false).toBool();
-    preferences.fullLineServer = settings.value(QStringLiteral("editor/fullLineServer"), preferences.fullLineServer).toString();
+    preferences.fullLineServer =
+        settings.value(QStringLiteral("editor/fullLineServer"), preferences.fullLineServer).toString();
     preferences.fullLineEndpoint =
         settings.value(QStringLiteral("editor/fullLineEndpoint"), preferences.fullLineEndpoint).toString();
-    preferences.fullLineModel = settings.value(QStringLiteral("editor/fullLineModel"), preferences.fullLineModel).toString();
+    preferences.fullLineModel =
+        settings.value(QStringLiteral("editor/fullLineModel"), preferences.fullLineModel).toString();
 
     preferences.alwaysSelectOpenedFile = settings.value(QStringLiteral("alwaysSelectOpenedFile"), false).toBool();
 

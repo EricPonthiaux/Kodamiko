@@ -19,7 +19,13 @@
 
 namespace {
 
-enum Role { IndexRole = Qt::UserRole, SubtitleRole, TrackingRole, HeadingRole, CurrentRole };
+enum Role {
+    IndexRole = Qt::UserRole,
+    SubtitleRole,
+    TrackingRole,
+    HeadingRole,
+    CurrentRole
+};
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 const char *branchesRules = R"(
@@ -92,7 +98,8 @@ public:
         const QFontMetrics titleMetrics(title);
         const qreal lineHeight = option.fontMetrics.height();
         const qreal top = text.center().y() - lineHeight - 1;
-        QString name = titleMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideMiddle, int(text.width()));
+        QString name =
+            titleMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideMiddle, int(text.width()));
         painter->setFont(title);
         painter->setPen(selected ? theme.accentText : theme.foreground);
         painter->drawText(QRectF(text.left(), top, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter, name);
@@ -112,10 +119,9 @@ public:
         }
         painter->setFont(option.font);
         painter->setPen(theme.mutedText);
-        painter->drawText(QRectF(text.left(), top + lineHeight + 3, text.width(), lineHeight),
-                          Qt::AlignLeft | Qt::AlignVCenter,
-                          option.fontMetrics.elidedText(index.data(SubtitleRole).toString(), Qt::ElideRight,
-                                                        int(text.width())));
+        painter->drawText(
+            QRectF(text.left(), top + lineHeight + 3, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
+            option.fontMetrics.elidedText(index.data(SubtitleRole).toString(), Qt::ElideRight, int(text.width())));
         painter->restore();
     }
 };
@@ -213,12 +219,10 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     auto *hint = new QLabel(tr("Right-click a branch for more."), footer);
     hint->setObjectName(QStringLiteral("footerHint"));
     switch_->setDefault(true);
-    connect(merge_, &QPushButton::clicked, this, [this] {
-        act([this](const BranchInfo &branch) { actions_->merge(branch.name); });
-    });
-    connect(rebase_, &QPushButton::clicked, this, [this] {
-        act([this](const BranchInfo &branch) { actions_->rebase(branch.name); });
-    });
+    connect(merge_, &QPushButton::clicked, this,
+            [this] { act([this](const BranchInfo &branch) { actions_->merge(branch.name); }); });
+    connect(rebase_, &QPushButton::clicked, this,
+            [this] { act([this](const BranchInfo &branch) { actions_->rebase(branch.name); }); });
     connect(switch_, &QPushButton::clicked, this, &BranchesPopup::switchToSelected);
     auto *footerLayout = new QHBoxLayout(footer);
     footerLayout->setContentsMargins(28, 12, 18, 14);
@@ -385,27 +389,23 @@ void BranchesPopup::showMenu(const QPoint &position)
     const bool onBranch = !current_.isEmpty();
     QMenu menu(this);
     if (!branch->current) {
-        menu.addAction(tr("Switch to %1").arg(branch->remote ? Branches::nameOnRemote(branch->name) : branch->name), this,
-                       &BranchesPopup::switchToSelected);
+        menu.addAction(tr("Switch to %1").arg(branch->remote ? Branches::nameOnRemote(branch->name) : branch->name),
+                       this, &BranchesPopup::switchToSelected);
         if (onBranch) {
-            menu.addAction(tr("Merge into %1").arg(current_), this, [this] {
-                act([this](const BranchInfo &chosen) { actions_->merge(chosen.name); });
-            });
-            menu.addAction(tr("Rebase %1 onto It").arg(current_), this, [this] {
-                act([this](const BranchInfo &chosen) { actions_->rebase(chosen.name); });
-            });
+            menu.addAction(tr("Merge into %1").arg(current_), this,
+                           [this] { act([this](const BranchInfo &chosen) { actions_->merge(chosen.name); }); });
+            menu.addAction(tr("Rebase %1 onto It").arg(current_), this,
+                           [this] { act([this](const BranchInfo &chosen) { actions_->rebase(chosen.name); }); });
         }
     }
     if (branch->remote && onBranch) {
-        menu.addAction(tr("Track It from %1").arg(current_), this, [this] {
-            act([this](const BranchInfo &chosen) { actions_->trackBranch(chosen.name); });
-        });
+        menu.addAction(tr("Track It from %1").arg(current_), this,
+                       [this] { act([this](const BranchInfo &chosen) { actions_->trackBranch(chosen.name); }); });
     }
     menu.addSeparator();
     if (!branch->remote) {
-        menu.addAction(tr("Rename…"), this, [this] {
-            act([this](const BranchInfo &chosen) { actions_->renameBranch(chosen.name); });
-        });
+        menu.addAction(tr("Rename…"), this,
+                       [this] { act([this](const BranchInfo &chosen) { actions_->renameBranch(chosen.name); }); });
     }
     QAction *remove = menu.addAction(branch->remote ? tr("Delete on the Remote…") : tr("Delete"), this, [this] {
         act([this](const BranchInfo &chosen) { actions_->deleteBranch(chosen.name, chosen.remote); });
@@ -419,8 +419,8 @@ bool BranchesPopup::eventFilter(QObject *watched, QEvent *event)
     // Up and Down in the filter move through the list.
     if (watched == filter_ && event->type() == QEvent::KeyPress) {
         const auto *key = static_cast<QKeyEvent *>(event);
-        if (key->key() == Qt::Key_Up || key->key() == Qt::Key_Down || key->key() == Qt::Key_PageUp
-            || key->key() == Qt::Key_PageDown) {
+        if (key->key() == Qt::Key_Up || key->key() == Qt::Key_Down || key->key() == Qt::Key_PageUp ||
+            key->key() == Qt::Key_PageDown) {
             int row = list_->currentRow();
             const int step = key->key() == Qt::Key_Up || key->key() == Qt::Key_PageUp ? -1 : 1;
             do {

@@ -1,8 +1,8 @@
 #include "OutlineView.h"
 
-#include "editor/EditorWidget.h"
 #include "IOutlineProvider.h"
 #include "OutlineProviders.h"
+#include "editor/EditorWidget.h"
 #include "ui/TreeColumnFit.h"
 
 #include <QHBoxLayout>
@@ -23,7 +23,11 @@ namespace {
 
 constexpr int refreshDelayMs = 300;
 
-enum ItemRole { PositionRole = Qt::UserRole, StartLineRole, EndLineRole };
+enum ItemRole {
+    PositionRole = Qt::UserRole,
+    StartLineRole,
+    EndLineRole
+};
 
 struct KindStyle {
     char letter;
@@ -34,18 +38,30 @@ struct KindStyle {
 KindStyle styleOf(SymbolKind kind)
 {
     switch (kind) {
-    case SymbolKind::Namespace: return {'N', QColor("#8a94a6"), QT_TRANSLATE_NOOP("OutlineView", "Namespace")};
-    case SymbolKind::Class: return {'C', QColor("#d19a40"), QT_TRANSLATE_NOOP("OutlineView", "Class")};
-    case SymbolKind::Struct: return {'S', QColor("#c7783e"), QT_TRANSLATE_NOOP("OutlineView", "Struct")};
-    case SymbolKind::Interface: return {'I', QColor("#3fa7a0"), QT_TRANSLATE_NOOP("OutlineView", "Interface")};
-    case SymbolKind::Enum: return {'E', QColor("#b5a13a"), QT_TRANSLATE_NOOP("OutlineView", "Enum")};
-    case SymbolKind::Type: return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Type")};
-    case SymbolKind::Function: return {'f', QColor("#9b6fd1"), QT_TRANSLATE_NOOP("OutlineView", "Function")};
-    case SymbolKind::Method: return {'m', QColor("#a573c9"), QT_TRANSLATE_NOOP("OutlineView", "Method")};
-    case SymbolKind::Field: return {'v', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Field")};
-    case SymbolKind::Macro: return {'#', QColor("#c25b6b"), QT_TRANSLATE_NOOP("OutlineView", "Macro")};
-    case SymbolKind::Heading: return {'H', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Heading")};
-    case SymbolKind::Target: return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Target")};
+    case SymbolKind::Namespace:
+        return {'N', QColor("#8a94a6"), QT_TRANSLATE_NOOP("OutlineView", "Namespace")};
+    case SymbolKind::Class:
+        return {'C', QColor("#d19a40"), QT_TRANSLATE_NOOP("OutlineView", "Class")};
+    case SymbolKind::Struct:
+        return {'S', QColor("#c7783e"), QT_TRANSLATE_NOOP("OutlineView", "Struct")};
+    case SymbolKind::Interface:
+        return {'I', QColor("#3fa7a0"), QT_TRANSLATE_NOOP("OutlineView", "Interface")};
+    case SymbolKind::Enum:
+        return {'E', QColor("#b5a13a"), QT_TRANSLATE_NOOP("OutlineView", "Enum")};
+    case SymbolKind::Type:
+        return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Type")};
+    case SymbolKind::Function:
+        return {'f', QColor("#9b6fd1"), QT_TRANSLATE_NOOP("OutlineView", "Function")};
+    case SymbolKind::Method:
+        return {'m', QColor("#a573c9"), QT_TRANSLATE_NOOP("OutlineView", "Method")};
+    case SymbolKind::Field:
+        return {'v', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Field")};
+    case SymbolKind::Macro:
+        return {'#', QColor("#c25b6b"), QT_TRANSLATE_NOOP("OutlineView", "Macro")};
+    case SymbolKind::Heading:
+        return {'H', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Heading")};
+    case SymbolKind::Target:
+        return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Target")};
     }
     return {'?', QColor("#8a94a6"), ""};
 }
@@ -154,10 +170,11 @@ void OutlineView::setEditor(EditorWidget *editor)
         editorConnections_ = {
             connect(editor_, &QsciScintilla::textChanged, this, &OutlineView::scheduleRefresh),
             connect(editor_, &QsciScintilla::cursorPositionChanged, this, &OutlineView::selectSymbolAtCursor),
-            connect(editor_, &EditorWidget::languageChanged, this, [this] {
-                updateProvider();
-                refresh();
-            }),
+            connect(editor_, &EditorWidget::languageChanged, this,
+                    [this] {
+                        updateProvider();
+                        refresh();
+                    }),
         };
     }
     updateProvider();
@@ -235,8 +252,8 @@ void OutlineView::refresh()
         return;
     }
 
-    const auto *text = static_cast<const char *>(
-        editor_->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
+    const auto *text =
+        static_cast<const char *>(editor_->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
     const long length = editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
     const std::vector<OutlineSymbol> symbols = provider_->symbols(QByteArray(text, length));
     if (symbols.empty()) {
@@ -313,8 +330,8 @@ void OutlineView::selectSymbolAtCursor()
         QTreeWidgetItem *next = nullptr;
         for (int i = 0; i < parent->childCount(); ++i) {
             QTreeWidgetItem *child = parent->child(i);
-            if (!child->isHidden() && child->data(0, StartLineRole).toInt() <= line
-                && line <= child->data(0, EndLineRole).toInt()) {
+            if (!child->isHidden() && child->data(0, StartLineRole).toInt() <= line &&
+                line <= child->data(0, EndLineRole).toInt()) {
                 next = child;
                 break;
             }

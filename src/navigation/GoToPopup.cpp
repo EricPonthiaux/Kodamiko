@@ -29,18 +29,30 @@ constexpr int maxShown = 200;
 QString kindName(SymbolKind kind)
 {
     switch (kind) {
-    case SymbolKind::Namespace: return QObject::tr("namespace");
-    case SymbolKind::Class: return QObject::tr("class");
-    case SymbolKind::Struct: return QObject::tr("struct");
-    case SymbolKind::Interface: return QObject::tr("interface");
-    case SymbolKind::Enum: return QObject::tr("enum");
-    case SymbolKind::Type: return QObject::tr("type");
-    case SymbolKind::Function: return QObject::tr("function");
-    case SymbolKind::Method: return QObject::tr("method");
-    case SymbolKind::Field: return QObject::tr("field");
-    case SymbolKind::Macro: return QObject::tr("macro");
-    case SymbolKind::Heading: return QObject::tr("heading");
-    case SymbolKind::Target: return QObject::tr("target");
+    case SymbolKind::Namespace:
+        return QObject::tr("namespace");
+    case SymbolKind::Class:
+        return QObject::tr("class");
+    case SymbolKind::Struct:
+        return QObject::tr("struct");
+    case SymbolKind::Interface:
+        return QObject::tr("interface");
+    case SymbolKind::Enum:
+        return QObject::tr("enum");
+    case SymbolKind::Type:
+        return QObject::tr("type");
+    case SymbolKind::Function:
+        return QObject::tr("function");
+    case SymbolKind::Method:
+        return QObject::tr("method");
+    case SymbolKind::Field:
+        return QObject::tr("field");
+    case SymbolKind::Macro:
+        return QObject::tr("macro");
+    case SymbolKind::Heading:
+        return QObject::tr("heading");
+    case SymbolKind::Target:
+        return QObject::tr("target");
     }
     return {};
 }
@@ -211,8 +223,8 @@ int GoToPopup::fileScore(QStringView relativePath, QStringView normalized, bool 
             int bonus = name.startsWith(normalized, Qt::CaseInsensitive) ? 20 : 0;
             const qsizetype dot = name.lastIndexOf(QLatin1Char('.'));
             const QStringView baseName = dot >= 0 ? name.first(dot) : name;
-            if (baseName.compare(normalized, Qt::CaseInsensitive) == 0
-                || name.compare(normalized, Qt::CaseInsensitive) == 0)
+            if (baseName.compare(normalized, Qt::CaseInsensitive) == 0 ||
+                name.compare(normalized, Qt::CaseInsensitive) == 0)
                 bonus += 30;
             return 2 * score + bonus;
         }
@@ -262,8 +274,8 @@ void GoToPopup::filter()
         item->setFlags(Qt::NoItemFlags);
     } else {
         // Recent Files opens on the previous file, as Ctrl+Tab would.
-        const bool previousFile = tab() == Tab::Recent && query.isEmpty() && !editedByClaude_->isChecked()
-            && list_->topLevelItemCount() > 1;
+        const bool previousFile =
+            tab() == Tab::Recent && query.isEmpty() && !editedByClaude_->isChecked() && list_->topLevelItemCount() > 1;
         list_->setCurrentItem(list_->topLevelItem(previousFile ? 1 : 0));
     }
 }
@@ -352,7 +364,9 @@ void GoToPopup::filterSymbols(const QString &query, QList<Entry> &entries) const
         const SymbolLocation &symbol = symbols_[index];
         Entry entry;
         entry.title = symbol.container.isEmpty() ? symbol.name : symbol.container + QLatin1String("::") + symbol.name;
-        entry.location = QStringLiteral("%1 — %2:%3").arg(kindName(symbol.kind), relativePath(symbol.filePath)).arg(symbol.startLine + 1);
+        entry.location = QStringLiteral("%1 — %2:%3")
+                             .arg(kindName(symbol.kind), relativePath(symbol.filePath))
+                             .arg(symbol.startLine + 1);
         if (symbol.declarationOnly)
             entry.location += tr(" (declaration)");
         entry.filePath = symbol.filePath;

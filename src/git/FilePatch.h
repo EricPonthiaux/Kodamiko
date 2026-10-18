@@ -26,7 +26,10 @@ using PatchSelection = QHash<int, QSet<int>>;
 // Direction in which a partial patch is applied. Forward: applied as is (stage
 // lines). Reverse: applied with "git apply -R" (unstage lines, discard lines
 // on disk).
-enum class PatchDirection { Forward, Reverse };
+enum class PatchDirection {
+    Forward,
+    Reverse
+};
 
 // Unified diff of a file, as produced by git, split into header and hunks.
 // Used to build partial patches for "git apply".

@@ -27,9 +27,10 @@ QString commandOrThrow(const RepositoryInfo &repository)
 {
     const QString command = commandOf(repository.operation);
     if (command.isEmpty()) {
-        throw GitError(repository.operation.isEmpty()
-                           ? QObject::tr("No merge or rebase is in progress")
-                           : QObject::tr("A %1 cannot be finished from the editor: use a terminal").arg(repository.operation));
+        throw GitError(
+            repository.operation.isEmpty()
+                ? QObject::tr("No merge or rebase is in progress")
+                : QObject::tr("A %1 cannot be finished from the editor: use a terminal").arg(repository.operation));
     }
     return command;
 }

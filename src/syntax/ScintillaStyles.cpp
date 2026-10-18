@@ -17,16 +17,13 @@ void applyDefaultStyle(QsciScintilla &editor, const Theme &theme)
     // With the ligatures if the editor's are on (the highlighters style
     // the editors).
     const QByteArray family = AppFonts::scintillaFamily(theme.font, theme.editorLigatures);
-    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFONT, QsciScintillaBase::STYLE_DEFAULT,
-                         family.constData());
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFONT, QsciScintillaBase::STYLE_DEFAULT, family.constData());
     editor.SendScintilla(QsciScintillaBase::SCI_STYLESETSIZE, QsciScintillaBase::STYLE_DEFAULT,
                          static_cast<long>(theme.font.pointSize()));
     editor.SendScintilla(QsciScintillaBase::SCI_STYLESETWEIGHT, QsciScintillaBase::STYLE_DEFAULT,
                          static_cast<long>(styleWeight(theme.font, false)));
-    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, QsciScintillaBase::STYLE_DEFAULT,
-                         theme.foreground);
-    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, QsciScintillaBase::STYLE_DEFAULT,
-                         theme.background);
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, QsciScintillaBase::STYLE_DEFAULT, theme.foreground);
+    editor.SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, QsciScintillaBase::STYLE_DEFAULT, theme.background);
     editor.SendScintilla(QsciScintillaBase::SCI_STYLECLEARALL);
 }
 
@@ -39,8 +36,7 @@ void applySyntaxStyles(QsciScintilla &editor, const Theme &theme)
         editor.SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, styleNumber, style.foreground);
         editor.SendScintilla(QsciScintillaBase::SCI_STYLESETWEIGHT, styleNumber,
                              static_cast<long>(styleWeight(theme.font, style.bold)));
-        editor.SendScintilla(QsciScintillaBase::SCI_STYLESETITALIC, styleNumber,
-                             static_cast<long>(style.italic));
+        editor.SendScintilla(QsciScintillaBase::SCI_STYLESETITALIC, styleNumber, static_cast<long>(style.italic));
     }
 }
 

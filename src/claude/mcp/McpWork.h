@@ -20,7 +20,7 @@ void inBackground(Work work, McpReply reply)
         } catch (const std::exception &error) {
             result = McpResult::error(QString::fromUtf8(error.what()));
         }
-        QMetaObject::invokeMethod(QCoreApplication::instance(), [reply, result] { reply(result); },
-                                  Qt::QueuedConnection);
+        QMetaObject::invokeMethod(
+            QCoreApplication::instance(), [reply, result] { reply(result); }, Qt::QueuedConnection);
     });
 }

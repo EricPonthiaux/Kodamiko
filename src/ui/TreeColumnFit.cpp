@@ -29,7 +29,7 @@ TreeColumnFit::TreeColumnFit(QTreeView *tree)
     connect(model, &QAbstractItemModel::modelReset, this, &TreeColumnFit::refit);
     connect(model, &QAbstractItemModel::layoutChanged, this, &TreeColumnFit::refit);
     connect(model, &QAbstractItemModel::dataChanged, this, &TreeColumnFit::refit);
-    tree->installEventFilter(this);           // font, style
+    tree->installEventFilter(this);             // font, style
     tree->viewport()->installEventFilter(this); // size
     refit();
 }

@@ -168,9 +168,9 @@ qreal C4ElementShape::layoutText()
     technologyLines_ =
         technology.trimmed().isEmpty() ? QStringList() : text::wrap(small, technology, std::max<qreal>(20, inner - 12));
     descriptionLines_ = description.trimmed().isEmpty() ? QStringList() : text::wrap(font, description, inner);
-    return std::max<qreal>(104, contentTop() + titleLines_.size() * 22 + 4 + typeLines_.size() * 16 + 10
-                                    + (technologyLines_.isEmpty() ? 0 : technologyLines_.size() * 15 + 11)
-                                    + descriptionLines_.size() * lineHeight + 20);
+    return std::max<qreal>(104, contentTop() + titleLines_.size() * 22 + 4 + typeLines_.size() * 16 + 10 +
+                                    (technologyLines_.isEmpty() ? 0 : technologyLines_.size() * 15 + 11) +
+                                    descriptionLines_.size() * lineHeight + 20);
 }
 
 void C4ElementShape::resizeTo(qreal width, qreal height, const Board &board)
@@ -518,7 +518,8 @@ QStringList C4RelationLink::displayLines(const Board &board) const
     // than the canvas ends up showing.
     const Font labelFont(board.style().linkLabel.fontPx);
     QStringList lines;
-    for (const QString &logical : {label, technology.isEmpty() ? QString() : QLatin1Char('[') + technology + QLatin1Char(']')}) {
+    for (const QString &logical :
+         {label, technology.isEmpty() ? QString() : QLatin1Char('[') + technology + QLatin1Char(']')}) {
         if (!logical.isEmpty())
             lines += text::wrap(labelFont, logical, relationMaxWidth);
     }
@@ -629,8 +630,8 @@ const Family &c4()
         f.title = tr("C4 architecture");
         f.shapes = {{QStringLiteral("c4boundary"), [] { return std::unique_ptr<Shape>(new C4BoundaryShape); }},
                     {QStringLiteral("c4"), [] { return std::unique_ptr<Shape>(new C4ElementShape); }}};
-        f.links = {{QStringLiteral("c4relation"), [] { return std::unique_ptr<Link>(new C4RelationLink); },
-                    false, true}};
+        f.links = {
+            {QStringLiteral("c4relation"), [] { return std::unique_ptr<Link>(new C4RelationLink); }, false, true}};
         f.defaultShape = QStringLiteral("c4");
         f.defaultLink = QStringLiteral("c4relation");
         f.graphvizClusters = true;
@@ -647,10 +648,7 @@ const Family &c4()
                 id.append(variant);
             if (external)
                 id.append(QStringLiteral("external"));
-            return ElementPreset{id.join(QLatin1Char('-')),
-                                 label,
-                                 help,
-                                 QStringLiteral("c4"),
+            return ElementPreset{id.join(QLatin1Char('-')), label, help, QStringLiteral("c4"),
                                  QJsonObject{{QStringLiteral("name"), name},
                                              {QStringLiteral("kind"), kind},
                                              {QStringLiteral("description"), QString()},
@@ -658,11 +656,11 @@ const Family &c4()
                                              {QStringLiteral("external"), external},
                                              {QStringLiteral("variant"), variant}}};
         };
-        f.elements = {element(QStringLiteral("person"), QStringLiteral("box"), false, tr("Person"), tr("Person"),
-                              tr("Person")),
-                      element(QStringLiteral("person"), QStringLiteral("box"), true, tr("External person"),
-                              tr("External person"), tr("Person")),
-                      };
+        f.elements = {
+            element(QStringLiteral("person"), QStringLiteral("box"), false, tr("Person"), tr("Person"), tr("Person")),
+            element(QStringLiteral("person"), QStringLiteral("box"), true, tr("External person"), tr("External person"),
+                    tr("Person")),
+        };
         struct Structural {
             const char *kind;
             QString noun;
@@ -684,16 +682,18 @@ const Family &c4()
                     QString label = v == QLatin1String("box") ? s.noun : s.noun + QLatin1Char(' ') + base.toLower();
                     if (external)
                         label = tr("External %1").arg(label.toLower());
-                    const QString help = s.abbreviation
-                                         + (v == QLatin1String("database") ? QStringLiteral(" · DB")
-                                            : v == QLatin1String("queue")  ? QStringLiteral(" · QUEUE")
-                                                                           : QString());
+                    const QString help = s.abbreviation + (v == QLatin1String("database") ? QStringLiteral(" · DB")
+                                                           : v == QLatin1String("queue")  ? QStringLiteral(" · QUEUE")
+                                                                                          : QString());
                     f.elements.append(element(QString::fromLatin1(s.kind), v, external, label, name, help));
                 }
             }
         }
         const auto boundary = [](const char *id, const QString &label, const char *kind) {
-            return ElementPreset{QString::fromLatin1(id), label, {}, QStringLiteral("c4boundary"),
+            return ElementPreset{QString::fromLatin1(id),
+                                 label,
+                                 {},
+                                 QStringLiteral("c4boundary"),
                                  QJsonObject{{QStringLiteral("name"), label},
                                              {QStringLiteral("boundaryKind"), QString::fromLatin1(kind)}}};
         };
@@ -717,8 +717,9 @@ const Family &c4()
                        relation("hosts", tr("Hosts"), tr("Hosts"), false),
                        relation("depends", tr("Depends on"), tr("Depends on"), false),
                        relation("exchanges", tr("Bidirectional exchange"), tr("Exchanges with"), true)};
-        f.technologies = {QStringLiteral("HTTP/HTTPS"), QStringLiteral("REST/JSON"), QStringLiteral("WebSocket"),
-                          QStringLiteral("gRPC"),       QStringLiteral("SQL"),       QStringLiteral("AMQP"),
+        f.technologies = {QStringLiteral("HTTP/HTTPS"), QStringLiteral("REST/JSON"),
+                          QStringLiteral("WebSocket"),  QStringLiteral("gRPC"),
+                          QStringLiteral("SQL"),        QStringLiteral("AMQP"),
                           QStringLiteral("Kafka"),      tr("Event")};
         return f;
     }();

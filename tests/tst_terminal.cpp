@@ -2,8 +2,8 @@
 #include "terminal/TerminalWidget.h"
 #include "terminal/VtScreen.h"
 
-#include <QSignalSpy>
 #include <QKeyEvent>
+#include <QSignalSpy>
 #include <QtTest>
 
 class TestTerminal : public QObject {
@@ -110,8 +110,10 @@ private slots:
     {
         QByteArray output;
         for (int line = 0; line < 20000; ++line)
-            output += "\x1b[32mline\x1b[0m " + QByteArray::number(line) + " \x1b[1;34mlorem ipsum dolor sit amet\x1b[0m\r\n";
-        QBENCHMARK {
+            output +=
+                "\x1b[32mline\x1b[0m " + QByteArray::number(line) + " \x1b[1;34mlorem ipsum dolor sit amet\x1b[0m\r\n";
+        QBENCHMARK
+        {
             VtScreen screen(60, 200);
             screen.feed(output);
         }

@@ -33,9 +33,8 @@ QString managedDir()
 // The file holding Claude Code's state, user MCP servers included.
 QString stateFile()
 {
-    return qEnvironmentVariableIsSet("CLAUDE_CONFIG_DIR")
-               ? QDir(configDir()).filePath(QStringLiteral(".claude.json"))
-               : QDir::home().filePath(QStringLiteral(".claude.json"));
+    return qEnvironmentVariableIsSet("CLAUDE_CONFIG_DIR") ? QDir(configDir()).filePath(QStringLiteral(".claude.json"))
+                                                          : QDir::home().filePath(QStringLiteral(".claude.json"));
 }
 
 QByteArray readHead(const QString &path)
@@ -160,24 +159,29 @@ QList<Entry> entries(const QString &projectDir, const QString &sessionSettings)
     const QString autoMemory = autoMemoryDir(projectDir);
     const QStringList memories = markdownFiles(autoMemory, false);
     if (memories.contains(QStringLiteral("MEMORY.md")))
-        c.add(Category::Memory, Scope::Auto, QStringLiteral("MEMORY.md"), QDir(autoMemory).filePath(QStringLiteral("MEMORY.md")));
+        c.add(Category::Memory, Scope::Auto, QStringLiteral("MEMORY.md"),
+              QDir(autoMemory).filePath(QStringLiteral("MEMORY.md")));
     for (const QString &memory : memories) {
         if (memory != QLatin1String("MEMORY.md"))
             c.add(Category::Memory, Scope::Auto, memory, QDir(autoMemory).filePath(memory));
     }
     if (projectClaude.exists(QStringLiteral("CLAUDE.md")) && !project.exists(QStringLiteral("CLAUDE.md")))
-        c.add(Category::Memory, Scope::Project, QStringLiteral(".claude/CLAUDE.md"), projectClaude.filePath(QStringLiteral("CLAUDE.md")));
+        c.add(Category::Memory, Scope::Project, QStringLiteral(".claude/CLAUDE.md"),
+              projectClaude.filePath(QStringLiteral("CLAUDE.md")));
     else
-        c.addUsual(Category::Memory, Scope::Project, QStringLiteral("CLAUDE.md"), project.filePath(QStringLiteral("CLAUDE.md")));
+        c.addUsual(Category::Memory, Scope::Project, QStringLiteral("CLAUDE.md"),
+                   project.filePath(QStringLiteral("CLAUDE.md")));
     ProjectFiles::Options options;
     options.accept = [](const QFileInfo &info) {
         return info.fileName() == QLatin1String("CLAUDE.md") || info.fileName() == QLatin1String("CLAUDE.local.md");
     };
     for (const QFileInfo &info : ProjectFiles::list(projectDir, options)) {
         if (info.absolutePath() != project.absolutePath())
-            c.add(Category::Memory, Scope::Subfolder, project.relativeFilePath(info.absoluteFilePath()), info.absoluteFilePath());
+            c.add(Category::Memory, Scope::Subfolder, project.relativeFilePath(info.absoluteFilePath()),
+                  info.absoluteFilePath());
     }
-    c.addUsual(Category::Memory, Scope::Local, QStringLiteral("CLAUDE.local.md"), project.filePath(QStringLiteral("CLAUDE.local.md")));
+    c.addUsual(Category::Memory, Scope::Local, QStringLiteral("CLAUDE.local.md"),
+               project.filePath(QStringLiteral("CLAUDE.local.md")));
 
     for (const auto &[scope, base] : {std::pair{Scope::User, user}, std::pair{Scope::Project, projectClaude}}) {
         c.addMarkdown(Category::Rules, scope, base.filePath(QStringLiteral("rules")), true);
@@ -190,19 +194,30 @@ QList<Entry> entries(const QString &projectDir, const QString &sessionSettings)
     // Settings.
     for (const SettingsFile &file : settingsFiles(projectDir, sessionSettings)) {
         switch (file.scope) {
-        case Scope::Managed: c.add(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path); break;
-        case Scope::Session: c.add(Category::Settings, file.scope, tr("Duet session hooks"), file.path); break;
-        case Scope::User: c.addUsual(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path); break;
-        default: c.addUsual(Category::Settings, file.scope, project.relativeFilePath(file.path), file.path); break;
+        case Scope::Managed:
+            c.add(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
+            break;
+        case Scope::Session:
+            c.add(Category::Settings, file.scope, tr("Duet session hooks"), file.path);
+            break;
+        case Scope::User:
+            c.addUsual(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
+            break;
+        default:
+            c.addUsual(Category::Settings, file.scope, project.relativeFilePath(file.path), file.path);
+            break;
         }
     }
-    c.add(Category::Settings, Scope::User, QStringLiteral("keybindings.json"), user.filePath(QStringLiteral("keybindings.json")));
+    c.add(Category::Settings, Scope::User, QStringLiteral("keybindings.json"),
+          user.filePath(QStringLiteral("keybindings.json")));
 
     // MCP servers. Claude Code rewrites its state file all the time: it
     // is shown, never edited (`claude mcp` changes it).
-    c.add(Category::Mcp, Scope::Managed, QStringLiteral("managed-mcp.json"), managed.filePath(QStringLiteral("managed-mcp.json")));
+    c.add(Category::Mcp, Scope::Managed, QStringLiteral("managed-mcp.json"),
+          managed.filePath(QStringLiteral("managed-mcp.json")));
     c.add(Category::Mcp, Scope::User, QFileInfo(stateFile()).fileName(), stateFile(), true);
-    c.addUsual(Category::Mcp, Scope::Project, QStringLiteral(".mcp.json"), project.filePath(QStringLiteral(".mcp.json")));
+    c.addUsual(Category::Mcp, Scope::Project, QStringLiteral(".mcp.json"),
+               project.filePath(QStringLiteral(".mcp.json")));
 
     std::stable_sort(c.entries.begin(), c.entries.end(), [](const Entry &a, const Entry &b) {
         if (a.category != b.category)
@@ -229,14 +244,22 @@ QList<SettingsFile> settingsFiles(const QString &projectDir, const QString &sess
 QString categoryTitle(Category category)
 {
     switch (category) {
-    case Category::Memory: return tr("Memory");
-    case Category::Rules: return tr("Rules");
-    case Category::Skills: return tr("Skills");
-    case Category::Agents: return tr("Agents");
-    case Category::Commands: return tr("Commands");
-    case Category::OutputStyles: return tr("Output Styles");
-    case Category::Settings: return tr("Settings");
-    case Category::Mcp: return tr("MCP Servers");
+    case Category::Memory:
+        return tr("Memory");
+    case Category::Rules:
+        return tr("Rules");
+    case Category::Skills:
+        return tr("Skills");
+    case Category::Agents:
+        return tr("Agents");
+    case Category::Commands:
+        return tr("Commands");
+    case Category::OutputStyles:
+        return tr("Output Styles");
+    case Category::Settings:
+        return tr("Settings");
+    case Category::Mcp:
+        return tr("MCP Servers");
     }
     return {};
 }
@@ -244,14 +267,22 @@ QString categoryTitle(Category category)
 QString scopeTitle(Scope scope)
 {
     switch (scope) {
-    case Scope::Managed: return tr("Managed");
-    case Scope::User: return tr("User");
-    case Scope::Parent: return tr("Parent");
-    case Scope::Auto: return tr("Auto");
-    case Scope::Project: return tr("Project");
-    case Scope::Subfolder: return tr("Folder");
-    case Scope::Local: return tr("Local");
-    case Scope::Session: return tr("Duet");
+    case Scope::Managed:
+        return tr("Managed");
+    case Scope::User:
+        return tr("User");
+    case Scope::Parent:
+        return tr("Parent");
+    case Scope::Auto:
+        return tr("Auto");
+    case Scope::Project:
+        return tr("Project");
+    case Scope::Subfolder:
+        return tr("Folder");
+    case Scope::Local:
+        return tr("Local");
+    case Scope::Session:
+        return tr("Duet");
     }
     return {};
 }
@@ -259,14 +290,22 @@ QString scopeTitle(Scope scope)
 QString scopeDescription(Scope scope)
 {
     switch (scope) {
-    case Scope::Managed: return tr("Set by your administrator, read-only");
-    case Scope::User: return tr("Yours, for every project");
-    case Scope::Parent: return tr("From a folder above the project");
-    case Scope::Auto: return tr("Written by Claude itself, for this project");
-    case Scope::Project: return tr("The project's, shared through git");
-    case Scope::Subfolder: return tr("Read when Claude works in this folder");
-    case Scope::Local: return tr("Yours, for this project only, not shared");
-    case Scope::Session: return tr("Passed by Duet to its Claude session, read-only");
+    case Scope::Managed:
+        return tr("Set by your administrator, read-only");
+    case Scope::User:
+        return tr("Yours, for every project");
+    case Scope::Parent:
+        return tr("From a folder above the project");
+    case Scope::Auto:
+        return tr("Written by Claude itself, for this project");
+    case Scope::Project:
+        return tr("The project's, shared through git");
+    case Scope::Subfolder:
+        return tr("Read when Claude works in this folder");
+    case Scope::Local:
+        return tr("Yours, for this project only, not shared");
+    case Scope::Session:
+        return tr("Passed by Duet to its Claude session, read-only");
     }
     return {};
 }
@@ -285,8 +324,8 @@ QMap<QString, QString> frontMatter(const QByteArray &text)
         if (colon <= 0 || lines[i].front().isSpace())
             continue;
         QString value = line.mid(colon + 1).trimmed();
-        if (value.size() >= 2 && (value.front() == QLatin1Char('"') || value.front() == QLatin1Char('\''))
-            && value.back() == value.front())
+        if (value.size() >= 2 && (value.front() == QLatin1Char('"') || value.front() == QLatin1Char('\'')) &&
+            value.back() == value.front())
             value = value.mid(1, value.size() - 2);
         fields.insert(line.left(colon).trimmed(), value);
     }
@@ -295,8 +334,8 @@ QMap<QString, QString> frontMatter(const QByteArray &text)
 
 bool canCreate(Category category)
 {
-    return category == Category::Skills || category == Category::Agents || category == Category::Commands
-           || category == Category::Rules;
+    return category == Category::Skills || category == Category::Agents || category == Category::Commands ||
+           category == Category::Rules;
 }
 
 bool isValidName(const QString &name)
@@ -309,11 +348,16 @@ QString newEntryPath(Category category, Scope scope, const QString &projectDir, 
 {
     const QDir base(scope == Scope::User ? configDir() : QDir(projectDir).filePath(QStringLiteral(".claude")));
     switch (category) {
-    case Category::Skills: return base.filePath(QStringLiteral("skills/%1/SKILL.md").arg(name));
-    case Category::Agents: return base.filePath(QStringLiteral("agents/%1.md").arg(name));
-    case Category::Commands: return base.filePath(QStringLiteral("commands/%1.md").arg(name));
-    case Category::Rules: return base.filePath(QStringLiteral("rules/%1.md").arg(name));
-    default: return {};
+    case Category::Skills:
+        return base.filePath(QStringLiteral("skills/%1/SKILL.md").arg(name));
+    case Category::Agents:
+        return base.filePath(QStringLiteral("agents/%1.md").arg(name));
+    case Category::Commands:
+        return base.filePath(QStringLiteral("commands/%1.md").arg(name));
+    case Category::Rules:
+        return base.filePath(QStringLiteral("rules/%1.md").arg(name));
+    default:
+        return {};
     }
 }
 
@@ -325,15 +369,15 @@ QByteArray templateFor(const Entry &entry)
         return entry.scope == Scope::Project ? QByteArrayLiteral("# Project instructions\n\n")
                                              : QByteArrayLiteral("# My instructions\n\n");
     case Category::Skills:
-        return "---\nname: " + name
-               + "\ndescription: What this skill does, and when Claude should use it.\n---\n\n# " + name + "\n\n";
+        return "---\nname: " + name + "\ndescription: What this skill does, and when Claude should use it.\n---\n\n# " +
+               name + "\n\n";
     case Category::Agents:
-        return "---\nname: " + name
-               + "\ndescription: When Claude should hand a task to this agent.\n---\n\n"
-                 "You are an agent that…\n";
+        return "---\nname: " + name +
+               "\ndescription: When Claude should hand a task to this agent.\n---\n\n"
+               "You are an agent that…\n";
     case Category::Commands:
-        return QByteArrayLiteral("---\ndescription: What /") + name
-               + " does.\n---\n\nThe prompt sent to Claude. $ARGUMENTS stands for what follows the command.\n";
+        return QByteArrayLiteral("---\ndescription: What /") + name +
+               " does.\n---\n\nThe prompt sent to Claude. $ARGUMENTS stands for what follows the command.\n";
     case Category::Rules:
         return "# " + name + "\n\n";
     case Category::Settings:

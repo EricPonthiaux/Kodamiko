@@ -19,7 +19,7 @@ class MessageLink;
 // `and`, `option`) is the branch keyword and label of its copy.
 struct Fragment {
     QString id;
-    QString kind;  // loop | alt | opt | par | critical | break | rect | group
+    QString kind; // loop | alt | opt | par | critical | break | rect | group
     QString label;
     int depth = 0;
     QString branchKeyword;

@@ -95,8 +95,8 @@ QByteArray run(const QString &workDir, const QStringList &arguments, const RunOp
 
     const QByteArray output = process.readAllStandardOutput();
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        QString message = options.feedback.progress ? withoutProgress(errorOutput)
-                                                    : QString::fromUtf8(errorOutput).trimmed();
+        QString message =
+            options.feedback.progress ? withoutProgress(errorOutput) : QString::fromUtf8(errorOutput).trimmed();
         if (message.isEmpty())
             message = QString::fromUtf8(output).trimmed();
         if (message.isEmpty())

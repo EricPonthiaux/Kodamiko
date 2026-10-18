@@ -50,11 +50,12 @@ QString CodeColorizer::languageOfFence(const QString &info)
         return LanguageRegistry::plainText;
     // Names that are not file extensions.
     static const QHash<QString, QString> aliases = {
-        {"c++", "x.cpp"}, {"cplusplus", "x.cpp"}, {"python", "x.py"}, {"javascript", "x.js"},
-        {"typescript", "x.ts"}, {"shell", "x.sh"}, {"console", "x.sh"}, {"shell-session", "x.sh"},
-        {"bash", "x.sh"}, {"zsh", "x.sh"}, {"yaml", "x.yml"}, {"markdown", "x.md"}, {"make", "Makefile"},
-        {"makefile", "Makefile"}, {"cmake", "CMakeLists.txt"}, {"batch", "x.bat"}, {"dos", "x.bat"},
-        {"jsonc", "x.json"}, {"patch", "x.diff"}, {"toml", "x.toml"}, {"ini", "x.ini"},
+        {"c++", "x.cpp"},       {"cplusplus", "x.cpp"},   {"python", "x.py"},          {"javascript", "x.js"},
+        {"typescript", "x.ts"}, {"shell", "x.sh"},        {"console", "x.sh"},         {"shell-session", "x.sh"},
+        {"bash", "x.sh"},       {"zsh", "x.sh"},          {"yaml", "x.yml"},           {"markdown", "x.md"},
+        {"make", "Makefile"},   {"makefile", "Makefile"}, {"cmake", "CMakeLists.txt"}, {"batch", "x.bat"},
+        {"dos", "x.bat"},       {"jsonc", "x.json"},      {"patch", "x.diff"},         {"toml", "x.toml"},
+        {"ini", "x.ini"},
     };
     return LanguageRegistry::languageForFile(aliases.value(name, QStringLiteral("x.") + name));
 }
@@ -88,8 +89,8 @@ QList<CodeColorizer::Span> CodeColorizer::categorize(const QString &code, const 
     while (byte < length && index < code.size()) {
         const int style = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, byte));
         const qsizetype runStart = index;
-        while (byte < length && index < code.size()
-               && editor_->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, byte) == style) {
+        while (byte < length && index < code.size() &&
+               editor_->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, byte) == style) {
             qsizetype characters = 1;
             byte += utf8Length(code, index, &characters);
             index += characters;

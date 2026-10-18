@@ -92,8 +92,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("list_diagram_kinds"), QStringLiteral("Diagram kinds"),
         QStringLiteral("The kinds of diagram Duet's editor draws, with the file extension and a blank source of "
                        "each (follow the duet:diagrams skill to write one)."),
-        object({}),
-        McpTool::immediate([](const QJsonObject &) {
+        object({}), McpTool::immediate([](const QJsonObject &) {
             QJsonArray kinds;
             for (const DiagramKind &kind : DiagramKinds::available())
                 kinds.append(QJsonObject{{QStringLiteral("id"), kind.id},
@@ -183,10 +182,10 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("Lays an open diagram out again automatically in Duet's editor (the user's arrangement is "
                        "replaced; one step they can undo)."),
         object({{QStringLiteral("path"), pathArgument()},
-                {QStringLiteral("direction"), enumeration({QStringLiteral("TB"), QStringLiteral("LR"),
-                                                           QStringLiteral("BT"), QStringLiteral("RL")},
-                                                          QStringLiteral("Reading direction, for the kinds that "
-                                                                         "have one (optional)"))}},
+                {QStringLiteral("direction"),
+                 enumeration({QStringLiteral("TB"), QStringLiteral("LR"), QStringLiteral("BT"), QStringLiteral("RL")},
+                             QStringLiteral("Reading direction, for the kinds that "
+                                            "have one (optional)"))}},
                {QStringLiteral("path")}),
         McpTool::immediate([context](const QJsonObject &arguments) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
@@ -195,7 +194,8 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
             if (!view)
                 return McpResult::error(error);
             if (arguments.contains(QStringLiteral("direction")))
-                view->board()->meta.insert(QStringLiteral("rankdir"), arguments.value(QStringLiteral("direction")).toString());
+                view->board()->meta.insert(QStringLiteral("rankdir"),
+                                           arguments.value(QStringLiteral("direction")).toString());
             if (!view->canvas()->arrange(true))
                 return McpResult::error(QStringLiteral("The layout failed"));
             return McpResult::message(QStringLiteral("Laid out"));
@@ -207,7 +207,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
                        "an empty list clears the selection."),
         object({{QStringLiteral("path"), pathArgument()},
                 {QStringLiteral("keys"), array(string(QStringLiteral("Element key")), QStringLiteral("Elements to "
-                                                                                                    "select"))}},
+                                                                                                     "select"))}},
                {QStringLiteral("path"), QStringLiteral("keys")}),
         McpTool::immediate([context](const QJsonObject &arguments) {
             const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
@@ -224,8 +224,9 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
                 else
                     missing.append(key.toString());
             }
-            return missing.isEmpty() ? McpResult::message(QStringLiteral("Selected"))
-                                     : McpResult::error(QStringLiteral("No element %1").arg(missing.join(QStringLiteral(", "))));
+            return missing.isEmpty()
+                       ? McpResult::message(QStringLiteral("Selected"))
+                       : McpResult::error(QStringLiteral("No element %1").arg(missing.join(QStringLiteral(", "))));
         })));
 
     registry.addTool(McpTool::acting(
@@ -247,22 +248,24 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
             return McpResult::message(QStringLiteral("Wrote %1").arg(context.relative(output)));
         })));
 
-    registry.addPrompt({QStringLiteral("draw-diagram"),
-                        QStringLiteral("Draw a diagram"),
-                        QStringLiteral("Draw a diagram of part of the project, opened in Duet's diagram editor"),
-                        {{QStringLiteral("subject"), QStringLiteral("What it shows (\"the login flow in src/auth\")"), true},
-                         {QStringLiteral("kind"), QStringLiteral("Kind: flowchart, sequence, class, state, data model, "
-                                                                 "C4, mind map… (optional)"),
-                          false}},
-                        [](const QJsonObject &arguments) {
-                            const QString kind = arguments.value(QStringLiteral("kind")).toString();
-                            return QStringLiteral("Following the duet:diagrams skill, draw %1 of %2: read the code it "
-                                                  "refers to first and draw what it really does. Then open it in Duet "
-                                                  "(open_file) and check it reads cleanly (get_diagram_problems).")
-                                .arg(kind.isEmpty() ? QStringLiteral("the most fitting diagram")
-                                                    : QStringLiteral("a %1 diagram").arg(kind),
-                                     arguments.value(QStringLiteral("subject")).toString());
-                        }});
+    registry.addPrompt(
+        {QStringLiteral("draw-diagram"),
+         QStringLiteral("Draw a diagram"),
+         QStringLiteral("Draw a diagram of part of the project, opened in Duet's diagram editor"),
+         {{QStringLiteral("subject"), QStringLiteral("What it shows (\"the login flow in src/auth\")"), true},
+          {QStringLiteral("kind"),
+           QStringLiteral("Kind: flowchart, sequence, class, state, data model, "
+                          "C4, mind map… (optional)"),
+           false}},
+         [](const QJsonObject &arguments) {
+             const QString kind = arguments.value(QStringLiteral("kind")).toString();
+             return QStringLiteral("Following the duet:diagrams skill, draw %1 of %2: read the code it "
+                                   "refers to first and draw what it really does. Then open it in Duet "
+                                   "(open_file) and check it reads cleanly (get_diagram_problems).")
+                 .arg(kind.isEmpty() ? QStringLiteral("the most fitting diagram")
+                                     : QStringLiteral("a %1 diagram").arg(kind),
+                      arguments.value(QStringLiteral("subject")).toString());
+         }});
 
     registry.addResource({
         QStringLiteral("duet://diagram/{path}"),

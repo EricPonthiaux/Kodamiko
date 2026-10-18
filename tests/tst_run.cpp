@@ -187,21 +187,24 @@ private slots:
         write(dir.path() + "/src/App.java", "class App {}\n");
         write(dir.path() + "/web/a.ts", "let a = 1;\n");
 
-        const Problems problems = parse(
-            dir.path(),
-            "[ 50%] Building CXX object main.cpp.o\n"
-            "\x1b[1msrc/main.cpp:12:5: \x1b[31merror: \x1b[0m'x' was not declared in this scope\r\n"
-            "src/main.cpp:3:1: warning: unused variable 'y' [-Wunused-variable]\n"
-            "src/main.cpp:3:1: note: declared here\n"
-            "In file included from src/main.cpp:2:\n"
-            "src/main.cpp:12:5: error: 'x' was not declared in this scope\n" // told twice
-            + dir.path().toUtf8() + "/src/App.java:7: error: cannot find symbol\n"
-            "[ERROR] " + dir.path().toUtf8() + "/src/App.java:[9,13] incompatible types\n"
-            "web/a.ts(4,7): error TS2322: Type 'string' is not assignable to type 'number'.\n"
-            "web/a.ts:5:1 - error TS2304: Cannot find name 'b'.\n"
-            "src/main.cpp(20): warning C4996: 'strcpy': This function may be unsafe.\n"
-            "missing.cpp:1:1: error: a file that is not there\n"
-            "make: *** [Makefile:12: all] Error 1\n");
+        const Problems problems =
+            parse(dir.path(),
+                  "[ 50%] Building CXX object main.cpp.o\n"
+                  "\x1b[1msrc/main.cpp:12:5: \x1b[31merror: \x1b[0m'x' was not declared in this scope\r\n"
+                  "src/main.cpp:3:1: warning: unused variable 'y' [-Wunused-variable]\n"
+                  "src/main.cpp:3:1: note: declared here\n"
+                  "In file included from src/main.cpp:2:\n"
+                  "src/main.cpp:12:5: error: 'x' was not declared in this scope\n" // told twice
+                      + dir.path().toUtf8() +
+                      "/src/App.java:7: error: cannot find symbol\n"
+                      "[ERROR] " +
+                      dir.path().toUtf8() +
+                      "/src/App.java:[9,13] incompatible types\n"
+                      "web/a.ts(4,7): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+                      "web/a.ts:5:1 - error TS2304: Cannot find name 'b'.\n"
+                      "src/main.cpp(20): warning C4996: 'strcpy': This function may be unsafe.\n"
+                      "missing.cpp:1:1: error: a file that is not there\n"
+                      "make: *** [Makefile:12: all] Error 1\n");
         QCOMPARE(problems.size(), 7);
         QCOMPARE(problems.at(0).path, dir.path() + "/src/main.cpp");
         QCOMPARE(problems.at(0).line, 11);
@@ -229,25 +232,28 @@ private slots:
         write(dir.path() + "/web/b.js", "b()\n");
 
         const QByteArray root = dir.path().toUtf8();
-        const Problems problems = parse(dir.path(),
-                                        "error[E0308]: mismatched types\n"
-                                        " --> src/main.rs:4:18\n"
-                                        "  |\n"
-                                        "CMake Error at CMakeLists.txt:5 (add_executable):\n"
-                                        "  Cannot find source file:\n"
-                                        "\n"
-                                        "    missing.cpp\n"
-                                        "\n"
-                                        "Call Stack (most recent call first):\n"
-                                        "Traceback (most recent call last):\n"
-                                        "  File \"" + root + "/app/run.py\", line 1, in <module>\n"
-                                        "    main()\n"
-                                        "  File \"/usr/lib/python3/json/__init__.py\", line 7, in loads\n"
-                                        "ValueError: bad value\n"
-                                        "e: file://" + root + "/app/A.kt:3:9 Unresolved reference: x\n"
-                                        + root + "/web/b.js\n"
-                                        "  2:3  warning  'b' is not defined  no-undef\n"
-                                        "\n");
+        const Problems problems =
+            parse(dir.path(), "error[E0308]: mismatched types\n"
+                              " --> src/main.rs:4:18\n"
+                              "  |\n"
+                              "CMake Error at CMakeLists.txt:5 (add_executable):\n"
+                              "  Cannot find source file:\n"
+                              "\n"
+                              "    missing.cpp\n"
+                              "\n"
+                              "Call Stack (most recent call first):\n"
+                              "Traceback (most recent call last):\n"
+                              "  File \"" +
+                                  root +
+                                  "/app/run.py\", line 1, in <module>\n"
+                                  "    main()\n"
+                                  "  File \"/usr/lib/python3/json/__init__.py\", line 7, in loads\n"
+                                  "ValueError: bad value\n"
+                                  "e: file://" +
+                                  root + "/app/A.kt:3:9 Unresolved reference: x\n" + root +
+                                  "/web/b.js\n"
+                                  "  2:3  warning  'b' is not defined  no-undef\n"
+                                  "\n");
         QCOMPARE(problems.size(), 5);
         QCOMPARE(problems.at(0).path, dir.path() + "/src/main.rs");
         QCOMPARE(problems.at(0).line, 3);
@@ -367,7 +373,8 @@ private slots:
         configuration.command = "trap '' INT; echo ready; sleep 30";
         TerminalWidget terminal;
         QByteArray output;
-        connect(&terminal, &TerminalWidget::outputReceived, this, [&output](const QByteArray &data) { output += data; });
+        connect(&terminal, &TerminalWidget::outputReceived, this,
+                [&output](const QByteArray &data) { output += data; });
         QSignalSpy finished(&runner, &Runner::finished);
         runner.start(configuration, &terminal);
         QTRY_VERIFY_WITH_TIMEOUT(output.contains("ready"), 10000); // the trap is set

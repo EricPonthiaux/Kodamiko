@@ -11,8 +11,15 @@
 // snapshots) and Claude Code (the Claude session). On a new machine,
 // they may be missing or too old.
 struct Prerequisite {
-    enum class Id { Git, ClaudeCode };
-    enum class Status { Missing, Outdated, Ok };
+    enum class Id {
+        Git,
+        ClaudeCode
+    };
+    enum class Status {
+        Missing,
+        Outdated,
+        Ok
+    };
 
     Id id;
     QString name;

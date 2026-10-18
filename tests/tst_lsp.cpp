@@ -67,9 +67,9 @@ private slots:
                  QString("JavaSE-1.8"));
 
         LanguageSetup python{"python", true, "3.12", "/p/.venv/bin/python", "pyright", "1.1.414"};
-        QCOMPARE(LspClient::settingAt(LanguageServers::optionsFor("pyright", python, "/p/.venv/bin", "/p/.venv/bin/python")
-                                          .settings,
-                                      "python.pythonPath")
+        QCOMPARE(LspClient::settingAt(
+                     LanguageServers::optionsFor("pyright", python, "/p/.venv/bin", "/p/.venv/bin/python").settings,
+                     "python.pythonPath")
                      .toString(),
                  QString("/p/.venv/bin/python"));
     }
@@ -83,7 +83,9 @@ private slots:
         QVERIFY(LspClient::settingAt(jdtls.settings, "java.completion.favoriteStaticMembers")
                     .toArray()
                     .contains(QJsonValue("org.junit.jupiter.api.Assertions.*")));
-        QVERIFY(LspClient::settingAt(jdtls.settings, "java.completion.filteredTypes").toArray().contains(QJsonValue("java.awt.*")));
+        QVERIFY(LspClient::settingAt(jdtls.settings, "java.completion.filteredTypes")
+                    .toArray()
+                    .contains(QJsonValue("java.awt.*")));
         QVERIFY(LspClient::settingAt(jdtls.settings, "java.configuration.runtimes").isNull());
         QCOMPARE(jdtls.initialization.value("settings").toObject(), jdtls.settings);
         // With one: the runtime as well.
@@ -179,8 +181,8 @@ private slots:
              "filterText": "equals(Object obj) : boolean", "insertText": "equals", "sortText": "c"}
         ]})json";
         bool incomplete = false;
-        const QList<CompletionItem> items = LspCompletionProvider::parse(QJsonDocument::fromJson(json).object(),
-                                                                          &incomplete);
+        const QList<CompletionItem> items =
+            LspCompletionProvider::parse(QJsonDocument::fromJson(json).object(), &incomplete);
         QVERIFY(incomplete);
         QCOMPARE(items.size(), 4);
         QCOMPARE(items[3].label, QString("equals")); // jdtls
@@ -286,8 +288,10 @@ private slots:
         QStringList labels;
         for (const CompletionItem &item : items)
             labels.append(item.label);
-        QVERIFY2(labels.contains("x") && labels.contains("y") && labels.contains("move"), qPrintable(labels.join(", ")));
-        const auto move = std::find_if(items.begin(), items.end(), [](const CompletionItem &i) { return i.label == "move"; });
+        QVERIFY2(labels.contains("x") && labels.contains("y") && labels.contains("move"),
+                 qPrintable(labels.join(", ")));
+        const auto move =
+            std::find_if(items.begin(), items.end(), [](const CompletionItem &i) { return i.label == "move"; });
         QCOMPARE(move->kind, CompletionItem::Kind::Method);
         QVERIFY2(move->detail.contains("int dx"), qPrintable(move->detail));
         QVERIFY(move->isSnippet);
@@ -370,7 +374,8 @@ private slots:
                                   "    }\n"
                                   "}\n";
         const QList<CompletionItem> members = completeAt(dir, "src/Main.java", "java", member, 2, 13, '.', 120000);
-        QVERIFY2(itemNamed(members, "length").kind == CompletionItem::Kind::Method, qPrintable(labelsOf(members).join(", ")));
+        QVERIFY2(itemNamed(members, "length").kind == CompletionItem::Kind::Method,
+                 qPrintable(labelsOf(members).join(", ")));
         for (const CompletionItem &item : members)
             QVERIFY2(item.kind != CompletionItem::Kind::Snippet, qPrintable(item.label));
     }
@@ -397,7 +402,7 @@ private:
     // column) of `text`, saved as `name` in `dir`. The servers stay alive
     // with the test object (resolving needs them).
     QList<CompletionItem> completeAt(const QTemporaryDir &dir, const QString &name, const QString &languageId,
-                                  const QByteArray &text, int line, int column, QChar trigger, int timeoutMs)
+                                     const QByteArray &text, int line, int column, QChar trigger, int timeoutMs)
     {
         QFile file(dir.filePath(name));
         if (!file.open(QIODevice::WriteOnly))

@@ -25,7 +25,15 @@ class DiffView : public QsciScintilla {
     Q_OBJECT
 
 public:
-    enum class LineKind { Spacer, FileHeader, HunkHeader, Context, Added, Removed, Note };
+    enum class LineKind {
+        Spacer,
+        FileHeader,
+        HunkHeader,
+        Context,
+        Added,
+        Removed,
+        Note
+    };
 
     // What a displayed line stands for in the files' patches. `hunk` is -1
     // on a file's title bar, `line` -1 on a block separator.
@@ -48,7 +56,7 @@ public:
         Location location;
         int oldNumber = 0; // from 1; 0 when the line is not on that side
         int newNumber = 0;
-        int emphasis = 0;  // title bars: characters of the file name, shown brighter
+        int emphasis = 0;    // title bars: characters of the file name, shown brighter
         int statsStart = -1; // title bars: where "+12 −3" begins
         // Added or removed lines facing their counterpart: the words that changed.
         QList<Range> changes;
@@ -85,6 +93,6 @@ private:
     QList<Line> lines_;
     QList<int> fileStarts_;
     QStringList paths_;
-    int numberWidth_ = 3; // digits of the largest line number
+    int numberWidth_ = 3;             // digits of the largest line number
     QHash<qint64, int> syntaxStyles_; // color, bold and italic → style
 };

@@ -62,8 +62,8 @@ QImage foldChevron(const QColor &color, bool open)
 
 bool isBlankLine(QsciScintilla &editor, int line)
 {
-    return editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line)
-        == editor.SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line);
+    return editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line) ==
+           editor.SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line);
 }
 
 int lineIndentation(QsciScintilla &editor, int line)
@@ -102,8 +102,8 @@ EditorWidget::ActiveGuide activeGuide(QsciScintilla &editor, int line)
         column = indentation;
         inside = next;
     } else if (!blank && previous >= 0 && lineIndentation(editor, previous) > indentation) {
-        const auto first = editor.SendScintilla(QsciScintillaBase::SCI_GETCHARAT,
-                                                editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line));
+        const auto first = editor.SendScintilla(
+            QsciScintillaBase::SCI_GETCHARAT, editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line));
         if (first == '}' || first == ')' || first == ']') {
             column = indentation;
             inside = previous;
@@ -126,8 +126,8 @@ EditorWidget::ActiveGuide activeGuide(QsciScintilla &editor, int line)
     if (first < 0 || !inBlock(first))
         return {};
     int last = first;
-    for (int above = nonBlankLine(editor, first - 1, -1); above >= 0 && inBlock(above) && first - above < guideSearchLines;
-         above = nonBlankLine(editor, above - 1, -1))
+    for (int above = nonBlankLine(editor, first - 1, -1);
+         above >= 0 && inBlock(above) && first - above < guideSearchLines; above = nonBlankLine(editor, above - 1, -1))
         first = above;
     for (int below = nonBlankLine(editor, last + 1, 1); below >= 0 && inBlock(below) && below - last < guideSearchLines;
          below = nonBlankLine(editor, below + 1, 1))
@@ -138,9 +138,12 @@ EditorWidget::ActiveGuide activeGuide(QsciScintilla &editor, int line)
 QsciScintilla::EolMode toEolMode(LineEnding lineEnding)
 {
     switch (lineEnding) {
-    case LineEnding::CrLf: return QsciScintilla::EolWindows;
-    case LineEnding::Cr: return QsciScintilla::EolMac;
-    case LineEnding::Lf: break;
+    case LineEnding::CrLf:
+        return QsciScintilla::EolWindows;
+    case LineEnding::Cr:
+        return QsciScintilla::EolMac;
+    case LineEnding::Lf:
+        break;
     }
     return QsciScintilla::EolUnix;
 }
@@ -370,8 +373,9 @@ void EditorWidget::paintActiveGuide(QPainter &painter)
     };
     const int bottomLine = activeGuide_.lastLine;
     const int y1 = std::max(0, top(activeGuide_.firstLine));
-    const int y2 = std::min(viewport()->height(), top(bottomLine) + static_cast<int>(SendScintilla(SCI_TEXTHEIGHT, bottomLine))
-                                                      * static_cast<int>(SendScintilla(SCI_WRAPCOUNT, bottomLine)));
+    const int y2 = std::min(viewport()->height(),
+                            top(bottomLine) + static_cast<int>(SendScintilla(SCI_TEXTHEIGHT, bottomLine)) *
+                                                  static_cast<int>(SendScintilla(SCI_WRAPCOUNT, bottomLine)));
     if (y2 <= y1)
         return;
     painter.fillRect(QRect(x, y1, 1, y2 - y1), theme_.marginForeground);
@@ -385,7 +389,8 @@ void EditorWidget::paintCurrentLineNumber(QPainter &painter, const QRect &dirty)
     const int numbersWidth = marginWidth(0);
     if (line < 0 || line >= lines() || numbersWidth <= 0 || !SendScintilla(SCI_GETLINEVISIBLE, line))
         return;
-    const int top = static_cast<int>(SendScintilla(SCI_POINTYFROMPOSITION, 0, SendScintilla(SCI_POSITIONFROMLINE, line)));
+    const int top =
+        static_cast<int>(SendScintilla(SCI_POINTYFROMPOSITION, 0, SendScintilla(SCI_POSITIONFROMLINE, line)));
     const QRect row(0, top, numbersWidth, static_cast<int>(SendScintilla(SCI_TEXTHEIGHT, line)));
     if (!dirty.intersects(row))
         return;
@@ -415,7 +420,8 @@ void EditorWidget::followCaretLine()
     for (const int changed : {previous, line}) {
         if (changed < 0 || changed >= lines())
             continue;
-        const int top = static_cast<int>(SendScintilla(SCI_POINTYFROMPOSITION, 0, SendScintilla(SCI_POSITIONFROMLINE, changed)));
+        const int top =
+            static_cast<int>(SendScintilla(SCI_POINTYFROMPOSITION, 0, SendScintilla(SCI_POSITIONFROMLINE, changed)));
         viewport()->update(0, top, marginWidth(0), static_cast<int>(SendScintilla(SCI_TEXTHEIGHT, changed)));
     }
 }
@@ -587,6 +593,12 @@ void EditorWidget::setIndentationStyle(bool useTabs, int width)
     emit formatChanged();
 }
 
+void EditorWidget::showColumnLimit(int columnLimit)
+{
+    setEdgeMode(columnLimit > 0 ? QsciScintilla::EdgeLine : QsciScintilla::EdgeNone);
+    setEdgeColumn(columnLimit);
+}
+
 void EditorWidget::applyTheme(const Theme &theme)
 {
     theme_ = theme;
@@ -606,6 +618,7 @@ void EditorWidget::applyTheme(const Theme &theme)
     setUnmatchedBraceForegroundColor(theme.error);
     setIndentationGuidesBackgroundColor(theme.background);
     setIndentationGuidesForegroundColor(theme.caretLine);
+    setEdgeColor(theme.caretLine);
     ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     SendScintilla(SCI_INDICSETFORE, errorIndicator, theme.error);
     SendScintilla(SCI_INDICSETFORE, warningIndicator, theme.warning);
@@ -619,8 +632,8 @@ void EditorWidget::setDiagnostics(const Diagnostics &diagnostics)
         return;
     diagnostics_ = diagnostics;
     const long length = SendScintilla(SCI_GETLENGTH);
-    for (const auto &[indicator, color] : {std::pair{errorIndicator, theme_.error},
-                                           std::pair{warningIndicator, theme_.warning}}) {
+    for (const auto &[indicator, color] :
+         {std::pair{errorIndicator, theme_.error}, std::pair{warningIndicator, theme_.warning}}) {
         SendScintilla(SCI_INDICSETSTYLE, indicator, INDIC_SQUIGGLEPIXMAP);
         SendScintilla(SCI_INDICSETFORE, indicator, color);
         SendScintilla(SCI_INDICSETUNDER, indicator, true);
@@ -666,8 +679,11 @@ void EditorWidget::showHoverInfo(int position, const QPoint &point)
             // The first line in bold: what the text is about.
             const qsizetype newline = help.indexOf(QLatin1Char('\n'));
             messages.append(newline < 0 ? help.toHtmlEscaped()
-                                        : QStringLiteral("<b>%1</b><br>%2").arg(help.left(newline).toHtmlEscaped(),
-                                                                                help.mid(newline + 1).toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br>"))));
+                                        : QStringLiteral("<b>%1</b><br>%2")
+                                              .arg(help.left(newline).toHtmlEscaped(),
+                                                   help.mid(newline + 1)
+                                                       .toHtmlEscaped()
+                                                       .replace(QLatin1Char('\n'), QStringLiteral("<br>"))));
         }
     }
     if (messages.isEmpty())

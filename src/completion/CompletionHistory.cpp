@@ -42,8 +42,8 @@ CompletionHistory::~CompletionHistory()
 QString CompletionHistory::fileFor(const QString &folder)
 {
     const QByteArray id = QCryptographicHash::hash(QDir::cleanPath(folder).toUtf8(), QCryptographicHash::Sha1).toHex();
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/completion/")
-           + QString::fromLatin1(id.left(16)) + QStringLiteral(".json");
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/completion/") +
+           QString::fromLatin1(id.left(16)) + QStringLiteral(".json");
 }
 
 void CompletionHistory::setFile(const QString &path)
@@ -133,7 +133,8 @@ void CompletionHistory::save()
         return;
     QJsonObject entries;
     for (auto it = uses_.cbegin(); it != uses_.cend(); ++it)
-        entries.insert(it.key(), QJsonObject{{"accepted", it->accepted}, {"rejected", it->rejected}, {"lastUsed", it->lastUsed}});
+        entries.insert(it.key(),
+                       QJsonObject{{"accepted", it->accepted}, {"rejected", it->rejected}, {"lastUsed", it->lastUsed}});
     QDir().mkpath(QFileInfo(file_).absolutePath());
     QSaveFile file(file_);
     if (file.open(QIODevice::WriteOnly)) {

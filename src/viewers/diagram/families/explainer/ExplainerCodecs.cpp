@@ -180,7 +180,8 @@ QJsonObject common(const QJsonObject &element, QString *id)
     if (!safeId(*id))
         fail(QStringLiteral("invalid element id \"%1\"").arg(*id));
     QJsonObject props{{QStringLiteral("key"), *id}};
-    const QString description = text(element.value(QStringLiteral("description")), *id + QStringLiteral(".description"));
+    const QString description =
+        text(element.value(QStringLiteral("description")), *id + QStringLiteral(".description"));
     if (!description.isEmpty())
         props.insert(QStringLiteral("description"), description);
     props.insert(QStringLiteral("tone"), optionalTone(element.value(QStringLiteral("tone"))));
@@ -228,13 +229,12 @@ QString endpoint(const QJsonValue &value, const QString &edgeId, const QString &
     const QJsonObject end = object(value, edgeId + QLatin1Char('.') + side);
     if (end.value(QStringLiteral("element")).isString())
         return end.value(QStringLiteral("element")).toString();
-    const QJsonObject point = end.value(QStringLiteral("point")).isObject() ? end.value(QStringLiteral("point")).toObject()
-                                                                             : end;
+    const QJsonObject point =
+        end.value(QStringLiteral("point")).isObject() ? end.value(QStringLiteral("point")).toObject() : end;
     const qreal x = number(point.value(QStringLiteral("x")), edgeId + QLatin1Char('.') + side + QStringLiteral(".x"));
     const qreal y = number(point.value(QStringLiteral("y")), edgeId + QLatin1Char('.') + side + QStringLiteral(".y"));
     const QString key = QStringLiteral("__%1:%2").arg(edgeId, side);
-    model.nodes.append({QStringLiteral("freeAnchor"),
-                        key,
+    model.nodes.append({QStringLiteral("freeAnchor"), key,
                         QJsonObject{{QStringLiteral("x"), x - 1},
                                     {QStringLiteral("y"), y - 1},
                                     {QStringLiteral("w"), 2},
@@ -318,9 +318,11 @@ void parseScene(const QString &source, Model &model)
 
         if (type.toString() == QLatin1String("node")) {
             box(element, id, props);
-            props.insert(QStringLiteral("label"), text(element.value(QStringLiteral("label")), id + QStringLiteral(".label"), 1000));
-            props.insert(QStringLiteral("shape"), optionalEnum(element.value(QStringLiteral("shape")), shapeNames(),
-                                                               QStringLiteral("rounded"), id + QStringLiteral(".shape")));
+            props.insert(QStringLiteral("label"),
+                         text(element.value(QStringLiteral("label")), id + QStringLiteral(".label"), 1000));
+            props.insert(QStringLiteral("shape"),
+                         optionalEnum(element.value(QStringLiteral("shape")), shapeNames(), QStringLiteral("rounded"),
+                                      id + QStringLiteral(".shape")));
             model.nodes.append({QStringLiteral("freeNode"), id, props});
         } else if (type.toString() == QLatin1String("frame")) {
             box(element, id, props);
@@ -336,10 +338,13 @@ void parseScene(const QString &source, Model &model)
             QJsonArray points;
             for (int i = 0; i < rawPoints.size(); ++i)
                 points.append(strokePoint(rawPoints[i], id, i));
-            props.insert(QStringLiteral("x"), number(orDefault(element.value(QStringLiteral("x")), 0), id + QStringLiteral(".x")));
-            props.insert(QStringLiteral("y"), number(orDefault(element.value(QStringLiteral("y")), 0), id + QStringLiteral(".y")));
+            props.insert(QStringLiteral("x"),
+                         number(orDefault(element.value(QStringLiteral("x")), 0), id + QStringLiteral(".x")));
+            props.insert(QStringLiteral("y"),
+                         number(orDefault(element.value(QStringLiteral("y")), 0), id + QStringLiteral(".y")));
             props.insert(QStringLiteral("points"), points);
-            props.insert(QStringLiteral("label"), text(element.value(QStringLiteral("label")), id + QStringLiteral(".label"), 500));
+            props.insert(QStringLiteral("label"),
+                         text(element.value(QStringLiteral("label")), id + QStringLiteral(".label"), 500));
             props.insert(QStringLiteral("arrow"), optionalEnum(element.value(QStringLiteral("arrow")), arrowNames(),
                                                                QStringLiteral("none"), id + QStringLiteral(".arrow")));
             props.insert(QStringLiteral("line"), optionalEnum(element.value(QStringLiteral("line")), lineNames(),
@@ -388,7 +393,8 @@ void parseScene(const QString &source, Model &model)
         QJsonObject props = common;
         props.remove(QStringLiteral("customFill"));
         props.remove(QStringLiteral("parentBoundary"));
-        props.insert(QStringLiteral("label"), text(element.value(QStringLiteral("label")), id + QStringLiteral(".label"), 500));
+        props.insert(QStringLiteral("label"),
+                     text(element.value(QStringLiteral("label")), id + QStringLiteral(".label"), 500));
         props.insert(QStringLiteral("arrow"), optionalEnum(element.value(QStringLiteral("arrow")), arrowNames(),
                                                            QStringLiteral("end"), id + QStringLiteral(".arrow")));
         const QString line = optionalEnum(element.value(QStringLiteral("line")), lineNames(), QStringLiteral("solid"),
@@ -413,13 +419,27 @@ QString quote(const QString &value)
     for (qsizetype i = 0; i < value.size(); ++i) {
         const QChar c = value[i];
         switch (c.unicode()) {
-        case '"': out += QStringLiteral("\\\""); break;
-        case '\\': out += QStringLiteral("\\\\"); break;
-        case '\b': out += QStringLiteral("\\b"); break;
-        case '\f': out += QStringLiteral("\\f"); break;
-        case '\n': out += QStringLiteral("\\n"); break;
-        case '\r': out += QStringLiteral("\\r"); break;
-        case '\t': out += QStringLiteral("\\t"); break;
+        case '"':
+            out += QStringLiteral("\\\"");
+            break;
+        case '\\':
+            out += QStringLiteral("\\\\");
+            break;
+        case '\b':
+            out += QStringLiteral("\\b");
+            break;
+        case '\f':
+            out += QStringLiteral("\\f");
+            break;
+        case '\n':
+            out += QStringLiteral("\\n");
+            break;
+        case '\r':
+            out += QStringLiteral("\\r");
+            break;
+        case '\t':
+            out += QStringLiteral("\\t");
+            break;
         default:
             if (c.unicode() < 0x20) {
                 out += QStringLiteral("\\u%1").arg(uint(c.unicode()), 4, 16, QLatin1Char('0'));
@@ -455,8 +475,8 @@ QString writeObject(const QJsonObject &object, int depth, const QStringList &ord
 {
     if (object.isEmpty())
         return QStringLiteral("{}");
-    static const QStringList nested{QStringLiteral("id"), QStringLiteral("title"),  QStringLiteral("narration"),
-                                    QStringLiteral("x"),  QStringLiteral("y"),      QStringLiteral("width"),
+    static const QStringList nested{QStringLiteral("id"),     QStringLiteral("title"),   QStringLiteral("narration"),
+                                    QStringLiteral("x"),      QStringLiteral("y"),       QStringLiteral("width"),
                                     QStringLiteral("height"), QStringLiteral("element"), QStringLiteral("point")};
     QStringList keys;
     for (const QStringList &list : {order, nested}) {
@@ -473,8 +493,8 @@ QString writeObject(const QJsonObject &object, int depth, const QStringList &ord
     QStringList parts;
     for (const QString &key : keys)
         parts.append(inner + quote(key) + QStringLiteral(": ") + write(object.value(key), depth + 1));
-    return QStringLiteral("{\n") + parts.join(QStringLiteral(",\n")) + QLatin1Char('\n')
-           + QString(2 * depth, QLatin1Char(' ')) + QLatin1Char('}');
+    return QStringLiteral("{\n") + parts.join(QStringLiteral(",\n")) + QLatin1Char('\n') +
+           QString(2 * depth, QLatin1Char(' ')) + QLatin1Char('}');
 }
 
 QString write(const QJsonValue &value, int depth, const QStringList &order)
@@ -494,8 +514,8 @@ QString write(const QJsonValue &value, int depth, const QStringList &order)
         QStringList parts;
         for (const QJsonValue &item : array)
             parts.append(inner + write(item, depth + 1, order));
-        return QStringLiteral("[\n") + parts.join(QStringLiteral(",\n")) + QLatin1Char('\n')
-               + QString(2 * depth, QLatin1Char(' ')) + QLatin1Char(']');
+        return QStringLiteral("[\n") + parts.join(QStringLiteral(",\n")) + QLatin1Char('\n') +
+               QString(2 * depth, QLatin1Char(' ')) + QLatin1Char(']');
     }
     case QJsonValue::Object:
         return writeObject(value.toObject(), depth, order);
@@ -509,21 +529,21 @@ const QStringList &elementOrder(const QString &type)
 {
     static const QStringList tail{QStringLiteral("description"), QStringLiteral("tone"), QStringLiteral("appearAt"),
                                   QStringLiteral("fill"), QStringLiteral("parent")};
-    static const QStringList node = QStringList{QStringLiteral("id"),    QStringLiteral("type"),  QStringLiteral("shape"),
-                                                QStringLiteral("x"),     QStringLiteral("y"),     QStringLiteral("width"),
-                                                QStringLiteral("height"), QStringLiteral("label")}
-                                    + tail;
-    static const QStringList frame = QStringList{QStringLiteral("id"), QStringLiteral("type"),  QStringLiteral("x"),
-                                                 QStringLiteral("y"),  QStringLiteral("width"), QStringLiteral("height"),
-                                                 QStringLiteral("title")}
-                                     + tail;
+    static const QStringList node =
+        QStringList{QStringLiteral("id"), QStringLiteral("type"),  QStringLiteral("shape"),  QStringLiteral("x"),
+                    QStringLiteral("y"),  QStringLiteral("width"), QStringLiteral("height"), QStringLiteral("label")} +
+        tail;
+    static const QStringList frame =
+        QStringList{QStringLiteral("id"),    QStringLiteral("type"),   QStringLiteral("x"),    QStringLiteral("y"),
+                    QStringLiteral("width"), QStringLiteral("height"), QStringLiteral("title")} +
+        tail;
     static const QStringList stroke =
         QStringList{QStringLiteral("id"), QStringLiteral("type"), QStringLiteral("x"), QStringLiteral("y"),
-                    QStringLiteral("points")}
-        + tail + QStringList{QStringLiteral("label"), QStringLiteral("arrow"), QStringLiteral("line")};
+                    QStringLiteral("points")} +
+        tail + QStringList{QStringLiteral("label"), QStringLiteral("arrow"), QStringLiteral("line")};
     static const QStringList edge =
-        QStringList{QStringLiteral("id"), QStringLiteral("type"), QStringLiteral("from"), QStringLiteral("to")} + tail
-        + QStringList{QStringLiteral("label"), QStringLiteral("arrow"), QStringLiteral("line")};
+        QStringList{QStringLiteral("id"), QStringLiteral("type"), QStringLiteral("from"), QStringLiteral("to")} + tail +
+        QStringList{QStringLiteral("label"), QStringLiteral("arrow"), QStringLiteral("line")};
     if (type == QLatin1String("node"))
         return node;
     if (type == QLatin1String("frame"))
@@ -555,8 +575,8 @@ void optionalCommon(QJsonObject &target, const QString &description, const QStri
 
 bool isPublic(const Shape &shape)
 {
-    return shape.type == QLatin1String("freeNode") || shape.type == QLatin1String("freeFrame")
-           || shape.type == QLatin1String("freeStroke");
+    return shape.type == QLatin1String("freeNode") || shape.type == QLatin1String("freeFrame") ||
+           shape.type == QLatin1String("freeStroke");
 }
 
 class ExplainerBoard : public Codec {
@@ -730,20 +750,21 @@ public:
                 ordered.append(element);
         }
 
-        const QJsonValue canvas = meta.value(QStringLiteral("canvas")).isObject()
-                                      ? meta.value(QStringLiteral("canvas"))
-                                      : QJsonValue(QJsonObject{{QStringLiteral("width"), 1200}, {QStringLiteral("height"), 800}});
+        const QJsonValue canvas =
+            meta.value(QStringLiteral("canvas")).isObject()
+                ? meta.value(QStringLiteral("canvas"))
+                : QJsonValue(QJsonObject{{QStringLiteral("width"), 1200}, {QStringLiteral("height"), 800}});
         QStringList elements;
         for (const QJsonObject &element : ordered)
-            elements.append(QStringLiteral("    ")
-                            + write(element, 2, elementOrder(element.value(QStringLiteral("type")).toString())));
+            elements.append(QStringLiteral("    ") +
+                            write(element, 2, elementOrder(element.value(QStringLiteral("type")).toString())));
         QStringList parts{QStringLiteral("  \"format\": ") + quote(format),
                           QStringLiteral("  \"version\": ") + QString::number(version),
                           QStringLiteral("  \"canvas\": ") + write(canvas, 1),
-                          QStringLiteral("  \"elements\": ")
-                              + (elements.isEmpty() ? QStringLiteral("[]")
-                                                    : QStringLiteral("[\n") + elements.join(QStringLiteral(",\n"))
-                                                          + QStringLiteral("\n  ]"))};
+                          QStringLiteral("  \"elements\": ") +
+                              (elements.isEmpty() ? QStringLiteral("[]")
+                                                  : QStringLiteral("[\n") + elements.join(QStringLiteral(",\n")) +
+                                                        QStringLiteral("\n  ]"))};
         const QJsonArray steps = meta.value(QStringLiteral("steps")).toArray();
         if (!steps.isEmpty())
             parts.append(QStringLiteral("  \"steps\": ") + write(steps, 1));

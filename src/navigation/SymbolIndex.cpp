@@ -21,8 +21,8 @@ constexpr int maxFiles = 50000;
 
 bool isTypeContainer(SymbolKind kind)
 {
-    return kind == SymbolKind::Namespace || kind == SymbolKind::Class || kind == SymbolKind::Struct
-        || kind == SymbolKind::Interface || kind == SymbolKind::Enum;
+    return kind == SymbolKind::Namespace || kind == SymbolKind::Class || kind == SymbolKind::Struct ||
+           kind == SymbolKind::Interface || kind == SymbolKind::Enum;
 }
 
 // "ns::Foo::bar<T>" → qualifier "ns::Foo", name "bar".
@@ -94,8 +94,8 @@ void SymbolIndex::refresh()
 
     pool_.start([this, folder = folder_, known, generation = generation_] {
         ScanResult result = scan(folder, known, workerProviders_);
-        QMetaObject::invokeMethod(this, [this, generation, result = std::move(result)] { apply(generation, result); },
-                                  Qt::QueuedConnection);
+        QMetaObject::invokeMethod(
+            this, [this, generation, result = std::move(result)] { apply(generation, result); }, Qt::QueuedConnection);
     });
 }
 
@@ -128,7 +128,8 @@ SymbolIndex::ScanResult SymbolIndex::scan(const QString &folder, const QHash<QSt
     ProjectFiles::Options options;
     options.maxFiles = maxFiles;
     options.accept = [&providers](const QFileInfo &entry) {
-        return entry.size() <= maxFileSize && providers.count(LanguageRegistry::languageForFile(entry.absoluteFilePath())) > 0;
+        return entry.size() <= maxFileSize &&
+               providers.count(LanguageRegistry::languageForFile(entry.absoluteFilePath())) > 0;
     };
     for (const QFileInfo &entry : ProjectFiles::list(folder, options)) {
         const QString path = entry.absoluteFilePath();
@@ -199,8 +200,8 @@ QList<SymbolLocation> SymbolIndex::flatten(const std::vector<OutlineSymbol> &sym
                 location.filePath = filePath;
                 location.languageId = languageId;
                 // The cursor goes to "bar", not to "Foo::".
-                location.position = symbol.position
-                    + (qualifier.isEmpty() ? 0 : static_cast<int>(qualifier.toUtf8().size()) + 2);
+                location.position =
+                    symbol.position + (qualifier.isEmpty() ? 0 : static_cast<int>(qualifier.toUtf8().size()) + 2);
                 location.startLine = symbol.startLine;
                 location.endLine = symbol.endLine;
                 result.append(location);

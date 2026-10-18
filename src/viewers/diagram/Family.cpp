@@ -12,8 +12,8 @@ const QList<const Family *> &allFamilies()
     // A family without shapes is not ported yet: it is left out.
     static const QList<const Family *> list = [] {
         QList<const Family *> all{
-            &families::flowchart(), &families::sequence(), &families::classes(),  &families::states(),
-            &families::dataModel(), &families::c4(),       &families::mindmap(),  &families::journey(),
+            &families::flowchart(),     &families::sequence(),  &families::classes(), &families::states(),
+            &families::dataModel(),     &families::c4(),        &families::mindmap(), &families::journey(),
             &families::productVision(), &families::explainer(),
         };
         QList<const Family *> ported;
@@ -97,8 +97,8 @@ QString languageOfFile(const QString &path)
     const QString suffix = QFileInfo(path).suffix().toLower();
     if (suffix == QLatin1String("mmd") || suffix == QLatin1String("mermaid"))
         return QStringLiteral("mermaid");
-    if (suffix == QLatin1String("puml") || suffix == QLatin1String("plantuml") || suffix == QLatin1String("pu")
-        || suffix == QLatin1String("iuml"))
+    if (suffix == QLatin1String("puml") || suffix == QLatin1String("plantuml") || suffix == QLatin1String("pu") ||
+        suffix == QLatin1String("iuml"))
         return QStringLiteral("plantuml");
     if (suffix == QLatin1String("board"))
         return QStringLiteral("board");

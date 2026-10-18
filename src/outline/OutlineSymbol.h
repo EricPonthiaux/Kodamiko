@@ -4,7 +4,20 @@
 
 #include <vector>
 
-enum class SymbolKind { Namespace, Class, Struct, Interface, Enum, Type, Function, Method, Field, Macro, Heading, Target };
+enum class SymbolKind {
+    Namespace,
+    Class,
+    Struct,
+    Interface,
+    Enum,
+    Type,
+    Function,
+    Method,
+    Field,
+    Macro,
+    Heading,
+    Target
+};
 
 // Element of a file's outline: a function, a class, a heading...
 // Lines start at 0; `position` is a byte offset in the UTF-8 text,
@@ -14,7 +27,7 @@ struct OutlineSymbol {
     SymbolKind kind = SymbolKind::Function;
     int position = 0; // start of the name, where to place the cursor
     int startLine = 0;
-    int endLine = 0;  // inclusive
+    int endLine = 0;              // inclusive
     bool declarationOnly = false; // prototype, signature: the definition is elsewhere
     std::vector<OutlineSymbol> children;
 };

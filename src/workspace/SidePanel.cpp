@@ -31,8 +31,8 @@ protected:
             initStyleOption(&option, i);
             painter.drawControl(QStyle::CE_TabBarTabShape, option);
             const QColor color = i == currentIndex() ? theme_.accentText
-                                 : i == hovered       ? theme_.foreground
-                                                      : theme_.mutedText;
+                                 : i == hovered      ? theme_.foreground
+                                                     : theme_.mutedText;
             drawLabel(painter, option.rect, tabIcon(i), tabText(i), color);
         }
     }
@@ -64,7 +64,8 @@ private:
                 icon.paint(&imagePainter, QRect(QPoint(x, (level.height() - icons.height()) / 2), icons));
                 x += icons.width() + spacing;
             }
-            imagePainter.drawText(QRect(x, 0, textWidth, level.height()), Qt::AlignVCenter | Qt::TextShowMnemonic, text);
+            imagePainter.drawText(QRect(x, 0, textWidth, level.height()), Qt::AlignVCenter | Qt::TextShowMnemonic,
+                                  text);
         }
         // Read from bottom to top.
         QImage turned = image.transformed(QTransform().rotate(270));

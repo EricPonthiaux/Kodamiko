@@ -176,8 +176,8 @@ public:
     qreal y = 0;
     qreal w = 120;
     qreal h = 60;
-    QString customFill;      // "#rrggbb" chosen by the user, or empty
-    QString parentBoundary;  // id or key of the frame holding it, or empty
+    QString customFill;     // "#rrggbb" chosen by the user, or empty
+    QString parentBoundary; // id or key of the frame holding it, or empty
     // Order in which an explainer reveals it (0: none).
     int appearAt = 0;
 

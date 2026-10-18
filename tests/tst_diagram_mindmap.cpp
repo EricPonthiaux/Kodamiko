@@ -174,23 +174,23 @@ private slots:
     void readsNodeShapesAndDecorations()
     {
         const Model model = parsed(mindmapCodec(), QStringLiteral("mindmap\n"
-            "  a((Circle))\n"
-            "    b))Bang((\n"
-            "    c{{Hexagon}}\n"
-            "    d)Cloud(\n"
-            "    e([Stadium])\n"
-            "    f[Square]\n"
-            "      g(Rounded)\n"
-            "    h[\"Quoted (with) brackets\"]\n"
-            "    Bare text ::icon(fa fa-book)\n"
-            "    i[Classy]:::urgent\n"
-            "    j[Two<br>lines]\n"
-            "  %% a comment\n"));
-        QCOMPARE(texts(model), (QStringList{QStringLiteral("Circle"), QStringLiteral("Bang"), QStringLiteral("Hexagon"),
-                                            QStringLiteral("Cloud"), QStringLiteral("Stadium"), QStringLiteral("Square"),
-                                            QStringLiteral("Rounded"), QStringLiteral("Quoted (with) brackets"),
-                                            QStringLiteral("Bare text"), QStringLiteral("Classy"),
-                                            QStringLiteral("Two\nlines")}));
+                                                                  "  a((Circle))\n"
+                                                                  "    b))Bang((\n"
+                                                                  "    c{{Hexagon}}\n"
+                                                                  "    d)Cloud(\n"
+                                                                  "    e([Stadium])\n"
+                                                                  "    f[Square]\n"
+                                                                  "      g(Rounded)\n"
+                                                                  "    h[\"Quoted (with) brackets\"]\n"
+                                                                  "    Bare text ::icon(fa fa-book)\n"
+                                                                  "    i[Classy]:::urgent\n"
+                                                                  "    j[Two<br>lines]\n"
+                                                                  "  %% a comment\n"));
+        QCOMPARE(texts(model),
+                 (QStringList{QStringLiteral("Circle"), QStringLiteral("Bang"), QStringLiteral("Hexagon"),
+                              QStringLiteral("Cloud"), QStringLiteral("Stadium"), QStringLiteral("Square"),
+                              QStringLiteral("Rounded"), QStringLiteral("Quoted (with) brackets"),
+                              QStringLiteral("Bare text"), QStringLiteral("Classy"), QStringLiteral("Two\nlines")}));
         QCOMPARE(model.nodes.at(0).key, QStringLiteral("a"));
         QCOMPARE(model.nodes.at(5).key, QStringLiteral("f"));
         QCOMPARE(depths(model), (QList<int>{0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1}));
@@ -201,23 +201,27 @@ private slots:
     {
         // Deeper lines are children; a line back at a sibling's indent closes
         // the branches in between, whatever the indent step.
-        const Model model = parsed(mindmapCodec(), QStringLiteral("mindmap\n root\n   A\n      A1\n        A11\n   B\n      B1\n"));
+        const Model model =
+            parsed(mindmapCodec(), QStringLiteral("mindmap\n root\n   A\n      A1\n        A11\n   B\n      B1\n"));
         QCOMPARE(depths(model), (QList<int>{0, 1, 2, 3, 1, 2}));
-        QCOMPARE(branches(model), (QStringList{QStringLiteral("root > A"), QStringLiteral("A > A1"),
-                                               QStringLiteral("A1 > A11"), QStringLiteral("root > B"),
-                                               QStringLiteral("B > B1")}));
+        QCOMPARE(branches(model),
+                 (QStringList{QStringLiteral("root > A"), QStringLiteral("A > A1"), QStringLiteral("A1 > A11"),
+                              QStringLiteral("root > B"), QStringLiteral("B > B1")}));
     }
 
     void keepsKeysUnique()
     {
         // Bare texts are keyed by their slug, never taking a source id.
-        const Model model = parsed(mindmapCodec(), QStringLiteral("mindmap\n  Idea\n    Idea\n    Idea[Other]\n    x[Same]\n    x[Again]\n"));
+        const Model model = parsed(
+            mindmapCodec(), QStringLiteral("mindmap\n  Idea\n    Idea\n    Idea[Other]\n    x[Same]\n    x[Again]\n"));
         QSet<QString> keys;
         for (const Model::Node &n : model.nodes)
             keys.insert(n.key);
         QCOMPARE(keys.size(), model.nodes.size());
-        QCOMPARE(node(model, QStringLiteral("Idea"))->props.value(QStringLiteral("text")).toString(), QStringLiteral("Other"));
-        QCOMPARE(node(model, QStringLiteral("x"))->props.value(QStringLiteral("text")).toString(), QStringLiteral("Same"));
+        QCOMPARE(node(model, QStringLiteral("Idea"))->props.value(QStringLiteral("text")).toString(),
+                 QStringLiteral("Other"));
+        QCOMPARE(node(model, QStringLiteral("x"))->props.value(QStringLiteral("text")).toString(),
+                 QStringLiteral("Same"));
     }
 
     void matchesOnlyMindMaps()
@@ -260,7 +264,8 @@ private slots:
         const Codec &codec = mindmapCodec();
         Board board;
         board.setFamily(&families::mindmap());
-        Shape *root = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Root")}, {QStringLiteral("depth"), 0}});
+        Shape *root =
+            board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Root")}, {QStringLiteral("depth"), 0}});
         Shape *child = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Child (draft)")}});
         Shape *other = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Another root")}});
         Shape *empty = board.addShape({}, {{QStringLiteral("text"), QString()}});
@@ -274,9 +279,9 @@ private slots:
         const Model model = parsed(codec, written);
         // One root; the other root and the cycle become top-level branches;
         // an empty text is an idea; brackets are quoted.
-        QCOMPARE(texts(model), (QStringList{QStringLiteral("Root"), QStringLiteral("Child (draft)"),
-                                            QStringLiteral("Another root"), QStringLiteral("Idea"),
-                                            QStringLiteral("Loop A"), QStringLiteral("Loop B")}));
+        QCOMPARE(texts(model),
+                 (QStringList{QStringLiteral("Root"), QStringLiteral("Child (draft)"), QStringLiteral("Another root"),
+                              QStringLiteral("Idea"), QStringLiteral("Loop A"), QStringLiteral("Loop B")}));
         QCOMPARE(depths(model), (QList<int>{0, 1, 1, 2, 1, 2}));
         QVERIFY(written.contains(QStringLiteral("[\"Child (draft)\"]")));
     }
@@ -290,7 +295,8 @@ private slots:
         const Font fonts[] = {Font(16, 600), Font(14, 500), Font(13)};
         const qreal padX[] = {24, 18, 10}, padY[] = {16, 12, 6}, lineHeights[] = {23, 20, 19};
         for (int depth : {0, 1, 2, 5}) {
-            Shape *s = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Idea")}, {QStringLiteral("depth"), depth}});
+            Shape *s = board.addShape(
+                {}, {{QStringLiteral("text"), QStringLiteral("Idea")}, {QStringLiteral("depth"), depth}});
             const int l = mindmap::level(depth);
             QCOMPARE(s->w, text::width(fonts[l], QStringLiteral("Idea")) + padX[l] * 2);
             QCOMPARE(s->h, lineHeights[l] + padY[l] * 2);
@@ -337,7 +343,8 @@ private slots:
         Shape *path = byKey(board, QStringLiteral("First_path"));
         QVERIFY(path);
         // A new idea is a bubble; attached under a leaf, it is a leaf too.
-        Shape *created = board.createShapeAt(QPointF(500, 500), {}, {{QStringLiteral("text"), QStringLiteral("New")}}, false);
+        Shape *created =
+            board.createShapeAt(QPointF(500, 500), {}, {{QStringLiteral("text"), QStringLiteral("New")}}, false);
         QCOMPARE(static_cast<mindmap::MindNode *>(created)->depth, 1);
         const qreal bubbleHeight = created->h;
         QVERIFY(board.connect(path->id, created->id));
@@ -379,7 +386,8 @@ private slots:
             QCOMPARE(t->displayText(), s->displayText());
             QCOMPARE(t->x, std::round(s->x * 10) / 10);
             QCOMPARE(t->y, std::round(s->y * 10) / 10);
-            QCOMPARE(static_cast<const mindmap::MindNode *>(t)->depth, static_cast<const mindmap::MindNode *>(s.get())->depth);
+            QCOMPARE(static_cast<const mindmap::MindNode *>(t)->depth,
+                     static_cast<const mindmap::MindNode *>(s.get())->depth);
         }
         paints(again);
     }
@@ -401,7 +409,8 @@ private slots:
         QVERIFY(loadInto(again, QStringLiteral("ideas.mmd"), saved.toUtf8(), &reloaded));
         QCOMPARE(reloaded.unplaced.size(), 1);
         const Shape *moved = byKey(again, QStringLiteral("Agent"));
-        QCOMPARE(QPointF(moved->x, moved->y), QPointF(std::round(agent.x() * 10) / 10, std::round(agent.y() * 10) / 10));
+        QCOMPARE(QPointF(moved->x, moved->y),
+                 QPointF(std::round(agent.x() * 10) / 10, std::round(agent.y() * 10) / 10));
     }
 
     void drawsEveryLevel()
@@ -439,15 +448,14 @@ private slots:
         QCOMPARE(model.meta.value(QStringLiteral("engine")).toString(), QStringLiteral("dot"));
         QCOMPARE(model.meta.value(QStringLiteral("rankdir")).toString(), QStringLiteral("TB"));
         QCOMPARE(model.meta.value(QStringLiteral("purpose")).toString(), QStringLiteral("product-vision"));
-        QCOMPARE(roles(model), (QStringList{QStringLiteral("product"), QStringLiteral("emotions"), QStringLiteral("problem"),
-                                            QStringLiteral("users"), QStringLiteral("value"),
-                                            QStringLiteral("capabilities"), QStringLiteral("journeys"),
-                                            QStringLiteral("unknowns")}));
-        QCOMPARE(arrows(model),
-                 (QStringList{QStringLiteral("product>emotions"), QStringLiteral("emotions>problem"),
-                              QStringLiteral("emotions>users"), QStringLiteral("emotions>value"),
-                              QStringLiteral("problem>capabilities"), QStringLiteral("users>journeys"),
-                              QStringLiteral("value>unknowns")}));
+        QCOMPARE(roles(model),
+                 (QStringList{QStringLiteral("product"), QStringLiteral("emotions"), QStringLiteral("problem"),
+                              QStringLiteral("users"), QStringLiteral("value"), QStringLiteral("capabilities"),
+                              QStringLiteral("journeys"), QStringLiteral("unknowns")}));
+        QCOMPARE(arrows(model), (QStringList{QStringLiteral("product>emotions"), QStringLiteral("emotions>problem"),
+                                             QStringLiteral("emotions>users"), QStringLiteral("emotions>value"),
+                                             QStringLiteral("problem>capabilities"), QStringLiteral("users>journeys"),
+                                             QStringLiteral("value>unknowns")}));
         const Model::Node *product = node(model, QStringLiteral("product"));
         QCOMPARE(product->props.value(QStringLiteral("title")).toString(), QStringLiteral("My product"));
         QCOMPARE(product->props.value(QStringLiteral("items")).toArray().first().toString(),
@@ -480,7 +488,8 @@ private slots:
     {
         const Codec &codec = visionCodec();
         QString source = codec.blank();
-        static const QRegularExpression unknowns(QStringLiteral("\\n    unknowns\\[[^\\n]+\\]\\n      unknowns_1\\[[^\\n]+\\]"));
+        static const QRegularExpression unknowns(
+            QStringLiteral("\\n    unknowns\\[[^\\n]+\\]\\n      unknowns_1\\[[^\\n]+\\]"));
         source.replace(unknowns, QStringLiteral("\n    unknowns[\"Unknowns\"]"));
         const Model model = parsed(codec, source);
         QVERIFY(!roles(model).contains(QStringLiteral("unknowns")));
@@ -496,20 +505,21 @@ private slots:
     {
         const Codec &codec = visionCodec();
         const Model model = parsed(codec, QStringLiteral("%% product-vision\n"
-            "mindmap\n"
-            "  Atlas\n"
-            "    vision[Vision]\n"
-            "      v1[Maps for everyone]\n"
-            "    problem[Problem]\n"
-            "      p1[\"Maps are #quot;stale#quot;\"]\n"
-            "        p11[Nobody updates them]\n"
-            "      p2[Too expensive]\n"
-            "    users[Users]\n"));
+                                                         "mindmap\n"
+                                                         "  Atlas\n"
+                                                         "    vision[Vision]\n"
+                                                         "      v1[Maps for everyone]\n"
+                                                         "    problem[Problem]\n"
+                                                         "      p1[\"Maps are #quot;stale#quot;\"]\n"
+                                                         "        p11[Nobody updates them]\n"
+                                                         "      p2[Too expensive]\n"
+                                                         "    users[Users]\n"));
         // No `product` key: the root is the node nobody points to.
         const Model::Node *product = node(model, QStringLiteral("product"));
         QCOMPARE(product->props.value(QStringLiteral("title")).toString(), QStringLiteral("Atlas"));
         QCOMPARE(product->props.value(QStringLiteral("items")).toArray().size(), 1);
-        const QJsonArray problems = node(model, QStringLiteral("problem"))->props.value(QStringLiteral("items")).toArray();
+        const QJsonArray problems =
+            node(model, QStringLiteral("problem"))->props.value(QStringLiteral("items")).toArray();
         QCOMPARE(problems.size(), 3);
         QCOMPARE(problems.at(1).toString(), QStringLiteral("Nobody updates them"));
         QVERIFY(node(model, QStringLiteral("users"))->props.value(QStringLiteral("items")).toArray().isEmpty());

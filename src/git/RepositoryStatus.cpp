@@ -42,18 +42,25 @@ QString withoutTrailingSlash(const char *path)
 QString operationName(int state)
 {
     switch (state) {
-    case GIT_REPOSITORY_STATE_MERGE: return QObject::tr("merge");
+    case GIT_REPOSITORY_STATE_MERGE:
+        return QObject::tr("merge");
     case GIT_REPOSITORY_STATE_REVERT:
-    case GIT_REPOSITORY_STATE_REVERT_SEQUENCE: return QObject::tr("revert");
+    case GIT_REPOSITORY_STATE_REVERT_SEQUENCE:
+        return QObject::tr("revert");
     case GIT_REPOSITORY_STATE_CHERRYPICK:
-    case GIT_REPOSITORY_STATE_CHERRYPICK_SEQUENCE: return QObject::tr("cherry-pick");
-    case GIT_REPOSITORY_STATE_BISECT: return QObject::tr("bisect");
+    case GIT_REPOSITORY_STATE_CHERRYPICK_SEQUENCE:
+        return QObject::tr("cherry-pick");
+    case GIT_REPOSITORY_STATE_BISECT:
+        return QObject::tr("bisect");
     case GIT_REPOSITORY_STATE_REBASE:
     case GIT_REPOSITORY_STATE_REBASE_INTERACTIVE:
-    case GIT_REPOSITORY_STATE_REBASE_MERGE: return QObject::tr("rebase");
+    case GIT_REPOSITORY_STATE_REBASE_MERGE:
+        return QObject::tr("rebase");
     case GIT_REPOSITORY_STATE_APPLY_MAILBOX:
-    case GIT_REPOSITORY_STATE_APPLY_MAILBOX_OR_REBASE: return QObject::tr("git am");
-    default: return {};
+    case GIT_REPOSITORY_STATE_APPLY_MAILBOX_OR_REBASE:
+        return QObject::tr("git am");
+    default:
+        return {};
     }
 }
 

@@ -52,6 +52,7 @@ add_library(duet_core STATIC
     diagnostics/ProblemsView.cpp
     editor/ChangeGutter.cpp
     editor/CodeColorizer.cpp
+    editor/ClangFormatStyle.cpp
     editor/CodeFormatter.cpp
     editor/EditorStatus.cpp
     editor/EditorTabs.cpp
@@ -136,6 +137,7 @@ add_library(duet_core STATIC
     ui/Theme.cpp
     ui/ThemeStyle.cpp
     ui/TitleBar.cpp
+    ui/TrailingLayout.cpp
     ui/TrailingTabButton.cpp
     ui/TreeColumnFit.cpp
     ui/TreeMetrics.cpp

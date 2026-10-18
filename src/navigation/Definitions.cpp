@@ -7,8 +7,8 @@ namespace {
 
 bool isType(SymbolKind kind)
 {
-    return kind == SymbolKind::Class || kind == SymbolKind::Struct || kind == SymbolKind::Interface
-        || kind == SymbolKind::Enum || kind == SymbolKind::Type;
+    return kind == SymbolKind::Class || kind == SymbolKind::Struct || kind == SymbolKind::Interface ||
+           kind == SymbolKind::Enum || kind == SymbolKind::Type;
 }
 
 bool isFunction(SymbolKind kind)
@@ -50,8 +50,8 @@ QString enclosingContainer(const QList<SymbolLocation> &fileSymbols, int line)
 {
     const SymbolLocation *innermost = nullptr;
     for (const SymbolLocation &symbol : fileSymbols) {
-        if (isFunction(symbol.kind) && !symbol.declarationOnly && symbol.startLine <= line && line <= symbol.endLine
-            && (!innermost || symbol.startLine >= innermost->startLine))
+        if (isFunction(symbol.kind) && !symbol.declarationOnly && symbol.startLine <= line && line <= symbol.endLine &&
+            (!innermost || symbol.startLine >= innermost->startLine))
             innermost = &symbol;
     }
     return innermost ? innermost->container : QString();
@@ -71,18 +71,20 @@ Result resolve(const Request &request, QList<SymbolLocation> matches, const QLis
     if (current != matches.cend()) {
         const SymbolLocation here = *current;
         matches.removeIf([&](const SymbolLocation &symbol) {
-            return (symbol.filePath == here.filePath && symbol.position == here.position)
-                || symbol.container != here.container || isType(symbol.kind) != isType(here.kind)
-                || isFunction(symbol.kind) != isFunction(here.kind);
+            return (symbol.filePath == here.filePath && symbol.position == here.position) ||
+                   symbol.container != here.container || isType(symbol.kind) != isType(here.kind) ||
+                   isFunction(symbol.kind) != isFunction(here.kind);
         });
-        keepIfAny(matches, [&](const SymbolLocation &symbol) { return symbol.declarationOnly != here.declarationOnly; });
+        keepIfAny(matches,
+                  [&](const SymbolLocation &symbol) { return symbol.declarationOnly != here.declarationOnly; });
         return {matches, matches.size() > 1};
     }
 
     if (!request.qualifier.isEmpty())
         keepIfAny(matches, [&](const SymbolLocation &symbol) { return symbol.container == request.qualifier; });
-    const QString preferredContainer =
-        request.qualifier.isEmpty() && !request.memberAccess ? enclosingContainer(fileSymbols, request.line) : QString();
+    const QString preferredContainer = request.qualifier.isEmpty() && !request.memberAccess
+                                           ? enclosingContainer(fileSymbols, request.line)
+                                           : QString();
 
     const auto rank = [&](const SymbolLocation &symbol) {
         const bool otherContainer = preferredContainer.isEmpty() || symbol.container != preferredContainer;

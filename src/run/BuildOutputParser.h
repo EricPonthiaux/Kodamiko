@@ -42,7 +42,12 @@ private:
     Problems problems_;
     QSet<QString> seen_;
 
-    enum class Pending { None, Rust, CMake, Python };
+    enum class Pending {
+        None,
+        Rust,
+        CMake,
+        Python
+    };
     Pending pending_ = Pending::None;
     Diagnostic::Severity pendingSeverity_ = Diagnostic::Severity::Error;
     QString pendingMessage_;

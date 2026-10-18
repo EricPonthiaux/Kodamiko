@@ -23,8 +23,9 @@ using namespace diagram::source;
 
 const QRegularExpression &header()
 {
-    static const QRegularExpression pattern(QStringLiteral("^(C4(?:Context|Container|Component|Dynamic|Deployment))\\b"),
-                                            QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression pattern(
+        QStringLiteral("^(C4(?:Context|Container|Component|Dynamic|Deployment))\\b"),
+        QRegularExpression::CaseInsensitiveOption);
     return pattern;
 }
 
@@ -53,8 +54,9 @@ const QRegularExpression &presentation()
 bool isBoundary(const QString &macro)
 {
     static const QSet<QString> boundaries{
-        QStringLiteral("Boundary"),        QStringLiteral("Enterprise_Boundary"), QStringLiteral("System_Boundary"),
-        QStringLiteral("Container_Boundary"), QStringLiteral("Deployment_Node"), QStringLiteral("Node"),
+        QStringLiteral("Boundary"),        QStringLiteral("Enterprise_Boundary"),
+        QStringLiteral("System_Boundary"), QStringLiteral("Container_Boundary"),
+        QStringLiteral("Deployment_Node"), QStringLiteral("Node"),
         QStringLiteral("Node_L"),          QStringLiteral("Node_R"),
     };
     return boundaries.contains(macro);
@@ -200,10 +202,10 @@ public:
 
             if (isBoundary(macro) && !args.value(0).isEmpty()) {
                 const QString key = args[0];
-                QJsonObject props{
-                    {QStringLiteral("name"), args.value(1).isEmpty() ? key : args[1]},
-                    {QStringLiteral("boundaryKind"),
-                     macro.startsWith(QLatin1String("Node")) ? QStringLiteral("Deployment_Node") : macro}};
+                QJsonObject props{{QStringLiteral("name"), args.value(1).isEmpty() ? key : args[1]},
+                                  {QStringLiteral("boundaryKind"), macro.startsWith(QLatin1String("Node"))
+                                                                       ? QStringLiteral("Deployment_Node")
+                                                                       : macro}};
                 parentProps(props);
                 setNode(QStringLiteral("c4boundary"), key, props);
                 if (opens)
@@ -217,11 +219,12 @@ public:
                     model.warnings.append(QStringLiteral("Not understood: %1").arg(line));
                     continue;
                 }
-                model.links.append({QStringLiteral("c4relation"), args[offset], args[offset + 1],
-                                    QJsonObject{{QStringLiteral("label"), args.value(offset + 2)},
-                                                {QStringLiteral("technology"), args.value(offset + 3)},
-                                                {QStringLiteral("description"), args.value(offset + 4)},
-                                                {QStringLiteral("bidirectional"), macro.startsWith(QLatin1String("BiRel"))}}});
+                model.links.append(
+                    {QStringLiteral("c4relation"), args[offset], args[offset + 1],
+                     QJsonObject{{QStringLiteral("label"), args.value(offset + 2)},
+                                 {QStringLiteral("technology"), args.value(offset + 3)},
+                                 {QStringLiteral("description"), args.value(offset + 4)},
+                                 {QStringLiteral("bidirectional"), macro.startsWith(QLatin1String("BiRel"))}}});
                 continue;
             }
 
@@ -287,8 +290,8 @@ public:
             const QString indent(depth * 2, QLatin1Char(' '));
             const QString key = keys.value(shape->id);
             if (const auto *boundary = dynamic_cast<const C4BoundaryShape *>(shape)) {
-                const QString macro = boundary->boundaryKind.isEmpty() ? QStringLiteral("System_Boundary")
-                                                                       : boundary->boundaryKind;
+                const QString macro =
+                    boundary->boundaryKind.isEmpty() ? QStringLiteral("System_Boundary") : boundary->boundaryKind;
                 out.append(QStringLiteral("%1%2(%3, %4) {").arg(indent, macro, key, quote(boundary->name)));
                 for (const Shape *child : shapes) {
                     if (parentKey(child) == key)
@@ -304,11 +307,11 @@ public:
                                                        {QStringLiteral("system"), QStringLiteral("System")},
                                                        {QStringLiteral("container"), QStringLiteral("Container")},
                                                        {QStringLiteral("component"), QStringLiteral("Component")}};
-            const QString macro = bases.value(element->kind, QStringLiteral("System"))
-                                  + (element->variant == QLatin1String("database") ? QStringLiteral("Db")
-                                     : element->variant == QLatin1String("queue")  ? QStringLiteral("Queue")
-                                                                                   : QString())
-                                  + (element->external ? QStringLiteral("_Ext") : QString());
+            const QString macro = bases.value(element->kind, QStringLiteral("System")) +
+                                  (element->variant == QLatin1String("database") ? QStringLiteral("Db")
+                                   : element->variant == QLatin1String("queue")  ? QStringLiteral("Queue")
+                                                                                 : QString()) +
+                                  (element->external ? QStringLiteral("_Ext") : QString());
             QStringList args{key, quote(element->name)};
             if (isStructural(element->kind))
                 args.append(quote(element->technology));
@@ -338,9 +341,9 @@ public:
                 args.append(quote(technology));
             if (!description.isEmpty())
                 args.append(quote(description));
-            out.append(QStringLiteral("  %1(%2)").arg(relation && relation->bidirectional ? QStringLiteral("BiRel")
-                                                                                         : QStringLiteral("Rel"),
-                                                     args.join(QStringLiteral(", "))));
+            out.append(QStringLiteral("  %1(%2)")
+                           .arg(relation && relation->bidirectional ? QStringLiteral("BiRel") : QStringLiteral("Rel"),
+                                args.join(QStringLiteral(", "))));
         }
         return out.join(QLatin1Char('\n'));
     }

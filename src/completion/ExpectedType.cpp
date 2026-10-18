@@ -36,18 +36,19 @@ int skipBlanksBack(const QByteArray &text, int i)
 
 const QSet<QString> &specifiers()
 {
-    static const QSet<QString> words = {"static", "const", "final", "constexpr", "constinit", "inline", "mutable",
-                                        "volatile", "thread_local", "extern", "register", "public", "private",
-                                        "protected", "transient", "readonly"};
+    static const QSet<QString> words = {"static",  "const",     "final",        "constexpr", "constinit", "inline",
+                                        "mutable", "volatile",  "thread_local", "extern",    "register",  "public",
+                                        "private", "protected", "transient",    "readonly"};
     return words;
 }
 
 // Words before a name that make it no declaration: "return x".
 const QSet<QString> &notTypes()
 {
-    static const QSet<QString> words = {"return", "case", "new", "delete", "throw", "else", "goto", "co_return",
-                                        "co_yield", "co_await", "sizeof", "typeof", "await", "yield", "in", "of",
-                                        "not", "and", "or", "using", "namespace", "import", "package", "do"};
+    static const QSet<QString> words = {"return", "case",      "new",       "delete",   "throw",   "else",
+                                        "goto",   "co_return", "co_yield",  "co_await", "sizeof",  "typeof",
+                                        "await",  "yield",     "in",        "of",       "not",     "and",
+                                        "or",     "using",     "namespace", "import",   "package", "do"};
     return words;
 }
 
@@ -88,9 +89,8 @@ QString declarationBefore(const QByteArray &blanked, int end)
             if (angle == 0)
                 break;
             --angle;
-        } else if (c == ';' || c == '{' || c == '}' || c == '(' || c == ')' || c == '\n'
-                   || (c == ',' && angle == 0) || (c == ':' && !(i >= 2 && blanked[i - 2] == ':')
-                                                   && !(i < blanked.size() && blanked[i] == ':'))) {
+        } else if (c == ';' || c == '{' || c == '}' || c == '(' || c == ')' || c == '\n' || (c == ',' && angle == 0) ||
+                   (c == ':' && !(i >= 2 && blanked[i - 2] == ':') && !(i < blanked.size() && blanked[i] == ':'))) {
             break;
         }
         --i;
@@ -119,8 +119,8 @@ QString declaredType(const QByteArray &blanked, const QByteArray &name, int befo
     for (int at = int(blanked.lastIndexOf(name, before - int(name.size()))); at >= 0;
          at = at > 0 ? int(blanked.lastIndexOf(name, at - 1)) : -1) {
         const int end = at + int(name.size());
-        if ((at > 0 && CodeScan::isIdentifierByte(blanked[at - 1]))
-            || (end < blanked.size() && CodeScan::isIdentifierByte(blanked[end])))
+        if ((at > 0 && CodeScan::isIdentifierByte(blanked[at - 1])) ||
+            (end < blanked.size() && CodeScan::isIdentifierByte(blanked[end])))
             continue;
         int after = end;
         while (after < blanked.size() && (blanked[after] == ' ' || blanked[after] == '\t'))
@@ -172,21 +172,60 @@ QString returnType(const QByteArray &blanked, int position, const QString &langu
 
 bool isNumber(const QString &type)
 {
-    static const QSet<QString> numbers = {
-        "int", "long", "short", "unsigned", "signed", "unsignedint", "signedint", "longint", "longlong",
-        "unsignedlong", "unsignedlonglong", "unsignedshort", "longdouble", "float", "double", "size_t", "ssize_t",
-        "ptrdiff_t", "qsizetype", "qint8", "qint16", "qint32", "qint64", "quint8", "quint16", "quint32", "quint64",
-        "qreal", "uint", "ulong", "ushort", "byte", "Integer", "Long", "Short", "Double", "Float", "Byte", "number",
-        "BigDecimal", "BigInteger", "intptr_t", "uintptr_t", "size_type", "difference_type"};
+    static const QSet<QString> numbers = {"int",
+                                          "long",
+                                          "short",
+                                          "unsigned",
+                                          "signed",
+                                          "unsignedint",
+                                          "signedint",
+                                          "longint",
+                                          "longlong",
+                                          "unsignedlong",
+                                          "unsignedlonglong",
+                                          "unsignedshort",
+                                          "longdouble",
+                                          "float",
+                                          "double",
+                                          "size_t",
+                                          "ssize_t",
+                                          "ptrdiff_t",
+                                          "qsizetype",
+                                          "qint8",
+                                          "qint16",
+                                          "qint32",
+                                          "qint64",
+                                          "quint8",
+                                          "quint16",
+                                          "quint32",
+                                          "quint64",
+                                          "qreal",
+                                          "uint",
+                                          "ulong",
+                                          "ushort",
+                                          "byte",
+                                          "Integer",
+                                          "Long",
+                                          "Short",
+                                          "Double",
+                                          "Float",
+                                          "Byte",
+                                          "number",
+                                          "BigDecimal",
+                                          "BigInteger",
+                                          "intptr_t",
+                                          "uintptr_t",
+                                          "size_type",
+                                          "difference_type"};
     static const QRegularExpression fixed(QStringLiteral("^u?int(?:_least|_fast)?(?:8|16|32|64)_t$"));
     return numbers.contains(type) || fixed.match(type).hasMatch();
 }
 
 bool isString(const QString &type)
 {
-    static const QSet<QString> strings = {"string", "QString", "String", "char*", "wchar_t*", "string_view",
-                                          "QStringView", "QLatin1String", "QLatin1StringView", "CharSequence",
-                                          "wstring", "u16string", "QAnyStringView", "str"};
+    static const QSet<QString> strings = {
+        "string",        "QString",           "String",       "char*",   "wchar_t*",  "string_view",    "QStringView",
+        "QLatin1String", "QLatin1StringView", "CharSequence", "wstring", "u16string", "QAnyStringView", "str"};
     return strings.contains(type);
 }
 
@@ -223,8 +262,8 @@ QString at(const QByteArray &text, int position, const QString &languageId)
         if (keyword == "if" || keyword == "while")
             return QStringLiteral("bool");
     }
-    if ((c == '!' && !(i < blanked.size() && blanked[i] == '='))
-        || (i >= 2 && ((c == '&' && blanked[i - 2] == '&') || (c == '|' && blanked[i - 2] == '|'))))
+    if ((c == '!' && !(i < blanked.size() && blanked[i] == '=')) ||
+        (i >= 2 && ((c == '&' && blanked[i - 2] == '&') || (c == '|' && blanked[i - 2] == '|'))))
         return QStringLiteral("bool");
 
     if (c != '=' || isUntyped(languageId))
@@ -256,7 +295,8 @@ QString at(const QByteArray &text, int position, const QString &languageId)
     if (lhs.isEmpty())
         return {};
     // "Type name = |": a declaration.
-    static const QRegularExpression declaration(QStringLiteral("^(.*?[\\w>\\]*&])\\s*\\b([A-Za-z_$][\\w$]*)\\s*(?:\\[[^\\]]*\\])?$"));
+    static const QRegularExpression declaration(
+        QStringLiteral("^(.*?[\\w>\\]*&])\\s*\\b([A-Za-z_$][\\w$]*)\\s*(?:\\[[^\\]]*\\])?$"));
     if (const QRegularExpressionMatch match = declaration.match(lhs);
         match.hasMatch() && operatorStart == i - 1 && looksLikeType(match.captured(1))) {
         QString type = typeOf(match.captured(1));
@@ -342,12 +382,13 @@ bool accepts(const QString &expected, const CompletionItem &item, bool afterNew)
         return false;
     if (type == wanted)
         return true;
-    if ((isNumber(type) && isNumber(wanted)) || (isString(type) && isString(wanted))
-        || (isBoolean(type) && isBoolean(wanted)))
+    if ((isNumber(type) && isNumber(wanted)) || (isString(type) && isString(wanted)) ||
+        (isBoolean(type) && isBoolean(wanted)))
         return true;
     // "QList" and "QList<int>": one of them without its arguments.
     if (!type.contains(QLatin1Char('<')) || !wanted.contains(QLatin1Char('<')))
-        return withoutArguments(type) == withoutArguments(wanted) && type.endsWith(QLatin1Char('*')) == wanted.endsWith(QLatin1Char('*'));
+        return withoutArguments(type) == withoutArguments(wanted) &&
+               type.endsWith(QLatin1Char('*')) == wanted.endsWith(QLatin1Char('*'));
     return false;
 }
 

@@ -54,12 +54,12 @@ struct Function {
     QString returnType; // specifiers ("virtual", "static", "public"...) left out; empty for constructors
     QString scope;      // "Foo" of "Foo::size"
     QString name;
-    QString parameters; // between the parentheses, as written
-    QString trailing;   // after them: "const override", "throws IOException"
-    QStringList specifiers; // "virtual", "static", "public", "@Override"...
+    QString parameters;         // between the parentheses, as written
+    QString trailing;           // after them: "const override", "throws IOException"
+    QStringList specifiers;     // "virtual", "static", "public", "@Override"...
     QString templateParameters; // "typename T, int N" of "template <typename T, int N>"
-    bool pure = false;  // "= 0", or an abstract or interface method
-    bool deleted = false; // "= default" or "= delete"
+    bool pure = false;          // "= 0", or an abstract or interface method
+    bool deleted = false;       // "= default" or "= delete"
 
     QList<Parameter> parameterList(bool typed = true) const;
     // The qualifiers to repeat in an override or a definition ("const",

@@ -1,0 +1,67 @@
+# Code style of Duet: 4-space indentation, 120 columns, function braces on
+# their own line, `Type *pointer`. Close to Qt's own style.
+---
+Language: Cpp
+BasedOnStyle: WebKit
+Standard: c++20
+ColumnLimit: 120
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterClass: false
+  AfterStruct: false
+  AfterEnum: false
+  AfterNamespace: false
+  AfterControlStatement: Never
+  BeforeElse: false
+  BeforeCatch: false
+  BeforeLambdaBody: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: false
+
+PointerAlignment: Right
+ReferenceAlignment: Right
+AccessModifierOffset: -4
+IndentCaseLabels: false
+NamespaceIndentation: None
+FixNamespaceComments: true
+CompactNamespaces: false
+
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortLambdasOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: true
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+BreakInheritanceList: BeforeColon
+BreakTemplateDeclarations: Yes
+Cpp11BracedListStyle: true
+SpaceBeforeCpp11BracedList: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+SeparateDefinitionBlocks: Leave
+InsertNewlineAtEOF: true
+
+# Own header first, then project headers, Qt, third-party C APIs and the
+# standard library, each group separated by a blank line.
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+
+# Qt macros that read as statements or declarations.
+StatementMacros: [Q_OBJECT, Q_GADGET, Q_UNUSED, QT_REQUIRE_VERSION]
+ForEachMacros: [foreach, Q_FOREACH]
+...

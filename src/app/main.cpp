@@ -11,16 +11,15 @@
 #include <QMenu>
 #include <QProxyStyle>
 #include <QSettings>
-#include <QStyleOption>
 #include <QStyleFactory>
+#include <QStyleOption>
 
 namespace {
 
 // Fusion with roomier menus (taller items, wider menu bar entries and a
 // margin around the item list of each popup menu) and filled tabs on
 // every tab bar.
-class AppStyle : public QProxyStyle
-{
+class AppStyle : public QProxyStyle {
 public:
     using QProxyStyle::QProxyStyle;
 

@@ -44,7 +44,8 @@ RepositoryInfo reread(const RepositoryInfo &repository)
 
 QStringList names(const QString &workDir)
 {
-    return QString::fromUtf8(Git::run(workDir, {QStringLiteral("remote")})).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    return QString::fromUtf8(Git::run(workDir, {QStringLiteral("remote")}))
+        .split(QLatin1Char('\n'), Qt::SkipEmptyParts);
 }
 
 QString defaultRemote(const QStringList &remotes)
@@ -58,9 +59,10 @@ QString fetch(const RepositoryInfo &repository, const Git::Feedback &feedback)
 {
     if (names(repository.workDir).isEmpty())
         throw GitError(QObject::tr("The repository has no remote"));
-    Git::run(repository.workDir,
-             {QStringLiteral("fetch"), QStringLiteral("--all"), QStringLiteral("--prune"), QStringLiteral("--progress")},
-             options(feedback));
+    Git::run(
+        repository.workDir,
+        {QStringLiteral("fetch"), QStringLiteral("--all"), QStringLiteral("--prune"), QStringLiteral("--progress")},
+        options(feedback));
     const RepositoryInfo after = reread(repository);
     if (after.upstream.isEmpty() || after.behind == 0)
         return QObject::tr("Fetched: nothing new for %1").arg(after.branch.isEmpty() ? after.headId : after.branch);
@@ -77,17 +79,17 @@ QString pull(const RepositoryInfo &repository, const Git::Feedback &feedback)
     QStringList arguments{QStringLiteral("pull"), QStringLiteral("--progress")};
     // The user's choice between merge and rebase; none made: never a merge
     // commit nobody asked for.
-    const bool configured = configValue(repository.workDir, QStringLiteral("pull.rebase"))
-                            || configValue(repository.workDir, QStringLiteral("pull.ff"))
-                            || configValue(repository.workDir, QStringLiteral("branch.%1.rebase").arg(repository.branch));
+    const bool configured = configValue(repository.workDir, QStringLiteral("pull.rebase")) ||
+                            configValue(repository.workDir, QStringLiteral("pull.ff")) ||
+                            configValue(repository.workDir, QStringLiteral("branch.%1.rebase").arg(repository.branch));
     if (!configured)
         arguments.append(QStringLiteral("--ff-only"));
     try {
         Git::run(repository.workDir, arguments, options(feedback));
     } catch (const GitError &error) {
-        if (error.kind() == GitError::Kind::General
-            && (error.message().contains(QLatin1String("Not possible to fast-forward"))
-                || error.message().contains(QLatin1String("divergent branches")))) {
+        if (error.kind() == GitError::Kind::General &&
+            (error.message().contains(QLatin1String("Not possible to fast-forward")) ||
+             error.message().contains(QLatin1String("divergent branches")))) {
             throw GitError(QObject::tr("%1 and %2 have both moved on: merge or rebase to bring them together")
                                .arg(repository.branch, repository.upstream),
                            GitError::Kind::Diverged);

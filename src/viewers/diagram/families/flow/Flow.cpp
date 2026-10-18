@@ -281,8 +281,8 @@ void FlowShape::drawDetails(QPainter &painter, const QColor &color, qreal width)
 QList<Port> FlowShape::ports(const Board &) const
 {
     QList<Port> result;
-    for (const QPointF &toward : {QPointF(cx(), y - h), QPointF(x + w * 2, cy()), QPointF(cx(), y + h * 2),
-                                  QPointF(x - w, cy())}) {
+    for (const QPointF &toward :
+         {QPointF(cx(), y - h), QPointF(x + w * 2, cy()), QPointF(cx(), y + h * 2), QPointF(x - w, cy())}) {
         const QPointF p = borderPoint(toward);
         result.append({p.x(), p.y(), {}});
     }
@@ -308,7 +308,8 @@ QPointF FlowShape::borderPoint(QPointF toward) const
             const qreal b = 2 * ox * dx;
             const qreal c = ox * ox - radius * radius;
             const qreal discriminant = std::max<qreal>(0, b * b - 4 * a * c);
-            const qreal t = std::max((-b - std::sqrt(discriminant)) / (2 * a), (-b + std::sqrt(discriminant)) / (2 * a));
+            const qreal t =
+                std::max((-b - std::sqrt(discriminant)) / (2 * a), (-b + std::sqrt(discriminant)) / (2 * a));
             return {cx() + dx * t, cy() + dy * t};
         }
         return ellipseBorderPoint(center, toward, w / 2, h / 2);
@@ -326,9 +327,12 @@ QString FlowShape::graphvizGeometry() const
     // against the outline drawn. `leanl` has none: Graphviz cannot mirror its
     // parallelogram.
     static const QHash<QString, QString> geometry{
-        {QStringLiteral("circle"), QStringLiteral("ellipse")}, {QStringLiteral("doublecircle"), QStringLiteral("ellipse")},
-        {QStringLiteral("hexagon"), QStringLiteral("hexagon")}, {QStringLiteral("diamond"), QStringLiteral("diamond")},
-        {QStringLiteral("trap"), QStringLiteral("trapezium")},  {QStringLiteral("invtrap"), QStringLiteral("invtrapezium")},
+        {QStringLiteral("circle"), QStringLiteral("ellipse")},
+        {QStringLiteral("doublecircle"), QStringLiteral("ellipse")},
+        {QStringLiteral("hexagon"), QStringLiteral("hexagon")},
+        {QStringLiteral("diamond"), QStringLiteral("diamond")},
+        {QStringLiteral("trap"), QStringLiteral("trapezium")},
+        {QStringLiteral("invtrap"), QStringLiteral("invtrapezium")},
         {QStringLiteral("leanr"), QStringLiteral("parallelogram")},
     };
     return geometry.value(variant, QStringLiteral("box"));
@@ -549,7 +553,8 @@ void FlowLink::draw(QPainter &painter, const Board &board, bool selected) const
         fillArrowHead(painter, b, angle, style.arrow, style.color);
     } else if (head == QLatin1String("circle")) {
         const qreal radius = 4.5 * style.markerScale;
-        const QPointF c(b.x() - 4 * style.markerScale * std::cos(angle), b.y() - 4 * style.markerScale * std::sin(angle));
+        const QPointF c(b.x() - 4 * style.markerScale * std::cos(angle),
+                        b.y() - 4 * style.markerScale * std::sin(angle));
         const QPainterPath dot = ellipse(c, radius, radius);
         painter.fillPath(dot, board.style().background);
         stroke(painter, dot, style.color, style.width);
@@ -620,7 +625,9 @@ const Family &flowchart()
             return ShapeType{QString::fromLatin1(type),
                              [type] { return std::unique_ptr<Shape>(new FlowShape(QString::fromLatin1(type))); }};
         };
-        f.shapes = {shape("process"), shape("decision"), shape("terminator"),
+        f.shapes = {shape("process"),
+                    shape("decision"),
+                    shape("terminator"),
                     {QStringLiteral("flowText"), [] { return std::unique_ptr<Shape>(new FlowTextShape); }}};
         f.links = {{QStringLiteral("flow"), [] { return std::unique_ptr<Link>(new FlowLink); }}};
         f.defaultShape = QStringLiteral("process");
@@ -628,7 +635,10 @@ const Family &flowchart()
         f.hasDirection = true;
         const auto preset = [](const char *id, const QString &label, const QString &text, const char *variant) {
             const QString v = QString::fromLatin1(variant);
-            return ElementPreset{QString::fromLatin1(id), label, {}, typeOf(v),
+            return ElementPreset{QString::fromLatin1(id),
+                                 label,
+                                 {},
+                                 typeOf(v),
                                  QJsonObject{{QStringLiteral("text"), text}, {QStringLiteral("variant"), v}}};
         };
         f.elements = {

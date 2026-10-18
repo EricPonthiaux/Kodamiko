@@ -26,7 +26,8 @@ QString EditorContext::describe() const
             const bool cut = text.size() > maximumSelectionLength;
             if (cut)
                 text.truncate(maximumSelectionLength);
-            lines.append(QStringLiteral("- Selected text (%1%2):").arg(range, cut ? QStringLiteral(", cut") : QString()));
+            lines.append(
+                QStringLiteral("- Selected text (%1%2):").arg(range, cut ? QStringLiteral(", cut") : QString()));
             // A fence longer than any backtick run in the text.
             QString fence = QStringLiteral("```");
             while (text.contains(fence))
@@ -56,11 +57,11 @@ QString EditorContext::describe() const
 
 QJsonObject EditorContext::promptHookOutput(const QString &context)
 {
-    return QJsonObject{{QLatin1String("hookSpecificOutput"),
-                        QJsonObject{
-                            {QLatin1String("hookEventName"), QLatin1String("UserPromptSubmit")},
-                            {QLatin1String("additionalContext"), context},
-                        }}};
+    return QJsonObject{
+        {QLatin1String("hookSpecificOutput"), QJsonObject{
+                                                  {QLatin1String("hookEventName"), QLatin1String("UserPromptSubmit")},
+                                                  {QLatin1String("additionalContext"), context},
+                                              }}};
 }
 
 EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFolder)
@@ -120,10 +121,10 @@ QJsonObject EditorContext::toJson() const
     }
     QJsonArray problemList;
     for (const Problem &problem : problems)
-        problemList.append(QJsonObject{{QLatin1String("line"), problem.line},
-                                       {QLatin1String("severity"), problem.error ? QLatin1String("error")
-                                                                                 : QLatin1String("warning")},
-                                       {QLatin1String("message"), problem.message}});
+        problemList.append(
+            QJsonObject{{QLatin1String("line"), problem.line},
+                        {QLatin1String("severity"), problem.error ? QLatin1String("error") : QLatin1String("warning")},
+                        {QLatin1String("message"), problem.message}});
     json.insert(QLatin1String("problems"), problemList);
     json.insert(QLatin1String("unsavedFiles"), QJsonArray::fromStringList(unsavedFiles));
     return json;

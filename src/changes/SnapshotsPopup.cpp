@@ -20,7 +20,10 @@
 
 namespace {
 
-enum Role { SubtitleRole = Qt::UserRole, IconRole };
+enum Role {
+    SubtitleRole = Qt::UserRole,
+    IconRole
+};
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 const char *snapshotRules = R"(
@@ -77,15 +80,14 @@ public:
         const qreal top = text.center().y() - lineHeight - 1;
         painter->setFont(title);
         painter->setPen(selected ? theme.accentText : theme.foreground);
-        painter->drawText(QRectF(text.left(), top, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
-                          titleMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight,
-                                                  int(text.width())));
+        painter->drawText(
+            QRectF(text.left(), top, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
+            titleMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, int(text.width())));
         painter->setFont(option.font);
         painter->setPen(theme.mutedText);
-        painter->drawText(QRectF(text.left(), top + lineHeight + 3, text.width(), lineHeight),
-                          Qt::AlignLeft | Qt::AlignVCenter,
-                          option.fontMetrics.elidedText(index.data(SubtitleRole).toString(), Qt::ElideRight,
-                                                        int(text.width())));
+        painter->drawText(
+            QRectF(text.left(), top + lineHeight + 3, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
+            option.fontMetrics.elidedText(index.data(SubtitleRole).toString(), Qt::ElideRight, int(text.width())));
         painter->restore();
     }
 };
@@ -297,7 +299,8 @@ void SnapshotsPopup::load(const QString &folder)
     const QDateTime now = QDateTime::currentDateTime();
     for (const Snapshot &snapshot : std::as_const(snapshots_)) {
         auto *item = new QListWidgetItem(snapshot.reason, list_);
-        item->setData(SubtitleRole, QStringLiteral("%1  ·  %2").arg(describeDate(snapshot.date, now), countText(snapshot)));
+        item->setData(SubtitleRole,
+                      QStringLiteral("%1  ·  %2").arg(describeDate(snapshot.date, now), countText(snapshot)));
         item->setData(IconRole, iconFor(snapshot));
         item->setToolTip(snapshot.reason);
     }
@@ -331,9 +334,8 @@ void SnapshotsPopup::showDetails()
                                    "ignored files excepted. The files below had changed since the last commit.")
                               : tr("Restoring puts these files back as they were; a file that did not exist yet "
                                    "is deleted. Other files are left alone."));
-    filesHeading_->setText((snapshot.wholeWorkingTree ? tr("Changed files · %1") : tr("Files · %1"))
-                               .arg(snapshot.paths.size())
-                               .toUpper());
+    filesHeading_->setText(
+        (snapshot.wholeWorkingTree ? tr("Changed files · %1") : tr("Files · %1")).arg(snapshot.paths.size()).toUpper());
     files_->clear();
     for (const QString &path : snapshot.paths) {
         auto *item = new QListWidgetItem(FileIcons::file(QFileInfo(path).fileName(), theme_.isDark), path, files_);

@@ -9,12 +9,16 @@
 // IntelliJ's run configurations: run by the system's shell in a terminal
 // tab, from a folder of the project.
 struct RunConfiguration {
-    enum class Kind { Build, Run, Test };
+    enum class Kind {
+        Build,
+        Run,
+        Test
+    };
 
     QString name;
     Kind kind = Kind::Run;
-    QString command; // a shell command line ("cmake --build build")
-    QString folder;  // relative to the project; empty: its root
+    QString command;                    // a shell command line ("cmake --build build")
+    QString folder;                     // relative to the project; empty: its root
     QMap<QString, QString> environment; // added to the editor's
     // Found in the project's build files rather than written in
     // .duet/run.json.

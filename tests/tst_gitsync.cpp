@@ -338,7 +338,8 @@ private slots:
         Branches::create(info(remote.mine), "local", false);
         Branches::setUpstream(info(remote.mine), "local", "origin/gone");
         const QList<BranchInfo> branches = Branches::list(remote.mine.path());
-        const auto local = std::find_if(branches.begin(), branches.end(), [](const BranchInfo &b) { return b.name == "local"; });
+        const auto local =
+            std::find_if(branches.begin(), branches.end(), [](const BranchInfo &b) { return b.name == "local"; });
         QVERIFY(local != branches.end());
         QCOMPARE(local->upstream, QString("origin/gone"));
         Branches::removeRemote(info(remote.mine), "origin/gone", {});
@@ -480,7 +481,8 @@ private slots:
         commands.runLong(
             "Slow",
             [path = project.path()](const Git::Feedback &feedback) {
-                Git::run(path, {"-c", "alias.slow=!echo started >&2; sleep 30", "slow"}, Git::RunOptions{{}, {}, feedback});
+                Git::run(path, {"-c", "alias.slow=!echo started >&2; sleep 30", "slow"},
+                         Git::RunOptions{{}, {}, feedback});
                 return QString();
             },
             {},

@@ -428,11 +428,10 @@ QJsonObject Spline::toJson() const
     for (const QPointF &p : points)
         pts.append(point(p));
     QJsonObject json{{QStringLiteral("pts"), pts},
-                     {QStringLiteral("anchors"),
-                      QJsonObject{{QStringLiteral("fx"), fromAnchor.x()},
-                                  {QStringLiteral("fy"), fromAnchor.y()},
-                                  {QStringLiteral("tx"), toAnchor.x()},
-                                  {QStringLiteral("ty"), toAnchor.y()}}}};
+                     {QStringLiteral("anchors"), QJsonObject{{QStringLiteral("fx"), fromAnchor.x()},
+                                                             {QStringLiteral("fy"), fromAnchor.y()},
+                                                             {QStringLiteral("tx"), toAnchor.x()},
+                                                             {QStringLiteral("ty"), toAnchor.y()}}}};
     if (start)
         json.insert(QStringLiteral("start"), point(*start));
     if (end)
@@ -459,10 +458,10 @@ std::optional<Spline> Spline::fromJson(const QJsonValue &value)
     spline.end = pointFrom(json.value(QStringLiteral("end")));
     spline.labelPoint = pointFrom(json.value(QStringLiteral("labelPoint")));
     const QJsonObject anchors = json.value(QStringLiteral("anchors")).toObject();
-    spline.fromAnchor = QPointF(anchors.value(QStringLiteral("fx")).toDouble(),
-                                anchors.value(QStringLiteral("fy")).toDouble());
-    spline.toAnchor = QPointF(anchors.value(QStringLiteral("tx")).toDouble(),
-                              anchors.value(QStringLiteral("ty")).toDouble());
+    spline.fromAnchor =
+        QPointF(anchors.value(QStringLiteral("fx")).toDouble(), anchors.value(QStringLiteral("fy")).toDouble());
+    spline.toAnchor =
+        QPointF(anchors.value(QStringLiteral("tx")).toDouble(), anchors.value(QStringLiteral("ty")).toDouble());
     return spline;
 }
 
@@ -485,10 +484,10 @@ void Link::load(const QJsonObject &props)
     key = jsonString(props, QStringLiteral("key"));
     label = jsonString(props, QStringLiteral("label"));
     const QString line = jsonString(props, QStringLiteral("customLineStyle"));
-    customLineStyle = line == QLatin1String("solid") || line == QLatin1String("dashed")
-                              || line == QLatin1String("dotted")
-                          ? line
-                          : QString();
+    customLineStyle =
+        line == QLatin1String("solid") || line == QLatin1String("dashed") || line == QLatin1String("dotted")
+            ? line
+            : QString();
     const QString color = jsonString(props, QStringLiteral("customColor"));
     customColor = isHexColor(color) ? color.toLower() : QString();
     const QJsonValue width = props.value(QStringLiteral("customWidth"));
@@ -524,8 +523,8 @@ const Spline *Link::validSpline(const Shape &a, const Shape &b) const
     if (!spline)
         return nullptr;
     const Spline &s = *spline;
-    if (std::abs(a.x - s.fromAnchor.x()) > 0.5 || std::abs(a.y - s.fromAnchor.y()) > 0.5
-        || std::abs(b.x - s.toAnchor.x()) > 0.5 || std::abs(b.y - s.toAnchor.y()) > 0.5) {
+    if (std::abs(a.x - s.fromAnchor.x()) > 0.5 || std::abs(a.y - s.fromAnchor.y()) > 0.5 ||
+        std::abs(b.x - s.toAnchor.x()) > 0.5 || std::abs(b.y - s.toAnchor.y()) > 0.5) {
         // The curve lies as soon as an end moves: the link falls back to a
         // straight line until the next routing.
         const_cast<Link *>(this)->spline.reset();
@@ -541,8 +540,8 @@ std::optional<QPointF> Link::validLayoutLabelPoint(const Shape &a, const Shape &
     if (!layoutLabelPoint)
         return std::nullopt;
     const ReservedLabel &reserved = *layoutLabelPoint;
-    if (std::abs(a.x - reserved.fromAnchor.x()) <= 0.5 && std::abs(a.y - reserved.fromAnchor.y()) <= 0.5
-        && std::abs(b.x - reserved.toAnchor.x()) <= 0.5 && std::abs(b.y - reserved.toAnchor.y()) <= 0.5)
+    if (std::abs(a.x - reserved.fromAnchor.x()) <= 0.5 && std::abs(a.y - reserved.fromAnchor.y()) <= 0.5 &&
+        std::abs(b.x - reserved.toAnchor.x()) <= 0.5 && std::abs(b.y - reserved.toAnchor.y()) <= 0.5)
         return reserved.point;
     const_cast<Link *>(this)->layoutLabelPoint.reset();
     return std::nullopt;

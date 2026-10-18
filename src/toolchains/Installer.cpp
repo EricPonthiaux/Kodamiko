@@ -67,9 +67,9 @@ QStringList Installer::extractCommand(ArchiveFormat format, const QString &archi
 {
     const auto found = [](const QString &program) { return !QStandardPaths::findExecutable(program).isEmpty(); };
     if (format == ArchiveFormat::TarGz)
-        return found(QStringLiteral("tar"))
-                   ? QStringList{QStringLiteral("tar"), QStringLiteral("-xzf"), archive, QStringLiteral("-C"), destination}
-                   : QStringList{};
+        return found(QStringLiteral("tar")) ? QStringList{QStringLiteral("tar"), QStringLiteral("-xzf"), archive,
+                                                          QStringLiteral("-C"), destination}
+                                            : QStringList{};
 #if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
     // Their tar is bsdtar, which reads zip files too.
     if (found(QStringLiteral("tar")))
@@ -78,12 +78,13 @@ QStringList Installer::extractCommand(ArchiveFormat format, const QString &archi
     if (found(QStringLiteral("bsdtar")))
         return {QStringLiteral("bsdtar"), QStringLiteral("-xf"), archive, QStringLiteral("-C"), destination};
     if (found(QStringLiteral("unzip")))
-        return {QStringLiteral("unzip"), QStringLiteral("-q"), QStringLiteral("-o"), archive, QStringLiteral("-d"),
-                destination};
+        return {QStringLiteral("unzip"), QStringLiteral("-q"), QStringLiteral("-o"), archive,
+                QStringLiteral("-d"),    destination};
     for (const QString &python : {QStringLiteral("python3"), QStringLiteral("python")}) {
         if (found(python))
-            return {python, QStringLiteral("-I"), QStringLiteral("-m"), QStringLiteral("zipfile"), QStringLiteral("-e"),
-                    archive, destination};
+            return {
+                python,  QStringLiteral("-I"), QStringLiteral("-m"), QStringLiteral("zipfile"), QStringLiteral("-e"),
+                archive, destination};
     }
     return {};
 }
@@ -264,20 +265,22 @@ void Installer::extract(const DownloadSource &source, const QString &archive)
     process_ = process;
     process->setProcessChannelMode(QProcess::MergedChannels);
     const int generation = generation_;
-    connect(process, &QProcess::finished, this, [this, process, generation, content, archive](int code, QProcess::ExitStatus status) {
-        process->deleteLater();
-        if (generation != generation_)
-            return;
-        if (status != QProcess::NormalExit || code != 0) {
-            fail(tr("Cannot unpack %1: %2")
-                     .arg(QFileInfo(archive).fileName(), QString::fromLocal8Bit(process->readAll()).trimmed()));
-            return;
-        }
-        QFile::remove(archive);
-        // Archives holding a single folder (jdk-17.0.2+8/): its contents.
-        const QFileInfoList children = QDir(content).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
-        complete(children.size() == 1 && children.first().isDir() ? children.first().filePath() : content);
-    });
+    connect(process, &QProcess::finished, this,
+            [this, process, generation, content, archive](int code, QProcess::ExitStatus status) {
+                process->deleteLater();
+                if (generation != generation_)
+                    return;
+                if (status != QProcess::NormalExit || code != 0) {
+                    fail(tr("Cannot unpack %1: %2")
+                             .arg(QFileInfo(archive).fileName(), QString::fromLocal8Bit(process->readAll()).trimmed()));
+                    return;
+                }
+                QFile::remove(archive);
+                // Archives holding a single folder (jdk-17.0.2+8/): its contents.
+                const QFileInfoList children =
+                    QDir(content).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
+                complete(children.size() == 1 && children.first().isDir() ? children.first().filePath() : content);
+            });
     connect(process, &QProcess::errorOccurred, this, [this, process, generation](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart || generation != generation_)
             return;
@@ -300,8 +303,13 @@ void Installer::installNpm()
     }
     const QString content = stagingFolder() + QStringLiteral("/content");
     QDir().mkpath(content);
-    QStringList arguments{npm, QStringLiteral("install"), QStringLiteral("--prefix"), content,
-                          QStringLiteral("--no-audit"), QStringLiteral("--no-fund"), QStringLiteral("--loglevel=error")};
+    QStringList arguments{npm,
+                          QStringLiteral("install"),
+                          QStringLiteral("--prefix"),
+                          content,
+                          QStringLiteral("--no-audit"),
+                          QStringLiteral("--no-fund"),
+                          QStringLiteral("--loglevel=error")};
     for (QString package : spec->npmPackages)
         arguments.append(package.replace(QStringLiteral("{version}"), step.version));
 
@@ -310,23 +318,24 @@ void Installer::installNpm()
     process->setProcessChannelMode(QProcess::MergedChannels);
     // Install scripts call node: the same one.
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-    environment.insert(QStringLiteral("PATH"), QFileInfo(node->executable).absolutePath() + QDir::listSeparator()
-                                                   + environment.value(QStringLiteral("PATH")));
+    environment.insert(QStringLiteral("PATH"), QFileInfo(node->executable).absolutePath() + QDir::listSeparator() +
+                                                   environment.value(QStringLiteral("PATH")));
     process->setProcessEnvironment(environment);
     const int generation = generation_;
     const int index = index_;
     emit progress(index, 0, 0);
-    connect(process, &QProcess::finished, this, [this, process, generation, content](int code, QProcess::ExitStatus status) {
-        process->deleteLater();
-        if (generation != generation_)
-            return;
-        if (status != QProcess::NormalExit || code != 0) {
-            const QString output = QString::fromLocal8Bit(process->readAll()).trimmed();
-            fail(tr("npm failed: %1").arg(output.section(QLatin1Char('\n'), -3)));
-            return;
-        }
-        complete(content);
-    });
+    connect(process, &QProcess::finished, this,
+            [this, process, generation, content](int code, QProcess::ExitStatus status) {
+                process->deleteLater();
+                if (generation != generation_)
+                    return;
+                if (status != QProcess::NormalExit || code != 0) {
+                    const QString output = QString::fromLocal8Bit(process->readAll()).trimmed();
+                    fail(tr("npm failed: %1").arg(output.section(QLatin1Char('\n'), -3)));
+                    return;
+                }
+                complete(content);
+            });
     connect(process, &QProcess::errorOccurred, this, [this, process, generation](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart || generation != generation_)
             return;

@@ -298,9 +298,10 @@ QList<TextEdit> javaImport(const QByteArray &text, const QString &qualified)
     const QRegularExpressionMatch own = packageLine.match(source);
     if (own.hasMatch() && own.captured(1) == package)
         return {};
-    const QRegularExpression imported(QStringLiteral("^\\s*import\\s+(?:%1|%2\\.\\*)\\s*;")
-                                          .arg(QRegularExpression::escape(qualified), QRegularExpression::escape(package)),
-                                      QRegularExpression::MultilineOption);
+    const QRegularExpression imported(
+        QStringLiteral("^\\s*import\\s+(?:%1|%2\\.\\*)\\s*;")
+            .arg(QRegularExpression::escape(qualified), QRegularExpression::escape(package)),
+        QRegularExpression::MultilineOption);
     if (imported.match(source).hasMatch())
         return {};
     // After the last import, else after the package, else at the top.
@@ -338,7 +339,11 @@ namespace {
 // subscripts and member accesses, or a parenthesized expression.
 int operandStart(const QByteArray &text, int end, int limit)
 {
-    enum class After { Connector, Name, Group };
+    enum class After {
+        Connector,
+        Name,
+        Group
+    };
     After state = After::Connector;
     bool scopeConnector = false;
     int start = -1;
@@ -418,12 +423,11 @@ int operandStart(const QByteArray &text, int end, int limit)
     int before = start;
     while (before > 0 && text[before - 1] == ' ')
         --before;
-    if (before >= 3 && before < start && text.mid(before - 3, 3) == "new"
-        && (before == 3 || !isIdentifierByte(text[before - 4])))
+    if (before >= 3 && before < start && text.mid(before - 3, 3) == "new" &&
+        (before == 3 || !isIdentifierByte(text[before - 4])))
         start = before - 3;
     return start;
 }
-
 
 } // namespace
 
@@ -463,8 +467,8 @@ QList<int> PostfixTemplateProvider::expressionStarts(const QByteArray &text, int
         int length = 0;
         if (i - 2 >= limit) {
             const QByteArray two = text.mid(i - 2, 2);
-            if (two == "&&" || two == "||" || two == "==" || two == "!=" || two == "<=" || two == ">=" || two == "<<"
-                || two == ">>")
+            if (two == "&&" || two == "||" || two == "==" || two == "!=" || two == "<=" || two == ">=" || two == "<<" ||
+                two == ">>")
                 length = 2;
             else if (two == "++" || two == "--" || two == "->" || two == "::" || (two[1] == '=' && two[0] != ' '))
                 break; // an assignment, an increment
@@ -521,8 +525,8 @@ QString PostfixTemplateProvider::suggestName(const QString &expression)
 
 bool PostfixTemplateProvider::handles(const CompletionContext &context) const
 {
-    return languageOf(context.languageId) != 0 && context.prefixStart > 0
-        && context.prefixStart <= context.text.size() && context.text[context.prefixStart - 1] == '.';
+    return languageOf(context.languageId) != 0 && context.prefixStart > 0 &&
+           context.prefixStart <= context.text.size() && context.text[context.prefixStart - 1] == '.';
 }
 
 QString PostfixTemplateProvider::triggerCharacters(const QString &languageId) const
@@ -573,10 +577,10 @@ void PostfixTemplateProvider::complete(const CompletionContext &context, const C
         const auto fill = [&entry, &unit, operand](const Candidate &candidate, const QString &value) {
             QString snippet = CodeScan::indented(QString::fromUtf8(entry.body), candidate.indent, unit);
             const QString wrapped = candidate.compound ? QLatin1Char('(') + value + QLatin1Char(')') : value;
-            snippet.replace(QChar(0x00AC), Snippet::escape(QLatin1Char('!') + wrapped));        // ¬
-            snippet.replace(QChar(0x00B6), Snippet::escape(quoted(value)));                     // ¶
-            snippet.replace(QChar(0x00A7), Snippet::escape(operand ? wrapped : value));         // §
-            snippet.replace(QChar(0x00A4), candidate.name);                                     // ¤
+            snippet.replace(QChar(0x00AC), Snippet::escape(QLatin1Char('!') + wrapped)); // ¬
+            snippet.replace(QChar(0x00B6), Snippet::escape(quoted(value)));              // ¶
+            snippet.replace(QChar(0x00A7), Snippet::escape(operand ? wrapped : value));  // §
+            snippet.replace(QChar(0x00A4), candidate.name);                              // ¤
             return snippet;
         };
         QList<const Candidate *> fitting;
@@ -587,8 +591,8 @@ void PostfixTemplateProvider::complete(const CompletionContext &context, const C
         if (fitting.isEmpty())
             continue;
         const Candidate &nearest = *fitting.first();
-        CompletionItem item = itemOf(entry, fill(nearest, nearest.expression), fill(nearest, QStringLiteral("expr")),
-                                     postfix, 3);
+        CompletionItem item =
+            itemOf(entry, fill(nearest, nearest.expression), fill(nearest, QStringLiteral("expr")), postfix, 3);
         item.replaceStart = nearest.start;
         if (entry.import)
             item.additionalEdits = javaImport(context.text, QString::fromLatin1(entry.import));
@@ -611,9 +615,9 @@ namespace {
 
 // What a template says of where it is written.
 struct Surroundings {
-    QString className;       // of the class around
+    QString className;         // of the class around
     CodeScan::Function method; // the function around, an empty name if none
-    QString variable;        // the variable declared last before, "value" if none
+    QString variable;          // the variable declared last before, "value" if none
 };
 
 Surroundings surroundings(const QByteArray &text, int position)
@@ -666,8 +670,8 @@ QString printedParameters(const CodeScan::Function &function)
     for (const CodeScan::Parameter &parameter : function.parameterList()) {
         if (parameter.name.isEmpty())
             continue;
-        parts.append(QStringLiteral("\"%1%2 = \" + %2").arg(parts.isEmpty() ? QString() : QStringLiteral(", "),
-                                                           parameter.name));
+        parts.append(
+            QStringLiteral("\"%1%2 = \" + %2").arg(parts.isEmpty() ? QString() : QStringLiteral(", "), parameter.name));
     }
     return parts.isEmpty() ? QStringLiteral("\"\"") : parts.join(QStringLiteral(" + "));
 }

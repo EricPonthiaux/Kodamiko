@@ -89,7 +89,7 @@ public:
     // In a physical schema the line already joins the visible FK and target
     // columns: the Mermaid verb stays in the source, but is neither drawn
     // nor given room by Graphviz.
-    void drawLabel(QPainter &, const Board &, bool) const override {}
+    void drawLabel(QPainter &, const Board &, bool) const override { }
     QString layoutLabel(const Board &) const override { return {}; }
     std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>>
     graphvizEndpoints(const Board &board, const QString &rankdir) const override;

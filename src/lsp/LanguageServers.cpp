@@ -8,10 +8,10 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
-#include <QProcessEnvironment>
-#include <QSysInfo>
 #include <QJsonArray>
+#include <QProcessEnvironment>
 #include <QStandardPaths>
+#include <QSysInfo>
 #include <QUrl>
 
 LanguageServers::LanguageServers(QObject *parent)
@@ -82,8 +82,8 @@ const LanguageSetup *LanguageServers::setupFor(const QString &languageId) const
 QString LanguageServers::programFor(const LanguageServerSpec &spec) const
 {
     for (const LanguageSetup &setup : project_.languages) {
-        if (setup.server != spec.name || !toolchains_
-            || setup.serverVersion == QLatin1String(ProjectLanguages::systemVersion))
+        if (setup.server != spec.name || !toolchains_ ||
+            setup.serverVersion == QLatin1String(ProjectLanguages::systemVersion))
             continue;
         const QString downloaded = toolchains_->installedExecutable(spec.name, setup.serverVersion);
         if (!downloaded.isEmpty())
@@ -240,10 +240,10 @@ std::optional<LanguageServers::Launch> LanguageServers::jdtlsLaunch(const QStrin
 
     // The installation: bin/jdtls next to plugins/ and config_<system>/.
     const QDir base(QFileInfo(QFileInfo(jdtlsProgram).canonicalFilePath()).absolutePath() + QStringLiteral("/.."));
-    const QStringList launchers =
-        QDir(base.filePath(QStringLiteral("plugins")))
-            .entryList({QStringLiteral("org.eclipse.equinox.launcher_*.jar"), QStringLiteral("org.eclipse.equinox.launcher.jar")},
-                       QDir::Files);
+    const QStringList launchers = QDir(base.filePath(QStringLiteral("plugins")))
+                                      .entryList({QStringLiteral("org.eclipse.equinox.launcher_*.jar"),
+                                                  QStringLiteral("org.eclipse.equinox.launcher.jar")},
+                                                 QDir::Files);
 #if defined(Q_OS_WIN)
     QString config = QStringLiteral("config_win");
 #elif defined(Q_OS_MACOS)
@@ -251,7 +251,8 @@ std::optional<LanguageServers::Launch> LanguageServers::jdtlsLaunch(const QStrin
 #else
     QString config = QStringLiteral("config_linux");
 #endif
-    if (QSysInfo::currentCpuArchitecture().startsWith(QLatin1String("arm")) && base.exists(config + QStringLiteral("_arm")))
+    if (QSysInfo::currentCpuArchitecture().startsWith(QLatin1String("arm")) &&
+        base.exists(config + QStringLiteral("_arm")))
         config += QStringLiteral("_arm");
 
     Launch launch;
@@ -341,8 +342,8 @@ LspClient *LanguageServers::clientFor(const QString &languageId)
 
     if (name == QLatin1String("jdtls")) {
         // jdtls keeps its index in a folder of its own, one per project.
-        const QString id = QString::fromLatin1(
-            QCryptographicHash::hash(folder_.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
+        const QString id =
+            QString::fromLatin1(QCryptographicHash::hash(folder_.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
         const QString data =
             QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/jdtls/") + id;
         QDir().mkpath(data);
@@ -420,13 +421,11 @@ QJsonObject jdtlsSettings()
                          "org.junit.jupiter.api.Assumptions.*", "org.junit.jupiter.api.DynamicContainer.*",
                          "org.junit.jupiter.api.DynamicTest.*", "org.mockito.Mockito.*",
                          "org.mockito.ArgumentMatchers.*", "org.assertj.core.api.Assertions.*",
-                         "org.hamcrest.MatcherAssert.*", "org.hamcrest.Matchers.*",
-                         "java.util.stream.Collectors.*", "java.util.Objects.requireNonNull",
-                         "java.util.Objects.requireNonNullElse"}},
+                         "org.hamcrest.MatcherAssert.*", "org.hamcrest.Matchers.*", "java.util.stream.Collectors.*",
+                         "java.util.Objects.requireNonNull", "java.util.Objects.requireNonNullElse"}},
              // Never offered: "List" is java.util's, not java.awt's.
-             {"filteredTypes",
-              QJsonArray{"java.awt.*", "com.sun.*", "sun.*", "jdk.*", "org.graalvm.*", "io.micrometer.shaded.*",
-                         "javax.swing.text.html.HTML.Tag"}},
+             {"filteredTypes", QJsonArray{"java.awt.*", "com.sun.*", "sun.*", "jdk.*", "org.graalvm.*",
+                                          "io.micrometer.shaded.*", "javax.swing.text.html.HTML.Tag"}},
              // A method comes with its parameters' names to fill in.
              {"guessMethodArguments", "insertParameterNames"},
              // Templates are Duet's own (see PostfixTemplateProvider), not
@@ -487,10 +486,9 @@ LanguageServers::Options LanguageServers::optionsFor(const QString &server, cons
             const int major = setup.runtimeVersion.toInt();
             const QString environment =
                 major <= 8 ? QStringLiteral("JavaSE-1.%1").arg(major) : QStringLiteral("JavaSE-%1").arg(major);
-            java.insert("configuration",
-                        QJsonObject{{"runtimes", QJsonArray{QJsonObject{{"name", environment},
-                                                                        {"path", runtimeHome},
-                                                                        {"default", true}}}}});
+            java.insert("configuration", QJsonObject{{"runtimes", QJsonArray{QJsonObject{{"name", environment},
+                                                                                         {"path", runtimeHome},
+                                                                                         {"default", true}}}}});
         }
         options.settings = QJsonObject{{"java", java}};
         options.initialization.insert("settings", options.settings);
@@ -573,5 +571,5 @@ void LanguageServers::warmUp(const QString &path, const QString &languageId, con
                     QJsonObject{{"textDocument", QJsonObject{{"uri", QUrl::fromLocalFile(path).toString()}}},
                                 {"position", QJsonObject{{"line", 0}, {"character", 0}}},
                                 {"context", QJsonObject{{"triggerKind", 1}}}},
-                    [](const QJsonValue &, const QString &) {});
+                    [](const QJsonValue &, const QString &) { });
 }

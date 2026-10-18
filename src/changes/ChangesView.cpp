@@ -43,8 +43,7 @@ QString discardHint()
 // "Discard" rather than "Cancel", which would be confused with the Cancel button.
 bool confirmDiscard(QWidget *parent, const QString &question, const QString &details)
 {
-    QMessageBox box(QMessageBox::Warning, QObject::tr("Discard Changes"), question, QMessageBox::NoButton,
-                    parent);
+    QMessageBox box(QMessageBox::Warning, QObject::tr("Discard Changes"), question, QMessageBox::NoButton, parent);
     box.setInformativeText(details.isEmpty() ? discardHint() : details + QLatin1Char(' ') + discardHint());
     QPushButton *discard = box.addButton(QObject::tr("Discard"), QMessageBox::DestructiveRole);
     box.setDefaultButton(box.addButton(QObject::tr("Keep"), QMessageBox::RejectRole));
@@ -79,8 +78,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     };
     toolButton(stageButton_, tr("Stage"), tr("Stage the selected files"));
     toolButton(unstageButton_, tr("Unstage"), tr("Unstage the selected files"));
-    toolButton(discardButton_, tr("Discard…"),
-               tr("Discard changes to the selected files (a copy is kept)"));
+    toolButton(discardButton_, tr("Discard…"), tr("Discard changes to the selected files (a copy is kept)"));
     connect(stageButton_, &QToolButton::clicked, this, [this] { stageFiles(selectedFiles()); });
     connect(unstageButton_, &QToolButton::clicked, this, [this] { unstageFiles(selectedFiles()); });
     connect(discardButton_, &QToolButton::clicked, this, [this] { discardFiles(selectedFiles()); });
@@ -178,7 +176,8 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     connect(generator_, &CommitMessageGenerator::runningChanged, this, &ChangesView::onGeneratingChanged);
     connect(generator_, &CommitMessageGenerator::finished, this, &ChangesView::showGeneratedMessage);
     connect(generator_, &CommitMessageGenerator::failed, this, [this](const QString &error) {
-        emit statusMessage(tr("Claude could not write the commit message: %1").arg(error.section(QLatin1Char('\n'), 0, 0)));
+        emit statusMessage(
+            tr("Claude could not write the commit message: %1").arg(error.section(QLatin1Char('\n'), 0, 0)));
     });
 
     auto *commitRow = new QHBoxLayout;
@@ -283,8 +282,7 @@ void ChangesView::refresh()
             error = QString::fromStdString(exception.what());
         }
         QMetaObject::invokeMethod(
-            this, [this, status, error, generation] { onStatusRead(status, error, generation); },
-            Qt::QueuedConnection);
+            this, [this, status, error, generation] { onStatusRead(status, error, generation); }, Qt::QueuedConnection);
     });
 }
 
@@ -313,7 +311,8 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
     const auto keyOf = [this](const QTreeWidgetItem *item) {
         const int index = item->data(0, indexRole).toInt();
         const Section section = static_cast<Section>(item->data(0, sectionRole).toInt());
-        return std::make_pair(static_cast<int>(section), index < 0 || !status_ ? QString() : files(section).at(index).change.path);
+        return std::make_pair(static_cast<int>(section),
+                              index < 0 || !status_ ? QString() : files(section).at(index).change.path);
     };
     QList<std::pair<int, QString>> selected;
     for (const QTreeWidgetItem *item : list_->selectedItems())
@@ -425,7 +424,8 @@ void ChangesView::showSection(Section section)
         }
     }
     if (shown.isEmpty())
-        diff_->showMessage(status_ ? (section == Section::Staged ? tr("Nothing is staged") : tr("No changes")) : QString());
+        diff_->showMessage(status_ ? (section == Section::Staged ? tr("Nothing is staged") : tr("No changes"))
+                                   : QString());
     else
         diff_->setFiles(shown);
 }
@@ -451,8 +451,9 @@ QList<ChangesView::FileRef> ChangesView::selectedFiles() const
     if (!status_)
         return result;
     const auto add = [&result](Section section, int index) {
-        const bool known = std::any_of(result.begin(), result.end(),
-                                       [&](const FileRef &ref) { return ref.section == section && ref.index == index; });
+        const bool known = std::any_of(result.begin(), result.end(), [&](const FileRef &ref) {
+            return ref.section == section && ref.index == index;
+        });
         if (!known)
             result.append({section, index});
     };
@@ -491,7 +492,8 @@ void ChangesView::updateActions()
     const bool busy = commands_->isBusy();
     const QList<FileRef> selection = selectedFiles();
     const auto any = [&selection](Section section) {
-        return std::any_of(selection.begin(), selection.end(), [section](const FileRef &ref) { return ref.section == section; });
+        return std::any_of(selection.begin(), selection.end(),
+                           [section](const FileRef &ref) { return ref.section == section; });
     };
     stageButton_->setEnabled(!busy && any(Section::Unstaged));
     unstageButton_->setEnabled(!busy && any(Section::Staged));
@@ -520,8 +522,8 @@ void ChangesView::showOperation()
         operationText_->setText(tr("%1 in progress: finish it from a terminal.").arg(name));
     } else if (conflicts > 0) {
         operationText_->setText((conflicts == 1 ? tr("%1 in progress · 1 conflict.").arg(name)
-                                                : tr("%1 in progress · %2 conflicts.").arg(name).arg(conflicts))
-                                + tr(" Edit the files, stage them once resolved, then continue."));
+                                                : tr("%1 in progress · %2 conflicts.").arg(name).arg(conflicts)) +
+                                tr(" Edit the files, stage them once resolved, then continue."));
     } else {
         operationText_->setText(tr("%1 in progress · no conflicts left. Continue to commit the result.").arg(name));
     }
@@ -719,14 +721,14 @@ void ChangesView::showListMenu(const QPoint &position)
         return;
     const bool busy = commands_->isBusy();
     const auto count = [&selection](Section section) {
-        return std::count_if(selection.begin(), selection.end(), [section](const FileRef &ref) { return ref.section == section; });
+        return std::count_if(selection.begin(), selection.end(),
+                             [section](const FileRef &ref) { return ref.section == section; });
     };
 
     QMenu menu;
     if (count(Section::Unstaged) > 0) {
         menu.addAction(tr("Stage"), this, [this, selection] { stageFiles(selection); })->setEnabled(!busy);
-        menu.addAction(tr("Discard Changes…"), this, [this, selection] { discardFiles(selection); })
-            ->setEnabled(!busy);
+        menu.addAction(tr("Discard Changes…"), this, [this, selection] { discardFiles(selection); })->setEnabled(!busy);
     }
     if (count(Section::Staged) > 0)
         menu.addAction(tr("Unstage"), this, [this, selection] { unstageFiles(selection); })->setEnabled(!busy);
@@ -815,10 +817,10 @@ void ChangesView::commit()
             emit statusMessage(tr("Nothing to commit"));
             return;
         }
-        const auto answer = QMessageBox::question(
-            this, tr("Commit"),
-            tr("No changes are staged. Stage all changes (%n file(s)) and commit them?", nullptr,
-               static_cast<int>(status_->unstaged.size())));
+        const auto answer =
+            QMessageBox::question(this, tr("Commit"),
+                                  tr("No changes are staged. Stage all changes (%n file(s)) and commit them?", nullptr,
+                                     static_cast<int>(status_->unstaged.size())));
         if (answer != QMessageBox::Yes)
             return;
         runCommit(message, false, true);

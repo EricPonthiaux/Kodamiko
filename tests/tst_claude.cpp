@@ -1,13 +1,13 @@
 #include "claude/ClaudeActivity.h"
 #include "claude/ClaudeConfig.h"
 #include "claude/ClaudeConfigView.h"
-#include "claude/ClaudeLint.h"
-#include "claude/EffectiveSettings.h"
 #include "claude/ClaudeLauncher.h"
+#include "claude/ClaudeLint.h"
 #include "claude/ClaudeUsage.h"
 #include "claude/CommitMessage.h"
 #include "claude/DiagramRequest.h"
 #include "claude/EditorContext.h"
+#include "claude/EffectiveSettings.h"
 #include "claude/HookEvent.h"
 #include "claude/HookServer.h"
 #include "claude/UnsavedEditGuard.h"
@@ -104,14 +104,15 @@ private slots:
 
     void asksClaudeForADiagram()
     {
-        const QString prompt = DiagramRequest::prompt("Flowchart", "docs/diagrams/returns.mmd", "  How returns work \n");
+        const QString prompt =
+            DiagramRequest::prompt("Flowchart", "docs/diagrams/returns.mmd", "  How returns work \n");
         QVERIFY(prompt.startsWith(QStringLiteral("Draw a diagram in the file docs/diagrams/returns.mmd, which does not "
                                                  "exist yet, following the duet:diagrams skill. Kind of diagram: "
                                                  "Flowchart.\n")));
         QVERIFY(prompt.contains(QStringLiteral("<request>\nHow returns work\n</request>")));
 
-        const QStringList arguments =
-            DiagramRequest::arguments(prompt, "docs/diagrams/returns.mmd", "/opt/duet/claude-plugin", "\"/opt/duet-hook\"");
+        const QStringList arguments = DiagramRequest::arguments(prompt, "docs/diagrams/returns.mmd",
+                                                                "/opt/duet/claude-plugin", "\"/opt/duet-hook\"");
         QCOMPARE(arguments.first(), prompt); // before the variadic --allowedTools
         QCOMPARE(arguments.at(arguments.indexOf("--output-format") + 1), QStringLiteral("stream-json"));
         QVERIFY(arguments.contains("--verbose"));
@@ -124,7 +125,8 @@ private slots:
             QJsonDocument::fromJson(arguments.at(arguments.indexOf("--settings") + 1).toUtf8()).object();
         const QJsonObject check = settings["hooks"].toObject()["PostToolUse"].toArray().first().toObject();
         QCOMPARE(check["matcher"].toString(), QStringLiteral("Write|Edit|MultiEdit"));
-        QCOMPARE(check["hooks"].toArray().first().toObject()["command"].toString(), QStringLiteral("\"/opt/duet-hook\""));
+        QCOMPARE(check["hooks"].toArray().first().toObject()["command"].toString(),
+                 QStringLiteral("\"/opt/duet-hook\""));
 
         const QStringList bare = DiagramRequest::arguments(prompt, "a.flow", {}, {});
         QVERIFY(!bare.contains("--plugin-dir"));
@@ -144,8 +146,9 @@ private slots:
         QCOMPARE(steps.steps, (QStringList{QDir::toNativeSeparators("Reading src/a.cpp"),
                                            QStringLiteral("Searching for \u201corder\u201d"),
                                            QDir::toNativeSeparators("Drawing docs/a.flow")}));
-        QCOMPARE(DiagramRequest::parseLine(R"({"type":"assistant","message":{"content":[{"type":"text"}]}})", "/p").kind,
-                 Kind::None);
+        QCOMPARE(
+            DiagramRequest::parseLine(R"({"type":"assistant","message":{"content":[{"type":"text"}]}})", "/p").kind,
+            Kind::None);
         QCOMPARE(DiagramRequest::parseLine(R"({"type":"system","subtype":"init"})", "/p").kind, Kind::None);
 
         const auto done = DiagramRequest::parseLine(
@@ -153,7 +156,8 @@ private slots:
         QCOMPARE(done.kind, Kind::Finished);
         QVERIFY(!done.failed);
         QCOMPARE(done.text, QStringLiteral("The diagram shows returns."));
-        const auto limit = DiagramRequest::parseLine(R"({"type":"result","subtype":"error_max_turns","is_error":true})", "/p");
+        const auto limit =
+            DiagramRequest::parseLine(R"({"type":"result","subtype":"error_max_turns","is_error":true})", "/p");
         QVERIFY(limit.failed);
         QCOMPARE(limit.text, QStringLiteral("error_max_turns"));
     }
@@ -205,7 +209,8 @@ private slots:
             "cost": {"total_cost_usd": 1.25, "total_lines_added": 10, "total_lines_removed": 2},
             "rate_limits": {"five_hour": {"used_percentage": 80, "resets_at": 1790000000},
                             "seven_day": {"used_percentage": 12}}
-        })").object();
+        })")
+                                       .object();
         const ClaudeUsage usage = ClaudeUsage::fromStatusJson(status);
         QCOMPARE(usage.model, QStringLiteral("Opus"));
         QCOMPARE(usage.summary(), QStringLiteral("Context 42% · 5h 80% · 7d 12%"));
@@ -360,10 +365,12 @@ private slots:
 
         const QString text = context.describe();
         QVERIFY(text.contains(QStringLiteral("- File open in the editor: src/a.cpp, cursor at line 12, column 5")));
-        QVERIFY(text.contains(QStringLiteral("- Selected text (lines 10-12):\n````\nint a = 0;\n```\nreturn a;\n````")));
+        QVERIFY(
+            text.contains(QStringLiteral("- Selected text (lines 10-12):\n````\nint a = 0;\n```\nreturn a;\n````")));
         QVERIFY(text.contains(QStringLiteral("  - line 11, error: use of undeclared identifier 'b'")));
         QVERIFY(text.contains(QStringLiteral("  - line 12, warning: unused variable")));
-        QVERIFY(text.contains(QStringLiteral("- Unsaved changes in the editor (the files on disk are older): src/a.cpp, src/b.h")));
+        QVERIFY(text.contains(
+            QStringLiteral("- Unsaved changes in the editor (the files on disk are older): src/a.cpp, src/b.h")));
     }
 
     void cutsALongSelection()
@@ -489,7 +496,8 @@ private slots:
     void autoMemoryFollowsClaudeCodeNaming()
     {
         qputenv("CLAUDE_CONFIG_DIR", "/c");
-        QCOMPARE(ClaudeConfig::autoMemoryDir("/home/me/my_app.v2"), QStringLiteral("/c/projects/-home-me-my-app-v2/memory"));
+        QCOMPARE(ClaudeConfig::autoMemoryDir("/home/me/my_app.v2"),
+                 QStringLiteral("/c/projects/-home-me-my-app-v2/memory"));
         qunsetenv("CLAUDE_CONFIG_DIR");
     }
 
@@ -590,8 +598,9 @@ private slots:
         QTemporaryDir project;
         QVERIFY(user.isValid() && project.isValid());
         qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
-        writeFile(user.filePath("settings.json"),
-                  R"j({"model":"sonnet","permissions":{"allow":["Bash(make)"],"defaultMode":"default"},"env":{"A":"1"}})j");
+        writeFile(
+            user.filePath("settings.json"),
+            R"j({"model":"sonnet","permissions":{"allow":["Bash(make)"],"defaultMode":"default"},"env":{"A":"1"}})j");
         writeFile(project.filePath(".claude/settings.json"),
                   R"j({"permissions":{"allow":["Bash(make)","Read"]},"env":{"B":"2"}})j");
         writeFile(project.filePath(".claude/settings.local.json"), R"j({"$schema":"x","model":"opus"})j");
@@ -608,8 +617,7 @@ private slots:
         const QJsonObject merged = EffectiveSettings::merged(layers);
         QCOMPARE(merged.value("model").toString(), QStringLiteral("opus"));
         QVERIFY(!merged.contains("$schema"));
-        QCOMPARE(merged.value("permissions").toObject().value("allow").toArray(),
-                 (QJsonArray{"Bash(make)", "Read"}));
+        QCOMPARE(merged.value("permissions").toObject().value("allow").toArray(), (QJsonArray{"Bash(make)", "Read"}));
         QCOMPARE(merged.value("permissions").toObject().value("defaultMode").toString(), QStringLiteral("default"));
         QCOMPARE(merged.value("env").toObject(), (QJsonObject{{"A", "1"}, {"B", "2"}}));
 
@@ -623,7 +631,7 @@ private slots:
         };
         QVERIFY(lineWith("\"model\": \"opus\"").contains("// Local, over User: \"sonnet\""));
         QVERIFY(lineWith("\"Read\"").contains("// Project"));
-        QVERIFY(lineWith("\"Bash(make)\"").endsWith("\"Bash(make)\","));  // as the array: User
+        QVERIFY(lineWith("\"Bash(make)\"").endsWith("\"Bash(make)\",")); // as the array: User
         QVERIFY(lineWith("\"permissions\": {").contains("// User"));
         QVERIFY(lineWith("\"B\": \"2\"").contains("// Project"));
         QVERIFY(lineWith("session.json").contains("ignored"));
@@ -661,8 +669,8 @@ private slots:
         QCOMPARE(syntax[0].severity, Diagnostic::Severity::Error);
         QCOMPARE(syntax[0].start, 17);
 
-        const Diagnostics rules = ClaudeLint::check(ClaudeLint::Kind::Settings,
-                                                    "{\"permissions\": {\"allow\": [\"Bash(make)\", \"Wirte\", \"Read(\"]}}");
+        const Diagnostics rules = ClaudeLint::check(
+            ClaudeLint::Kind::Settings, "{\"permissions\": {\"allow\": [\"Bash(make)\", \"Wirte\", \"Read(\"]}}");
         QCOMPARE(rules.size(), 2);
         QVERIFY(rules[0].message.contains("did you mean “Write”"));
         QVERIFY(rules[1].message.contains("Tool permission rule")); // the pattern is too long to show
@@ -712,13 +720,13 @@ private slots:
         const QString word = QStringLiteral("abcdefghi"); // 10 characters with its space
         const QString summary = QStringList(8, word).join(' ') + " longer";
         const QString json = QJsonDocument(QJsonObject{{"is_error", false},
-                                                       {"result", summary + "\n\n" + QStringList(10, word).join(' ')
-                                                                      + "\n- " + QStringList(8, word).join(' ')}})
+                                                       {"result", summary + "\n\n" + QStringList(10, word).join(' ') +
+                                                                      "\n- " + QStringList(8, word).join(' ')}})
                                  .toJson();
         const QString message = CommitMessage::parseReply(json.toUtf8(), &error).value_or(QString());
         const QString seven = QStringList(7, word).join(' ');
-        QCOMPARE(message.split('\n'), QStringList({summary, "", seven, QStringList(3, word).join(' '),
-                                                   "- " + seven, "  " + word}));
+        QCOMPARE(message.split('\n'),
+                 QStringList({summary, "", seven, QStringList(3, word).join(' '), "- " + seven, "  " + word}));
     }
 
     void commitMessageInputCutsTheDiff()

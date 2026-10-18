@@ -129,7 +129,8 @@ void TestDiagnostics::reportsUnknownAndDuplicateKeys()
             "permissions": {"type": "object", "properties": {"allow": {"type": "array"}}, "additionalProperties": false}
         }
     })j"));
-    const QByteArray text = R"({"modle": "x", "custom": 1, "permissions": {"alow": [], "zzz": 1}, "model": "a", "model": "b"})";
+    const QByteArray text =
+        R"({"modle": "x", "custom": 1, "permissions": {"alow": [], "zzz": 1}, "model": "a", "model": "b"})";
     const Diagnostics diagnostics = schema.validate(*parseJson(text).root);
     QStringList messages;
     for (const Diagnostic &diagnostic : diagnostics)

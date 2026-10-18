@@ -5,12 +5,16 @@
 
 #include <optional>
 
-enum class LineEnding { Lf, CrLf, Cr };
+enum class LineEnding {
+    Lf,
+    CrLf,
+    Cr
+};
 
 // What needs to be known about a file to write it back identically.
 struct TextFileFormat {
     bool hasUtf8Bom = false;
-    bool isLatin1 = false;   // file that was not valid UTF-8
+    bool isLatin1 = false;                  // file that was not valid UTF-8
     LineEnding lineEnding = LineEnding::Lf; // used for new lines
 };
 

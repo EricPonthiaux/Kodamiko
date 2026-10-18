@@ -34,9 +34,8 @@ inline void check(int result, const char *action)
     if (result >= 0)
         return;
     const git_error *error = git_error_last();
-    throw GitError(QStringLiteral("%1: %2")
-                       .arg(QString::fromUtf8(action),
-                            error ? QString::fromUtf8(error->message) : QStringLiteral("unknown error")));
+    throw GitError(QStringLiteral("%1: %2").arg(QString::fromUtf8(action), error ? QString::fromUtf8(error->message)
+                                                                                 : QStringLiteral("unknown error")));
 }
 
 // Keeps libgit2 initialized for the duration of a read.

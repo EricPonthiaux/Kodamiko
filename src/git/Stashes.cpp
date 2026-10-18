@@ -30,8 +30,8 @@ void runReporting(const QString &workDir, const QStringList &arguments)
 QList<Stash> list(const QString &workDir)
 {
     // %gd: stash@{n}; one stash per line, fields separated by a null byte.
-    const QByteArray output = Git::run(workDir, {QStringLiteral("stash"), QStringLiteral("list"),
-                                                 QStringLiteral("--format=%gd%x00%gs%x00%ct")});
+    const QByteArray output = Git::run(
+        workDir, {QStringLiteral("stash"), QStringLiteral("list"), QStringLiteral("--format=%gd%x00%gs%x00%ct")});
     QList<Stash> stashes;
     for (const QByteArray &line : output.split('\n')) {
         const QList<QByteArray> fields = line.split('\0');

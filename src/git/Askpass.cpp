@@ -85,8 +85,8 @@ void AskpassServer::answer(QLocalSocket *socket, const QByteArray &request)
     // git gave up waiting (cancelled) while the user was typing.
     if (!guard)
         return;
-    const QJsonObject reply = answer ? QJsonObject{{QLatin1String("answer"), *answer}}
-                                     : QJsonObject{{QLatin1String("cancelled"), true}};
+    const QJsonObject reply =
+        answer ? QJsonObject{{QLatin1String("answer"), *answer}} : QJsonObject{{QLatin1String("cancelled"), true}};
     socket->write(QJsonDocument(reply).toJson(QJsonDocument::Compact) + '\n');
     socket->flush();
 }

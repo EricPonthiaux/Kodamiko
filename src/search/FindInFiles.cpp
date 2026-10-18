@@ -103,8 +103,8 @@ QList<FindMatch> search(const QString &text, const QRegularExpression &pattern, 
         QString lineText = text.mid(lineStart, lineEnd - lineStart);
         if (lineText.endsWith(QLatin1Char('\r')))
             lineText.chop(1);
-        matches.append({filePath, line, static_cast<int>(start - lineStart), static_cast<int>(match.capturedLength()),
-                        lineText});
+        matches.append(
+            {filePath, line, static_cast<int>(start - lineStart), static_cast<int>(match.capturedLength()), lineText});
     }
     return matches;
 }

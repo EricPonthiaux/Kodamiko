@@ -63,8 +63,7 @@ private slots:
     {
         FindQuery query;
         query.text = "é";
-        const QList<FindMatch> matches =
-            FindInFiles::search("abc\r\n  été\nno\n", *query.compile(), "/f", 100);
+        const QList<FindMatch> matches = FindInFiles::search("abc\r\n  été\nno\n", *query.compile(), "/f", 100);
         QCOMPARE(matches.size(), 2);
         QCOMPARE(matches[0].line, 1);
         QCOMPARE(matches[0].column, 2);

@@ -156,7 +156,8 @@ qreal MindLink::nativeWidth(const Board &board) const
 
 QStringList MindLink::graphvizAttributes(const Board &board) const
 {
-    return {QStringLiteral("arrowhead=none"), QStringLiteral("penwidth=") + QString::number(nativeWidth(board), 'f', 3)};
+    return {QStringLiteral("arrowhead=none"),
+            QStringLiteral("penwidth=") + QString::number(nativeWidth(board), 'f', 3)};
 }
 
 LinkStyle MindLink::drawStyle(const Board &board, bool selected) const

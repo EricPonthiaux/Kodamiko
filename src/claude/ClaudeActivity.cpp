@@ -46,7 +46,7 @@ void ClaudeActivity::handle(const HookEvent &event)
         break;
     }
     case HookEvent::Kind::ResponseFinished: {
-        const QString detail = !event.failed        ? QString()
+        const QString detail = !event.failed             ? QString()
                                : event.message.isEmpty() ? tr("Claude stopped on an error")
                                                          : tr("Claude stopped on an error: %1").arg(event.message);
         if (watched_) {

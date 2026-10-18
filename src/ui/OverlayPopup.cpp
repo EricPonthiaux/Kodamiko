@@ -57,8 +57,8 @@ bool OverlayPopup::event(QEvent *event)
     const bool result = QFrame::event(event);
     // A style sheet resets the margins of the widgets it polishes (at each
     // change of theme): the shadow's room is given back.
-    if ((event->type() == QEvent::StyleChange || event->type() == QEvent::Polish)
-        && contentsMargins() != QMargins(shadowWidth, shadowWidth, shadowWidth, shadowWidth))
+    if ((event->type() == QEvent::StyleChange || event->type() == QEvent::Polish) &&
+        contentsMargins() != QMargins(shadowWidth, shadowWidth, shadowWidth, shadowWidth))
         applyMargins();
     return result;
 }

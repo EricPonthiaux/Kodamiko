@@ -35,7 +35,8 @@ const std::map<QString, GrammarDefinition> &definitions()
     static const std::map<QString, GrammarDefinition> table = {
         {"c", {tree_sitter_c, {":/queries/c/highlights.scm"}, ":/queries/c/outline.scm"}},
         {"cpp",
-         {tree_sitter_cpp, {":/queries/c/highlights.scm", ":/queries/cpp/highlights.scm"},
+         {tree_sitter_cpp,
+          {":/queries/c/highlights.scm", ":/queries/cpp/highlights.scm"},
           ":/queries/cpp/outline.scm"}},
         {"java", {tree_sitter_java, {":/queries/java/highlights.scm"}, ":/queries/java/outline.scm"}},
         {"javascript",
@@ -73,7 +74,7 @@ QByteArray readQuerySources(const QStringList &resources)
 
 struct LoadedGrammar {
     std::unique_ptr<HighlightQuery> query;
-    std::unique_ptr<HighlightQuery> outline; // nullptr if the query is invalid
+    std::unique_ptr<HighlightQuery> outline;    // nullptr if the query is invalid
     std::unique_ptr<TreeSitterGrammar> grammar; // nullptr if the query is invalid
 };
 
@@ -99,7 +100,8 @@ const TreeSitterGrammar *forLanguage(const QString &languageId)
         entry.outline.reset();
     }
     if (entry.query->isValid())
-        entry.grammar = std::make_unique<TreeSitterGrammar>(TreeSitterGrammar{language, *entry.query, entry.outline.get()});
+        entry.grammar =
+            std::make_unique<TreeSitterGrammar>(TreeSitterGrammar{language, *entry.query, entry.outline.get()});
     else
         qWarning().noquote() << "Invalid highlighting query" << languageId << ":" << entry.query->errorMessage();
 

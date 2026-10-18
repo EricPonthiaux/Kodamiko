@@ -1,9 +1,9 @@
 #include "TerminalWidget.h"
 
 #include "IPty.h"
+#include "VtScreen.h"
 #include "settings/Preferences.h"
 #include "ui/Theme.h"
-#include "VtScreen.h"
 
 #include <QApplication>
 #include <QFontMetricsF>
@@ -506,9 +506,9 @@ void TerminalWidget::wheelEvent(QWheelEvent *event)
         const int delta = event->angleDelta().y();
         const qreal size = baseFont_.pointSizeF();
         if (delta != 0 && size > 0) {
-            const int zoom = std::clamp(zoom_ + (delta > 0 ? 1 : -1),
-                                        Preferences::minimumFontSize - static_cast<int>(size),
-                                        Preferences::maximumFontSize - static_cast<int>(size));
+            const int zoom =
+                std::clamp(zoom_ + (delta > 0 ? 1 : -1), Preferences::minimumFontSize - static_cast<int>(size),
+                           Preferences::maximumFontSize - static_cast<int>(size));
             if (zoom != zoom_) {
                 zoom_ = zoom;
                 applyFont();

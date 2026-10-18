@@ -284,6 +284,17 @@ To create an install folder (used by the packages):
 cmake --install build --component duet --prefix <folder>
 ```
 
+**Formatting and static analysis (optional).** `.clang-format` and
+`.clang-tidy` describe the code style and the checks. With clang-format and
+clang-tidy (and its `run-clang-tidy` script) installed:
+
+```sh
+cmake --build build --target format        # reformat src/, tests/ and tools/
+cmake --build build --target format-check  # fail on an unformatted source
+cmake --build build --target tidy          # analyze every source
+cmake --preset debug -DDUET_CLANG_TIDY=ON  # analyze each source as it compiles
+```
+
 The CI (`.github/workflows/ci.yml`) builds and tests on all three systems,
 then produces an AppImage, a Windows zip and a macOS dmg.
 

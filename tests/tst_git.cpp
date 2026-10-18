@@ -220,10 +220,10 @@ private slots:
         const FilePatch patch = FilePatch::parse(result.unstaged.first().patch);
         QCOMPARE(patch.hunks.size(), 2);
         // Only the lines of the second hunk that touch "11", not the final addition.
-        const PatchSelection selection = selectLines(patch, [](const QByteArray &line) {
-            return line == "-11" || line == "+ELEVEN";
-        });
-        GitOperations::applyToIndex(result.info, patch.partial(selection, PatchDirection::Forward), PatchDirection::Forward);
+        const PatchSelection selection =
+            selectLines(patch, [](const QByteArray &line) { return line == "-11" || line == "+ELEVEN"; });
+        GitOperations::applyToIndex(result.info, patch.partial(selection, PatchDirection::Forward),
+                                    PatchDirection::Forward);
         QCOMPARE(indexed(project, "f.txt"), QByteArray("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\nELEVEN\n12\n"));
 
         // Then the first hunk: its start does not depend on what is already staged.
@@ -244,10 +244,10 @@ private slots:
 
         const RepositoryStatus result = status(project);
         const FilePatch patch = FilePatch::parse(result.staged.first().patch);
-        const PatchSelection selection = selectLines(patch, [](const QByteArray &line) {
-            return line == "-c" || line == "+C";
-        });
-        GitOperations::applyToIndex(result.info, patch.partial(selection, PatchDirection::Reverse), PatchDirection::Reverse);
+        const PatchSelection selection =
+            selectLines(patch, [](const QByteArray &line) { return line == "-c" || line == "+C"; });
+        GitOperations::applyToIndex(result.info, patch.partial(selection, PatchDirection::Reverse),
+                                    PatchDirection::Reverse);
         QCOMPARE(indexed(project, "f.txt"), QByteArray("A\nb\nc\nd\n"));
         QCOMPARE(read(project, "f.txt"), QByteArray("A\nb\nC\nd\n"));
     }
@@ -262,27 +262,30 @@ private slots:
         // Part of an untracked file: it is created in the index.
         RepositoryStatus result = status(project);
         FilePatch created = FilePatch::parse(find(result.unstaged, "new.txt")->patch);
-        GitOperations::applyToIndex(result.info,
-                                    created.partial(selectLines(created, [](const QByteArray &line) { return line != "+2"; }),
-                                                    PatchDirection::Forward),
-                                    PatchDirection::Forward);
+        GitOperations::applyToIndex(
+            result.info,
+            created.partial(selectLines(created, [](const QByteArray &line) { return line != "+2"; }),
+                            PatchDirection::Forward),
+            PatchDirection::Forward);
         QCOMPARE(indexed(project, "new.txt"), QByteArray("1\n3\n"));
 
         // Part of a deletion: the file stays in the index.
         const FilePatch deleted = FilePatch::parse(find(result.unstaged, "old.txt")->patch);
-        GitOperations::applyToIndex(result.info,
-                                    deleted.partial(selectLines(deleted, [](const QByteArray &line) { return line == "-y"; }),
-                                                    PatchDirection::Forward),
-                                    PatchDirection::Forward);
+        GitOperations::applyToIndex(
+            result.info,
+            deleted.partial(selectLines(deleted, [](const QByteArray &line) { return line == "-y"; }),
+                            PatchDirection::Forward),
+            PatchDirection::Forward);
         QCOMPARE(indexed(project, "old.txt"), QByteArray("x\nz\n"));
 
         // Unstaging part of a created file: it stays in the index.
         result = status(project);
         created = FilePatch::parse(find(result.staged, "new.txt")->patch);
-        GitOperations::applyToIndex(result.info,
-                                    created.partial(selectLines(created, [](const QByteArray &line) { return line == "+3"; }),
-                                                    PatchDirection::Reverse),
-                                    PatchDirection::Reverse);
+        GitOperations::applyToIndex(
+            result.info,
+            created.partial(selectLines(created, [](const QByteArray &line) { return line == "+3"; }),
+                            PatchDirection::Reverse),
+            PatchDirection::Reverse);
         QCOMPARE(indexed(project, "new.txt"), QByteArray("1\n"));
     }
 
@@ -295,11 +298,13 @@ private slots:
 
         RepositoryStatus result = status(project);
         const FilePatch crlf = FilePatch::parse(find(result.unstaged, "crlf.txt")->patch);
-        GitOperations::applyToIndex(
-            result.info,
-            crlf.partial(selectLines(crlf, [](const QByteArray &line) { return line.startsWith("-c") || line.startsWith("+C"); }),
-                         PatchDirection::Forward),
-            PatchDirection::Forward);
+        GitOperations::applyToIndex(result.info,
+                                    crlf.partial(selectLines(crlf,
+                                                             [](const QByteArray &line) {
+                                                                 return line.startsWith("-c") || line.startsWith("+C");
+                                                             }),
+                                                 PatchDirection::Forward),
+                                    PatchDirection::Forward);
         QCOMPARE(indexed(project, "crlf.txt"), QByteArray("a\r\nb\r\nC\r\n"));
 
         const FilePatch eof = FilePatch::parse(find(result.unstaged, "eof.txt")->patch);
@@ -422,9 +427,8 @@ private slots:
 
         const RepositoryStatus result = status(project);
         const FilePatch patch = FilePatch::parse(result.unstaged.first().patch);
-        const PatchSelection selection = selectLines(patch, [](const QByteArray &line) {
-            return line == "-a" || line == "+A";
-        });
+        const PatchSelection selection =
+            selectLines(patch, [](const QByteArray &line) { return line == "-a" || line == "+A"; });
         GitOperations::discardPatch(result.info, {"f.txt"}, patch.partial(selection, PatchDirection::Reverse));
         QCOMPARE(read(project, "f.txt"), QByteArray("a\nb\nC\n"));
         QCOMPARE(Snapshots::list(project.path()).size(), 1);
@@ -545,7 +549,13 @@ private slots:
         QSignalSpy busy(&commands, &GitCommands::busyChanged);
         QStringList order;
         bool callbackRan = false;
-        commands.run("one", [&order] { order << "one"; return QString("done"); }, [&callbackRan] { callbackRan = true; });
+        commands.run(
+            "one",
+            [&order] {
+                order << "one";
+                return QString("done");
+            },
+            [&callbackRan] { callbackRan = true; });
         commands.run("two", []() -> QString { throw GitError("failure"); });
         QVERIFY(commands.isBusy());
         QTRY_COMPARE(busy.size(), 2);
@@ -560,7 +570,8 @@ private slots:
     void fileStatusesForTheTree()
     {
         QTemporaryDir project;
-        initRepository(project, {{"src/kept.cpp", "k\n"}, {"src/changed.cpp", "c\n"}, {".gitignore", "build/\n*.log\n"}});
+        initRepository(project,
+                       {{"src/kept.cpp", "k\n"}, {"src/changed.cpp", "c\n"}, {".gitignore", "build/\n*.log\n"}});
         write(project, "src/changed.cpp", "c2\n");
         write(project, "src/new/added.cpp", "a\n");
         git(project, {"add", "src/new/added.cpp"});
@@ -644,8 +655,8 @@ private slots:
     void lineChangesRevertEveryKind()
     {
         const QByteArray base = "a\nb\nc\nd\ne";
-        const QList<QByteArray> currents = {"a\nB\nc\nd\ne", "a\nb\nx\nc\nd\ne", "a\nd\ne", "a\nb\nc\nd\ne\n",
-                                            "z\na\nb\nc\nd\ne", "a\nb\nc\nd", ""};
+        const QList<QByteArray> currents = {"a\nB\nc\nd\ne",    "a\nb\nx\nc\nd\ne", "a\nd\ne", "a\nb\nc\nd\ne\n",
+                                            "z\na\nb\nc\nd\ne", "a\nb\nc\nd",       ""};
         for (const QByteArray &current : currents) {
             QByteArray text = current;
             // Undoing the changes one by one, from the last, gives the base back.
@@ -677,8 +688,9 @@ private slots:
     {
         for (const char *valid : {"main", "feature/login", "fix-42", "release/v1.2", "user@work"})
             QVERIFY2(Branches::nameError(valid).isEmpty(), valid);
-        for (const char *invalid : {"", "with space", "a..b", "-x", "a/", "a.", "/a", "a//b", ".hidden", "a/.b",
-                                    "x.lock", "a~1", "a^", "a:b", "a?", "a*", "a[b", "a\\b", "@", "a@{b"})
+        for (const char *invalid :
+             {"",       "with space", "a..b", "-x",  "a/", "a.", "/a",  "a//b", ".hidden", "a/.b",
+              "x.lock", "a~1",        "a^",   "a:b", "a?", "a*", "a[b", "a\\b", "@",       "a@{b"})
             QVERIFY2(!Branches::nameError(invalid).isEmpty(), invalid);
         QCOMPARE(Branches::sanitizedName("Fix the  login bug"), QString("Fix-the-login-bug"));
         QCOMPARE(Branches::sanitizedName("a..b~c"), QString("a.bc"));

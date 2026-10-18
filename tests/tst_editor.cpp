@@ -1,4 +1,5 @@
 #include "editor/ChangeGutter.h"
+#include "editor/ClangFormatStyle.h"
 #include "editor/CodeColorizer.h"
 #include "editor/CodeFormatter.h"
 #include "editor/EditorStatus.h"
@@ -10,14 +11,14 @@
 #include "git/GitProcess.h"
 
 #include <QLineEdit>
-#include <Qsci/qscicommandset.h>
-#include <QTextBlock>
-#include <QToolButton>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
+#include <QTextBlock>
+#include <QToolButton>
+#include <Qsci/qscicommandset.h>
 #include <QtTest>
 
 namespace {
@@ -424,6 +425,50 @@ private slots:
                  QStringList{"--assume-filename=/p/a.cpp"});
     }
 
+    void clangFormatStyleIsReadFromTheDumpedConfig()
+    {
+        const QByteArray dumped =
+            "---\nLanguage:        Cpp\nBraceWrapping:\n  IndentWidth: 9\n"
+            "ColumnLimit:     100\nIndentWidth:     3\nTabWidth:        8\nUseTab:          Never\n";
+        const std::optional<ClangFormatStyle::Style> style = ClangFormatStyle::parse(dumped);
+        QVERIFY(style);
+        QCOMPARE(style->indentWidth, 3); // the top-level key, not the nested one
+        QCOMPARE(style->tabWidth, 8);
+        QCOMPARE(style->columnLimit, 100);
+        QVERIFY(!style->useTabs);
+        QVERIFY(ClangFormatStyle::parse("UseTab: ForIndentation\nIndentWidth: 4\n")->useTabs);
+        QVERIFY(!ClangFormatStyle::parse("error: invalid configuration\n"));
+    }
+
+    void editorIndentsAsTheProjectClangFormat()
+    {
+        if (QStandardPaths::findExecutable("clang-format").isEmpty())
+            QSKIP("clang-format is not installed");
+        QTemporaryDir dir;
+        write(dir.filePath(".clang-format"), "IndentWidth: 3\nColumnLimit: 90\n");
+        write(dir.filePath("main.cpp"), "int main()\n{\n}\n");
+        write(dir.filePath("notes.txt"), "text\n");
+        EditorTabs tabs(Theme::dark());
+        tabs.openFile(dir.filePath("main.cpp"));
+        EditorWidget *code = tabs.currentEditor();
+        QTRY_COMPARE(code->tabWidth(), 3);
+        QVERIFY(!code->indentationsUseTabs());
+        QCOMPARE(code->edgeColumn(), 90);
+        QCOMPARE(code->edgeMode(), QsciScintilla::EdgeLine);
+
+        // Files clang-format does not format keep the default.
+        tabs.openFile(dir.filePath("notes.txt"));
+        QCOMPARE(tabs.currentEditor()->edgeMode(), QsciScintilla::EdgeNone);
+
+        // Saving the .clang-format restyles the open files.
+        tabs.openFile(dir.filePath(".clang-format"));
+        EditorWidget *config = tabs.currentEditor();
+        config->setText("IndentWidth: 2\nColumnLimit: 0\n");
+        QVERIFY(tabs.saveCurrent());
+        QTRY_COMPARE(code->tabWidth(), 2);
+        QCOMPARE(code->edgeMode(), QsciScintilla::EdgeNone);
+    }
+
     void formattedTextKeepsLineEndingAndUndoesAtOnce()
     {
         QTemporaryDir dir;
@@ -515,7 +560,7 @@ private slots:
         editor.setCursorPosition(2, 4); // in f
         editor.foldBlock(true);
         QVERIFY(!visible(1) && !visible(2));
-        QVERIFY(visible(3)); // the closing brace stays
+        QVERIFY(visible(3));       // the closing brace stays
         QCOMPARE(cursorLine(), 0); // never on a hidden line
         editor.foldBlock(false);
         QVERIFY(visible(1) && visible(2));

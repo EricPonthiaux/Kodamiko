@@ -34,8 +34,8 @@ public:
     void styleRange(int start, int end);
 
 private:
-    void onModified(int position, int modificationType, const char *text, int length, int linesAdded,
-                    int line, int foldLevelNow, int foldLevelPrev, int token, int annotationLinesAdded);
+    void onModified(int position, int modificationType, const char *text, int length, int linesAdded, int line,
+                    int foldLevelNow, int foldLevelPrev, int token, int annotationLinesAdded);
     void onStyleNeeded(int endPosition);
 
     // Reparses if the text changed; returns the first position whose syntax

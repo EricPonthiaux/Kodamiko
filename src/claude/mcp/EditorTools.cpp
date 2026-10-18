@@ -142,7 +142,8 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
             }
             QStringList lines = text->split(QLatin1Char('\n'));
             const int first = std::max(1, arguments.value(QStringLiteral("startLine")).toInt(1));
-            const int last = std::min(int(lines.size()), arguments.value(QStringLiteral("endLine")).toInt(int(lines.size())));
+            const int last =
+                std::min(int(lines.size()), arguments.value(QStringLiteral("endLine")).toInt(int(lines.size())));
             lines = lines.mid(first - 1, std::max(0, last - first + 1));
             reply(McpResult::json(QJsonObject{{QStringLiteral("path"), context.relative(path)},
                                               {QStringLiteral("unsaved"), unsaved},
@@ -193,7 +194,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("Saves files that have unsaved changes in Duet (all of them without paths). Ask the user "
                        "first unless they asked you to."),
         object({{QStringLiteral("paths"), array(string(QStringLiteral("File")), QStringLiteral("Files to save; all "
-                                                                                                  "when omitted"))}}),
+                                                                                               "when omitted"))}}),
         {},
         false,
         false,
@@ -220,8 +221,9 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
                 if (editor->isModified() && !editor->save(&error))
                     failed.append(context.relative(path));
             }
-            reply(failed.isEmpty() ? McpResult::message(QStringLiteral("Saved"))
-                                   : McpResult::error(QStringLiteral("Not saved: %1").arg(failed.join(QStringLiteral(", ")))));
+            reply(failed.isEmpty()
+                      ? McpResult::message(QStringLiteral("Saved"))
+                      : McpResult::error(QStringLiteral("Not saved: %1").arg(failed.join(QStringLiteral(", ")))));
         },
     });
 
@@ -247,26 +249,28 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
     });
 
     // Prompts: slash commands in the Claude session (/mcp__duet__…).
-    registry.addPrompt({QStringLiteral("review-selection"),
-                        QStringLiteral("Review the selection"),
-                        QStringLiteral("Review the code selected in Duet"),
-                        {{QStringLiteral("focus"), QStringLiteral("What to look at (bugs, naming, performance…)"), false}},
-                        [](const QJsonObject &arguments) {
-                            const QString focus = arguments.value(QStringLiteral("focus")).toString();
-                            return QStringLiteral("Get the code I selected in Duet (get_editor_state) and review it%1: "
-                                                  "point out problems with their line, then propose fixes, applying "
-                                                  "nothing until I agree.")
-                                .arg(focus.isEmpty() ? QString() : QStringLiteral(", looking at ") + focus);
-                        }});
+    registry.addPrompt(
+        {QStringLiteral("review-selection"),
+         QStringLiteral("Review the selection"),
+         QStringLiteral("Review the code selected in Duet"),
+         {{QStringLiteral("focus"), QStringLiteral("What to look at (bugs, naming, performance…)"), false}},
+         [](const QJsonObject &arguments) {
+             const QString focus = arguments.value(QStringLiteral("focus")).toString();
+             return QStringLiteral("Get the code I selected in Duet (get_editor_state) and review it%1: "
+                                   "point out problems with their line, then propose fixes, applying "
+                                   "nothing until I agree.")
+                 .arg(focus.isEmpty() ? QString() : QStringLiteral(", looking at ") + focus);
+         }});
     registry.addPrompt({QStringLiteral("fix-diagnostics"),
                         QStringLiteral("Fix the problems"),
                         QStringLiteral("Fix the errors the language servers report"),
                         {{QStringLiteral("path"), QStringLiteral("File (optional: the open files)"), false}},
                         [](const QJsonObject &arguments) {
                             const QString path = arguments.value(QStringLiteral("path")).toString();
-                            return QStringLiteral("Get the problems Duet's language servers report%1 (get_diagnostics), "
-                                                  "fix the errors, then check again with get_diagnostics until none "
-                                                  "is left. Tell me what you changed.")
+                            return QStringLiteral(
+                                       "Get the problems Duet's language servers report%1 (get_diagnostics), "
+                                       "fix the errors, then check again with get_diagnostics until none "
+                                       "is left. Tell me what you changed.")
                                 .arg(path.isEmpty() ? QString() : QStringLiteral(" for ") + path);
                         }});
     registry.addPrompt({QStringLiteral("explain-symbol"),

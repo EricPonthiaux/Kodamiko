@@ -141,8 +141,8 @@ private:
     QWidget *preview_ = nullptr; // over the editor's viewport
     SnippetSession *snippet_;
     QTimer autoTimer_;
-    QTimer fullLineTimer_; // asks the model once typing pauses
-    QChar pendingTrigger_; // what autoTimer_ opens completion after
+    QTimer fullLineTimer_;   // asks the model once typing pauses
+    QChar pendingTrigger_;   // what autoTimer_ opens completion after
     QString announcedLabel_; // the candidate last read to a screen reader
 
     // A candidate just inserted: erased within a few seconds, it counts

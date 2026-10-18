@@ -20,25 +20,36 @@ namespace {
 bool isIdentifierByte(char c)
 {
     // Bytes of non-ASCII characters (é) count: identifiers can hold them.
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$'
-        || static_cast<unsigned char>(c) >= 0x80;
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$' ||
+           static_cast<unsigned char>(c) >= 0x80;
 }
 
 CompletionItem::Kind kindOf(SymbolKind kind)
 {
     switch (kind) {
-    case SymbolKind::Namespace: return CompletionItem::Kind::Namespace;
-    case SymbolKind::Class: return CompletionItem::Kind::Class;
-    case SymbolKind::Struct: return CompletionItem::Kind::Struct;
-    case SymbolKind::Interface: return CompletionItem::Kind::Interface;
-    case SymbolKind::Enum: return CompletionItem::Kind::Enum;
-    case SymbolKind::Type: return CompletionItem::Kind::Type;
-    case SymbolKind::Function: return CompletionItem::Kind::Function;
-    case SymbolKind::Method: return CompletionItem::Kind::Method;
-    case SymbolKind::Field: return CompletionItem::Kind::Field;
-    case SymbolKind::Macro: return CompletionItem::Kind::Macro;
+    case SymbolKind::Namespace:
+        return CompletionItem::Kind::Namespace;
+    case SymbolKind::Class:
+        return CompletionItem::Kind::Class;
+    case SymbolKind::Struct:
+        return CompletionItem::Kind::Struct;
+    case SymbolKind::Interface:
+        return CompletionItem::Kind::Interface;
+    case SymbolKind::Enum:
+        return CompletionItem::Kind::Enum;
+    case SymbolKind::Type:
+        return CompletionItem::Kind::Type;
+    case SymbolKind::Function:
+        return CompletionItem::Kind::Function;
+    case SymbolKind::Method:
+        return CompletionItem::Kind::Method;
+    case SymbolKind::Field:
+        return CompletionItem::Kind::Field;
+    case SymbolKind::Macro:
+        return CompletionItem::Kind::Macro;
     case SymbolKind::Heading:
-    case SymbolKind::Target: break;
+    case SymbolKind::Target:
+        break;
     }
     return CompletionItem::Kind::Text;
 }
@@ -48,8 +59,8 @@ QString family(const QString &languageId)
 {
     if (languageId == QLatin1String("c") || languageId == QLatin1String("cpp"))
         return QStringLiteral("c");
-    if (languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript")
-        || languageId == QLatin1String("tsx"))
+    if (languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript") ||
+        languageId == QLatin1String("tsx"))
         return QStringLiteral("js");
     return languageId;
 }
@@ -97,8 +108,7 @@ QStringList DocumentWordsProvider::words(const QByteArray &text, int exclude)
     nearest.reserve(static_cast<size_t>(distance.size()));
     for (auto it = distance.cbegin(); it != distance.cend(); ++it)
         nearest.emplace_back(it.value(), it.key());
-    std::sort(nearest.begin(), nearest.end(),
-              [](const auto &a, const auto &b) { return a.first < b.first; });
+    std::sort(nearest.begin(), nearest.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
     QStringList result;
     result.reserve(static_cast<qsizetype>(nearest.size()));
     for (const auto &[d, word] : nearest)
@@ -149,51 +159,156 @@ QStringList KeywordProvider::keywords(const QString &languageId)
 {
     static const QHash<QString, QStringList> table = {
         {QStringLiteral("c"),
-         {"auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern",
-          "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed", "sizeof",
-          "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "bool", "true",
-          "false", "NULL", "#include", "#define", "#ifdef", "#ifndef", "#endif", "#pragma"}},
+         {"auto",   "break",    "case",     "char",     "const",  "continue", "default", "do",     "double",
+          "else",   "enum",     "extern",   "float",    "for",    "goto",     "if",      "inline", "int",
+          "long",   "register", "restrict", "return",   "short",  "signed",   "sizeof",  "static", "struct",
+          "switch", "typedef",  "union",    "unsigned", "void",   "volatile", "while",   "bool",   "true",
+          "false",  "NULL",     "#include", "#define",  "#ifdef", "#ifndef",  "#endif",  "#pragma"}},
         {QStringLiteral("cpp"),
-         {"alignas", "alignof", "auto", "bool", "break", "case", "catch", "char", "class", "concept", "const",
-          "consteval", "constexpr", "constinit", "const_cast", "continue", "co_await", "co_return", "co_yield",
-          "decltype", "default", "delete", "do", "double", "dynamic_cast", "else", "enum", "explicit", "export", "extern",
-          "false", "final", "float", "for", "friend", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new",
-          "noexcept", "nullptr", "operator", "override", "private", "protected", "public", "reinterpret_cast",
-          "requires", "return", "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct",
-          "switch", "template", "this", "thread_local", "throw", "true", "try", "typedef", "typeid", "typename",
-          "union", "unsigned", "using", "virtual", "void", "volatile", "while", "std", "#include", "#define",
-          "#ifdef", "#ifndef", "#endif", "#pragma"}},
+         {"alignas",
+          "alignof",
+          "auto",
+          "bool",
+          "break",
+          "case",
+          "catch",
+          "char",
+          "class",
+          "concept",
+          "const",
+          "consteval",
+          "constexpr",
+          "constinit",
+          "const_cast",
+          "continue",
+          "co_await",
+          "co_return",
+          "co_yield",
+          "decltype",
+          "default",
+          "delete",
+          "do",
+          "double",
+          "dynamic_cast",
+          "else",
+          "enum",
+          "explicit",
+          "export",
+          "extern",
+          "false",
+          "final",
+          "float",
+          "for",
+          "friend",
+          "goto",
+          "if",
+          "inline",
+          "int",
+          "long",
+          "mutable",
+          "namespace",
+          "new",
+          "noexcept",
+          "nullptr",
+          "operator",
+          "override",
+          "private",
+          "protected",
+          "public",
+          "reinterpret_cast",
+          "requires",
+          "return",
+          "short",
+          "signed",
+          "sizeof",
+          "static",
+          "static_assert",
+          "static_cast",
+          "struct",
+          "switch",
+          "template",
+          "this",
+          "thread_local",
+          "throw",
+          "true",
+          "try",
+          "typedef",
+          "typeid",
+          "typename",
+          "union",
+          "unsigned",
+          "using",
+          "virtual",
+          "void",
+          "volatile",
+          "while",
+          "std",
+          "#include",
+          "#define",
+          "#ifdef",
+          "#ifndef",
+          "#endif",
+          "#pragma"}},
         {QStringLiteral("java"),
-         {"abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "continue", "default",
-          "do", "double", "else", "enum", "extends", "final", "finally", "float", "for", "if", "implements",
-          "import", "instanceof", "int", "interface", "long", "native", "new", "null", "package", "private",
-          "protected", "public", "record", "return", "sealed", "short", "static", "super", "switch", "synchronized",
-          "this", "throw", "throws", "transient", "true", "false", "try", "var", "void", "volatile", "while",
-          "yield", "String", "Override"}},
+         {"abstract",  "assert",       "boolean", "break",    "byte",   "case",       "catch",   "char",
+          "class",     "continue",     "default", "do",       "double", "else",       "enum",    "extends",
+          "final",     "finally",      "float",   "for",      "if",     "implements", "import",  "instanceof",
+          "int",       "interface",    "long",    "native",   "new",    "null",       "package", "private",
+          "protected", "public",       "record",  "return",   "sealed", "short",      "static",  "super",
+          "switch",    "synchronized", "this",    "throw",    "throws", "transient",  "true",    "false",
+          "try",       "var",          "void",    "volatile", "while",  "yield",      "String",  "Override"}},
         {QStringLiteral("js"),
-         {"async", "await", "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete",
-          "else", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof",
-          "let", "new", "null", "return", "static", "super", "switch", "this", "throw", "true", "try", "typeof",
-          "undefined", "var", "void", "while", "yield", "console", "document", "window", "Promise", "Array",
-          "Object", "String", "Number", "Boolean", "JSON", "Math", "Map", "Set"}},
-        {QStringLiteral("ts"),
-         {"abstract", "any", "as", "boolean", "declare", "enum", "implements", "interface", "keyof", "namespace",
-          "never", "number", "private", "protected", "public", "readonly", "string", "type", "unknown",
-          "satisfies"}},
+         {"async",   "await",  "break",   "case",       "catch",    "class",  "const",   "continue",  "debugger",
+          "default", "delete", "else",    "export",     "extends",  "false",  "finally", "for",       "function",
+          "if",      "import", "in",      "instanceof", "let",      "new",    "null",    "return",    "static",
+          "super",   "switch", "this",    "throw",      "true",     "try",    "typeof",  "undefined", "var",
+          "void",    "while",  "yield",   "console",    "document", "window", "Promise", "Array",     "Object",
+          "String",  "Number", "Boolean", "JSON",       "Math",     "Map",    "Set"}},
+        {QStringLiteral("ts"), {"abstract",  "any",      "as",        "boolean", "declare", "enum",     "implements",
+                                "interface", "keyof",    "namespace", "never",   "number",  "private",  "protected",
+                                "public",    "readonly", "string",    "type",    "unknown", "satisfies"}},
         {QStringLiteral("python"),
-         {"and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else",
-          "except", "False", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "None",
-          "nonlocal", "not", "or", "pass", "raise", "return", "True", "try", "while", "with", "yield", "self",
-          "print", "len", "range", "dict", "list", "set", "tuple", "str", "int", "float", "isinstance"}},
-        {QStringLiteral("bash"),
-         {"if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "function",
-          "in", "local", "export", "readonly", "return", "echo", "printf", "read", "shift", "source", "exit"}},
+         {"and",  "as",   "assert", "async", "await",    "break", "class",     "continue", "def",   "del",
+          "elif", "else", "except", "False", "finally",  "for",   "from",      "global",   "if",    "import",
+          "in",   "is",   "lambda", "None",  "nonlocal", "not",   "or",        "pass",     "raise", "return",
+          "True", "try",  "while",  "with",  "yield",    "self",  "print",     "len",      "range", "dict",
+          "list", "set",  "tuple",  "str",   "int",      "float", "isinstance"}},
+        {QStringLiteral("bash"), {"if",       "then",   "else", "elif",   "fi",       "for",   "while",  "until",
+                                  "do",       "done",   "case", "esac",   "function", "in",    "local",  "export",
+                                  "readonly", "return", "echo", "printf", "read",     "shift", "source", "exit"}},
         {QStringLiteral("cmake"),
-         {"add_executable", "add_library", "add_subdirectory", "add_test", "cmake_minimum_required", "else",
-          "endforeach", "endfunction", "endif", "endmacro", "find_package", "foreach", "function", "if",
-          "include", "install", "macro", "message", "option", "project", "set", "target_compile_definitions",
-          "target_compile_options", "target_include_directories", "target_link_libraries", "target_sources",
-          "PRIVATE", "PUBLIC", "INTERFACE", "REQUIRED", "STATIC", "SHARED"}},
+         {"add_executable",
+          "add_library",
+          "add_subdirectory",
+          "add_test",
+          "cmake_minimum_required",
+          "else",
+          "endforeach",
+          "endfunction",
+          "endif",
+          "endmacro",
+          "find_package",
+          "foreach",
+          "function",
+          "if",
+          "include",
+          "install",
+          "macro",
+          "message",
+          "option",
+          "project",
+          "set",
+          "target_compile_definitions",
+          "target_compile_options",
+          "target_include_directories",
+          "target_link_libraries",
+          "target_sources",
+          "PRIVATE",
+          "PUBLIC",
+          "INTERFACE",
+          "REQUIRED",
+          "STATIC",
+          "SHARED"}},
     };
     if (languageId == QLatin1String("typescript") || languageId == QLatin1String("tsx"))
         return table.value(QStringLiteral("js")) + table.value(QStringLiteral("ts"));
@@ -226,8 +341,8 @@ Scope scopeAt(const QByteArray &text, int position)
     // An anonymous class: "new Runnable() {".
     static const QRegularExpression anonymous(QStringLiteral("\\bnew\\s+[\\w.<>, ?]+\\([^()]*\\)\\s*$"));
     const int headerStart = CodeScan::headerStart(blanked, brace);
-    const bool inClass = !header.name.isEmpty()
-                      || anonymous.match(QString::fromUtf8(blanked.mid(headerStart, brace - headerStart))).hasMatch();
+    const bool inClass = !header.name.isEmpty() ||
+                         anonymous.match(QString::fromUtf8(blanked.mid(headerStart, brace - headerStart))).hasMatch();
     return inClass && !expression ? Scope::Class : Scope::Code;
 }
 
@@ -237,41 +352,46 @@ QStringList KeywordProvider::keywordsAt(const QString &languageId, const QByteAr
 {
     QStringList all = keywords(languageId);
     const bool java = languageId == QLatin1String("java");
-    const bool js = languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript")
-                 || languageId == QLatin1String("tsx");
+    const bool js = languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript") ||
+                    languageId == QLatin1String("tsx");
     if (!java && !js)
         return all;
     const Scope scope = scopeAt(text, position);
     if (java) {
-        static const QSet<QString> file = {"abstract", "class", "enum", "extends", "final", "implements", "import",
-                                           "interface", "package", "public", "record", "sealed", "static"};
-        static const QSet<QString> member = {"abstract", "boolean", "byte", "char", "class", "default", "double",
-                                             "enum", "extends", "final", "float", "implements", "int", "interface",
-                                             "long", "native", "private", "protected", "public", "record", "sealed",
-                                             "short", "static", "synchronized", "throws", "transient", "void",
-                                             "volatile", "String", "Override"};
-        static const QSet<QString> notInCode = {"package", "import", "public", "private", "protected", "abstract",
-                                                "native", "transient", "volatile", "sealed", "implements", "throws"};
+        static const QSet<QString> file = {"abstract",   "class",  "enum",      "extends", "final",
+                                           "implements", "import", "interface", "package", "public",
+                                           "record",     "sealed", "static"};
+        static const QSet<QString> member = {"abstract", "boolean",   "byte",    "char",     "class",   "default",
+                                             "double",   "enum",      "extends", "final",    "float",   "implements",
+                                             "int",      "interface", "long",    "native",   "private", "protected",
+                                             "public",   "record",    "sealed",  "short",    "static",  "synchronized",
+                                             "throws",   "transient", "void",    "volatile", "String",  "Override"};
+        static const QSet<QString> notInCode = {"package", "import",    "public",   "private", "protected",  "abstract",
+                                                "native",  "transient", "volatile", "sealed",  "implements", "throws"};
         all.removeIf([scope](const QString &keyword) {
             switch (scope) {
-            case Scope::File: return !file.contains(keyword);
-            case Scope::Class: return !member.contains(keyword);
-            case Scope::Code: return notInCode.contains(keyword);
+            case Scope::File:
+                return !file.contains(keyword);
+            case Scope::Class:
+                return !member.contains(keyword);
+            case Scope::Code:
+                return notInCode.contains(keyword);
             }
             return false;
         });
         return all;
     }
-    static const QSet<QString> member = {"async", "static", "get", "set", "constructor", "abstract", "private",
-                                         "protected", "public", "readonly", "declare", "override"};
+    static const QSet<QString> member = {"async",   "static",    "get",    "set",      "constructor", "abstract",
+                                         "private", "protected", "public", "readonly", "declare",     "override"};
     static const QSet<QString> notInCode = {"private", "protected", "public", "readonly"};
     if (scope == Scope::Class) {
         // The modifiers of TypeScript are not JavaScript's.
         const bool typescript = languageId != QLatin1String("javascript");
         QStringList members;
         for (const QString &keyword : member) {
-            if (typescript || !QStringList{"abstract", "private", "protected", "public", "readonly", "declare",
-                                           "override"}.contains(keyword))
+            if (typescript ||
+                !QStringList{"abstract", "private", "protected", "public", "readonly", "declare", "override"}.contains(
+                    keyword))
                 members.append(keyword);
         }
         members.sort();
@@ -297,9 +417,9 @@ void KeywordProvider::complete(const CompletionContext &context, const Callback 
             literals = {QStringLiteral("true"), QStringLiteral("false")};
         else if (expected.endsWith(QLatin1Char('*')))
             literals = {context.languageId == QLatin1String("c") ? QStringLiteral("NULL") : QStringLiteral("nullptr")};
-        else if (!expected.isEmpty() && expected[0].isUpper()
-                 && (context.languageId == QLatin1String("java") || context.languageId.startsWith(QLatin1Char('t'))
-                     || context.languageId == QLatin1String("javascript")))
+        else if (!expected.isEmpty() && expected[0].isUpper() &&
+                 (context.languageId == QLatin1String("java") || context.languageId.startsWith(QLatin1Char('t')) ||
+                  context.languageId == QLatin1String("javascript")))
             literals = {QStringLiteral("null")};
         for (const QString &literal : literals) {
             if (!keywords(context.languageId).contains(literal))

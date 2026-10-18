@@ -47,8 +47,9 @@ void CompletionService::merge(QList<CompletionItem> &into, const QList<Completio
         CompletionItem &existing = into[it.value()];
         // A mere word of the file never replaces a keyword or a symbol.
         const bool word = item.kind == CompletionItem::Kind::Text;
-        const bool richer = (existing.kind == CompletionItem::Kind::Text && !word)
-                         || (item.priority > existing.priority && (!word || existing.kind == CompletionItem::Kind::Text));
+        const bool richer =
+            (existing.kind == CompletionItem::Kind::Text && !word) ||
+            (item.priority > existing.priority && (!word || existing.kind == CompletionItem::Kind::Text));
         if (richer)
             existing = item;
     }
@@ -62,12 +63,12 @@ void CompletionService::request(const CompletionContext &context, const Update &
     auto incomplete = std::make_shared<bool>(false);
     QPointer<CompletionService> self(this);
     for (const std::shared_ptr<ICompletionProvider> &provider : providers_) {
-        if (!provider->handles(context) || provider->servesComments() != context.inDocComment
-            || (context.inModulePath && !provider->servesModulePaths())
-            || (context.mode == CompletionContext::Mode::Smart && !provider->servesSmart()))
+        if (!provider->handles(context) || provider->servesComments() != context.inDocComment ||
+            (context.inModulePath && !provider->servesModulePaths()) ||
+            (context.mode == CompletionContext::Mode::Smart && !provider->servesSmart()))
             continue;
-        provider->complete(context, [self, generation, gathered, incomplete,
-                                     update](const QList<CompletionItem> &items, bool partial) {
+        provider->complete(context, [self, generation, gathered, incomplete, update](const QList<CompletionItem> &items,
+                                                                                     bool partial) {
             if (!self || self->generation_ != generation)
                 return; // outdated
             merge(*gathered, items);

@@ -61,7 +61,8 @@ private slots:
     void parsesWorkspaceEdits()
     {
         const QJsonObject changes{
-            {"changes", QJsonObject{{uriOf("/p/a.cpp"), QJsonArray{QJsonObject{{"range", range(1, 0, 3)}, {"newText", "bar"}}}}}}};
+            {"changes",
+             QJsonObject{{uriOf("/p/a.cpp"), QJsonArray{QJsonObject{{"range", range(1, 0, 3)}, {"newText", "bar"}}}}}}};
         QCOMPARE(parseWorkspaceEdit(changes).value("/p/a.cpp"), (QList<TextEdit>{{{{1, 0}, {1, 3}}, "bar"}}));
 
         const QJsonObject documentChanges{
@@ -157,8 +158,9 @@ private slots:
         servers.syncDocument(client, root + "/total.cpp", "cpp", read(root + "/total.cpp"));
         QTRY_VERIFY_WITH_TIMEOUT(client->isReady(), 30000);
         const auto placeCaret = [](EditorWidget *editor, const QString &before) {
-            editor->SendScintilla(QsciScintillaBase::SCI_GOTOPOS,
-                                  static_cast<unsigned long>(editor->utf8Bytes().toByteArray().indexOf(before.toUtf8()) + 1));
+            editor->SendScintilla(
+                QsciScintillaBase::SCI_GOTOPOS,
+                static_cast<unsigned long>(editor->utf8Bytes().toByteArray().indexOf(before.toUtf8()) + 1));
         };
 
         // Header and source, by clangd.
@@ -171,7 +173,9 @@ private slots:
         intelligence.goToDefinition();
         QTRY_COMPARE_WITH_TIMEOUT(tabs.currentFilePath(), root + "/total.cpp", 30000);
         EditorWidget *source = tabs.currentEditor();
-        QCOMPARE(CodeIntelligence::lspPosition(source, int(source->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))).line, 1);
+        QCOMPARE(CodeIntelligence::lspPosition(source, int(source->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)))
+                     .line,
+                 1);
 
         intelligence.switchHeaderSource();
         QTRY_COMPARE_WITH_TIMEOUT(tabs.currentFilePath(), root + "/total.h", 30000);
@@ -197,7 +201,8 @@ private slots:
                                             main, int(main->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))))},
                            {"newName", "product"}};
         servers.syncDocument(client, main->filePath(), "cpp", main->utf8Bytes().toByteArray());
-        servers.syncDocument(client, root + "/total.h", "cpp", tabs.editorFor(root + "/total.h")->utf8Bytes().toByteArray());
+        servers.syncDocument(client, root + "/total.h", "cpp",
+                             tabs.editorFor(root + "/total.h")->utf8Bytes().toByteArray());
         // Once clangd has read the header (a request on it waits for that).
         bool parsed = false;
         client->request("textDocument/documentSymbol",
@@ -211,7 +216,8 @@ private slots:
             answered = true;
         });
         QTRY_VERIFY_WITH_TIMEOUT(answered, 30000);
-        QCOMPARE(main->text(), QString("#include \"total.h\"\nint main() {\n  return product(2, 3) + product(4, 5);\n}\n"));
+        QCOMPARE(main->text(),
+                 QString("#include \"total.h\"\nint main() {\n  return product(2, 3) + product(4, 5);\n}\n"));
         QVERIFY(main->isModified());
         main->undo();
         QVERIFY(main->text().contains("total(2, 3) + total(4, 5)")); // one step

@@ -47,10 +47,14 @@ QString textOf(const DuetToolContext &context, const QString &path)
 QString severityName(int severity)
 {
     switch (severity) {
-    case 1: return QStringLiteral("error");
-    case 2: return QStringLiteral("warning");
-    case 3: return QStringLiteral("information");
-    default: return QStringLiteral("hint");
+    case 1:
+        return QStringLiteral("error");
+    case 2:
+        return QStringLiteral("warning");
+    case 3:
+        return QStringLiteral("information");
+    default:
+        return QStringLiteral("hint");
     }
 }
 
@@ -67,7 +71,8 @@ LspClient *serverFor(const DuetToolContext &context, const QString &path, QStrin
     LspClient *client = context.languageServers->clientFor(languageId);
     if (!client) {
         const QString failure = context.languageServers->failure(languageId);
-        *error = failure.isEmpty() ? QStringLiteral("No language server for %1 files in Duet").arg(languageId) : failure;
+        *error =
+            failure.isEmpty() ? QStringLiteral("No language server for %1 files in Duet").arg(languageId) : failure;
         return nullptr;
     }
     const bool changed =
@@ -87,20 +92,22 @@ LspClient *serverFor(const DuetToolContext &context, const QString &path, QStrin
 
 QJsonObject positionParams(const QJsonObject &arguments, const QString &path)
 {
-    return QJsonObject{{QStringLiteral("textDocument"), QJsonObject{{QStringLiteral("uri"), uriOf(path)}}},
-                       {QStringLiteral("position"),
-                        QJsonObject{{QStringLiteral("line"), std::max(0, arguments.value(QStringLiteral("line")).toInt(1) - 1)},
-                                    {QStringLiteral("character"),
-                                     std::max(0, arguments.value(QStringLiteral("column")).toInt(1) - 1)}}}};
+    return QJsonObject{
+        {QStringLiteral("textDocument"), QJsonObject{{QStringLiteral("uri"), uriOf(path)}}},
+        {QStringLiteral("position"),
+         QJsonObject{
+             {QStringLiteral("line"), std::max(0, arguments.value(QStringLiteral("line")).toInt(1) - 1)},
+             {QStringLiteral("character"), std::max(0, arguments.value(QStringLiteral("column")).toInt(1) - 1)}}}};
 }
 
 // A position's arguments, with `extra` ones (required unless listed in
 // `optional`).
 QJsonObject positionSchema(const QJsonObject &extra = {}, const QStringList &optional = {})
 {
-    QJsonObject properties{{QStringLiteral("path"), string(QStringLiteral("File, relative to the project or absolute"))},
-                           {QStringLiteral("line"), integer(QStringLiteral("Line, 1-based"))},
-                           {QStringLiteral("column"), integer(QStringLiteral("Column, 1-based: on the symbol's name"))}};
+    QJsonObject properties{
+        {QStringLiteral("path"), string(QStringLiteral("File, relative to the project or absolute"))},
+        {QStringLiteral("line"), integer(QStringLiteral("Line, 1-based"))},
+        {QStringLiteral("column"), integer(QStringLiteral("Column, 1-based: on the symbol's name"))}};
     QStringList required{QStringLiteral("path"), QStringLiteral("line"), QStringLiteral("column")};
     for (auto it = extra.begin(); it != extra.end(); ++it) {
         properties.insert(it.key(), it.value());
@@ -133,11 +140,12 @@ QJsonArray diagnosticsJson(const QJsonArray &diagnostics)
     for (const QJsonValue &value : diagnostics) {
         const QJsonObject diagnostic = value.toObject();
         const Range range = rangeFrom(diagnostic.value(QStringLiteral("range")));
-        QJsonObject item{{QStringLiteral("line"), range.start.line + 1},
-                         {QStringLiteral("column"), range.start.character + 1},
-                         {QStringLiteral("endLine"), range.end.line + 1},
-                         {QStringLiteral("severity"), severityName(diagnostic.value(QStringLiteral("severity")).toInt(1))},
-                         {QStringLiteral("message"), diagnostic.value(QStringLiteral("message")).toString()}};
+        QJsonObject item{
+            {QStringLiteral("line"), range.start.line + 1},
+            {QStringLiteral("column"), range.start.character + 1},
+            {QStringLiteral("endLine"), range.end.line + 1},
+            {QStringLiteral("severity"), severityName(diagnostic.value(QStringLiteral("severity")).toInt(1))},
+            {QStringLiteral("message"), diagnostic.value(QStringLiteral("message")).toString()}};
         if (diagnostic.contains(QStringLiteral("source")))
             item.insert(QStringLiteral("source"), diagnostic.value(QStringLiteral("source")).toString());
         if (diagnostic.contains(QStringLiteral("code")))
@@ -198,7 +206,8 @@ public:
         for (const QString &path : paths) {
             QString error;
             bool sent = false;
-            if (serverFor(context, path, &error, &sent) && (sent || context.languageServers->diagnostics(path).isEmpty()))
+            if (serverFor(context, path, &error, &sent) &&
+                (sent || context.languageServers->diagnostics(path).isEmpty()))
                 waiting_.insert(path);
             paths_.append(path);
         }
@@ -292,18 +301,18 @@ void requestCodeActions(const DuetToolContext &context, const QJsonObject &argum
         if (range.start.line <= line && range.end.line >= line)
             onLine.append(diagnostic);
     }
-    const QJsonObject params{{QStringLiteral("textDocument"), QJsonObject{{QStringLiteral("uri"), uriOf(path)}}},
-                             {QStringLiteral("range"), QJsonObject{{QStringLiteral("start"), position},
-                                                                   {QStringLiteral("end"), position}}},
-                             {QStringLiteral("context"), QJsonObject{{QStringLiteral("diagnostics"), onLine}}}};
+    const QJsonObject params{
+        {QStringLiteral("textDocument"), QJsonObject{{QStringLiteral("uri"), uriOf(path)}}},
+        {QStringLiteral("range"), QJsonObject{{QStringLiteral("start"), position}, {QStringLiteral("end"), position}}},
+        {QStringLiteral("context"), QJsonObject{{QStringLiteral("diagnostics"), onLine}}}};
     const QPointer<LspClient> server(client);
     client->request(QStringLiteral("textDocument/codeAction"), params,
                     [server, done](const QJsonValue &result, const QString &failure) {
                         QList<QJsonObject> actions;
                         for (const QJsonValue &item : result.toArray()) {
                             const QJsonObject action = item.toObject();
-                            if (!action.contains(QStringLiteral("disabled"))
-                                && !action.value(QStringLiteral("title")).toString().isEmpty())
+                            if (!action.contains(QStringLiteral("disabled")) &&
+                                !action.value(QStringLiteral("title")).toString().isEmpty())
                                 actions.append(action);
                         }
                         done(server, actions, failure);
@@ -321,7 +330,8 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
                        "last builds the user ran in Duet (source \"build: <configuration>\"). Without paths: the "
                        "open files and every file a server or a build reported problems for. Use it to check your "
                        "edits compile."),
-        object({{QStringLiteral("paths"), array(string(QStringLiteral("File")), QStringLiteral("Files to check (optional)"))}}),
+        object({{QStringLiteral("paths"),
+                 array(string(QStringLiteral("File")), QStringLiteral("Files to check (optional)"))}}),
         [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
             QStringList paths;
             for (const QJsonValue &value : arguments.value(QStringLiteral("paths")).toArray())
@@ -352,8 +362,7 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("find_definition"), QStringLiteral("Definition"),
         QStringLiteral("Where the symbol at a position is defined, according to the file's language server (types "
                        "and overloads resolved, unlike a text search)."),
-        positionSchema(),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
             positionalRequest(context, arguments, QStringLiteral("textDocument/definition"), {}, reply,
                               [context](const QJsonValue &result) {
                                   return McpResult::json(QJsonObject{
@@ -369,24 +378,23 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
                                                                                       "(default true)"))}},
                        {QStringLiteral("includeDeclaration")}),
         [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
-            positionalRequest(
-                context, arguments, QStringLiteral("textDocument/references"),
-                {{QStringLiteral("context"),
-                  QJsonObject{{QStringLiteral("includeDeclaration"),
-                               arguments.value(QStringLiteral("includeDeclaration")).toBool(true)}}}},
-                reply, [context](const QJsonValue &result) {
-                    const QList<Location> locations = parseLocations(result);
-                    return McpResult::json(QJsonObject{{QStringLiteral("references"), locationsJson(context, locations)},
-                                                       {QStringLiteral("count"), int(locations.size())}});
-                });
+            positionalRequest(context, arguments, QStringLiteral("textDocument/references"),
+                              {{QStringLiteral("context"),
+                                QJsonObject{{QStringLiteral("includeDeclaration"),
+                                             arguments.value(QStringLiteral("includeDeclaration")).toBool(true)}}}},
+                              reply, [context](const QJsonValue &result) {
+                                  const QList<Location> locations = parseLocations(result);
+                                  return McpResult::json(
+                                      QJsonObject{{QStringLiteral("references"), locationsJson(context, locations)},
+                                                  {QStringLiteral("count"), int(locations.size())}});
+                              });
         }));
 
     registry.addTool(McpTool::reading(
         QStringLiteral("get_symbol_info"), QStringLiteral("Symbol information"),
         QStringLiteral("The type, signature and documentation of the symbol at a position, as the language "
                        "server's hover gives them."),
-        positionSchema(),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
             positionalRequest(context, arguments, QStringLiteral("textDocument/hover"), {}, reply,
                               [](const QJsonValue &result) {
                                   const QJsonValue contents = result.toObject().value(QStringLiteral("contents"));
@@ -443,24 +451,24 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("get_code_actions"), QStringLiteral("Quick fixes"),
         QStringLiteral("The quick fixes and refactorings the language server offers at a position (for the "
                        "problems on its line): their titles, to apply one with apply_code_action."),
-        positionSchema(),
-        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
-            requestCodeActions(context, arguments, [reply](LspClient *, QList<QJsonObject> actions, const QString &error) {
-                if (!error.isEmpty()) {
-                    reply(McpResult::error(error));
-                    return;
-                }
-                QJsonArray titles;
-                for (const QJsonObject &action : actions) {
-                    QJsonObject item{{QStringLiteral("title"), action.value(QStringLiteral("title")).toString()}};
-                    if (action.contains(QStringLiteral("kind")))
-                        item.insert(QStringLiteral("kind"), action.value(QStringLiteral("kind")).toString());
-                    if (action.value(QStringLiteral("isPreferred")).toBool())
-                        item.insert(QStringLiteral("preferred"), true);
-                    titles.append(item);
-                }
-                reply(McpResult::json(QJsonObject{{QStringLiteral("actions"), titles}}));
-            });
+        positionSchema(), [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+            requestCodeActions(
+                context, arguments, [reply](LspClient *, QList<QJsonObject> actions, const QString &error) {
+                    if (!error.isEmpty()) {
+                        reply(McpResult::error(error));
+                        return;
+                    }
+                    QJsonArray titles;
+                    for (const QJsonObject &action : actions) {
+                        QJsonObject item{{QStringLiteral("title"), action.value(QStringLiteral("title")).toString()}};
+                        if (action.contains(QStringLiteral("kind")))
+                            item.insert(QStringLiteral("kind"), action.value(QStringLiteral("kind")).toString());
+                        if (action.value(QStringLiteral("isPreferred")).toBool())
+                            item.insert(QStringLiteral("preferred"), true);
+                        titles.append(item);
+                    }
+                    reply(McpResult::json(QJsonObject{{QStringLiteral("actions"), titles}}));
+                });
         }));
 
     registry.addTool(McpTool::acting(
@@ -470,42 +478,44 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         positionSchema({{QStringLiteral("title"), string(QStringLiteral("The action's title"))}}),
         [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
             const QString title = arguments.value(QStringLiteral("title")).toString();
-            requestCodeActions(context, arguments,
-                               [context, reply, title](LspClient *server, QList<QJsonObject> actions, const QString &error) {
-                                   if (!error.isEmpty()) {
-                                       reply(McpResult::error(error));
-                                       return;
-                                   }
-                                   for (const QJsonObject &action : actions) {
-                                       if (action.value(QStringLiteral("title")).toString() != title)
-                                           continue;
-                                       int files = 0;
-                                       if (action.contains(QStringLiteral("edit")))
-                                           files = context.intelligence->applyWorkspaceEdit(
-                                               parseWorkspaceEdit(action.value(QStringLiteral("edit")).toObject()));
-                                       // A command: the server carries it out and sends the edit back.
-                                       const QJsonObject command =
-                                           action.value(QStringLiteral("command")).isObject()
-                                               ? action.value(QStringLiteral("command")).toObject()
-                                           : action.value(QStringLiteral("command")).isString() ? action
-                                                                                                 : QJsonObject();
-                                       if (!command.isEmpty() && server) {
-                                           server->request(QStringLiteral("workspace/executeCommand"),
-                                                           QJsonObject{{QStringLiteral("command"), command.value(QStringLiteral("command"))},
-                                                                       {QStringLiteral("arguments"),
-                                                                        command.value(QStringLiteral("arguments")).toArray()}},
-                                                           [reply](const QJsonValue &, const QString &failure) {
-                                                               reply(failure.isEmpty() ? McpResult::message(QStringLiteral("Applied"))
-                                                                                       : McpResult::error(failure));
-                                                           });
-                                           return;
-                                       }
-                                       reply(McpResult::json(QJsonObject{{QStringLiteral("applied"), title},
-                                                                         {QStringLiteral("filesChanged"), files}}));
-                                       return;
-                                   }
-                                   reply(McpResult::error(QStringLiteral("No action \"%1\" here (see get_code_actions)").arg(title)));
-                               });
+            requestCodeActions(
+                context, arguments,
+                [context, reply, title](LspClient *server, QList<QJsonObject> actions, const QString &error) {
+                    if (!error.isEmpty()) {
+                        reply(McpResult::error(error));
+                        return;
+                    }
+                    for (const QJsonObject &action : actions) {
+                        if (action.value(QStringLiteral("title")).toString() != title)
+                            continue;
+                        int files = 0;
+                        if (action.contains(QStringLiteral("edit")))
+                            files = context.intelligence->applyWorkspaceEdit(
+                                parseWorkspaceEdit(action.value(QStringLiteral("edit")).toObject()));
+                        // A command: the server carries it out and sends the edit back.
+                        const QJsonObject command = action.value(QStringLiteral("command")).isObject()
+                                                        ? action.value(QStringLiteral("command")).toObject()
+                                                    : action.value(QStringLiteral("command")).isString()
+                                                        ? action
+                                                        : QJsonObject();
+                        if (!command.isEmpty() && server) {
+                            server->request(
+                                QStringLiteral("workspace/executeCommand"),
+                                QJsonObject{{QStringLiteral("command"), command.value(QStringLiteral("command"))},
+                                            {QStringLiteral("arguments"),
+                                             command.value(QStringLiteral("arguments")).toArray()}},
+                                [reply](const QJsonValue &, const QString &failure) {
+                                    reply(failure.isEmpty() ? McpResult::message(QStringLiteral("Applied"))
+                                                            : McpResult::error(failure));
+                                });
+                            return;
+                        }
+                        reply(McpResult::json(
+                            QJsonObject{{QStringLiteral("applied"), title}, {QStringLiteral("filesChanged"), files}}));
+                        return;
+                    }
+                    reply(McpResult::error(QStringLiteral("No action \"%1\" here (see get_code_actions)").arg(title)));
+                });
         }));
 
     registry.addTool(McpTool::acting(
@@ -586,7 +596,8 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
                     files.append(QJsonObject{{QStringLiteral("file"), context.relative(path)},
                                              {QStringLiteral("problems"), problems}});
             }
-            return QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("files"), files}}).toJson(QJsonDocument::Compact));
+            return QString::fromUtf8(
+                QJsonDocument(QJsonObject{{QStringLiteral("files"), files}}).toJson(QJsonDocument::Compact));
         },
     });
     McpRegistry *target = &registry;

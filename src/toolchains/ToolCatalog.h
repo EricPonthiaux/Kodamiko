@@ -35,7 +35,11 @@ struct Platform {
     QString arch; // "x64", "aarch64"
 };
 
-enum class ArchiveFormat { TarGz, Zip, Npm };
+enum class ArchiveFormat {
+    TarGz,
+    Zip,
+    Npm
+};
 
 // Where to download one version of a tool.
 struct DownloadSource {
@@ -69,8 +73,7 @@ Platform currentPlatform();
 QUrl metadataUrl(const QString &id, const QString &version);
 // The archive of `id` `version` for `platform`, given what metadataUrl
 // returned.
-DownloadSource source(const QString &id, const QString &version, const Platform &platform,
-                      const QByteArray &metadata);
+DownloadSource source(const QString &id, const QString &version, const Platform &platform, const QByteArray &metadata);
 // The SHA-256 of `fileName` in a checksum file: a single hash, or lines of
 // "hash  name". Empty if it is not there.
 QString checksumFor(const QByteArray &checksums, const QString &fileName);

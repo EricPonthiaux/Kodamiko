@@ -34,7 +34,8 @@ void fakeInstall(const Toolchains &toolchains, const QString &tool, const QStrin
 {
     const QString folder = toolchains.installFolder(tool, version);
     write(folder + QLatin1Char('/') + executable, "#!/bin/sh\n");
-    QFile::setPermissions(folder + QLatin1Char('/') + executable, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    QFile::setPermissions(folder + QLatin1Char('/') + executable,
+                          QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
     write(folder + QStringLiteral("/.complete"), "");
 }
 
@@ -168,11 +169,13 @@ private slots:
     void namesTheDownloads()
     {
         const Platform linuxX64{"linux", "x64"};
-        const QByteArray release =
-            "{\"assets\": ["
-            "{\"name\": \"OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.20.1_1.tar.gz\", \"browser_download_url\": \"https://x/arm.tar.gz\"},"
-            "{\"name\": \"OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz\", \"browser_download_url\": \"https://x/jdk.tar.gz\"},"
-            "{\"name\": \"OpenJDK17U-jdk_x64_windows_hotspot_17.0.20.1_1.zip\", \"browser_download_url\": \"https://x/jdk.zip\"}]}";
+        const QByteArray release = "{\"assets\": ["
+                                   "{\"name\": \"OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.20.1_1.tar.gz\", "
+                                   "\"browser_download_url\": \"https://x/arm.tar.gz\"},"
+                                   "{\"name\": \"OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz\", "
+                                   "\"browser_download_url\": \"https://x/jdk.tar.gz\"},"
+                                   "{\"name\": \"OpenJDK17U-jdk_x64_windows_hotspot_17.0.20.1_1.zip\", "
+                                   "\"browser_download_url\": \"https://x/jdk.zip\"}]}";
         DownloadSource jdk = ToolCatalog::source("jdk", "17", linuxX64, release);
         QCOMPARE(jdk.url, QUrl("https://x/jdk.tar.gz"));
         QCOMPARE(jdk.checksumUrl, QUrl("https://x/jdk.tar.gz.sha256.txt"));
@@ -184,7 +187,8 @@ private slots:
         QCOMPARE(ToolCatalog::metadataUrl("jdk", "21"),
                  QUrl("https://api.github.com/repos/adoptium/temurin21-binaries/releases/latest"));
 
-        const QByteArray index = "[{\"version\": \"v26.1.0\"}, {\"version\": \"v24.22.0\"}, {\"version\": \"v24.21.0\"}]";
+        const QByteArray index =
+            "[{\"version\": \"v26.1.0\"}, {\"version\": \"v24.22.0\"}, {\"version\": \"v24.21.0\"}]";
         const DownloadSource node = ToolCatalog::source("node", "24", {"mac", "aarch64"}, index);
         QCOMPARE(node.url, QUrl("https://nodejs.org/dist/v24.22.0/node-v24.22.0-darwin-arm64.tar.gz"));
         QCOMPARE(node.checksumUrl, QUrl("https://nodejs.org/dist/v24.22.0/SHASUMS256.txt"));
@@ -192,16 +196,17 @@ private slots:
         QCOMPARE(ToolCatalog::source("clangd", "23.1.0", linuxX64, {}).url,
                  QUrl("https://github.com/clangd/clangd/releases/download/23.1.0/clangd-linux-23.1.0.zip"));
         QVERIFY(!ToolCatalog::source("clangd", "23.1.0", {"linux", "aarch64"}, {}).error.isEmpty());
-        QCOMPARE(ToolCatalog::source("jdtls", "1.62.0", linuxX64, "jdt-language-server-1.62.0-202610131109.tar.gz\n").url,
-                 QUrl("https://download.eclipse.org/jdtls/milestones/1.62.0/"
-                      "jdt-language-server-1.62.0-202610131109.tar.gz"));
+        QCOMPARE(
+            ToolCatalog::source("jdtls", "1.62.0", linuxX64, "jdt-language-server-1.62.0-202610131109.tar.gz\n").url,
+            QUrl("https://download.eclipse.org/jdtls/milestones/1.62.0/"
+                 "jdt-language-server-1.62.0-202610131109.tar.gz"));
         QCOMPARE(ToolCatalog::source("pyright", "1.1.414", linuxX64, {}).format, ArchiveFormat::Npm);
 
         const QString hash(64, QLatin1Char('a'));
         QCOMPARE(ToolCatalog::checksumFor(hash.toLatin1() + "  jdk.tar.gz\n", "jdk.tar.gz"), hash);
         QCOMPARE(ToolCatalog::checksumFor(hash.toLatin1() + "\n", "anything"), hash);
-        QCOMPARE(ToolCatalog::checksumFor(QString(64, 'b').toLatin1() + "  other.zip\n" + hash.toLatin1()
-                                              + "  node.tar.gz\n",
+        QCOMPARE(ToolCatalog::checksumFor(QString(64, 'b').toLatin1() + "  other.zip\n" + hash.toLatin1() +
+                                              "  node.tar.gz\n",
                                           "node.tar.gz"),
                  hash);
         QVERIFY(ToolCatalog::checksumFor(hash.toLatin1() + "  a\n" + hash.toLatin1() + "  b\n", "c").isEmpty());
@@ -227,7 +232,6 @@ private slots:
         config.languages.append({"cpp", false, "c++20", {}, "clangd", "23.1.0"});
         QCOMPARE(titles(InstallPlan::plan(config, toolchains)), (QStringList{"Node.js 24", "pyright 1.1.414"}));
         QVERIFY(InstallPlan::unavailable(config, toolchains).join(' ').contains("Python 3.12"));
-
     }
 
     void completesASetup()

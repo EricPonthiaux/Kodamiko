@@ -180,7 +180,8 @@ QString McpRegistry::validate(const QJsonObject &schema, const QJsonObject &argu
             QStringList allowed;
             for (const QJsonValue &value : values)
                 allowed.append(value.toString());
-            return QStringLiteral("Argument \"%1\" must be one of: %2").arg(it.key(), allowed.join(QStringLiteral(", ")));
+            return QStringLiteral("Argument \"%1\" must be one of: %2")
+                .arg(it.key(), allowed.join(QStringLiteral(", ")));
         }
     }
     return {};

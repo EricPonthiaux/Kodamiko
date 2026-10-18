@@ -52,16 +52,16 @@ namespace {
 
 bool isControlEnter(const QKeyEvent *event)
 {
-    return (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
-           && event->modifiers().testFlag(Qt::ControlModifier);
+    return (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) &&
+           event->modifiers().testFlag(Qt::ControlModifier);
 }
 
 } // namespace
 
 bool DiagramRequestPopup::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == description_ && event->type() == QEvent::KeyPress
-        && isControlEnter(static_cast<QKeyEvent *>(event))) {
+    if (watched == description_ && event->type() == QEvent::KeyPress &&
+        isControlEnter(static_cast<QKeyEvent *>(event))) {
         accept();
         return true;
     }

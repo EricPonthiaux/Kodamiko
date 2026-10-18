@@ -7,7 +7,14 @@
 #include <optional>
 
 // State of a working directory file as the file tree shows it.
-enum class FileStatus { Modified, Added, Untracked, Renamed, Conflicted, Ignored };
+enum class FileStatus {
+    Modified,
+    Added,
+    Untracked,
+    Renamed,
+    Conflicted,
+    Ignored
+};
 
 // States of the files of a repository, by absolute path. Unchanged files are
 // absent; deleted files too (the tree cannot show them). An ignored folder

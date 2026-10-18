@@ -34,8 +34,8 @@ qreal channelLuminance(qreal v)
 
 qreal luminance(const QColor &color)
 {
-    return 0.2126 * channelLuminance(color.redF()) + 0.7152 * channelLuminance(color.greenF())
-           + 0.0722 * channelLuminance(color.blueF());
+    return 0.2126 * channelLuminance(color.redF()) + 0.7152 * channelLuminance(color.greenF()) +
+           0.0722 * channelLuminance(color.blueF());
 }
 
 void finish(Style &style)
@@ -238,8 +238,8 @@ qreal widest(const Font &font, const QStringList &lines)
     return result;
 }
 
-void draw(QPainter &painter, const Font &font, const QString &value, QPointF position, const QColor &color,
-          Align align, Baseline baseline)
+void draw(QPainter &painter, const Font &font, const QString &value, QPointF position, const QColor &color, Align align,
+          Baseline baseline)
 {
     if (value.isEmpty())
         return;
@@ -366,8 +366,7 @@ void stroke(QPainter &painter, const QPainterPath &path, const QColor &color, qr
     painter.strokePath(path, pen(color, width, dash));
 }
 
-void strokeLine(QPainter &painter, QPointF from, QPointF to, const QColor &color, qreal width,
-                const QList<qreal> &dash)
+void strokeLine(QPainter &painter, QPointF from, QPointF to, const QColor &color, qreal width, const QList<qreal> &dash)
 {
     painter.save();
     painter.setPen(pen(color, width, dash));
@@ -429,12 +428,11 @@ QColor withAlpha(const QColor &color, qreal alpha)
 const QStringList &swatches()
 {
     static const QStringList list{
-        QStringLiteral("#bbdefb"), QStringLiteral("#b2dfdb"), QStringLiteral("#c8e6c9"),
-        QStringLiteral("#d1c4e9"), QStringLiteral("#ffecb3"), QStringLiteral("#ffccbc"),
-        QStringLiteral("#f8bbd0"), QStringLiteral("#cfd8dc"), QStringLiteral("#1565c0"),
-        QStringLiteral("#00695c"), QStringLiteral("#2e7d32"), QStringLiteral("#4527a0"),
-        QStringLiteral("#ff8f00"), QStringLiteral("#d84315"), QStringLiteral("#ad1457"),
-        QStringLiteral("#37474f"), QStringLiteral("#eeeeee"), QStringLiteral("#ffffff"),
+        QStringLiteral("#bbdefb"), QStringLiteral("#b2dfdb"), QStringLiteral("#c8e6c9"), QStringLiteral("#d1c4e9"),
+        QStringLiteral("#ffecb3"), QStringLiteral("#ffccbc"), QStringLiteral("#f8bbd0"), QStringLiteral("#cfd8dc"),
+        QStringLiteral("#1565c0"), QStringLiteral("#00695c"), QStringLiteral("#2e7d32"), QStringLiteral("#4527a0"),
+        QStringLiteral("#ff8f00"), QStringLiteral("#d84315"), QStringLiteral("#ad1457"), QStringLiteral("#37474f"),
+        QStringLiteral("#eeeeee"), QStringLiteral("#ffffff"),
     };
     return list;
 }

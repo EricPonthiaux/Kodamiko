@@ -1,8 +1,8 @@
 #include "Toolchains.h"
 
 #include "JavaRuntimes.h"
-#include "projects/ProjectDetector.h"
 #include "ToolCatalog.h"
+#include "projects/ProjectDetector.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -64,12 +64,13 @@ QList<RuntimeInstall> machineNodes()
         executables.append(onPath);
     // Version managers keep one folder per version.
     const QString home = QDir::homePath();
-    for (const QString &parent : {home + QStringLiteral("/.nvm/versions/node"),
-                                  home + QStringLiteral("/.local/share/fnm/node-versions"),
-                                  home + QStringLiteral("/.volta/tools/image/node")}) {
+    for (const QString &parent :
+         {home + QStringLiteral("/.nvm/versions/node"), home + QStringLiteral("/.local/share/fnm/node-versions"),
+          home + QStringLiteral("/.volta/tools/image/node")}) {
         for (const QString &name : QDir(parent).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-            for (const QString &candidate : {parent + QLatin1Char('/') + name + QStringLiteral("/bin/node"),
-                                             parent + QLatin1Char('/') + name + QStringLiteral("/installation/bin/node")}) {
+            for (const QString &candidate :
+                 {parent + QLatin1Char('/') + name + QStringLiteral("/bin/node"),
+                  parent + QLatin1Char('/') + name + QStringLiteral("/installation/bin/node")}) {
                 if (QFileInfo(candidate).isExecutable())
                     executables.append(candidate);
             }
@@ -235,7 +236,8 @@ QList<RuntimeInstall> Toolchains::runtimes(const QString &tool) const
     return all;
 }
 
-std::optional<RuntimeInstall> Toolchains::runtime(const QString &tool, const QString &version, const QString &path) const
+std::optional<RuntimeInstall> Toolchains::runtime(const QString &tool, const QString &version,
+                                                  const QString &path) const
 {
     const QList<RuntimeInstall> all = runtimes(tool);
     if (!path.isEmpty()) {
@@ -287,8 +289,8 @@ std::optional<RuntimeInstall> Toolchains::runtimeFor(const LanguageSetup &setup)
 
 QString Toolchains::npmScript(const RuntimeInstall &node)
 {
-    for (const QString &relative : {QStringLiteral("/lib/node_modules/npm/bin/npm-cli.js"),
-                                    QStringLiteral("/node_modules/npm/bin/npm-cli.js")}) {
+    for (const QString &relative :
+         {QStringLiteral("/lib/node_modules/npm/bin/npm-cli.js"), QStringLiteral("/node_modules/npm/bin/npm-cli.js")}) {
         if (QFileInfo::exists(node.home + relative))
             return node.home + relative;
     }

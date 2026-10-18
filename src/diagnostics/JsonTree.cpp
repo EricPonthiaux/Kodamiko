@@ -45,10 +45,7 @@ private:
     bool atEnd() const { return pos_ >= text_.size(); }
     char peek() const { return atEnd() ? '\0' : text_[pos_]; }
 
-    std::nullopt_t fail(const QString &message)
-    {
-        return fail(message, int(pos_));
-    }
+    std::nullopt_t fail(const QString &message) { return fail(message, int(pos_)); }
 
     std::nullopt_t fail(const QString &message, int offset)
     {
@@ -229,14 +226,30 @@ private:
             const char escape = peek();
             ++pos_;
             switch (escape) {
-            case '"': result += QLatin1Char('"'); break;
-            case '\\': result += QLatin1Char('\\'); break;
-            case '/': result += QLatin1Char('/'); break;
-            case 'b': result += QLatin1Char('\b'); break;
-            case 'f': result += QLatin1Char('\f'); break;
-            case 'n': result += QLatin1Char('\n'); break;
-            case 'r': result += QLatin1Char('\r'); break;
-            case 't': result += QLatin1Char('\t'); break;
+            case '"':
+                result += QLatin1Char('"');
+                break;
+            case '\\':
+                result += QLatin1Char('\\');
+                break;
+            case '/':
+                result += QLatin1Char('/');
+                break;
+            case 'b':
+                result += QLatin1Char('\b');
+                break;
+            case 'f':
+                result += QLatin1Char('\f');
+                break;
+            case 'n':
+                result += QLatin1Char('\n');
+                break;
+            case 'r':
+                result += QLatin1Char('\r');
+                break;
+            case 't':
+                result += QLatin1Char('\t');
+                break;
             case 'u': {
                 std::optional<int> code = hex4();
                 if (!code)
@@ -253,9 +266,9 @@ private:
 
     bool literal(JsonNode &node)
     {
-        for (const auto &[word, value] : {std::pair{QByteArrayView("true"), QJsonValue(true)},
-                                          std::pair{QByteArrayView("false"), QJsonValue(false)},
-                                          std::pair{QByteArrayView("null"), QJsonValue()}}) {
+        for (const auto &[word, value] :
+             {std::pair{QByteArrayView("true"), QJsonValue(true)},
+              std::pair{QByteArrayView("false"), QJsonValue(false)}, std::pair{QByteArrayView("null"), QJsonValue()}}) {
             if (text_.sliced(pos_).startsWith(word)) {
                 pos_ += word.size();
                 node.type = value.type();

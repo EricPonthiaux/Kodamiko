@@ -22,9 +22,12 @@ const QColor runningColor("#4fa36b");
 QString iconOf(RunConfiguration::Kind kind)
 {
     switch (kind) {
-    case RunConfiguration::Kind::Build: return QStringLiteral("build");
-    case RunConfiguration::Kind::Test: return QStringLiteral("test");
-    case RunConfiguration::Kind::Run: break;
+    case RunConfiguration::Kind::Build:
+        return QStringLiteral("build");
+    case RunConfiguration::Kind::Test:
+        return QStringLiteral("test");
+    case RunConfiguration::Kind::Run:
+        break;
     }
     return QStringLiteral("run");
 }
@@ -150,7 +153,8 @@ protected:
         if (!configuration_.folder.isEmpty())
             command = configuration_.folder + QStringLiteral(" › ") + command;
         painter.drawText(QRect(left, top + nameMetrics.height() + 1, textWidth, commandMetrics.height()),
-                         Qt::AlignLeft | Qt::AlignVCenter, commandMetrics.elidedText(command, Qt::ElideMiddle, textWidth));
+                         Qt::AlignLeft | Qt::AlignVCenter,
+                         commandMetrics.elidedText(command, Qt::ElideMiddle, textWidth));
     }
 
 private:
@@ -199,9 +203,9 @@ void addHeading(QMenu *menu, const QString &text, const Theme &theme)
 
 void addNote(QMenu *menu, const QString &text, const Theme &theme)
 {
-    QLabel *note = label(menu, text,
-                         QStringLiteral("color: %1; padding: 8px 10px; background: transparent;")
-                             .arg(theme.mutedText.name()));
+    QLabel *note =
+        label(menu, text,
+              QStringLiteral("color: %1; padding: 8px 10px; background: transparent;").arg(theme.mutedText.name()));
     note->setWordWrap(true);
     note->setMaximumWidth(rowWidth);
 }

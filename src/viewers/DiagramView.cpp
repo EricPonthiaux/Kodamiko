@@ -240,7 +240,7 @@ void DiagramView::exportSource()
     if (!codec_)
         return;
     const QFileInfo info(filePath_);
-    const QString extension = codec_->language() == QLatin1String("plantuml") ? QStringLiteral("puml")
+    const QString extension = codec_->language() == QLatin1String("plantuml")  ? QStringLiteral("puml")
                               : codec_->language() == QLatin1String("mermaid") ? QStringLiteral("mmd")
                                                                                : info.suffix();
     const QString path = QFileDialog::getSaveFileName(
@@ -324,9 +324,9 @@ bool DiagramView::exportImage(const QString &path, QString *error) const
 void DiagramView::exportPng()
 {
     const QFileInfo info(filePath_);
-    const QString path = QFileDialog::getSaveFileName(this, tr("Export PNG"),
-                                                      info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(".png")),
-                                                      tr("PNG Image (*.png)"));
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Export PNG"), info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(".png")),
+        tr("PNG Image (*.png)"));
     if (path.isEmpty())
         return;
     QString error;
@@ -336,9 +336,9 @@ void DiagramView::exportPng()
 void DiagramView::exportSvg()
 {
     const QFileInfo info(filePath_);
-    const QString path = QFileDialog::getSaveFileName(this, tr("Export SVG"),
-                                                      info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(".svg")),
-                                                      tr("SVG Image (*.svg)"));
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Export SVG"), info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(".svg")),
+        tr("SVG Image (*.svg)"));
     if (path.isEmpty())
         return;
     QString error;

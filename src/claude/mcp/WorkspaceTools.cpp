@@ -35,18 +35,30 @@ using namespace McpSchema;
 QString kindName(SymbolKind kind)
 {
     switch (kind) {
-    case SymbolKind::Namespace: return QStringLiteral("namespace");
-    case SymbolKind::Class: return QStringLiteral("class");
-    case SymbolKind::Struct: return QStringLiteral("struct");
-    case SymbolKind::Interface: return QStringLiteral("interface");
-    case SymbolKind::Enum: return QStringLiteral("enum");
-    case SymbolKind::Type: return QStringLiteral("type");
-    case SymbolKind::Function: return QStringLiteral("function");
-    case SymbolKind::Method: return QStringLiteral("method");
-    case SymbolKind::Field: return QStringLiteral("field");
-    case SymbolKind::Macro: return QStringLiteral("macro");
-    case SymbolKind::Heading: return QStringLiteral("heading");
-    case SymbolKind::Target: return QStringLiteral("target");
+    case SymbolKind::Namespace:
+        return QStringLiteral("namespace");
+    case SymbolKind::Class:
+        return QStringLiteral("class");
+    case SymbolKind::Struct:
+        return QStringLiteral("struct");
+    case SymbolKind::Interface:
+        return QStringLiteral("interface");
+    case SymbolKind::Enum:
+        return QStringLiteral("enum");
+    case SymbolKind::Type:
+        return QStringLiteral("type");
+    case SymbolKind::Function:
+        return QStringLiteral("function");
+    case SymbolKind::Method:
+        return QStringLiteral("method");
+    case SymbolKind::Field:
+        return QStringLiteral("field");
+    case SymbolKind::Macro:
+        return QStringLiteral("macro");
+    case SymbolKind::Heading:
+        return QStringLiteral("heading");
+    case SymbolKind::Target:
+        return QStringLiteral("target");
     }
     return {};
 }
@@ -108,22 +120,24 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
                 reply(McpResult::error(error));
                 return;
             }
-            const int limit = std::clamp(arguments.value(QStringLiteral("limit")).toInt(200), 1, FindInFilesSearch::matchLimit);
+            const int limit =
+                std::clamp(arguments.value(QStringLiteral("limit")).toInt(200), 1, FindInFilesSearch::matchLimit);
             auto *search = new FindInFilesSearch;
-            QObject::connect(search, &FindInFilesSearch::finished, search,
-                             [search, reply, context, limit](const QList<FindMatch> &matches, bool truncated, int files) {
-                                 QJsonArray found;
-                                 for (const FindMatch &match : matches.mid(0, limit))
-                                     found.append(QJsonObject{{QStringLiteral("file"), context.relative(match.filePath)},
-                                                              {QStringLiteral("line"), match.line + 1},
-                                                              {QStringLiteral("column"), match.column + 1},
-                                                              {QStringLiteral("text"), match.lineText.trimmed()}});
-                                 reply(McpResult::json(QJsonObject{
-                                     {QStringLiteral("matches"), found},
-                                     {QStringLiteral("truncated"), truncated || matches.size() > limit},
-                                     {QStringLiteral("filesSearched"), files}}));
-                                 search->deleteLater();
-                             });
+            QObject::connect(
+                search, &FindInFilesSearch::finished, search,
+                [search, reply, context, limit](const QList<FindMatch> &matches, bool truncated, int files) {
+                    QJsonArray found;
+                    for (const FindMatch &match : matches.mid(0, limit))
+                        found.append(QJsonObject{{QStringLiteral("file"), context.relative(match.filePath)},
+                                                 {QStringLiteral("line"), match.line + 1},
+                                                 {QStringLiteral("column"), match.column + 1},
+                                                 {QStringLiteral("text"), match.lineText.trimmed()}});
+                    reply(
+                        McpResult::json(QJsonObject{{QStringLiteral("matches"), found},
+                                                    {QStringLiteral("truncated"), truncated || matches.size() > limit},
+                                                    {QStringLiteral("filesSearched"), files}}));
+                    search->deleteLater();
+                });
             search->start(context.folder(), query, context.tabs->unsavedTexts());
         }));
 
@@ -157,8 +171,8 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
                     QJsonArray files;
                     for (size_t i = 0; i < scored.size() && int(i) < limit; ++i)
                         files.append(scored[i].path);
-                    return McpResult::json(QJsonObject{{QStringLiteral("files"), files},
-                                                       {QStringLiteral("total"), int(scored.size())}});
+                    return McpResult::json(
+                        QJsonObject{{QStringLiteral("files"), files}, {QStringLiteral("total"), int(scored.size())}});
                 },
                 reply);
         }));
@@ -200,7 +214,8 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
             if (!context.symbols)
                 return McpResult::error(QStringLiteral("No symbol index"));
             QJsonArray found;
-            for (const SymbolLocation &symbol : context.symbols->lookup(arguments.value(QStringLiteral("name")).toString())) {
+            for (const SymbolLocation &symbol :
+                 context.symbols->lookup(arguments.value(QStringLiteral("name")).toString())) {
                 found.append(QJsonObject{{QStringLiteral("name"), symbol.name},
                                          {QStringLiteral("container"), symbol.container},
                                          {QStringLiteral("kind"), kindName(symbol.kind)},
@@ -217,8 +232,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
         QStringLiteral("list_commands"), QStringLiteral("Editor commands"),
         QStringLiteral("The commands of Duet's menus (ids such as \"Edit/Format Document\"), with their "
                        "shortcuts and whether they are available now: what run_command can trigger."),
-        object({}),
-        McpTool::immediate([context](const QJsonObject &) {
+        object({}), McpTool::immediate([context](const QJsonObject &) {
             QJsonArray commands;
             if (context.menus) {
                 for (const Keymap::Command &command : Keymap::commands(context.menus)) {
@@ -263,8 +277,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
         QStringLiteral("get_project_info"), QStringLiteral("Project information"),
         QStringLiteral("The project Duet has open: its folder, the languages detected (with runtime versions and "
                        "the files that tell), and the state of the language servers."),
-        object({}),
-        [context](const QJsonObject &, McpReply reply, McpProgress) {
+        object({}), [context](const QJsonObject &, McpReply reply, McpProgress) {
             const QString folder = context.folder();
             const QStringList servers = context.languageServers ? context.languageServers->describe() : QStringList();
             inBackground(
@@ -274,11 +287,11 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
                         languages.append(QJsonObject{{QStringLiteral("language"), language.language},
                                                      {QStringLiteral("runtimeVersion"), language.runtimeVersion},
                                                      {QStringLiteral("evidence"), language.evidence}});
-                    return McpResult::json(QJsonObject{{QStringLiteral("folder"), folder},
-                                                       {QStringLiteral("name"), QDir(folder).dirName()},
-                                                       {QStringLiteral("languages"), languages},
-                                                       {QStringLiteral("languageServers"),
-                                                        QJsonArray::fromStringList(servers)}});
+                    return McpResult::json(
+                        QJsonObject{{QStringLiteral("folder"), folder},
+                                    {QStringLiteral("name"), QDir(folder).dirName()},
+                                    {QStringLiteral("languages"), languages},
+                                    {QStringLiteral("languageServers"), QJsonArray::fromStringList(servers)}});
                 },
                 reply);
         }));

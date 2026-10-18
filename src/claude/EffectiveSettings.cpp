@@ -24,12 +24,16 @@ QString tr(const char *text)
 
 // A merged value and the layer it comes from.
 struct Node {
-    enum class Kind { Scalar, Object, Array };
+    enum class Kind {
+        Scalar,
+        Object,
+        Array
+    };
     Kind kind = Kind::Scalar;
     Scope scope = Scope::User;
     QJsonValue scalar;
     QList<std::pair<QString, Node>> members; // Object
-    QList<Node> items; // Array
+    QList<Node> items;                       // Array
     // The values this one replaced, the latest first.
     QList<std::pair<Scope, QJsonValue>> replaced;
 };
@@ -145,17 +149,16 @@ struct Line {
 // Lines of `node`; its scope is written only where it differs from the
 // scope of the line above it in the tree (`shown`), or where it replaced
 // something.
-void renderNode(const Node &node, const QString &indent, const QString &prefix, bool comma,
-                std::optional<Scope> shown, QList<Line> *lines)
+void renderNode(const Node &node, const QString &indent, const QString &prefix, bool comma, std::optional<Scope> shown,
+                QList<Line> *lines)
 {
     const QString end = comma ? QStringLiteral(",") : QString();
     const bool annotate = !shown || *shown != node.scope || !node.replaced.isEmpty();
     const QString comment = annotate ? scopeComment(node) : QString();
     const std::optional<Scope> childShown = annotate ? std::optional(node.scope) : shown;
 
-    if (node.kind == Node::Kind::Scalar
-        || (node.kind == Node::Kind::Object && node.members.isEmpty())
-        || (node.kind == Node::Kind::Array && node.items.isEmpty())) {
+    if (node.kind == Node::Kind::Scalar || (node.kind == Node::Kind::Object && node.members.isEmpty()) ||
+        (node.kind == Node::Kind::Array && node.items.isEmpty())) {
         lines->append({indent + prefix + compact(toJson(node)) + end, comment});
         return;
     }

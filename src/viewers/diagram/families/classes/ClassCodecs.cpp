@@ -71,13 +71,13 @@ void addRelation(Model &model, const ClassNode &a, const ClassNode &b, const QSt
 void finish(Model &model, const ClassNodes &nodes, const QJsonObject &meta)
 {
     for (const ClassNode &node : nodes.list) {
-        model.nodes.append({QStringLiteral("class"), node.key,
-                            QJsonObject{{QStringLiteral("name"), node.name},
-                                        {QStringLiteral("stereotype"), node.stereotype.isEmpty()
-                                                                           ? QJsonValue(QJsonValue::Null)
-                                                                           : QJsonValue(node.stereotype)},
-                                        {QStringLiteral("attributes"), toJsonArray(node.attributes)},
-                                        {QStringLiteral("methods"), toJsonArray(node.methods)}}});
+        model.nodes.append(
+            {QStringLiteral("class"), node.key,
+             QJsonObject{{QStringLiteral("name"), node.name},
+                         {QStringLiteral("stereotype"),
+                          node.stereotype.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(node.stereotype)},
+                         {QStringLiteral("attributes"), toJsonArray(node.attributes)},
+                         {QStringLiteral("methods"), toJsonArray(node.methods)}}});
     }
     model.meta = meta;
 }
@@ -112,14 +112,13 @@ QStringList relationLines(const Board &board, const QHash<QString, QString> &key
             continue;
         const auto *relation = dynamic_cast<const ClassLink *>(l.get());
         const QString kind = relation ? relation->kind : QStringLiteral("association");
-        const QString fromCard = relation && !relation->fromCard.isEmpty()
-                                     ? QStringLiteral(" \"%1\"").arg(relation->fromCard)
-                                     : QString();
+        const QString fromCard =
+            relation && !relation->fromCard.isEmpty() ? QStringLiteral(" \"%1\"").arg(relation->fromCard) : QString();
         const QString toCard =
             relation && !relation->toCard.isEmpty() ? QStringLiteral("\"%1\" ").arg(relation->toCard) : QString();
         const QString label = l->label.isEmpty() ? QString() : QStringLiteral(" : ") + l->label;
-        QString line = indent + from + fromCard + QLatin1Char(' ') + umlRelationOutput(kind) + QLatin1Char(' ') + toCard
-                       + to + label;
+        QString line = indent + from + fromCard + QLatin1Char(' ') + umlRelationOutput(kind) + QLatin1Char(' ') +
+                       toCard + to + label;
         line.replace(QLatin1Char('\n'), QLatin1Char(' '));
         out.append(line);
     }
@@ -158,20 +157,18 @@ public:
     {
         constexpr auto unicode = QRegularExpression::UseUnicodePropertiesOption;
         // [left, "card"], operator, ["card"] right, [: label]
-        static const QRegularExpression relationPattern(QStringLiteral("^(") + mermaidName
-                                                            + QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(")
-                                                            + umlRelationPattern()
-                                                            + QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(") + mermaidName
-                                                            + QStringLiteral(")\\s*(?::\\s*(.*))?$"),
-                                                        unicode);
+        static const QRegularExpression relationPattern(
+            QStringLiteral("^(") + mermaidName + QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(") + umlRelationPattern() +
+                QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(") + mermaidName + QStringLiteral(")\\s*(?::\\s*(.*))?$"),
+            unicode);
         // class Name / class Name["Label"] / class Name {
-        static const QRegularExpression declaration(QStringLiteral("^class\\s+(") + mermaidName
-                                                        + QStringLiteral(")\\s*(?:\\[\"([^\"]*)\"\\])?\\s*(\\{)?\\s*$"),
+        static const QRegularExpression declaration(QStringLiteral("^class\\s+(") + mermaidName +
+                                                        QStringLiteral(")\\s*(?:\\[\"([^\"]*)\"\\])?\\s*(\\{)?\\s*$"),
                                                     unicode);
-        static const QRegularExpression annotation(QStringLiteral("^<<(.+)>>\\s+(") + mermaidName + QStringLiteral(")$"),
-                                                   unicode);
-        static const QRegularExpression memberLine(QStringLiteral("^(") + mermaidName + QStringLiteral(")\\s*:\\s*(.+)$"),
-                                                   unicode);
+        static const QRegularExpression annotation(
+            QStringLiteral("^<<(.+)>>\\s+(") + mermaidName + QStringLiteral(")$"), unicode);
+        static const QRegularExpression memberLine(
+            QStringLiteral("^(") + mermaidName + QStringLiteral(")\\s*:\\s*(.+)$"), unicode);
         static const QRegularExpression skip(
             QStringLiteral("^(?:direction\\b|note\\b|namespace\\b|style\\b|classDef\\b|cssClass\\b|callback\\b|link\\b|"
                            "click\\b|href\\b|accTitle|accDescr|\\})"));
@@ -305,8 +302,8 @@ public:
 // ---------------------------------------------------------------------------
 // PlantUML
 
-const QString plantumlKinds = QStringLiteral(
-    "abstract\\s+class|abstract|class|interface|enum|annotation|entity|struct|exception|protocol");
+const QString plantumlKinds =
+    QStringLiteral("abstract\\s+class|abstract|class|interface|enum|annotation|entity|struct|exception|protocol");
 
 // `-left->`, `-l->`, `-[#red,dashed]->`, `-->>`… reduce to the canonical
 // two-character body the relation pattern knows: infixes stripped, dashes
@@ -350,20 +347,22 @@ public:
         constexpr auto options =
             QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption;
         static const QRegularExpression declaration(
-            QStringLiteral("^(?:") + plantumlKinds
-                + QStringLiteral(")\\s+(?:\"([^\"]+)\"(?:\\s+as\\s+([\\w.]+))?|([\\w.]+(?:<[^>]*>)?)(?:\\s+as\\s+\"([^\"]+)\")?)"
-                                 "\\s*(?:<<[^>]*>>\\s*)?(\\{)?\\s*$"),
+            QStringLiteral("^(?:") + plantumlKinds +
+                QStringLiteral(
+                    ")\\s+(?:\"([^\"]+)\"(?:\\s+as\\s+([\\w.]+))?|([\\w.]+(?:<[^>]*>)?)(?:\\s+as\\s+\"([^\"]+)\")?)"
+                    "\\s*(?:<<[^>]*>>\\s*)?(\\{)?\\s*$"),
             options);
         static const QRegularExpression declarationKind(QStringLiteral("^(") + plantumlKinds + QStringLiteral(")"),
                                                         QRegularExpression::CaseInsensitiveOption);
         // After infix stripping, the arrows are Mermaid's.
         static const QRegularExpression relationPattern(
-            QStringLiteral("^([\\w.\"<>]+)\\s*(?:\"([^\"]*)\"\\s*)?(") + umlRelationPattern()
-                + QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?([\\w.\"<>]+)\\s*(?::\\s*(.*))?$"),
+            QStringLiteral("^([\\w.\"<>]+)\\s*(?:\"([^\"]*)\"\\s*)?(") + umlRelationPattern() +
+                QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?([\\w.\"<>]+)\\s*(?::\\s*(.*))?$"),
             QRegularExpression::UseUnicodePropertiesOption);
-        static const QRegularExpression skip(QStringLiteral("^(?:package\\b|namespace\\b|together\\b|note\\b|end\\s+note|"
-                                                            "\\.\\.|__|==|--$|\\})"),
-                                             QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression skip(
+            QStringLiteral("^(?:package\\b|namespace\\b|together\\b|note\\b|end\\s+note|"
+                           "\\.\\.|__|==|--$|\\})"),
+            QRegularExpression::CaseInsensitiveOption);
         static const QRegularExpression stereotypePattern(QStringLiteral("<<\\s*([^>]*?)\\s*>>"));
         static const QRegularExpression memberLine(QStringLiteral("^([\\w.]+)\\s*:\\s*(.+)$"),
                                                    QRegularExpression::UseUnicodePropertiesOption);
@@ -408,11 +407,11 @@ public:
             }
             if (const QRegularExpressionMatch m = declaration.match(stmt); m.hasMatch()) {
                 const QString kind = declarationKind.match(stmt).captured(1).toLower();
-                ClassNode &node = !m.captured(1).isEmpty()
-                                      ? (!m.captured(2).isEmpty() ? cls(m.captured(2), plantumlText(m.captured(1)))
-                                                                  : cls(plantumlText(m.captured(1))))
-                                      : cls(m.captured(3), m.captured(4).isEmpty() ? QString()
-                                                                                   : plantumlText(m.captured(4)));
+                ClassNode &node =
+                    !m.captured(1).isEmpty()
+                        ? (!m.captured(2).isEmpty() ? cls(m.captured(2), plantumlText(m.captured(1)))
+                                                    : cls(plantumlText(m.captured(1))))
+                        : cls(m.captured(3), m.captured(4).isEmpty() ? QString() : plantumlText(m.captured(4)));
                 if (kind != QLatin1String("class") && !kind.startsWith(QLatin1String("abstract")))
                     node.stereotype = kind;
                 else if (kind.startsWith(QLatin1String("abstract")))

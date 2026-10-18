@@ -17,7 +17,11 @@ class WindowButton : public QAbstractButton {
     Q_OBJECT
 
 public:
-    enum class Kind { Minimize, Maximize, Close };
+    enum class Kind {
+        Minimize,
+        Maximize,
+        Close
+    };
 
     WindowButton(Kind kind, QWidget *parent);
     void applyTheme(const Theme &theme);
@@ -54,8 +58,7 @@ public:
     // The run configuration chip (its menu chooses one), followed by one
     // button: Run while the configuration is stopped, Stop while it runs.
     // Hidden while `name` is empty.
-    void setRunConfiguration(const QIcon &icon, const QString &name, const QString &toolTip, QMenu *menu,
-                             bool running);
+    void setRunConfiguration(const QIcon &icon, const QString &name, const QString &toolTip, QMenu *menu, bool running);
     void setRunActions(QAction *run, QAction *stop);
 
     // Window controls (frameless window); otherwise the system draws them.

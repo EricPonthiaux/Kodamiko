@@ -121,15 +121,16 @@ const QRegularExpression &mermaidMessage()
         QStringList alternatives;
         for (const Arrow &arrow : arrows)
             alternatives.append(QRegularExpression::escape(QLatin1String(arrow.token)));
-        return QRegularExpression(QStringLiteral("^(.+?)\\s*(") + alternatives.join(QLatin1Char('|'))
-                                  + QStringLiteral(")\\s*([+-]?)\\s*([^:]+?)\\s*(?::\\s*(.*))?$"));
+        return QRegularExpression(QStringLiteral("^(.+?)\\s*(") + alternatives.join(QLatin1Char('|')) +
+                                  QStringLiteral(")\\s*([+-]?)\\s*([^:]+?)\\s*(?::\\s*(.*))?$"));
     }();
     return pattern;
 }
 
 const QRegularExpression &mermaidHeader()
 {
-    static const QRegularExpression pattern(QStringLiteral("^sequenceDiagram\\b"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression pattern(QStringLiteral("^sequenceDiagram\\b"),
+                                            QRegularExpression::CaseInsensitiveOption);
     return pattern;
 }
 
@@ -145,8 +146,8 @@ const QRegularExpression &mermaidPresentation()
 // Read but not kept (notes, standalone activations, boxes): reported.
 const QRegularExpression &mermaidDropped()
 {
-    static const QRegularExpression pattern(
-        QStringLiteral("^(?:activate\\b|deactivate\\b|destroy\\b|box\\b|note\\b)"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression pattern(QStringLiteral("^(?:activate\\b|deactivate\\b|destroy\\b|box\\b|note\\b)"),
+                                            QRegularExpression::CaseInsensitiveOption);
     return pattern;
 }
 
@@ -221,7 +222,8 @@ public:
         static const QRegularExpression branch(QStringLiteral("^(else|and|option)\\b\\s*(.*)$"),
                                                QRegularExpression::CaseInsensitiveOption);
         static const QRegularExpression end(QStringLiteral("^end\\b"), QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression wrap(QStringLiteral("^(?:wrap|nowrap):\\s*"), QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression wrap(QStringLiteral("^(?:wrap|nowrap):\\s*"),
+                                             QRegularExpression::CaseInsensitiveOption);
 
         for (const QString &stmt : statements) {
             if (mermaidHeader().match(stmt).hasMatch())
@@ -257,9 +259,8 @@ public:
             }
             if (mermaidPresentation().match(stmt).hasMatch())
                 continue;
-            const QRegularExpressionMatch msg = mermaidDropped().match(stmt).hasMatch()
-                                                    ? QRegularExpressionMatch()
-                                                    : mermaidMessage().match(stmt);
+            const QRegularExpressionMatch msg =
+                mermaidDropped().match(stmt).hasMatch() ? QRegularExpressionMatch() : mermaidMessage().match(stmt);
             if (!msg.hasMatch()) {
                 model.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
                 continue;
@@ -307,8 +308,8 @@ public:
             if (from.isEmpty() || to.isEmpty())
                 continue;
             active = syncFragments(out, active, l->fragments, QStringLiteral("  "), true, mermaidText);
-            out.append(QStringLiteral("  ") + from + mermaidArrow(*l) + l->activation + to + QStringLiteral(": ")
-                       + mermaidText(l->label));
+            out.append(QStringLiteral("  ") + from + mermaidArrow(*l) + l->activation + to + QStringLiteral(": ") +
+                       mermaidText(l->label));
         }
         for (qsizetype i = active.size() - 1; i >= 0; --i)
             out.append(QStringLiteral("  end"));
@@ -337,9 +338,9 @@ const QString kinds = QStringLiteral("participant|actor|boundary|control|entity|
 const QRegularExpression &plantumlDeclaration()
 {
     static const QRegularExpression pattern(
-        QStringLiteral("^(") + kinds
-            + QStringLiteral(")\\s+(?:\"([^\"]+)\"\\s+as\\s+([\\w.]+)|([\\w.]+)\\s+as\\s+\"([^\"]+)\"|([\\w.]+)\\s+as\\s+"
-                             "([\\w.]+)|\"([^\"]+)\"|([\\w.]+))(?:\\s+.*)?$"),
+        QStringLiteral("^(") + kinds +
+            QStringLiteral(")\\s+(?:\"([^\"]+)\"\\s+as\\s+([\\w.]+)|([\\w.]+)\\s+as\\s+\"([^\"]+)\"|([\\w.]+)\\s+as\\s+"
+                           "([\\w.]+)|\"([^\"]+)\"|([\\w.]+))(?:\\s+.*)?$"),
         QRegularExpression::CaseInsensitiveOption);
     return pattern;
 }
@@ -370,7 +371,8 @@ const QRegularExpression &plantumlPresentation()
 const QRegularExpression &plantumlDropped()
 {
     static const QRegularExpression pattern(
-        QStringLiteral(R"(^(?:activate\b|deactivate\b|destroy\b|create\b|return\b|note\b|hnote\b|rnote\b|ref\b|box\b))"),
+        QStringLiteral(
+            R"(^(?:activate\b|deactivate\b|destroy\b|create\b|return\b|note\b|hnote\b|rnote\b|ref\b|box\b))"),
         QRegularExpression::CaseInsensitiveOption);
     return pattern;
 }
@@ -434,8 +436,9 @@ public:
 
     bool matches(const QString &source) const override
     {
-        static const QRegularExpression otherKinds(QStringLiteral("^(class|interface|enum|abstract|annotation|state)\\b"),
-                                                   QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression otherKinds(
+            QStringLiteral("^(class|interface|enum|abstract|annotation|state)\\b"),
+            QRegularExpression::CaseInsensitiveOption);
         const QStringList lines = plantumlLines(source);
         for (const QString &line : lines) {
             if (otherKinds.match(line).hasMatch() || line.contains(QStringLiteral("[*]")))
@@ -458,8 +461,9 @@ public:
                 node.text = alias;
         };
 
-        static const QRegularExpression open(QStringLiteral("^(loop|alt|opt|par|critical|break|group|rect)\\b\\s*(.*)$"),
-                                             QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression open(
+            QStringLiteral("^(loop|alt|opt|par|critical|break|group|rect)\\b\\s*(.*)$"),
+            QRegularExpression::CaseInsensitiveOption);
         static const QRegularExpression branch(QStringLiteral("^(else|and)\\b\\s*(.*)$"),
                                                QRegularExpression::CaseInsensitiveOption);
         static const QRegularExpression end(QStringLiteral("^end\\b"), QRegularExpression::CaseInsensitiveOption);
@@ -571,7 +575,7 @@ public:
             const QString dash = l->line == QLatin1String("dashed") ? QStringLiteral("--") : QStringLiteral("-");
             const QString head = l->head == QLatin1String("cross")  ? QStringLiteral(">x")
                                  : l->head == QLatin1String("open") ? QStringLiteral(">>")
-                                                                     : QStringLiteral(">");
+                                                                    : QStringLiteral(">");
             const QString start = l->startHead == QLatin1String("arrow")   ? QStringLiteral("<")
                                   : l->startHead == QLatin1String("cross") ? QStringLiteral("x")
                                                                            : QString();
@@ -580,8 +584,8 @@ public:
             const QString shortcut = l->activation == QLatin1String("+")   ? QStringLiteral(" ++")
                                      : l->activation == QLatin1String("-") ? QStringLiteral(" --")
                                                                            : QString();
-            out.append(QStringLiteral("%1 %2%3%4 %5%6").arg(from, start, dash, head, to, shortcut)
-                       + (l->label.isEmpty() ? QString() : QStringLiteral(" : ") + plantumlEscape(l->label)));
+            out.append(QStringLiteral("%1 %2%3%4 %5%6").arg(from, start, dash, head, to, shortcut) +
+                       (l->label.isEmpty() ? QString() : QStringLiteral(" : ") + plantumlEscape(l->label)));
         }
         for (qsizetype i = active.size() - 1; i >= 0; --i)
             out.append(QStringLiteral("end"));

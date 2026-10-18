@@ -86,7 +86,7 @@ private:
 
     void dollar()
     {
-        ++i_; // "$"
+        ++i_;                                     // "$"
         if (i_ < s_.size() && s_[i_].isDigit()) { // $1
             const int index = number();
             const int start = int(out_.size());
@@ -152,7 +152,7 @@ private:
     int bestLength_ = 0;
     int finalStop_ = -1;
     QMap<int, QList<ExpandedSnippet::Range>> stops_; // by index
-    QHash<int, QString> placeholders_; // the first text of each tab stop
+    QHash<int, QString> placeholders_;               // the first text of each tab stop
 };
 
 } // namespace

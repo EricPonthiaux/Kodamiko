@@ -98,7 +98,8 @@ QStringList plantumlLines(const QString &source)
         QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression styleOpen(QStringLiteral("^<style\\b"), QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression styleClose(QStringLiteral("</style>"), QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression skinparam(QStringLiteral("^skinparam\\b"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression skinparam(QStringLiteral("^skinparam\\b"),
+                                              QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression newline(QStringLiteral("\\r?\\n"));
     QString text = source;
     text.remove(block);

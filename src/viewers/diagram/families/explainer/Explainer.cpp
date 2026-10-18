@@ -70,7 +70,7 @@ QString oneOf(const QString &value, const QStringList &allowed, const QString &f
 
 QList<std::pair<QString, QString>> toneChoices()
 {
-    return {{QStringLiteral("neutral"), tr("Neutral")}, {QStringLiteral("accent"), tr("Accent")},
+    return {{QStringLiteral("neutral"), tr("Neutral")},  {QStringLiteral("accent"), tr("Accent")},
             {QStringLiteral("info"), tr("Information")}, {QStringLiteral("success"), tr("Success")},
             {QStringLiteral("warning"), tr("Warning")},  {QStringLiteral("danger"), tr("Danger")}};
 }
@@ -110,7 +110,7 @@ void arrowHead(QPainter &painter, QPointF tip, QPointF previous, const QColor &c
 
 const QStringList &shapeNames()
 {
-    static const QStringList names{QStringLiteral("rectangle"), QStringLiteral("rounded"), QStringLiteral("circle"),
+    static const QStringList names{QStringLiteral("rectangle"), QStringLiteral("rounded"),  QStringLiteral("circle"),
                                    QStringLiteral("ellipse"),   QStringLiteral("triangle"), QStringLiteral("diamond"),
                                    QStringLiteral("hexagon"),   QStringLiteral("text")};
     return names;
@@ -248,10 +248,14 @@ QStringList FreeNodeShape::graphvizNodeAttributes(const Board &, const QString &
 {
     // A shape with no outline of its own (text) routes against its text box.
     static const QHash<QString, QString> geometry{
-        {QStringLiteral("rectangle"), QStringLiteral("box")},  {QStringLiteral("rounded"), QStringLiteral("box")},
-        {QStringLiteral("text"), QStringLiteral("box")},       {QStringLiteral("circle"), QStringLiteral("circle")},
-        {QStringLiteral("ellipse"), QStringLiteral("ellipse")}, {QStringLiteral("triangle"), QStringLiteral("triangle")},
-        {QStringLiteral("diamond"), QStringLiteral("diamond")}, {QStringLiteral("hexagon"), QStringLiteral("hexagon")},
+        {QStringLiteral("rectangle"), QStringLiteral("box")},
+        {QStringLiteral("rounded"), QStringLiteral("box")},
+        {QStringLiteral("text"), QStringLiteral("box")},
+        {QStringLiteral("circle"), QStringLiteral("circle")},
+        {QStringLiteral("ellipse"), QStringLiteral("ellipse")},
+        {QStringLiteral("triangle"), QStringLiteral("triangle")},
+        {QStringLiteral("diamond"), QStringLiteral("diamond")},
+        {QStringLiteral("hexagon"), QStringLiteral("hexagon")},
     };
     return {QStringLiteral("shape=") + geometry.value(shape, QStringLiteral("box")),
             QStringLiteral("fixedsize=true"),
@@ -485,8 +489,8 @@ bool FreeFrameShape::hitTest(QPointF point) const
     if (!Shape::hitTest(point))
         return false;
     constexpr qreal inset = 12;
-    return point.y() <= y + titleHeight_ || point.x() <= x + inset || point.x() >= x + w - inset
-           || point.y() >= y + h - inset;
+    return point.y() <= y + titleHeight_ || point.x() <= x + inset || point.x() >= x + w - inset ||
+           point.y() >= y + h - inset;
 }
 
 void FreeFrameShape::onDoubleClick(Board &board)
@@ -513,9 +517,11 @@ void FreeFrameShape::draw(QPainter &painter, const Board &board, const ShapeStat
     painter.setOpacity(painter.opacity() * (dropTarget ? 0.5 : 0.3));
     shadowFill(painter, path, fillColor(toneFill(board, tone)), style);
     painter.restore();
-    stroke(painter, path,
-           strokeColor(state.selected || dropTarget ? style.shape.selectedStroke : style.shape.stroke),
-           dropTarget ? 2.5 : state.selected ? 2 : 1.2, dropTarget ? QList<qreal>{} : QList<qreal>{7, 5});
+    stroke(painter, path, strokeColor(state.selected || dropTarget ? style.shape.selectedStroke : style.shape.stroke),
+           dropTarget       ? 2.5
+           : state.selected ? 2
+                            : 1.2,
+           dropTarget ? QList<qreal>{} : QList<qreal>{7, 5});
     if (state.editing || title.isEmpty())
         return;
     const QColor ink = textColor(style.palette.ink);
@@ -667,8 +673,8 @@ bool FreeStrokeShape::hitTest(QPointF point) const
     if (label.isEmpty())
         return false;
     const QPointF at = labelPoint();
-    return point.x() >= at.x() - labelWidth_ / 2 - 4 && point.x() <= at.x() + labelWidth_ / 2 + 4
-           && point.y() >= at.y() - lineHeight && point.y() <= at.y() + 4;
+    return point.x() >= at.x() - labelWidth_ / 2 - 4 && point.x() <= at.x() + labelWidth_ / 2 + 4 &&
+           point.y() >= at.y() - lineHeight && point.y() <= at.y() + 4;
 }
 
 void FreeStrokeShape::onDoubleClick(Board &board)
@@ -921,7 +927,10 @@ const Family &explainer()
             node("free-diamond", tr("Diamond"), 132, 96, tr("Question?"), "diamond", "warning"),
             node("free-hexagon", tr("Hexagon"), 180, 82, tr("Step"), "hexagon", "info"),
             node("free-text", tr("Text"), 180, 60, tr("Free text"), "text", nullptr),
-            ElementPreset{QStringLiteral("free-frame"), tr("Frame"), {}, QStringLiteral("freeFrame"),
+            ElementPreset{QStringLiteral("free-frame"),
+                          tr("Frame"),
+                          {},
+                          QStringLiteral("freeFrame"),
                           QJsonObject{{QStringLiteral("title"), tr("New section")},
                                       {QStringLiteral("tone"), QStringLiteral("neutral")}}},
             // Drawn by a press-drag-release: no arbitrary endpoints imposed.
@@ -935,8 +944,14 @@ const Family &explainer()
                           true},
         };
         f.relations = {
-            {QStringLiteral("free-arrow"), tr("Arrow"), {}, QJsonObject{{QStringLiteral("arrow"), QStringLiteral("end")}}},
-            {QStringLiteral("free-line"), tr("Line"), {}, QJsonObject{{QStringLiteral("arrow"), QStringLiteral("none")}}},
+            {QStringLiteral("free-arrow"),
+             tr("Arrow"),
+             {},
+             QJsonObject{{QStringLiteral("arrow"), QStringLiteral("end")}}},
+            {QStringLiteral("free-line"),
+             tr("Line"),
+             {},
+             QJsonObject{{QStringLiteral("arrow"), QStringLiteral("none")}}},
         };
         return f;
     }();

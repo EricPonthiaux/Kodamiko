@@ -9,7 +9,11 @@
 // Block of lines in which the current text of a file differs from a base
 // version (its content in the git index). Line numbers start at 0.
 struct LineChange {
-    enum class Kind { Added, Modified, Deleted };
+    enum class Kind {
+        Added,
+        Modified,
+        Deleted
+    };
 
     int baseStart = 0; // first base line replaced; insertion point if baseCount is 0
     int baseCount = 0;

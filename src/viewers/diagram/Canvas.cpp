@@ -58,9 +58,18 @@ bool isCanvasShortcut(const QKeyEvent *event)
     const int key = event->key();
     if (modifiers == Qt::NoModifier || modifiers == Qt::ShiftModifier) {
         switch (key) {
-        case Qt::Key_Delete: case Qt::Key_Backspace: case Qt::Key_Escape: case Qt::Key_F2:
-        case Qt::Key_Return: case Qt::Key_Enter: case Qt::Key_Left: case Qt::Key_Right:
-        case Qt::Key_Up: case Qt::Key_Down: case Qt::Key_F: case Qt::Key_Space:
+        case Qt::Key_Delete:
+        case Qt::Key_Backspace:
+        case Qt::Key_Escape:
+        case Qt::Key_F2:
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+        case Qt::Key_Left:
+        case Qt::Key_Right:
+        case Qt::Key_Up:
+        case Qt::Key_Down:
+        case Qt::Key_F:
+        case Qt::Key_Space:
             return true;
         default:
             return false;
@@ -68,8 +77,18 @@ bool isCanvasShortcut(const QKeyEvent *event)
     }
     if (modifiers == Qt::ControlModifier) {
         switch (key) {
-        case Qt::Key_Z: case Qt::Key_Y: case Qt::Key_C: case Qt::Key_X: case Qt::Key_V: case Qt::Key_D:
-        case Qt::Key_A: case Qt::Key_L: case Qt::Key_0: case Qt::Key_Equal: case Qt::Key_Plus: case Qt::Key_Minus:
+        case Qt::Key_Z:
+        case Qt::Key_Y:
+        case Qt::Key_C:
+        case Qt::Key_X:
+        case Qt::Key_V:
+        case Qt::Key_D:
+        case Qt::Key_A:
+        case Qt::Key_L:
+        case Qt::Key_0:
+        case Qt::Key_Equal:
+        case Qt::Key_Plus:
+        case Qt::Key_Minus:
             return true;
         default:
             return false;
@@ -88,9 +107,20 @@ bool isTextEditingKey(const QKeyEvent *event)
     if (modifiers != Qt::ControlModifier)
         return false;
     switch (event->key()) {
-    case Qt::Key_Z: case Qt::Key_Y: case Qt::Key_C: case Qt::Key_X: case Qt::Key_V: case Qt::Key_A:
-    case Qt::Key_Left: case Qt::Key_Right: case Qt::Key_Home: case Qt::Key_End:
-    case Qt::Key_Backspace: case Qt::Key_Delete: case Qt::Key_Return: case Qt::Key_Enter:
+    case Qt::Key_Z:
+    case Qt::Key_Y:
+    case Qt::Key_C:
+    case Qt::Key_X:
+    case Qt::Key_V:
+    case Qt::Key_A:
+    case Qt::Key_Left:
+    case Qt::Key_Right:
+    case Qt::Key_Home:
+    case Qt::Key_End:
+    case Qt::Key_Backspace:
+    case Qt::Key_Delete:
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
         return true;
     default:
         return false;
@@ -137,13 +167,14 @@ Snap snapAlignment(const QRectF &moving, const std::vector<QRectF> &targets, qre
     const QRectF shifted = moving.translated(snap.dx, snap.dy);
     if (vertical) {
         const QRectF &t = vertical->second.second;
-        snap.guides.push_back({true, {vertical->second.first, std::min(shifted.top(), t.top()),
-                                      std::max(shifted.bottom(), t.bottom())}});
+        snap.guides.push_back(
+            {true, {vertical->second.first, std::min(shifted.top(), t.top()), std::max(shifted.bottom(), t.bottom())}});
     }
     if (horizontal) {
         const QRectF &t = horizontal->second.second;
-        snap.guides.push_back({false, {horizontal->second.first, std::min(shifted.left(), t.left()),
-                                       std::max(shifted.right(), t.right())}});
+        snap.guides.push_back(
+            {false,
+             {horizontal->second.first, std::min(shifted.left(), t.left()), std::max(shifted.right(), t.right())}});
     }
     return snap;
 }
@@ -224,21 +255,23 @@ Canvas::Canvas(Board *board, QWidget *parent)
             appearing_.insert(id, {qreal(clock_.elapsed()), appearMs});
         startAnimation();
     });
-    connect(board_, &Board::removing, this, [this](const QList<const Shape *> &shapes, const QList<const Link *> &links) {
-        if (!isVisible() || board_->shapes().size() >= 200)
-            return;
-        const qreal now = clock_.elapsed();
-        for (const Shape *s : shapes) {
-            if (std::shared_ptr<Shape> copy = board_->instantiate(s->type, s->toJson()))
-                ghosts_.push_back({copy, {}, {}, now});
-        }
-        for (const Link *l : links) {
-            if (const std::optional<Route> r = l->route(*board_))
-                ghosts_.push_back({nullptr, l->routePolyline(*r), board_->style().link.color, now});
-        }
-        startAnimation();
-    });
-    board_->setTextEditor([this](Shape *shape, Link *link, const TextEditSpec &spec) { beginTextEdit(shape, link, spec); });
+    connect(board_, &Board::removing, this,
+            [this](const QList<const Shape *> &shapes, const QList<const Link *> &links) {
+                if (!isVisible() || board_->shapes().size() >= 200)
+                    return;
+                const qreal now = clock_.elapsed();
+                for (const Shape *s : shapes) {
+                    if (std::shared_ptr<Shape> copy = board_->instantiate(s->type, s->toJson()))
+                        ghosts_.push_back({copy, {}, {}, now});
+                }
+                for (const Link *l : links) {
+                    if (const std::optional<Route> r = l->route(*board_))
+                        ghosts_.push_back({nullptr, l->routePolyline(*r), board_->style().link.color, now});
+                }
+                startAnimation();
+            });
+    board_->setTextEditor(
+        [this](Shape *shape, Link *link, const TextEditSpec &spec) { beginTextEdit(shape, link, spec); });
 }
 
 Canvas::~Canvas()
@@ -368,8 +401,9 @@ void Canvas::stepAnimation()
             ++it;
         }
     }
-    ghosts_.erase(std::remove_if(ghosts_.begin(), ghosts_.end(), [now](const Ghost &g) { return now - g.start >= ghostMs; }),
-                  ghosts_.end());
+    ghosts_.erase(
+        std::remove_if(ghosts_.begin(), ghosts_.end(), [now](const Ghost &g) { return now - g.start >= ghostMs; }),
+        ghosts_.end());
     running = running || !ghosts_.empty();
     if (!running)
         animationTimer_->stop();
@@ -458,10 +492,14 @@ void Canvas::withVisualGeometry(Fn draw)
         Spline spline = *l->spline;
         const QPointF anchorA = spline.start.value_or(spline.points.front());
         const QPointF anchorB = spline.end.value_or(spline.points.back());
-        const qreal dxA = a->x - finalA.x() + (anchorA.x() - finalA.x()) * (a->w / (finalA.width() ? finalA.width() : 1) - 1);
-        const qreal dyA = a->y - finalA.y() + (anchorA.y() - finalA.y()) * (a->h / (finalA.height() ? finalA.height() : 1) - 1);
-        const qreal dxB = b->x - finalB.x() + (anchorB.x() - finalB.x()) * (b->w / (finalB.width() ? finalB.width() : 1) - 1);
-        const qreal dyB = b->y - finalB.y() + (anchorB.y() - finalB.y()) * (b->h / (finalB.height() ? finalB.height() : 1) - 1);
+        const qreal dxA =
+            a->x - finalA.x() + (anchorA.x() - finalA.x()) * (a->w / (finalA.width() ? finalA.width() : 1) - 1);
+        const qreal dyA =
+            a->y - finalA.y() + (anchorA.y() - finalA.y()) * (a->h / (finalA.height() ? finalA.height() : 1) - 1);
+        const qreal dxB =
+            b->x - finalB.x() + (anchorB.x() - finalB.x()) * (b->w / (finalB.width() ? finalB.width() : 1) - 1);
+        const qreal dyB =
+            b->y - finalB.y() + (anchorB.y() - finalB.y()) * (b->h / (finalB.height() ? finalB.height() : 1) - 1);
         const auto shift = [&](QPointF p, qreal u) {
             return QPointF(p.x() + dxA * (1 - u) + dxB * u, p.y() + dyA * (1 - u) + dyB * u);
         };
@@ -484,8 +522,8 @@ void Canvas::withVisualGeometry(Fn draw)
         spline.toAnchor = QPointF(b->x, b->y);
         l->spline = spline;
         if (l->layoutLabelPoint)
-            l->layoutLabelPoint = Link::ReservedLabel{shift(l->layoutLabelPoint->point, 0.5), QPointF(a->x, a->y),
-                                                      QPointF(b->x, b->y)};
+            l->layoutLabelPoint =
+                Link::ReservedLabel{shift(l->layoutLabelPoint->point, 0.5), QPointF(a->x, a->y), QPointF(b->x, b->y)};
     }
     draw();
     for (const Saved &saved : shapes) {
@@ -588,8 +626,8 @@ void Canvas::settle(const document::Loaded &loaded, bool animate)
 
 bool Canvas::portsVisible(const Shape &shape) const
 {
-    return board_->selection().contains(shape.id) || shape.showConnectionPorts()
-           || (shape.showConnectionPortsOnHover() && hoverConnectionShape_ == shape.id);
+    return board_->selection().contains(shape.id) || shape.showConnectionPorts() ||
+           (shape.showConnectionPortsOnHover() && hoverConnectionShape_ == shape.id);
 }
 
 void Canvas::paintEvent(QPaintEvent *)
@@ -657,7 +695,8 @@ void Canvas::render(QPainter &painter, const QRectF &area)
                 painter.restore();
             if (state.dropTarget) {
                 QPainterPath halo = roundRect(s.x - 3, s.y - 3, s.w + 6, s.h + 6, style.shape.radius + 3);
-                stroke(painter, halo, style.shape.selectedStroke, 2 / camera_.scale, {6 / camera_.scale, 4 / camera_.scale});
+                stroke(painter, halo, style.shape.selectedStroke, 2 / camera_.scale,
+                       {6 / camera_.scale, 4 / camera_.scale});
             }
             if (decorate && selected)
                 drawSelectionHalo(painter, s);
@@ -775,8 +814,9 @@ void Canvas::drawSelectionHalo(QPainter &painter, const Shape &shape) const
     const qreal grow = 4;
     painter.save();
     painter.setOpacity(0.34);
-    stroke(painter, roundRect(shape.x - grow, shape.y - grow, shape.w + grow * 2, shape.h + grow * 2,
-                              std::max<qreal>(5, style.shape.radius + 2)),
+    stroke(painter,
+           roundRect(shape.x - grow, shape.y - grow, shape.w + grow * 2, shape.h + grow * 2,
+                     std::max<qreal>(5, style.shape.radius + 2)),
            style.shape.selectedStroke, 1.25);
     painter.restore();
 }
@@ -1203,9 +1243,8 @@ void Canvas::mouseReleaseEvent(QMouseEvent *event)
             QJsonObject props = trace_->props;
             props.insert(QStringLiteral("x"), minX);
             props.insert(QStringLiteral("y"), minY);
-            props.insert(QStringLiteral("points"),
-                         QJsonArray{QJsonArray{dragStart_.x() - minX, dragStart_.y() - minY},
-                                    QJsonArray{p.x() - minX, p.y() - minY}});
+            props.insert(QStringLiteral("points"), QJsonArray{QJsonArray{dragStart_.x() - minX, dragStart_.y() - minY},
+                                                              QJsonArray{p.x() - minX, p.y() - minY}});
             if (Shape *created = board_->addShape(trace_->type, props)) {
                 board_->selectShape(created->id);
                 board_->containShape(*created);
@@ -1231,7 +1270,8 @@ void Canvas::mouseReleaseEvent(QMouseEvent *event)
                 const auto decision = board_->dropDecision(*s, moving);
                 if (!decision)
                     continue;
-                s->parentBoundary = *decision ? ((*decision)->key.isEmpty() ? (*decision)->id : (*decision)->key) : QString();
+                s->parentBoundary =
+                    *decision ? ((*decision)->key.isEmpty() ? (*decision)->id : (*decision)->key) : QString();
                 if (*decision)
                     board_->containShape(*s, true);
             }
@@ -1341,8 +1381,8 @@ bool Canvas::event(QEvent *event)
         event->accept();
         return true;
     }
-    if (event->type() == QEvent::KeyRelease && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Space
-        && !static_cast<QKeyEvent *>(event)->isAutoRepeat()) {
+    if (event->type() == QEvent::KeyRelease && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Space &&
+        !static_cast<QKeyEvent *>(event)->isAutoRepeat()) {
         spaceDown_ = false;
         unsetCursor();
     }
@@ -1459,8 +1499,12 @@ void Canvas::keyPressEvent(QKeyEvent *event)
         if (board_->selection().isEmpty())
             return;
         const qreal step = shift ? 10 : 1;
-        const QPointF delta(event->key() == Qt::Key_Left ? -step : event->key() == Qt::Key_Right ? step : 0,
-                            event->key() == Qt::Key_Up ? -step : event->key() == Qt::Key_Down ? step : 0);
+        const QPointF delta(event->key() == Qt::Key_Left    ? -step
+                            : event->key() == Qt::Key_Right ? step
+                                                            : 0,
+                            event->key() == Qt::Key_Up     ? -step
+                            : event->key() == Qt::Key_Down ? step
+                                                           : 0);
         board_->edit([&] {
             QSet<QString> moving = board_->selection();
             for (const QString &id : board_->selection()) {
@@ -1538,9 +1582,8 @@ void Canvas::paste()
     if (data && data->hasFormat(QString::fromLatin1(selectionMime))) {
         const QJsonObject json = QJsonDocument::fromJson(data->data(QString::fromLatin1(selectionMime))).object();
         if (board_->family() && json.value(QStringLiteral("family")).toString() == board_->family()->id) {
-            const QPointF center = board_->hasClipboard() && board_->selection().isEmpty()
-                                       ? viewCenter()
-                                       : viewCenter() + QPointF(24, 24);
+            const QPointF center =
+                board_->hasClipboard() && board_->selection().isEmpty() ? viewCenter() : viewCenter() + QPointF(24, 24);
             board_->pasteJson(json, center);
             return;
         }
@@ -1611,8 +1654,8 @@ void Canvas::beginTextEdit(Shape *shape, Link *link, const TextEditSpec &spec)
     QPalette palette = editor_->palette();
     palette.setColor(QPalette::Base, Qt::transparent);
     palette.setColor(QPalette::Text, shape ? (parseColor(shape->customFill).isValid()
-                                                   ? readableTextColor(parseColor(shape->customFill), spec.color)
-                                                   : spec.color)
+                                                  ? readableTextColor(parseColor(shape->customFill), spec.color)
+                                                  : spec.color)
                                            : spec.color);
     editor_->setPalette(palette);
     editor_->setAutoFillBackground(false);
@@ -1656,7 +1699,8 @@ void Canvas::syncEditor()
     const qreal height = std::max(r.height() * camera_.scale, blocks * lineHeight);
     // A little room so that the caret never clips; the text stays where
     // the shape draws it.
-    editor_->setGeometry(QRectF(topLeft.x() - 2, topLeft.y(), r.width() * camera_.scale + 4, height + 4).toAlignedRect());
+    editor_->setGeometry(
+        QRectF(topLeft.x() - 2, topLeft.y(), r.width() * camera_.scale + 4, height + 4).toAlignedRect());
 }
 
 void Canvas::keepVisible(const Shape &shape)
@@ -1666,9 +1710,9 @@ void Canvas::keepVisible(const Shape &shape)
     const qreal padding = 28;
     const qreal availableWidth = std::max<qreal>(1, width() - padding * 2);
     const qreal availableHeight = std::max<qreal>(1, height() - padding * 2);
-    const qreal scale = std::max(board_->style().minScale,
-                                 std::min({camera_.scale, availableWidth / std::max<qreal>(1, shape.w),
-                                           availableHeight / std::max<qreal>(1, shape.h)}));
+    const qreal scale =
+        std::max(board_->style().minScale, std::min({camera_.scale, availableWidth / std::max<qreal>(1, shape.w),
+                                                     availableHeight / std::max<qreal>(1, shape.h)}));
     const QPointF center = camera_.toScreen(QPointF(shape.cx(), shape.cy()));
     camera_.scale = scale;
     camera_.x = center.x() - shape.cx() * scale;
@@ -1828,8 +1872,8 @@ void Canvas::chooseRelation(QPointF screen, const QString &from, const QString &
     menu.setToolTipsVisible(true);
     const Shape *a = board_->shape(from);
     const Shape *b = board_->shape(to);
-    QAction *title = menu.addAction(QStringLiteral("%1 → %2").arg(a ? a->displayText() : QString(),
-                                                                  b ? b->displayText() : QString()));
+    QAction *title = menu.addAction(
+        QStringLiteral("%1 → %2").arg(a ? a->displayText() : QString(), b ? b->displayText() : QString()));
     title->setEnabled(false);
     menu.addSeparator();
     const QByteArray before = dragBase_.isEmpty() ? board_->snapshot() : dragBase_;
@@ -1868,21 +1912,20 @@ void Canvas::addFillMenu(QMenu *menu)
 void Canvas::addLinkStyleMenu(QMenu *menu)
 {
     QMenu *line = menu->addMenu(tr("Line Style"));
-    const QList<std::pair<QString, QString>> styles{
-        {QString(), tr("Default")}, {QStringLiteral("solid"), tr("Solid")}, {QStringLiteral("dashed"), tr("Dashed")},
-        {QStringLiteral("dotted"), tr("Dotted")}};
+    const QList<std::pair<QString, QString>> styles{{QString(), tr("Default")},
+                                                    {QStringLiteral("solid"), tr("Solid")},
+                                                    {QStringLiteral("dashed"), tr("Dashed")},
+                                                    {QStringLiteral("dotted"), tr("Dotted")}};
     for (const auto &[value, label] : styles) {
-        connect(line->addAction(label), &QAction::triggered, this, [this, value] {
-            board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customLineStyle"), value}});
-        });
+        connect(line->addAction(label), &QAction::triggered, this,
+                [this, value] { board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customLineStyle"), value}}); });
     }
     QMenu *color = menu->addMenu(tr("Line Color"));
     for (const QString &value : lineColors()) {
         QPixmap swatch(16, 16);
         swatch.fill(QColor::fromString(value));
-        connect(color->addAction(QIcon(swatch), value), &QAction::triggered, this, [this, value] {
-            board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customColor"), value}});
-        });
+        connect(color->addAction(QIcon(swatch), value), &QAction::triggered, this,
+                [this, value] { board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customColor"), value}}); });
     }
     color->addSeparator();
     connect(color->addAction(tr("Default Color")), &QAction::triggered, this,
@@ -1891,9 +1934,8 @@ void Canvas::addLinkStyleMenu(QMenu *menu)
     connect(width->addAction(tr("Default")), &QAction::triggered, this,
             [this] { board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customWidth"), QJsonValue::Null}}); });
     for (int value : {1, 2, 3, 4, 6, 8}) {
-        connect(width->addAction(QString::number(value)), &QAction::triggered, this, [this, value] {
-            board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customWidth"), value}});
-        });
+        connect(width->addAction(QString::number(value)), &QAction::triggered, this,
+                [this, value] { board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customWidth"), value}}); });
     }
 }
 

@@ -5,8 +5,8 @@
 #include "workspace/EntryPopups.h"
 #include "workspace/FileIcons.h"
 
-#include <QApplication>
 #include <QAction>
+#include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QDir>
@@ -31,21 +31,29 @@ namespace {
 
 constexpr int refreshDelayMs = 400;
 
-enum ItemRole { EntryRole = Qt::UserRole, CategoryRole, EffectiveRole };
+enum ItemRole {
+    EntryRole = Qt::UserRole,
+    CategoryRole,
+    EffectiveRole
+};
 
-constexpr Category allCategories[] = {Category::Memory,       Category::Rules,    Category::Skills,
-                                      Category::Agents,       Category::Commands, Category::OutputStyles,
-                                      Category::Settings,     Category::Mcp};
+constexpr Category allCategories[] = {Category::Memory,   Category::Rules,        Category::Skills,   Category::Agents,
+                                      Category::Commands, Category::OutputStyles, Category::Settings, Category::Mcp};
 
 // "skill", "agent"... for the New menus and popups.
 QString itemNoun(Category category)
 {
     switch (category) {
-    case Category::Skills: return ClaudeConfigView::tr("Skill");
-    case Category::Agents: return ClaudeConfigView::tr("Agent");
-    case Category::Commands: return ClaudeConfigView::tr("Command");
-    case Category::Rules: return ClaudeConfigView::tr("Rule");
-    default: return {};
+    case Category::Skills:
+        return ClaudeConfigView::tr("Skill");
+    case Category::Agents:
+        return ClaudeConfigView::tr("Agent");
+    case Category::Commands:
+        return ClaudeConfigView::tr("Command");
+    case Category::Rules:
+        return ClaudeConfigView::tr("Rule");
+    default:
+        return {};
     }
 }
 
@@ -103,9 +111,8 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     optionsMenu->addAction(tr("Effective Settings"), this, &ClaudeConfigView::effectiveSettingsRequested);
     optionsMenu->addAction(tr("Restart Claude Session"), this, &ClaudeConfigView::restartSessionRequested)
         ->setToolTip(tr("Claude reads some of its configuration only when it starts; the conversation goes on"));
-    optionsMenu->addAction(tr("Open Claude Folder"), this, [] {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(ClaudeConfig::configDir()));
-    });
+    optionsMenu->addAction(tr("Open Claude Folder"), this,
+                           [] { QDesktopServices::openUrl(QUrl::fromLocalFile(ClaudeConfig::configDir())); });
     optionsMenu->setToolTipsVisible(true);
     options_->setMenu(optionsMenu);
 
@@ -356,7 +363,7 @@ QString ClaudeConfigView::removeTarget(const QString &target, bool permanently)
     const QFileInfo info(target);
     if (!info.exists() && !info.isSymLink())
         return tr("“%1” no longer exists").arg(info.fileName());
-    const bool removed = !permanently ? QFile::moveToTrash(target)
+    const bool removed = !permanently                        ? QFile::moveToTrash(target)
                          : info.isDir() && !info.isSymLink() ? QDir(target).removeRecursively()
                                                              : QFile::remove(target);
     if (!removed)
@@ -414,10 +421,9 @@ void ClaudeConfigView::askName(Category category, Scope scope)
     // The folder the item goes in: skills/, agents/...
     const QString location = category == Category::Skills ? QFileInfo(QFileInfo(path).absolutePath()).absolutePath()
                                                           : QFileInfo(path).absolutePath();
-    auto *popup = new NamePopup(tr("New %1").arg(itemNoun(category)),
-                                QDir::toNativeSeparators(location + QLatin1Char('/')),
-                                [this, category, scope](const QString &name) { return createNamed(category, scope, name); },
-                                this);
+    auto *popup = new NamePopup(
+        tr("New %1").arg(itemNoun(category)), QDir::toNativeSeparators(location + QLatin1Char('/')),
+        [this, category, scope](const QString &name) { return createNamed(category, scope, name); }, this);
     popup->popup();
 }
 
@@ -449,9 +455,8 @@ void ClaudeConfigView::showContextMenu(const QPoint &position)
         menu.addSeparator();
         menu.addAction(tr("Copy &Path"), this,
                        [path] { QApplication::clipboard()->setText(QDir::toNativeSeparators(path)); });
-        menu.addAction(tr("Open in &File Manager"), this, [path] {
-            QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
-        });
+        menu.addAction(tr("Open in &File Manager"), this,
+                       [path] { QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath())); });
         if (!deletionTarget(*entry).isEmpty()) {
             menu.addSeparator();
             menu.addAction(tr("&Delete…"), QKeySequence::Delete, this, [this, item] { confirmDelete(item); });

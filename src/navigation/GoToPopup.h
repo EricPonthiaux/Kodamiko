@@ -21,7 +21,11 @@ class GoToPopup : public OverlayPopup {
     Q_OBJECT
 
 public:
-    enum class Tab { Files, Symbols, Recent };
+    enum class Tab {
+        Files,
+        Symbols,
+        Recent
+    };
 
     GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent);
     ~GoToPopup() override;

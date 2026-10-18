@@ -20,7 +20,11 @@ namespace {
 
 constexpr int refreshDelayMs = 200;
 
-enum ItemRole { PathRole = Qt::UserRole, LineRole, ColumnRole };
+enum ItemRole {
+    PathRole = Qt::UserRole,
+    LineRole,
+    ColumnRole
+};
 
 // A red disc with "!" for an error, an amber triangle for a warning.
 QIcon severityIcon(Diagnostic::Severity severity)
@@ -42,8 +46,8 @@ QIcon severityIcon(Diagnostic::Severity severity)
             painter.drawEllipse(QRectF(2 * unit, 2 * unit, 12 * unit, 12 * unit));
         } else {
             painter.setBrush(QColor("#d4a72c"));
-            painter.drawPolygon(QPolygonF({QPointF(8 * unit, 1.5 * unit), QPointF(15 * unit, 14 * unit),
-                                           QPointF(1 * unit, 14 * unit)}));
+            painter.drawPolygon(QPolygonF(
+                {QPointF(8 * unit, 1.5 * unit), QPointF(15 * unit, 14 * unit), QPointF(1 * unit, 14 * unit)}));
         }
         painter.setPen(QPen(Qt::white, 1.6 * unit, Qt::SolidLine, Qt::RoundCap));
         const qreal top = severity == Diagnostic::Severity::Error ? 4.8 : 5.6;
@@ -177,9 +181,11 @@ void ProblemsView::refresh()
         if (folder == QLatin1String("."))
             folder.clear();
         auto *fileItem = new QTreeWidgetItem(tree_);
-        fileItem->setText(0, QStringLiteral("%1  %2").arg(info.fileName(), countText(file.errors, file.problems.size() - file.errors)));
+        fileItem->setText(0, QStringLiteral("%1  %2").arg(info.fileName(),
+                                                          countText(file.errors, file.problems.size() - file.errors)));
         fileItem->setIcon(0, FileIcons::file(info.fileName(), darkIcons_));
-        fileItem->setToolTip(0, QDir::toNativeSeparators(folder.isEmpty() ? info.fileName() : folder + QLatin1Char('/') + info.fileName()));
+        fileItem->setToolTip(0, QDir::toNativeSeparators(
+                                    folder.isEmpty() ? info.fileName() : folder + QLatin1Char('/') + info.fileName()));
         fileItem->setData(0, PathRole, file.path);
         if (selectedLine < 0 && file.path == selectedPath)
             selected = fileItem;

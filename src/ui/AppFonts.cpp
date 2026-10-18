@@ -8,8 +8,8 @@ namespace AppFonts {
 namespace {
 
 QString interfaceFamily_;
-QString codeFamily_;      // without ligatures
-QString ligatureFamily_;  // the same with them
+QString codeFamily_;     // without ligatures
+QString ligatureFamily_; // the same with them
 
 QString addFont(const QString &path)
 {
@@ -103,15 +103,26 @@ QList<RecommendedFont> recommendedFonts()
     const QString monaspace = QStringLiteral("https://monaspace.githubnext.com");
     return {
         {QStringLiteral("Geist Mono"), {QStringLiteral("Geist Mono")}, QStringLiteral("https://vercel.com/font")},
-        {QStringLiteral("Commit Mono"), {QStringLiteral("CommitMono"), QStringLiteral("Commit Mono")},
+        {QStringLiteral("Commit Mono"),
+         {QStringLiteral("CommitMono"), QStringLiteral("Commit Mono")},
          QStringLiteral("https://commitmono.com")},
-        {QStringLiteral("Monaspace Neon"), {QStringLiteral("Monaspace Neon"), QStringLiteral("Monaspace Neon Var")}, monaspace},
-        {QStringLiteral("Monaspace Argon"), {QStringLiteral("Monaspace Argon"), QStringLiteral("Monaspace Argon Var")}, monaspace},
-        {QStringLiteral("Monaspace Xenon"), {QStringLiteral("Monaspace Xenon"), QStringLiteral("Monaspace Xenon Var")}, monaspace},
-        {QStringLiteral("Monaspace Radon"), {QStringLiteral("Monaspace Radon"), QStringLiteral("Monaspace Radon Var")}, monaspace},
-        {QStringLiteral("Monaspace Krypton"), {QStringLiteral("Monaspace Krypton"), QStringLiteral("Monaspace Krypton Var")},
+        {QStringLiteral("Monaspace Neon"),
+         {QStringLiteral("Monaspace Neon"), QStringLiteral("Monaspace Neon Var")},
          monaspace},
-        {QStringLiteral("Iosevka"), {QStringLiteral("Iosevka"), QStringLiteral("Iosevka Term")},
+        {QStringLiteral("Monaspace Argon"),
+         {QStringLiteral("Monaspace Argon"), QStringLiteral("Monaspace Argon Var")},
+         monaspace},
+        {QStringLiteral("Monaspace Xenon"),
+         {QStringLiteral("Monaspace Xenon"), QStringLiteral("Monaspace Xenon Var")},
+         monaspace},
+        {QStringLiteral("Monaspace Radon"),
+         {QStringLiteral("Monaspace Radon"), QStringLiteral("Monaspace Radon Var")},
+         monaspace},
+        {QStringLiteral("Monaspace Krypton"),
+         {QStringLiteral("Monaspace Krypton"), QStringLiteral("Monaspace Krypton Var")},
+         monaspace},
+        {QStringLiteral("Iosevka"),
+         {QStringLiteral("Iosevka"), QStringLiteral("Iosevka Term")},
          QStringLiteral("https://typeof.net/Iosevka/")},
     };
 }

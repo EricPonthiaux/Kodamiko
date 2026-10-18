@@ -138,6 +138,9 @@ private:
     std::optional<CodeFormatter::Command> formatterFor(EditorWidget *editor, bool quiet);
     void applyFormatted(EditorWidget *editor, const std::optional<QString> &formatted, const QString &error,
                         bool quiet);
+    // Indents `editor` as clang-format lays its file out, when clang-format
+    // is its formatter.
+    void applyFormatterStyle(EditorWidget *editor);
     void updateTabTitle(EditorWidget *editor);
     void updateTabIcon(QWidget *page);
 

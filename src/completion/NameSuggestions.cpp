@@ -17,10 +17,10 @@ bool isJava(const QString &languageId)
 // Words before a type that still declare a name after it.
 const QSet<QByteArray> &qualifierWords()
 {
-    static const QSet<QByteArray> words = {"const", "static", "final", "volatile", "constexpr", "constinit",
-                                           "inline", "unsigned", "signed", "long", "short", "struct", "enum",
-                                           "union", "mutable", "register", "public", "private", "protected",
-                                           "transient", "thread_local", "extern", "typename"};
+    static const QSet<QByteArray> words = {
+        "const",  "static",  "final",     "volatile",  "constexpr",    "constinit", "inline",  "unsigned",
+        "signed", "long",    "short",     "struct",    "enum",         "union",     "mutable", "register",
+        "public", "private", "protected", "transient", "thread_local", "extern",    "typename"};
     return words;
 }
 
@@ -28,31 +28,35 @@ const QSet<QByteArray> &qualifierWords()
 const QSet<QString> &notTypes()
 {
     static const QSet<QString> words = {
-        "return", "new", "delete", "throw", "case", "goto", "else", "do", "using", "namespace", "class", "struct",
-        "enum", "union", "template", "typename", "operator", "sizeof", "co_return", "co_await", "co_yield",
-        "public", "private", "protected", "import", "package", "extends", "implements", "instanceof", "yield",
-        "auto", "var", "void", "const", "static", "final", "and", "or", "not", "if", "while", "for", "switch",
-        "catch", "try", "default", "break", "continue", "this", "true", "false", "nullptr", "null", "friend",
-        "virtual", "typedef", "decltype", "throws", "assert", "super", "volatile", "inline", "explicit"};
+        "return",     "new",        "delete",   "throw",  "case",    "goto",      "else",     "do",       "using",
+        "namespace",  "class",      "struct",   "enum",   "union",   "template",  "typename", "operator", "sizeof",
+        "co_return",  "co_await",   "co_yield", "public", "private", "protected", "import",   "package",  "extends",
+        "implements", "instanceof", "yield",    "auto",   "var",     "void",      "const",    "static",   "final",
+        "and",        "or",         "not",      "if",     "while",   "for",       "switch",   "catch",    "try",
+        "default",    "break",      "continue", "this",   "true",    "false",     "nullptr",  "null",     "friend",
+        "virtual",    "typedef",    "decltype", "throws", "assert",  "super",     "volatile", "inline",   "explicit"};
     return words;
 }
 
 const QSet<QString> &primitives()
 {
-    static const QSet<QString> words = {"int", "char", "bool", "float", "double", "long", "short", "unsigned",
-                                        "signed", "size_t", "wchar_t", "boolean", "byte", "qsizetype", "qreal",
-                                        "uint", "qint64", "quint64", "qint32", "quint32", "ssize_t", "ptrdiff_t"};
+    static const QSet<QString> words = {"int",    "char",      "bool",    "float",    "double",  "long",
+                                        "short",  "unsigned",  "signed",  "size_t",   "wchar_t", "boolean",
+                                        "byte",   "qsizetype", "qreal",   "uint",     "qint64",  "quint64",
+                                        "qint32", "quint32",   "ssize_t", "ptrdiff_t"};
     return words;
 }
 
 const QSet<QString> &reservedNames()
 {
-    static const QSet<QString> words = {
-        "class", "new", "default", "delete", "operator", "template", "namespace", "int", "char", "bool", "float",
-        "double", "long", "short", "union", "register", "this", "switch", "case", "do", "for", "if", "else",
-        "while", "return", "enum", "struct", "goto", "try", "catch", "throw", "public", "private", "protected",
-        "virtual", "static", "const", "auto", "void", "package", "import", "interface", "final", "boolean",
-        "byte", "native", "super", "volatile", "transient", "and", "or", "not", "export", "module", "object"};
+    static const QSet<QString> words = {"class",  "new",      "default", "delete", "operator", "template",  "namespace",
+                                        "int",    "char",     "bool",    "float",  "double",   "long",      "short",
+                                        "union",  "register", "this",    "switch", "case",     "do",        "for",
+                                        "if",     "else",     "while",   "return", "enum",     "struct",    "goto",
+                                        "try",    "catch",    "throw",   "public", "private",  "protected", "virtual",
+                                        "static", "const",    "auto",    "void",   "package",  "import",    "interface",
+                                        "final",  "boolean",  "byte",    "native", "super",    "volatile",  "transient",
+                                        "and",    "or",       "not",     "export", "module",   "object"};
     return words;
 }
 
@@ -100,8 +104,8 @@ QStringList camelWords(QString name)
         const QChar previous = name[i - 1];
         const QChar current = name[i];
         const bool next = i + 1 < name.size() && name[i + 1].isLower();
-        if ((current.isUpper() && previous.isLower()) || (current.isUpper() && previous.isUpper() && next)
-            || (current.isDigit() != previous.isDigit() && current.isLetter())) {
+        if ((current.isUpper() && previous.isLower()) || (current.isUpper() && previous.isUpper() && next) ||
+            (current.isDigit() != previous.isDigit() && current.isLetter())) {
             words.append(name.mid(start, i - start));
             start = i;
         }
@@ -118,8 +122,8 @@ QString plural(const QString &name)
     static const QRegularExpression consonantY(QStringLiteral("[^aeiou]y$"));
     if (consonantY.match(name).hasMatch())
         return name.left(name.size() - 1) + QStringLiteral("ies");
-    for (const QLatin1String ending : {QLatin1String("s"), QLatin1String("x"), QLatin1String("z"), QLatin1String("ch"),
-                                       QLatin1String("sh")}) {
+    for (const QLatin1String ending :
+         {QLatin1String("s"), QLatin1String("x"), QLatin1String("z"), QLatin1String("ch"), QLatin1String("sh")}) {
         if (name.endsWith(ending))
             return name + QStringLiteral("es");
     }
@@ -147,8 +151,8 @@ QString splitTemplate(const QString &type, QStringList *arguments)
 bool NameSuggestionProvider::handles(const CompletionContext &context) const
 {
     const QString &language = context.languageId;
-    return context.triggerCharacter.isNull()
-        && (language == QLatin1String("c") || language == QLatin1String("cpp") || isJava(language));
+    return context.triggerCharacter.isNull() &&
+           (language == QLatin1String("c") || language == QLatin1String("cpp") || isJava(language));
 }
 
 QString NameSuggestionProvider::declaredTypeAt(const QByteArray &text, int position, const QString &languageId)
@@ -206,8 +210,8 @@ QString NameSuggestionProvider::declaredTypeAt(const QByteArray &text, int posit
             break;
         before = wordStart;
     }
-    if (before > 0 && !QByteArrayView("\n;{}(,").contains(text[before - 1])
-        && !(text[before - 1] == ':' && !(before >= 2 && text[before - 2] == ':')))
+    if (before > 0 && !QByteArrayView("\n;{}(,").contains(text[before - 1]) &&
+        !(text[before - 1] == ':' && !(before >= 2 && text[before - 2] == ':')))
         return {};
     const QString type = QString::fromUtf8(text.mid(typeStart, end - typeStart)).trimmed();
     return looksLikeType(type, languageId) ? type : QString();
@@ -233,13 +237,15 @@ QStringList NameSuggestionProvider::namesFor(const QString &type, const QString 
     }
     QStringList arguments;
     const QString base = splitTemplate(cleaned, &arguments);
-    static const QSet<QString> containers = {
-        "vector", "list", "deque", "set", "unordered_set", "multiset", "QList", "QVector", "QSet", "QStack",
-        "QQueue", "span", "array", "List", "ArrayList", "LinkedList", "Set", "HashSet", "TreeSet", "Collection",
-        "Iterable", "Queue", "Deque", "Stream", "initializer_list", "QVarLengthArray", "forward_list"};
-    static const QSet<QString> wrappers = {"unique_ptr", "shared_ptr", "weak_ptr", "optional", "QPointer",
-                                           "QSharedPointer", "QScopedPointer", "Optional", "atomic",
-                                           "reference_wrapper", "QFuture", "Future", "CompletableFuture"};
+    static const QSet<QString> containers = {"vector",          "list",        "deque",   "set",     "unordered_set",
+                                             "multiset",        "QList",       "QVector", "QSet",    "QStack",
+                                             "QQueue",          "span",        "array",   "List",    "ArrayList",
+                                             "LinkedList",      "Set",         "HashSet", "TreeSet", "Collection",
+                                             "Iterable",        "Queue",       "Deque",   "Stream",  "initializer_list",
+                                             "QVarLengthArray", "forward_list"};
+    static const QSet<QString> wrappers = {
+        "unique_ptr", "shared_ptr", "weak_ptr",          "optional", "QPointer", "QSharedPointer",   "QScopedPointer",
+        "Optional",   "atomic",     "reference_wrapper", "QFuture",  "Future",   "CompletableFuture"};
     if (!arguments.isEmpty() && containers.contains(base)) {
         for (const QString &name : namesFor(arguments.first(), languageId))
             add(plural(name));
@@ -250,11 +256,19 @@ QStringList NameSuggestionProvider::namesFor(const QString &type, const QString 
         return namesFor(arguments.first(), languageId);
 
     if (primitives().contains(base)) {
-        static const QHash<QString, QStringList> byType = {
-            {"int", {"i", "n", "count"}}, {"long", {"l", "n"}}, {"short", {"s"}}, {"size_t", {"size", "n", "i"}},
-            {"qsizetype", {"size", "n", "i"}}, {"char", {"c"}}, {"wchar_t", {"c"}}, {"bool", {"b", "enabled"}},
-            {"boolean", {"b", "enabled"}}, {"float", {"f", "value"}}, {"double", {"d", "value"}},
-            {"qreal", {"value"}}, {"byte", {"b"}}};
+        static const QHash<QString, QStringList> byType = {{"int", {"i", "n", "count"}},
+                                                           {"long", {"l", "n"}},
+                                                           {"short", {"s"}},
+                                                           {"size_t", {"size", "n", "i"}},
+                                                           {"qsizetype", {"size", "n", "i"}},
+                                                           {"char", {"c"}},
+                                                           {"wchar_t", {"c"}},
+                                                           {"bool", {"b", "enabled"}},
+                                                           {"boolean", {"b", "enabled"}},
+                                                           {"float", {"f", "value"}},
+                                                           {"double", {"d", "value"}},
+                                                           {"qreal", {"value"}},
+                                                           {"byte", {"b"}}};
         for (const QString &name : byType.value(base, {QStringLiteral("value")}))
             add(name);
         return names;

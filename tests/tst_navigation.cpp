@@ -6,8 +6,8 @@
 #include "navigation/SymbolIndex.h"
 #include "outline/OutlineProviders.h"
 
-#include <QDir>
 #include <QCheckBox>
+#include <QDir>
 #include <QFile>
 #include <QLineEdit>
 #include <QSignalSpy>
@@ -106,8 +106,10 @@ private slots:
         QCOMPARE(QByteArray(source).mid(load.position, 4), QByteArray("load"));
 
         const QList<SymbolLocation> declared = symbolsOf(QStringLiteral("a.h"), header);
-        QCOMPARE(find(declared, QStringLiteral("load"), QStringLiteral("a.h"), true).container, QStringLiteral("Widget"));
-        QCOMPARE(find(declared, QStringLiteral("Widget"), QStringLiteral("a.h"), false).container, QStringLiteral("app"));
+        QCOMPARE(find(declared, QStringLiteral("load"), QStringLiteral("a.h"), true).container,
+                 QStringLiteral("Widget"));
+        QCOMPARE(find(declared, QStringLiteral("Widget"), QStringLiteral("a.h"), false).container,
+                 QStringLiteral("app"));
     }
 
     void classWinsOverConstructors()
@@ -122,14 +124,15 @@ private slots:
     {
         const auto all = project();
         const SymbolLocation &declaration = find(all, "load", "Widget.h", true);
-        auto result = Definitions::resolve(request("load", declaration.filePath, declaration.position),
-                                           named(all, "load"), {});
+        auto result =
+            Definitions::resolve(request("load", declaration.filePath, declaration.position), named(all, "load"), {});
         QCOMPARE(result.targets.size(), 1);
         QCOMPARE(result.targets.first().filePath, QStringLiteral("/p/Widget.cpp"));
         QVERIFY(!result.targets.first().declarationOnly);
 
         const SymbolLocation &definition = result.targets.first();
-        result = Definitions::resolve(request("load", definition.filePath, definition.position), named(all, "load"), {});
+        result =
+            Definitions::resolve(request("load", definition.filePath, definition.position), named(all, "load"), {});
         QCOMPARE(result.targets.size(), 1);
         QCOMPARE(result.targets.first().filePath, QStringLiteral("/p/Widget.h"));
     }
@@ -190,9 +193,10 @@ private slots:
     void goToRanksFileNamesFirst()
     {
         // The name counts more than the folders.
-        QVERIFY(GoToPopup::fileScore("src/editor/EditorTabs.cpp", "edtabs")
-                > GoToPopup::fileScore("src/editor/TextFile.cpp", "edtabs"));
-        QVERIFY(GoToPopup::fileScore("src/a/Widget.h", "widget") > GoToPopup::fileScore("src/widgets/Other.h", "widget"));
+        QVERIFY(GoToPopup::fileScore("src/editor/EditorTabs.cpp", "edtabs") >
+                GoToPopup::fileScore("src/editor/TextFile.cpp", "edtabs"));
+        QVERIFY(GoToPopup::fileScore("src/a/Widget.h", "widget") >
+                GoToPopup::fileScore("src/widgets/Other.h", "widget"));
         QVERIFY(GoToPopup::fileScore("src/widgets/Other.h", "widget") >= 0); // through the path
         QVERIFY(GoToPopup::fileScore("src/app/main.cpp", "app/main") >= 0);
         QCOMPARE(GoToPopup::fileScore("src/app/main.cpp", "zzz"), -1);

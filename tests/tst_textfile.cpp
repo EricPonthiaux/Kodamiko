@@ -37,7 +37,9 @@ private slots:
     {
         QTemporaryFile file;
         QVERIFY(file.open());
-        file.write(QByteArray("\x7F" "ELF\0\0\0", 7));
+        file.write(QByteArray("\x7F"
+                              "ELF\0\0\0",
+                              7));
         file.close();
         QString error;
         QVERIFY(!TextFile::load(file.fileName(), &error));

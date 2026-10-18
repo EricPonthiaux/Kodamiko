@@ -36,22 +36,28 @@ struct Classifier {
 };
 const Classifier classifiers[] = {
     {"class", QT_TRANSLATE_NOOP("ClassDiagram", "Class"), QT_TRANSLATE_NOOP("ClassDiagram", "Class"), nullptr},
-    {"abstract", QT_TRANSLATE_NOOP("ClassDiagram", "Abstract class"), QT_TRANSLATE_NOOP("ClassDiagram", "Abstract class"),
-     "abstract"},
-    {"interface", QT_TRANSLATE_NOOP("ClassDiagram", "Interface"), QT_TRANSLATE_NOOP("ClassDiagram", "Interface"), "interface"},
+    {"abstract", QT_TRANSLATE_NOOP("ClassDiagram", "Abstract class"),
+     QT_TRANSLATE_NOOP("ClassDiagram", "Abstract class"), "abstract"},
+    {"interface", QT_TRANSLATE_NOOP("ClassDiagram", "Interface"), QT_TRANSLATE_NOOP("ClassDiagram", "Interface"),
+     "interface"},
     {"enumeration", QT_TRANSLATE_NOOP("ClassDiagram", "Enumeration"), QT_TRANSLATE_NOOP("ClassDiagram", "Enumeration"),
      "enumeration"},
-    {"datatype", QT_TRANSLATE_NOOP("ClassDiagram", "Data type"), QT_TRANSLATE_NOOP("ClassDiagram", "Data type"), "datatype"},
-    {"primitive", QT_TRANSLATE_NOOP("ClassDiagram", "Primitive type"), QT_TRANSLATE_NOOP("ClassDiagram", "Primitive type"),
-     "primitive"},
+    {"datatype", QT_TRANSLATE_NOOP("ClassDiagram", "Data type"), QT_TRANSLATE_NOOP("ClassDiagram", "Data type"),
+     "datatype"},
+    {"primitive", QT_TRANSLATE_NOOP("ClassDiagram", "Primitive type"),
+     QT_TRANSLATE_NOOP("ClassDiagram", "Primitive type"), "primitive"},
     {"signal", QT_TRANSLATE_NOOP("ClassDiagram", "Signal"), QT_TRANSLATE_NOOP("ClassDiagram", "Signal"), "signal"},
-    {"metaclass", QT_TRANSLATE_NOOP("ClassDiagram", "Metaclass"), QT_TRANSLATE_NOOP("ClassDiagram", "Metaclass"), "metaclass"},
+    {"metaclass", QT_TRANSLATE_NOOP("ClassDiagram", "Metaclass"), QT_TRANSLATE_NOOP("ClassDiagram", "Metaclass"),
+     "metaclass"},
     {"annotation", QT_TRANSLATE_NOOP("ClassDiagram", "Annotation"), QT_TRANSLATE_NOOP("ClassDiagram", "Annotation"),
      "annotation"},
     {"entity", QT_TRANSLATE_NOOP("ClassDiagram", "Entity"), QT_TRANSLATE_NOOP("ClassDiagram", "Entity"), "entity"},
-    {"struct", QT_TRANSLATE_NOOP("ClassDiagram", "Structure"), QT_TRANSLATE_NOOP("ClassDiagram", "Structure"), "struct"},
-    {"exception", QT_TRANSLATE_NOOP("ClassDiagram", "Exception"), QT_TRANSLATE_NOOP("ClassDiagram", "Exception"), "exception"},
-    {"protocol", QT_TRANSLATE_NOOP("ClassDiagram", "Protocol"), QT_TRANSLATE_NOOP("ClassDiagram", "Protocol"), "protocol"},
+    {"struct", QT_TRANSLATE_NOOP("ClassDiagram", "Structure"), QT_TRANSLATE_NOOP("ClassDiagram", "Structure"),
+     "struct"},
+    {"exception", QT_TRANSLATE_NOOP("ClassDiagram", "Exception"), QT_TRANSLATE_NOOP("ClassDiagram", "Exception"),
+     "exception"},
+    {"protocol", QT_TRANSLATE_NOOP("ClassDiagram", "Protocol"), QT_TRANSLATE_NOOP("ClassDiagram", "Protocol"),
+     "protocol"},
     {"custom", QT_TRANSLATE_NOOP("ClassDiagram", "Custom stereotype"), QT_TRANSLATE_NOOP("ClassDiagram", "UML element"),
      "stereotype"},
 };
@@ -64,7 +70,8 @@ struct Relation {
     const char *help;
 };
 const Relation relations[] = {
-    {"link", QT_TRANSLATE_NOOP("ClassDiagram", "Association —"), QT_TRANSLATE_NOOP("ClassDiagram", "Association"), nullptr},
+    {"link", QT_TRANSLATE_NOOP("ClassDiagram", "Association —"), QT_TRANSLATE_NOOP("ClassDiagram", "Association"),
+     nullptr},
     {"association", QT_TRANSLATE_NOOP("ClassDiagram", "Directed association →"),
      QT_TRANSLATE_NOOP("ClassDiagram", "Directed association"), nullptr},
     {"extension", QT_TRANSLATE_NOOP("ClassDiagram", "Generalization / inheritance ▷"),
@@ -73,9 +80,11 @@ const Relation relations[] = {
     {"realization", QT_TRANSLATE_NOOP("ClassDiagram", "Realization / implementation ⇢▷"),
      QT_TRANSLATE_NOOP("ClassDiagram", "Implementation"),
      QT_TRANSLATE_NOOP("ClassDiagram", "Drag from the implementation to the interface.")},
-    {"composition", QT_TRANSLATE_NOOP("ClassDiagram", "Composition ◆"), QT_TRANSLATE_NOOP("ClassDiagram", "Composition"),
+    {"composition", QT_TRANSLATE_NOOP("ClassDiagram", "Composition ◆"),
+     QT_TRANSLATE_NOOP("ClassDiagram", "Composition"),
      QT_TRANSLATE_NOOP("ClassDiagram", "Drag from the part to the whole that owns it.")},
-    {"aggregation", QT_TRANSLATE_NOOP("ClassDiagram", "Aggregation ◇"), QT_TRANSLATE_NOOP("ClassDiagram", "Aggregation"),
+    {"aggregation", QT_TRANSLATE_NOOP("ClassDiagram", "Aggregation ◇"),
+     QT_TRANSLATE_NOOP("ClassDiagram", "Aggregation"),
      QT_TRANSLATE_NOOP("ClassDiagram", "Drag from the part to the whole.")},
     {"dependency", QT_TRANSLATE_NOOP("ClassDiagram", "Dependency ⇢"), QT_TRANSLATE_NOOP("ClassDiagram", "Dependency"),
      nullptr},
@@ -241,8 +250,8 @@ void ClassShape::draw(QPainter &painter, const Board &board, const ShapeState &s
                    textColor(style.palette.inkMuted), Align::Center, Baseline::Top);
         ty += lineHeight;
     }
-    text::draw(painter, stereotype == QLatin1String("abstract") ? abstractTitleFont : titleFont, name, QPointF(cx(), ty),
-               ink, Align::Center, Baseline::Top);
+    text::draw(painter, stereotype == QLatin1String("abstract") ? abstractTitleFont : titleFont, name,
+               QPointF(cx(), ty), ink, Align::Center, Baseline::Top);
     ty += lineHeight + pad;
 
     const auto separator = [&] {
@@ -360,8 +369,9 @@ void ClassLink::draw(QPainter &painter, const Board &board, bool selected) const
         markerLength = arrowBaseInset(14, 0.46);
     else if (kind == QLatin1String("composition") || kind == QLatin1String("aggregation"))
         markerLength = 18;
-    strokeBody(painter, *r, {style.color, style.width, dashed ? QList<qreal>{6, 4} : QList<qreal>{},
-                             markerLength * style.markerScale, 0});
+    strokeBody(
+        painter, *r,
+        {style.color, style.width, dashed ? QList<qreal>{6, 4} : QList<qreal>{}, markerLength * style.markerScale, 0});
     drawMarker(painter, board, *r, angle, style);
     drawCards(painter, board, *r, angle);
 }
@@ -374,9 +384,10 @@ void ClassLink::drawMarker(QPainter &painter, const Board &board, const Route &r
     if (kind == QLatin1String("extension") || kind == QLatin1String("realization")) {
         // A hollow triangle.
         const qreal size = 14 * style.markerScale, spread = 0.46;
-        const QPainterPath head = polygon({{bx, by},
-                                           {bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread)},
-                                           {bx - size * std::cos(angle + spread), by - size * std::sin(angle + spread)}});
+        const QPainterPath head =
+            polygon({{bx, by},
+                     {bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread)},
+                     {bx - size * std::cos(angle + spread), by - size * std::sin(angle + spread)}});
         painter.fillPath(head, background);
         stroke(painter, head, style.color, style.width);
     } else if (kind == QLatin1String("composition") || kind == QLatin1String("aggregation")) {
@@ -481,18 +492,21 @@ const Family &classes()
         f.defaultShape = QStringLiteral("class");
         f.defaultLink = QStringLiteral("relation");
         for (const Classifier &classifier : classifiers) {
-            f.elements.append(ElementPreset{
-                QString::fromLatin1(classifier.id), tr(classifier.label), {}, QStringLiteral("class"),
-                QJsonObject{{QStringLiteral("name"), tr(classifier.defaultName)},
-                            {QStringLiteral("stereotype"),
-                             classifier.stereotype ? QJsonValue(QString::fromUtf8(classifier.stereotype))
-                                                   : QJsonValue(QJsonValue::Null)}}});
+            f.elements.append(
+                ElementPreset{QString::fromLatin1(classifier.id),
+                              tr(classifier.label),
+                              {},
+                              QStringLiteral("class"),
+                              QJsonObject{{QStringLiteral("name"), tr(classifier.defaultName)},
+                                          {QStringLiteral("stereotype"),
+                                           classifier.stereotype ? QJsonValue(QString::fromUtf8(classifier.stereotype))
+                                                                 : QJsonValue(QJsonValue::Null)}}});
         }
         for (const Relation &relation : relations) {
-            f.relations.append(RelationPreset{
-                QString::fromLatin1(relation.kind), tr(relation.label), relation.help ? tr(relation.help) : QString(),
-                QJsonObject{{QStringLiteral("kind"), QString::fromLatin1(relation.kind)},
-                            {QStringLiteral("label"), tr(relation.edgeLabel)}}});
+            f.relations.append(RelationPreset{QString::fromLatin1(relation.kind), tr(relation.label),
+                                              relation.help ? tr(relation.help) : QString(),
+                                              QJsonObject{{QStringLiteral("kind"), QString::fromLatin1(relation.kind)},
+                                                          {QStringLiteral("label"), tr(relation.edgeLabel)}}});
         }
         f.cardinalities = true;
         return f;

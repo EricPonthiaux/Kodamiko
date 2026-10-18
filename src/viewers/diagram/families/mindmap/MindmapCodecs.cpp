@@ -120,9 +120,9 @@ void parseTree(const QString &source, Model &model)
             stack.removeLast();
         // The depth drives the presentation: 0 the root pill, 1 bubbles, 2+
         // bare leaves.
-        model.nodes.append({QStringLiteral("mind"), key,
-                            QJsonObject{{QStringLiteral("text"), entry.node.text},
-                                        {QStringLiteral("depth"), int(stack.size())}}});
+        model.nodes.append(
+            {QStringLiteral("mind"), key,
+             QJsonObject{{QStringLiteral("text"), entry.node.text}, {QStringLiteral("depth"), int(stack.size())}}});
         if (!stack.isEmpty())
             model.links.append({QStringLiteral("mind"), stack.last().key, key, QJsonObject{}});
         stack.append({entry.indent, key});
@@ -197,8 +197,8 @@ public:
             static const QRegularExpression special(QStringLiteral("[()\\[\\]{}\"\\n]"));
             // Also quoted: what a bare line would read differently (spaces
             // around it, the header's word).
-            const bool needsQuotes = text.contains(special) || text != text.trimmed()
-                                     || text.compare(QStringLiteral("mindmap"), Qt::CaseInsensitive) == 0;
+            const bool needsQuotes = text.contains(special) || text != text.trimmed() ||
+                                     text.compare(QStringLiteral("mindmap"), Qt::CaseInsensitive) == 0;
             const QString inner = needsQuotes ? mermaidQuote(text) : text;
             const QString indent(2 * (depth + 1), QLatin1Char(' '));
             if (depth == 0)

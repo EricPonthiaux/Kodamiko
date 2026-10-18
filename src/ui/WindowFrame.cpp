@@ -43,8 +43,8 @@ Qt::Edges WindowFrame::edgesAt(const QPoint &position, const QSize &size, int ma
     const bool nearRight = position.x() >= size.width() - grip;
     const bool nearTop = position.y() < grip;
     const bool nearBottom = position.y() >= size.height() - grip;
-    const bool inShadow = position.x() < margin || position.x() >= size.width() - margin || position.y() < margin
-        || position.y() >= size.height() - margin;
+    const bool inShadow = position.x() < margin || position.x() >= size.width() - margin || position.y() < margin ||
+                          position.y() >= size.height() - margin;
     // In the shadow, or in a corner of the window itself.
     if (!inShadow && !((nearLeft || nearRight) && (nearTop || nearBottom)))
         return edges;

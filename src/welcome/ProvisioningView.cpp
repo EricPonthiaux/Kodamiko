@@ -17,7 +17,8 @@ ProvisioningView::ProvisioningView(Toolchains *toolchains, QWidget *parent)
 {
     layout_->setContentsMargins(0, 0, 0, 0);
     layout_->setSpacing(8);
-    auto *where = new QLabel(tr("Into %1, shared by all projects.").arg(QDir::toNativeSeparators(toolchains->root())), this);
+    auto *where =
+        new QLabel(tr("Into %1, shared by all projects.").arg(QDir::toNativeSeparators(toolchains->root())), this);
     where->setObjectName(QStringLiteral("pageDescription"));
     where->setWordWrap(true);
     layout_->addWidget(where);
@@ -86,8 +87,7 @@ void ProvisioningView::onProgress(int index, qint64 received, qint64 total)
     }
     line.bar->setRange(0, 100);
     line.bar->setValue(int(received * 100 / total));
-    line.status->setText(
-        tr("%1 of %2").arg(QLocale().formattedDataSize(received), QLocale().formattedDataSize(total)));
+    line.status->setText(tr("%1 of %2").arg(QLocale().formattedDataSize(received), QLocale().formattedDataSize(total)));
 }
 
 void ProvisioningView::onStepFinished(int index, const QString &error)

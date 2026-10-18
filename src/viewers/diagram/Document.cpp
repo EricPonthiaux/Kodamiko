@@ -260,8 +260,8 @@ bool build(Board &board, const Codec &codec, const QString &source, const SavedL
         unplaced = restore(board, layout);
     }
     if (!board.isEmpty()) {
-        if (unplaced.size() == qsizetype(board.shapes().size())
-            || (family.alwaysArrange && codec.arrangeWithGraphviz() && !codec.sourceOwnsLayout()))
+        if (unplaced.size() == qsizetype(board.shapes().size()) ||
+            (family.alwaysArrange && codec.arrangeWithGraphviz() && !codec.sourceOwnsLayout()))
             loaded.needsArrange = true;
         else
             loaded.unplaced = unplaced;
@@ -329,8 +329,8 @@ QByteArray save(const Board &board, const Codec &codec)
             static const QRegularExpression end(QStringLiteral("\\n\\s*@enduml\\s*$"));
             const QRegularExpressionMatch m = end.match(text);
             if (codec.language() == QLatin1String("plantuml") && m.hasMatch())
-                text = text.left(m.capturedStart()) + QStringLiteral("\n\n") + lines.join(QLatin1Char('\n'))
-                       + QStringLiteral("\n@enduml");
+                text = text.left(m.capturedStart()) + QStringLiteral("\n\n") + lines.join(QLatin1Char('\n')) +
+                       QStringLiteral("\n@enduml");
             else
                 text += QStringLiteral("\n\n") + lines.join(QLatin1Char('\n'));
         }

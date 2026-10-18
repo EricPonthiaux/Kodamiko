@@ -61,7 +61,8 @@ QStringList cmakePresets(const QString &folder, const QString &key)
 void detectCMake(const QString &folder, QList<RunConfiguration> &found)
 {
     using Kind = RunConfiguration::Kind;
-    if (exists(folder, QStringLiteral("CMakePresets.json")) || exists(folder, QStringLiteral("CMakeUserPresets.json"))) {
+    if (exists(folder, QStringLiteral("CMakePresets.json")) ||
+        exists(folder, QStringLiteral("CMakeUserPresets.json"))) {
         for (const QString &name : cmakePresets(folder, QStringLiteral("buildPresets")))
             found.append(make(QStringLiteral("CMake: build %1").arg(name), Kind::Build,
                               QStringLiteral("cmake --build --preset %1").arg(name)));
@@ -69,8 +70,8 @@ void detectCMake(const QString &folder, QList<RunConfiguration> &found)
             found.append(make(QStringLiteral("CMake: configure %1").arg(name), Kind::Build,
                               QStringLiteral("cmake --preset %1").arg(name)));
         for (const QString &name : cmakePresets(folder, QStringLiteral("testPresets")))
-            found.append(make(QStringLiteral("CTest: %1").arg(name), Kind::Test,
-                              QStringLiteral("ctest --preset %1").arg(name)));
+            found.append(
+                make(QStringLiteral("CTest: %1").arg(name), Kind::Test, QStringLiteral("ctest --preset %1").arg(name)));
         return;
     }
     if (!exists(folder, QStringLiteral("CMakeLists.txt")))
@@ -78,7 +79,8 @@ void detectCMake(const QString &folder, QList<RunConfiguration> &found)
     // Configured on the first build; later configurations are quick.
     found.append(make(QStringLiteral("CMake: build"), Kind::Build,
                       QStringLiteral("cmake -S . -B build && cmake --build build")));
-    found.append(make(QStringLiteral("CTest"), Kind::Test, QStringLiteral("ctest --test-dir build --output-on-failure")));
+    found.append(
+        make(QStringLiteral("CTest"), Kind::Test, QStringLiteral("ctest --test-dir build --output-on-failure")));
 }
 
 RunConfiguration::Kind scriptKind(const QString &script)
@@ -124,19 +126,20 @@ void detectJava(const QString &folder, QList<RunConfiguration> &found)
 {
     using Kind = RunConfiguration::Kind;
     if (exists(folder, QStringLiteral("pom.xml"))) {
-        const QString mvn = exists(folder, QStringLiteral("mvnw")) ? wrapper(QStringLiteral("mvnw")) : QStringLiteral("mvn");
+        const QString mvn =
+            exists(folder, QStringLiteral("mvnw")) ? wrapper(QStringLiteral("mvnw")) : QStringLiteral("mvn");
         found.append(make(QStringLiteral("Maven: compile"), Kind::Build, mvn + QStringLiteral(" compile")));
         found.append(make(QStringLiteral("Maven: package"), Kind::Build, mvn + QStringLiteral(" package")));
         found.append(make(QStringLiteral("Maven: test"), Kind::Test, mvn + QStringLiteral(" test")));
     }
-    if (exists(folder, QStringLiteral("build.gradle")) || exists(folder, QStringLiteral("build.gradle.kts"))
-        || exists(folder, QStringLiteral("settings.gradle")) || exists(folder, QStringLiteral("settings.gradle.kts"))) {
+    if (exists(folder, QStringLiteral("build.gradle")) || exists(folder, QStringLiteral("build.gradle.kts")) ||
+        exists(folder, QStringLiteral("settings.gradle")) || exists(folder, QStringLiteral("settings.gradle.kts"))) {
         const QString gradle =
             exists(folder, QStringLiteral("gradlew")) ? wrapper(QStringLiteral("gradlew")) : QStringLiteral("gradle");
         found.append(make(QStringLiteral("Gradle: build"), Kind::Build, gradle + QStringLiteral(" build")));
         found.append(make(QStringLiteral("Gradle: test"), Kind::Test, gradle + QStringLiteral(" test")));
-        const QByteArray script = readFile(folder + QStringLiteral("/build.gradle"))
-                                  + readFile(folder + QStringLiteral("/build.gradle.kts"));
+        const QByteArray script =
+            readFile(folder + QStringLiteral("/build.gradle")) + readFile(folder + QStringLiteral("/build.gradle.kts"));
         if (script.contains("application"))
             found.append(make(QStringLiteral("Gradle: run"), Kind::Run, gradle + QStringLiteral(" run")));
     }
@@ -154,22 +157,25 @@ void detectOthers(const QString &folder, QList<RunConfiguration> &found)
         found.append(make(QStringLiteral("Go: build"), Kind::Build, QStringLiteral("go build ./...")));
         found.append(make(QStringLiteral("Go: test"), Kind::Test, QStringLiteral("go test ./...")));
     }
-    if (exists(folder, QStringLiteral("pytest.ini")) || exists(folder, QStringLiteral("conftest.py"))
-        || readFile(folder + QStringLiteral("/pyproject.toml")).contains("[tool.pytest")) {
+    if (exists(folder, QStringLiteral("pytest.ini")) || exists(folder, QStringLiteral("conftest.py")) ||
+        readFile(folder + QStringLiteral("/pyproject.toml")).contains("[tool.pytest")) {
         found.append(make(QStringLiteral("pytest"), Kind::Test, QStringLiteral("python -m pytest")));
     }
-    for (const QString &name : {QStringLiteral("GNUmakefile"), QStringLiteral("makefile"), QStringLiteral("Makefile")}) {
+    for (const QString &name :
+         {QStringLiteral("GNUmakefile"), QStringLiteral("makefile"), QStringLiteral("Makefile")}) {
         if (!exists(folder, name))
             continue;
         found.append(make(QStringLiteral("make"), Kind::Build, QStringLiteral("make")));
         static const QRegularExpression target(QStringLiteral("^([A-Za-z0-9_.-]+)\\s*:(?!=)"),
                                                QRegularExpression::MultilineOption);
         QSet<QString> targets;
-        for (const QRegularExpressionMatch &match : target.globalMatch(QString::fromUtf8(readFile(folder + QLatin1Char('/') + name))))
+        for (const QRegularExpressionMatch &match :
+             target.globalMatch(QString::fromUtf8(readFile(folder + QLatin1Char('/') + name))))
             targets.insert(match.captured(1));
         for (const QString &test : {QStringLiteral("test"), QStringLiteral("check")}) {
             if (targets.contains(test))
-                found.append(make(QStringLiteral("make %1").arg(test), Kind::Test, QStringLiteral("make %1").arg(test)));
+                found.append(
+                    make(QStringLiteral("make %1").arg(test), Kind::Test, QStringLiteral("make %1").arg(test)));
         }
         if (targets.contains(QStringLiteral("run")))
             found.append(make(QStringLiteral("make run"), Kind::Run, QStringLiteral("make run")));
@@ -184,9 +190,12 @@ namespace RunConfigurations {
 QString kindName(RunConfiguration::Kind kind)
 {
     switch (kind) {
-    case RunConfiguration::Kind::Build: return QStringLiteral("build");
-    case RunConfiguration::Kind::Test: return QStringLiteral("test");
-    case RunConfiguration::Kind::Run: break;
+    case RunConfiguration::Kind::Build:
+        return QStringLiteral("build");
+    case RunConfiguration::Kind::Test:
+        return QStringLiteral("test");
+    case RunConfiguration::Kind::Run:
+        break;
     }
     return QStringLiteral("run");
 }

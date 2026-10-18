@@ -15,8 +15,8 @@
 #include "ui/PopupWidgets.h"
 
 #include <QCheckBox>
-#include <QLineEdit>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -39,8 +39,9 @@ QStringList sectionTitles(const QTreeWidget *list)
 {
     QStringList titles;
     for (int i = 0; i < list->topLevelItemCount(); ++i)
-        titles << QStringLiteral("%1 (%2)").arg(list->topLevelItem(i)->text(0)).arg(
-                      list->topLevelItem(i)->data(0, FileChangeDelegate::SectionCountRole).toInt());
+        titles << QStringLiteral("%1 (%2)")
+                      .arg(list->topLevelItem(i)->text(0))
+                      .arg(list->topLevelItem(i)->data(0, FileChangeDelegate::SectionCountRole).toInt());
     return titles;
 }
 
@@ -81,11 +82,11 @@ private slots:
         QStringList texts;
         for (const DiffView::Line &line : lines)
             texts.append(line.text);
-        QCOMPARE(texts, QStringList({"", "x.cpp   modified   +1 −2", "⋯ lines 10–12  ·  void run()", "keep", "old", "new", "end",
-                                     "⋯ line 40", "gone", "No line break at the end of the file"}));
+        QCOMPARE(texts, QStringList({"", "x.cpp   modified   +1 −2", "⋯ lines 10–12  ·  void run()", "keep", "old",
+                                     "new", "end", "⋯ line 40", "gone", "No line break at the end of the file"}));
         QCOMPARE(lines[0].kind, DiffView::LineKind::Spacer);
         QCOMPARE(lines[1].kind, DiffView::LineKind::FileHeader);
-        QCOMPARE(lines[1].emphasis, 5); // "x.cpp"
+        QCOMPARE(lines[1].emphasis, 5);    // "x.cpp"
         QCOMPARE(lines[1].statsStart, 19); // "+1 −2"
         QCOMPARE(lines[4].kind, DiffView::LineKind::Removed);
         QCOMPARE(lines[4].oldNumber, 11);
@@ -103,7 +104,8 @@ private slots:
         QCOMPARE(lines[0].location.file, -1); // a blank line leads nowhere
 
         DiffView view(Theme::dark());
-        view.setFiles({{"src/x.cpp", "modified", patch}, {"y.bin", "added", FilePatch::parse("Binary files differ\n")}});
+        view.setFiles(
+            {{"src/x.cpp", "modified", patch}, {"y.bin", "added", FilePatch::parse("Binary files differ\n")}});
         QCOMPARE(view.lines()[1].text, QString("x.cpp   src  ·  modified   +1 −2"));
         QCOMPARE(view.lines().size(), lines.size() + 3);
         QCOMPARE(view.fileStart(1), static_cast<int>(lines.size()) + 1);

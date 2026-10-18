@@ -78,8 +78,9 @@ QList<MessageLink *> messagesOf(const Board &board)
         if (auto *m = dynamic_cast<MessageLink *>(l.get()))
             result.append(m);
     }
-    std::stable_sort(result.begin(), result.end(),
-                     [](const MessageLink *a, const MessageLink *b) { return a->order.value_or(0) < b->order.value_or(0); });
+    std::stable_sort(result.begin(), result.end(), [](const MessageLink *a, const MessageLink *b) {
+        return a->order.value_or(0) < b->order.value_or(0);
+    });
     return result;
 }
 
@@ -171,7 +172,8 @@ private slots:
         QCOMPARE(plantuml().id(), QStringLiteral("plantuml-sequence"));
         QVERIFY(!mermaid().arrangeWithGraphviz());
         QVERIFY(!plantuml().arrangeWithGraphviz());
-        QCOMPARE(codecFor(QStringLiteral("mermaid"), QStringLiteral("%% title\nsequenceDiagram\n  A->>B: hi")), &mermaid());
+        QCOMPARE(codecFor(QStringLiteral("mermaid"), QStringLiteral("%% title\nsequenceDiagram\n  A->>B: hi")),
+                 &mermaid());
         QCOMPARE(codecFor(QStringLiteral("plantuml"), QStringLiteral("@startuml\nA -> B : hi\n@enduml")), &plantuml());
         QVERIFY(!plantuml().matches(QStringLiteral("@startuml\nclass A\nA -> B\n@enduml")));
         QVERIFY(!plantuml().matches(QStringLiteral("@startuml\n[*] --> A\n@enduml")));
@@ -220,8 +222,9 @@ private slots:
         const QJsonObject first = model.links[0].props, second = model.links[1].props;
         QCOMPARE(first.value(QStringLiteral("startHead")).toString(), QStringLiteral("arrow"));
         QCOMPARE(first.value(QStringLiteral("activation")).toString(), QStringLiteral("+"));
-        QCOMPARE(first.value(QStringLiteral("fragments")).toArray()[0].toObject().value(QStringLiteral("kind")).toString(),
-                 QStringLiteral("alt"));
+        QCOMPARE(
+            first.value(QStringLiteral("fragments")).toArray()[0].toObject().value(QStringLiteral("kind")).toString(),
+            QStringLiteral("alt"));
         QCOMPARE(second.value(QStringLiteral("fragments"))
                      .toArray()[0]
                      .toObject()
@@ -264,8 +267,8 @@ private slots:
         QCOMPARE(model.links.size(), expected.size());
         for (int i = 0; i < expected.size(); ++i) {
             const QJsonObject props = model.links[i].props;
-            QCOMPARE(props.value(QStringLiteral("line")).toString() + QLatin1Char(' ')
-                         + props.value(QStringLiteral("head")).toString(),
+            QCOMPARE(props.value(QStringLiteral("line")).toString() + QLatin1Char(' ') +
+                         props.value(QStringLiteral("head")).toString(),
                      expected[i]);
             QCOMPARE(props.value(QStringLiteral("order")).toInt(), i);
         }
@@ -348,7 +351,8 @@ private slots:
         QStringList keys;
         for (const Model::Node &node : model.nodes)
             keys.append(node.key);
-        QCOMPARE(keys, (QStringList{QStringLiteral("U"), QStringLiteral("W"), QStringLiteral("DB"), QStringLiteral("Events")}));
+        QCOMPARE(keys, (QStringList{QStringLiteral("U"), QStringLiteral("W"), QStringLiteral("DB"),
+                                    QStringLiteral("Events")}));
         QCOMPARE(model.nodes[0].props.value(QStringLiteral("text")).toString(), QStringLiteral("User"));
         QCOMPARE(model.nodes[1].props.value(QStringLiteral("text")).toString(), QStringLiteral("Web app"));
         QCOMPARE(model.nodes[3].props.value(QStringLiteral("kind")).toString(), QStringLiteral("queue"));
@@ -381,7 +385,8 @@ private slots:
             QCOMPARE(reparsed.links[i].from, model.links[i].from);
             QCOMPARE(reparsed.links[i].to, model.links[i].to);
             for (const char *field : {"label", "line", "head", "startHead", "activation", "fragments"})
-                QCOMPARE(reparsed.links[i].props.value(QLatin1String(field)), model.links[i].props.value(QLatin1String(field)));
+                QCOMPARE(reparsed.links[i].props.value(QLatin1String(field)),
+                         model.links[i].props.value(QLatin1String(field)));
         }
     }
 
@@ -412,15 +417,18 @@ private slots:
         QCOMPARE(reparsed.nodes.size(), original.nodes.size());
         for (int i = 0; i < original.nodes.size(); ++i) {
             QCOMPARE(reparsed.nodes[i].key, original.nodes[i].key);
-            QCOMPARE(reparsed.nodes[i].props.value(QStringLiteral("text")), original.nodes[i].props.value(QStringLiteral("text")));
-            QCOMPARE(reparsed.nodes[i].props.value(QStringLiteral("kind")), original.nodes[i].props.value(QStringLiteral("kind")));
+            QCOMPARE(reparsed.nodes[i].props.value(QStringLiteral("text")),
+                     original.nodes[i].props.value(QStringLiteral("text")));
+            QCOMPARE(reparsed.nodes[i].props.value(QStringLiteral("kind")),
+                     original.nodes[i].props.value(QStringLiteral("kind")));
         }
         QCOMPARE(reparsed.links.size(), original.links.size());
         for (int i = 0; i < original.links.size(); ++i) {
             QCOMPARE(reparsed.links[i].from, original.links[i].from);
             QCOMPARE(reparsed.links[i].to, original.links[i].to);
             for (const char *field : {"label", "line", "head", "startHead", "activation", "fragments", "order"})
-                QCOMPARE(reparsed.links[i].props.value(QLatin1String(field)), original.links[i].props.value(QLatin1String(field)));
+                QCOMPARE(reparsed.links[i].props.value(QLatin1String(field)),
+                         original.links[i].props.value(QLatin1String(field)));
         }
         // `par` branches are written with `and`.
         QVERIFY2(serialized.contains(QStringLiteral("  and Load the news")), qPrintable(serialized));
@@ -459,9 +467,10 @@ private slots:
         board.setFamily(&families::sequence());
         ParticipantShape *a = participant(board, {{QStringLiteral("x"), 20}, {QStringLiteral("y"), 20}});
         ParticipantShape *b = participant(board, {{QStringLiteral("x"), 260}, {QStringLiteral("y"), 20}});
-        MessageLink *call = message(board, a->id, b->id, {{QStringLiteral("order"), 0}, {QStringLiteral("label"), QStringLiteral("Call")}});
-        MessageLink *back =
-            message(board, a->id, a->id, {{QStringLiteral("order"), 1}, {QStringLiteral("label"), QStringLiteral("Callback")}});
+        MessageLink *call = message(board, a->id, b->id,
+                                    {{QStringLiteral("order"), 0}, {QStringLiteral("label"), QStringLiteral("Call")}});
+        MessageLink *back = message(
+            board, a->id, a->id, {{QStringLiteral("order"), 1}, {QStringLiteral("label"), QStringLiteral("Callback")}});
         const Route r = *call->route(board);
         QCOMPARE(call->labelPos(r, board), QPointF((r.a.x() + r.b.x()) / 2, r.a.y()));
         const Route s = *back->route(board);
@@ -477,14 +486,17 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(board, {{QStringLiteral("text"), QStringLiteral("Actor")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
+        ParticipantShape *a = participant(
+            board,
+            {{QStringLiteral("text"), QStringLiteral("Actor")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
         ParticipantShape *b = participant(board, {{QStringLiteral("text"), QStringLiteral("System")},
                                                   {QStringLiteral("kind"), QStringLiteral("actor")},
                                                   {QStringLiteral("x"), 220},
                                                   {QStringLiteral("y"), 20}});
         for (int order = 0; order < 8; ++order)
             message(board, a->id, b->id,
-                    {{QStringLiteral("order"), order}, {QStringLiteral("label"), QStringLiteral("Interaction %1").arg(order + 1)}});
+                    {{QStringLiteral("order"), order},
+                     {QStringLiteral("label"), QStringLiteral("Interaction %1").arg(order + 1)}});
         QCOMPARE(board.links().size(), size_t(8));
         const qreal nextY = messageY(board, 8);
         QVERIFY(!a->showConnectionPorts());
@@ -508,7 +520,9 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(board, {{QStringLiteral("kind"), QStringLiteral("actor")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
+        ParticipantShape *a = participant(
+            board,
+            {{QStringLiteral("kind"), QStringLiteral("actor")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
         ParticipantShape *b = participant(board, {{QStringLiteral("x"), 220}, {QStringLiteral("y"), 20}});
         const QList<Port> ports = a->connectionPorts(board);
         QCOMPARE(ports.size(), 1);
@@ -553,8 +567,12 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(board, {{QStringLiteral("text"), QStringLiteral("A")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
-        ParticipantShape *b = participant(board, {{QStringLiteral("text"), QStringLiteral("B")}, {QStringLiteral("x"), 220}, {QStringLiteral("y"), 20}});
+        ParticipantShape *a = participant(
+            board,
+            {{QStringLiteral("text"), QStringLiteral("A")}, {QStringLiteral("x"), 0}, {QStringLiteral("y"), 20}});
+        ParticipantShape *b = participant(
+            board,
+            {{QStringLiteral("text"), QStringLiteral("B")}, {QStringLiteral("x"), 220}, {QStringLiteral("y"), 20}});
         const auto fragment = [](const char *keyword, const char *label) {
             return QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("alt-1")},
                                           {QStringLiteral("kind"), QStringLiteral("alt")},
@@ -564,7 +582,8 @@ private slots:
                                           {QStringLiteral("branchLabel"), QLatin1String(label)}}};
         };
         message(board, a->id, b->id, {{QStringLiteral("order"), 0}, {QStringLiteral("fragments"), fragment("", "")}});
-        message(board, b->id, a->id, {{QStringLiteral("order"), 1}, {QStringLiteral("fragments"), fragment("else", "invalid")}});
+        message(board, b->id, a->id,
+                {{QStringLiteral("order"), 1}, {QStringLiteral("fragments"), fragment("else", "invalid")}});
         // 24 px for the alt header (sidecar's 132 with an unmeasured 44 px header).
         QCOMPARE(messageY(board, 0), a->y + a->h + 44 + 24);
         QCOMPARE(messageY(board, 1) - messageY(board, 0), 66.0); // the else adds 22 px to the 44 px step
@@ -580,8 +599,8 @@ private slots:
         QList<Fragment> active = syncFragments(out, {}, {loop, par}, QStringLiteral("  "), true);
         active = syncFragments(out, active, {loop, parBranch}, QStringLiteral("  "), true);
         active = syncFragments(out, active, {}, QStringLiteral("  "), true);
-        QCOMPARE(out, (QStringList{QStringLiteral("  loop again"), QStringLiteral("  par one"), QStringLiteral("  and two"),
-                                   QStringLiteral("  end"), QStringLiteral("  end")}));
+        QCOMPARE(out, (QStringList{QStringLiteral("  loop again"), QStringLiteral("  par one"),
+                                   QStringLiteral("  and two"), QStringLiteral("  end"), QStringLiteral("  end")}));
         out.clear();
         syncFragments(out, {loop, par}, {loop, parBranch});
         QCOMPARE(out, QStringList{QStringLiteral("else two")});
@@ -593,12 +612,19 @@ private slots:
     {
         Board board;
         board.setFamily(&families::sequence());
-        ParticipantShape *a = participant(board, {{QStringLiteral("text"), QStringLiteral("A")}, {QStringLiteral("x"), 500}, {QStringLiteral("y"), 300}});
-        ParticipantShape *b = participant(board, {{QStringLiteral("text"), QStringLiteral("B")}, {QStringLiteral("x"), 100}, {QStringLiteral("y"), 90}});
-        ParticipantShape *c = participant(board, {{QStringLiteral("text"), QStringLiteral("C")}, {QStringLiteral("x"), 900}});
-        const QString longLabel = QStringLiteral("A very long message label that needs a lot of room between lifelines");
+        ParticipantShape *a = participant(
+            board,
+            {{QStringLiteral("text"), QStringLiteral("A")}, {QStringLiteral("x"), 500}, {QStringLiteral("y"), 300}});
+        ParticipantShape *b = participant(
+            board,
+            {{QStringLiteral("text"), QStringLiteral("B")}, {QStringLiteral("x"), 100}, {QStringLiteral("y"), 90}});
+        ParticipantShape *c =
+            participant(board, {{QStringLiteral("text"), QStringLiteral("C")}, {QStringLiteral("x"), 900}});
+        const QString longLabel =
+            QStringLiteral("A very long message label that needs a lot of room between lifelines");
         message(board, b->id, a->id, {{QStringLiteral("order"), 4}, {QStringLiteral("label"), longLabel}});
-        message(board, a->id, a->id, {{QStringLiteral("order"), 9}, {QStringLiteral("label"), QStringLiteral("Think")}});
+        message(board, a->id, a->id,
+                {{QStringLiteral("order"), 9}, {QStringLiteral("label"), QStringLiteral("Think")}});
         message(board, a->id, c->id, {{QStringLiteral("order"), 2}});
         families::sequence().autoArrange(board);
         QCOMPARE(b->x, 0.0);
@@ -617,7 +643,8 @@ private slots:
 
     void blankFilesLoad()
     {
-        for (const auto &[name, codec] : {std::pair{QStringLiteral("a.mmd"), &mermaid()}, std::pair{QStringLiteral("a.puml"), &plantuml()}}) {
+        for (const auto &[name, codec] :
+             {std::pair{QStringLiteral("a.mmd"), &mermaid()}, std::pair{QStringLiteral("a.puml"), &plantuml()}}) {
             Board board;
             document::Loaded loaded;
             QVERIFY(load(board, name, codec->blank().toUtf8(), &loaded));
@@ -649,7 +676,8 @@ private slots:
             Shape *moved = board.shapes().back().get();
             moved->x += 37;
             moved->customFill = QStringLiteral("#ffcc00");
-            const QByteArray saved = document::save(board, name.endsWith(QStringLiteral(".mmd")) ? mermaid() : plantuml());
+            const QByteArray saved =
+                document::save(board, name.endsWith(QStringLiteral(".mmd")) ? mermaid() : plantuml());
             QVERIFY2(!saved.contains("\"c\":"), saved.constData());
 
             Board again;
@@ -747,9 +775,12 @@ private slots:
         int order = 0;
         for (const char *head : {"arrow", "open", "cross", "none"}) {
             message(board, a->id, b->id,
-                    {{QStringLiteral("order"), order++}, {QStringLiteral("head"), QLatin1String(head)},
-                     {QStringLiteral("startHead"), QLatin1String(head)}, {QStringLiteral("customWidth"), 5}});
-            message(board, a->id, a->id, {{QStringLiteral("order"), order++}, {QStringLiteral("head"), QLatin1String(head)}});
+                    {{QStringLiteral("order"), order++},
+                     {QStringLiteral("head"), QLatin1String(head)},
+                     {QStringLiteral("startHead"), QLatin1String(head)},
+                     {QStringLiteral("customWidth"), 5}});
+            message(board, a->id, a->id,
+                    {{QStringLiteral("order"), order++}, {QStringLiteral("head"), QLatin1String(head)}});
         }
         QImage image(600, 600, QImage::Format_ARGB32_Premultiplied);
         QPainter painter(&image);

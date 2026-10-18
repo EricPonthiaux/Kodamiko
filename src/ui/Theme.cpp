@@ -9,9 +9,18 @@ QFont editorFont()
     return AppFonts::codeFont(11);
 }
 
-TextStyle plain(const char *color) { return {QColor(color)}; }
-TextStyle bold(const char *color) { return {QColor(color), true, false}; }
-TextStyle italic(const char *color) { return {QColor(color), false, true}; }
+TextStyle plain(const char *color)
+{
+    return {QColor(color)};
+}
+TextStyle bold(const char *color)
+{
+    return {QColor(color), true, false};
+}
+TextStyle italic(const char *color)
+{
+    return {QColor(color), false, true};
+}
 
 } // namespace
 
@@ -50,34 +59,20 @@ Theme Theme::duet()
     theme.gradientStart = QColor("#4570e4");
     theme.gradientEnd = QColor("#4570e4");
     theme.syntaxStyles = {
-        {"comment", italic("#6b7489")},
-        {"string", plain("#a8d67e")},
-        {"string.special", plain("#5fd4e8")},
-        {"escape", plain("#5fd4e8")},
-        {"number", plain("#ff9e64")},
-        {"constant", plain("#ff9e64")},
-        {"constant.builtin", plain("#ff9e64")},
-        {"keyword", plain("#a08cff")},
-        {"operator", plain("#7fb5e0")},
-        {"type", plain("#4fd1c5")},
-        {"type.builtin", plain("#4fd1c5")},
-        {"constructor", plain("#4fd1c5")},
-        {"module", plain("#4fd1c5")},
-        {"function", plain("#6cb6ff")},
-        {"function.builtin", plain("#5fd4e8")},
-        {"variable", plain("#c9cfdb")},
-        {"variable.builtin", plain("#ff7a93")},
-        {"variable.parameter", italic("#f0a6ca")},
-        {"property", plain("#e6c384")},
-        {"label", plain("#ff7a93")},
-        {"attribute", plain("#e6c384")},
-        {"tag", plain("#ff7a93")},
-        {"punctuation", plain("#8a93a6")},
-        {"punctuation.special", plain("#a08cff")},
-        {"embedded", plain("#c9cfdb")},
-        {"heading", bold("#6cb6ff")},
-        {"diff.plus", plain("#8fd18a")},
-        {"diff.minus", plain("#ff7a93")},
+        {"comment", italic("#6b7489")},         {"string", plain("#a8d67e")},
+        {"string.special", plain("#5fd4e8")},   {"escape", plain("#5fd4e8")},
+        {"number", plain("#ff9e64")},           {"constant", plain("#ff9e64")},
+        {"constant.builtin", plain("#ff9e64")}, {"keyword", plain("#a08cff")},
+        {"operator", plain("#7fb5e0")},         {"type", plain("#4fd1c5")},
+        {"type.builtin", plain("#4fd1c5")},     {"constructor", plain("#4fd1c5")},
+        {"module", plain("#4fd1c5")},           {"function", plain("#6cb6ff")},
+        {"function.builtin", plain("#5fd4e8")}, {"variable", plain("#c9cfdb")},
+        {"variable.builtin", plain("#ff7a93")}, {"variable.parameter", italic("#f0a6ca")},
+        {"property", plain("#e6c384")},         {"label", plain("#ff7a93")},
+        {"attribute", plain("#e6c384")},        {"tag", plain("#ff7a93")},
+        {"punctuation", plain("#8a93a6")},      {"punctuation.special", plain("#a08cff")},
+        {"embedded", plain("#c9cfdb")},         {"heading", bold("#6cb6ff")},
+        {"diff.plus", plain("#8fd18a")},        {"diff.minus", plain("#ff7a93")},
     };
     return theme;
 }
@@ -113,34 +108,20 @@ Theme Theme::dark()
     theme.gradientStart = QColor("#3e6fd8");
     theme.gradientEnd = QColor("#5c8eff");
     theme.syntaxStyles = {
-        {"comment", italic("#7f848e")},
-        {"string", plain("#98c379")},
-        {"string.special", plain("#56b6c2")},
-        {"escape", plain("#56b6c2")},
-        {"number", plain("#d19a66")},
-        {"constant", plain("#d19a66")},
-        {"constant.builtin", plain("#d19a66")},
-        {"keyword", plain("#c678dd")},
-        {"operator", plain("#56b6c2")},
-        {"type", plain("#e5c07b")},
-        {"type.builtin", plain("#e5c07b")},
-        {"constructor", plain("#e5c07b")},
-        {"module", plain("#e5c07b")},
-        {"function", plain("#61afef")},
-        {"function.builtin", plain("#56b6c2")},
-        {"variable", plain("#abb2bf")},
-        {"variable.builtin", plain("#e06c75")},
-        {"variable.parameter", plain("#d19a66")},
-        {"property", plain("#e06c75")},
-        {"label", plain("#e06c75")},
-        {"attribute", plain("#d19a66")},
-        {"tag", plain("#e06c75")},
-        {"punctuation", plain("#abb2bf")},
-        {"punctuation.special", plain("#c678dd")},
-        {"embedded", plain("#abb2bf")},
-        {"heading", bold("#e06c75")},
-        {"diff.plus", plain("#98c379")},
-        {"diff.minus", plain("#e06c75")},
+        {"comment", italic("#7f848e")},         {"string", plain("#98c379")},
+        {"string.special", plain("#56b6c2")},   {"escape", plain("#56b6c2")},
+        {"number", plain("#d19a66")},           {"constant", plain("#d19a66")},
+        {"constant.builtin", plain("#d19a66")}, {"keyword", plain("#c678dd")},
+        {"operator", plain("#56b6c2")},         {"type", plain("#e5c07b")},
+        {"type.builtin", plain("#e5c07b")},     {"constructor", plain("#e5c07b")},
+        {"module", plain("#e5c07b")},           {"function", plain("#61afef")},
+        {"function.builtin", plain("#56b6c2")}, {"variable", plain("#abb2bf")},
+        {"variable.builtin", plain("#e06c75")}, {"variable.parameter", plain("#d19a66")},
+        {"property", plain("#e06c75")},         {"label", plain("#e06c75")},
+        {"attribute", plain("#d19a66")},        {"tag", plain("#e06c75")},
+        {"punctuation", plain("#abb2bf")},      {"punctuation.special", plain("#c678dd")},
+        {"embedded", plain("#abb2bf")},         {"heading", bold("#e06c75")},
+        {"diff.plus", plain("#98c379")},        {"diff.minus", plain("#e06c75")},
     };
     return theme;
 }
@@ -176,34 +157,20 @@ Theme Theme::purple()
     theme.gradientStart = QColor("#6d4fd8");
     theme.gradientEnd = QColor("#a855f7");
     theme.syntaxStyles = {
-        {"comment", italic("#6e6790")},
-        {"string", plain("#9fe0c0")},
-        {"string.special", plain("#7dd3fc")},
-        {"escape", plain("#7dd3fc")},
-        {"number", plain("#f7a8c4")},
-        {"constant", plain("#f7a8c4")},
-        {"constant.builtin", plain("#f7a8c4")},
-        {"keyword", plain("#c4a1ff")},
-        {"operator", plain("#89ddff")},
-        {"type", plain("#f5c2e7")},
-        {"type.builtin", plain("#f5c2e7")},
-        {"constructor", plain("#f5c2e7")},
-        {"module", plain("#f5c2e7")},
-        {"function", plain("#8fb4ff")},
-        {"function.builtin", plain("#89ddff")},
-        {"variable", plain("#ddd6f3")},
-        {"variable.builtin", plain("#ff8fb1")},
-        {"variable.parameter", plain("#f0c38e")},
-        {"property", plain("#b9a8ff")},
-        {"label", plain("#ff8fb1")},
-        {"attribute", plain("#f0c38e")},
-        {"tag", plain("#ff8fb1")},
-        {"punctuation", plain("#a39cc2")},
-        {"punctuation.special", plain("#c4a1ff")},
-        {"embedded", plain("#ddd6f3")},
-        {"heading", bold("#c4a1ff")},
-        {"diff.plus", plain("#9fe0c0")},
-        {"diff.minus", plain("#ff8fb1")},
+        {"comment", italic("#6e6790")},         {"string", plain("#9fe0c0")},
+        {"string.special", plain("#7dd3fc")},   {"escape", plain("#7dd3fc")},
+        {"number", plain("#f7a8c4")},           {"constant", plain("#f7a8c4")},
+        {"constant.builtin", plain("#f7a8c4")}, {"keyword", plain("#c4a1ff")},
+        {"operator", plain("#89ddff")},         {"type", plain("#f5c2e7")},
+        {"type.builtin", plain("#f5c2e7")},     {"constructor", plain("#f5c2e7")},
+        {"module", plain("#f5c2e7")},           {"function", plain("#8fb4ff")},
+        {"function.builtin", plain("#89ddff")}, {"variable", plain("#ddd6f3")},
+        {"variable.builtin", plain("#ff8fb1")}, {"variable.parameter", plain("#f0c38e")},
+        {"property", plain("#b9a8ff")},         {"label", plain("#ff8fb1")},
+        {"attribute", plain("#f0c38e")},        {"tag", plain("#ff8fb1")},
+        {"punctuation", plain("#a39cc2")},      {"punctuation.special", plain("#c4a1ff")},
+        {"embedded", plain("#ddd6f3")},         {"heading", bold("#c4a1ff")},
+        {"diff.plus", plain("#9fe0c0")},        {"diff.minus", plain("#ff8fb1")},
     };
     return theme;
 }
@@ -240,34 +207,20 @@ Theme Theme::light()
     theme.error = QColor("#d1242f");
     theme.warning = QColor("#9a6700");
     theme.syntaxStyles = {
-        {"comment", italic("#a0a1a7")},
-        {"string", plain("#50a14f")},
-        {"string.special", plain("#0184bc")},
-        {"escape", plain("#0184bc")},
-        {"number", plain("#986801")},
-        {"constant", plain("#986801")},
-        {"constant.builtin", plain("#986801")},
-        {"keyword", plain("#a626a4")},
-        {"operator", plain("#0184bc")},
-        {"type", plain("#c18401")},
-        {"type.builtin", plain("#c18401")},
-        {"constructor", plain("#c18401")},
-        {"module", plain("#c18401")},
-        {"function", plain("#4078f2")},
-        {"function.builtin", plain("#0184bc")},
-        {"variable", plain("#383a42")},
-        {"variable.builtin", plain("#e45649")},
-        {"variable.parameter", plain("#986801")},
-        {"property", plain("#e45649")},
-        {"label", plain("#e45649")},
-        {"attribute", plain("#986801")},
-        {"tag", plain("#e45649")},
-        {"punctuation", plain("#383a42")},
-        {"punctuation.special", plain("#a626a4")},
-        {"embedded", plain("#383a42")},
-        {"heading", bold("#e45649")},
-        {"diff.plus", plain("#50a14f")},
-        {"diff.minus", plain("#e45649")},
+        {"comment", italic("#a0a1a7")},         {"string", plain("#50a14f")},
+        {"string.special", plain("#0184bc")},   {"escape", plain("#0184bc")},
+        {"number", plain("#986801")},           {"constant", plain("#986801")},
+        {"constant.builtin", plain("#986801")}, {"keyword", plain("#a626a4")},
+        {"operator", plain("#0184bc")},         {"type", plain("#c18401")},
+        {"type.builtin", plain("#c18401")},     {"constructor", plain("#c18401")},
+        {"module", plain("#c18401")},           {"function", plain("#4078f2")},
+        {"function.builtin", plain("#0184bc")}, {"variable", plain("#383a42")},
+        {"variable.builtin", plain("#e45649")}, {"variable.parameter", plain("#986801")},
+        {"property", plain("#e45649")},         {"label", plain("#e45649")},
+        {"attribute", plain("#986801")},        {"tag", plain("#e45649")},
+        {"punctuation", plain("#383a42")},      {"punctuation.special", plain("#a626a4")},
+        {"embedded", plain("#383a42")},         {"heading", bold("#e45649")},
+        {"diff.plus", plain("#50a14f")},        {"diff.minus", plain("#e45649")},
     };
     return theme;
 }

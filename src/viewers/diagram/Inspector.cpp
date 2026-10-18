@@ -199,7 +199,8 @@ void Inspector::rebuild()
     // in keeps its focus.
     if (section_ && key == shown_ && !key.startsWith(QLatin1Char('s')) && !key.startsWith(QLatin1Char('l')))
         return;
-    if (section_ && key == shown_ && section_->findChild<QWidget *>() && section_->isAncestorOf(QApplication::focusWidget()))
+    if (section_ && key == shown_ && section_->findChild<QWidget *>() &&
+        section_->isAncestorOf(QApplication::focusWidget()))
         return;
     shown_ = key;
     if (section_) {
@@ -214,10 +215,13 @@ void Inspector::rebuild()
         section_ = new QWidget(properties_);
         auto *layout = new QVBoxLayout(section_);
         layout->setContentsMargins(0, 0, 0, 0);
-        layout->addWidget(sectionTitle(tr("%n elements", nullptr, int(board_->selection().size() + board_->linkSelection().size())).toUpper(), section_));
+        layout->addWidget(sectionTitle(
+            tr("%n elements", nullptr, int(board_->selection().size() + board_->linkSelection().size())).toUpper(),
+            section_));
         if (!board_->selection().isEmpty()) {
             layout->addWidget(fieldLabel(tr("Color"), section_));
-            layout->addWidget(swatchGrid(swatches(), section_, [this](const QString &color) { board_->paintSelection(color); }));
+            layout->addWidget(
+                swatchGrid(swatches(), section_, [this](const QString &color) { board_->paintSelection(color); }));
         }
         layout->addStretch();
     } else {
@@ -246,8 +250,10 @@ void addPropertyFields(QWidget *section, QVBoxLayout *layout, const QList<Proper
         case Property::Kind::Text: {
             layout->addWidget(fieldLabel(property.label, section));
             auto *field = new QLineEdit(get(id).toString(), section);
-            QObject::connect(field, &QLineEdit::textEdited, section, [set, id](const QString &value) { set(id, value, true); });
-            QObject::connect(field, &QLineEdit::editingFinished, section, [set, id, field] { set(id, field->text(), false); });
+            QObject::connect(field, &QLineEdit::textEdited, section,
+                             [set, id](const QString &value) { set(id, value, true); });
+            QObject::connect(field, &QLineEdit::editingFinished, section,
+                             [set, id, field] { set(id, field->text(), false); });
             layout->addWidget(field);
             break;
         }
@@ -362,9 +368,9 @@ QWidget *Inspector::buildLinkSection()
     const Shape *from = board_->shape(link->from);
     const Shape *to = board_->shape(link->to);
     layout->addWidget(sectionTitle(tr("LINK"), section));
-    auto *ends = new QLabel(QStringLiteral("%1 → %2").arg(from ? from->displayText() : QString(),
-                                                          to ? to->displayText() : QString()),
-                            section);
+    auto *ends = new QLabel(
+        QStringLiteral("%1 → %2").arg(from ? from->displayText() : QString(), to ? to->displayText() : QString()),
+        section);
     ends->setWordWrap(true);
     layout->addWidget(ends);
     const QString id = link->id;
@@ -421,7 +427,8 @@ QWidget *Inspector::buildLinkSection()
     width->setCurrentIndex(std::max(0, width->findData(int(link->customWidth.value_or(0)))));
     connect(width, &QComboBox::activated, this, [this, width](int index) {
         const int value = width->itemData(index).toInt();
-        board_->styleSelectedLinks(QJsonObject{{QStringLiteral("customWidth"), value ? QJsonValue(value) : QJsonValue()}});
+        board_->styleSelectedLinks(
+            QJsonObject{{QStringLiteral("customWidth"), value ? QJsonValue(value) : QJsonValue()}});
     });
     layout->addWidget(width);
     auto *reset = new QPushButton(tr("Default Appearance"), section);
@@ -455,8 +462,8 @@ QWidget *Inspector::buildDocumentSection()
         auto *direction = new QComboBox(section);
         for (const QString &value : directions)
             direction->addItem(directionLabel(value), value);
-        direction->setCurrentIndex(
-            std::max(0, direction->findData(board_->meta.value(QStringLiteral("rankdir")).toString(QStringLiteral("TB")))));
+        direction->setCurrentIndex(std::max(
+            0, direction->findData(board_->meta.value(QStringLiteral("rankdir")).toString(QStringLiteral("TB")))));
         connect(direction, &QComboBox::activated, this, [this, direction](int index) {
             board_->meta.insert(QStringLiteral("rankdir"), direction->itemData(index).toString());
             canvas_->arrange(true);

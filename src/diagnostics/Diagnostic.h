@@ -6,7 +6,10 @@
 // A problem found in a text, shown in the editor with a wavy underline and
 // its message on hover.
 struct Diagnostic {
-    enum class Severity { Error, Warning };
+    enum class Severity {
+        Error,
+        Warning
+    };
 
     Severity severity = Severity::Error;
     // UTF-8 byte offsets [start, end[ in the text, as Scintilla's positions.

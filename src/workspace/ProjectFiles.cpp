@@ -21,8 +21,8 @@ QFileInfoList list(const QString &folder, const Options &options)
                 return;
             const QString path = entry.absoluteFilePath();
             if (entry.isDir()) {
-                if (!entry.isSymLink() && entry.fileName() != QLatin1String("node_modules")
-                    && entry.fileName() != QLatin1String(".git") && !ignoreRules.isIgnored(path, true))
+                if (!entry.isSymLink() && entry.fileName() != QLatin1String("node_modules") &&
+                    entry.fileName() != QLatin1String(".git") && !ignoreRules.isIgnored(path, true))
                     visit(path);
                 continue;
             }

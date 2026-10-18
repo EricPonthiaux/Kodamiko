@@ -73,8 +73,8 @@ Changes read(const RepositoryInfo &repository, bool amend, bool stageEverything,
     const QString &workDir = repository.workDir;
     Changes changes;
     if (!repository.unborn) {
-        const QString log = QString::fromUtf8(Git::run(
-            workDir, {QStringLiteral("log"), QStringLiteral("-n"), QStringLiteral("15"), QStringLiteral("--format=%s")}));
+        const QString log = QString::fromUtf8(Git::run(workDir, {QStringLiteral("log"), QStringLiteral("-n"),
+                                                                 QStringLiteral("15"), QStringLiteral("--format=%s")}));
         changes.recentSubjects = log.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
     }
 
@@ -85,10 +85,10 @@ Changes read(const RepositoryInfo &repository, bool amend, bool stageEverything,
         if (!repository.unborn)
             range = {QStringLiteral("HEAD")};
         paths = {QStringLiteral("--"), pathspec.isEmpty() ? QStringLiteral(".") : pathspec};
-        changes.untracked = Git::splitNul(Git::run(workDir, QStringList{QStringLiteral("ls-files"), QStringLiteral("-z"),
-                                                                        QStringLiteral("--others"),
-                                                                        QStringLiteral("--exclude-standard")}
-                                                                + paths));
+        changes.untracked = Git::splitNul(
+            Git::run(workDir, QStringList{QStringLiteral("ls-files"), QStringLiteral("-z"), QStringLiteral("--others"),
+                                          QStringLiteral("--exclude-standard")} +
+                                  paths));
     } else {
         range = {QStringLiteral("--cached")};
         if (amend)
@@ -214,8 +214,8 @@ void CommitMessageGenerator::cancel()
     setRunning(false);
 }
 
-void CommitMessageGenerator::onChangesRead(const std::optional<CommitMessage::Changes> &changes,
-                                           const QString &error, const QString &workDir, int generation)
+void CommitMessageGenerator::onChangesRead(const std::optional<CommitMessage::Changes> &changes, const QString &error,
+                                           const QString &workDir, int generation)
 {
     if (generation != generation_)
         return;

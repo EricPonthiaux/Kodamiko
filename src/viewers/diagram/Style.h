@@ -114,15 +114,27 @@ struct Font {
 
     Font() = default;
     constexpr Font(qreal px_, int weight_ = 400, bool italic_ = false, bool mono_ = false)
-        : px(px_), weight(weight_), italic(italic_), mono(mono_)
+        : px(px_)
+        , weight(weight_)
+        , italic(italic_)
+        , mono(mono_)
     {
     }
 };
 
-enum class Align { Left, Center, Right };
+enum class Align {
+    Left,
+    Center,
+    Right
+};
 // Canvas text baselines: top of the em box, its middle, the alphabetic
 // baseline, the bottom of the em box.
-enum class Baseline { Top, Middle, Alphabetic, Bottom };
+enum class Baseline {
+    Top,
+    Middle,
+    Alphabetic,
+    Bottom
+};
 
 namespace text {
 

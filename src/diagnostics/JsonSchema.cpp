@@ -29,41 +29,60 @@ QString compact(const QJsonValue &value)
 
 QString typeName(const QString &type)
 {
-    if (type == QLatin1String("string")) return tr("a string");
-    if (type == QLatin1String("number")) return tr("a number");
-    if (type == QLatin1String("integer")) return tr("an integer");
-    if (type == QLatin1String("boolean")) return tr("true or false");
-    if (type == QLatin1String("object")) return tr("an object");
-    if (type == QLatin1String("array")) return tr("an array");
-    if (type == QLatin1String("null")) return QStringLiteral("null");
+    if (type == QLatin1String("string"))
+        return tr("a string");
+    if (type == QLatin1String("number"))
+        return tr("a number");
+    if (type == QLatin1String("integer"))
+        return tr("an integer");
+    if (type == QLatin1String("boolean"))
+        return tr("true or false");
+    if (type == QLatin1String("object"))
+        return tr("an object");
+    if (type == QLatin1String("array"))
+        return tr("an array");
+    if (type == QLatin1String("null"))
+        return QStringLiteral("null");
     return type;
 }
 
 QString actualName(const JsonNode &node)
 {
     switch (node.type) {
-    case QJsonValue::String: return tr("a string");
-    case QJsonValue::Double: return tr("a number");
-    case QJsonValue::Bool: return node.scalar.toBool() ? QStringLiteral("true") : QStringLiteral("false");
-    case QJsonValue::Object: return tr("an object");
-    case QJsonValue::Array: return tr("an array");
-    default: return QStringLiteral("null");
+    case QJsonValue::String:
+        return tr("a string");
+    case QJsonValue::Double:
+        return tr("a number");
+    case QJsonValue::Bool:
+        return node.scalar.toBool() ? QStringLiteral("true") : QStringLiteral("false");
+    case QJsonValue::Object:
+        return tr("an object");
+    case QJsonValue::Array:
+        return tr("an array");
+    default:
+        return QStringLiteral("null");
     }
 }
 
 bool hasType(const JsonNode &node, const QString &type)
 {
     switch (node.type) {
-    case QJsonValue::String: return type == QLatin1String("string");
-    case QJsonValue::Bool: return type == QLatin1String("boolean");
-    case QJsonValue::Object: return type == QLatin1String("object");
-    case QJsonValue::Array: return type == QLatin1String("array");
-    case QJsonValue::Null: return type == QLatin1String("null");
+    case QJsonValue::String:
+        return type == QLatin1String("string");
+    case QJsonValue::Bool:
+        return type == QLatin1String("boolean");
+    case QJsonValue::Object:
+        return type == QLatin1String("object");
+    case QJsonValue::Array:
+        return type == QLatin1String("array");
+    case QJsonValue::Null:
+        return type == QLatin1String("null");
     case QJsonValue::Double: {
         const double number = node.scalar.toDouble();
         return type == QLatin1String("number") || (type == QLatin1String("integer") && std::floor(number) == number);
     }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -140,7 +159,8 @@ QString patternMessage(const QString &text, const QString &pattern, const QJsonO
     QString message = tr("“%1” does not have the expected form").arg(text);
     const QString description = schema.value(QLatin1String("description")).toString().section(QLatin1Char('\n'), 0, 0);
     if (!description.isEmpty())
-        message += QStringLiteral(" (%1)").arg(description.trimmed().chopped(description.trimmed().endsWith(QLatin1Char('.')) ? 1 : 0));
+        message += QStringLiteral(" (%1)").arg(
+            description.trimmed().chopped(description.trimmed().endsWith(QLatin1Char('.')) ? 1 : 0));
     QStringList examples;
     for (const QJsonValue &example : schema.value(QLatin1String("examples")).toArray()) {
         if (examples.size() < 3)
@@ -247,7 +267,8 @@ JsonSchema::Result JsonSchema::check(const JsonNode &node, const QJsonValue &sch
     const QJsonObject schema = resolve(schemaValue);
 
     const QStringList types = typesOf(schema);
-    if (!types.isEmpty() && std::none_of(types.begin(), types.end(), [&](const QString &type) { return hasType(node, type); })) {
+    if (!types.isEmpty() &&
+        std::none_of(types.begin(), types.end(), [&](const QString &type) { return hasType(node, type); })) {
         QStringList names;
         for (const QString &type : types)
             names.append(typeName(type));
@@ -281,8 +302,9 @@ JsonSchema::Result JsonSchema::check(const JsonNode &node, const QJsonValue &sch
         const QString text = node.scalar.toString();
         const qsizetype length = text.toUcs4().size();
         if (schema.contains(QLatin1String("minLength")) && length < schema.value(QLatin1String("minLength")).toInt())
-            result.add(node, length == 0 ? tr("Must not be empty")
-                                         : tr("At least %1 characters").arg(schema.value(QLatin1String("minLength")).toInt()));
+            result.add(node, length == 0
+                                 ? tr("Must not be empty")
+                                 : tr("At least %1 characters").arg(schema.value(QLatin1String("minLength")).toInt()));
         if (schema.contains(QLatin1String("maxLength")) && length > schema.value(QLatin1String("maxLength")).toInt())
             result.add(node, tr("At most %1 characters").arg(schema.value(QLatin1String("maxLength")).toInt()));
         if (schema.contains(QLatin1String("pattern"))) {
@@ -313,10 +335,14 @@ JsonSchema::Result JsonSchema::check(const JsonNode &node, const QJsonValue &sch
             if (!itemSchema.isUndefined())
                 result.diagnostics += check(node.items[i], itemSchema, depth + 1).diagnostics;
         }
-        if (schema.contains(QLatin1String("minItems")) && node.items.size() < schema.value(QLatin1String("minItems")).toInt())
-            result.add(node, QCoreApplication::translate("JsonSchema", "At least %n item(s)", nullptr, schema.value(QLatin1String("minItems")).toInt()));
-        if (schema.contains(QLatin1String("maxItems")) && node.items.size() > schema.value(QLatin1String("maxItems")).toInt())
-            result.add(node, QCoreApplication::translate("JsonSchema", "At most %n item(s)", nullptr, schema.value(QLatin1String("maxItems")).toInt()));
+        if (schema.contains(QLatin1String("minItems")) &&
+            node.items.size() < schema.value(QLatin1String("minItems")).toInt())
+            result.add(node, QCoreApplication::translate("JsonSchema", "At least %n item(s)", nullptr,
+                                                         schema.value(QLatin1String("minItems")).toInt()));
+        if (schema.contains(QLatin1String("maxItems")) &&
+            node.items.size() > schema.value(QLatin1String("maxItems")).toInt())
+            result.add(node, QCoreApplication::translate("JsonSchema", "At most %n item(s)", nullptr,
+                                                         schema.value(QLatin1String("maxItems")).toInt()));
         if (schema.value(QLatin1String("uniqueItems")).toBool()) {
             for (qsizetype i = 1; i < node.items.size(); ++i) {
                 const QJsonValue item = node.items[i].toJson();
@@ -378,7 +404,8 @@ JsonSchema::Result JsonSchema::check(const JsonNode &node, const QJsonValue &sch
         result.add(node, tr("Expected %1, not %2").arg(expected.join(tr(" or ")), actualName(node)));
     }
 
-    if (schema.contains(QLatin1String("not")) && check(node, schema.value(QLatin1String("not")), depth + 1).diagnostics.isEmpty())
+    if (schema.contains(QLatin1String("not")) &&
+        check(node, schema.value(QLatin1String("not")), depth + 1).diagnostics.isEmpty())
         result.add(node, tr("Not allowed here"));
     return result;
 }
@@ -406,8 +433,9 @@ void JsonSchema::checkObject(const JsonNode &node, const QJsonObject &schema, in
             const QString suggestion = closestName(member.key, properties.keys());
             if (additional.isBool() && !additional.toBool()) {
                 result.add(member.keyStart, member.keyEnd,
-                           suggestion.isEmpty() ? tr("Unknown key “%1”").arg(member.key)
-                                                : tr("Unknown key “%1”: did you mean “%2”?").arg(member.key, suggestion));
+                           suggestion.isEmpty()
+                               ? tr("Unknown key “%1”").arg(member.key)
+                               : tr("Unknown key “%1”: did you mean “%2”?").arg(member.key, suggestion));
             } else if (additional.isObject()) {
                 result.diagnostics += check(member.value, additional, depth + 1).diagnostics;
             } else if (!suggestion.isEmpty()) {

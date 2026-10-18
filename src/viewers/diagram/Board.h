@@ -84,8 +84,7 @@ public:
     QJsonObject creationLinkProps;
     // A shape centered on `center`, selected; `edit` opens its editor. One
     // step of history (with the first edit).
-    Shape *createShapeAt(QPointF center, const QString &type = {}, const QJsonObject &props = {},
-                         bool edit = true);
+    Shape *createShapeAt(QPointF center, const QString &type = {}, const QJsonObject &props = {}, bool edit = true);
     // A link with the default type and the current relation preset.
     Link *connect(const QString &from, const QString &to, const QJsonObject &props = {});
 

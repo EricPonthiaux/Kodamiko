@@ -10,7 +10,12 @@
 // skills (SKILL.md) and agents.
 namespace ClaudeLint {
 
-enum class Kind { None, Settings, Skill, Agent };
+enum class Kind {
+    None,
+    Settings,
+    Skill,
+    Agent
+};
 
 // What `path` is to Claude Code: settings.json or settings.local.json in a
 // .claude folder or Claude's configuration folder, managed-settings.json,

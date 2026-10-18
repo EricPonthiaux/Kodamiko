@@ -55,7 +55,8 @@ void SnippetSession::start(const ExpandedSnippet &snippet, int start)
     editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, stopIndicator, editor_->theme().mutedText);
     editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETALPHA, stopIndicator, 20);
     editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETOUTLINEALPHA, stopIndicator, 110);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETSTYLE, currentIndicator, QsciScintillaBase::INDIC_STRAIGHTBOX);
+    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETSTYLE, currentIndicator,
+                           QsciScintillaBase::INDIC_STRAIGHTBOX);
     editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, currentIndicator, accent);
     editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETALPHA, currentIndicator, 40);
     editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETOUTLINEALPHA, currentIndicator, 220);
@@ -122,12 +123,13 @@ void SnippetSession::paint()
 {
     clearBoxes();
     for (int i = 0; i < stops_.size() - 1; ++i) {
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT, i == current_ ? currentIndicator
-                                                                                          : stopIndicator);
+        editor_->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT,
+                               i == current_ ? currentIndicator : stopIndicator);
         for (const Range &range : stops_[i].ranges) {
             if (range.end > range.start)
                 editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORFILLRANGE,
-                                       static_cast<unsigned long>(range.start), static_cast<long>(range.end - range.start));
+                                       static_cast<unsigned long>(range.start),
+                                       static_cast<long>(range.end - range.start));
         }
     }
 }

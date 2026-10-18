@@ -44,8 +44,7 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
         QStringLiteral("list_terminals"), QStringLiteral("Terminals"),
         QStringLiteral("The terminal tabs of Duet (the first is this Claude session), with whether their program "
                        "still runs: what read_terminal can read."),
-        object({}),
-        McpTool::immediate([context](const QJsonObject &) {
+        object({}), McpTool::immediate([context](const QJsonObject &) {
             QJsonArray terminals;
             const auto tabs = context.terminals ? context.terminals() : QList<std::pair<QString, TerminalWidget *>>();
             for (qsizetype i = 0; i < tabs.size(); ++i)
@@ -69,9 +68,10 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
             if (id < 0 || id >= tabs.size())
                 return McpResult::error(QStringLiteral("No terminal %1 (see list_terminals)").arg(id));
             const int count = std::clamp(arguments.value(QStringLiteral("lines")).toInt(defaultLines), 1, maximumLines);
-            return McpResult::json(QJsonObject{{QStringLiteral("title"), tabs[id].first},
-                                               {QStringLiteral("running"), tabs[id].second->isRunning()},
-                                               {QStringLiteral("text"), tabs[id].second->lastLines(count).join(QLatin1Char('\n'))}});
+            return McpResult::json(
+                QJsonObject{{QStringLiteral("title"), tabs[id].first},
+                            {QStringLiteral("running"), tabs[id].second->isRunning()},
+                            {QStringLiteral("text"), tabs[id].second->lastLines(count).join(QLatin1Char('\n'))}});
         })));
 
     registry.addTool(McpTool::sensitive(
@@ -94,7 +94,8 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
                 return;
             }
             const QString command = arguments.value(QStringLiteral("command")).toString();
-            const QString title = arguments.value(QStringLiteral("title")).toString(command.section(QLatin1Char(' '), 0, 0));
+            const QString title =
+                arguments.value(QStringLiteral("title")).toString(command.section(QLatin1Char(' '), 0, 0));
             TerminalWidget *terminal = context.addTerminal(title, commandSpec(context.folder(), command));
             if (!terminal) {
                 reply(McpResult::error(QStringLiteral("The terminal could not start")));
@@ -109,8 +110,8 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
                     return;
                 *answered = true;
                 QJsonObject result{{QStringLiteral("finished"), finished},
-                                   {QStringLiteral("output"), guard ? guard->lastLines(outputLines).join(QLatin1Char('\n'))
-                                                                    : QString()}};
+                                   {QStringLiteral("output"),
+                                    guard ? guard->lastLines(outputLines).join(QLatin1Char('\n')) : QString()}};
                 if (finished)
                     result.insert(QStringLiteral("exitCode"), exitCode);
                 reply(McpResult::json(result));

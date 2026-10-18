@@ -52,8 +52,8 @@ QPoint belowCaret(EditorWidget *editor)
     const long caret = editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS);
     const long line = editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret);
     const QPoint point(int(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
-                       int(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret)
-                           + editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
+                       int(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret) +
+                           editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
     return editor->viewport()->mapToGlobal(point);
 }
 
@@ -157,8 +157,10 @@ int CodeIntelligence::positionOf(EditorWidget *editor, const Position &position)
 {
     if (position.line >= editor->lines())
         return int(editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
-    const int lineStart = int(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, std::max(position.line, 0)));
-    const int lineEnd = int(editor->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, std::max(position.line, 0)));
+    const int lineStart =
+        int(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, std::max(position.line, 0)));
+    const int lineEnd =
+        int(editor->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, std::max(position.line, 0)));
     const QString line = QString::fromUtf8(editor->utf8Range(lineStart, lineEnd));
     return lineStart + int(line.left(std::max(position.character, 0)).toUtf8().size());
 }
@@ -178,8 +180,9 @@ LspClient *CodeIntelligence::serverFor(EditorWidget *editor, bool quiet)
     if (!client) {
         if (!quiet) {
             const QString failure = servers_->failure(editor->languageId());
-            emit statusMessage(failure.isEmpty() ? tr("No language server for %1").arg(QFileInfo(editor->filePath()).fileName())
-                                                 : failure);
+            emit statusMessage(failure.isEmpty()
+                                   ? tr("No language server for %1").arg(QFileInfo(editor->filePath()).fileName())
+                                   : failure);
         }
         return nullptr;
     }
@@ -215,24 +218,25 @@ void CodeIntelligence::showHover(EditorWidget *editor, int bytePosition, const Q
     if (!client || (!explicitRequest && !client->isReady()))
         return;
     const int generation = ++hoverGeneration_;
-    client->request(QStringLiteral("textDocument/hover"), positionParams(editor, bytePosition),
-                    [this, generation, guard = QPointer<EditorWidget>(editor), where,
-                     explicitRequest](const QJsonValue &result, const QString &) {
-                        if (generation != hoverGeneration_ || !guard)
-                            return;
-                        QString text = plainText(result.toObject().value("contents")).trimmed();
-                        if (text.isEmpty()) {
-                            if (explicitRequest)
-                                emit statusMessage(tr("No documentation here"));
-                            return;
-                        }
-                        if (text.size() > maxDocumentationLength)
-                            text = text.left(maxDocumentationLength) + QStringLiteral("…");
-                        QToolTip::showText(where,
-                                           QStringLiteral("<pre style=\"white-space: pre-wrap; margin: 0\">%1</pre>")
-                                               .arg(text.toHtmlEscaped()),
-                                           guard->viewport());
-                    });
+    client->request(
+        QStringLiteral("textDocument/hover"), positionParams(editor, bytePosition),
+        [this, generation, guard = QPointer<EditorWidget>(editor), where, explicitRequest](const QJsonValue &result,
+                                                                                           const QString &) {
+            if (generation != hoverGeneration_ || !guard)
+                return;
+            QString text = plainText(result.toObject().value("contents")).trimmed();
+            if (text.isEmpty()) {
+                if (explicitRequest)
+                    emit statusMessage(tr("No documentation here"));
+                return;
+            }
+            if (text.size() > maxDocumentationLength)
+                text = text.left(maxDocumentationLength) + QStringLiteral("…");
+            QToolTip::showText(
+                where,
+                QStringLiteral("<pre style=\"white-space: pre-wrap; margin: 0\">%1</pre>").arg(text.toHtmlEscaped()),
+                guard->viewport());
+        });
 }
 
 void CodeIntelligence::showDocumentation()
@@ -319,7 +323,9 @@ void CodeIntelligence::requestSignatureHelp(EditorWidget *editor, bool explicitR
                                   uintptr_t(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)),
                                   bytes.constData());
             if (highlightStart >= 0 && highlightEnd > highlightStart) {
-                const auto byteOffset = [&shown](int characters) { return long(shown.left(characters).toUtf8().size()); };
+                const auto byteOffset = [&shown](int characters) {
+                    return long(shown.left(characters).toUtf8().size());
+                };
                 editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETHLT,
                                       static_cast<unsigned long>(byteOffset(offset + highlightStart)),
                                       byteOffset(offset + highlightEnd));
@@ -375,33 +381,34 @@ void CodeIntelligence::findUsages()
     QJsonObject params = positionParams(editor, caret);
     params.insert("context", QJsonObject{{"includeDeclaration", true}});
     emit statusMessage(tr("Looking for the usages of “%1”…").arg(word));
-    client->request(QStringLiteral("textDocument/references"), params,
-                    [this, guard = QPointer<EditorWidget>(editor), word](const QJsonValue &result, const QString &error) {
-                        if (!guard)
-                            return;
-                        if (!error.isEmpty()) {
-                            emit statusMessage(tr("Find Usages failed: %1").arg(error));
-                            return;
-                        }
-                        QList<Location> locations = parseLocations(result);
-                        std::sort(locations.begin(), locations.end(), [](const Location &a, const Location &b) {
-                            return a.filePath != b.filePath ? a.filePath < b.filePath : a.range.start < b.range.start;
-                        });
-                        if (locations.isEmpty()) {
-                            emit statusMessage(tr("No usages of “%1”").arg(word));
-                            return;
-                        }
-                        emit statusMessage(locations.size() == 1 ? tr("1 usage of “%1”").arg(word)
-                                                                 : tr("%1 usages of “%2”").arg(locations.size()).arg(word));
-                        if (locations.size() > maxUsagesShown)
-                            locations.resize(maxUsagesShown);
-                        QHash<QString, QStringList> lines;
-                        QStringList entries;
-                        for (const Location &location : std::as_const(locations))
-                            entries.append(describe(location, lines));
-                        if (const int chosen = chooseFrom(guard, entries); chosen >= 0)
-                            jumpTo(locations.at(chosen));
-                    });
+    client->request(
+        QStringLiteral("textDocument/references"), params,
+        [this, guard = QPointer<EditorWidget>(editor), word](const QJsonValue &result, const QString &error) {
+            if (!guard)
+                return;
+            if (!error.isEmpty()) {
+                emit statusMessage(tr("Find Usages failed: %1").arg(error));
+                return;
+            }
+            QList<Location> locations = parseLocations(result);
+            std::sort(locations.begin(), locations.end(), [](const Location &a, const Location &b) {
+                return a.filePath != b.filePath ? a.filePath < b.filePath : a.range.start < b.range.start;
+            });
+            if (locations.isEmpty()) {
+                emit statusMessage(tr("No usages of “%1”").arg(word));
+                return;
+            }
+            emit statusMessage(locations.size() == 1 ? tr("1 usage of “%1”").arg(word)
+                                                     : tr("%1 usages of “%2”").arg(locations.size()).arg(word));
+            if (locations.size() > maxUsagesShown)
+                locations.resize(maxUsagesShown);
+            QHash<QString, QStringList> lines;
+            QStringList entries;
+            for (const Location &location : std::as_const(locations))
+                entries.append(describe(location, lines));
+            if (const int chosen = chooseFrom(guard, entries); chosen >= 0)
+                jumpTo(locations.at(chosen));
+        });
 }
 
 void CodeIntelligence::jumpTo(const Location &location)
@@ -428,7 +435,10 @@ QString CodeIntelligence::describe(const Location &location, QHash<QString, QStr
     QString path = QDir(servers_->folder()).relativeFilePath(location.filePath);
     if (path.startsWith(QLatin1String("..")))
         path = location.filePath;
-    return QStringLiteral("%1:%2   %3").arg(QDir::toNativeSeparators(path)).arg(location.range.start.line + 1).arg(code);
+    return QStringLiteral("%1:%2   %3")
+        .arg(QDir::toNativeSeparators(path))
+        .arg(location.range.start.line + 1)
+        .arg(code);
 }
 
 int CodeIntelligence::chooseFrom(EditorWidget *editor, const QStringList &entries) const
@@ -459,9 +469,9 @@ void CodeIntelligence::rename()
     if (!client)
         return;
     bool accepted = false;
-    const QString newName = QInputDialog::getText(editor, tr("Rename"), tr("Rename “%1” to:").arg(word),
-                                                  QLineEdit::Normal, word, &accepted)
-                                .trimmed();
+    const QString newName =
+        QInputDialog::getText(editor, tr("Rename"), tr("Rename “%1” to:").arg(word), QLineEdit::Normal, word, &accepted)
+            .trimmed();
     if (!accepted || newName.isEmpty() || newName == word)
         return;
     syncOpenEditors(client, editor->languageId());
@@ -479,8 +489,9 @@ void CodeIntelligence::rename()
                             return;
                         }
                         const int files = applyWorkspaceEdit(edit);
-                        emit statusMessage(files == 1 ? tr("Renamed “%1” to “%2”").arg(word, newName)
-                                                      : tr("Renamed “%1” to “%2” in %3 files").arg(word, newName).arg(files));
+                        emit statusMessage(files == 1
+                                               ? tr("Renamed “%1” to “%2”").arg(word, newName)
+                                               : tr("Renamed “%1” to “%2” in %3 files").arg(word, newName).arg(files));
                     });
 }
 
@@ -497,50 +508,50 @@ void CodeIntelligence::showQuickFixes()
         {"range", toJson(Range{lspPosition(editor, from), lspPosition(editor, to)})},
         {"context", QJsonObject{{"diagnostics", QJsonArray{}}}},
     };
-    client->request(
-        QStringLiteral("textDocument/codeAction"), params,
-        [this, guard = QPointer<EditorWidget>(editor), server = QPointer<LspClient>(client)](const QJsonValue &result,
-                                                                                            const QString &error) {
-            if (!guard)
-                return;
-            if (!error.isEmpty()) {
-                emit statusMessage(tr("Quick fixes failed: %1").arg(error));
-                return;
-            }
-            QList<QJsonObject> actions;
-            QStringList titles;
-            for (const QJsonValue &item : result.toArray()) {
-                const QJsonObject action = item.toObject();
-                if (action.contains("disabled") || action.value("title").toString().isEmpty())
-                    continue;
-                actions.append(action);
-                titles.append(action.value("title").toString());
-            }
-            if (actions.isEmpty()) {
-                emit statusMessage(tr("No quick fixes here"));
-                return;
-            }
-            const int chosen = chooseFrom(guard, titles);
-            if (chosen < 0)
-                return;
-            const QJsonObject action = actions.at(chosen);
-            if (action.contains("edit"))
-                applyWorkspaceEdit(parseWorkspaceEdit(action.value("edit").toObject()));
-            // A Command, or a CodeAction carrying one: the server carries
-            // it out and sends back the edit ("workspace/applyEdit").
-            const QJsonObject command = action.value("command").isObject() ? action.value("command").toObject()
-                                        : action.value("command").isString() ? action
-                                                                             : QJsonObject();
-            if (!command.isEmpty() && server) {
-                server->request(QStringLiteral("workspace/executeCommand"),
-                                QJsonObject{{"command", command.value("command")},
-                                            {"arguments", command.value("arguments").toArray()}},
-                                [this](const QJsonValue &, const QString &error) {
-                                    if (!error.isEmpty())
-                                        emit statusMessage(tr("The quick fix failed: %1").arg(error));
-                                });
-            }
-        });
+    client->request(QStringLiteral("textDocument/codeAction"), params,
+                    [this, guard = QPointer<EditorWidget>(editor),
+                     server = QPointer<LspClient>(client)](const QJsonValue &result, const QString &error) {
+                        if (!guard)
+                            return;
+                        if (!error.isEmpty()) {
+                            emit statusMessage(tr("Quick fixes failed: %1").arg(error));
+                            return;
+                        }
+                        QList<QJsonObject> actions;
+                        QStringList titles;
+                        for (const QJsonValue &item : result.toArray()) {
+                            const QJsonObject action = item.toObject();
+                            if (action.contains("disabled") || action.value("title").toString().isEmpty())
+                                continue;
+                            actions.append(action);
+                            titles.append(action.value("title").toString());
+                        }
+                        if (actions.isEmpty()) {
+                            emit statusMessage(tr("No quick fixes here"));
+                            return;
+                        }
+                        const int chosen = chooseFrom(guard, titles);
+                        if (chosen < 0)
+                            return;
+                        const QJsonObject action = actions.at(chosen);
+                        if (action.contains("edit"))
+                            applyWorkspaceEdit(parseWorkspaceEdit(action.value("edit").toObject()));
+                        // A Command, or a CodeAction carrying one: the server carries
+                        // it out and sends back the edit ("workspace/applyEdit").
+                        const QJsonObject command = action.value("command").isObject()
+                                                        ? action.value("command").toObject()
+                                                    : action.value("command").isString() ? action
+                                                                                         : QJsonObject();
+                        if (!command.isEmpty() && server) {
+                            server->request(QStringLiteral("workspace/executeCommand"),
+                                            QJsonObject{{"command", command.value("command")},
+                                                        {"arguments", command.value("arguments").toArray()}},
+                                            [this](const QJsonValue &, const QString &error) {
+                                                if (!error.isEmpty())
+                                                    emit statusMessage(tr("The quick fix failed: %1").arg(error));
+                                            });
+                        }
+                    });
 }
 
 int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit)
@@ -557,7 +568,8 @@ int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit)
                 const int start = positionOf(editor, textEdit.range.start);
                 const int end = std::max(start, positionOf(editor, textEdit.range.end));
                 const QByteArray bytes = withLineEnding(textEdit.newText, editor->format().lineEnding).toUtf8();
-                editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start), long(end));
+                editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start),
+                                      long(end));
                 editor->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<uintptr_t>(bytes.size()),
                                       bytes.constData());
             }
@@ -632,11 +644,12 @@ QString CodeIntelligence::counterpartOf(const QString &filePath)
         return {};
     const QDir folder = info.dir();
     const QStringList folders = {folder.path(), folder.filePath(QStringLiteral("../include")),
-                                 folder.filePath(QStringLiteral("../src")), folder.filePath(QStringLiteral("../source"))};
+                                 folder.filePath(QStringLiteral("../src")),
+                                 folder.filePath(QStringLiteral("../source"))};
     for (const QString &candidateFolder : folders) {
         for (const QString &extension : *wanted) {
-            const QString candidate =
-                QDir::cleanPath(candidateFolder + QLatin1Char('/') + info.completeBaseName() + QLatin1Char('.') + extension);
+            const QString candidate = QDir::cleanPath(candidateFolder + QLatin1Char('/') + info.completeBaseName() +
+                                                      QLatin1Char('.') + extension);
             if (QFileInfo::exists(candidate))
                 return candidate;
         }

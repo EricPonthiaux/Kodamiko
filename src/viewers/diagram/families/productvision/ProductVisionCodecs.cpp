@@ -115,8 +115,8 @@ public:
         for (const Model::Node &node : model.nodes)
             visible.insert(node.key);
         static const std::pair<const char *, const char *> arrows[] = {
-            {"product", "emotions"}, {"emotions", "problem"},  {"emotions", "users"}, {"emotions", "value"},
-            {"problem", "capabilities"}, {"users", "journeys"}, {"value", "unknowns"},
+            {"product", "emotions"},     {"emotions", "problem"}, {"emotions", "users"}, {"emotions", "value"},
+            {"problem", "capabilities"}, {"users", "journeys"},   {"value", "unknowns"},
         };
         for (const auto &[fromText, toText] : arrows) {
             const QString from = QString::fromLatin1(fromText), to = QString::fromLatin1(toText);
@@ -140,15 +140,17 @@ public:
             return nullptr;
         };
         const ProductVisionShape *root = cardOf(QStringLiteral("product"));
-        QStringList out{marker, QStringLiteral("mindmap"),
-                        QStringLiteral("  product((%1))")
-                            .arg(mermaidQuote(root && !root->title.isEmpty() ? root->title : term(QStringLiteral("product"))))};
+        QStringList out{
+            marker, QStringLiteral("mindmap"),
+            QStringLiteral("  product((%1))")
+                .arg(mermaidQuote(root && !root->title.isEmpty() ? root->title : term(QStringLiteral("product"))))};
         const auto emitBranch = [&out](const QString &role, const QStringList &items) {
             out.append(QStringLiteral("    %1[%2]").arg(role, mermaidQuote(term(role))));
             int index = 0;
             for (const QString &item : items) {
                 if (!item.trimmed().isEmpty())
-                    out.append(QStringLiteral("      %1_%2[%3]").arg(role).arg(++index).arg(mermaidQuote(item.trimmed())));
+                    out.append(
+                        QStringLiteral("      %1_%2[%3]").arg(role).arg(++index).arg(mermaidQuote(item.trimmed())));
             }
         };
         emitBranch(QStringLiteral("vision"), root ? root->items : QStringList());

@@ -109,14 +109,14 @@ private:
     // of cells is drawn in one call (see fontFor()).
     std::array<QFont, 16> fonts_;
     QFont baseFont_;
-    int zoom_ = 0; // points added to the theme font by Ctrl+wheel
+    int zoom_ = 0;           // points added to the theme font by Ctrl+wheel
     int wheelRemainder_ = 0; // eighths of a degree not yet sent as a notch
     QSize cellSize_{8, 16};
     int ascent_ = 12;
     QColor foreground_;
     QColor background_;
 
-    int scrollOffset_ = 0; // history lines shown above the screen
+    int scrollOffset_ = 0;           // history lines shown above the screen
     bool updatingScrollBar_ = false; // the bar follows scrollOffset_, not the reverse
     bool selecting_ = false;
     bool gridUpdatePending_ = false;

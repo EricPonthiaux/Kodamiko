@@ -72,9 +72,9 @@ QList<InstallStep> plan(const ProjectConfig &config, const Toolchains &toolchain
         const bool system = isSystem(setup.serverVersion);
         // What it runs on: always for jdtls (Duet starts it with Java),
         // for Duet's own npm installs otherwise.
-        if (!server->runtime.isEmpty() && (!system || server->runtime == QLatin1String("jdk"))
-            && !toolchains.runtimeAtLeast(server->runtime, server->minimumRuntime)
-            && !planned(server->runtime, server->minimumRuntime))
+        if (!server->runtime.isEmpty() && (!system || server->runtime == QLatin1String("jdk")) &&
+            !toolchains.runtimeAtLeast(server->runtime, server->minimumRuntime) &&
+            !planned(server->runtime, server->minimumRuntime))
             add(server->runtime, runtimeVersionFor(server->runtime, server->minimumRuntime),
                 QObject::tr("runs %1").arg(server->id));
         if (!system && !toolchains.isInstalled(server->id, setup.serverVersion))
@@ -99,10 +99,10 @@ QStringList unavailable(const ProjectConfig &config, const Toolchains &toolchain
                                 ? QObject::tr("No Python found: install one, Duet does not download it.")
                                 : QObject::tr("No Python %1 found: install it, Duet does not download it.")
                                       .arg(setup.runtimeVersion));
-        if (!setup.server.isEmpty() && isSystem(setup.serverVersion)
-            && toolchains.systemProgram(setup.server).isEmpty())
-            problems.append(QObject::tr("%1 is not in the PATH: choose a version for Duet to download.")
-                                .arg(setup.server));
+        if (!setup.server.isEmpty() && isSystem(setup.serverVersion) &&
+            toolchains.systemProgram(setup.server).isEmpty())
+            problems.append(
+                QObject::tr("%1 is not in the PATH: choose a version for Duet to download.").arg(setup.server));
     }
     return problems;
 }

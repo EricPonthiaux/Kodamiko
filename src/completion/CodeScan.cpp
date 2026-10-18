@@ -14,10 +14,10 @@ constexpr int maxDeclarationBytes = 4000;
 const QSet<QString> &specifierWords()
 {
     static const QSet<QString> words = {
-        "virtual", "static",   "inline",    "explicit", "constexpr", "consteval", "friend",       "extern",
-        "mutable", "public",   "private",   "protected", "abstract", "final",     "synchronized", "native",
-        "default", "async",    "export",    "function", "override",  "transient", "Q_INVOKABLE",  "Q_SLOT",
-        "Q_SIGNAL", "strictfp", "readonly", "declare",
+        "virtual",      "static",      "inline",  "explicit", "constexpr", "consteval", "friend",
+        "extern",       "mutable",     "public",  "private",  "protected", "abstract",  "final",
+        "synchronized", "native",      "default", "async",    "export",    "function",  "override",
+        "transient",    "Q_INVOKABLE", "Q_SLOT",  "Q_SIGNAL", "strictfp",  "readonly",  "declare",
     };
     return words;
 }
@@ -27,19 +27,21 @@ const QSet<QString> &specifierWords()
 const QSet<QString> &notFunctionWords()
 {
     static const QSet<QString> words = {
-        "if", "for", "while", "switch", "catch", "return", "sizeof", "decltype", "alignof", "typeid",
-        "static_assert", "new", "delete", "defined", "throw", "do", "else", "case", "co_return", "co_await",
-        "co_yield", "await", "yield", "__attribute__", "__declspec", "alignas", "noexcept", "requires", "assert",
-        "synchronized", "with", "elif", "typeof", "instanceof", "in", "of",
+        "if",       "for",          "while",         "switch",        "catch",     "return",     "sizeof",
+        "decltype", "alignof",      "typeid",        "static_assert", "new",       "delete",     "defined",
+        "throw",    "do",           "else",          "case",          "co_return", "co_await",   "co_yield",
+        "await",    "yield",        "__attribute__", "__declspec",    "alignas",   "noexcept",   "requires",
+        "assert",   "synchronized", "with",          "elif",          "typeof",    "instanceof", "in",
+        "of",
     };
     return words;
 }
 
 const QSet<QString> &typeWords()
 {
-    static const QSet<QString> words = {"int", "char", "long", "short", "double", "float", "bool", "unsigned",
-                                        "signed", "void", "auto", "const", "volatile", "struct", "class",
-                                        "enum", "typename", "boolean", "byte"};
+    static const QSet<QString> words = {"int",      "char",   "long",     "short",   "double", "float",    "bool",
+                                        "unsigned", "signed", "void",     "auto",    "const",  "volatile", "struct",
+                                        "class",    "enum",   "typename", "boolean", "byte"};
     return words;
 }
 
@@ -109,8 +111,8 @@ QString simplifiedType(const QString &type)
 
 bool isIdentifierByte(char c)
 {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$'
-        || static_cast<unsigned char>(c) >= 0x80;
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$' ||
+           static_cast<unsigned char>(c) >= 0x80;
 }
 
 QByteArray blank(const QByteArray &text)
@@ -138,9 +140,9 @@ QByteArray blank(const QByteArray &text)
             end = end < 0 ? size : end + 2;
             clear(i, end);
             i = end;
-        } else if (c == '"' && i > 0 && text[i - 1] == 'R' && (i < 2 || !isIdentifierByte(text[i - 2]) || text[i - 2] == '8'
-                                                                 || text[i - 2] == 'L' || text[i - 2] == 'u'
-                                                                 || text[i - 2] == 'U')) {
+        } else if (c == '"' && i > 0 && text[i - 1] == 'R' &&
+                   (i < 2 || !isIdentifierByte(text[i - 2]) || text[i - 2] == '8' || text[i - 2] == 'L' ||
+                    text[i - 2] == 'u' || text[i - 2] == 'U')) {
             // R"delimiter( ... )delimiter"
             const int paren = int(text.indexOf('(', i));
             if (paren < 0 || paren - i > 17) {
@@ -152,8 +154,9 @@ QByteArray blank(const QByteArray &text)
             end = end < 0 ? size : end + int(close.size());
             clear(i + 1, end - 1);
             i = end;
-        } else if (c == '"' || c == '`' || (c == '\'' && !(i > 0 && std::isxdigit(static_cast<unsigned char>(text[i - 1]))
-                                                           && std::isxdigit(static_cast<unsigned char>(next))))) {
+        } else if (c == '"' || c == '`' ||
+                   (c == '\'' && !(i > 0 && std::isxdigit(static_cast<unsigned char>(text[i - 1])) &&
+                                   std::isxdigit(static_cast<unsigned char>(next))))) {
             // A string, a template literal or a character; "1'000" is a number.
             int end = i + 1;
             while (end < size && text[end] != c) {
@@ -389,8 +392,8 @@ Parameter parseParameter(const QString &text, bool typed)
     // Words that need a type after them; "unsigned count", "long amount"
     // are named.
     static const QSet<QString> qualifiersOnly = {"const", "volatile", "struct", "class", "enum", "typename", "final"};
-    if (name.isEmpty() || before.isEmpty() || typeWords().contains(name) || qualifiersOnly.contains(before)
-        || before.endsWith(QLatin1String("::"))) {
+    if (name.isEmpty() || before.isEmpty() || typeWords().contains(name) || qualifiersOnly.contains(before) ||
+        before.endsWith(QLatin1String("::"))) {
         parameter.type = declaration; // a type alone: "int", "const Foo &"
         return parameter;
     }
@@ -475,13 +478,15 @@ Function parseFunction(const QString &header)
 
     QString before = text.left(open).trimmed();
     QString name;
-    static const QRegularExpression operatorName(QStringLiteral("(operator\\s*(?:\\(\\)|[^\\s\\w(]+|\\w[\\w\\s:]*?))\\s*$"));
+    static const QRegularExpression operatorName(
+        QStringLiteral("(operator\\s*(?:\\(\\)|[^\\s\\w(]+|\\w[\\w\\s:]*?))\\s*$"));
     if (const QRegularExpressionMatch match = operatorName.match(before); match.hasMatch()) {
         name = match.captured(1).simplified();
         before = before.left(match.capturedStart(1));
     } else {
         int start = int(before.size());
-        while (start > 0 && (before[start - 1].isLetterOrNumber() || before[start - 1] == u'_' || before[start - 1] == u'$'))
+        while (start > 0 &&
+               (before[start - 1].isLetterOrNumber() || before[start - 1] == u'_' || before[start - 1] == u'$'))
             --start;
         if (start > 0 && before[start - 1] == u'~')
             --start;
@@ -551,7 +556,8 @@ Function parseFunction(const QString &header)
     }
     static const QRegularExpression pure(QStringLiteral("=\\s*0\\s*$"));
     static const QRegularExpression deleted(QStringLiteral("=\\s*(?:default|delete)\\s*$"));
-    function.pure = pure.match(function.trailing).hasMatch() || function.specifiers.contains(QStringLiteral("abstract"));
+    function.pure =
+        pure.match(function.trailing).hasMatch() || function.specifiers.contains(QStringLiteral("abstract"));
     function.deleted = deleted.match(function.trailing).hasMatch();
     return function;
 }
@@ -628,8 +634,8 @@ ClassHeader classAt(const QByteArray &blanked, int brace)
     ClassHeader header;
     if (brace < 0)
         return header;
-    QString source = withoutLabels(QString::fromUtf8(blanked.mid(headerStart(blanked, brace),
-                                                                 brace - headerStart(blanked, brace))));
+    QString source =
+        withoutLabels(QString::fromUtf8(blanked.mid(headerStart(blanked, brace), brace - headerStart(blanked, brace))));
     static const QRegularExpression templateHead(QStringLiteral("^\\s*template\\s*<"));
     if (const QRegularExpressionMatch match = templateHead.match(source); match.hasMatch()) {
         const int close = angleCloser(source, int(match.capturedEnd()) - 1);

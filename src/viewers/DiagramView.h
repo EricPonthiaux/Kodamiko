@@ -70,7 +70,7 @@ private:
     QLabel *message_;
     QTimer *messageTimer_;
     QString filePath_;
-    QByteArray diskContent_;    // as last read or written: recognizes our own writes
-    QByteArray savedSnapshot_;  // the board as last loaded or saved
+    QByteArray diskContent_;   // as last read or written: recognizes our own writes
+    QByteArray savedSnapshot_; // the board as last loaded or saved
     bool lastModified_ = false;
 };

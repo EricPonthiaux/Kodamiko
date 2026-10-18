@@ -22,22 +22,36 @@ QString categoryForLexerStyle(const QString &description)
         return false;
     };
 
-    if (mentions({"comment"})) return QStringLiteral("comment");
-    if (mentions({"added", "inserted"})) return QStringLiteral("diff.plus");
-    if (mentions({"removed", "deleted"})) return QStringLiteral("diff.minus");
-    if (mentions({"header", "heading", "position"})) return QStringLiteral("heading");
-    if (mentions({"string", "quot", "character", "heredoc", "literal", "cdata"})) return QStringLiteral("string");
-    if (mentions({"number", "numeric"})) return QStringLiteral("number");
+    if (mentions({"comment"}))
+        return QStringLiteral("comment");
+    if (mentions({"added", "inserted"}))
+        return QStringLiteral("diff.plus");
+    if (mentions({"removed", "deleted"}))
+        return QStringLiteral("diff.minus");
+    if (mentions({"header", "heading", "position"}))
+        return QStringLiteral("heading");
+    if (mentions({"string", "quot", "character", "heredoc", "literal", "cdata"}))
+        return QStringLiteral("string");
+    if (mentions({"number", "numeric"}))
+        return QStringLiteral("number");
     if (mentions({"keyword", "reserved", "preprocessor", "directive", "command", "instruction"}))
         return QStringLiteral("keyword");
-    if (mentions({"operator"})) return QStringLiteral("operator");
-    if (mentions({"attribute"})) return QStringLiteral("attribute");
-    if (mentions({"tag", "element", "entity"})) return QStringLiteral("tag");
-    if (mentions({"function", "target"})) return QStringLiteral("function");
-    if (mentions({"class", "type"})) return QStringLiteral("type");
-    if (mentions({"variable", "parameter", "property", "key"})) return QStringLiteral("property");
-    if (mentions({"error"})) return QStringLiteral("variable.builtin");
-    if (mentions({"emphasis", "strong", "link", "url"})) return QStringLiteral("function");
+    if (mentions({"operator"}))
+        return QStringLiteral("operator");
+    if (mentions({"attribute"}))
+        return QStringLiteral("attribute");
+    if (mentions({"tag", "element", "entity"}))
+        return QStringLiteral("tag");
+    if (mentions({"function", "target"}))
+        return QStringLiteral("function");
+    if (mentions({"class", "type"}))
+        return QStringLiteral("type");
+    if (mentions({"variable", "parameter", "property", "key"}))
+        return QStringLiteral("property");
+    if (mentions({"error"}))
+        return QStringLiteral("variable.builtin");
+    if (mentions({"emphasis", "strong", "link", "url"}))
+        return QStringLiteral("function");
     return QString();
 }
 

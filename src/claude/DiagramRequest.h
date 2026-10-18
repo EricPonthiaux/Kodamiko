@@ -22,9 +22,13 @@ QStringList arguments(const QString &prompt, const QString &relativePath, const 
 
 // One line of the stream-json output.
 struct Event {
-    enum class Kind { None, Steps, Finished };
+    enum class Kind {
+        None,
+        Steps,
+        Finished
+    };
     Kind kind = Kind::None;
-    QStringList steps; // Steps: what Claude does, "Reading src/a.cpp"
+    QStringList steps;   // Steps: what Claude does, "Reading src/a.cpp"
     bool failed = false; // Finished
     QString text;        // Finished: Claude's answer, or the error
 };

@@ -16,12 +16,12 @@
 #include "editor/EditorWidget.h"
 
 #include <QAccessible>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QListView>
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <QListView>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -106,7 +106,8 @@ private slots:
 
     void fuzzyRanksPrefixesFirst()
     {
-        QCOMPARE(ranked("gv", {"getSelectedValue", "setValue", "getValue"}), QStringList({"getValue", "getSelectedValue"}));
+        QCOMPARE(ranked("gv", {"getSelectedValue", "setValue", "getValue"}),
+                 QStringList({"getValue", "getSelectedValue"}));
         QCOMPARE(ranked("val", {"setValue", "value", "validate"}).first(), QString("value"));
         QCOMPARE(ranked("Val", {"value", "Value"}).first(), QString("Value")); // same case
     }
@@ -163,7 +164,7 @@ private slots:
         QCOMPARE(f.editor->text(0), QString("import java.util.ArrayList;\n"));
         QCOMPARE(f.editor->text(4), QString("        ArrayList<E>()\n"));
         QCOMPARE(f.editor->selectedText(), QString("E")); // typing replaces it
-        f.editor->undo(); // one step for both
+        f.editor->undo();                                 // one step for both
         QCOMPARE(f.editor->text(2), QString("        Arr\n"));
         QVERIFY(!f.editor->text().contains("import"));
     }
@@ -354,7 +355,7 @@ private slots:
         history.recordAccepted("cpp", "value", now);
         QVERIFY(history.boost("cpp", "value", now) > once);
         QVERIFY(history.boost("cpp", "value", now.addDays(60)) < history.boost("cpp", "value", now)); // it fades
-        QCOMPARE(history.boost("java", "value", now), 0); // per language
+        QCOMPARE(history.boost("java", "value", now), 0);                                             // per language
         history.recordRejected("cpp", "wrong");
         history.recordRejected("cpp", "wrong");
         QVERIFY(history.boost("cpp", "wrong", now) < 0);
@@ -407,7 +408,8 @@ private slots:
         }
         QWidget parent;
         CompletionPopup popup(&parent);
-        QBENCHMARK {
+        QBENCHMARK
+        {
             popup.setItems(items, QStringLiteral("gsv"));
         }
         QCOMPARE(popup.count(), 200);
@@ -418,7 +420,8 @@ private slots:
         QByteArray text;
         for (int i = 0; i < 20000; ++i)
             text += "    const int value" + QByteArray::number(i % 500) + " = compute(first, second);\n";
-        QBENCHMARK {
+        QBENCHMARK
+        {
             DocumentWordsProvider::words(text, int(text.size() / 2));
         }
     }
@@ -490,7 +493,8 @@ private slots:
         Fixture f("int main() {\n    \n}\n", 1, 4, late);
         QTest::keyClicks(f.editor, "lo");
         QTRY_VERIFY(late->pending);
-        CompletionItem loop{"loop", "for (int ${1:i} = 0; $1 < ${2:n}; ++$1) {$0}", {}, CompletionItem::Kind::Snippet, 10};
+        CompletionItem loop{
+            "loop", "for (int ${1:i} = 0; $1 < ${2:n}; ++$1) {$0}", {}, CompletionItem::Kind::Snippet, 10};
         loop.isSnippet = true;
         late->pending({loop}, false);
         QTRY_VERIFY(f.controller->isActive());
@@ -660,8 +664,8 @@ private slots:
         QVERIFY(g.controller->popup()->keyHint().contains("Ctrl+Space more"));
         g.controller->complete();
         QCOMPARE(g.controller->mode(), CompletionContext::Mode::Extended);
-        QTRY_VERIFY(g.controller->popup()->labels().contains("widget")); // matched inside the word
-        QVERIFY(g.controller->popup()->labels().contains("getterElsewhere")); // the other file's
+        QTRY_VERIFY(g.controller->popup()->labels().contains("widget"));        // matched inside the word
+        QVERIFY(g.controller->popup()->labels().contains("getterElsewhere"));   // the other file's
         QCOMPARE(g.controller->popup()->labels().first(), QString("getValue")); // a prefix still first
         QVERIFY(g.controller->popup()->keyHint().startsWith("All suggestions"));
         // A third time: the documentation.
@@ -790,11 +794,15 @@ private slots:
             connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
                 received += socket->readAll();
                 const int headerEnd = int(received.indexOf("\r\n\r\n"));
-                const int length = int(received.mid(received.toLower().indexOf("content-length:") + 15).split('\r').first().trimmed().toInt());
+                const int length = int(received.mid(received.toLower().indexOf("content-length:") + 15)
+                                           .split('\r')
+                                           .first()
+                                           .trimmed()
+                                           .toInt());
                 if (headerEnd < 0 || received.size() < headerEnd + 4 + length)
                     return;
-                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
-                              + QByteArray::number(answer.size()) + "\r\nConnection: close\r\n\r\n" + answer);
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
+                              QByteArray::number(answer.size()) + "\r\nConnection: close\r\n\r\n" + answer);
                 socket->disconnectFromHost();
             });
         });
@@ -827,7 +835,7 @@ private slots:
         suggestion = "<none>";
         model.suggest("a", "", "cpp", [&](const QString &text) { suggestion = text; });
         QTRY_COMPARE(suggestion, QString());
-        model.suggest("a", "", "cpp", [](const QString &) {});
+        model.suggest("a", "", "cpp", [](const QString &) { });
         QTRY_COMPARE(failures.count(), 1);
     }
 
@@ -891,7 +899,8 @@ private slots:
 
     void codeScanReadsDeclarations()
     {
-        CodeScan::Function f = CodeScan::parseFunction("virtual QSize sizeHint(int a, const QString &b = {}) const override");
+        CodeScan::Function f =
+            CodeScan::parseFunction("virtual QSize sizeHint(int a, const QString &b = {}) const override");
         QCOMPARE(f.name, QString("sizeHint"));
         QCOMPARE(f.returnType, QString("QSize"));
         QVERIFY(f.specifiers.contains("virtual"));
@@ -918,9 +927,10 @@ private slots:
         QCOMPARE(CodeScan::parseParameter("char *argv[]").name, QString("argv"));
         QCOMPARE(CodeScan::parseParameter("...rest", false).name, QString("rest"));
 
-        const QByteArray text = "// class Fake {\nclass Q_DECL_EXPORT Widget final : public QObject, private Base<int> {\n"
-                                "    Q_OBJECT\npublic:\n    void a();\nsignals:\n    void changed();\n"
-                                "private:\n    int b() const { return 1; }\n    struct Inner { int x; };\n};\n";
+        const QByteArray text =
+            "// class Fake {\nclass Q_DECL_EXPORT Widget final : public QObject, private Base<int> {\n"
+            "    Q_OBJECT\npublic:\n    void a();\nsignals:\n    void changed();\n"
+            "private:\n    int b() const { return 1; }\n    struct Inner { int x; };\n};\n";
         const QByteArray blanked = CodeScan::blank(text);
         QCOMPARE(blanked.size(), text.size());
         const int body = CodeScan::classBody(blanked, "Widget");
@@ -970,8 +980,8 @@ private slots:
 
     void javaPostfixTemplatesImportWhatTheyUse()
     {
-        Fixture f("package app;\n\nimport java.util.List;\n\nclass A {\n    void f() {\n        name\n    }\n}\n", 6, 12,
-                  std::make_shared<PostfixTemplateProvider>(), "A.java");
+        Fixture f("package app;\n\nimport java.util.List;\n\nclass A {\n    void f() {\n        name\n    }\n}\n", 6,
+                  12, std::make_shared<PostfixTemplateProvider>(), "A.java");
         QTest::keyClicks(f.editor, ".opt");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("opt"));
@@ -1001,13 +1011,15 @@ private slots:
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("soutv"));
         QTest::keyClick(f.editor, Qt::Key_Return);
-        QCOMPARE(f.editor->text(2), QString("        System.out.println(\"map.get(\\\"a\\\") = \" + map.get(\"a\"));\n"));
+        QCOMPARE(f.editor->text(2),
+                 QString("        System.out.println(\"map.get(\\\"a\\\") = \" + map.get(\"a\"));\n"));
     }
 
     void javaLiveTemplatesKnowWhereTheyAre()
     {
-        const QByteArray text = "class Account {\n    void deposit(long amount, String note) {\n        int total = 3;\n"
-                                "        \n    }\n}\n";
+        const QByteArray text =
+            "class Account {\n    void deposit(long amount, String note) {\n        int total = 3;\n"
+            "        \n    }\n}\n";
         const auto expand = [&text](const QString &key) {
             Fixture f(text, 3, 8, std::make_shared<LiveTemplateProvider>(), "Account.java");
             QTest::keyClicks(f.editor, key);
@@ -1080,7 +1092,8 @@ private slots:
             using RecordingProvider::RecordingProvider;
             bool servesModulePaths() const override { return true; }
         };
-        auto paths = std::make_shared<Paths>(QList<CompletionItem>{{"components", {}, {}, CompletionItem::Kind::Module, 10}});
+        auto paths =
+            std::make_shared<Paths>(QList<CompletionItem>{{"components", {}, {}, CompletionItem::Kind::Module, 10}});
         Fixture f("import Button from '';\n", 0, 20, paths, "a.js");
         f.controller->complete();
         QTRY_VERIFY(f.controller->isActive());
@@ -1100,9 +1113,10 @@ private slots:
 
     void overridesFromTheBaseClass()
     {
-        const QByteArray text = "class Base {\npublic:\n    virtual ~Base();\n    virtual void paint(int x) const;\n"
-                                "    virtual int size() const = 0;\n    void plain();\n    virtual void done() final;\n};\n"
-                                "class Derived : public Base {\npublic:\n    \n};\n";
+        const QByteArray text =
+            "class Base {\npublic:\n    virtual ~Base();\n    virtual void paint(int x) const;\n"
+            "    virtual int size() const = 0;\n    void plain();\n    virtual void done() final;\n};\n"
+            "class Derived : public Base {\npublic:\n    \n};\n";
         auto provider = std::make_shared<CodeGenerationProvider>(nullptr, CodeGenerationProvider::Counterpart());
         Fixture f(text, 10, 4, provider);
         QTest::keyClicks(f.editor, "pai");
@@ -1158,12 +1172,14 @@ private slots:
         QTemporaryDir headers;
         QFile header(headers.filePath("a.h"));
         QVERIFY(header.open(QIODevice::WriteOnly));
-        header.write("class Foo : public QObject {\n    Q_OBJECT\npublic:\n    explicit Foo(int n = 0);\n"
-                     "    virtual int size() const override;\n    void clear();\n    int inlined() const { return 0; }\n"
-                     "    virtual void abstract() = 0;\nsignals:\n    void changed();\n};\nint helper(double x);\n");
+        header.write(
+            "class Foo : public QObject {\n    Q_OBJECT\npublic:\n    explicit Foo(int n = 0);\n"
+            "    virtual int size() const override;\n    void clear();\n    int inlined() const { return 0; }\n"
+            "    virtual void abstract() = 0;\nsignals:\n    void changed();\n};\nint helper(double x);\n");
         header.close();
         const QString headerPath = headers.filePath("a.h");
-        auto provider = std::make_shared<CodeGenerationProvider>(nullptr, [headerPath](const QString &) { return headerPath; });
+        auto provider =
+            std::make_shared<CodeGenerationProvider>(nullptr, [headerPath](const QString &) { return headerPath; });
         Fixture f("#include \"a.h\"\n\nvoid Foo::clear()\n{\n}\n\n", 5, 0, provider);
         QTest::keyClicks(f.editor, "si");
         QTRY_VERIFY(f.controller->isActive());
@@ -1208,7 +1224,7 @@ private slots:
         QCOMPARE(P::declaredTypeAt("    const Widget *", 17, "cpp"), QString("Widget"));
         QCOMPARE(P::declaredTypeAt("void f(std::map<K, V> ", 22, "cpp"), QString("std::map<K, V>"));
         QCOMPARE(P::declaredTypeAt("    return Foo ", 15, "cpp"), QString());
-        QCOMPARE(P::declaredTypeAt("    foo ", 8, "cpp"), QString()); // not a type
+        QCOMPARE(P::declaredTypeAt("    foo ", 8, "cpp"), QString());    // not a type
         QCOMPARE(P::declaredTypeAt("    Widget", 10, "cpp"), QString()); // the type itself
         QCOMPARE(P::declaredTypeAt("    private final Widget ", 25, "java"), QString("Widget"));
 

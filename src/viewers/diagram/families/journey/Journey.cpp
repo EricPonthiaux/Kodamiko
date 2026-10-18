@@ -96,8 +96,8 @@ void JourneyTaskShape::measure(const Board &)
                                    text::widest(bodyFont, probe.actors)});
     w = std::max<qreal>(170, std::min(maxWidth, widest + innerPad * 2));
     const TextLayout layout = textLayout(w - innerPad * 2);
-    const qreal content = layout.header.size() * headerLineH + 6 + layout.title.size() * titleLineH
-                          + (layout.actors.isEmpty() ? 0 : 7 + layout.actors.size() * actorLineH);
+    const qreal content = layout.header.size() * headerLineH + 6 + layout.title.size() * titleLineH +
+                          (layout.actors.isEmpty() ? 0 : 7 + layout.actors.size() * actorLineH);
     h = std::max<qreal>(96, innerPad * 2 + content);
 }
 
@@ -105,7 +105,9 @@ void JourneyTaskShape::onDoubleClick(Board &board)
 {
     // Three lines: the task, its score, its actors.
     TextEditSpec spec;
-    spec.get = [this] { return QStringLiteral("%1\n%2\n%3").arg(text).arg(score).arg(actors.join(QStringLiteral(", "))); };
+    spec.get = [this] {
+        return QStringLiteral("%1\n%2\n%3").arg(text).arg(score).arg(actors.join(QStringLiteral(", ")));
+    };
     spec.set = [this](const QString &value) {
         const QStringList lines = value.split(QLatin1Char('\n'));
         const QString task = lines.value(0).trimmed();
@@ -125,7 +127,8 @@ void JourneyTaskShape::draw(QPainter &painter, const Board &board, const ShapeSt
 {
     const Style &style = board.style();
     // The mood of the step: rose for a pain point, cool for a delight.
-    const QColor scoreTones[] = {style.tones.rose, style.tones.warm, style.tones.warm, style.tones.sage, style.tones.cool};
+    const QColor scoreTones[] = {style.tones.rose, style.tones.warm, style.tones.warm, style.tones.sage,
+                                 style.tones.cool};
     const QColor nativeFill = style.tones.colorful ? scoreTones[score - 1] : QColor(legacyScore[score - 1]);
     const QColor ink = textColor(style.palette.ink);
     const QColor muted = textColor(style.palette.inkMuted);

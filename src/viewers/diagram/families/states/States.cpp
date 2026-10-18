@@ -277,8 +277,8 @@ bool StateContainerShape::hitTest(QPointF p) const
     constexpr qreal tolerance = 9;
     if (!Shape::hitTest(p))
         return false;
-    return p.y() <= y + containerTitleHeight || p.x() - x <= tolerance || x + w - p.x() <= tolerance
-           || y + h - p.y() <= tolerance;
+    return p.y() <= y + containerTitleHeight || p.x() - x <= tolerance || x + w - p.x() <= tolerance ||
+           y + h - p.y() <= tolerance;
 }
 
 std::optional<QRectF> StateContainerShape::childBounds(const Board &) const
@@ -613,8 +613,9 @@ std::optional<QPointF> TransitionLink::validPlacement(const Board &board) const
         return std::nullopt;
     const Shape *a = board.shape(from);
     const Shape *b = board.shape(to);
-    if (!a || !b || std::abs(a->x - placement->fromAnchor.x()) > 0.5 || std::abs(a->y - placement->fromAnchor.y()) > 0.5
-        || std::abs(b->x - placement->toAnchor.x()) > 0.5 || std::abs(b->y - placement->toAnchor.y()) > 0.5) {
+    if (!a || !b || std::abs(a->x - placement->fromAnchor.x()) > 0.5 ||
+        std::abs(a->y - placement->fromAnchor.y()) > 0.5 || std::abs(b->x - placement->toAnchor.x()) > 0.5 ||
+        std::abs(b->y - placement->toAnchor.y()) > 0.5) {
         placement.reset();
         return std::nullopt;
     }
@@ -661,8 +662,8 @@ namespace {
 
 qreal overlapArea(const QRectF &a, const QRectF &b)
 {
-    return std::max<qreal>(0, std::min(a.right(), b.right()) - std::max(a.left(), b.left()))
-           * std::max<qreal>(0, std::min(a.bottom(), b.bottom()) - std::max(a.top(), b.top()));
+    return std::max<qreal>(0, std::min(a.right(), b.right()) - std::max(a.left(), b.left())) *
+           std::max<qreal>(0, std::min(a.bottom(), b.bottom()) - std::max(a.top(), b.top()));
 }
 
 std::optional<QPointF> pointOnPolyline(const std::vector<QPointF> &points, qreal fraction)
@@ -776,15 +777,18 @@ const Family &states()
         f.shapes = {
             {QStringLiteral("state"), [] { return std::unique_ptr<Shape>(new StateShape); }},
             {QStringLiteral("stateContainer"), [] { return std::unique_ptr<Shape>(new StateContainerShape); }},
-            {QStringLiteral("initial"), [] { return std::unique_ptr<Shape>(new RoundShape(QStringLiteral("initial"), 18)); }},
-            {QStringLiteral("final"), [] { return std::unique_ptr<Shape>(new RoundShape(QStringLiteral("final"), 22)); }},
+            {QStringLiteral("initial"),
+             [] { return std::unique_ptr<Shape>(new RoundShape(QStringLiteral("initial"), 18)); }},
+            {QStringLiteral("final"),
+             [] { return std::unique_ptr<Shape>(new RoundShape(QStringLiteral("final"), 22)); }},
             {QStringLiteral("choice"), [] { return std::unique_ptr<Shape>(new ChoiceShape); }},
             {QStringLiteral("fork"), [] { return std::unique_ptr<Shape>(new ForkJoinShape(QStringLiteral("fork"))); }},
             {QStringLiteral("join"), [] { return std::unique_ptr<Shape>(new ForkJoinShape(QStringLiteral("join"))); }},
         };
         // Self-transitions are idiomatic (A --> A : retry), and several events
         // can join the same pair of states.
-        f.links = {{QStringLiteral("transition"), [] { return std::unique_ptr<Link>(new TransitionLink); }, true, true}};
+        f.links = {
+            {QStringLiteral("transition"), [] { return std::unique_ptr<Link>(new TransitionLink); }, true, true}};
         f.defaultShape = QStringLiteral("state");
         f.defaultLink = QStringLiteral("transition");
         f.resolveLabels = &diagram::states::resolveLabels;

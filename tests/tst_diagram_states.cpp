@@ -229,7 +229,8 @@ private slots:
                 types.insert(node.type);
             QCOMPARE(types, (QSet<QString>{"state", "stateContainer", "initial", "final", "choice", "fork", "join"}));
             QCOMPARE(nodeBy(model, "sourceKey", "active")->props.value("text").toString(), QStringLiteral("New state"));
-            QCOMPARE(nodeBy(model, "sourceKey", "decision")->props.value("text").toString(), QStringLiteral("Condition?"));
+            QCOMPARE(nodeBy(model, "sourceKey", "decision")->props.value("text").toString(),
+                     QStringLiteral("Condition?"));
             QCOMPARE(model.links.size(), 5);
             QVERIFY(model.warnings.isEmpty());
         }
@@ -237,7 +238,8 @@ private slots:
 
     void nestedCompositesKeepTheirChildrenAndPseudoStates()
     {
-        for (const auto &[codec, body] : {std::pair{&mermaid(), kNestedMermaid}, std::pair{&plantuml(), kNestedPlantuml}}) {
+        for (const auto &[codec, body] :
+             {std::pair{&mermaid(), kNestedMermaid}, std::pair{&plantuml(), kNestedPlantuml}}) {
             const Model model = parsed(*codec, QString::fromUtf8(body));
             const Model::Node *active = nodeBy(model, "sourceKey", "Active");
             const Model::Node *nested = nodeBy(model, "sourceKey", "Nested");
@@ -369,8 +371,9 @@ private slots:
         QVERIFY(carried.contains(ready));
         QVERIFY(carried.contains(byKey(board, "Active.Nested")));
         // A shape created in a composite joins it and stays in it.
-        Shape *created = board.createShapeAt(QPointF(active->cx(), active->y + active->h - 4), "state",
-                                             QJsonObject{{"text", "New state"}, {"parentBoundary", active->key}}, false);
+        Shape *created =
+            board.createShapeAt(QPointF(active->cx(), active->y + active->h - 4), "state",
+                                QJsonObject{{"text", "New state"}, {"parentBoundary", active->key}}, false);
         QVERIFY(created);
         QVERIFY(active->rect().contains(created->rect()));
     }
@@ -528,8 +531,9 @@ private slots:
         board.setFamily(&families::states());
         Shape *container =
             board.addShape("stateContainer", QJsonObject{{"key", "Active"}, {"text", "Active"}, {"x", 0}, {"y", 0}});
-        Shape *child = board.addShape("state", QJsonObject{{"key", "Active.Idle"}, {"sourceKey", "Idle"},
-                                                           {"text", "Idle"}, {"parentBoundary", "Active"}});
+        Shape *child = board.addShape(
+            "state",
+            QJsonObject{{"key", "Active.Idle"}, {"sourceKey", "Idle"}, {"text", "Idle"}, {"parentBoundary", "Active"}});
         Shape *outside = board.addShape("state", QJsonObject{{"key", "Done"}, {"text", "Done"}});
         Link *exit = board.addLink({}, container->id, outside->id);
         QVERIFY(graphviz::autoArrange(board, {QStringLiteral("LR"), {}, {}, true}));
@@ -540,7 +544,8 @@ private slots:
         QVERIFY(container->w >= text::width(Font(14, 600), container->displayText()) + 4 * 14);
         // The transition leaves from the composite's real border.
         const Route r = *exit->route(board);
-        QVERIFY(std::abs(r.a.x() - (container->x + container->w)) < 2 || container->rect().adjusted(-2, -2, 2, 2).contains(r.a));
+        QVERIFY(std::abs(r.a.x() - (container->x + container->w)) < 2 ||
+                container->rect().adjusted(-2, -2, 2, 2).contains(r.a));
     }
 
     void documentsRoundTripWithTheirLayout()
@@ -566,8 +571,8 @@ private slots:
                 if (!s->parentBoundary.isEmpty())
                     QVERIFY2(insideComposite(board, *s), qPrintable(name + ": " + s->key));
                 for (const auto &t : board.shapes()) {
-                    if (s == t || board.descendantShapes(s.get()).contains(t.get())
-                        || board.descendantShapes(t.get()).contains(s.get()))
+                    if (s == t || board.descendantShapes(s.get()).contains(t.get()) ||
+                        board.descendantShapes(t.get()).contains(s.get()))
                         continue;
                     QVERIFY2(!s->rect().intersects(t->rect()), qPrintable(name + ": " + s->key + " / " + t->key));
                 }
@@ -595,8 +600,10 @@ private slots:
                 QCOMPARE(copy->displayText(), s->displayText());
                 QCOMPARE(copy->parentBoundary, s->parentBoundary);
                 QVERIFY(std::abs(copy->x - s->x) < 0.1 && std::abs(copy->y - s->y) < 0.1);
-                QVERIFY2(std::abs(copy->w - s->w) < 0.6 && std::abs(copy->h - s->h) < 0.6,
-                         qPrintable(QStringLiteral("%1 %2x%3 %4x%5").arg(s->key).arg(s->w).arg(s->h).arg(copy->w).arg(copy->h)));
+                QVERIFY2(
+                    std::abs(copy->w - s->w) < 0.6 && std::abs(copy->h - s->h) < 0.6,
+                    qPrintable(
+                        QStringLiteral("%1 %2x%3 %4x%5").arg(s->key).arg(s->w).arg(s->h).arg(copy->w).arg(copy->h)));
             }
             QStringList labels, labelsAgain;
             for (const auto &l : board.links())

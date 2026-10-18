@@ -104,8 +104,15 @@ class PreviewPage : public QWidget {
     Q_OBJECT
 
 public:
-    enum class Kind { Markdown, Html };
-    enum class Mode { Editor, Split, Preview };
+    enum class Kind {
+        Markdown,
+        Html
+    };
+    enum class Mode {
+        Editor,
+        Split,
+        Preview
+    };
 
     // Takes `editor`, which holds the file.
     PreviewPage(EditorWidget *editor, const Theme &theme, QWidget *parent = nullptr);

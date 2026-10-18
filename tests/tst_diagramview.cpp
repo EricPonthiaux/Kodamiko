@@ -337,7 +337,8 @@ private slots:
             QVERIFY2(loadInto(board, name, kind.blank, &loaded), qPrintable(kind.id));
             QCOMPARE(loaded.codec->family().id, kind.id);
         }
-        QCOMPARE(DiagramKinds::withExtension(QStringLiteral("docs/returns"), flowchart), QStringLiteral("docs/returns.mmd"));
+        QCOMPARE(DiagramKinds::withExtension(QStringLiteral("docs/returns"), flowchart),
+                 QStringLiteral("docs/returns.mmd"));
         QCOMPARE(DiagramKinds::withExtension(QStringLiteral("Returns.MMD"), flowchart), QStringLiteral("Returns.MMD"));
         QVERIFY(DiagramKinds::find(QStringLiteral("nope")).id.isEmpty());
     }
@@ -354,7 +355,7 @@ private slots:
         auto *view = qobject_cast<DiagramView *>(tabs.openFile(path));
         QVERIFY(view);
         QCOMPARE(view->filePath(), QFileInfo(path).absoluteFilePath());
-        QVERIFY(!view->isModified()); // laying it out is not a change
+        QVERIFY(!view->isModified());        // laying it out is not a change
         QCOMPARE(tabs.openFile(path), view); // no second tab
         QCOMPARE(tabs.count(), 1);
         QCOMPARE(tabs.currentFilePath(), view->filePath());

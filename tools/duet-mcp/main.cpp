@@ -67,11 +67,12 @@ void answerAlone(const QJsonObject &message)
                                     .toObject()
                                     .value(QLatin1String("protocolVersion"))
                                     .toString(QStringLiteral("2025-06-18"));
-        answer(id, QJsonObject{{QLatin1String("protocolVersion"), version},
-                               {QLatin1String("capabilities"), QJsonObject{{QLatin1String("tools"), QJsonObject{}}}},
-                               {QLatin1String("serverInfo"), QJsonObject{{QLatin1String("name"), QLatin1String("duet")},
-                                                                         {QLatin1String("version"), QLatin1String("0")}}},
-                               {QLatin1String("instructions"), unreachable}});
+        answer(id,
+               QJsonObject{{QLatin1String("protocolVersion"), version},
+                           {QLatin1String("capabilities"), QJsonObject{{QLatin1String("tools"), QJsonObject{}}}},
+                           {QLatin1String("serverInfo"), QJsonObject{{QLatin1String("name"), QLatin1String("duet")},
+                                                                     {QLatin1String("version"), QLatin1String("0")}}},
+                           {QLatin1String("instructions"), unreachable}});
     } else if (method == QLatin1String("ping")) {
         answer(id, {});
     } else if (method == QLatin1String("tools/list")) {

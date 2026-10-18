@@ -118,7 +118,7 @@ public:
     QJsonObject toJson() const override;
     bool resizable() const override { return false; }
     bool hitTest(QPointF) const override { return false; }
-    void draw(QPainter &, const Board &, const ShapeState &) const override {}
+    void draw(QPainter &, const Board &, const ShapeState &) const override { }
 
     QString sourceEdgeId;
     QString endpoint; // "from" or "to"

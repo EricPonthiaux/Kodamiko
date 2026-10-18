@@ -37,24 +37,41 @@ std::pair<QChar, const char *> badgeOf(CompletionItem::Kind kind)
 {
     using Kind = CompletionItem::Kind;
     switch (kind) {
-    case Kind::Keyword: return {QLatin1Char('k'), "keyword"};
+    case Kind::Keyword:
+        return {QLatin1Char('k'), "keyword"};
     // Not "f", which fields use: the letter alone tells them apart.
-    case Kind::Function: return {QChar(0x0192), "function"}; // ƒ
-    case Kind::Method: return {QLatin1Char('m'), "function"};
-    case Kind::Class: return {QLatin1Char('c'), "type"};
-    case Kind::Struct: return {QLatin1Char('s'), "type"};
-    case Kind::Interface: return {QLatin1Char('i'), "type"};
-    case Kind::Enum: return {QLatin1Char('e'), "type"};
-    case Kind::Namespace: return {QLatin1Char('n'), "keyword"};
-    case Kind::Module: return {QLatin1Char('M'), "keyword"};
-    case Kind::Type: return {QLatin1Char('t'), "type"};
-    case Kind::Field: return {QLatin1Char('f'), "property"};
-    case Kind::Property: return {QLatin1Char('p'), "property"};
-    case Kind::Variable: return {QLatin1Char('v'), "variable"};
-    case Kind::Constant: return {QLatin1Char('C'), "constant"};
-    case Kind::Macro: return {QLatin1Char('#'), "keyword"};
-    case Kind::Snippet: return {QLatin1Char('S'), "string"};
-    case Kind::Text: break;
+    case Kind::Function:
+        return {QChar(0x0192), "function"}; // ƒ
+    case Kind::Method:
+        return {QLatin1Char('m'), "function"};
+    case Kind::Class:
+        return {QLatin1Char('c'), "type"};
+    case Kind::Struct:
+        return {QLatin1Char('s'), "type"};
+    case Kind::Interface:
+        return {QLatin1Char('i'), "type"};
+    case Kind::Enum:
+        return {QLatin1Char('e'), "type"};
+    case Kind::Namespace:
+        return {QLatin1Char('n'), "keyword"};
+    case Kind::Module:
+        return {QLatin1Char('M'), "keyword"};
+    case Kind::Type:
+        return {QLatin1Char('t'), "type"};
+    case Kind::Field:
+        return {QLatin1Char('f'), "property"};
+    case Kind::Property:
+        return {QLatin1Char('p'), "property"};
+    case Kind::Variable:
+        return {QLatin1Char('v'), "variable"};
+    case Kind::Constant:
+        return {QLatin1Char('C'), "constant"};
+    case Kind::Macro:
+        return {QLatin1Char('#'), "keyword"};
+    case Kind::Snippet:
+        return {QLatin1Char('S'), "string"};
+    case Kind::Text:
+        break;
     }
     return {QLatin1Char('w'), "comment"};
 }
@@ -66,23 +83,40 @@ QString kindName(CompletionItem::Kind kind)
     using Kind = CompletionItem::Kind;
     const auto tr = [](const char *text) { return QCoreApplication::translate("Completion", text); };
     switch (kind) {
-    case Kind::Keyword: return tr("keyword");
-    case Kind::Function: return tr("function");
-    case Kind::Method: return tr("method");
-    case Kind::Class: return tr("class");
-    case Kind::Struct: return tr("struct");
-    case Kind::Interface: return tr("interface");
-    case Kind::Enum: return tr("enum");
-    case Kind::Namespace: return tr("namespace");
-    case Kind::Module: return tr("module");
-    case Kind::Type: return tr("type");
-    case Kind::Field: return tr("field");
-    case Kind::Property: return tr("property");
-    case Kind::Variable: return tr("variable");
-    case Kind::Constant: return tr("constant");
-    case Kind::Macro: return tr("macro");
-    case Kind::Snippet: return tr("snippet");
-    case Kind::Text: break;
+    case Kind::Keyword:
+        return tr("keyword");
+    case Kind::Function:
+        return tr("function");
+    case Kind::Method:
+        return tr("method");
+    case Kind::Class:
+        return tr("class");
+    case Kind::Struct:
+        return tr("struct");
+    case Kind::Interface:
+        return tr("interface");
+    case Kind::Enum:
+        return tr("enum");
+    case Kind::Namespace:
+        return tr("namespace");
+    case Kind::Module:
+        return tr("module");
+    case Kind::Type:
+        return tr("type");
+    case Kind::Field:
+        return tr("field");
+    case Kind::Property:
+        return tr("property");
+    case Kind::Variable:
+        return tr("variable");
+    case Kind::Constant:
+        return tr("constant");
+    case Kind::Macro:
+        return tr("macro");
+    case Kind::Snippet:
+        return tr("snippet");
+    case Kind::Text:
+        break;
     }
     return tr("word");
 }
@@ -98,13 +132,18 @@ public:
             return {};
         const CompletionItem &item = entries[index.row()].item;
         switch (role) {
-        case Qt::DisplayRole: return item.label;
+        case Qt::DisplayRole:
+            return item.label;
         // What a screen reader says of the row: the kind in words, not
         // only the badge's letter and color.
-        case Qt::AccessibleTextRole: return QStringLiteral("%1, %2").arg(item.label, kindName(item.kind));
-        case Qt::AccessibleDescriptionRole: return item.detail;
-        case Qt::ToolTipRole: return kindName(item.kind);
-        default: return {};
+        case Qt::AccessibleTextRole:
+            return QStringLiteral("%1, %2").arg(item.label, kindName(item.kind));
+        case Qt::AccessibleDescriptionRole:
+            return item.detail;
+        case Qt::ToolTipRole:
+            return kindName(item.kind);
+        default:
+            return {};
         }
     }
     void reset(std::vector<Entry> newEntries)
@@ -421,7 +460,8 @@ void CompletionPopup::updateDocumentation()
         body = tr("Loading the documentation…");
         resolveTimer_.start();
     }
-    documentationBody_->setText(body.isEmpty() ? kindName(item->kind) : kindName(item->kind) + QStringLiteral("\n\n") + body);
+    documentationBody_->setText(body.isEmpty() ? kindName(item->kind)
+                                               : kindName(item->kind) + QStringLiteral("\n\n") + body);
     documentation_->setAccessibleDescription(documentationBody_->text());
     placeDocumentation();
     documentation_->show();
@@ -522,8 +562,8 @@ void CompletionPopup::fitSize()
     for (int i = 0; i < std::min(count(), 60); ++i) {
         const CompletionItem &item = model_->entries[i].item;
         // Badge, bold label, gap, detail and margins (see CompletionDelegate).
-        const int wanted = 56 + metrics.horizontalAdvance(item.label) * 11 / 10
-                         + (item.detail.isEmpty() ? 0 : 40 + metrics.horizontalAdvance(item.detail));
+        const int wanted = 56 + metrics.horizontalAdvance(item.label) * 11 / 10 +
+                           (item.detail.isEmpty() ? 0 : 40 + metrics.horizontalAdvance(item.detail));
         width = std::max(width, wanted);
     }
     // As CompletionDelegate::sizeHint, plus the frame's margins and the

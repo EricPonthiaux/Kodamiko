@@ -51,20 +51,21 @@ QStringList jdkParents()
 {
     const QString home = QDir::homePath();
     QStringList parents{home + QStringLiteral("/.sdkman/candidates/java"), home + QStringLiteral("/.jdks"),
-                        home + QStringLiteral("/.asdf/installs/java"), home + QStringLiteral("/.local/share/mise/installs/java")};
+                        home + QStringLiteral("/.asdf/installs/java"),
+                        home + QStringLiteral("/.local/share/mise/installs/java")};
 #if defined(Q_OS_WIN)
     for (const char *variable : {"ProgramFiles", "ProgramW6432"}) {
         const QString programFiles = qEnvironmentVariable(variable);
         if (programFiles.isEmpty())
             continue;
-        for (const char *vendor : {"Java", "Eclipse Adoptium", "Microsoft", "Zulu", "Amazon Corretto", "BellSoft",
-                                   "Semeru", "OpenJDK"})
+        for (const char *vendor :
+             {"Java", "Eclipse Adoptium", "Microsoft", "Zulu", "Amazon Corretto", "BellSoft", "Semeru", "OpenJDK"})
             parents.append(programFiles + QLatin1Char('/') + QLatin1String(vendor));
     }
 #elif defined(Q_OS_MACOS)
     parents << QStringLiteral("/Library/Java/JavaVirtualMachines")
-            << home + QStringLiteral("/Library/Java/JavaVirtualMachines")
-            << QStringLiteral("/opt/homebrew/opt") << QStringLiteral("/usr/local/opt");
+            << home + QStringLiteral("/Library/Java/JavaVirtualMachines") << QStringLiteral("/opt/homebrew/opt")
+            << QStringLiteral("/usr/local/opt");
 #else
     parents << QStringLiteral("/usr/lib/jvm") << QStringLiteral("/usr/lib64/jvm") << QStringLiteral("/usr/java")
             << QStringLiteral("/opt/java") << QStringLiteral("/opt");
@@ -79,7 +80,8 @@ QStringList homesIn(const QString &folder)
     const QDir dir(folder);
     for (const QString &name : dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
         const QString path = dir.filePath(name);
-        for (const QString &candidate : {path, path + QStringLiteral("/Contents/Home"), path + QStringLiteral("/libexec/openjdk.jdk/Contents/Home")}) {
+        for (const QString &candidate : {path, path + QStringLiteral("/Contents/Home"),
+                                         path + QStringLiteral("/libexec/openjdk.jdk/Contents/Home")}) {
             if (QFileInfo(candidate + QStringLiteral("/bin/") + javaName).isExecutable())
                 homes.append(candidate);
         }

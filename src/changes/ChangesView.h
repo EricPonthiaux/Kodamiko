@@ -67,7 +67,10 @@ signals:
     void abortRequested();
 
 private:
-    enum class Section { Staged, Unstaged };
+    enum class Section {
+        Staged,
+        Unstaged
+    };
     struct FileRef {
         Section section;
         int index; // in RepositoryStatus::staged or ::unstaged

@@ -69,7 +69,9 @@ struct Editor {
             terminal->start(spec);
             return terminal;
         };
-        context.showChanges = [this](const QString &path) { changesShown = path.isEmpty() ? QStringLiteral("*") : path; };
+        context.showChanges = [this](const QString &path) {
+            changesShown = path.isEmpty() ? QStringLiteral("*") : path;
+        };
         DuetTools::registerEditorTools(registry, context);
         DuetTools::registerWorkspaceTools(registry, context);
         DuetTools::registerGitTools(registry, context);
@@ -96,11 +98,12 @@ struct Editor {
                 if (message.value(QStringLiteral("id")).toInt() == requestId)
                     result = message;
             });
-        session.handleMessage(QJsonObject{{QStringLiteral("jsonrpc"), QStringLiteral("2.0")},
-                                          {QStringLiteral("id"), requestId},
-                                          {QStringLiteral("method"), QStringLiteral("tools/call")},
-                                          {QStringLiteral("params"), QJsonObject{{QStringLiteral("name"), tool},
-                                                                                {QStringLiteral("arguments"), arguments}}}});
+        session.handleMessage(
+            QJsonObject{{QStringLiteral("jsonrpc"), QStringLiteral("2.0")},
+                        {QStringLiteral("id"), requestId},
+                        {QStringLiteral("method"), QStringLiteral("tools/call")},
+                        {QStringLiteral("params"),
+                         QJsonObject{{QStringLiteral("name"), tool}, {QStringLiteral("arguments"), arguments}}}});
         QElapsedTimer clock;
         clock.start();
         while (result.isEmpty() && clock.elapsed() < timeoutMs)
@@ -117,7 +120,12 @@ QJsonObject structured(const QJsonObject &result)
 
 QString text(const QJsonObject &result)
 {
-    return result.value(QStringLiteral("content")).toArray().first().toObject().value(QStringLiteral("text")).toString();
+    return result.value(QStringLiteral("content"))
+        .toArray()
+        .first()
+        .toObject()
+        .value(QStringLiteral("text"))
+        .toString();
 }
 
 } // namespace
@@ -144,38 +152,49 @@ private slots:
                  QStringLiteral("return 2;"));
         QCOMPARE(state.value(QStringLiteral("unsavedFiles")).toArray(), QJsonArray{QStringLiteral("src/a.cpp")});
 
-        const QJsonArray files = structured(editor.call(QStringLiteral("get_open_files"))).value(QStringLiteral("files")).toArray();
+        const QJsonArray files =
+            structured(editor.call(QStringLiteral("get_open_files"))).value(QStringLiteral("files")).toArray();
         QCOMPARE(files.size(), 1);
         QVERIFY(files.first().toObject().value(QStringLiteral("unsaved")).toBool());
 
         // The unsaved text, not the disk's; a range of lines.
-        QJsonObject file = structured(editor.call(QStringLiteral("get_file_text"),
-                                                  {{QStringLiteral("path"), QStringLiteral("src/a.cpp")},
-                                                   {QStringLiteral("startLine"), 3},
-                                                   {QStringLiteral("endLine"), 3}}));
+        QJsonObject file = structured(
+            editor.call(QStringLiteral("get_file_text"), {{QStringLiteral("path"), QStringLiteral("src/a.cpp")},
+                                                          {QStringLiteral("startLine"), 3},
+                                                          {QStringLiteral("endLine"), 3}}));
         QCOMPARE(file.value(QStringLiteral("text")).toString(), QStringLiteral("    return 2;"));
         QVERIFY(file.value(QStringLiteral("unsaved")).toBool());
         QVERIFY(editor.call(QStringLiteral("get_file_text"), {{QStringLiteral("path"), QStringLiteral("none.txt")}})
-                    .value(QStringLiteral("isError")).toBool());
+                    .value(QStringLiteral("isError"))
+                    .toBool());
 
         // Search sees the unsaved text; files by fuzzy name; the outline.
-        const QJsonObject found = structured(editor.call(QStringLiteral("search_in_files"),
-                                                         {{QStringLiteral("text"), QStringLiteral("return 2")}}));
+        const QJsonObject found = structured(
+            editor.call(QStringLiteral("search_in_files"), {{QStringLiteral("text"), QStringLiteral("return 2")}}));
         QCOMPARE(found.value(QStringLiteral("matches")).toArray().size(), 1);
-        QCOMPARE(found.value(QStringLiteral("matches")).toArray().first().toObject().value(QStringLiteral("line")).toInt(), 3);
-        QCOMPARE(structured(editor.call(QStringLiteral("find_files"), {{QStringLiteral("query"), QStringLiteral("acpp")}}))
-                     .value(QStringLiteral("files")).toArray().first().toString(),
-                 QStringLiteral("src/a.cpp"));
+        QCOMPARE(
+            found.value(QStringLiteral("matches")).toArray().first().toObject().value(QStringLiteral("line")).toInt(),
+            3);
+        QCOMPARE(
+            structured(editor.call(QStringLiteral("find_files"), {{QStringLiteral("query"), QStringLiteral("acpp")}}))
+                .value(QStringLiteral("files"))
+                .toArray()
+                .first()
+                .toString(),
+            QStringLiteral("src/a.cpp"));
         const QJsonArray symbols = structured(editor.call(QStringLiteral("get_document_symbols"),
                                                           {{QStringLiteral("path"), QStringLiteral("src/a.cpp")}}))
-                                       .value(QStringLiteral("symbols")).toArray();
+                                       .value(QStringLiteral("symbols"))
+                                       .toArray();
         QCOMPARE(symbols.first().toObject().value(QStringLiteral("name")).toString(), QStringLiteral("one"));
         QCOMPARE(symbols.first().toObject().value(QStringLiteral("kind")).toString(), QStringLiteral("function"));
 
         // Opening at a line, saving.
-        QVERIFY(!editor.call(QStringLiteral("open_file"), {{QStringLiteral("path"), QStringLiteral("notes.md")},
-                                                           {QStringLiteral("line"), 1}})
-                     .value(QStringLiteral("isError")).toBool());
+        QVERIFY(!editor
+                     .call(QStringLiteral("open_file"),
+                           {{QStringLiteral("path"), QStringLiteral("notes.md")}, {QStringLiteral("line"), 1}})
+                     .value(QStringLiteral("isError"))
+                     .toBool());
         QCOMPARE(QFileInfo(editor.tabs.currentFilePath()).fileName(), QStringLiteral("notes.md"));
         editor.call(QStringLiteral("save_files"), {{QStringLiteral("paths"), QJsonArray{QStringLiteral("src/a.cpp")}}});
         QFile saved(editor.folder.filePath(QStringLiteral("src/a.cpp")));
@@ -196,18 +215,26 @@ private slots:
         Git::run(editor.folder.path(), {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"});
         write(editor.folder, QStringLiteral("a.txt"), "two\n");
 
-        QJsonObject status = structured(editor.call(QStringLiteral("get_git_status"), {{QStringLiteral("patches"), true}}));
+        QJsonObject status =
+            structured(editor.call(QStringLiteral("get_git_status"), {{QStringLiteral("patches"), true}}));
         QCOMPARE(status.value(QStringLiteral("branch")).toString(), QStringLiteral("main"));
         const QJsonObject change = status.value(QStringLiteral("unstaged")).toArray().first().toObject();
         QCOMPARE(change.value(QStringLiteral("path")).toString(), QStringLiteral("a.txt"));
         QVERIFY(change.value(QStringLiteral("patch")).toString().contains(QStringLiteral("+two")));
-        QCOMPARE(structured(editor.call(QStringLiteral("get_file_history"))).value(QStringLiteral("commits")).toArray()
-                     .first().toObject().value(QStringLiteral("summary")).toString(),
+        QCOMPARE(structured(editor.call(QStringLiteral("get_file_history")))
+                     .value(QStringLiteral("commits"))
+                     .toArray()
+                     .first()
+                     .toObject()
+                     .value(QStringLiteral("summary"))
+                     .toString(),
                  QStringLiteral("init"));
 
-        QVERIFY(text(editor.call(QStringLiteral("create_snapshot"), {{QStringLiteral("reason"), QStringLiteral("test")}}))
-                    .startsWith(QStringLiteral("Snapshot ")));
-        const QJsonArray snapshots = structured(editor.call(QStringLiteral("list_snapshots"))).value(QStringLiteral("snapshots")).toArray();
+        QVERIFY(
+            text(editor.call(QStringLiteral("create_snapshot"), {{QStringLiteral("reason"), QStringLiteral("test")}}))
+                .startsWith(QStringLiteral("Snapshot ")));
+        const QJsonArray snapshots =
+            structured(editor.call(QStringLiteral("list_snapshots"))).value(QStringLiteral("snapshots")).toArray();
         QCOMPARE(snapshots.size(), 1);
         const QString id = snapshots.first().toObject().value(QStringLiteral("id")).toString();
         write(editor.folder, QStringLiteral("a.txt"), "three\n");
@@ -215,7 +242,8 @@ private slots:
         // Refused: nothing happens.
         editor.allow = false;
         QVERIFY(editor.call(QStringLiteral("restore_snapshot"), {{QStringLiteral("id"), id}})
-                    .value(QStringLiteral("isError")).toBool());
+                    .value(QStringLiteral("isError"))
+                    .toBool());
         QCOMPARE(editor.asked.last(), QStringLiteral("restore the files of snapshot %1").arg(id));
         QFile file(editor.folder.filePath(QStringLiteral("a.txt")));
         QVERIFY(file.open(QIODevice::ReadOnly));
@@ -224,7 +252,8 @@ private slots:
         // Allowed: the snapshot's file is back.
         editor.allow = true;
         QVERIFY(!editor.call(QStringLiteral("restore_snapshot"), {{QStringLiteral("id"), id}})
-                     .value(QStringLiteral("isError")).toBool());
+                     .value(QStringLiteral("isError"))
+                     .toBool());
         QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll(), QByteArray("two\n"));
         file.close();
@@ -235,8 +264,14 @@ private slots:
         QCOMPARE(status.value(QStringLiteral("staged")).toArray().size(), 1);
         editor.call(QStringLiteral("commit"), {{QStringLiteral("message"), QStringLiteral("Second\n\nBody")}});
         QCOMPARE(editor.asked.last(), QStringLiteral("commit “Second”"));
-        QCOMPARE(structured(editor.call(QStringLiteral("get_file_history"), {{QStringLiteral("path"), QStringLiteral("a.txt")}}))
-                     .value(QStringLiteral("commits")).toArray().first().toObject().value(QStringLiteral("summary")).toString(),
+        QCOMPARE(structured(editor.call(QStringLiteral("get_file_history"),
+                                        {{QStringLiteral("path"), QStringLiteral("a.txt")}}))
+                     .value(QStringLiteral("commits"))
+                     .toArray()
+                     .first()
+                     .toObject()
+                     .value(QStringLiteral("summary"))
+                     .toString(),
                  QStringLiteral("Second"));
 
         editor.call(QStringLiteral("show_changes"), {{QStringLiteral("path"), QStringLiteral("a.txt")}});
@@ -272,15 +307,16 @@ private slots:
 
         // A new branch, refused then allowed.
         editor.allow = false;
-        editor.call(QStringLiteral("switch_branch"), {{QStringLiteral("name"), QStringLiteral("topic")},
-                                                      {QStringLiteral("create"), true}});
+        editor.call(QStringLiteral("switch_branch"),
+                    {{QStringLiteral("name"), QStringLiteral("topic")}, {QStringLiteral("create"), true}});
         QCOMPARE(editor.asked.last(), QStringLiteral("create and switch to topic"));
         QCOMPARE(RepositoryInfo::read(editor.folder.path())->branch, QStringLiteral("main"));
         editor.allow = true;
-        editor.call(QStringLiteral("switch_branch"), {{QStringLiteral("name"), QStringLiteral("topic")},
-                                                      {QStringLiteral("create"), true}});
+        editor.call(QStringLiteral("switch_branch"),
+                    {{QStringLiteral("name"), QStringLiteral("topic")}, {QStringLiteral("create"), true}});
         QCOMPARE(RepositoryInfo::read(editor.folder.path())->branch, QStringLiteral("topic"));
-        const QJsonArray branches = structured(editor.call(QStringLiteral("list_branches"))).value(QStringLiteral("branches")).toArray();
+        const QJsonArray branches =
+            structured(editor.call(QStringLiteral("list_branches"))).value(QStringLiteral("branches")).toArray();
         QCOMPARE(branches.size(), 3); // main, topic, origin/main
         QVERIFY(branches.at(1).toObject().value(QStringLiteral("current")).toBool());
         QVERIFY(branches.at(2).toObject().value(QStringLiteral("remote")).toBool());
@@ -289,8 +325,10 @@ private slots:
         write(editor.folder, QStringLiteral("a.txt"), "two\n");
         editor.call(QStringLiteral("stash_changes"), {{QStringLiteral("message"), QStringLiteral("wip")}});
         QCOMPARE(editor.asked.last(), QStringLiteral("stash the uncommitted changes as “wip”"));
-        const QJsonArray stashes = structured(editor.call(QStringLiteral("list_stashes"), {{QStringLiteral("patches"), true}}))
-                                       .value(QStringLiteral("stashes")).toArray();
+        const QJsonArray stashes =
+            structured(editor.call(QStringLiteral("list_stashes"), {{QStringLiteral("patches"), true}}))
+                .value(QStringLiteral("stashes"))
+                .toArray();
         QCOMPARE(stashes.size(), 1);
         QVERIFY(stashes.first().toObject().value(QStringLiteral("patch")).toString().contains(QStringLiteral("+two")));
         editor.call(QStringLiteral("apply_stash"), {{QStringLiteral("index"), 0}});
@@ -306,7 +344,8 @@ private slots:
         write(editor.folder, QStringLiteral("a.txt"), "three\n");
         Git::run(editor.folder.path(), {"commit", "-qam", "main"});
         QVERIFY(editor.call(QStringLiteral("merge_branch"), {{QStringLiteral("branch"), QStringLiteral("topic")}})
-                    .value(QStringLiteral("isError")).toBool());
+                    .value(QStringLiteral("isError"))
+                    .toBool());
         QCOMPARE(editor.asked.last(), QStringLiteral("merge into the current branch topic"));
         status = structured(editor.call(QStringLiteral("get_git_status")));
         QCOMPARE(status.value(QStringLiteral("operation")).toString(), QStringLiteral("merge"));
@@ -320,16 +359,20 @@ private slots:
     {
         Editor editor;
         // The same in sh and PowerShell.
-        const QJsonObject result = structured(editor.call(
-            QStringLiteral("run_in_terminal"), {{QStringLiteral("command"), QStringLiteral("echo hello; exit 3")}}, 20000));
+        const QJsonObject result =
+            structured(editor.call(QStringLiteral("run_in_terminal"),
+                                   {{QStringLiteral("command"), QStringLiteral("echo hello; exit 3")}}, 20000));
         QVERIFY(result.value(QStringLiteral("finished")).toBool());
         QCOMPARE(result.value(QStringLiteral("exitCode")).toInt(), 3);
         QVERIFY(result.value(QStringLiteral("output")).toString().contains(QStringLiteral("hello")));
         QVERIFY(editor.asked.last().startsWith(QStringLiteral("run “echo hello")));
-        const QJsonArray terminals = structured(editor.call(QStringLiteral("list_terminals"))).value(QStringLiteral("terminals")).toArray();
+        const QJsonArray terminals =
+            structured(editor.call(QStringLiteral("list_terminals"))).value(QStringLiteral("terminals")).toArray();
         QCOMPARE(terminals.size(), 1);
         QVERIFY(structured(editor.call(QStringLiteral("read_terminal"), {{QStringLiteral("id"), 0}}))
-                    .value(QStringLiteral("text")).toString().contains(QStringLiteral("hello")));
+                    .value(QStringLiteral("text"))
+                    .toString()
+                    .contains(QStringLiteral("hello")));
     }
 
 #ifdef DUET_WITH_DIAGRAMS
@@ -339,17 +382,20 @@ private slots:
     {
         Editor editor;
         write(editor.folder, QStringLiteral("flow.mmd"), "flowchart TB\n  A[Start] --> B[End]\n");
-        QJsonObject diagram = structured(editor.call(QStringLiteral("get_diagram"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")}}));
+        QJsonObject diagram = structured(
+            editor.call(QStringLiteral("get_diagram"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")}}));
         QCOMPARE(diagram.value(QStringLiteral("family")).toString(), QStringLiteral("flowchart"));
         QCOMPARE(diagram.value(QStringLiteral("elements")).toArray().size(), 2);
         QVERIFY(!diagram.value(QStringLiteral("open")).toBool());
 
         // Selected by key, then read back as the user's selection.
         editor.call(QStringLiteral("select_diagram_elements"),
-                    {{QStringLiteral("path"), QStringLiteral("flow.mmd")}, {QStringLiteral("keys"), QJsonArray{QStringLiteral("B")}}});
+                    {{QStringLiteral("path"), QStringLiteral("flow.mmd")},
+                     {QStringLiteral("keys"), QJsonArray{QStringLiteral("B")}}});
         DiagramView *view = editor.tabs.diagramViewFor(editor.folder.filePath(QStringLiteral("flow.mmd")));
         QVERIFY(view);
-        diagram = structured(editor.call(QStringLiteral("get_diagram"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")}}));
+        diagram = structured(
+            editor.call(QStringLiteral("get_diagram"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")}}));
         QVERIFY(diagram.value(QStringLiteral("open")).toBool());
         int selected = 0;
         for (const QJsonValue &element : diagram.value(QStringLiteral("elements")).toArray())
@@ -366,27 +412,42 @@ private slots:
              {QStringLiteral("source"), QStringLiteral("flowchart TB\n  A[Start] --> B[End]\n  B --> C{Again?}\n")}}));
         QCOMPARE(applied.value(QStringLiteral("elements")).toInt(), 3);
         start = view->board()->shapeByReference(QStringLiteral("A"));
-        QVERIFY2(std::abs(start->x - startPlace.x()) < 0.2 && std::abs(start->y - startPlace.y()) < 0.2,
-                 qPrintable(QStringLiteral("%1,%2 -> %3,%4").arg(startPlace.x()).arg(startPlace.y()).arg(start->x).arg(start->y)));
+        QVERIFY2(
+            std::abs(start->x - startPlace.x()) < 0.2 && std::abs(start->y - startPlace.y()) < 0.2,
+            qPrintable(
+                QStringLiteral("%1,%2 -> %3,%4").arg(startPlace.x()).arg(startPlace.y()).arg(start->x).arg(start->y)));
         QVERIFY(view->isModified());
         QVERIFY(view->board()->canUndo());
-        QVERIFY(editor.call(QStringLiteral("apply_diagram_source"),
-                            {{QStringLiteral("path"), QStringLiteral("flow.mmd")}, {QStringLiteral("source"), QStringLiteral("nonsense")}})
-                    .value(QStringLiteral("isError")).toBool());
+        QVERIFY(
+            editor
+                .call(QStringLiteral("apply_diagram_source"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")},
+                                                               {QStringLiteral("source"), QStringLiteral("nonsense")}})
+                .value(QStringLiteral("isError"))
+                .toBool());
 
-        QVERIFY(!editor.call(QStringLiteral("layout_diagram"),
-                             {{QStringLiteral("path"), QStringLiteral("flow.mmd")}, {QStringLiteral("direction"), QStringLiteral("LR")}})
-                     .value(QStringLiteral("isError")).toBool());
+        QVERIFY(!editor
+                     .call(QStringLiteral("layout_diagram"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")},
+                                                              {QStringLiteral("direction"), QStringLiteral("LR")}})
+                     .value(QStringLiteral("isError"))
+                     .toBool());
         QCOMPARE(view->board()->meta.value(QStringLiteral("rankdir")).toString(), QStringLiteral("LR"));
 
-        QVERIFY(!editor.call(QStringLiteral("export_diagram"),
-                             {{QStringLiteral("path"), QStringLiteral("flow.mmd")}, {QStringLiteral("output"), QStringLiteral("flow.png")}})
-                     .value(QStringLiteral("isError")).toBool());
+        QVERIFY(!editor
+                     .call(QStringLiteral("export_diagram"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")},
+                                                              {QStringLiteral("output"), QStringLiteral("flow.png")}})
+                     .value(QStringLiteral("isError"))
+                     .toBool());
         QVERIFY(QFileInfo(editor.folder.filePath(QStringLiteral("flow.png"))).size() > 1000);
 
-        QVERIFY(structured(editor.call(QStringLiteral("get_diagram_problems"), {{QStringLiteral("path"), QStringLiteral("flow.mmd")}}))
-                    .value(QStringLiteral("problems")).toArray().isEmpty());
-        QVERIFY(!structured(editor.call(QStringLiteral("list_diagram_kinds"))).value(QStringLiteral("kinds")).toArray().isEmpty());
+        QVERIFY(structured(editor.call(QStringLiteral("get_diagram_problems"),
+                                       {{QStringLiteral("path"), QStringLiteral("flow.mmd")}}))
+                    .value(QStringLiteral("problems"))
+                    .toArray()
+                    .isEmpty());
+        QVERIFY(!structured(editor.call(QStringLiteral("list_diagram_kinds")))
+                     .value(QStringLiteral("kinds"))
+                     .toArray()
+                     .isEmpty());
     }
 #endif
 };

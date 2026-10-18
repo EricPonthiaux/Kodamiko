@@ -218,10 +218,10 @@ private slots:
     {
         Board board;
         board.setFamily(&families::classes());
-        Shape *s = board.addShape(QStringLiteral("class"),
-                                  QJsonObject{{"name", "Service"},
-                                              {"attributes", QJsonArray{"-repository: Repository"}},
-                                              {"methods", QJsonArray{"+execute(): Result"}}});
+        Shape *s =
+            board.addShape(QStringLiteral("class"), QJsonObject{{"name", "Service"},
+                                                                {"attributes", QJsonArray{"-repository: Repository"}},
+                                                                {"methods", QJsonArray{"+execute(): Result"}}});
         auto *c = dynamic_cast<ClassShape *>(s);
         QVERIFY(c);
         // Header (1 line) + two sections of one member each.
@@ -320,8 +320,9 @@ private slots:
         };
         QCOMPARE(attributesOf("aggregation"), QStringList{"arrowsize=1.800"});
         QCOMPARE(attributesOf("extension"), QStringList{"arrowsize=1.400"});
-        QCOMPARE(attributesOf("association"),
-                 QStringList{QStringLiteral("arrowsize=") + QString::number((board.style().link.arrow + 2) / 10, 'f', 3)});
+        QCOMPARE(
+            attributesOf("association"),
+            QStringList{QStringLiteral("arrowsize=") + QString::number((board.style().link.arrow + 2) / 10, 'f', 3)});
         QCOMPARE(attributesOf("link"), QStringList{"arrowhead=none"});
         QCOMPARE(attributesOf("dotted"), QStringList{"arrowhead=none"});
     }
@@ -413,7 +414,8 @@ private slots:
     void reportsWhatItDoesNotUnderstand()
     {
         Model model;
-        QVERIFY(mermaid().parse(QStringLiteral("classDiagram\n  class A\n  note \"for A\"\n  A ==> B\n"), model, nullptr));
+        QVERIFY(
+            mermaid().parse(QStringLiteral("classDiagram\n  class A\n  note \"for A\"\n  A ==> B\n"), model, nullptr));
         QCOMPARE(model.warnings, QStringList{"Not understood: A ==> B"});
         Model puml;
         QVERIFY(plantuml().parse(QStringLiteral("@startuml\nclass A\nA ~~ B\n@enduml"), puml, nullptr));
@@ -422,10 +424,11 @@ private slots:
 
     void plantumlReadsTheSpecializedDeclarations()
     {
-        const QString source = QStringLiteral("@startuml\n    abstract class Base\n    interface Contract\n    enum Status\n"
-                                              "    annotation Injectable\n    entity Account\n    struct Value\n"
-                                              "    exception Failure\n    protocol Adapter\n    abstract Shape\n"
-                                              "    class Order <<aggregate>>\n@enduml");
+        const QString source =
+            QStringLiteral("@startuml\n    abstract class Base\n    interface Contract\n    enum Status\n"
+                           "    annotation Injectable\n    entity Account\n    struct Value\n"
+                           "    exception Failure\n    protocol Adapter\n    abstract Shape\n"
+                           "    class Order <<aggregate>>\n@enduml");
         QVERIFY(plantuml().matches(source));
         QVERIFY(!mermaid().matches(source));
         Model model;
@@ -445,21 +448,20 @@ private slots:
 
     void plantumlRoundTrips()
     {
-        const QString source = QStringLiteral(
-            "@startuml\n"
-            "class \"Customer account\" as Account {\n"
-            "  -id: UUID\n"
-            "  {static} +create(): Account\n"
-            "  --\n"
-            "}\n"
-            "class List<T>\n"
-            "interface Repository\n"
-            "Account \"1\" -left-> \"*\" Order : places >\n"
-            "AccountRepository .[#red].|> Repository\n"
-            "Order *--- Line\n"
-            "Account : +close()\n"
-            "List ..> Order\n"
-            "@enduml");
+        const QString source = QStringLiteral("@startuml\n"
+                                              "class \"Customer account\" as Account {\n"
+                                              "  -id: UUID\n"
+                                              "  {static} +create(): Account\n"
+                                              "  --\n"
+                                              "}\n"
+                                              "class List<T>\n"
+                                              "interface Repository\n"
+                                              "Account \"1\" -left-> \"*\" Order : places >\n"
+                                              "AccountRepository .[#red].|> Repository\n"
+                                              "Order *--- Line\n"
+                                              "Account : +close()\n"
+                                              "List ..> Order\n"
+                                              "@enduml");
         Model model;
         QVERIFY(plantuml().parse(source, model, nullptr));
         QVERIFY(model.warnings.isEmpty());

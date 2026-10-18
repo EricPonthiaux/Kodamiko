@@ -47,8 +47,10 @@ public:
 
     bool parse(const QString &source, Model &model, QString *) const override
     {
-        static const QRegularExpression heading(QStringLiteral("^title\\s+(.+)$"), QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression group(QStringLiteral("^section\\s+(.+)$"), QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression heading(QStringLiteral("^title\\s+(.+)$"),
+                                                QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression group(QStringLiteral("^section\\s+(.+)$"),
+                                              QRegularExpression::CaseInsensitiveOption);
         static const QRegularExpression task(QStringLiteral("^(.+?)\\s*:\\s*([1-5])\\s*(?::\\s*(.*))?$"));
         QString title;
         QString section = defaultSection();

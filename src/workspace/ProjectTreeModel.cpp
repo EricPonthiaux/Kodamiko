@@ -25,13 +25,33 @@ struct NestingRule {
     const char *child;
 };
 const NestingRule nestingRules[] = {
-    {".cpp", ".h"}, {".cpp", ".hpp"}, {".cc", ".h"}, {".cc", ".hh"}, {".cxx", ".h"}, {".cxx", ".hxx"},
-    {".c", ".h"}, {".ts", ".js"}, {".ts", ".js.map"}, {".ts", ".d.ts"}, {".tsx", ".js"}, {".tsx", ".js.map"},
-    {".js", ".js.map"}, {".js", ".min.js"}, {".scss", ".css"}, {".scss", ".css.map"}, {".less", ".css"},
-    {".css", ".css.map"}, {".css", ".min.css"},
-    {"package.json", "package-lock.json"}, {"package.json", "yarn.lock"}, {"package.json", "pnpm-lock.yaml"},
-    {"Cargo.toml", "Cargo.lock"}, {"pyproject.toml", "poetry.lock"}, {"go.mod", "go.sum"},
-    {"Gemfile", "Gemfile.lock"}, {"composer.json", "composer.lock"},
+    {".cpp", ".h"},
+    {".cpp", ".hpp"},
+    {".cc", ".h"},
+    {".cc", ".hh"},
+    {".cxx", ".h"},
+    {".cxx", ".hxx"},
+    {".c", ".h"},
+    {".ts", ".js"},
+    {".ts", ".js.map"},
+    {".ts", ".d.ts"},
+    {".tsx", ".js"},
+    {".tsx", ".js.map"},
+    {".js", ".js.map"},
+    {".js", ".min.js"},
+    {".scss", ".css"},
+    {".scss", ".css.map"},
+    {".less", ".css"},
+    {".css", ".css.map"},
+    {".css", ".min.css"},
+    {"package.json", "package-lock.json"},
+    {"package.json", "yarn.lock"},
+    {"package.json", "pnpm-lock.yaml"},
+    {"Cargo.toml", "Cargo.lock"},
+    {"pyproject.toml", "poetry.lock"},
+    {"go.mod", "go.sum"},
+    {"Gemfile", "Gemfile.lock"},
+    {"composer.json", "composer.lock"},
 };
 
 // Direct main file of `name` among `siblings`; empty if none. The longest
@@ -40,8 +60,9 @@ QString directParent(const QString &name, const QStringList &siblings)
 {
     static const std::vector<NestingRule> rules = [] {
         std::vector<NestingRule> sorted(std::begin(nestingRules), std::end(nestingRules));
-        std::stable_sort(sorted.begin(), sorted.end(),
-                         [](const NestingRule &a, const NestingRule &b) { return qstrlen(a.child) > qstrlen(b.child); });
+        std::stable_sort(sorted.begin(), sorted.end(), [](const NestingRule &a, const NestingRule &b) {
+            return qstrlen(a.child) > qstrlen(b.child);
+        });
         return sorted;
     }();
     for (const NestingRule &rule : rules) {
@@ -184,7 +205,7 @@ std::vector<ProjectTreeModel::Entry> ProjectTreeModel::list(const QString &folde
     }
 
     std::vector<Entry> result;
-    QHash<QString, size_t> fileRows; // file name → index in result
+    QHash<QString, size_t> fileRows;     // file name → index in result
     QList<QPair<QString, Entry>> nested; // main file name, companion
     for (const QFileInfo &info : entries) {
         Entry entry;

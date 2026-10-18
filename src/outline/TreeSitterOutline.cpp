@@ -10,16 +10,26 @@ namespace {
 
 std::optional<SymbolKind> kindFromName(QStringView kind)
 {
-    if (kind == u"namespace") return SymbolKind::Namespace;
-    if (kind == u"class") return SymbolKind::Class;
-    if (kind == u"struct") return SymbolKind::Struct;
-    if (kind == u"interface") return SymbolKind::Interface;
-    if (kind == u"enum") return SymbolKind::Enum;
-    if (kind == u"type") return SymbolKind::Type;
-    if (kind == u"function") return SymbolKind::Function;
-    if (kind == u"method") return SymbolKind::Method;
-    if (kind == u"field") return SymbolKind::Field;
-    if (kind == u"macro") return SymbolKind::Macro;
+    if (kind == u"namespace")
+        return SymbolKind::Namespace;
+    if (kind == u"class")
+        return SymbolKind::Class;
+    if (kind == u"struct")
+        return SymbolKind::Struct;
+    if (kind == u"interface")
+        return SymbolKind::Interface;
+    if (kind == u"enum")
+        return SymbolKind::Enum;
+    if (kind == u"type")
+        return SymbolKind::Type;
+    if (kind == u"function")
+        return SymbolKind::Function;
+    if (kind == u"method")
+        return SymbolKind::Method;
+    if (kind == u"field")
+        return SymbolKind::Field;
+    if (kind == u"macro")
+        return SymbolKind::Macro;
     return std::nullopt;
 }
 

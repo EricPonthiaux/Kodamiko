@@ -20,7 +20,7 @@ bool severityOf(const QString &rest, Severity *severity, QString *message)
     if (!match.hasMatch())
         return false;
     *severity = match.captured(1).compare(QLatin1String("warning"), Qt::CaseInsensitive) == 0 ? Severity::Warning
-                                                                                                 : Severity::Error;
+                                                                                              : Severity::Error;
     *message = match.captured(2).trimmed();
     return true;
 }
@@ -61,12 +61,12 @@ void BuildOutputParser::finish()
 
 QString BuildOutputParser::cleanLine(const QString &line)
 {
-    static const QRegularExpression escapes(QStringLiteral(
-        "\x1b\\][^\x07\x1b]*(?:\x07|\x1b\\\\)"      // OSC: title, hyperlink
-        "|\x1b[P^_][^\x1b]*\x1b\\\\"                // DCS, PM, APC
-        "|\x1b\\[[0-?]*[ -/]*[@-~]"                 // CSI: colors, erasing
-        "|\x1b[()][A-Za-z0-9]|\x1b[=>78DEHMc]"      // character sets, modes
-        "|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]"));      // other controls, tab kept
+    static const QRegularExpression escapes(
+        QStringLiteral("\x1b\\][^\x07\x1b]*(?:\x07|\x1b\\\\)" // OSC: title, hyperlink
+                       "|\x1b[P^_][^\x1b]*\x1b\\\\"           // DCS, PM, APC
+                       "|\x1b\\[[0-?]*[ -/]*[@-~]"            // CSI: colors, erasing
+                       "|\x1b[()][A-Za-z0-9]|\x1b[=>78DEHMc]" // character sets, modes
+                       "|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")); // other controls, tab kept
     QString text = line;
     while (text.endsWith(QLatin1Char('\r')))
         text.chop(1);
@@ -89,7 +89,8 @@ void BuildOutputParser::parseLine(const QString &line)
     QString message;
 
     // Maven: [ERROR] /src/A.java:[12,5] cannot find symbol
-    static const QRegularExpression maven(QStringLiteral("^\\[(ERROR|WARNING)\\]\\s+(.+?):\\[(\\d+),(\\d+)\\]\\s*(.*)$"));
+    static const QRegularExpression maven(
+        QStringLiteral("^\\[(ERROR|WARNING)\\]\\s+(.+?):\\[(\\d+),(\\d+)\\]\\s*(.*)$"));
     if (const QRegularExpressionMatch match = maven.match(line); match.hasMatch()) {
         add(match.captured(2), number(match.captured(3)), number(match.captured(4)),
             match.captured(1) == QLatin1String("WARNING") ? Severity::Warning : Severity::Error, match.captured(5));
@@ -218,7 +219,8 @@ bool BuildOutputParser::continuePending(const QString &line)
             add(pythonPath_, pythonLine_, 0, Severity::Error, line.trimmed());
         return true;
     }
-    case Pending::None: break;
+    case Pending::None:
+        break;
     }
     return false;
 }

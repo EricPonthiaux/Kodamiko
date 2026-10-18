@@ -53,10 +53,8 @@ QStringList arguments(const QString &prompt, const QString &relativePath, const 
                       const QString &hookCommand)
 {
     // The prompt first: --allowedTools takes every argument that follows.
-    QStringList arguments{prompt,
-                          QStringLiteral("--output-format"), QStringLiteral("stream-json"),
-                          QStringLiteral("--verbose"),
-                          QStringLiteral("--no-session-persistence")};
+    QStringList arguments{prompt, QStringLiteral("--output-format"), QStringLiteral("stream-json"),
+                          QStringLiteral("--verbose"), QStringLiteral("--no-session-persistence")};
     if (!pluginPath.isEmpty())
         arguments << QStringLiteral("--plugin-dir") << QDir::toNativeSeparators(pluginPath);
     if (!hookCommand.isEmpty()) {
@@ -97,8 +95,8 @@ Event parseLine(const QByteArray &line, const QString &workDir)
             event.kind = Event::Kind::Steps;
     } else if (type == QLatin1String("result")) {
         event.kind = Event::Kind::Finished;
-        event.failed = object.value(QLatin1String("is_error")).toBool()
-                       || object.value(QLatin1String("subtype")).toString() != QLatin1String("success");
+        event.failed = object.value(QLatin1String("is_error")).toBool() ||
+                       object.value(QLatin1String("subtype")).toString() != QLatin1String("success");
         event.text = object.value(QLatin1String("result")).toString().trimmed();
         if (event.text.isEmpty() && event.failed)
             event.text = object.value(QLatin1String("subtype")).toString();

@@ -107,8 +107,8 @@ private:
 
 bool isIdentifierByte(char c)
 {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$'
-        || static_cast<unsigned char>(c) >= 0x80;
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$' ||
+           static_cast<unsigned char>(c) >= 0x80;
 }
 
 } // namespace
@@ -161,7 +161,7 @@ CompletionController::~CompletionController()
 CompletionController *CompletionController::of(const EditorWidget *editor)
 {
     return editor ? editor->findChild<CompletionController *>(QStringLiteral("completionController"),
-                                                               Qt::FindDirectChildrenOnly)
+                                                              Qt::FindDirectChildrenOnly)
                   : nullptr;
 }
 
@@ -216,8 +216,8 @@ QString CompletionController::textBetween(int start, int end) const
 int CompletionController::identifierStart(int position) const
 {
     int start = position;
-    while (start > 0
-           && isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, start - 1))))
+    while (start > 0 &&
+           isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, start - 1))))
         --start;
     return start;
 }
@@ -227,8 +227,9 @@ bool CompletionController::insideCommentOrString(int position) const
     if (position <= 0)
         return false;
     // The text just typed may not be styled yet.
-    const long lineStart = editor_->SendScintilla(
-        QsciScintillaBase::SCI_POSITIONFROMLINE, editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
+    const long lineStart =
+        editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE,
+                               editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
     editor_->SendScintilla(QsciScintillaBase::SCI_COLOURISE, lineStart, static_cast<long>(position));
     const int style = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position - 1));
     QString name;
@@ -254,9 +255,8 @@ bool CompletionController::insideDocComment(int position) const
 bool CompletionController::inModulePath(int position) const
 {
     static const QStringList languages = {"javascript", "typescript", "tsx"};
-    return languages.contains(editor_->languageId())
-        && CodeScan::inModulePath(editor_->utf8Range(std::max(0, position - 1000), position),
-                                  std::min(position, 1000));
+    return languages.contains(editor_->languageId()) &&
+           CodeScan::inModulePath(editor_->utf8Range(std::max(0, position - 1000), position), std::min(position, 1000));
 }
 
 QChar CompletionController::docCommentTrigger(QChar typed, int position) const
@@ -307,10 +307,9 @@ void CompletionController::onCharacterAdded(int character)
     if ((typed == u'\n' || typed == u'\r') && writeDocComment(position))
         return;
     scheduleFullLine(position);
-    const QChar previous = position >= 2
-                               ? QChar(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT,
-                                                                                position - 2)))
-                               : QChar();
+    const QChar previous =
+        position >= 2 ? QChar(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, position - 2)))
+                      : QChar();
     const AutoCompletion mode = editor_->options().autoCompletion;
     if (mode == AutoCompletion::Off)
         return;
@@ -368,9 +367,9 @@ void CompletionController::start(bool explicitRequest, QChar triggerCharacter, M
     if (!explicitRequest && triggerCharacter.isNull() && identifierStart(position) == position)
         return;
     // The trigger character was erased or typed past while waiting (Calm).
-    if (!triggerCharacter.isNull() && !explicitRequest
-        && (position < 1 || QChar(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, position - 1)))
-                                != triggerCharacter))
+    if (!triggerCharacter.isNull() && !explicitRequest &&
+        (position < 1 || QChar(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT,
+                                                                        position - 1))) != triggerCharacter))
         return;
 
     // A name typed after "object." (or "->", "::") is a member, whoever
@@ -492,18 +491,18 @@ void CompletionController::refilter()
     updatePreview();
     if (opening) {
         announcedLabel_ = popup_->current() ? popup_->current()->label : QString();
-        CompletionPopup::announce(tr("%n suggestions", nullptr, popup_->count()) + QStringLiteral(". ")
-                                  + popup_->describeCurrent());
+        CompletionPopup::announce(tr("%n suggestions", nullptr, popup_->count()) + QStringLiteral(". ") +
+                                  popup_->describeCurrent());
     }
 }
 
 void CompletionController::showPopup()
 {
     QWidget *viewport = editor_->viewport();
-    const int x = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L,
-                                                          static_cast<long>(prefixStart_)));
-    const int y = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L,
-                                                          static_cast<long>(prefixStart_)));
+    const int x = static_cast<int>(
+        editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
+    const int y = static_cast<int>(
+        editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
     const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line_));
     QWidget *parent = popup_->parentWidget();
     // Aligned with the identifier's text: the badge's width to the left.
@@ -519,19 +518,23 @@ void CompletionController::updateKeyHint()
     if (!popup_)
         return;
     if (choosing_) {
-        popup_->setKeyHint(tr("Expression to wrap   %1 choose   Esc cancel")
-                               .arg(editor_->options().completionAcceptsEnter ? QStringLiteral("↵") : QStringLiteral("⇥")));
+        popup_->setKeyHint(
+            tr("Expression to wrap   %1 choose   Esc cancel")
+                .arg(editor_->options().completionAcceptsEnter ? QStringLiteral("↵") : QStringLiteral("⇥")));
         return;
     }
-    QString keys = editor_->options().completionAcceptsEnter
-                       ? tr("↵ insert   ⇥ replace word   Ctrl+→ next word")
-                       : tr("⇥ insert   Ctrl+→ next word");
+    QString keys = editor_->options().completionAcceptsEnter ? tr("↵ insert   ⇥ replace word   Ctrl+→ next word")
+                                                             : tr("⇥ insert   Ctrl+→ next word");
     switch (mode_) {
-    case Mode::Basic: keys += tr("   Ctrl+Space more"); break;
-    case Mode::Extended: keys = tr("All suggestions   ") + keys; break;
+    case Mode::Basic:
+        keys += tr("   Ctrl+Space more");
+        break;
+    case Mode::Extended:
+        keys = tr("All suggestions   ") + keys;
+        break;
     case Mode::Smart:
-        keys = (expectedType_.isEmpty() ? tr("Smart") : tr("Expected %1").arg(expectedType_.simplified()))
-             + QStringLiteral("   ") + keys;
+        keys = (expectedType_.isEmpty() ? tr("Smart") : tr("Expected %1").arg(expectedType_.simplified())) +
+               QStringLiteral("   ") + keys;
         break;
     }
     popup_->setKeyHint(keys + tr("   Ctrl+Q details   Esc close"));
@@ -569,8 +572,8 @@ void CompletionController::updatePreview()
     const QString prefix = item ? textBetween(prefixStart_, position) : QString();
     // The rest of the name, as it will be: same case as typed, nothing
     // after the cursor on the line to hide.
-    const bool fits = item && !choosing_ && item->label.size() > prefix.size() && item->label.startsWith(prefix)
-                      && editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line_) == position;
+    const bool fits = item && !choosing_ && item->label.size() > prefix.size() && item->label.startsWith(prefix) &&
+                      editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line_) == position;
     if (!fits) {
         if (!isActive() && !fullLine_.isEmpty())
             showFullLine();
@@ -578,13 +581,15 @@ void CompletionController::updatePreview()
             preview->hide();
         return;
     }
-    const int x = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, long(position)));
-    const int y = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, long(position)));
+    const int x =
+        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, long(position)));
+    const int y =
+        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, long(position)));
     const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line_));
     const Theme &theme = editor_->theme();
-    preview->show(item->label.mid(prefix.size()), editor_->options().completionAcceptsEnter ? QStringLiteral("↵")
-                                                                                             : QStringLiteral("Tab"),
-                  theme.font, theme.mutedText, QPoint(x, y), lineHeight);
+    preview->show(item->label.mid(prefix.size()),
+                  editor_->options().completionAcceptsEnter ? QStringLiteral("↵") : QStringLiteral("Tab"), theme.font,
+                  theme.mutedText, QPoint(x, y), lineHeight);
 }
 
 void CompletionController::onModified(int position, int modificationType, int length)
@@ -698,8 +703,8 @@ void CompletionController::accept(bool replaceWord)
     int end = position;
     if (replaceWord) {
         const int length = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
-        while (end < length
-               && isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, end))))
+        while (end < length &&
+               isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, end))))
             ++end;
     }
     const int start = item.replaceStart >= 0 ? std::min(item.replaceStart, prefixStart_) : prefixStart_;
@@ -825,8 +830,10 @@ bool CompletionController::writeDocComment(int position)
     if (line == 0)
         return false;
     // Enter at the end of a line holding only "/**".
-    const int previousStart = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line - 1));
-    const int previousEnd = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line - 1));
+    const int previousStart =
+        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line - 1));
+    const int previousEnd =
+        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line - 1));
     const QString opener = textBetween(previousStart, previousEnd).trimmed();
     if (opener != QLatin1String("/**") && opener != QLatin1String("/*!"))
         return false;
@@ -883,8 +890,8 @@ void CompletionController::requestFullLine()
     const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
     const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
     const int lineStart = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line));
-    if (editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line) != position
-        || textBetween(lineStart, position).trimmed().isEmpty() || insideCommentOrString(position))
+    if (editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line) != position ||
+        textBetween(lineStart, position).trimmed().isEmpty() || insideCommentOrString(position))
         return;
     const QByteArray text = editor_->utf8Bytes().toByteArray();
     // Whole lines before, so that no character is cut.
@@ -896,8 +903,9 @@ void CompletionController::requestFullLine()
         to = std::max(int(text.lastIndexOf('\n', to)), position);
     const int generation = ++fullLineGeneration_;
     QPointer<CompletionController> self(this);
-    model->suggest(QString::fromUtf8(text.mid(from, position - from)), QString::fromUtf8(text.mid(position, to - position)),
-                   editor_->languageId(), [self, generation, position](const QString &suggestion) {
+    model->suggest(QString::fromUtf8(text.mid(from, position - from)),
+                   QString::fromUtf8(text.mid(position, to - position)), editor_->languageId(),
+                   [self, generation, position](const QString &suggestion) {
                        if (!self || generation != self->fullLineGeneration_ || self->active_ || suggestion.isEmpty())
                            return;
                        if (self->editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS) != position)
@@ -1044,8 +1052,8 @@ bool CompletionController::eventFilter(QObject *watched, QEvent *event)
         // The snippet's placeholders: Tab, Shift+Tab, Escape.
         const bool shift = key->modifiers() == Qt::ShiftModifier;
         const bool plain = key->modifiers() == Qt::NoModifier;
-        const bool ours = (key->key() == Qt::Key_Tab && plain) || key->key() == Qt::Key_Backtab
-                       || (key->key() == Qt::Key_Tab && shift) || (key->key() == Qt::Key_Escape && plain);
+        const bool ours = (key->key() == Qt::Key_Tab && plain) || key->key() == Qt::Key_Backtab ||
+                          (key->key() == Qt::Key_Tab && shift) || (key->key() == Qt::Key_Escape && plain);
         if (!ours)
             return false;
         if (event->type() == QEvent::KeyPress) {
@@ -1103,14 +1111,28 @@ bool CompletionController::eventFilter(QObject *watched, QEvent *event)
         return true;
     }
     switch (key->key()) {
-    case Qt::Key_Escape: close(); break;
-    case Qt::Key_Up: popup_->moveSelection(-1); break;
-    case Qt::Key_Down: popup_->moveSelection(1); break;
-    case Qt::Key_PageUp: popup_->moveSelection(-popup_->pageRows()); break;
-    case Qt::Key_PageDown: popup_->moveSelection(popup_->pageRows()); break;
+    case Qt::Key_Escape:
+        close();
+        break;
+    case Qt::Key_Up:
+        popup_->moveSelection(-1);
+        break;
+    case Qt::Key_Down:
+        popup_->moveSelection(1);
+        break;
+    case Qt::Key_PageUp:
+        popup_->moveSelection(-popup_->pageRows());
+        break;
+    case Qt::Key_PageDown:
+        popup_->moveSelection(popup_->pageRows());
+        break;
     case Qt::Key_Return:
-    case Qt::Key_Enter: accept(false); break;
-    case Qt::Key_Tab: accept(true); break;
+    case Qt::Key_Enter:
+        accept(false);
+        break;
+    case Qt::Key_Tab:
+        accept(true);
+        break;
     }
     return true;
 }

@@ -53,10 +53,10 @@ private slots:
         QVERIFY(!Theme::named("light").isDark);
         // Every theme has the interface colors the controls' style sheet uses.
         for (const Theme &theme : Theme::all()) {
-            for (const QColor &color : {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent,
-                                        theme.accentText, theme.mutedText, theme.border, theme.line, theme.hover,
-                                        theme.gradientStart, theme.gradientEnd, theme.currentLineNumber, theme.error,
-                                        theme.warning})
+            for (const QColor &color :
+                 {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent, theme.accentText,
+                  theme.mutedText, theme.border, theme.line, theme.hover, theme.gradientStart, theme.gradientEnd,
+                  theme.currentLineNumber, theme.error, theme.warning})
                 QVERIFY2(color.isValid(), qPrintable(theme.name));
         }
         QCOMPARE(Theme::named("unknown").name, QString("duet"));
@@ -122,7 +122,8 @@ private slots:
     {
         const Theme theme = Theme::dark();
         QsciScintilla editor;
-        auto h = highlight(editor, "cpp", "// éléments\ntemplate <typename T>\nT sum(T a) { T total{}; return total; }\n", theme);
+        auto h = highlight(editor, "cpp",
+                           "// éléments\ntemplate <typename T>\nT sum(T a) { T total{}; return total; }\n", theme);
         const QByteArray text = editor.text().toUtf8();
         for (int i = 0; i < text.size(); ++i)
             if (text[i] == 'T')
@@ -174,29 +175,29 @@ private slots:
     {
         QsciScintilla editor;
         auto h = highlight(editor, "cpp",
-                           "int f(int x) {\n"   // 0
-                           "    if (x) {\n"     // 1
+                           "int f(int x) {\n"    // 0
+                           "    if (x) {\n"      // 1
                            "        return 1;\n" // 2
-                           "    } else {\n"     // 3
+                           "    } else {\n"      // 3
                            "        return 2;\n" // 4
-                           "    }\n"            // 5
-                           "}\n"                // 6
-                           "/* a\n"             // 7
-                           "   b */\n"          // 8
-                           "#if A\n"            // 9
-                           "int y;\n"           // 10
-                           "#endif\n"           // 11
-                           "int z(int a,\n"     // 12: two lines, nothing to hide
+                           "    }\n"             // 5
+                           "}\n"                 // 6
+                           "/* a\n"              // 7
+                           "   b */\n"           // 8
+                           "#if A\n"             // 9
+                           "int y;\n"            // 10
+                           "#endif\n"            // 11
+                           "int z(int a,\n"      // 12: two lines, nothing to hide
                            "      int b);\n",
                            Theme::dark());
         const auto depth = [&editor](int line) {
-            return static_cast<int>((editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line)
-                                     & QsciScintillaBase::SC_FOLDLEVELNUMBERMASK)
-                                    - QsciScintillaBase::SC_FOLDLEVELBASE);
+            return static_cast<int>((editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) &
+                                     QsciScintillaBase::SC_FOLDLEVELNUMBERMASK) -
+                                    QsciScintillaBase::SC_FOLDLEVELBASE);
         };
         const auto isHeader = [&editor](int line) {
-            return (editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line)
-                    & QsciScintillaBase::SC_FOLDLEVELHEADERFLAG) != 0;
+            return (editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) &
+                    QsciScintillaBase::SC_FOLDLEVELHEADERFLAG) != 0;
         };
         const QList<int> depths = {0, 1, 2, 1, 2, 1, 0, 0, 1, 0, 1, 0, 0, 0};
         const QList<int> headers = {0, 1, 3, 7, 9};

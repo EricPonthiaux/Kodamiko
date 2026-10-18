@@ -15,9 +15,9 @@ bool isWordStart(const QString &text, int i)
     const QChar previous = text[i - 1];
     const QChar current = text[i];
     // Separators, and the "::" or "." of a qualified name ("Foo::size").
-    if (previous == QLatin1Char('_') || previous == QLatin1Char('-') || previous == QLatin1Char('$')
-        || previous == QLatin1Char(':') || previous == QLatin1Char('.') || previous == QLatin1Char('~')
-        || previous == QLatin1Char(' '))
+    if (previous == QLatin1Char('_') || previous == QLatin1Char('-') || previous == QLatin1Char('$') ||
+        previous == QLatin1Char(':') || previous == QLatin1Char('.') || previous == QLatin1Char('~') ||
+        previous == QLatin1Char(' '))
         return current != previous;
     if (current.isUpper() && previous.isLower())
         return true;

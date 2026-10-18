@@ -73,12 +73,11 @@ private slots:
 
     void c()
     {
-        const auto symbols = outline("c",
-                                     "#define MAX(a, b) ((a) > (b) ? (a) : (b))\n"
-                                     "struct point { int x; int *y; };\n"
-                                     "int area(int w);\n"
-                                     "static char *name(void) { int local(int); return 0; }\n"
-                                     "int area(int w) { return w; }\n");
+        const auto symbols = outline("c", "#define MAX(a, b) ((a) > (b) ? (a) : (b))\n"
+                                          "struct point { int x; int *y; };\n"
+                                          "int area(int w);\n"
+                                          "static char *name(void) { int local(int); return 0; }\n"
+                                          "int area(int w) { return w; }\n");
         QCOMPARE(describe(symbols), QStringLiteral("MAX,point{x,y},area,name,area"));
         QCOMPARE(find(symbols, "point")->kind, SymbolKind::Struct);
         QCOMPARE(find(symbols, "x")->kind, SymbolKind::Field);
@@ -103,8 +102,7 @@ private slots:
                            "using Id = int;\n"
                            "}\n";
         const auto symbols = outline("cpp", code);
-        QCOMPARE(describe(symbols),
-                 QStringLiteral("app{Foo{Foo,size,run,n_},Foo::run,(anonymous){helper},Id}"));
+        QCOMPARE(describe(symbols), QStringLiteral("app{Foo{Foo,size,run,n_},Foo::run,(anonymous){helper},Id}"));
         QCOMPARE(find(symbols, "size")->kind, SymbolKind::Method);
         QCOMPARE(find(symbols, "Foo::run")->kind, SymbolKind::Method);
         QCOMPARE(find(symbols, "helper")->kind, SymbolKind::Function);
@@ -118,57 +116,54 @@ private slots:
 
     void cppQtClass()
     {
-        const auto symbols = outline("cpp",
-                                     "class View : public QWidget {\n"
-                                     "    Q_OBJECT\n"
-                                     "\n"
-                                     "public:\n"
-                                     "    explicit View(QWidget *parent = nullptr);\n"
-                                     "signals:\n"
-                                     "    void changed();\n"
-                                     "private slots:\n"
-                                     "    void update();\n"
-                                     "};\n");
+        const auto symbols = outline("cpp", "class View : public QWidget {\n"
+                                            "    Q_OBJECT\n"
+                                            "\n"
+                                            "public:\n"
+                                            "    explicit View(QWidget *parent = nullptr);\n"
+                                            "signals:\n"
+                                            "    void changed();\n"
+                                            "private slots:\n"
+                                            "    void update();\n"
+                                            "};\n");
         QCOMPARE(describe(symbols), QStringLiteral("View{View,changed,update}"));
     }
 
     void java()
     {
-        const auto symbols = outline("java",
-                                     "public class App {\n"
-                                     "    private int count, total;\n"
-                                     "    public App() {}\n"
-                                     "    void run() {}\n"
-                                     "    interface Listener { void changed(); }\n"
-                                     "    enum Mode { A, B }\n"
-                                     "}\n");
+        const auto symbols = outline("java", "public class App {\n"
+                                             "    private int count, total;\n"
+                                             "    public App() {}\n"
+                                             "    void run() {}\n"
+                                             "    interface Listener { void changed(); }\n"
+                                             "    enum Mode { A, B }\n"
+                                             "}\n");
         QCOMPARE(describe(symbols), QStringLiteral("App{count,total,App,run,Listener{changed},Mode}"));
         QCOMPARE(find(symbols, "Listener")->kind, SymbolKind::Interface);
     }
 
     void javaScript()
     {
-        const auto symbols = outline("javascript",
-                                     "class View {\n"
-                                     "  count = 0;\n"
-                                     "  render() {}\n"
-                                     "}\n"
-                                     "function main() { const inner = () => 1; }\n"
-                                     "export const greet = (name) => name;\n"
-                                     "const config = { a: 1 };\n");
+        const auto symbols = outline("javascript", "class View {\n"
+                                                   "  count = 0;\n"
+                                                   "  render() {}\n"
+                                                   "}\n"
+                                                   "function main() { const inner = () => 1; }\n"
+                                                   "export const greet = (name) => name;\n"
+                                                   "const config = { a: 1 };\n");
         QCOMPARE(describe(symbols), QStringLiteral("View{count,render},main{inner},greet"));
     }
 
     void typeScript()
     {
-        const auto symbols = outline("typescript",
-                                     "namespace Shapes {\n"
-                                     "  export interface Shape { area(): number; name: string; }\n"
-                                     "  export type Id = string;\n"
-                                     "  export enum Kind { Circle }\n"
-                                     "  export abstract class Base { private id: Id = ''; abstract area(): number; }\n"
-                                     "}\n"
-                                     "function compute(x: number): number;\n");
+        const auto symbols =
+            outline("typescript", "namespace Shapes {\n"
+                                  "  export interface Shape { area(): number; name: string; }\n"
+                                  "  export type Id = string;\n"
+                                  "  export enum Kind { Circle }\n"
+                                  "  export abstract class Base { private id: Id = ''; abstract area(): number; }\n"
+                                  "}\n"
+                                  "function compute(x: number): number;\n");
         QCOMPARE(describe(symbols), QStringLiteral("Shapes{Shape{area,name},Id,Kind,Base{id,area}},compute"));
     }
 
@@ -203,13 +198,12 @@ private slots:
 
     void cmake()
     {
-        const auto symbols = outline("cmake",
-                                     "project(Demo)\n"
-                                     "function(add_demo name)\n"
-                                     "    add_executable(${name} main.cpp)\n"
-                                     "endfunction()\n"
-                                     "add_library(core STATIC a.cpp)\n"
-                                     "qt_add_executable(app WIN32 main.cpp)\n");
+        const auto symbols = outline("cmake", "project(Demo)\n"
+                                              "function(add_demo name)\n"
+                                              "    add_executable(${name} main.cpp)\n"
+                                              "endfunction()\n"
+                                              "add_library(core STATIC a.cpp)\n"
+                                              "qt_add_executable(app WIN32 main.cpp)\n");
         QCOMPARE(describe(symbols), QStringLiteral("add_demo{${name}},core,app"));
         QCOMPARE(find(symbols, "add_demo")->endLine, 3);
         QCOMPARE(find(symbols, "core")->kind, SymbolKind::Target);

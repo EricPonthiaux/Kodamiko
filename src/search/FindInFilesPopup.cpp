@@ -27,7 +27,11 @@ namespace {
 constexpr int searchDelayMs = 300;
 constexpr int matchContext = 80; // characters kept before a match on long lines
 
-enum Role { MatchRole = Qt::UserRole, HighlightStartRole, HighlightLengthRole };
+enum Role {
+    MatchRole = Qt::UserRole,
+    HighlightStartRole,
+    HighlightLengthRole
+};
 
 // Line of a result: the occurrence stands out in bold on a colored background.
 class MatchDelegate : public QStyledItemDelegate {
@@ -56,8 +60,8 @@ public:
         item.text.clear();
         item.widget->style()->drawControl(QStyle::CE_ItemViewItem, &item, painter, item.widget);
 
-        const QRect rect = item.widget->style()->subElementRect(QStyle::SE_ItemViewItemText, &item, item.widget)
-                               .adjusted(3, 0, -3, 0);
+        const QRect rect =
+            item.widget->style()->subElementRect(QStyle::SE_ItemViewItemText, &item, item.widget).adjusted(3, 0, -3, 0);
         // Too long for its column: cut with "…", the occurrence kept in view
         // (lines are already shortened around it, see showResults).
         QString shown = text;
@@ -68,8 +72,9 @@ public:
         const QFontMetrics strong(bold);
         const auto widthOf = [&](const QString &candidate) {
             const int end = std::min<int>(start + length, candidate.size());
-            return plain.horizontalAdvance(candidate.left(start)) + strong.horizontalAdvance(candidate.mid(start, end - start))
-                + plain.horizontalAdvance(candidate.mid(end));
+            return plain.horizontalAdvance(candidate.left(start)) +
+                   strong.horizontalAdvance(candidate.mid(start, end - start)) +
+                   plain.horizontalAdvance(candidate.mid(end));
         };
         if (widthOf(shown) > rect.width()) {
             // The longest prefix that fits, found by bisection: painted
@@ -98,7 +103,8 @@ public:
         layout.endLayout();
         painter->save();
         painter->setClipRect(rect);
-        painter->setPen(item.palette.color(item.state & QStyle::State_Selected ? QPalette::HighlightedText : QPalette::Text));
+        painter->setPen(
+            item.palette.color(item.state & QStyle::State_Selected ? QPalette::HighlightedText : QPalette::Text));
         const qreal y = rect.top() + (rect.height() - line.height()) / 2;
         layout.draw(painter, QPointF(rect.left(), y));
         painter->restore();
@@ -111,7 +117,6 @@ FindInFilesPopup::FindInFilesPopup(const Theme &theme, QWidget *parent)
     : OverlayPopup(QStringLiteral("findInFiles"), QSizeF(0.72, 0.8), QSize(760, 520), parent)
     , theme_(theme)
 {
-
     auto *title = new QLabel(tr("Find in Files"), this);
     AppFonts::setInterfaceFont(title, 1);
     summary_ = new QLabel(this);
@@ -298,7 +303,9 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
         text = text.mid(leading);
         start -= static_cast<int>(leading);
 
-        const QString location = QStringLiteral("%1 %2").arg(QDir::toNativeSeparators(root.relativeFilePath(match.filePath))).arg(match.line + 1);
+        const QString location = QStringLiteral("%1 %2")
+                                     .arg(QDir::toNativeSeparators(root.relativeFilePath(match.filePath)))
+                                     .arg(match.line + 1);
         auto *item = new QTreeWidgetItem(results_, {text, location});
         item->setFont(0, theme_.font); // code, in the code font (no "->" turned into an arrow)
         item->setData(0, MatchRole, QVariant::fromValue(i));
@@ -313,8 +320,9 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
         summary_->setText(tr("No matches"));
     else
         summary_->setText(tr("%1 in %2")
-                              .arg(truncated ? tr("%1+ matches").arg(matches_.size())
-                                             : matches_.size() == 1 ? tr("1 match") : tr("%1 matches").arg(matches_.size()),
+                              .arg(truncated              ? tr("%1+ matches").arg(matches_.size())
+                                   : matches_.size() == 1 ? tr("1 match")
+                                                          : tr("%1 matches").arg(matches_.size()),
                                    files.size() == 1 ? tr("1 file") : tr("%1 files").arg(files.size())));
     fitLocationColumn();
     if (results_->topLevelItemCount() > 0)
@@ -386,7 +394,8 @@ void FindInFilesPopup::openCurrent()
     const FindMatch match = matches_.value(item->data(0, MatchRole).toLongLong());
     dismiss();
     // After the popup has closed and given the focus back.
-    QTimer::singleShot(0, this, [this, match] { emit matchChosen(match.filePath, match.line, match.column, match.length); });
+    QTimer::singleShot(0, this,
+                       [this, match] { emit matchChosen(match.filePath, match.line, match.column, match.length); });
 }
 
 void FindInFilesPopup::applyTheme(const Theme &theme)

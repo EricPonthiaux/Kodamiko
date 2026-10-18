@@ -5,8 +5,8 @@
 #include <QTreeView>
 
 #include <algorithm>
-#include <typeinfo>
 #include <cmath>
+#include <typeinfo>
 
 namespace {
 

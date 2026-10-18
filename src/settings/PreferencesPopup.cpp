@@ -52,7 +52,8 @@ void addGroup(QVBoxLayout *layout, const QString &heading, QWidget *card)
 QIcon sidebarIcon(const QString &name, const Theme &theme)
 {
     QIcon icon;
-    for (const auto &[mode, color] : {std::pair{QIcon::Normal, theme.mutedText}, std::pair{QIcon::Selected, theme.accentText}}) {
+    for (const auto &[mode, color] :
+         {std::pair{QIcon::Normal, theme.mutedText}, std::pair{QIcon::Selected, theme.accentText}}) {
         const QIcon drawn = UiIcons::icon(name, color);
         for (const QSize size : {QSize(16, 16), QSize(32, 32)})
             icon.addPixmap(drawn.pixmap(size), mode);
@@ -298,8 +299,8 @@ QWidget *PreferencesPopup::createAppearancePage()
     }
     fontFamily_->insertSeparator(fontFamily_->count());
     for (const QString &family : QFontDatabase::families()) {
-        if (QFontDatabase::isFixedPitch(family) && !QFontDatabase::isPrivateFamily(family)
-            && !AppFonts::isBuiltInCode(family) && !recommended.contains(family))
+        if (QFontDatabase::isFixedPitch(family) && !QFontDatabase::isPrivateFamily(family) &&
+            !AppFonts::isBuiltInCode(family) && !recommended.contains(family))
             fontFamily_->addItem(family, family);
     }
     fontSources_ = new QLabel;
@@ -356,8 +357,7 @@ QWidget *PreferencesPopup::createAppearancePage()
 #else
     auto *windowCard = new SettingsCard;
     windowCard->addRow(tr("System title bar"),
-                       tr("The system's window frame instead of Duet's, for tiling window managers."),
-                       systemTitleBar_);
+                       tr("The system's window frame instead of Duet's, for tiling window managers."), systemTitleBar_);
     addGroup(layout, tr("Window"), windowCard);
 #endif
 
@@ -377,8 +377,7 @@ QWidget *PreferencesPopup::createEditorPage()
     showWhitespace_ = new ToggleSwitch;
     display->addRow(tr("Code folding"), tr("Marks in the margin fold blocks, comments and #if sections."),
                     codeFolding_);
-    display->addRow(tr("Wrap long lines"), tr("Long lines continue below instead of scrolling sideways."),
-                    wrapLines_);
+    display->addRow(tr("Wrap long lines"), tr("Long lines continue below instead of scrolling sideways."), wrapLines_);
     display->addRow(tr("Show whitespace"), tr("Spaces appear as dots and tabs as arrows."), showWhitespace_);
     addGroup(layout, tr("Display"), display);
 
@@ -415,8 +414,9 @@ QWidget *PreferencesPopup::createEditorPage()
     fullLineServer_->addItem(tr("Ollama"), QStringLiteral("ollama"));
     fullLineServer_->addItem(tr("llama.cpp server"), QStringLiteral("llama.cpp"));
     fullLineServer_->setAccessibleName(tr("Model server"));
-    fullLineServerRow_ = fullLine->addRow(tr("Server"), tr("Ollama, or llama.cpp's llama-server with a model that fills in the middle."),
-                                          fullLineServer_);
+    fullLineServerRow_ =
+        fullLine->addRow(tr("Server"), tr("Ollama, or llama.cpp's llama-server with a model that fills in the middle."),
+                         fullLineServer_);
     fullLineEndpoint_ = new QLineEdit;
     fullLineEndpoint_->setAccessibleName(tr("Server address"));
     fullLineEndpoint_->setMinimumWidth(220);
@@ -424,15 +424,17 @@ QWidget *PreferencesPopup::createEditorPage()
     fullLineModel_ = new QLineEdit;
     fullLineModel_->setAccessibleName(tr("Model"));
     fullLineModel_->setMinimumWidth(220);
-    fullLineModelRow_ = fullLine->addRow(tr("Model"), tr("Ollama's model name, such as qwen2.5-coder:1.5b."), fullLineModel_);
+    fullLineModelRow_ =
+        fullLine->addRow(tr("Model"), tr("Ollama's model name, such as qwen2.5-coder:1.5b."), fullLineModel_);
     connect(fullLine_, &ToggleSwitch::toggled, this, &PreferencesPopup::updateFullLineRows);
     connect(fullLineServer_, &QComboBox::currentIndexChanged, this, [this] {
         // Each server's usual port, unless another was set.
         const QString endpoint = fullLineEndpoint_->text().trimmed();
         const bool ollama = fullLineServer_->currentData().toString() == QLatin1String("ollama");
-        if (endpoint.isEmpty() || endpoint == QLatin1String("http://localhost:11434")
-            || endpoint == QLatin1String("http://localhost:8080"))
-            fullLineEndpoint_->setText(ollama ? QStringLiteral("http://localhost:11434") : QStringLiteral("http://localhost:8080"));
+        if (endpoint.isEmpty() || endpoint == QLatin1String("http://localhost:11434") ||
+            endpoint == QLatin1String("http://localhost:8080"))
+            fullLineEndpoint_->setText(ollama ? QStringLiteral("http://localhost:11434")
+                                              : QStringLiteral("http://localhost:8080"));
         updateFullLineRows();
     });
     addGroup(layout, tr("Full Line"), fullLine);
@@ -488,7 +490,8 @@ QWidget *PreferencesPopup::createClaudePage()
                     tr("Lets Claude read and act in the editor (open files with their unsaved changes, problems, "
                        "diagrams, terminals, git) through Duet's MCP server. Applies to the next session."),
                     exposeTools_);
-    session->addRow(tr("Notifications"), tr("Alerts you when Claude needs you or has finished while you are elsewhere."),
+    session->addRow(tr("Notifications"),
+                    tr("Alerts you when Claude needs you or has finished while you are elsewhere."),
                     claudeNotifications_);
     addGroup(layout, tr("Session"), session);
 
@@ -659,8 +662,8 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
     // A weight set by hand in the settings: the closest offered.
     int weight = 0;
     for (int i = 1; i < fontWeight_->count(); ++i) {
-        if (std::abs(fontWeight_->itemData(i).toInt() - preferences.codeFontWeight)
-            < std::abs(fontWeight_->itemData(weight).toInt() - preferences.codeFontWeight))
+        if (std::abs(fontWeight_->itemData(i).toInt() - preferences.codeFontWeight) <
+            std::abs(fontWeight_->itemData(weight).toInt() - preferences.codeFontWeight))
             weight = i;
     }
     fontWeight_->setCurrentIndex(weight);
@@ -769,8 +772,8 @@ void PreferencesPopup::fillCommandList()
     for (int i = 0; i < commands_.size(); ++i) {
         const Keymap::Command &command = commands_[i];
         const QString shortcuts = shortcutsText(Keymap::shortcutsOf(command, overrides_));
-        if (!filter.isEmpty() && !command.title.contains(filter, Qt::CaseInsensitive)
-            && !shortcuts.contains(filter, Qt::CaseInsensitive))
+        if (!filter.isEmpty() && !command.title.contains(filter, Qt::CaseInsensitive) &&
+            !shortcuts.contains(filter, Qt::CaseInsensitive))
             continue;
         auto *item = new QTreeWidgetItem(commandList_, {command.title, shortcuts});
         item->setData(0, commandIndexRole, i);
@@ -840,8 +843,8 @@ void PreferencesPopup::assignShortcut(const QKeySequence &shortcut)
         }
     }
     setShortcuts(*command, {shortcut});
-    setNote(takenFrom.isEmpty()
-                             ? QString()
-                             : tr("%1 was removed from %2.")
-                                   .arg(shortcut.toString(QKeySequence::NativeText), takenFrom.join(tr(", "))));
+    setNote(
+        takenFrom.isEmpty()
+            ? QString()
+            : tr("%1 was removed from %2.").arg(shortcut.toString(QKeySequence::NativeText), takenFrom.join(tr(", "))));
 }

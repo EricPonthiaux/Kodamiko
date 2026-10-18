@@ -117,7 +117,8 @@ std::optional<QString> resultOf(QProcess &process, const QString &name, const QS
     const QByteArray output = process.readAllStandardOutput();
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
         // The first line names the problem (often a syntax error and its position).
-        const QString message = QString::fromUtf8(process.readAllStandardError()).trimmed().section(QLatin1Char('\n'), 0, 0);
+        const QString message =
+            QString::fromUtf8(process.readAllStandardError()).trimmed().section(QLatin1Char('\n'), 0, 0);
         *error = message.isEmpty() ? QObject::tr("%1 failed (code %2)").arg(name).arg(process.exitCode())
                                    : QStringLiteral("%1: %2").arg(name, message);
         return std::nullopt;

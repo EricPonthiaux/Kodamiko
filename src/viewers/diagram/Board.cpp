@@ -250,7 +250,8 @@ bool Board::removeShape(const QString &id)
     }
     selection_.remove(id);
     shapeIndex_.remove(id);
-    shapes_.erase(std::find_if(shapes_.begin(), shapes_.end(), [removed](const auto &s) { return s.get() == removed; }));
+    shapes_.erase(
+        std::find_if(shapes_.begin(), shapes_.end(), [removed](const auto &s) { return s.get() == removed; }));
     ++version_;
     return true;
 }
@@ -786,10 +787,10 @@ bool Board::styleSelectedLinks(const QJsonObject &patch)
             continue;
         if (patch.contains(QStringLiteral("customLineStyle"))) {
             const QString line = patch.value(QStringLiteral("customLineStyle")).toString();
-            l->customLineStyle = line == QLatin1String("solid") || line == QLatin1String("dashed")
-                                         || line == QLatin1String("dotted")
-                                     ? line
-                                     : QString();
+            l->customLineStyle =
+                line == QLatin1String("solid") || line == QLatin1String("dashed") || line == QLatin1String("dotted")
+                    ? line
+                    : QString();
         }
         if (patch.contains(QStringLiteral("customColor"))) {
             const QString color = patch.value(QStringLiteral("customColor")).toString();

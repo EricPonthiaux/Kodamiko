@@ -28,7 +28,11 @@ class FileTreeView : public QTreeView {
     Q_OBJECT
 
 public:
-    enum class Scope { Project, ChangedFiles, EditedByClaude };
+    enum class Scope {
+        Project,
+        ChangedFiles,
+        EditedByClaude
+    };
 
     explicit FileTreeView(QWidget *parent = nullptr);
     ~FileTreeView() override;
@@ -167,8 +171,7 @@ private:
     void createDiagramIn(const QString &folder, const QString &kindId);
     // Returns an error message, empty once the entry is created. A new file
     // gets `content`.
-    QString createEntryNamed(const QString &folder, const QString &name, bool isFolder,
-                             const QByteArray &content = {});
+    QString createEntryNamed(const QString &folder, const QString &name, bool isFolder, const QByteArray &content = {});
     // Path of the item, empty for none or for the working folder.
     QString editablePath(const QModelIndex &index) const;
     void renameEntry(const QString &path);

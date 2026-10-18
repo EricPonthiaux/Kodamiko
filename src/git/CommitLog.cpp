@@ -43,8 +43,8 @@ QHash<QString, QStringList> refsByCommit(git_repository *repository)
     git_reference *reference = nullptr;
     while (git_reference_next(&reference, iterator) == 0) {
         const Ptr<git_reference> referenceGuard(reference);
-        if (!git_reference_is_branch(reference) && !git_reference_is_remote(reference)
-            && !git_reference_is_tag(reference))
+        if (!git_reference_is_branch(reference) && !git_reference_is_remote(reference) &&
+            !git_reference_is_tag(reference))
             continue;
         git_object *target = nullptr;
         if (git_reference_peel(&target, reference, GIT_OBJECT_COMMIT) < 0)
@@ -174,8 +174,8 @@ CommitDetails CommitDetails::read(const QString &folder, const QString &commitId
     const git_signature *author = git_commit_author(commit);
     const git_signature *committer = git_commit_committer(commit);
     if (qstrcmp(author->name, committer->name) != 0 || qstrcmp(author->email, committer->email) != 0)
-        details.committer = QStringLiteral("%1 <%2>").arg(QString::fromUtf8(committer->name),
-                                                          QString::fromUtf8(committer->email));
+        details.committer =
+            QStringLiteral("%1 <%2>").arg(QString::fromUtf8(committer->name), QString::fromUtf8(committer->email));
     details.commitDate = dateOf(committer->when);
     for (unsigned int i = 0; i < git_commit_parentcount(commit); ++i)
         details.parentIds.append(idOf(git_commit_parent_id(commit, i)).left(7));

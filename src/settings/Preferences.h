@@ -14,7 +14,7 @@ struct Theme;
 struct Preferences {
     // Appearance
     QString theme = QStringLiteral("duet"); // Theme::name
-    QString codeFontFamily; // empty: the embedded JetBrains Mono
+    QString codeFontFamily;                 // empty: the embedded JetBrains Mono
     int codeFontSize = 11;
     int codeFontWeight = QFont::Normal; // QFont::Light, Normal or Medium
     // Lines of code at this multiple of the font size.
@@ -30,7 +30,7 @@ struct Preferences {
 
     // Editor
     EditorOptions editor;
-    bool formatOnSave = false;
+    bool formatOnSave = true;
     // Completion from clangd, jdtls... when installed.
     bool languageServers = true;
     // Full Line completion: the rest of the line from a code model served

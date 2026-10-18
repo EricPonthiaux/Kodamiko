@@ -13,14 +13,14 @@
 
 // One cell of the terminal grid, ready to draw.
 struct TerminalCell {
-    QString text;     // empty for a blank cell
+    QString text; // empty for a blank cell
     QColor foreground;
     QColor background;
     bool bold = false;
     bool italic = false;
     bool underline = false;
     bool strike = false;
-    int width = 1;    // 2 for a wide character (CJK, emoji)
+    int width = 1;               // 2 for a wide character (CJK, emoji)
     bool isContinuation = false; // second half of a wide character
 };
 

@@ -64,9 +64,8 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     list_->setTextElideMode(Qt::ElideRight);
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     connect(list_, &QListWidget::currentRowChanged, this, &StashesPopup::showSelected);
-    connect(list_, &QListWidget::itemActivated, this, [this] {
-        act([this](const Stash &stash) { actions_->applyStash(stash.index, true); });
-    });
+    connect(list_, &QListWidget::itemActivated, this,
+            [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, true); }); });
     auto *listCard = new QFrame(this);
     listCard->setObjectName(QStringLiteral("settingsCard"));
     auto *listLayout = new QVBoxLayout(listCard);
@@ -90,15 +89,12 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     auto *hint = new QLabel(tr("Pop brings the changes back and drops the stash; Apply keeps it."), footer);
     hint->setObjectName(QStringLiteral("footerHint"));
     pop_->setDefault(true);
-    connect(drop_, &QPushButton::clicked, this, [this] {
-        act([this](const Stash &stash) { actions_->dropStash(stash.index, stash.message); });
-    });
-    connect(apply_, &QPushButton::clicked, this, [this] {
-        act([this](const Stash &stash) { actions_->applyStash(stash.index, false); });
-    });
-    connect(pop_, &QPushButton::clicked, this, [this] {
-        act([this](const Stash &stash) { actions_->applyStash(stash.index, true); });
-    });
+    connect(drop_, &QPushButton::clicked, this,
+            [this] { act([this](const Stash &stash) { actions_->dropStash(stash.index, stash.message); }); });
+    connect(apply_, &QPushButton::clicked, this,
+            [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, false); }); });
+    connect(pop_, &QPushButton::clicked, this,
+            [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, true); }); });
     auto *footerLayout = new QHBoxLayout(footer);
     footerLayout->setContentsMargins(28, 12, 18, 14);
     footerLayout->setSpacing(8);
@@ -153,8 +149,8 @@ void StashesPopup::load(const QString &folder)
     list_->clear();
     const QDateTime now = QDateTime::currentDateTime();
     for (const Stash &stash : std::as_const(stashes_)) {
-        auto *item = new QListWidgetItem(QStringLiteral("%1\n%2").arg(stash.message, SnapshotsPopup::describeDate(stash.date, now)),
-                                         list_);
+        auto *item = new QListWidgetItem(
+            QStringLiteral("%1\n%2").arg(stash.message, SnapshotsPopup::describeDate(stash.date, now)), list_);
         item->setToolTip(stash.message);
     }
     body_->setCurrentIndex(stashes_.isEmpty() ? 1 : 0);
@@ -196,7 +192,7 @@ QList<DiffFile> StashesPopup::splitPatch(const QByteArray &patch)
         const qsizetype newPath = firstLine.lastIndexOf(" b/");
         DiffFile file;
         file.path = QString::fromUtf8(newPath < 0 ? firstLine.mid(11) : firstLine.mid(newPath + 3));
-        file.status = chunk.contains("\nnew file mode") ? tr("added")
+        file.status = chunk.contains("\nnew file mode")       ? tr("added")
                       : chunk.contains("\ndeleted file mode") ? tr("deleted")
                                                               : tr("modified");
         file.patch = FilePatch::parse(chunk);

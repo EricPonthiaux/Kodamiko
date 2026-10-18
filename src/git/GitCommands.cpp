@@ -19,8 +19,7 @@ void GitCommands::run(const QString &title, Job job, std::function<void()> onSuc
     start(std::move(job), finishing(title, std::move(onSuccess), std::move(onFailure)));
 }
 
-void GitCommands::runLong(const QString &title, LongJob job, std::function<void()> onSuccess,
-                          FailureHandler onFailure)
+void GitCommands::runLong(const QString &title, LongJob job, std::function<void()> onSuccess, FailureHandler onFailure)
 {
     if (pending_++ == 0)
         emit busyChanged(true);
@@ -55,8 +54,8 @@ void GitCommands::cancel()
 GitCommands::Done GitCommands::finishing(const QString &title, std::function<void()> onSuccess,
                                          FailureHandler onFailure)
 {
-    return [this, title, onSuccess = std::move(onSuccess), onFailure = std::move(onFailure)](
-               const QString &message, const std::optional<GitError> &error) {
+    return [this, title, onSuccess = std::move(onSuccess),
+            onFailure = std::move(onFailure)](const QString &message, const std::optional<GitError> &error) {
         if (!error) {
             if (onSuccess)
                 onSuccess();
@@ -94,7 +93,6 @@ void GitCommands::start(Job job, Done done)
         }
         // The result is handed back to the UI thread; it is lost if the
         // object was destroyed in the meantime.
-        QMetaObject::invokeMethod(
-            this, [message, error, done] { done(message, error); }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, [message, error, done] { done(message, error); }, Qt::QueuedConnection);
     });
 }

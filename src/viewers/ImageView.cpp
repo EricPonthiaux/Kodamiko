@@ -99,8 +99,8 @@ void ImageView::zoomToFit()
     if (image_.isNull())
         return;
     const QSize available = viewport()->size();
-    const double fit = std::min(double(available.width()) / image_.width(),
-                                double(available.height()) / image_.height());
+    const double fit =
+        std::min(double(available.width()) / image_.width(), double(available.height()) / image_.height());
     setZoom(std::min(1.0, fit)); // shrink large images, without enlarging small ones
 }
 
@@ -118,7 +118,8 @@ void ImageView::updatePixmap()
 
 void ImageView::keyPressEvent(QKeyEvent *event)
 {
-    if (event->matches(QKeySequence::ZoomIn) || (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_Equal)) {
+    if (event->matches(QKeySequence::ZoomIn) ||
+        (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_Equal)) {
         fitToWindow_ = false;
         setZoom(zoom_ * zoomStep);
     } else if (event->matches(QKeySequence::ZoomOut)) {

@@ -20,8 +20,25 @@ struct TextEdit {
 };
 
 struct CompletionItem {
-    enum class Kind { Keyword, Function, Method, Class, Struct, Interface, Enum, Namespace, Type, Field, Variable,
-                      Constant, Macro, Module, Property, Snippet, Text };
+    enum class Kind {
+        Keyword,
+        Function,
+        Method,
+        Class,
+        Struct,
+        Interface,
+        Enum,
+        Namespace,
+        Type,
+        Field,
+        Variable,
+        Constant,
+        Macro,
+        Module,
+        Property,
+        Snippet,
+        Text
+    };
 
     QString label;      // shown, and matched against what is typed
     QString insertText; // inserted in place of the typed prefix; empty: the label

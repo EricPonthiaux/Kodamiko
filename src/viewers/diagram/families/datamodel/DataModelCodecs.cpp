@@ -34,8 +34,8 @@ const QRegularExpression &header()
 // `A ||--o{ B : label`; `..` instead of `--` for a non-identifying relation.
 const QRegularExpression &relation()
 {
-    static const QRegularExpression pattern(QStringLiteral("^(%1)\\s+([|o}{]+)(--|\\.\\.)([|o}{]+)\\s+(%1)\\s*:\\s*(.*)$")
-                                                .arg(namePattern));
+    static const QRegularExpression pattern(
+        QStringLiteral("^(%1)\\s+([|o}{]+)(--|\\.\\.)([|o}{]+)\\s+(%1)\\s*:\\s*(.*)$").arg(namePattern));
     return pattern;
 }
 
@@ -84,8 +84,9 @@ public:
         const auto entity = [&](const QString &key) -> Model::Node & {
             if (!index.contains(key)) {
                 index.insert(key, model.nodes.size());
-                model.nodes.append({QStringLiteral("entity"), key,
-                                    QJsonObject{{QStringLiteral("name"), key}, {QStringLiteral("attributes"), QJsonArray()}}});
+                model.nodes.append(
+                    {QStringLiteral("entity"), key,
+                     QJsonObject{{QStringLiteral("name"), key}, {QStringLiteral("attributes"), QJsonArray()}}});
             }
             return model.nodes[index.value(key)];
         };
@@ -180,11 +181,12 @@ public:
             if (from.isEmpty() || to.isEmpty())
                 continue;
             const auto *relationship = dynamic_cast<const RelationshipLink *>(l.get());
-            const QString fromCard = relationship && !relationship->fromCard.isEmpty() ? relationship->fromCard
-                                                                                       : QStringLiteral("||");
-            const QString toCard = relationship && !relationship->toCard.isEmpty() ? relationship->toCard
-                                                                                   : QStringLiteral("o{");
-            const QString line = relationship && !relationship->identifying ? QStringLiteral("..") : QStringLiteral("--");
+            const QString fromCard =
+                relationship && !relationship->fromCard.isEmpty() ? relationship->fromCard : QStringLiteral("||");
+            const QString toCard =
+                relationship && !relationship->toCard.isEmpty() ? relationship->toCard : QStringLiteral("o{");
+            const QString line =
+                relationship && !relationship->identifying ? QStringLiteral("..") : QStringLiteral("--");
             out.append(QStringLiteral("  %1 %2%3%4 %5 : %6")
                            .arg(from, fromCard, line, toCard, to,
                                 roleText(l->label.isEmpty() ? QStringLiteral("relates to") : l->label)));
@@ -194,8 +196,9 @@ public:
 
     QString blank() const override
     {
-        return QStringLiteral("erDiagram\n  ENTITY {\n    uuid id PK\n    string name\n  }\n  ELEMENT {\n    uuid id PK\n"
-                              "    uuid entity_id FK\n  }\n  ENTITY ||--o{ ELEMENT : contains");
+        return QStringLiteral(
+            "erDiagram\n  ENTITY {\n    uuid id PK\n    string name\n  }\n  ELEMENT {\n    uuid id PK\n"
+            "    uuid entity_id FK\n  }\n  ENTITY ||--o{ ELEMENT : contains");
     }
 };
 

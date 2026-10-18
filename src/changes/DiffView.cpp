@@ -15,16 +15,38 @@ namespace {
 
 // Styles of the text (no lexer: they are set by hand) and of the margin;
 // from firstSyntaxStyle, the colors of the code (see syntaxStyle()).
-enum Style { PlainStyle = 0, FileHeaderStyle = 40, FileNameStyle, HunkHeaderStyle, NoteStyle, NumberStyle,
-             AddedNumberStyle, RemovedNumberStyle, AddedStatsStyle, RemovedStatsStyle, FileMarginStyle,
-             HunkMarginStyle };
+enum Style {
+    PlainStyle = 0,
+    FileHeaderStyle = 40,
+    FileNameStyle,
+    HunkHeaderStyle,
+    NoteStyle,
+    NumberStyle,
+    AddedNumberStyle,
+    RemovedNumberStyle,
+    AddedStatsStyle,
+    RemovedStatsStyle,
+    FileMarginStyle,
+    HunkMarginStyle
+};
 constexpr int firstSyntaxStyle = 64;
 constexpr int lastSyntaxStyle = 255;
 // Markers: full-line backgrounds, and a stronger strip in the side margin.
-enum Marker { AddedBackground = 0, RemovedBackground, FileHeaderBackground, HunkHeaderBackground, AddedStrip, RemovedStrip,
-              FileHeaderStrip, HunkHeaderStrip };
+enum Marker {
+    AddedBackground = 0,
+    RemovedBackground,
+    FileHeaderBackground,
+    HunkHeaderBackground,
+    AddedStrip,
+    RemovedStrip,
+    FileHeaderStrip,
+    HunkHeaderStrip
+};
 // Indicators: the words that changed within a line.
-enum Indicator { AddedWords = 8, RemovedWords };
+enum Indicator {
+    AddedWords = 8,
+    RemovedWords
+};
 constexpr int numberMargin = 0;
 constexpr int stripMargin = 1;
 // Beyond this, a file's code is not colored: the diff appears at once.
@@ -138,8 +160,8 @@ DiffView::DiffView(const Theme &theme, QWidget *parent)
     setMarginType(numberMargin, QsciScintilla::TextMarginRightJustified);
     setMarginType(stripMargin, QsciScintilla::SymbolMargin);
     setMarginMarkerMask(numberMargin, 0);
-    setMarginMarkerMask(stripMargin, (1 << AddedStrip) | (1 << RemovedStrip) | (1 << FileHeaderStrip)
-                                         | (1 << HunkHeaderStrip));
+    setMarginMarkerMask(stripMargin,
+                        (1 << AddedStrip) | (1 << RemovedStrip) | (1 << FileHeaderStrip) | (1 << HunkHeaderStrip));
     setMarginWidth(stripMargin, 3);
     for (int margin = 2; margin < 5; ++margin)
         setMarginWidth(margin, 0);
@@ -147,7 +169,7 @@ DiffView::DiffView(const Theme &theme, QWidget *parent)
 }
 
 std::pair<QList<DiffView::Range>, QList<DiffView::Range>> DiffView::wordChanges(const QString &removed,
-                                                                              const QString &added)
+                                                                                const QString &added)
 {
     const QList<Range> before = tokenize(removed);
     const QList<Range> after = tokenize(added);
@@ -155,7 +177,9 @@ std::pair<QList<DiffView::Range>, QList<DiffView::Range>> DiffView::wordChanges(
     const size_t m = after.size();
     if (n == 0 || m == 0 || n * m > 40000)
         return {};
-    const auto token = [](const QString &text, Range range) { return QStringView(text).mid(range.start, range.length); };
+    const auto token = [](const QString &text, Range range) {
+        return QStringView(text).mid(range.start, range.length);
+    };
 
     // Longest common subsequence of the tokens, from the end.
     std::vector<int> common((n + 1) * (m + 1), 0);
@@ -244,8 +268,8 @@ QList<DiffView::Line> DiffView::layout(const QList<DiffFile> &files)
             Line separator;
             separator.kind = LineKind::HunkHeader;
             // Numbers of the new version, unless the block only removes.
-            separator.text = QStringLiteral("⋯ ")
-                + (hunk.newCount > 0 ? linesLabel(hunk.newStart, hunk.newCount) : linesLabel(hunk.oldStart, hunk.oldCount));
+            separator.text = QStringLiteral("⋯ ") + (hunk.newCount > 0 ? linesLabel(hunk.newStart, hunk.newCount)
+                                                                       : linesLabel(hunk.oldStart, hunk.oldCount));
             if (const QString heading = QString::fromUtf8(hunk.heading).trimmed(); headings && !heading.isEmpty())
                 separator.text += QStringLiteral("  ·  ") + heading;
             separator.location = {f, h, -1};
@@ -397,7 +421,8 @@ void DiffView::render()
             setMarginText(i, QStringLiteral("%1 %2 −").arg(number(line.oldNumber), blank), RemovedNumberStyle);
             break;
         case LineKind::Context:
-            setMarginText(i, QStringLiteral("%1 %2  ").arg(number(line.oldNumber), number(line.newNumber)), NumberStyle);
+            setMarginText(i, QStringLiteral("%1 %2  ").arg(number(line.oldNumber), number(line.newNumber)),
+                          NumberStyle);
             break;
         }
         SendScintilla(SCI_STARTSTYLING, start);
@@ -422,7 +447,8 @@ void DiffView::render()
             SendScintilla(SCI_SETINDICATORCURRENT, line.kind == LineKind::Added ? AddedWords : RemovedWords);
             for (const Range &range : line.changes) {
                 const long from = start + bytes(line.text, range.start);
-                SendScintilla(SCI_INDICATORFILLRANGE, from, start + bytes(line.text, range.start + range.length) - from);
+                SendScintilla(SCI_INDICATORFILLRANGE, from,
+                              start + bytes(line.text, range.start + range.length) - from);
             }
         }
     }
@@ -433,7 +459,8 @@ void DiffView::render()
     const bool numbered = std::any_of(lines_.begin(), lines_.end(),
                                       [](const Line &line) { return line.oldNumber > 0 || line.newNumber > 0; });
     const QFontMetrics metrics(theme_.font);
-    setMarginWidth(numberMargin, numbered ? metrics.horizontalAdvance(QString(2 * numberWidth_ + 5, QLatin1Char('9'))) : 8);
+    setMarginWidth(numberMargin,
+                   numbered ? metrics.horizontalAdvance(QString(2 * numberWidth_ + 5, QLatin1Char('9'))) : 8);
 }
 
 void DiffView::highlightSyntax(int file)

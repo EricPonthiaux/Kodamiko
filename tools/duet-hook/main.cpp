@@ -48,8 +48,7 @@ QByteArray sendToEditor(const QJsonDocument &event, int acknowledgeTimeout)
         return {};
     socket.write(event.toJson(QJsonDocument::Compact) + '\n');
     socket.waitForBytesWritten(connectTimeoutMs);
-    while (!socket.canReadLine() && socket.waitForReadyRead(acknowledgeTimeout)) {
-    }
+    while (!socket.canReadLine() && socket.waitForReadyRead(acknowledgeTimeout)) { }
     if (!socket.canReadLine())
         return {};
     const QByteArray reply = socket.readLine().trimmed();
@@ -90,7 +89,8 @@ QByteArray runUserStatusLine(const QString &command, const QByteArray &input)
 QByteArray defaultStatusLine(const QJsonObject &status)
 {
     QString line = status.value(QLatin1String("model")).toObject().value(QLatin1String("display_name")).toString();
-    const QJsonValue context = status.value(QLatin1String("context_window")).toObject().value(QLatin1String("used_percentage"));
+    const QJsonValue context =
+        status.value(QLatin1String("context_window")).toObject().value(QLatin1String("used_percentage"));
     if (context.isDouble()) {
         if (!line.isEmpty())
             line += QStringLiteral(" · ");
