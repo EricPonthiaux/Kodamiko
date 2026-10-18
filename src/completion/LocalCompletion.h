@@ -32,6 +32,11 @@ public:
     bool servesSmart() const override { return true; }
 
     static QStringList keywords(const QString &languageId);
+    // The keywords that fit at `position` of `text`, as IntelliJ offers
+    // them: in Java and JavaScript, modifiers in a class body but no
+    // "return", statements in code but no "private", only declarations
+    // at the top of a Java file. The language's keywords elsewhere.
+    static QStringList keywordsAt(const QString &languageId, const QByteArray &text, int position);
 };
 
 // Classes, functions, fields... of every file of the project (see

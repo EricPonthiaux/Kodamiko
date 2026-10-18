@@ -7,6 +7,7 @@
 #include "McpRegistry.h"
 #include "McpWork.h"
 
+#include "diagnostics/ProblemStore.h"
 #include "editor/CodeFormatter.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
@@ -146,6 +147,28 @@ QJsonArray diagnosticsJson(const QJsonArray &diagnostics)
     return array;
 }
 
+// The problems the last builds found in `path` that no server reports.
+QJsonArray buildProblemsJson(const DuetToolContext &context, const QString &path)
+{
+    QJsonArray array;
+    if (!context.problems)
+        return array;
+    // The servers' first, then the builds'.
+    const Problems problems = context.problems->problems(path).mid(context.problems->serverProblems(path).size());
+    for (const Problem &problem : problems) {
+        QJsonObject item{{QStringLiteral("line"), problem.line + 1},
+                         {QStringLiteral("severity"), problem.severity == Diagnostic::Severity::Error
+                                                          ? QStringLiteral("error")
+                                                          : QStringLiteral("warning")},
+                         {QStringLiteral("message"), problem.message},
+                         {QStringLiteral("source"), QStringLiteral("build: %1").arg(problem.source)}};
+        if (problem.column >= 0)
+            item.insert(QStringLiteral("column"), problem.column + 1);
+        array.append(item);
+    }
+    return array;
+}
+
 // Problems an editor shows that do not come from a server (Claude's
 // configuration files).
 QJsonArray editorProblems(EditorWidget *editor)
@@ -197,10 +220,13 @@ private:
         int errors = 0;
         for (const QString &path : paths_) {
             QJsonArray problems = diagnosticsJson(context_.languageServers->diagnostics(path));
-            if (problems.isEmpty()) {
+            const QJsonArray built = buildProblemsJson(context_, path);
+            if (problems.isEmpty() && built.isEmpty()) {
                 if (EditorWidget *editor = context_.tabs->editorFor(path))
                     problems = editorProblems(editor);
             }
+            for (const QJsonValue &problem : built)
+                problems.append(problem);
             for (const QJsonValue &problem : problems)
                 errors += problem.toObject().value(QStringLiteral("severity")).toString() == QLatin1String("error");
             if (!problems.isEmpty())
@@ -291,8 +317,10 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool(McpTool::reading(
         QStringLiteral("get_diagnostics"), QStringLiteral("Problems"),
         QStringLiteral("Errors and warnings of files, from Duet's language servers (clangd, jdtls, tsserver, "
-                       "pyright…) on the text the user has, unsaved changes included. Without paths: the open "
-                       "files and every file a server reported problems for. Use it to check your edits compile."),
+                       "pyright…) on the text the user has, unsaved changes included, and from the output of the "
+                       "last builds the user ran in Duet (source \"build: <configuration>\"). Without paths: the "
+                       "open files and every file a server or a build reported problems for. Use it to check your "
+                       "edits compile."),
         object({{QStringLiteral("paths"), array(string(QStringLiteral("File")), QStringLiteral("Files to check (optional)"))}}),
         [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
             QStringList paths;
@@ -302,6 +330,12 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
                 paths = context.tabs->openFilePaths();
                 if (context.languageServers) {
                     for (const QString &path : context.languageServers->filesWithDiagnostics()) {
+                        if (!paths.contains(path))
+                            paths.append(path);
+                    }
+                }
+                if (context.problems) {
+                    for (const QString &path : context.problems->filesWithBuildProblems()) {
                         if (!paths.contains(path))
                             paths.append(path);
                     }
@@ -529,24 +563,38 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         false,
         QStringLiteral("diagnostics"),
         QStringLiteral("Problems"),
-        QStringLiteral("The errors and warnings the language servers reported, by file"),
+        QStringLiteral("The errors and warnings the language servers and the last builds reported, by file"),
         QStringLiteral("application/json"),
         [context](const QString &) -> std::optional<QString> {
+            QStringList paths;
+            if (context.languageServers)
+                paths = context.languageServers->filesWithDiagnostics();
+            if (context.problems) {
+                for (const QString &path : context.problems->filesWithBuildProblems()) {
+                    if (!paths.contains(path))
+                        paths.append(path);
+                }
+            }
             QJsonArray files;
-            if (context.languageServers) {
-                for (const QString &path : context.languageServers->filesWithDiagnostics())
+            for (const QString &path : std::as_const(paths)) {
+                QJsonArray problems = context.languageServers
+                                          ? diagnosticsJson(context.languageServers->diagnostics(path))
+                                          : QJsonArray();
+                for (const QJsonValue &problem : buildProblemsJson(context, path))
+                    problems.append(problem);
+                if (!problems.isEmpty())
                     files.append(QJsonObject{{QStringLiteral("file"), context.relative(path)},
-                                             {QStringLiteral("problems"),
-                                              diagnosticsJson(context.languageServers->diagnostics(path))}});
+                                             {QStringLiteral("problems"), problems}});
             }
             return QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("files"), files}}).toJson(QJsonDocument::Compact));
         },
     });
-    if (context.languageServers) {
-        McpRegistry *target = &registry;
-        QObject::connect(context.languageServers, &LanguageServers::diagnosticsChanged, target,
-                         [target] { target->notifyResourceUpdated(QStringLiteral("duet://diagnostics")); });
-    }
+    McpRegistry *target = &registry;
+    const auto notify = [target] { target->notifyResourceUpdated(QStringLiteral("duet://diagnostics")); };
+    if (context.problems)
+        QObject::connect(context.problems, &ProblemStore::changed, target, notify);
+    else if (context.languageServers)
+        QObject::connect(context.languageServers, &LanguageServers::diagnosticsChanged, target, notify);
 }
 
 } // namespace DuetTools

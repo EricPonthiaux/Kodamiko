@@ -6,7 +6,7 @@
 #include "editor/EditorWidget.h"
 #include "editor/FindBar.h"
 #include "editor/MarkdownHtml.h"
-#include "editor/MarkdownView.h"
+#include "editor/PreviewPage.h"
 #include "git/GitProcess.h"
 
 #include <QLineEdit>
@@ -324,9 +324,9 @@ private slots:
         write(dir.filePath("README.md"), "# Hello\n");
         QSettings().setValue("markdown/mode", 2); // Preview
         EditorTabs tabs(Theme::dark());
-        auto *page = qobject_cast<MarkdownPage *>(tabs.openFile(dir.filePath("README.md")));
+        auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("README.md")));
         QVERIFY(page);
-        QCOMPARE(page->mode(), MarkdownPage::Mode::Preview);
+        QCOMPARE(page->mode(), PreviewPage::Mode::Preview);
         QVERIFY(!tabs.tabIcon(0).isNull()); // the file type's icon
         // The tab counts as an editor everywhere.
         QCOMPARE(tabs.currentEditor(), page->editor());
@@ -334,24 +334,61 @@ private slots:
         QCOMPARE(tabs.currentFilePath(), dir.filePath("README.md"));
         QCOMPARE(tabs.openFile(dir.filePath("README.md")), page);
         // No web engine until the page shows.
-        QVERIFY(!page->preview());
+        QVERIFY(!page->markdownPreview());
         tabs.show();
-        QTRY_VERIFY(page->preview());
-        QTRY_VERIFY(page->preview()->bodyHtml().contains("Hello"));
+        QTRY_VERIFY(page->markdownPreview());
+        QTRY_VERIFY(page->markdownPreview()->bodyHtml().contains("Hello"));
 
         // The preview follows the text.
         page->editor()->setText("# Changed\n");
-        QTRY_VERIFY(page->preview()->bodyHtml().contains("Changed"));
+        QTRY_VERIFY(page->markdownPreview()->bodyHtml().contains("Changed"));
         QCOMPARE(tabs.tabText(0), QString("● README.md"));
         QVERIFY(tabs.saveCurrent());
         QCOMPARE(tabs.tabText(0), QString("README.md"));
 
         tabs.revealEditor(page->editor()); // a search or a jump: the editor shows
-        QCOMPARE(page->mode(), MarkdownPage::Mode::Split);
+        QCOMPARE(page->mode(), PreviewPage::Mode::Split);
         page->findChildren<QToolButton *>().first()->click(); // Editor
-        QCOMPARE(page->mode(), MarkdownPage::Mode::Editor);
+        QCOMPARE(page->mode(), PreviewPage::Mode::Editor);
         QCOMPARE(QSettings().value("markdown/mode").toInt(), 0); // kept for the next files
         QSettings().remove("markdown/mode");
+    }
+
+    void htmlTabsShowThePage()
+    {
+        QTemporaryDir dir;
+        write(dir.filePath("index.html"), "<html><head><title>Page</title></head>"
+                                          "<body><h1>Hello</h1><script>document.title = 'ran';</script></body></html>");
+        EditorTabs tabs(Theme::dark());
+        auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("index.html")));
+        QVERIFY(page);
+        QCOMPARE(page->kind(), PreviewPage::Kind::Html);
+        QCOMPARE(page->mode(), PreviewPage::Mode::Split); // the code beside the page
+        QCOMPARE(tabs.currentEditor(), page->editor());
+        QVERIFY(!page->htmlPreview());
+        tabs.show();
+        QTRY_VERIFY(page->htmlPreview());
+        HtmlPreview *preview = page->htmlPreview();
+        QTRY_VERIFY(preview->isReady());
+        const auto pageText = [preview] {
+            QString text;
+            bool done = false;
+            preview->page()->toPlainText([&](const QString &result) {
+                text = result;
+                done = true;
+            });
+            for (int i = 0; i < 100 && !done; ++i)
+                QTest::qWait(50);
+            return text;
+        };
+        QVERIFY(pageText().contains("Hello"));
+        QCOMPARE(preview->title(), QString("Page")); // its scripts never run
+
+        // The page follows the text.
+        page->editor()->setText("<html><body><p>Changed</p></body></html>");
+        QTRY_VERIFY(preview->isReady() && pageText().contains("Changed"));
+        QVERIFY(!page->markdownPreview());
+        QSettings().remove("html/mode");
     }
 
     void formatterPositionsFollowTheCode()

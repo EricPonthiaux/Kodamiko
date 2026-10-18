@@ -87,6 +87,47 @@ CompletionItem itemOf(const QString &label, const QString &detail, const QString
     return item;
 }
 
+// The fields a Java class body declares: "private final List<String>
+// names = new ArrayList<>(), others;" gives "names" and "others".
+QList<CodeGenerationProvider::Field> fieldsIn(const QByteArray &blanked, int brace)
+{
+    static const QSet<QString> modifiers = {"public", "protected", "private", "static", "final", "transient",
+                                            "volatile"};
+    static const QRegularExpression annotation(QStringLiteral("@[\\w.]+(?:\\s*\\([^()]*\\))?"));
+    static const QRegularExpression identifier(QStringLiteral("^[A-Za-z_$][\\w$]*$"));
+    QList<CodeGenerationProvider::Field> fields;
+    for (const CodeScan::Declaration &declaration : CodeScan::declarationsIn(blanked, brace)) {
+        if (declaration.hasBody || !CodeScan::parseFunction(declaration.text).name.isEmpty())
+            continue;
+        QString text = declaration.text;
+        text.remove(annotation);
+        const QStringList declarators = CodeScan::splitTopLevel(text);
+        if (declarators.isEmpty())
+            continue;
+        // The modifiers and the type, before the first name.
+        QStringList words = declarators.first().section(QLatin1Char('='), 0, 0).simplified().split(QLatin1Char(' '));
+        bool isStatic = false;
+        bool isFinal = false;
+        while (!words.isEmpty() && modifiers.contains(words.first())) {
+            isStatic = isStatic || words.first() == QLatin1String("static");
+            isFinal = isFinal || words.first() == QLatin1String("final");
+            words.removeFirst();
+        }
+        if (words.size() < 2 || words.first() == QLatin1String("import") || words.first() == QLatin1String("package"))
+            continue;
+        const QString first = words.takeLast();
+        const QString type = words.join(QLatin1Char(' '));
+        QStringList names{first};
+        for (qsizetype i = 1; i < declarators.size(); ++i)
+            names.append(declarators[i].section(QLatin1Char('='), 0, 0).trimmed());
+        for (const QString &name : std::as_const(names)) {
+            if (identifier.match(name).hasMatch())
+                fields.append({type, name, isStatic, isFinal});
+        }
+    }
+    return fields;
+}
+
 } // namespace
 
 CodeGenerationProvider::CodeGenerationProvider(const SymbolIndex *index, Counterpart counterpart)
@@ -267,6 +308,8 @@ void CodeGenerationProvider::addOverrides(const CompletionContext &context, int 
             items.append(item);
         }
     }
+    if (java && own.keyword == QLatin1String("class"))
+        addAccessors(blanked, brace, own.name, declared, indent, unit, items);
     if (java && own.keyword == QLatin1String("class")) {
         // Object's.
         static const QList<std::pair<const char *, const char *>> object = {
@@ -283,6 +326,40 @@ void CodeGenerationProvider::addOverrides(const CompletionContext &context, int 
             items.append(itemOf(QString::fromLatin1(name), QObject::tr("override Object"),
                                 CodeScan::indented(QString::fromLatin1(code), indent, unit), title));
         }
+    }
+}
+
+void CodeGenerationProvider::addAccessors(const QByteArray &blanked, int brace, const QString &className,
+                                          const QSet<QString> &declared, const QString &indent, const QString &unit,
+                                          QList<CompletionItem> &items)
+{
+    const QString getterTitle = QObject::tr("Getter");
+    const QString setterTitle = QObject::tr("Setter");
+    for (const Field &field : fieldsIn(blanked, brace)) {
+        // "isEnabled" for a boolean, as IntelliJ names them.
+        const QString capitalized = field.name.left(1).toUpper() + field.name.mid(1);
+        const QString getter = (field.type == QLatin1String("boolean") ? QStringLiteral("is") : QStringLiteral("get"))
+                             + capitalized;
+        const QString modifiers = field.isStatic ? QStringLiteral("public static ") : QStringLiteral("public ");
+        if (!declared.contains(getter + QStringLiteral("/0"))) {
+            const QString code = Snippet::escape(modifiers + field.type + QLatin1Char(' ') + getter + QStringLiteral("() {\n\treturn ")
+                                                 + field.name + QStringLiteral(";\n}"))
+                               + QStringLiteral("$0");
+            CompletionItem item = itemOf(getter, QObject::tr("getter · %1 %2").arg(field.type, field.name),
+                                         CodeScan::indented(code, indent, unit), getterTitle);
+            item.type = field.type;
+            items.append(item);
+        }
+        const QString setter = QStringLiteral("set") + capitalized;
+        if (field.isFinal || declared.contains(setter + QStringLiteral("/1")))
+            continue;
+        const QString target = (field.isStatic ? className : QStringLiteral("this")) + QLatin1Char('.') + field.name;
+        const QString code = Snippet::escape(modifiers + QStringLiteral("void ") + setter + QLatin1Char('(') + field.type
+                                             + QLatin1Char(' ') + field.name + QStringLiteral(") {\n\t") + target
+                                             + QStringLiteral(" = ") + field.name + QStringLiteral(";\n}"))
+                           + QStringLiteral("$0");
+        items.append(itemOf(setter, QObject::tr("setter · %1 %2").arg(field.type, field.name),
+                            CodeScan::indented(code, indent, unit), setterTitle));
     }
 }
 

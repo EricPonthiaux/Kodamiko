@@ -106,6 +106,8 @@ private:
     int identifierStart(int position) const;
     bool insideCommentOrString(int position) const;
     bool insideDocComment(int position) const;
+    // In the module name of a JavaScript import: "from './|'".
+    bool inModulePath(int position) const;
     // What opens completion in a documentation comment: "@", "\\", the
     // space after "@param". Null when nothing.
     QChar docCommentTrigger(QChar typed, int position) const;

@@ -83,8 +83,12 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     connect(showInspector, &QAction::toggled, inspector_, &QWidget::setVisible);
     more->setMenu(menu);
 
-    auto *toolbar = new QHBoxLayout;
-    toolbar->setContentsMargins(6, 2, 6, 2);
+    // Its own background and a line under it: the canvas starts below.
+    auto *toolbarArea = new QWidget(this);
+    toolbarArea->setObjectName(QStringLiteral("viewToolbar"));
+    toolbarArea->setAttribute(Qt::WA_StyledBackground);
+    auto *toolbar = new QHBoxLayout(toolbarArea);
+    toolbar->setContentsMargins(6, 2, 6, 3);
     toolbar->setSpacing(2);
     toolbar->addWidget(layOut);
     toolbar->addWidget(fit);
@@ -108,7 +112,7 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addLayout(toolbar);
+    layout->addWidget(toolbarArea);
     layout->addWidget(splitter, 1);
 
     connect(canvas_, &diagram::Canvas::zoomChanged, this, &DiagramView::updateZoom);

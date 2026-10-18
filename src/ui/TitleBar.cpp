@@ -20,6 +20,7 @@ namespace {
 
 constexpr int barHeight = 40;
 constexpr int controlWidth = 46;
+const QColor stopColor("#d9534f");
 
 } // namespace
 
@@ -154,6 +155,12 @@ TitleBar::TitleBar(QWidget *parent)
     connect(claude_, &QToolButton::clicked, this, &TitleBar::claudeClicked);
     claude_->hide();
     layout_->addStretch(1);
+    run_ = addChip();
+    run_->hide();
+    runActions_ = new QHBoxLayout;
+    runActions_->setSpacing(2);
+    layout_->addLayout(runActions_);
+    layout_->addSpacing(8);
     actions_ = new QHBoxLayout;
     actions_->setSpacing(2);
     layout_->addLayout(actions_);
@@ -202,20 +209,55 @@ void TitleBar::setClaudeState(const QIcon &icon, const QString &text, const QStr
     claude_->setToolTip(toolTip);
 }
 
-void TitleBar::addActionButton(QAction *action, const QString &iconName)
+QToolButton *TitleBar::actionButton(QAction *action, const QString &iconName, const QColor &color)
 {
     auto *button = new QToolButton(this);
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setIcon(UiIcons::icon(iconName, theme_.foreground));
-    actionButtons_.append({button, iconName});
+    button->setIcon(UiIcons::icon(iconName, color.isValid() ? color : theme_.foreground));
+    actionButtons_.append({button, iconName, color});
     button->setIconSize(QSize(16, 16));
-    const QString shortcut = action->shortcut().toString(QKeySequence::NativeText);
-    QString name = action->text();
-    name.remove(QLatin1Char('&'));
-    button->setToolTip(shortcut.isEmpty() ? name : QStringLiteral("%1 (%2)").arg(name, shortcut));
+    const auto update = [button, action] {
+        const QString shortcut = action->shortcut().toString(QKeySequence::NativeText);
+        QString name = action->text();
+        name.remove(QLatin1Char('&'));
+        button->setToolTip(shortcut.isEmpty() ? name : QStringLiteral("%1 (%2)").arg(name, shortcut));
+        button->setEnabled(action->isEnabled());
+    };
+    update();
+    connect(action, &QAction::changed, button, update);
     connect(button, &QToolButton::clicked, action, &QAction::trigger);
-    actions_->addWidget(button);
+    return button;
+}
+
+void TitleBar::addActionButton(QAction *action, const QString &iconName)
+{
+    actions_->addWidget(actionButton(action, iconName));
+}
+
+void TitleBar::setRunConfiguration(const QIcon &icon, const QString &name, const QString &toolTip, QMenu *menu,
+                                   bool running)
+{
+    run_->setVisible(!name.isEmpty());
+    run_->setIcon(icon);
+    run_->setText(name + QStringLiteral("  ▾"));
+    run_->setToolTip(toolTip);
+    run_->setMenu(menu);
+    running_ = running;
+    if (runButton_)
+        runButton_->setVisible(!name.isEmpty() && !running);
+    if (stopButton_)
+        stopButton_->setVisible(!name.isEmpty() && running);
+}
+
+void TitleBar::setRunActions(QAction *run, QAction *stop)
+{
+    runButton_ = actionButton(run, QStringLiteral("run"));
+    stopButton_ = actionButton(stop, QStringLiteral("stop"), stopColor);
+    runButton_->setVisible(run_->isVisibleTo(this) && !running_);
+    stopButton_->setVisible(run_->isVisibleTo(this) && running_);
+    runActions_->addWidget(runButton_);
+    runActions_->addWidget(stopButton_);
 }
 
 void TitleBar::setWindowControlsVisible(bool visible)
@@ -244,8 +286,8 @@ void TitleBar::applyTheme(const Theme &theme)
     theme_ = theme;
     for (WindowButton *button : {minimize_, maximize_, close_})
         button->applyTheme(theme);
-    for (const auto &[button, name] : std::as_const(actionButtons_))
-        button->setIcon(UiIcons::icon(name, theme.foreground));
+    for (const ActionButton &entry : std::as_const(actionButtons_))
+        entry.button->setIcon(UiIcons::icon(entry.iconName, entry.color.isValid() ? entry.color : theme.foreground));
     update();
 }
 

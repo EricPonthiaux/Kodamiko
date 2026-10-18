@@ -13,6 +13,7 @@ class EditorTabs;
 class GitCommands;
 class LanguageServers;
 class McpRegistry;
+class ProblemStore;
 class QMenuBar;
 class SymbolIndex;
 class TerminalWidget;
@@ -29,6 +30,8 @@ struct DuetToolContext {
     CodeNavigator *navigator = nullptr;
     SymbolIndex *symbols = nullptr;
     LanguageServers *languageServers = nullptr;
+    // The builds' problems too (null: the servers' only).
+    ProblemStore *problems = nullptr;
     CodeIntelligence *intelligence = nullptr;
     GitCommands *git = nullptr;
     QMenuBar *menus = nullptr;

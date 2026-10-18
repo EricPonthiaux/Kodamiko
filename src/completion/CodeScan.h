@@ -32,6 +32,10 @@ int headerStart(const QByteArray &blanked, int brace);
 // line, or after a "{", "}", ";" (and ":" of "public:" when `labels`).
 bool startsStatement(const QByteArray &text, int at, bool labels = false);
 
+// Whether `position` is in the module name of a JavaScript or TypeScript
+// import: "from './|", "import '|", "require('|", "import('|".
+bool inModulePath(const QByteArray &text, int position);
+
 // Splits at the commas outside brackets: "int a, std::map<K, V> b".
 QStringList splitTopLevel(const QString &text, QChar separator = QLatin1Char(','));
 

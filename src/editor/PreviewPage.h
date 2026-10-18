@@ -59,24 +59,64 @@ private:
     std::unique_ptr<CodeColorizer> colorizer_;
 };
 
-// Tab of a Markdown file: its editor, its preview, or both side by side,
-// chosen with the buttons at the top right (as in IntelliJ). The preview
-// follows the text as it is typed. The mode chosen last is kept for the
-// next files.
-class MarkdownPage : public QWidget {
+// An HTML page as a browser shows it, from the editor's text: relative
+// style sheets and images are found next to the file. The page's scripts
+// never run. Links leave the page as in MarkdownPreview.
+class HtmlPreview : public QWebEngineView {
     Q_OBJECT
 
 public:
+    explicit HtmlPreview(QWidget *parent = nullptr);
+
+    // Shows `text` as the page at `filePath`, at the same scroll position.
+    void render(const QString &text, const QString &filePath);
+    // Scrolls to the share `ratio` (0 to 1) of the page.
+    void scrollToRatio(double ratio);
+    // The page is loaded and shows the last rendered text.
+    bool isReady() const { return loaded_; }
+
+signals:
+    void openFileRequested(const QString &path);
+    // The rendered text is shown (after each render).
+    void rendered();
+
+protected:
+    void contextMenuEvent(QContextMenuEvent *event) override;
+
+private:
+    // The page again, from text_, at the same scroll position.
+    void reload();
+    void loadPage();
+
+    QString text_;
+    QString filePath_;
+    bool loaded_ = false;
+    bool pageLoading_ = false;
+    bool reloadPending_ = false;
+    double pendingRatio_ = -1;
+};
+
+// Tab of a Markdown or HTML file: its editor, its preview, or both side by
+// side, chosen with the buttons at the top right (as in IntelliJ). The
+// preview follows the text as it is typed. The mode chosen last is kept for
+// the next files of the same kind.
+class PreviewPage : public QWidget {
+    Q_OBJECT
+
+public:
+    enum class Kind { Markdown, Html };
     enum class Mode { Editor, Split, Preview };
 
     // Takes `editor`, which holds the file.
-    MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *parent = nullptr);
+    PreviewPage(EditorWidget *editor, const Theme &theme, QWidget *parent = nullptr);
 
     EditorWidget *editor() const { return editor_; }
+    Kind kind() const { return kind_; }
     // Created the first time the page shows in Split or Preview mode: a
-    // web engine for each Markdown tab restored at startup would slow it
-    // down. nullptr until then.
-    MarkdownPreview *preview() const { return preview_; }
+    // web engine for each tab restored at startup would slow it down.
+    // nullptr until then, and for the other kind.
+    MarkdownPreview *markdownPreview() const { return markdown_; }
+    HtmlPreview *htmlPreview() const { return html_; }
     Mode mode() const { return mode_; }
     void setMode(Mode mode);
     // The editor hidden by the Preview mode becomes visible (Split): to show
@@ -84,7 +124,8 @@ public:
     void revealEditor();
     void applyTheme(const Theme &theme);
 
-    static bool isMarkdownFile(const QString &path);
+    // A Markdown or HTML file: opened with its preview.
+    static bool hasPreview(const QString &path);
 
 signals:
     void openFileRequested(const QString &path);
@@ -96,10 +137,14 @@ private:
     void ensurePreview();
     void updatePreview();
     void syncScroll();
+    QWidget *preview() const;
+    QString settingsKey(const QString &name) const;
 
     EditorWidget *editor_;
     Theme theme_;
-    MarkdownPreview *preview_ = nullptr;
+    Kind kind_;
+    MarkdownPreview *markdown_ = nullptr;
+    HtmlPreview *html_ = nullptr;
     QSplitter *splitter_;
     QToolButton *buttons_[3];
     Mode mode_ = Mode::Preview;

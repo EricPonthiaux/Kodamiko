@@ -938,6 +938,166 @@ private slots:
         QCOMPARE(CodeScan::blank("a = \"{\"; // }\nb").count('{'), 0);
     }
 
+    void keywordsFitTheirPlace()
+    {
+        const auto at = [](const QByteArray &text, const QString &languageId) {
+            return KeywordProvider::keywordsAt(languageId, text, int(text.size()));
+        };
+        // Java: declarations at the top, modifiers in a class body,
+        // statements in a method.
+        QStringList top = at("package a;\n", "java");
+        QVERIFY(top.contains("import") && top.contains("class"));
+        QVERIFY(!top.contains("return") && !top.contains("int"));
+        QStringList member = at("class A {\n    ", "java");
+        QVERIFY(member.contains("private") && member.contains("void") && member.contains("static"));
+        QVERIFY(!member.contains("return") && !member.contains("if") && !member.contains("import"));
+        QStringList code = at("class A {\n    void f() {\n        ", "java");
+        QVERIFY(code.contains("return") && code.contains("if") && code.contains("int"));
+        QVERIFY(!code.contains("private") && !code.contains("import"));
+        // An initializer is code, a class body or not.
+        QVERIFY(at("class A {\n    int x = ", "java").contains("new"));
+        QVERIFY(at("class A {\n    Runnable r = new Runnable() {\n        ", "java").contains("public"));
+        // JavaScript: a class body's members.
+        QStringList js = at("class A {\n  ", "javascript");
+        QVERIFY(js.contains("static") && js.contains("constructor") && js.contains("async"));
+        QVERIFY(!js.contains("private") && !js.contains("if")); // TypeScript's, a statement
+        QVERIFY(at("class A {\n  ", "typescript").contains("private"));
+        QVERIFY(at("function f() {\n  ", "javascript").contains("return"));
+        QVERIFY(!at("function f() {\n  ", "typescript").contains("private"));
+        // Others: all of them.
+        QCOMPARE(at("int main() {\n", "cpp"), KeywordProvider::keywords("cpp"));
+    }
+
+    void javaPostfixTemplatesImportWhatTheyUse()
+    {
+        Fixture f("package app;\n\nimport java.util.List;\n\nclass A {\n    void f() {\n        name\n    }\n}\n", 6, 12,
+                  std::make_shared<PostfixTemplateProvider>(), "A.java");
+        QTest::keyClicks(f.editor, ".opt");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("opt"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(2), QString("import java.util.List;\n"));
+        QCOMPARE(f.editor->text(3), QString("import java.util.Optional;\n"));
+        QCOMPARE(f.editor->text(7), QString("        Optional.ofNullable(name)\n"));
+        f.editor->undo(); // one step, the import too
+        QCOMPARE(f.editor->text(3), QString("\n"));
+        QCOMPARE(f.editor->text(6), QString("        name.opt\n"));
+
+        // Imported already: once.
+        Fixture g("import java.util.*;\nclass A {\n    void f() {\n        items\n    }\n}\n", 3, 13,
+                  std::make_shared<PostfixTemplateProvider>(), "A.java");
+        QTest::keyClicks(g.editor, ".stream");
+        QTRY_VERIFY(g.controller->isActive());
+        QTest::keyClick(g.editor, Qt::Key_Return);
+        QCOMPARE(g.editor->text(0), QString("import java.util.*;\n"));
+        QCOMPARE(g.editor->text(3), QString("        Arrays.stream(items)\n"));
+    }
+
+    void javaSoutvQuotesTheExpression()
+    {
+        Fixture f("class A {\n    void f() {\n        map.get(\"a\")\n    }\n}\n", 2, 20,
+                  std::make_shared<PostfixTemplateProvider>(), "A.java");
+        QTest::keyClicks(f.editor, ".soutv");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("soutv"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(2), QString("        System.out.println(\"map.get(\\\"a\\\") = \" + map.get(\"a\"));\n"));
+    }
+
+    void javaLiveTemplatesKnowWhereTheyAre()
+    {
+        const QByteArray text = "class Account {\n    void deposit(long amount, String note) {\n        int total = 3;\n"
+                                "        \n    }\n}\n";
+        const auto expand = [&text](const QString &key) {
+            Fixture f(text, 3, 8, std::make_shared<LiveTemplateProvider>(), "Account.java");
+            QTest::keyClicks(f.editor, key);
+            if (!QTest::qWaitFor([&] { return f.controller->isActive(); }))
+                return QStringLiteral("(no list)");
+            if (f.controller->popup()->labels().first() != key)
+                return QStringLiteral("(first: %1)").arg(f.controller->popup()->labels().first());
+            QTest::keyClick(f.editor, Qt::Key_Return);
+            return f.editor->text(3);
+        };
+        QCOMPARE(expand("soutm"), QString("        System.out.println(\"Account.deposit\");\n"));
+        QCOMPARE(expand("soutp"),
+                 QString("        System.out.println(\"amount = \" + amount + \", note = \" + note);\n"));
+        QCOMPARE(expand("soutv"), QString("        System.out.println(\"total = \" + total);\n"));
+        QCOMPARE(expand("geti").left(48), QString("        public static Account getInstance() {\n"));
+    }
+
+    void javaGettersAndSettersFromFields()
+    {
+        const QByteArray text = "class Person {\n    private String name;\n    private final int age = 3;\n"
+                                "    private boolean active, admin;\n    public String getName() { return name; }\n"
+                                "    \n}\n";
+        auto provider = std::make_shared<CodeGenerationProvider>(nullptr, CodeGenerationProvider::Counterpart());
+        CompletionContext context;
+        context.languageId = "java";
+        context.filePath = "Person.java";
+        context.text = text;
+        context.position = context.prefixStart = int(text.indexOf("    \n}")) + 4;
+        QStringList generated;
+        provider->complete(context, [&generated](const QList<CompletionItem> &items, bool) {
+            for (const CompletionItem &item : items)
+                generated.append(item.label);
+        });
+        QVERIFY2(generated.contains("getAge") && generated.contains("isActive") && generated.contains("setName"),
+                 qPrintable(generated.join(", ")));
+        QVERIFY(!generated.contains("getName"));   // written already
+        QVERIFY(!generated.contains("getActive")); // "isActive" for a boolean
+        QVERIFY(!generated.contains("setAge"));    // final
+
+        Fixture f(text, 5, 4, provider, "Person.java");
+        QTest::keyClicks(f.editor, "getAg");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("getAge"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(5), QString("    public int getAge() {\n"));
+        QCOMPARE(f.editor->text(6), QString("        return age;\n"));
+        QCOMPARE(f.editor->text(7), QString("    }\n"));
+
+        f.editor->setCursorPosition(8, 0);
+        QTest::keyClicks(f.editor, "    setAdm");
+        QTRY_VERIFY(f.controller->isActive());
+        QCOMPARE(f.controller->popup()->labels().first(), QString("setAdmin"));
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(8), QString("    public void setAdmin(boolean admin) {\n"));
+        QCOMPARE(f.editor->text(9), QString("        this.admin = admin;\n"));
+    }
+
+    void modulePathsOnlyAskTheServer()
+    {
+        QVERIFY(CodeScan::inModulePath("import { x } from './co", 23));
+        QVERIFY(CodeScan::inModulePath("const fs = require('f", 21));
+        QVERIFY(CodeScan::inModulePath("import 'polyfill", 16));
+        QVERIFY(CodeScan::inModulePath("const m = await import(\"./", 26));
+        QVERIFY(!CodeScan::inModulePath("const s = 'from", 15));
+        QVERIFY(!CodeScan::inModulePath("import { x } from './a';\nconst s = '", 37));
+
+        // Only a provider serving module paths is asked there.
+        class Paths : public RecordingProvider {
+        public:
+            using RecordingProvider::RecordingProvider;
+            bool servesModulePaths() const override { return true; }
+        };
+        auto paths = std::make_shared<Paths>(QList<CompletionItem>{{"components", {}, {}, CompletionItem::Kind::Module, 10}});
+        Fixture f("import Button from '';\n", 0, 20, paths, "a.js");
+        f.controller->complete();
+        QTRY_VERIFY(f.controller->isActive());
+        QVERIFY(paths->last.inModulePath);
+        QCOMPARE(paths->last.triggerCharacter, QChar('\''));
+        QCOMPARE(f.controller->popup()->labels(), QStringList({"components"})); // no keywords, no words
+        QTest::keyClick(f.editor, Qt::Key_Return);
+        QCOMPARE(f.editor->text(0), QString("import Button from 'components';\n"));
+        // Typing in it opens the list too.
+        f.controller->close();
+        f.editor->setCursorPosition(0, 30);
+        QTest::keyClicks(f.editor, "/");
+        QTRY_COMPARE(paths->calls, 2);
+        QVERIFY(paths->last.inModulePath);
+        QCOMPARE(paths->last.triggerCharacter, QChar('/'));
+    }
+
     void overridesFromTheBaseClass()
     {
         const QByteArray text = "class Base {\npublic:\n    virtual ~Base();\n    virtual void paint(int x) const;\n"

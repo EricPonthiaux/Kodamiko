@@ -2,6 +2,7 @@
 
 #include "CodeNavigator.h"
 #include "claude/ClaudeLint.h"
+#include "diagnostics/ProblemStore.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/TextFile.h"
@@ -59,11 +60,12 @@ QPoint belowCaret(EditorWidget *editor)
 } // namespace
 
 CodeIntelligence::CodeIntelligence(EditorTabs *tabs, LanguageServers *servers, CodeNavigator *navigator,
-                                   QObject *parent)
+                                   ProblemStore *problems, QObject *parent)
     : QObject(parent)
     , tabs_(tabs)
     , servers_(servers)
     , navigator_(navigator)
+    , problems_(problems)
 {
     // A quick fix or a refactoring carried out by the server comes back as
     // an edit to apply.
@@ -71,7 +73,7 @@ CodeIntelligence::CodeIntelligence(EditorTabs *tabs, LanguageServers *servers, C
         applyWorkspaceEdit(parseWorkspaceEdit(params.toObject().value("edit").toObject()));
         return QJsonValue(QJsonObject{{"applied", true}});
     });
-    connect(servers_, &LanguageServers::diagnosticsChanged, this, &CodeIntelligence::showProblems);
+    connect(problems_, &ProblemStore::changed, this, &CodeIntelligence::showProblems);
 }
 
 void CodeIntelligence::showProblems(const QString &path)
@@ -80,19 +82,34 @@ void CodeIntelligence::showProblems(const QString &path)
     // Claude's configuration files have their own checker.
     if (!editor || ClaudeLint::kindOf(path) != ClaudeLint::Kind::None)
         return;
-    Diagnostics problems;
-    for (const QJsonValue &value : servers_->diagnostics(path)) {
-        const QJsonObject diagnostic = value.toObject();
-        const int severity = diagnostic.value("severity").toInt(1);
-        if (severity > 2)
-            continue; // information and hints stay quiet
-        const Range range = rangeFrom(diagnostic.value("range"));
-        const int start = positionOf(editor, range.start);
-        const int end = std::max(start, positionOf(editor, range.end));
-        problems.append({severity == 1 ? Diagnostic::Severity::Error : Diagnostic::Severity::Warning, start, end,
-                         diagnostic.value("message").toString()});
+    const auto send = [editor](int message, long argument, long more = 0) {
+        return int(editor->SendScintilla(message, argument, more));
+    };
+    Diagnostics shown;
+    for (const Problem &problem : problems_->problems(path)) {
+        if (problem.line >= editor->lines())
+            continue; // a build's, for a text that has changed since
+        int start = 0;
+        int end = 0;
+        if (problem.column < 0) {
+            // A line, without its indentation.
+            start = send(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, problem.line);
+            end = send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line);
+        } else {
+            start = positionOf(editor, {problem.line, problem.column});
+            if (problem.endLine >= 0) {
+                end = std::max(start, positionOf(editor, {problem.endLine, problem.endColumn}));
+            } else {
+                // The word at the column, or its character.
+                end = send(QsciScintillaBase::SCI_WORDENDPOSITION, start, 1);
+                if (end <= start)
+                    end = std::min(send(QsciScintillaBase::SCI_POSITIONAFTER, start),
+                                   send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line));
+            }
+        }
+        shown.append({problem.severity, start, end, problem.message});
     }
-    editor->setDiagnostics(problems);
+    editor->setDiagnostics(shown);
 }
 
 void CodeIntelligence::attach(EditorWidget *editor)

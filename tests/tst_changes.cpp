@@ -77,11 +77,12 @@ private slots:
         QStringList texts;
         for (const DiffView::Line &line : lines)
             texts.append(line.text);
-        QCOMPARE(texts, QStringList({"", "x.cpp   modified", "⋯ lines 10–12  ·  void run()", "keep", "old", "new", "end",
+        QCOMPARE(texts, QStringList({"", "x.cpp   modified   +1 −2", "⋯ lines 10–12  ·  void run()", "keep", "old", "new", "end",
                                      "⋯ line 40", "gone", "No line break at the end of the file"}));
         QCOMPARE(lines[0].kind, DiffView::LineKind::Spacer);
         QCOMPARE(lines[1].kind, DiffView::LineKind::FileHeader);
         QCOMPARE(lines[1].emphasis, 5); // "x.cpp"
+        QCOMPARE(lines[1].statsStart, 19); // "+1 −2"
         QCOMPARE(lines[4].kind, DiffView::LineKind::Removed);
         QCOMPARE(lines[4].oldNumber, 11);
         QCOMPARE(lines[4].newNumber, 0);
@@ -99,12 +100,39 @@ private slots:
 
         DiffView view(Theme::dark());
         view.setFiles({{"src/x.cpp", "modified", patch}, {"y.bin", "added", FilePatch::parse("Binary files differ\n")}});
-        QCOMPARE(view.lines()[1].text, QString("x.cpp   src  ·  modified"));
+        QCOMPARE(view.lines()[1].text, QString("x.cpp   src  ·  modified   +1 −2"));
         QCOMPARE(view.lines().size(), lines.size() + 3);
         QCOMPARE(view.fileStart(1), static_cast<int>(lines.size()) + 1);
         QCOMPARE(view.locate(5).line, 2);
         QVERIFY(view.text().contains("Binary file"));
         QVERIFY(!view.text().contains("@@"));
+    }
+
+    void diffShowsChangedWords()
+    {
+        using Range = DiffView::Range;
+        // One word replaced: only it stands out, on both sides.
+        const auto [before, after] = DiffView::wordChanges("int count = 0;", "int total = 0;");
+        QCOMPARE(before, QList<Range>({{4, 5}}));
+        QCOMPARE(after, QList<Range>({{4, 5}}));
+        // Two neighbouring words: one range, the space between them with them.
+        QCOMPARE(DiffView::wordChanges("call(a, b)", "call(x y, b)").second, QList<Range>({{5, 3}}));
+        // Rewritten: nothing stands out.
+        QVERIFY(DiffView::wordChanges("return value;", "throw Error(\"no\");").first.isEmpty());
+
+        // Removed then added lines face each other in the layout.
+        const FilePatch patch = FilePatch::parse("@@ -1,2 +1,2 @@\n-int count = 0;\n-gone\n+int total = 0;\n");
+        const QList<DiffView::Line> lines = DiffView::layout({{"x.cpp", "", patch}});
+        QCOMPARE(lines[3].changes, QList<Range>({{4, 5}}));
+        QVERIFY(lines[4].changes.isEmpty());
+        QCOMPARE(lines[5].changes, QList<Range>({{4, 5}}));
+    }
+
+    void diffHidesHeadingsOfProse()
+    {
+        const FilePatch patch = FilePatch::parse("@@ -10 +10 @@ a sentence cut\n-a\n+b\n");
+        QCOMPARE(DiffView::layout({{"x.md", "", patch}})[2].text, QString("⋯ line 10"));
+        QCOMPARE(DiffView::layout({{"x.cpp", "", patch}})[2].text, QString("⋯ line 10  ·  a sentence cut"));
     }
 
     void outsideARepository()

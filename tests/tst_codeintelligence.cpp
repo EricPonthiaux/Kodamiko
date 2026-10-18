@@ -1,3 +1,4 @@
+#include "diagnostics/ProblemStore.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "lsp/LanguageServers.h"
@@ -139,7 +140,8 @@ private slots:
         LanguageServers servers;
         servers.setFolder(root);
         CodeNavigator navigator(&tabs, &index);
-        CodeIntelligence intelligence(&tabs, &servers, &navigator);
+        ProblemStore problems(&servers);
+        CodeIntelligence intelligence(&tabs, &servers, &navigator, &problems);
         connect(&tabs, &EditorTabs::editorOpened, &intelligence, &CodeIntelligence::attach);
         QStringList messages;
         connect(&intelligence, &CodeIntelligence::statusMessage, this,

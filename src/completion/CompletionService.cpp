@@ -63,6 +63,7 @@ void CompletionService::request(const CompletionContext &context, const Update &
     QPointer<CompletionService> self(this);
     for (const std::shared_ptr<ICompletionProvider> &provider : providers_) {
         if (!provider->handles(context) || provider->servesComments() != context.inDocComment
+            || (context.inModulePath && !provider->servesModulePaths())
             || (context.mode == CompletionContext::Mode::Smart && !provider->servesSmart()))
             continue;
         provider->complete(context, [self, generation, gathered, incomplete,

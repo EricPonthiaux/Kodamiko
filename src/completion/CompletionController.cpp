@@ -251,6 +251,14 @@ bool CompletionController::insideDocComment(int position) const
     return DocComments::commentStart(text, position, editor_->languageId()) >= 0;
 }
 
+bool CompletionController::inModulePath(int position) const
+{
+    static const QStringList languages = {"javascript", "typescript", "tsx"};
+    return languages.contains(editor_->languageId())
+        && CodeScan::inModulePath(editor_->utf8Range(std::max(0, position - 1000), position),
+                                  std::min(position, 1000));
+}
+
 QChar CompletionController::docCommentTrigger(QChar typed, int position) const
 {
     const bool doxygen = editor_->languageId() == QLatin1String("c") || editor_->languageId() == QLatin1String("cpp");
@@ -315,6 +323,14 @@ void CompletionController::onCharacterAdded(int character)
         }
     };
     if (insideCommentOrString(position)) {
+        // "from './|'": the modules and files, from the language server.
+        if (inModulePath(position)) {
+            if (typed == u'\'' || typed == u'"' || typed == u'/')
+                open(typed);
+            else if (isIdentifierCharacter(typed))
+                open({});
+            return;
+        }
         // In a documentation comment: its tags and parameters.
         if (!insideDocComment(position))
             return;
@@ -383,8 +399,15 @@ void CompletionController::start(bool explicitRequest, QChar triggerCharacter, M
     context.triggerCharacter = triggerCharacter;
     context.explicitRequest = explicitRequest;
     context.mode = mode;
-    context.inDocComment = insideCommentOrString(position)
-                        && DocComments::commentStart(context.text, position, context.languageId) >= 0;
+    const bool inText = insideCommentOrString(position);
+    context.inDocComment = inText && DocComments::commentStart(context.text, position, context.languageId) >= 0;
+    context.inModulePath = inText && inModulePath(position);
+    if (context.inModulePath && triggerCharacter.isNull() && context.prefixStart > 0) {
+        // Right after the quote or a "/": the server lists what comes next.
+        const char before = context.text[context.prefixStart - 1];
+        if (before == '\'' || before == '"' || before == '/')
+            context.triggerCharacter = QChar(before);
+    }
     if (mode == Mode::Smart)
         context.expectedType = ExpectedType::at(context.text, context.prefixStart, context.languageId);
     if (mode == Mode::Extended) {

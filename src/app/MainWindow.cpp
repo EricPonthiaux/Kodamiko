@@ -20,6 +20,8 @@
 #include "completion/LocalCompletion.h"
 #include "completion/NameSuggestions.h"
 #include "completion/Templates.h"
+#include "diagnostics/ProblemStore.h"
+#include "diagnostics/ProblemsView.h"
 #include "editor/ChangeGutter.h"
 #include "editor/EditorStatus.h"
 #include "editor/EditorTabs.h"
@@ -41,6 +43,9 @@
 #include "navigation/SymbolIndex.h"
 #include "outline/OutlineView.h"
 #include "projects/ProjectStore.h"
+#include "run/RunConfiguration.h"
+#include "run/RunConfigurationMenu.h"
+#include "run/Runner.h"
 #include "search/FindInFilesPopup.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
@@ -97,6 +102,7 @@
 #include <QTreeView>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <QWidgetAction>
 
 #include <algorithm>
 
@@ -204,6 +210,17 @@ void MainWindow::createWidgets()
     languageServers_->setEnabled(Preferences::load().languageServers);
     connect(languageServers_, &LanguageServers::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
+    // Problems: the servers', and those read in the output of the runs.
+    problemStore_ = new ProblemStore(languageServers_, this);
+    runner_ = new Runner(problemStore_, this);
+    connect(runner_, &Runner::selectionChanged, this, &MainWindow::updateRunWidgets);
+    connect(runner_, &Runner::started, this, [this](const RunConfiguration &configuration) {
+        statusBar()->showMessage(configuration.kind == RunConfiguration::Kind::Build
+                                     ? tr("Building \u201c%1\u201d…").arg(configuration.name)
+                                     : tr("Running \u201c%1\u201d…").arg(configuration.name));
+        updateRunWidgets();
+    });
+    connect(runner_, &Runner::finished, this, &MainWindow::onRunFinished);
     completion_ = new CompletionService(this);
     completion_->addProvider(std::make_shared<LspCompletionProvider>(languageServers_));
     completion_->addProvider(std::make_shared<ProjectSymbolsProvider>(symbolIndex_));
@@ -238,7 +255,7 @@ void MainWindow::createWidgets()
     navigator_ = new CodeNavigator(editorTabs_, symbolIndex_, this);
     // The language server first (documentation, usages, rename...), the
     // project's index when there is none.
-    intelligence_ = new CodeIntelligence(editorTabs_, languageServers_, navigator_, this);
+    intelligence_ = new CodeIntelligence(editorTabs_, languageServers_, navigator_, problemStore_, this);
     connect(editorTabs_, &EditorTabs::editorOpened, intelligence_, &CodeIntelligence::attach);
     connect(editorTabs_, &EditorTabs::definitionRequested, intelligence_, &CodeIntelligence::goToDefinition);
     connect(intelligence_, &CodeIntelligence::statusMessage, this,
@@ -432,6 +449,12 @@ QWidget *MainWindow::createEditPage()
     connect(claudeConfigView_, &ClaudeConfigView::refreshed, this, [this] { showEffectiveSettings(false); });
 
     outlineView_ = new OutlineView(this);
+    problemsView_ = new ProblemsView(problemStore_, this);
+    connect(problemsView_, &ProblemsView::problemActivated, this, [this](const QString &path, int line, int column) {
+        setMode(Mode::Edit);
+        navigator_->goToLine(path, line, std::max(column, 0));
+    });
+    connect(problemsView_, &ProblemsView::countsChanged, this, &MainWindow::updateTabIcons);
     connect(editorTabs_, &QTabWidget::currentChanged, this,
             [this] { outlineView_->setEditor(editorTabs_->currentEditor()); });
     connect(editorTabs_, &QTabWidget::currentChanged, this, &MainWindow::onCurrentTabChanged);
@@ -474,6 +497,7 @@ QWidget *MainWindow::createEditPage()
     sidebar_->addView(filesPanel_, {}, tr("Files"));
     sidebar_->addView(outlineView_, {}, tr("Outline"));
     sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
+    sidebar_->addView(problemsView_, {}, tr("Problems"));
 
     editSplitter_ = new GripSplitter(Qt::Horizontal, this);
     editSplitter_->setChildrenCollapsible(false);
@@ -577,6 +601,15 @@ void MainWindow::createModeTabs()
     branchButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     branchButton_->hide();
     statusBar()->addPermanentWidget(branchButton_);
+    // On a narrow window the mode tabs keep their full width, without
+    // scroll arrows or elided titles: the other widgets give up their
+    // space first and get clipped.
+    modeTabs_->setUsesScrollButtons(false);
+    modeTabs_->setElideMode(Qt::ElideNone);
+    modeTabs_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+    for (QWidget *widget : {static_cast<QWidget *>(editorStatus_), static_cast<QWidget *>(usageLabel_),
+                            static_cast<QWidget *>(branchButton_)})
+        widget->setMinimumWidth(1);
     statusBar()->addPermanentWidget(modeTabs_);
 }
 
@@ -655,6 +688,7 @@ void MainWindow::createMenus()
             [](bool checked) { QSettings().setValue(QStringLiteral("claudeNotifications"), checked); });
 
     createNavigateMenu();
+    createRunMenu();
     createGitMenu();
 
     QMenu *view = titleBar_->menuBar()->addMenu(tr("&View"));
@@ -693,6 +727,11 @@ void MainWindow::createMenus()
     connect(toggleTerminal, &QAction::triggered, this, &MainWindow::toggleTerminalMode);
     view->addSeparator();
     view->addAction(tr("File &Outline"), QKeySequence(tr("Ctrl+Shift+O")), this, &MainWindow::showOutline);
+    view->addAction(tr("&Problems"), QKeySequence(tr("Alt+6")), this, [this] {
+        setMode(Mode::Edit);
+        sidebar_->showView(problemsView_);
+        problemsView_->tree()->setFocus();
+    });
     view->addAction(tr("&Claude Configuration"), this, [this] {
         setMode(Mode::Edit);
         sidebar_->showView(claudeConfigView_);
@@ -722,6 +761,7 @@ void MainWindow::createMenus()
     createHelpMenu();
 
     // Actions at the right of the title bar.
+    titleBar_->setRunActions(runAction_, stopAction_);
     titleBar_->addActionButton(goToFileAction_, QStringLiteral("search"));
     titleBar_->addActionButton(findInFilesAction_, QStringLiteral("find-in-files"));
     titleBar_->addActionButton(paletteAction_, QStringLiteral("palette"));
@@ -841,6 +881,303 @@ void MainWindow::createHelpMenu()
     help->addAction(tr("Check &Prerequisites…"), this, &MainWindow::showPrerequisites);
 }
 
+void MainWindow::createRunMenu()
+{
+    QMenu *run = titleBar_->menuBar()->addMenu(tr("&Run"));
+    runAction_ = run->addAction(tr("&Run"), QKeySequence(tr("Shift+F10")), this, &MainWindow::runSelected);
+    QMenu *runOther = run->addMenu(tr("Run &Configuration"));
+    connect(runOther, &QMenu::aboutToShow, this, [this, runOther] { fillRunMenu(runOther, true); });
+    run->addAction(tr("Run &Other…"), QKeySequence(tr("Alt+Shift+F10")), this, [this] {
+        // The configurations under the title bar's chip.
+        auto *menu = new QMenu(this);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        fillRunMenu(menu, true);
+        menu->popup(titleBar_->mapToGlobal(QPoint(titleBar_->width() / 2 - menu->sizeHint().width() / 2,
+                                                  titleBar_->height())));
+    });
+    buildAction_ = run->addAction(tr("&Build Project"), QKeySequence(tr("Ctrl+F9")), this, &MainWindow::buildProject);
+    stopAction_ = run->addAction(tr("&Stop"), QKeySequence(tr("Ctrl+F2")), this, &MainWindow::stopRun);
+    run->addSeparator();
+    run->addAction(tr("&Edit Configurations…"), this, &MainWindow::editRunConfigurations);
+    run->addSeparator();
+    run->addAction(tr("&Next Problem"), QKeySequence(Qt::Key_F2), this, [this] { goToProblem(true); });
+    run->addAction(tr("&Previous Problem"), QKeySequence(tr("Shift+F2")), this, [this] { goToProblem(false); });
+
+    runChooser_ = new QMenu(this);
+    connect(runChooser_, &QMenu::aboutToShow, this, [this] { fillRunMenu(runChooser_, false); });
+    // The configurations follow the project's files.
+    connect(editorTabs_, &EditorTabs::fileSaved, this, [this](const QString &path) {
+        if (QFileInfo(path) != QFileInfo(RunConfigurations::filePath(folder_)))
+            return;
+        QString error;
+        runner_->configurations(&error);
+        if (!error.isEmpty())
+            statusBar()->showMessage(error, statusMessageMs);
+        updateRunWidgets();
+    });
+    connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state == Qt::ApplicationActive)
+            updateRunWidgets();
+    });
+}
+
+void MainWindow::fillRunMenu(QMenu *menu, bool run)
+{
+    menu->clear();
+    QString error;
+    const QList<RunConfiguration> configurations = runner_->configurations(&error);
+    const std::optional<RunConfiguration> selected = runner_->selected();
+    // .duet/run.json's first, then the detected ones by kind.
+    const auto heading = [](const RunConfiguration &configuration) {
+        if (!configuration.detected)
+            return tr("Project");
+        switch (configuration.kind) {
+        case RunConfiguration::Kind::Build: return tr("Build");
+        case RunConfiguration::Kind::Test: return tr("Test");
+        case RunConfiguration::Kind::Run: break;
+        }
+        return tr("Run");
+    };
+    QString previous;
+    for (const RunConfiguration &configuration : configurations) {
+        if (heading(configuration) != previous) {
+            previous = heading(configuration);
+            RunConfigurationMenu::addHeading(menu, previous, theme_);
+        }
+        QAction *action = RunConfigurationMenu::addConfiguration(
+            menu, configuration, selected && selected->name == configuration.name,
+            runner_->isRunning(configuration.name), theme_);
+        connect(action, &QAction::triggered, this, [this, configuration, run] {
+            runner_->select(configuration.name);
+            if (run)
+                runConfiguration(configuration);
+        });
+    }
+    if (configurations.isEmpty())
+        RunConfigurationMenu::addNote(menu, tr("No configuration found in the project"), theme_);
+    if (!error.isEmpty())
+        RunConfigurationMenu::addNote(menu, error, theme_);
+    menu->addSeparator();
+    menu->addAction(UiIcons::icon(QStringLiteral("settings"), theme_.foreground), tr("&Edit Configurations…"), this,
+                    &MainWindow::editRunConfigurations);
+}
+
+void MainWindow::updateRunWidgets()
+{
+    if (!runner_ || !runAction_)
+        return;
+    const std::optional<RunConfiguration> selected = runner_->selected();
+    const bool any = !runner_->running().isEmpty();
+    stopAction_->setEnabled(any);
+    runAction_->setEnabled(selected.has_value());
+    buildAction_->setEnabled(runner_->buildConfiguration().has_value());
+    if (!selected) {
+        runAction_->setText(tr("&Run"));
+        stopAction_->setText(tr("&Stop"));
+        titleBar_->setRunConfiguration(UiIcons::icon(QStringLiteral("run"), theme_.mutedText), tr("Add Configuration"),
+                                       tr("No build file found: write the project's commands in .duet/run.json"),
+                                       runChooser_, false);
+        return;
+    }
+    const char *icons[] = {"build", "run", "test"};
+    const bool running = runner_->isRunning(selected->name);
+    runAction_->setText(running ? tr("&Rerun “%1”").arg(selected->name)
+                                : tr("&Run “%1”").arg(selected->name));
+    // stopRun() ends the selected configuration first.
+    stopAction_->setText(running ? tr("&Stop “%1”").arg(selected->name) : tr("&Stop"));
+    QString toolTip = selected->command;
+    if (!selected->folder.isEmpty())
+        toolTip += tr("\nin %1").arg(QDir::toNativeSeparators(selected->folder));
+    if (running)
+        toolTip += tr("\nRunning");
+    titleBar_->setRunConfiguration(
+        UiIcons::icon(QLatin1String(icons[static_cast<int>(selected->kind)]), running ? QColor("#4fa36b") : theme_.foreground),
+        selected->name, toolTip, runChooser_, running);
+}
+
+void MainWindow::runSelected()
+{
+    if (const std::optional<RunConfiguration> configuration = runner_->selected())
+        runConfiguration(*configuration);
+    else
+        editRunConfigurations();
+}
+
+void MainWindow::buildProject()
+{
+    if (const std::optional<RunConfiguration> configuration = runner_->buildConfiguration())
+        runConfiguration(*configuration);
+    else
+        statusBar()->showMessage(tr("No build configuration: add one in .duet/run.json"), statusMessageMs);
+}
+
+void MainWindow::runConfiguration(const RunConfiguration &configuration)
+{
+    // What runs is what the editor shows.
+    editorTabs_->saveAll();
+    TerminalWidget *previous = runner_->terminal(configuration.name);
+    if (previous && previous->isRunning())
+        previous->terminate();
+
+    auto *terminal = new TerminalWidget(terminalTabs_);
+    terminal->applyTheme(theme_);
+    int index = previous ? terminalTabs_->indexOf(previous) : -1;
+    if (index >= 0) {
+        terminalTabs_->removeTab(index);
+        previous->deleteLater();
+        index = terminalTabs_->insertTab(index, terminal, configuration.name);
+    } else {
+        index = terminalTabs_->addTab(terminal, configuration.name);
+    }
+    terminalTabs_->setTabToolTip(index, configuration.command);
+    const char *icons[] = {"build", "run", "test"};
+    setRunTabIcon(terminal, QLatin1String(icons[static_cast<int>(configuration.kind)]), {});
+    // Closing the tab ends the run.
+    connect(terminal, &QObject::destroyed, this, [this] { QTimer::singleShot(0, this, &MainWindow::updateRunWidgets); });
+
+    // The run's terminal comes to the front, whatever its kind.
+    terminalTabs_->setCurrentIndex(index);
+    updateTerminalPage();
+    setMode(Mode::Terminal);
+    terminal->setFocus();
+    runner_->start(configuration, terminal);
+}
+
+void MainWindow::setRunTabIcon(TerminalWidget *terminal, const QString &iconName, const QColor &color)
+{
+    terminal->setProperty("runIcon", iconName);
+    terminal->setProperty("runColor", color);
+    if (const int index = terminalTabs_->indexOf(terminal); index >= 0)
+        terminalTabs_->setTabIcon(index, UiIcons::icon(iconName, color.isValid() ? color : theme_.mutedText));
+}
+
+void MainWindow::onRunFinished(const RunConfiguration &configuration, int exitCode, int errors, int warnings)
+{
+    TerminalWidget *terminal = runner_->terminal(configuration.name);
+    const char *icons[] = {"build", "run", "test"};
+    const QString iconName = QLatin1String(icons[static_cast<int>(configuration.kind)]);
+    const bool failed = exitCode != 0;
+    if (terminal)
+        setRunTabIcon(terminal, iconName, exitCode == -1 ? QColor() : failed ? QColor("#e5534b") : QColor("#4fa36b"));
+
+    QStringList found;
+    if (errors > 0)
+        found.append(tr("%n error(s)", nullptr, errors));
+    if (warnings > 0)
+        found.append(tr("%n warning(s)", nullptr, warnings));
+    QString message;
+    if (exitCode == -1)
+        message = tr("“%1” stopped").arg(configuration.name);
+    else if (!failed)
+        message = found.isEmpty() ? tr("“%1” finished").arg(configuration.name)
+                                  : tr("“%1” finished: %2").arg(configuration.name, found.join(QStringLiteral(", ")));
+    else if (!found.isEmpty())
+        message = tr("“%1” failed: %2").arg(configuration.name, found.join(QStringLiteral(", ")));
+    else
+        message = tr("“%1” failed (exit code %2): F11 shows its output").arg(configuration.name).arg(exitCode);
+    statusBar()->showMessage(message, statusMessageMs);
+
+    if (exitCode != -1 && configuration.kind != RunConfiguration::Kind::Run) {
+        // A build or tests that went on out of sight.
+        if (mode_ == Mode::Edit && (errors > 0 || (failed && warnings > 0)))
+            sidebar_->showView(problemsView_);
+        else if (failed && terminal && mode_ != Mode::Terminal)
+            terminalTabs_->setCurrentWidget(terminal); // F11 shows it
+        if (!isActiveWindow())
+            QApplication::alert(this);
+    }
+    updateRunWidgets();
+}
+
+void MainWindow::stopRun()
+{
+    const QStringList running = runner_->running();
+    if (running.isEmpty())
+        return;
+    QString name = running.first();
+    const std::optional<RunConfiguration> selected = runner_->selected();
+    if (selected && running.contains(selected->name))
+        name = selected->name;
+    if (mode_ == Mode::Terminal) {
+        for (const QString &candidate : running) {
+            if (runner_->terminal(candidate) == terminalTabs_->currentWidget())
+                name = candidate;
+        }
+    }
+    runner_->stop(name);
+    statusBar()->showMessage(tr("Stopping “%1”… (Stop again to end it at once)").arg(name), statusMessageMs);
+}
+
+void MainWindow::editRunConfigurations()
+{
+    const QString path = RunConfigurations::filePath(folder_);
+    if (!QFileInfo::exists(path)) {
+        // Started from the chosen configuration, which it then replaces.
+        RunConfiguration example;
+        if (const std::optional<RunConfiguration> selected = runner_->selected()) {
+            example = *selected;
+        } else {
+            example.name = tr("Run");
+            example.command = QStringLiteral("echo Hello");
+        }
+        example.detected = false;
+        QDir().mkpath(QFileInfo(path).absolutePath());
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly)) {
+            QMessageBox::warning(this, tr("Edit Configurations"),
+                                 tr("Cannot create %1: %2").arg(QDir::toNativeSeparators(path), file.errorString()));
+            return;
+        }
+        file.write(RunConfigurations::serialize({example}));
+        file.close();
+        fileStatuses_->refresh();
+        statusBar()->showMessage(tr("A configuration of .duet/run.json replaces the detected one of the same name"),
+                                 statusMessageMs);
+    }
+    setMode(Mode::Edit);
+    editorTabs_->openFile(path);
+}
+
+void MainWindow::goToProblem(bool forward)
+{
+    EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
+    if (!editor || editor->diagnostics().isEmpty()) {
+        statusBar()->showMessage(tr("No problems in this file"), statusMessageMs);
+        return;
+    }
+    Diagnostics problems = editor->diagnostics();
+    std::sort(problems.begin(), problems.end(),
+              [](const Diagnostic &a, const Diagnostic &b) { return a.start < b.start; });
+    const int cursor = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const Diagnostic *target = nullptr;
+    if (forward) {
+        for (const Diagnostic &problem : problems) {
+            if (problem.start > cursor) {
+                target = &problem;
+                break;
+            }
+        }
+        if (!target)
+            target = &problems.first(); // around to the first
+    } else {
+        for (auto it = problems.crbegin(); it != problems.crend(); ++it) {
+            if (it->start < cursor) {
+                target = &*it;
+                break;
+            }
+        }
+        if (!target)
+            target = &problems.last();
+    }
+    int line = 0;
+    int index = 0;
+    editor->lineIndexFromPosition(target->start, &line, &index);
+    editor->setCursorPosition(line, index);
+    editor->ensureLineVisible(line);
+    editor->setFocus();
+    statusBar()->showMessage(target->message, statusMessageMs);
+}
+
 void MainWindow::createGitMenu()
 {
     QMenu *git = titleBar_->menuBar()->addMenu(tr("&Git"));
@@ -938,6 +1275,9 @@ void MainWindow::openFolder(const QString &folder)
     if (preferencesPopup_)
         preferencesPopup_->setInstalledServers(languageServers_->installed());
     updateToolsNotice();
+    problemStore_->clearBuildProblems();
+    problemsView_->setProjectFolder(folder_);
+    runner_->setProject(project_, toolchains_.get());
     goToPopup_->setFolder(folder_);
     fileStatuses_->setFolder(folder_);
     findInFiles_->setFolder(folder_);
@@ -1013,6 +1353,7 @@ void MainWindow::applyProject(const ProjectConfig &project)
         return; // another project's downloads, finished after a switch
     project_ = project;
     languageServers_->setProject(project_, toolchains_.get());
+    runner_->setProject(project_, toolchains_.get());
     warmUpLanguageServers();
     if (preferencesPopup_)
         preferencesPopup_->setInstalledServers(languageServers_->installed());
@@ -1071,7 +1412,7 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     }
     claudeTerminal_ = new TerminalWidget(terminalTabs_);
     claudeTerminal_->applyTheme(theme_);
-    claudeTerminal_->installEventFilter(this); // Escape interrupts the response
+    claudeTerminal_->installEventFilter(this); // Escape interrupts the response, Ctrl+C too
     connect(claudeTerminal_, &TerminalWidget::finished, &claudeActivity_, &ClaudeActivity::reset);
     claudeActivity_.reset();
     claudeStatus_ = {};
@@ -1174,6 +1515,7 @@ void MainWindow::setTheme(const QString &name)
     filesPanel_->setIconColor(theme_.foreground);
     claudeConfigView_->setDarkIcons(theme_.isDark);
     claudeConfigView_->setIconColor(theme_.foreground);
+    problemsView_->setDarkIcons(theme_.isDark);
     sidebar_->applyTheme(theme_);
     editorTabs_->applyTheme(theme_);
     for (int i = 0; i < terminalTabs_->count(); ++i) {
@@ -1415,11 +1757,21 @@ void MainWindow::updateTabIcons()
     sidebar_->setViewIcon(filesPanel_, UiIcons::icon(QStringLiteral("files"), color));
     sidebar_->setViewIcon(outlineView_, UiIcons::icon(QStringLiteral("outline"), color));
     sidebar_->setViewIcon(claudeConfigView_, UiIcons::icon(QStringLiteral("claude"), color));
+    sidebar_->setViewIcon(problemsView_, UiIcons::icon(QStringLiteral("problems"),
+                                                       problemsView_->errorCount() > 0     ? QColor("#e5534b")
+                                                       : problemsView_->warningCount() > 0 ? QColor("#d4a72c")
+                                                                                           : color));
     newTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     emptyNewTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     for (int i = 0; i < terminalTabs_->count(); ++i) {
-        if (terminalTabs_->widget(i) != claudeTerminal_) // its icon shows Claude's state
-            terminalTabs_->setTabIcon(i, UiIcons::icon(QStringLiteral("terminal"), color));
+        QWidget *terminal = terminalTabs_->widget(i);
+        if (terminal == claudeTerminal_)
+            continue; // its icon shows Claude's state
+        // A run's: its kind, colored by its outcome.
+        const QString runIcon = terminal->property("runIcon").toString();
+        const QColor runColor = terminal->property("runColor").value<QColor>();
+        terminalTabs_->setTabIcon(i, UiIcons::icon(runIcon.isEmpty() ? QStringLiteral("terminal") : runIcon,
+                                                   runColor.isValid() ? runColor : color));
     }
 }
 
@@ -1491,6 +1843,7 @@ void MainWindow::registerMcpTools()
     context.navigator = navigator_;
     context.symbols = symbolIndex_;
     context.languageServers = languageServers_;
+    context.problems = problemStore_;
     context.intelligence = intelligence_;
     context.git = gitCommands_;
     context.menus = titleBar_->menuBar();
@@ -1882,9 +2235,23 @@ void MainWindow::changeEvent(QEvent *event)
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == claudeTerminal_ && event->type() == QEvent::KeyPress
-        && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape)
-        claudeActivity_.interrupt();
+    if (watched == claudeTerminal_ && event->type() == QEvent::KeyPress) {
+        const auto *key = static_cast<QKeyEvent *>(event);
+#ifdef Q_OS_MACOS
+        const Qt::KeyboardModifiers control = Qt::MetaModifier; // the Control key; Cmd+C copies
+#else
+        const Qt::KeyboardModifiers control = Qt::ControlModifier;
+#endif
+        // Ctrl+C twice would quit Claude and leave the tab dead: it
+        // becomes Escape, which interrupts the response.
+        if (key->key() == Qt::Key_C && key->modifiers() == control) {
+            QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+            QCoreApplication::sendEvent(claudeTerminal_, &escape);
+            return true;
+        }
+        if (key->key() == Qt::Key_Escape)
+            claudeActivity_.interrupt();
+    }
     return QMainWindow::eventFilter(watched, event);
 }
 

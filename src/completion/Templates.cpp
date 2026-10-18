@@ -6,6 +6,8 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include <optional>
+
 #include <vector>
 
 namespace {
@@ -20,13 +22,17 @@ enum Language : unsigned {
 };
 
 // The body is a snippet: "§" stands for the expression, "¬" for its
-// negation, "¤" for a name suggested for its value; each tab is one
-// indentation step of the file.
+// negation, "¶" for its text in a string literal, "¤" for a name
+// suggested for its value; each tab is one indentation step of the file.
+// In live templates, "{{class}}", "{{method}}", "{{parameters}}" and
+// "{{variable}}" stand for the class and the method around, what prints
+// the method's parameters, and the variable declared last.
 struct Template {
     const char *key;
     unsigned languages;
     bool statement; // only where a statement starts
     const char *body;
+    const char *import = nullptr; // the class it uses, imported in Java
 };
 
 // The postfix templates of CLion (ReSharper C++) and IntelliJ.
@@ -84,6 +90,27 @@ const std::vector<Template> &postfixTemplates()
         {"co_await", Cpp, false, "co_await §"},
         {"co_yield", Cpp, false, "co_yield §"},
         {"await", Js, false, "await §"},
+        // IntelliJ IDEA's, for Java.
+        {"iter", Java, true, "for (var ${1:item} : §) {\n\t$0\n}"},
+        {"soutv", Java, true, "System.out.println(\"¶ = \" + §);"},
+        {"try", Java, true, "try {\n\t§;$0\n} catch (${1:Exception} e) {\n\tthrow new RuntimeException(e);\n}"},
+        {"synchronized", Java, true, "synchronized (§) {\n\t$0\n}"},
+        {"assert", Java, true, "assert §;$0"},
+        {"inst", Java, false, "§ instanceof ${1:Type} ${2:name}$0"},
+        {"instanceof", Java, false, "§ instanceof ${1:Type} ${2:name}$0"},
+        {"opt", Java, false, "Optional.ofNullable(§)", "java.util.Optional"},
+        {"stream", Java, false, "Arrays.stream(§)", "java.util.Arrays"},
+        {"reqnonnull", Java, false, "Objects.requireNonNull(§)", "java.util.Objects"},
+        {"lambda", Java, false, "() -> §"},
+        {"format", Java, false, "String.format(§, $0)"},
+        // WebStorm's, for JavaScript and TypeScript.
+        {"const", Js, true, "const ${1:¤} = §;$0"},
+        {"forof", Js, true, "for (const ${1:item} of §) {\n\t$0\n}"},
+        {"forin", Js, true, "for (const ${1:key} in §) {\n\t$0\n}"},
+        {"undefined", Js, true, "if (§ === undefined) {\n\t$0\n}"},
+        {"notundefined", Js, true, "if (§ !== undefined) {\n\t$0\n}"},
+        {"typeof", Js, false, "typeof §"},
+        {"instanceof", Js, false, "§ instanceof ${1:Type}$0"},
     };
     return templates;
 }
@@ -118,6 +145,30 @@ const std::vector<Template> &liveTemplates()
         {"psf", Java, true, "public static final $0"},
         {"prsf", Java, true, "private static final $0"},
         {"tryc", Java, true, "try {\n\t$0\n} catch (${1:Exception e}) {\n\t${2:throw new RuntimeException(e);}\n}"},
+        // More of IntelliJ IDEA's.
+        {"soutv", Java, true, "System.out.println(\"${1:{{variable}}} = \" + $1);$0"},
+        {"soutm", Java, true, "System.out.println(\"{{class}}.{{method}}\");$0"},
+        {"soutp", Java, true, "System.out.println({{parameters}});$0"},
+        {"itar", Java, true,
+         "for (int ${1:i} = 0; $1 < ${2:array}.length; $1++) {\n\t${3:var} ${4:element} = $2[$1];\n\t$0\n}"},
+        {"ritar", Java, true,
+         "for (int ${1:i} = ${2:array}.length - 1; $1 >= 0; $1--) {\n\t${3:var} ${4:element} = $2[$1];\n\t$0\n}"},
+        {"itli", Java, true,
+         "for (int ${1:i} = 0; $1 < ${2:list}.size(); $1++) {\n\t${3:var} ${4:element} = $2.get($1);\n\t$0\n}"},
+        {"itco", Java, true,
+         "for (Iterator<${3:Object}> ${2:iterator} = ${1:collection}.iterator(); $2.hasNext(); ) {\n\t$3 ${4:next} = "
+         "$2.next();\n\t$0\n}",
+         "java.util.Iterator"},
+        {"inst", Java, true, "if (${1:value} instanceof ${2:Type} ${3:name}) {\n\t$0\n}"},
+        {"lazy", Java, true, "if (${1:value} == null) {\n\t$1 = new ${2:Object}($3);\n}$0"},
+        {"mn", Java, true, "${1:value} = Math.min($1, ${2:other});$0"},
+        {"mx", Java, true, "${1:value} = Math.max($1, ${2:other});$0"},
+        {"lst", Java, false, "${1:array}[$1.length - 1]$0"},
+        {"toar", Java, false, "${1:list}.toArray(new ${2:Object}[0])$0"},
+        {"psfs", Java, true, "public static final String "},
+        {"psfi", Java, true, "public static final int "},
+        {"St", Java, false, "String "},
+        {"geti", Java, true, "public static {{class}} getInstance() {\n\treturn ${1:INSTANCE};\n}$0"},
         {"log", Js, true, "console.log($0);"},
         {"fori", Js, true, "for (let ${1:i} = 0; $1 < ${2:n}; $1++) {\n\t$0\n}"},
         {"iter", Js, true, "for (const ${2:item} of ${1:items}) {\n\t$0\n}"},
@@ -125,6 +176,13 @@ const std::vector<Template> &liveTemplates()
         {"arf", Js, false, "(${1}) => {\n\t$0\n}"},
         {"imp", Js, true, "import ${2:name} from '${1:module}';$0"},
         {"tryc", Js, true, "try {\n\t$0\n} catch (${1:error}) {\n}"},
+        // More of WebStorm's.
+        {"itar", Js, true,
+         "for (let ${1:i} = 0; $1 < ${2:array}.length; $1++) {\n\tconst ${3:element} = $2[$1];\n\t$0\n}"},
+        {"ritar", Js, true,
+         "for (let ${1:i} = ${2:array}.length - 1; $1 >= 0; $1--) {\n\tconst ${3:element} = $2[$1];\n\t$0\n}"},
+        {"forof", Js, true, "for (const ${2:item} of ${1:items}) {\n\t$0\n}"},
+        {"imn", Js, true, "import * as ${2:name} from '${1:module}';$0"},
     };
     return templates;
 }
@@ -224,6 +282,50 @@ CompletionItem itemOf(const Template &entry, const QString &snippet, const QStri
     item.detail = detail;
     item.documentation = kindLabel + QStringLiteral("\n\n") + Snippet::expand(snippet).text;
     return item;
+}
+
+// The import of `qualified` ("java.util.Optional") in a Java file, unless
+// it has it already (or the class is of java.lang or of its package).
+QList<TextEdit> javaImport(const QByteArray &text, const QString &qualified)
+{
+    const qsizetype dot = qualified.lastIndexOf(QLatin1Char('.'));
+    const QString package = qualified.left(dot);
+    if (package == QLatin1String("java.lang"))
+        return {};
+    const QString source = QString::fromUtf8(text);
+    static const QRegularExpression packageLine(QStringLiteral("^\\s*package\\s+([\\w.]+)\\s*;"),
+                                                QRegularExpression::MultilineOption);
+    const QRegularExpressionMatch own = packageLine.match(source);
+    if (own.hasMatch() && own.captured(1) == package)
+        return {};
+    const QRegularExpression imported(QStringLiteral("^\\s*import\\s+(?:%1|%2\\.\\*)\\s*;")
+                                          .arg(QRegularExpression::escape(qualified), QRegularExpression::escape(package)),
+                                      QRegularExpression::MultilineOption);
+    if (imported.match(source).hasMatch())
+        return {};
+    // After the last import, else after the package, else at the top.
+    static const QRegularExpression importLine(QStringLiteral("^\\s*import\\s+[\\w.*\\s]+;[^\\n]*$"),
+                                               QRegularExpression::MultilineOption);
+    qsizetype after = -1;
+    for (QRegularExpressionMatchIterator it = importLine.globalMatch(source); it.hasNext();)
+        after = it.next().capturedEnd();
+    const QString line = QStringLiteral("import %1;\n").arg(qualified);
+    if (after < 0 && own.hasMatch()) {
+        const int lineIndex = int(source.left(own.capturedEnd()).count(QLatin1Char('\n'))) + 1;
+        return {{lineIndex, 0, lineIndex, 0, QStringLiteral("\n") + line}};
+    }
+    if (after < 0)
+        return {{0, 0, 0, 0, line + QStringLiteral("\n")}};
+    const int lineIndex = int(source.left(after).count(QLatin1Char('\n'))) + 1;
+    return {{lineIndex, 0, lineIndex, 0, line}};
+}
+
+// The expression as the text of a string literal.
+QString quoted(const QString &expression)
+{
+    QString text = expression;
+    text.replace(QLatin1Char('\\'), QLatin1String("\\\\")).replace(QLatin1Char('"'), QLatin1String("\\\""));
+    return text.simplified();
 }
 
 } // namespace
@@ -472,6 +574,7 @@ void PostfixTemplateProvider::complete(const CompletionContext &context, const C
             QString snippet = CodeScan::indented(QString::fromUtf8(entry.body), candidate.indent, unit);
             const QString wrapped = candidate.compound ? QLatin1Char('(') + value + QLatin1Char(')') : value;
             snippet.replace(QChar(0x00AC), Snippet::escape(QLatin1Char('!') + wrapped));        // ¬
+            snippet.replace(QChar(0x00B6), Snippet::escape(quoted(value)));                     // ¶
             snippet.replace(QChar(0x00A7), Snippet::escape(operand ? wrapped : value));         // §
             snippet.replace(QChar(0x00A4), candidate.name);                                     // ¤
             return snippet;
@@ -487,6 +590,8 @@ void PostfixTemplateProvider::complete(const CompletionContext &context, const C
         CompletionItem item = itemOf(entry, fill(nearest, nearest.expression), fill(nearest, QStringLiteral("expr")),
                                      postfix, 3);
         item.replaceStart = nearest.start;
+        if (entry.import)
+            item.additionalEdits = javaImport(context.text, QString::fromLatin1(entry.import));
         if (fitting.size() > 1) {
             for (const Candidate *candidate : fitting) {
                 QString label = candidate->expression.simplified();
@@ -501,6 +606,73 @@ void PostfixTemplateProvider::complete(const CompletionContext &context, const C
 }
 
 // LiveTemplateProvider
+
+namespace {
+
+// What a template says of where it is written.
+struct Surroundings {
+    QString className;       // of the class around
+    CodeScan::Function method; // the function around, an empty name if none
+    QString variable;        // the variable declared last before, "value" if none
+};
+
+Surroundings surroundings(const QByteArray &text, int position)
+{
+    Surroundings result;
+    const QByteArray blanked = CodeScan::blank(text.left(position));
+    int bodyStart = std::max(0, position - maxExpressionBytes);
+    for (int brace = CodeScan::enclosingBrace(blanked, position); brace >= 0;
+         brace = CodeScan::enclosingBrace(blanked, brace)) {
+        const CodeScan::ClassHeader header = CodeScan::classAt(blanked, brace);
+        if (!header.name.isEmpty()) {
+            result.className = header.name;
+            break;
+        }
+        if (result.method.name.isEmpty()) {
+            const int start = CodeScan::headerStart(blanked, brace);
+            const CodeScan::Function function =
+                CodeScan::parseFunction(QString::fromUtf8(blanked.mid(start, brace - start)).trimmed());
+            static const QSet<QString> statements = {"if", "for", "while", "switch", "catch", "synchronized", "try"};
+            if (!function.name.isEmpty() && !statements.contains(function.name)) {
+                result.method = function;
+                bodyStart = std::max(bodyStart, brace + 1);
+            }
+        }
+    }
+    // "Type name =", "Type name;", "for (Type name :": the last one.
+    static const QRegularExpression declaration(
+        QStringLiteral("\\b([A-Za-z_][\\w.]*(?:<[^;{}()=]*>)?(?:\\[\\])*)\\s+([A-Za-z_]\\w*)\\s*(?:=(?!=)|;|:(?!:))"));
+    static const QSet<QString> notTypes = {"return", "new", "throw", "else", "case", "package", "import", "yield"};
+    const QString body = QString::fromUtf8(blanked.mid(bodyStart, position - bodyStart));
+    for (QRegularExpressionMatchIterator it = declaration.globalMatch(body); it.hasNext();) {
+        const QRegularExpressionMatch match = it.next();
+        if (!notTypes.contains(match.captured(1)))
+            result.variable = match.captured(2);
+    }
+    if (result.variable.isEmpty()) {
+        const QList<CodeScan::Parameter> parameters = result.method.parameterList();
+        if (!parameters.isEmpty())
+            result.variable = parameters.last().name;
+    }
+    if (result.variable.isEmpty())
+        result.variable = QStringLiteral("value");
+    return result;
+}
+
+// What prints the parameters of `function`: "\"a = \" + a + \", b = \" + b".
+QString printedParameters(const CodeScan::Function &function)
+{
+    QStringList parts;
+    for (const CodeScan::Parameter &parameter : function.parameterList()) {
+        if (parameter.name.isEmpty())
+            continue;
+        parts.append(QStringLiteral("\"%1%2 = \" + %2").arg(parts.isEmpty() ? QString() : QStringLiteral(", "),
+                                                           parameter.name));
+    }
+    return parts.isEmpty() ? QStringLiteral("\"\"") : parts.join(QStringLiteral(" + "));
+}
+
+} // namespace
 
 bool LiveTemplateProvider::handles(const CompletionContext &context) const
 {
@@ -519,12 +691,28 @@ void LiveTemplateProvider::complete(const CompletionContext &context, const Call
     const QString indent = CodeScan::lineIndent(context.text, context.prefixStart);
     const QString unit = CodeScan::indentUnit(context.text);
     const QString live = QObject::tr("Live template");
+    std::optional<Surroundings> around; // read for the first template that needs it
     for (const Template &entry : liveTemplates()) {
         if (!(entry.languages & language) || (entry.statement && !statement))
             continue;
-        const QString snippet = CodeScan::indented(QString::fromUtf8(entry.body), indent, unit);
+        QString snippet = CodeScan::indented(QString::fromUtf8(entry.body), indent, unit);
+        if (snippet.contains(QLatin1String("{{"))) {
+            if (!around)
+                around = surroundings(context.text, context.prefixStart);
+            if (snippet.contains(QLatin1String("{{class}}")) && around->className.isEmpty())
+                continue;
+            if (snippet.contains(QLatin1String("{{method}}")) && around->method.name.isEmpty())
+                continue;
+            snippet.replace(QLatin1String("{{class}}"), Snippet::escape(around->className))
+                .replace(QLatin1String("{{method}}"), Snippet::escape(around->method.name))
+                .replace(QLatin1String("{{parameters}}"), Snippet::escape(printedParameters(around->method)))
+                .replace(QLatin1String("{{variable}}"), Snippet::escape(around->variable));
+        }
         // Below the keyword of the same name ("for").
-        items.append(itemOf(entry, snippet, snippet, live, 1));
+        CompletionItem item = itemOf(entry, snippet, snippet, live, 1);
+        if (entry.import)
+            item.additionalEdits = javaImport(context.text, QString::fromLatin1(entry.import));
+        items.append(item);
     }
     done(items, false);
 }

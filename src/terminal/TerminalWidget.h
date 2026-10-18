@@ -32,6 +32,10 @@ public:
     bool start(const ProcessSpec &spec);
     QString errorString() const { return errorString_; }
     bool isRunning() const { return running_; }
+    // Ctrl+C, as typed: the program is asked to stop.
+    void interrupt();
+    // Ends the program at once (the terminal hangs up).
+    void terminate();
 
     void applyTheme(const Theme &theme);
     // Types `text` as a paste (bracketed if the program asked for it).
@@ -52,12 +56,16 @@ public:
 
 signals:
     void titleChanged(const QString &title);
+    // The program's raw output, escapes included.
+    void outputReceived(const QByteArray &data);
+    // -1 after terminate().
     void finished(int exitCode);
 
 protected:
     bool event(QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void inputMethodEvent(QInputMethodEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
@@ -72,6 +80,7 @@ private:
     void onProcessFinished(int exitCode);
     void onScreenChanged();
     void updateGridSize();
+    void scheduleGridUpdate();
     // Rebuilds the fonts and the cell size from the theme font and zoom_.
     void applyFont();
     void updateScrollBar();
@@ -101,6 +110,7 @@ private:
     std::array<QFont, 16> fonts_;
     QFont baseFont_;
     int zoom_ = 0; // points added to the theme font by Ctrl+wheel
+    int wheelRemainder_ = 0; // eighths of a degree not yet sent as a notch
     QSize cellSize_{8, 16};
     int ascent_ = 12;
     QColor foreground_;
@@ -109,6 +119,7 @@ private:
     int scrollOffset_ = 0; // history lines shown above the screen
     bool updatingScrollBar_ = false; // the bar follows scrollOffset_, not the reverse
     bool selecting_ = false;
+    bool gridUpdatePending_ = false;
     QPoint selectionAnchor_{-1, 0};
     QPoint selectionEnd_{-1, 0};
 

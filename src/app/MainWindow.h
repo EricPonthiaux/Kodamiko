@@ -38,6 +38,8 @@ class NoticeBar;
 class OutlineView;
 class PreferencesPopup;
 class PrerequisitesDialog;
+class ProblemStore;
+class ProblemsView;
 class ProjectSettingsPopup;
 class QAction;
 class QActionGroup;
@@ -49,6 +51,7 @@ class QTabBar;
 class QTabWidget;
 class QToolButton;
 class RepositoryWatcher;
+class Runner;
 class SidePanel;
 class SnapshotsPopup;
 class SymbolIndex;
@@ -58,6 +61,7 @@ class Toolchains;
 class WindowFrame;
 struct Preferences;
 struct ProcessSpec;
+struct RunConfiguration;
 
 // Main window with four full-screen modes, chosen with the tabs at the
 // bottom right: Terminal, Edit (Files / Outline / Claude panel | editor
@@ -91,6 +95,7 @@ private:
     void createGitMenu();
     void createEditMenu();
     void createNavigateMenu();
+    void createRunMenu();
     void createHelpMenu();
     void restoreSettings();
 
@@ -113,6 +118,27 @@ private:
     void showClaudeSession();
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);
+    // Runs `configuration` in its terminal tab (the one of its last run,
+    // replaced), after saving the files. A build runs out of sight, the
+    // Problems pane shows what it found; the others show their terminal.
+    void runConfiguration(const RunConfiguration &configuration);
+    void runSelected();
+    void buildProject();
+    // Stops the run in front of the user, else the chosen configuration's,
+    // else the last started.
+    void stopRun();
+    void onRunFinished(const RunConfiguration &configuration, int exitCode, int errors, int warnings);
+    // Opens .duet/run.json, created from the chosen configuration.
+    void editRunConfigurations();
+    // The configurations in `menu`: choosing one selects it, and runs it
+    // when `run`.
+    void fillRunMenu(QMenu *menu, bool run);
+    // The title bar's run chip and the Run and Stop commands.
+    void updateRunWidgets();
+    // The icon of a run's terminal tab, of its kind, colored by its outcome.
+    void setRunTabIcon(TerminalWidget *terminal, const QString &iconName, const QColor &color);
+    // F2 / Shift+F2: the next or previous problem of the current file.
+    void goToProblem(bool forward);
     // "dark", "purple" or "light" (see Theme::all), applied everywhere.
     void setTheme(const QString &name);
     static QString savedThemeName();
@@ -234,6 +260,13 @@ private:
     CodeNavigator *navigator_ = nullptr;
     CodeIntelligence *intelligence_ = nullptr;
     OutlineView *outlineView_ = nullptr;
+    ProblemStore *problemStore_ = nullptr;
+    ProblemsView *problemsView_ = nullptr;
+    Runner *runner_ = nullptr;
+    QMenu *runChooser_ = nullptr; // the title bar chip's menu
+    QAction *runAction_ = nullptr;
+    QAction *buildAction_ = nullptr;
+    QAction *stopAction_ = nullptr;
     ClaudeConfigView *claudeConfigView_ = nullptr;
     SidePanel *sidebar_ = nullptr;
     QTabWidget *terminalTabs_ = nullptr;

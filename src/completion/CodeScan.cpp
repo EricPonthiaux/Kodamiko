@@ -280,6 +280,16 @@ bool startsStatement(const QByteArray &text, int at, bool labels)
     return labels && text[i] == ':' && !(i > 0 && text[i - 1] == ':');
 }
 
+bool inModulePath(const QByteArray &text, int position)
+{
+    if (position <= 0 || position > text.size())
+        return false;
+    const int lineStart = int(text.lastIndexOf('\n', position - 1)) + 1;
+    static const QRegularExpression opened(
+        QStringLiteral("(?:\\bfrom|\\bimport|\\b(?:require|import)\\s*\\()\\s*['\"][^'\"]*$"));
+    return opened.match(QString::fromUtf8(text.mid(lineStart, position - lineStart))).hasMatch();
+}
+
 QStringList splitTopLevel(const QString &text, QChar separator)
 {
     QStringList parts;
@@ -376,8 +386,9 @@ Parameter parseParameter(const QString &text, bool typed)
         --start;
     const QString name = rest.mid(start, end - start);
     const QString before = rest.left(start).trimmed();
-    static const QSet<QString> qualifiersOnly = {"const", "volatile", "unsigned", "signed", "struct", "class",
-                                                 "enum", "typename", "final", "long", "short"};
+    // Words that need a type after them; "unsigned count", "long amount"
+    // are named.
+    static const QSet<QString> qualifiersOnly = {"const", "volatile", "struct", "class", "enum", "typename", "final"};
     if (name.isEmpty() || before.isEmpty() || typeWords().contains(name) || qualifiersOnly.contains(before)
         || before.endsWith(QLatin1String("::"))) {
         parameter.type = declaration; // a type alone: "int", "const Foo &"

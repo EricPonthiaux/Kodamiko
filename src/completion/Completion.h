@@ -102,6 +102,9 @@ struct CompletionContext {
     // Inside a documentation comment ("/** ... */", "///"): only the
     // providers that serve comments are asked.
     bool inDocComment = false;
+    // In the module name of an import ("from './|'", "require('|')"):
+    // only the providers that serve module paths are asked.
+    bool inModulePath = false;
     // Extended completion: the text of the other open files of the
     // language.
     QList<QByteArray> otherTexts;
@@ -127,6 +130,9 @@ public:
     // Whether it serves documentation comments (tags, parameter names);
     // those that do serve nothing else.
     virtual bool servesComments() const { return false; }
+    // Whether it serves the module names of imports (a language server
+    // knows the files and packages).
+    virtual bool servesModulePaths() const { return false; }
     // Whether it takes part in smart completion, offering only what has
     // the expected type.
     virtual bool servesSmart() const { return false; }

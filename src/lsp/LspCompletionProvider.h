@@ -20,12 +20,17 @@ public:
     // Smart completion: the candidates of the expected type, asked from
     // the server's signature help inside a call's arguments.
     bool servesSmart() const override { return true; }
+    // The files and packages of "from '|'".
+    bool servesModulePaths() const override { return true; }
 
     // Candidates of a "textDocument/completion" result (a list, or an
     // object with "items" and "isIncomplete"). With `client`, the
     // candidates without edits can ask for them once chosen
-    // ("completionItem/resolve"). Public for tests.
-    static QList<CompletionItem> parse(const QJsonValue &result, bool *incomplete, LspClient *client = nullptr);
+    // ("completionItem/resolve"). With `context`, a candidate whose edit
+    // starts before the typed prefix replaces from there (tsserver's "?."
+    // for ".", a scoped package "@scope/name"). Public for tests.
+    static QList<CompletionItem> parse(const QJsonValue &result, bool *incomplete, LspClient *client = nullptr,
+                                       const CompletionContext *context = nullptr);
     static QList<TextEdit> parseEdits(const QJsonArray &edits);
     // The type of the active parameter in a "textDocument/signatureHelp"
     // result, empty if none. Public for tests.

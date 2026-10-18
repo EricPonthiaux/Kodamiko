@@ -11,6 +11,7 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QScrollBar>
+#include <QTimer>
 
 #include <algorithm>
 #include <cmath>
@@ -103,6 +104,7 @@ bool TerminalWidget::start(const ProcessSpec &spec)
 {
     pty_ = createPty();
     connect(pty_.get(), &IPty::dataReceived, screen_.get(), &VtScreen::feed);
+    connect(pty_.get(), &IPty::dataReceived, this, &TerminalWidget::outputReceived);
     connect(screen_.get(), &VtScreen::outputReady, pty_.get(), &IPty::write);
     connect(pty_.get(), &IPty::finished, this, &TerminalWidget::onProcessFinished);
 
@@ -112,6 +114,22 @@ bool TerminalWidget::start(const ProcessSpec &spec)
         screen_->feed(QStringLiteral("\x1b[31m%1\x1b[0m\r\n").arg(errorString_).toUtf8());
     }
     return running_;
+}
+
+void TerminalWidget::interrupt()
+{
+    if (running_)
+        pty_->write(QByteArrayLiteral("\x03"));
+}
+
+void TerminalWidget::terminate()
+{
+    if (!running_)
+        return;
+    running_ = false;
+    pty_.reset();
+    screen_->feed(QByteArrayLiteral("\r\n\x1b[2m[Process stopped]\x1b[0m\r\n"));
+    emit finished(-1);
 }
 
 void TerminalWidget::applyTheme(const Theme &theme)
@@ -175,6 +193,10 @@ void TerminalWidget::onScreenChanged()
 
 void TerminalWidget::updateGridSize()
 {
+    // A hidden tab has a placeholder size: its output would wrap at a dozen
+    // columns. The grid follows the size it is shown at.
+    if (!isVisible())
+        return;
     const int columns = std::max(2, viewport()->width() / cellSize_.width());
     const int rows = std::max(1, viewport()->height() / cellSize_.height());
     if (columns == screen_->columns() && rows == screen_->rows())
@@ -264,7 +286,26 @@ bool TerminalWidget::focusNextPrevChild(bool)
 void TerminalWidget::resizeEvent(QResizeEvent *event)
 {
     QAbstractScrollArea::resizeEvent(event);
-    updateGridSize();
+    scheduleGridUpdate();
+}
+
+void TerminalWidget::showEvent(QShowEvent *event)
+{
+    QAbstractScrollArea::showEvent(event);
+    scheduleGridUpdate();
+}
+
+void TerminalWidget::scheduleGridUpdate()
+{
+    // Once the layout settles: a page being shown passes through sizes that
+    // would cut its lines.
+    if (gridUpdatePending_)
+        return;
+    gridUpdatePending_ = true;
+    QTimer::singleShot(0, this, [this] {
+        gridUpdatePending_ = false;
+        updateGridSize();
+    });
 }
 
 void TerminalWidget::paintEvent(QPaintEvent *event)
@@ -473,6 +514,17 @@ void TerminalWidget::wheelEvent(QWheelEvent *event)
                 applyFont();
             }
         }
+        event->accept();
+        return;
+    }
+    if (screen_->isMouseReporting() && !(event->modifiers() & Qt::ShiftModifier)) {
+        // The program scrolls itself; Shift+wheel keeps Duet's history.
+        wheelRemainder_ += event->angleDelta().y();
+        const int notches = wheelRemainder_ / 120;
+        wheelRemainder_ -= notches * 120;
+        const QPoint cell = cellAt(event->position().toPoint());
+        for (int i = 0; i < std::abs(notches); ++i)
+            screen_->sendWheel(cell.y() + scrollOffset_, cell.x(), notches > 0, event->modifiers());
         event->accept();
         return;
     }

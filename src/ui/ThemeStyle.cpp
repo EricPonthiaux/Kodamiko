@@ -94,7 +94,8 @@ QTabBar::tab { background: transparent; color: @muted; padding: 8px 16px; border
 QTabBar::tab:hover { color: @text; background: @panel; }
 QTabBar::tab:selected { color: @accentText; background: @base; border-bottom: 2px solid @accent; }
 QTabBar::tab:bottom:selected { border-bottom: none; border-top: 2px solid @accent; }
-QWidget#sideStrip { background: @window; border-right: 1px solid @line; }
+QWidget#sideStrip { background: @window; border-right: 1px solid @border; }
+QWidget#viewToolbar { background: @window; border-bottom: 1px solid @border; }
 QTabBar#sideTabs { background: transparent; }
 QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 3px; border-radius: 6px; color: @muted; }
 QTabBar#sideTabs::tab:hover { background: @hover; color: @text; }

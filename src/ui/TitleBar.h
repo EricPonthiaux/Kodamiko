@@ -51,6 +51,12 @@ public:
     // Buttons at the right, before the window controls, with one of the
     // UiIcons (drawn in the theme's colors).
     void addActionButton(QAction *action, const QString &iconName);
+    // The run configuration chip (its menu chooses one), followed by one
+    // button: Run while the configuration is stopped, Stop while it runs.
+    // Hidden while `name` is empty.
+    void setRunConfiguration(const QIcon &icon, const QString &name, const QString &toolTip, QMenu *menu,
+                             bool running);
+    void setRunActions(QAction *run, QAction *stop);
 
     // Window controls (frameless window); otherwise the system draws them.
     void setWindowControlsVisible(bool visible);
@@ -71,6 +77,8 @@ protected:
 
 private:
     QToolButton *addChip();
+    // `color` defaults to the theme's foreground.
+    QToolButton *actionButton(QAction *action, const QString &iconName, const QColor &color = {});
     void toggleMaximized();
     void updateMaximizeButton();
 
@@ -80,8 +88,18 @@ private:
     QMenuBar *menuBar_;
     QToolButton *project_;
     QToolButton *claude_;
+    QToolButton *run_;
+    QHBoxLayout *runActions_;
+    QToolButton *runButton_ = nullptr;
+    QToolButton *stopButton_ = nullptr;
+    bool running_ = false;
     QHBoxLayout *actions_;
-    QList<QPair<QToolButton *, QString>> actionButtons_;
+    struct ActionButton {
+        QToolButton *button;
+        QString iconName;
+        QColor color;
+    };
+    QList<ActionButton> actionButtons_;
     WindowButton *minimize_;
     WindowButton *maximize_;
     WindowButton *close_;

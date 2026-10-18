@@ -45,6 +45,8 @@ add_library(duet_core STATIC
     completion/Templates.cpp
     diagnostics/JsonSchema.cpp
     diagnostics/JsonTree.cpp
+    diagnostics/ProblemStore.cpp
+    diagnostics/ProblemsView.cpp
     editor/ChangeGutter.cpp
     editor/CodeColorizer.cpp
     editor/CodeFormatter.cpp
@@ -54,7 +56,7 @@ add_library(duet_core STATIC
     editor/FileWatcher.cpp
     editor/FindBar.cpp
     editor/MarkdownHtml.cpp
-    editor/MarkdownView.cpp
+    editor/PreviewPage.cpp
     editor/TextFile.cpp
     git/Branches.cpp
     git/CommitLog.cpp
@@ -89,6 +91,10 @@ add_library(duet_core STATIC
     projects/ProjectConfig.cpp
     projects/ProjectDetector.cpp
     projects/ProjectStore.cpp
+    run/BuildOutputParser.cpp
+    run/RunConfiguration.cpp
+    run/RunConfigurationMenu.cpp
+    run/Runner.cpp
     search/FindInFiles.cpp
     search/FindInFilesPopup.cpp
     settings/Keymap.cpp

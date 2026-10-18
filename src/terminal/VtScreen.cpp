@@ -268,6 +268,14 @@ bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &
 // Bracketed paste (if the program requested it) lets it tell a paste apart
 // from typing: Claude Code does not submit a pasted prompt that contains
 // line breaks.
+void VtScreen::sendWheel(int row, int column, bool up, Qt::KeyboardModifiers modifiers)
+{
+    const VTermModifier modifier = toVTermModifier(modifiers);
+    vterm_mouse_move(terminal_, row, column, modifier);
+    // Buttons 4 and 5: the wheel, a press without release.
+    vterm_mouse_button(terminal_, up ? 4 : 5, true, modifier);
+}
+
 void VtScreen::paste(const QString &text)
 {
     vterm_keyboard_start_paste(terminal_);
@@ -346,6 +354,9 @@ int VtScreen::onSetTermProp(VTermProp property, VTermValue *value, void *user)
         break;
     case VTERM_PROP_ALTSCREEN:
         self->alternateScreen_ = value->boolean;
+        break;
+    case VTERM_PROP_MOUSE:
+        self->mouseReporting_ = value->number != VTERM_PROP_MOUSE_NONE;
         break;
     case VTERM_PROP_TITLE: {
         // The title may arrive in several fragments.

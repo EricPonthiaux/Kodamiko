@@ -188,6 +188,21 @@ private slots:
         QCOMPARE(output, QByteArray("\x1b[200~a\rb\x1b[201~"));
     }
 
+    void sendsTheWheelWhenTheProgramAsks()
+    {
+        VtScreen screen(5, 20);
+        QByteArray output;
+        connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
+        QVERIFY(!screen.isMouseReporting());
+        screen.feed("\x1b[?1000h\x1b[?1006h"); // mouse events, SGR encoding
+        QVERIFY(screen.isMouseReporting());
+        screen.sendWheel(2, 3, true, Qt::NoModifier);
+        screen.sendWheel(2, 3, false, Qt::NoModifier);
+        QCOMPARE(output, QByteArray("\x1b[<64;4;3M\x1b[<65;4;3M"));
+        screen.feed("\x1b[?1000l");
+        QVERIFY(!screen.isMouseReporting());
+    }
+
     // A real program in a real PTY: its output arrives and its exit is reported.
     void runsAProgramInAPty()
     {

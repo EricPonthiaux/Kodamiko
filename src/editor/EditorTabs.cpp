@@ -3,7 +3,7 @@
 #include "ChangeGutter.h"
 #include "CodeFormatter.h"
 #include "EditorWidget.h"
-#include "MarkdownView.h"
+#include "PreviewPage.h"
 #include "ui/UiIcons.h"
 #include "viewers/ImageView.h"
 #include "workspace/FileIcons.h"
@@ -15,6 +15,7 @@
 #include <QFileInfo>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPointer>
 #include <QTabBar>
 
@@ -31,6 +32,19 @@ EditorTabs::EditorTabs(const Theme &theme, QWidget *parent)
     tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(tabBar(), &QWidget::customContextMenuRequested, this, &EditorTabs::showTabContextMenu);
     connect(&watcher_, &FileWatcher::fileChanged, this, &EditorTabs::syncWithDisk);
+}
+
+void EditorTabs::paintEvent(QPaintEvent *event)
+{
+    QTabWidget::paintEvent(event);
+    if (count() == 0)
+        return;
+    // A line under the tabs, the whole width: the page starts below. The
+    // tabs are transparent but the current one, which has its own line.
+    QPainter painter(this);
+    painter.setPen(palette().color(QPalette::Mid));
+    const int y = tabBar()->geometry().bottom();
+    painter.drawLine(0, y, width(), y);
 }
 
 QWidget *EditorTabs::openFile(const QString &path)
@@ -72,12 +86,12 @@ QWidget *EditorTabs::openFile(const QString &path)
     }
     emit editorOpened(editor);
 
-    // A Markdown file opens with its preview.
+    // A Markdown or HTML file opens with its preview.
     QWidget *page = editor;
-    if (MarkdownPage::isMarkdownFile(absolutePath)) {
-        auto *markdown = new MarkdownPage(editor, theme_, this);
-        connect(markdown, &MarkdownPage::openFileRequested, this, [this](const QString &path) { openFile(path); });
-        page = markdown;
+    if (PreviewPage::hasPreview(absolutePath)) {
+        auto *previewed = new PreviewPage(editor, theme_, this);
+        connect(previewed, &PreviewPage::openFileRequested, this, [this](const QString &path) { openFile(path); });
+        page = previewed;
     }
     const int index = addTab(page, QFileInfo(absolutePath).fileName());
     updateTabIcon(page);
@@ -211,8 +225,8 @@ EditorWidget *EditorTabs::currentEditor() const
 
 EditorWidget *EditorTabs::editorIn(QWidget *page)
 {
-    if (auto *markdown = qobject_cast<MarkdownPage *>(page))
-        return markdown->editor();
+    if (auto *previewed = qobject_cast<PreviewPage *>(page))
+        return previewed->editor();
     return qobject_cast<EditorWidget *>(page);
 }
 
@@ -227,8 +241,8 @@ QWidget *EditorTabs::pageOf(EditorWidget *editor) const
 
 void EditorTabs::revealEditor(EditorWidget *editor)
 {
-    if (auto *markdown = qobject_cast<MarkdownPage *>(pageOf(editor)))
-        markdown->revealEditor();
+    if (auto *previewed = qobject_cast<PreviewPage *>(pageOf(editor)))
+        previewed->revealEditor();
 }
 
 EditorWidget *EditorTabs::editorFor(const QString &path) const
@@ -765,8 +779,8 @@ void EditorTabs::applyTheme(const Theme &theme)
     for (int i = 0; i < count(); ++i)
         updateTabIcon(widget(i));
     for (int i = 0; i < count(); ++i) {
-        if (auto *markdown = qobject_cast<MarkdownPage *>(widget(i)))
-            markdown->applyTheme(theme);
+        if (auto *previewed = qobject_cast<PreviewPage *>(widget(i)))
+            previewed->applyTheme(theme);
         else if (auto *editor = qobject_cast<EditorWidget *>(widget(i)))
             editor->applyTheme(theme);
         else if (auto *image = qobject_cast<ImageView *>(widget(i)))

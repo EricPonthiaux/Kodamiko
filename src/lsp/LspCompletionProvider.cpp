@@ -59,6 +59,24 @@ CompletionItem::Kind kindOf(int lspKind)
     return Kind::Text;
 }
 
+// Where a candidate's edit starts, in bytes of the context's text, when on
+// the cursor's line before the typed prefix; else -1.
+int editStart(const QJsonObject &edit, const CompletionContext &context)
+{
+    // A range, or an insert-replace edit's "insert" range.
+    const QJsonObject range = edit.contains("range") ? edit.value("range").toObject() : edit.value("insert").toObject();
+    const QJsonObject start = range.value("start").toObject();
+    if (start.isEmpty() || start.value("line").toInt() != context.line)
+        return -1;
+    const int column = start.value("character").toInt();
+    if (column >= context.column)
+        return -1;
+    const int lineStart = int(context.text.lastIndexOf('\n', context.position - 1)) + 1;
+    const int at = lineStart
+                 + int(QString::fromUtf8(context.text.mid(lineStart, context.position - lineStart)).left(column).toUtf8().size());
+    return at < context.prefixStart ? at : -1;
+}
+
 } // namespace
 
 LspCompletionProvider::LspCompletionProvider(LanguageServers *servers)
@@ -91,7 +109,8 @@ QList<TextEdit> LspCompletionProvider::parseEdits(const QJsonArray &edits)
     return result;
 }
 
-QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, bool *incomplete, LspClient *client)
+QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, bool *incomplete, LspClient *client,
+                                                   const CompletionContext *context)
 {
     // Only a server that resolves items is asked to.
     const bool resolves =
@@ -168,6 +187,8 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, boo
         item.insertText = insert.isEmpty() || insert == name ? QString() : insert;
         item.isSnippet = lsp.value("insertTextFormat").toInt() == 2 && !item.insertText.isEmpty();
         item.order = rank;
+        if (context)
+            item.replaceStart = editStart(lsp.value("textEdit").toObject(), *context);
         item.additionalEdits = parseEdits(lsp.value("additionalTextEdits").toArray());
         if (resolves && item.additionalEdits.isEmpty()) {
             item.resolveEdits = [server, lsp](const CompletionItem::EditsCallback &done) {
@@ -284,14 +305,14 @@ void LspCompletionProvider::request(LspClient *client, const CompletionContext &
     const bool afterNew = before >= 3 && context.text.mid(before - 3, 3) == "new"
                        && (before == 3 || !CodeScan::isIdentifierByte(context.text[before - 4]));
     client->request(QStringLiteral("textDocument/completion"), params,
-                    [done, smart, expectedType, afterNew, server = QPointer<LspClient>(client)](const QJsonValue &result,
-                                                                                               const QString &error) {
+                    [done, smart, expectedType, afterNew, context,
+                     server = QPointer<LspClient>(client)](const QJsonValue &result, const QString &error) {
                         if (!error.isEmpty()) {
                             done({}, false);
                             return;
                         }
                         bool incomplete = false;
-                        QList<CompletionItem> items = parse(result, &incomplete, server);
+                        QList<CompletionItem> items = parse(result, &incomplete, server, &context);
                         if (smart) {
                             items.removeIf([&](const CompletionItem &item) {
                                 return !ExpectedType::accepts(expectedType, item, afterNew);

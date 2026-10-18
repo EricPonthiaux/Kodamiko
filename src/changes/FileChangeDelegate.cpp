@@ -1,6 +1,7 @@
 #include "FileChangeDelegate.h"
 
 #include "git/ChangeKindStyle.h"
+#include "git/FilePatch.h"
 #include "workspace/FileIcons.h"
 
 #include <QApplication>
@@ -40,6 +41,12 @@ void FileChangeDelegate::setChange(QTreeWidgetItem *item, const FileChange &chan
     item->setToolTip(0, changeLabel(change) + QLatin1Char('\n') + changeStatusText(change));
 }
 
+void FileChangeDelegate::setStats(QTreeWidgetItem *item, const FilePatch &patch)
+{
+    item->setData(0, AddedRole, patch.addedLines());
+    item->setData(0, RemovedRole, patch.removedLines());
+}
+
 void FileChangeDelegate::setSection(QTreeWidgetItem *item, const QString &title, int count)
 {
     item->setText(0, title);
@@ -62,6 +69,9 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     const QWidget *widget = option.widget;
     QStyle *style = widget ? widget->style() : QApplication::style();
     const bool selected = option.state & QStyle::State_Selected;
+    // Selected in the active window, the row is on the accent: white text.
+    // Otherwise its background is a soft gray and the text keeps its colors.
+    const bool onAccent = selected && (option.state & QStyle::State_Active);
     const QRect rect = option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0);
 
     painter->save();
@@ -81,7 +91,7 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         font.setWeight(QFont::DemiBold);
         font.setLetterSpacing(QFont::PercentageSpacing, 108);
         painter->setFont(font);
-        painter->setPen(muted(option, selected));
+        painter->setPen(muted(option, onAccent));
         const QFontMetrics metrics(font);
         const QRect text(rect.left(), rect.bottom() - metrics.height() - 4, rect.width(), metrics.height());
         const QString title = item.text;
@@ -95,7 +105,7 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         painter->setPen(Qt::NoPen);
         painter->setBrush(bubbleColor);
         painter->drawRoundedRect(bubble, bubble.height() / 2, bubble.height() / 2);
-        painter->setPen(muted(option, selected));
+        painter->setPen(muted(option, onAccent));
         painter->drawText(bubble, Qt::AlignCenter, count);
         painter->restore();
         return;
@@ -126,7 +136,7 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     const int badge = metrics.height();
     const QRectF badgeRect(rect.right() - badge, rect.center().y() - badge / 2.0, badge, badge);
     QColor tile = changeKindColor(kind);
-    tile.setAlphaF(selected ? 0.35 : 0.18);
+    tile.setAlphaF(onAccent ? 0.35 : 0.18);
     painter->setPen(Qt::NoPen);
     painter->setBrush(tile);
     painter->drawRoundedRect(badgeRect, 4, 4);
@@ -134,13 +144,37 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     badgeFont.setWeight(QFont::Bold);
     badgeFont.setPointSizeF(option.font.pointSizeF() * 0.8);
     painter->setFont(badgeFont);
-    painter->setPen(selected ? option.palette.color(QPalette::HighlightedText) : changeKindColor(kind));
+    painter->setPen(onAccent ? option.palette.color(QPalette::HighlightedText) : changeKindColor(kind));
     painter->drawText(badgeRect, Qt::AlignCenter, letter);
 
+    // "+12 −3" left of the badge, when known.
+    int right = int(badgeRect.left()) - 10;
+    if (const QVariant added = index.data(AddedRole); added.isValid()) {
+        QFont statsFont = option.font;
+        statsFont.setPointSizeF(option.font.pointSizeF() * 0.86);
+        statsFont.setWeight(QFont::DemiBold);
+        const QFontMetrics statsMetrics(statsFont);
+        const QString plus = added.toInt() > 0 ? QStringLiteral("+%1").arg(added.toInt()) : QString();
+        const int removed = index.data(RemovedRole).toInt();
+        const QString minus = removed > 0 ? QStringLiteral("−%1").arg(removed) : QString();
+        const bool dark = isDark(option.palette);
+        painter->setFont(statsFont);
+        for (const auto &[text, color] : {std::pair{minus, dark ? QColor("#f85149") : QColor("#cf222e")},
+                                          std::pair{plus, dark ? QColor("#3fb950") : QColor("#1a7f37")}}) {
+            if (text.isEmpty())
+                continue;
+            const int width = statsMetrics.horizontalAdvance(text);
+            painter->setPen(onAccent ? option.palette.color(QPalette::HighlightedText) : color);
+            painter->drawText(QRect(right - width, rect.top(), width, rect.height()), Qt::AlignRight | Qt::AlignVCenter, text);
+            right -= width + 6;
+        }
+        right -= 4;
+    }
+
     // Name, then the folder, dimmed, cut short if needed.
-    const int available = int(badgeRect.left()) - 10 - x;
+    const int available = right - x;
     painter->setFont(option.font);
-    painter->setPen(option.palette.color(selected ? QPalette::HighlightedText : QPalette::Text));
+    painter->setPen(option.palette.color(onAccent ? QPalette::HighlightedText : QPalette::Text));
     const QString shownName = metrics.elidedText(name, Qt::ElideMiddle, available);
     painter->drawText(QRect(x, rect.top(), available, rect.height()), Qt::AlignLeft | Qt::AlignVCenter, shownName);
     const int nameWidth = metrics.horizontalAdvance(shownName) + 10;
@@ -148,7 +182,7 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         QFont small = option.font;
         small.setPointSizeF(option.font.pointSizeF() * 0.92);
         painter->setFont(small);
-        painter->setPen(muted(option, selected));
+        painter->setPen(muted(option, onAccent));
         const QFontMetrics smallMetrics(small);
         painter->drawText(QRect(x + nameWidth, rect.top(), available - nameWidth, rect.height()),
                           Qt::AlignLeft | Qt::AlignVCenter,

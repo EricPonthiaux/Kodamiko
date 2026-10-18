@@ -378,6 +378,7 @@ void ChangesView::rebuildList()
         for (int i = 0; i < diffs.size(); ++i) {
             auto *item = new QTreeWidgetItem(root);
             FileChangeDelegate::setChange(item, diffs[i].change);
+            FileChangeDelegate::setStats(item, FilePatch::parse(diffs[i].patch));
             item->setData(0, sectionRole, static_cast<int>(section));
             item->setData(0, indexRole, i);
         }

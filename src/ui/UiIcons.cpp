@@ -158,6 +158,10 @@ QIcon draw(const QString &name, const QColor &color)
             p.drawLine(QPointF(3, 8), QPointF(13, 8));
         });
     }
+    if (name == QLatin1String("check"))
+        return drawIcon(color, [](QPainter &p) {
+            p.drawPolyline(QPolygonF({QPointF(3.5, 8.5), QPointF(6.5, 11.5), QPointF(12.5, 4.5)}));
+        });
     if (name == QLatin1String("minus"))
         return drawIcon(color, [](QPainter &p) { p.drawLine(QPointF(3, 8), QPointF(13, 8)); });
     if (name == QLatin1String("discard")) {
@@ -241,6 +245,40 @@ QIcon draw(const QString &name, const QColor &color)
                 p.drawLine(QPointF(8 + 4.6 * std::cos(angle), 8 + 4.6 * std::sin(angle)),
                            QPointF(8 + 6.6 * std::cos(angle), 8 + 6.6 * std::sin(angle)));
             }
+        });
+    }
+    if (name == QLatin1String("run")) {
+        // Play: a rounded triangle.
+        return drawIcon(color, [](QPainter &p) {
+            p.drawPolygon(QPolygonF({QPointF(4.5, 2.8), QPointF(13, 8), QPointF(4.5, 13.2)}));
+        });
+    }
+    if (name == QLatin1String("stop")) {
+        return drawIcon(color, [](QPainter &p) { p.drawRoundedRect(QRectF(3.5, 3.5, 9, 9), 1.5, 1.5); });
+    }
+    if (name == QLatin1String("build")) {
+        // A hammer: its head, then its handle.
+        return drawIcon(color, [](QPainter &p) {
+            p.drawPolygon(QPolygonF({QPointF(3, 4.5), QPointF(6.5, 1.8), QPointF(10.5, 5.8), QPointF(8.6, 7.7),
+                                     QPointF(6.4, 5.5), QPointF(4.8, 6.3)}));
+            p.drawLine(QPointF(7.5, 6.6), QPointF(13.8, 12.9));
+        });
+    }
+    if (name == QLatin1String("test")) {
+        // A flask.
+        return drawIcon(color, [](QPainter &p) {
+            p.drawPolyline(QPolygonF({QPointF(6.2, 2), QPointF(6.2, 6.2), QPointF(2.6, 12.6), QPointF(3.6, 14),
+                                      QPointF(12.4, 14), QPointF(13.4, 12.6), QPointF(9.8, 6.2), QPointF(9.8, 2)}));
+            p.drawLine(QPointF(5, 2), QPointF(11, 2));
+            p.drawLine(QPointF(4.6, 10.2), QPointF(11.4, 10.2));
+        });
+    }
+    if (name == QLatin1String("problems")) {
+        // A warning sign.
+        return drawIcon(color, [](QPainter &p) {
+            p.drawPolygon(QPolygonF({QPointF(8, 2), QPointF(14.5, 13.5), QPointF(1.5, 13.5)}));
+            p.drawLine(QPointF(8, 6.2), QPointF(8, 9.2));
+            p.drawPoint(QPointF(8, 11.4));
         });
     }
     // Command palette: a prompt.

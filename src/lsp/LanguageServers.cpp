@@ -39,13 +39,15 @@ const QList<LanguageServerSpec> &LanguageServers::known()
           QStringLiteral("--completion-parse=always")},
          {QStringLiteral("c"), QStringLiteral("cpp")},
          QStringLiteral(".>:")},
-        // Its workspace data goes to a cache folder (see clientFor).
-        {QStringLiteral("jdtls"), QStringLiteral("jdtls"), {}, {QStringLiteral("java")}, QStringLiteral(".")},
+        // Its workspace data goes to a cache folder (see clientFor). "@":
+        // the annotations.
+        {QStringLiteral("jdtls"), QStringLiteral("jdtls"), {}, {QStringLiteral("java")}, QStringLiteral(".@")},
+        // "@": the decorators.
         {QStringLiteral("typescript-language-server"),
          QStringLiteral("typescript-language-server"),
          {QStringLiteral("--stdio")},
          {QStringLiteral("javascript"), QStringLiteral("typescript"), QStringLiteral("tsx")},
-         QStringLiteral(".")},
+         QStringLiteral(".@")},
         {QStringLiteral("pyright"),
          QStringLiteral("pyright-langserver"),
          {QStringLiteral("--stdio")},
@@ -367,12 +369,13 @@ LspClient *LanguageServers::clientFor(const QString &languageId)
     }
     auto *client = new LspClient(program, arguments, folder_, this);
     client->setEnvironment(environment);
-    if (setup) {
-        const Options options =
-            optionsFor(name, *setup, runtime ? runtime->home : QString(), runtime ? runtime->executable : QString());
+    // Without a project setup too: how completion behaves.
+    const Options options = optionsFor(name, setup ? *setup : LanguageSetup(), runtime ? runtime->home : QString(),
+                                       runtime ? runtime->executable : QString());
+    if (!options.initialization.isEmpty())
         client->setInitializationOptions(options.initialization);
+    if (!options.settings.isEmpty())
         client->setSettings(options.settings);
-    }
     for (auto handler = requestHandlers_.cbegin(); handler != requestHandlers_.cend(); ++handler)
         client->setRequestHandler(handler.key(), handler.value());
     clients_.insert(name, client);
@@ -402,6 +405,73 @@ LspClient *LanguageServers::clientFor(const QString &languageId)
     return client;
 }
 
+namespace {
+
+// Completion as in IntelliJ IDEA.
+QJsonObject jdtlsSettings()
+{
+    return QJsonObject{
+        {"completion",
+         QJsonObject{
+             // The static members offered, and imported, without their
+             // class typed first ("assertEquals", "toList").
+             {"favoriteStaticMembers",
+              QJsonArray{"org.junit.Assert.*", "org.junit.Assume.*", "org.junit.jupiter.api.Assertions.*",
+                         "org.junit.jupiter.api.Assumptions.*", "org.junit.jupiter.api.DynamicContainer.*",
+                         "org.junit.jupiter.api.DynamicTest.*", "org.mockito.Mockito.*",
+                         "org.mockito.ArgumentMatchers.*", "org.assertj.core.api.Assertions.*",
+                         "org.hamcrest.MatcherAssert.*", "org.hamcrest.Matchers.*",
+                         "java.util.stream.Collectors.*", "java.util.Objects.requireNonNull",
+                         "java.util.Objects.requireNonNullElse"}},
+             // Never offered: "List" is java.util's, not java.awt's.
+             {"filteredTypes",
+              QJsonArray{"java.awt.*", "com.sun.*", "sun.*", "jdk.*", "org.graalvm.*", "io.micrometer.shaded.*",
+                         "javax.swing.text.html.HTML.Tag"}},
+             // A method comes with its parameters' names to fill in.
+             {"guessMethodArguments", "insertParameterNames"},
+             // Templates are Duet's own (see PostfixTemplateProvider), not
+             // twice in the list.
+             {"postfix", QJsonObject{{"enabled", false}}},
+             // Values reached through a chain of calls, for the expected
+             // type ("list.stream().toList()").
+             {"chain", QJsonObject{{"enabled", true}}},
+             // More than jdtls's 50: typing further narrows the list
+             // without asking again.
+             {"maxResults", 100},
+             // As IntelliJ: java.*, javax.*, then the others.
+             {"importOrder", QJsonArray{"java", "javax", "org", "com", ""}},
+         }},
+        // The code it generates (overrides, getters) uses braces.
+        {"codeGeneration", QJsonObject{{"useBlocks", true}}},
+    };
+}
+
+// The completion preferences of tsserver, as in WebStorm: the exports of
+// every module, imported once chosen; class members and object methods
+// written whole; "?." added where a value may be undefined.
+QJsonObject typescriptInitialization()
+{
+    return QJsonObject{
+        {"preferences",
+         QJsonObject{
+             {"includeCompletionsForModuleExports", true},
+             {"includeCompletionsForImportStatements", true},
+             {"includeCompletionsWithSnippetText", true},
+             {"includeCompletionsWithInsertText", true},
+             {"includeAutomaticOptionalChainCompletions", true},
+             {"includeCompletionsWithClassMemberSnippets", true},
+             {"includeCompletionsWithObjectLiteralMethodSnippets", true},
+             {"useLabelDetailsInCompletionEntries", true},
+             {"allowIncompleteCompletions", true},
+             {"importModuleSpecifierPreference", "shortest"},
+             {"importModuleSpecifierEnding", "auto"},
+             {"jsxAttributeCompletionStyle", "auto"},
+         }},
+    };
+}
+
+} // namespace
+
 LanguageServers::Options LanguageServers::optionsFor(const QString &server, const LanguageSetup &setup,
                                                      const QString &runtimeHome, const QString &runtimeExecutable)
 {
@@ -411,19 +481,24 @@ LanguageServers::Options LanguageServers::optionsFor(const QString &server, cons
         if (setup.runtimeVersion.startsWith(QLatin1String("c++")))
             options.initialization.insert("fallbackFlags", QJsonArray{QStringLiteral("-std=") + setup.runtimeVersion});
     } else if (server == QLatin1String("jdtls")) {
+        QJsonObject java = jdtlsSettings();
         if (!runtimeHome.isEmpty()) {
             // The project's JDK, by its execution environment's name.
             const int major = setup.runtimeVersion.toInt();
             const QString environment =
                 major <= 8 ? QStringLiteral("JavaSE-1.%1").arg(major) : QStringLiteral("JavaSE-%1").arg(major);
-            options.settings = QJsonObject{
-                {"java",
-                 QJsonObject{{"configuration",
-                              QJsonObject{{"runtimes", QJsonArray{QJsonObject{{"name", environment},
-                                                                              {"path", runtimeHome},
-                                                                              {"default", true}}}}}}}}};
-            options.initialization.insert("settings", options.settings);
+            java.insert("configuration",
+                        QJsonObject{{"runtimes", QJsonArray{QJsonObject{{"name", environment},
+                                                                        {"path", runtimeHome},
+                                                                        {"default", true}}}}});
         }
+        options.settings = QJsonObject{{"java", java}};
+        options.initialization.insert("settings", options.settings);
+    } else if (server == QLatin1String("typescript-language-server")) {
+        options.initialization = typescriptInitialization();
+        // "name(…)" with its arguments to fill in, as a function is
+        // inserted in IntelliJ.
+        options.settings = QJsonObject{{"completions", QJsonObject{{"completeFunctionCalls", true}}}};
     } else if (server == QLatin1String("pyright")) {
         if (!runtimeExecutable.isEmpty())
             options.settings = QJsonObject{{"python", QJsonObject{{"pythonPath", runtimeExecutable}}}};

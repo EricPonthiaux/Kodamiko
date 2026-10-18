@@ -12,18 +12,22 @@ class EditorTabs;
 class EditorWidget;
 class LanguageServers;
 class LspClient;
+class ProblemStore;
 class QPoint;
 
 // What the file's language server knows about the code, in the editor:
 // documentation under the mouse, the parameters of the call being typed,
 // definitions, usages, rename, quick fixes, and the header of a source
 // file (and back). Without a server, Go to Definition and Switch
-// Header/Source fall back on the project's index and on file names.
+// Header/Source fall back on the project's index and on file names. The
+// problems of `problems` (the servers' and the builds') are underlined in
+// the editors.
 class CodeIntelligence : public QObject {
     Q_OBJECT
 
 public:
-    CodeIntelligence(EditorTabs *tabs, LanguageServers *servers, CodeNavigator *navigator, QObject *parent = nullptr);
+    CodeIntelligence(EditorTabs *tabs, LanguageServers *servers, CodeNavigator *navigator, ProblemStore *problems,
+                     QObject *parent = nullptr);
 
     // Documentation when the mouse rests on a name, parameters while a
     // call is typed.
@@ -66,7 +70,7 @@ private:
     // even before the server has indexed the project.
     void syncOpenEditors(LspClient *client, const QString &languageId);
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
-    // Shows the problems the server reported for `path` in its editor.
+    // Shows the problems of `path` in its editor.
     void showProblems(const QString &path);
     void showHover(EditorWidget *editor, int bytePosition, const QPoint &where, bool explicitRequest);
     // Menu under the cursor of `editor`; returns the chosen entry or -1.
@@ -77,6 +81,7 @@ private:
     EditorTabs *tabs_;
     LanguageServers *servers_;
     CodeNavigator *navigator_;
+    ProblemStore *problems_;
     int hoverGeneration_ = 0; // answers for an older position are dropped
     int signatureGeneration_ = 0;
 };

@@ -23,7 +23,7 @@ class EditorTabs : public QTabWidget {
 public:
     explicit EditorTabs(const Theme &theme, QWidget *parent = nullptr);
 
-    // Opens a text file in an editor (a Markdown file with its preview), an
+    // Opens a text file in an editor (a Markdown or HTML file with its preview), an
     // image in a viewer, or a diagram (Mermaid, PlantUML…) in the diagram editor. Returns
     // the tab, or nullptr on failure.
     QWidget *openFile(const QString &path);
@@ -43,11 +43,11 @@ public:
     EditorWidget *currentEditor() const;
     // The text editors of every tab.
     QList<EditorWidget *> editors() const;
-    // Text editor of a tab: the tab itself, or the editor of a Markdown tab.
+    // Text editor of a tab: the tab itself, or the editor of a Markdown or HTML tab.
     static EditorWidget *editorIn(QWidget *page);
     // Tab that holds `editor`.
     QWidget *pageOf(EditorWidget *editor) const;
-    // A Markdown tab in Preview mode shows its editor too: to display a
+    // A Markdown or HTML tab in Preview mode shows its editor too: to display a
     // position or a search in it.
     void revealEditor(EditorWidget *editor);
     EditorWidget *editorFor(const QString &path) const;
@@ -105,6 +105,9 @@ signals:
     void definitionRequested();
     // A file was opened in a new text editor (not emitted for diffs).
     void editorOpened(EditorWidget *editor);
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
 
 private:
     QWidget *openImage(const QString &absolutePath);

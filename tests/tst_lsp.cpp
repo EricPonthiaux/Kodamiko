@@ -74,6 +74,59 @@ private slots:
                  QString("/p/.venv/bin/python"));
     }
 
+    void configuresCompletionAsIntelliJ()
+    {
+        // Without a project setup too.
+        const LanguageServers::Options jdtls = LanguageServers::optionsFor("jdtls", LanguageSetup(), {}, {});
+        QVERIFY(!LspClient::settingAt(jdtls.settings, "java.completion.postfix.enabled").toBool());
+        QVERIFY(LspClient::settingAt(jdtls.settings, "java.completion.chain.enabled").toBool());
+        QVERIFY(LspClient::settingAt(jdtls.settings, "java.completion.favoriteStaticMembers")
+                    .toArray()
+                    .contains(QJsonValue("org.junit.jupiter.api.Assertions.*")));
+        QVERIFY(LspClient::settingAt(jdtls.settings, "java.completion.filteredTypes").toArray().contains(QJsonValue("java.awt.*")));
+        QVERIFY(LspClient::settingAt(jdtls.settings, "java.configuration.runtimes").isNull());
+        QCOMPARE(jdtls.initialization.value("settings").toObject(), jdtls.settings);
+        // With one: the runtime as well.
+        LanguageSetup java{"java", true, "21", {}, "jdtls", "1.62.0"};
+        const LanguageServers::Options project = LanguageServers::optionsFor("jdtls", java, "/jdk21", {});
+        QVERIFY(!LspClient::settingAt(project.settings, "java.configuration.runtimes").isNull());
+        QVERIFY(LspClient::settingAt(project.settings, "java.completion.chain.enabled").toBool());
+
+        const LanguageServers::Options ts =
+            LanguageServers::optionsFor("typescript-language-server", LanguageSetup(), {}, {});
+        const QJsonObject preferences = ts.initialization.value("preferences").toObject();
+        QVERIFY(preferences.value("includeCompletionsForModuleExports").toBool());
+        QVERIFY(preferences.value("includeCompletionsWithClassMemberSnippets").toBool());
+        QVERIFY(LspClient::settingAt(ts.settings, "completions.completeFunctionCalls").toBool());
+    }
+
+    void editsBeforeThePrefixReplaceFromTheirStart()
+    {
+        // tsserver: "a." becomes "a?.name"; a scoped package replaces its "@".
+        const QByteArray json = R"json([
+            {"label": "name", "kind": 10, "insertText": "?.name",
+             "textEdit": {"range": {"start": {"line": 1, "character": 1}, "end": {"line": 1, "character": 3}},
+                          "newText": "?.name"}},
+            {"label": "nap", "kind": 10,
+             "textEdit": {"range": {"start": {"line": 1, "character": 2}, "end": {"line": 1, "character": 3}},
+                          "newText": "nap"}}
+        ])json";
+        CompletionContext context;
+        context.text = "x\na.n";
+        context.position = 5;
+        context.prefixStart = 4;
+        context.prefix = "n";
+        context.line = 1;
+        context.column = 3;
+        bool incomplete = false;
+        const QList<CompletionItem> items =
+            LspCompletionProvider::parse(QJsonDocument::fromJson(json).array(), &incomplete, nullptr, &context);
+        QCOMPARE(items.size(), 2);
+        QCOMPARE(items[0].replaceStart, 3); // the dot
+        QCOMPARE(items[0].insertText, QString("?.name"));
+        QCOMPARE(items[1].replaceStart, -1); // the prefix itself
+    }
+
     void usesTheProjectsServer()
     {
         QTemporaryDir dir;
@@ -291,6 +344,35 @@ private slots:
         for (const TextEdit &edit : edits)
             texts.append(edit.newText);
         QVERIFY2(texts.join("").contains("import java.util.ArrayList;"), qPrintable(texts.join("|")));
+    }
+
+    void jdtlsCompletesAsIntelliJ()
+    {
+        if (QStandardPaths::findExecutable("jdtls").isEmpty())
+            QSKIP("jdtls is not installed");
+        QTemporaryDir dir;
+        QDir().mkpath(dir.filePath("src"));
+        // Collectors' static members, offered without their class.
+        const QByteArray text = "import java.util.List;\n"
+                                "public class Main {\n"
+                                "    Object f(List<String> names) {\n"
+                                "        return names.stream().collect(toLi);\n"
+                                "    }\n"
+                                "}\n";
+        const QList<CompletionItem> items = completeAt(dir, "src/Main.java", "java", text, 3, 42, {}, 120000);
+        const CompletionItem toList = itemNamed(items, "toList");
+        QVERIFY2(!toList.label.isEmpty(), qPrintable(labelsOf(items).join(", ")));
+        QVERIFY2(toList.detail.contains("Collector<"), qPrintable(toList.detail));
+        // Its own postfix templates are off: Duet's are offered instead.
+        const QByteArray member = "public class Main {\n"
+                                  "    void f(String name) {\n"
+                                  "        name.\n"
+                                  "    }\n"
+                                  "}\n";
+        const QList<CompletionItem> members = completeAt(dir, "src/Main.java", "java", member, 2, 13, '.', 120000);
+        QVERIFY2(itemNamed(members, "length").kind == CompletionItem::Kind::Method, qPrintable(labelsOf(members).join(", ")));
+        for (const CompletionItem &item : members)
+            QVERIFY2(item.kind != CompletionItem::Kind::Snippet, qPrintable(item.label));
     }
 
 private:

@@ -1,4 +1,4 @@
-#include "MarkdownView.h"
+#include "PreviewPage.h"
 
 #include "CodeColorizer.h"
 #include "EditorWidget.h"
@@ -50,13 +50,17 @@ QWebEngineProfile *previewProfile()
 }
 
 // Links leave the page: files go to the editor, the rest to the browser.
-class PreviewPage : public QWebEnginePage {
+class LinkRoutingPage : public QWebEnginePage {
 public:
-    PreviewPage(MarkdownPreview *preview, std::function<void(const QString &)> openFile)
-        : QWebEnginePage(previewProfile(), preview)
+    LinkRoutingPage(QWebEngineView *view, std::function<void(const QString &)> openFile)
+        : QWebEnginePage(previewProfile(), view)
         , openFile_(std::move(openFile))
     {
     }
+
+    // The page's own address, when it was loaded from a text: "#heading"
+    // links to it stay in the page.
+    void setAddress(const QUrl &address) { address_ = address; }
 
 protected:
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override
@@ -64,7 +68,9 @@ protected:
         if (type != NavigationTypeLinkClicked || !isMainFrame)
             return true; // the page itself
         // "#heading": within the page.
-        if (url.hasFragment() && url.adjusted(QUrl::RemoveFragment) == this->url().adjusted(QUrl::RemoveFragment))
+        if (url.hasFragment()
+            && (url.adjusted(QUrl::RemoveFragment) == this->url().adjusted(QUrl::RemoveFragment)
+                || url.adjusted(QUrl::RemoveFragment) == address_))
             return true;
         if (url.isLocalFile()) {
             const QString path = QDir::cleanPath(url.toLocalFile());
@@ -78,7 +84,17 @@ protected:
 
 private:
     std::function<void(const QString &)> openFile_;
+    QUrl address_;
 };
+
+constexpr const char *scrollRatioScript =
+    "window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)";
+
+QString scrollToScript(double ratio)
+{
+    return QStringLiteral("window.scrollTo(0, %1 * (document.documentElement.scrollHeight - window.innerHeight));")
+        .arg(ratio);
+}
 
 // A string as a JavaScript literal.
 QString scriptString(const QString &text)
@@ -94,7 +110,7 @@ MarkdownPreview::MarkdownPreview(const Theme &theme, QWidget *parent)
     , dark_(theme.isDark)
     , colorizer_(std::make_unique<CodeColorizer>())
 {
-    setPage(new PreviewPage(this, [this](const QString &path) { emit openFileRequested(path); }));
+    setPage(new LinkRoutingPage(this, [this](const QString &path) { emit openFileRequested(path); }));
     // The page's color before it is loaded, not the view's default white.
     page()->setBackgroundColor(QColor(MarkdownHtml::pageColor(dark_)));
     connect(page(), &QWebEnginePage::loadFinished, this, [this] {
@@ -136,8 +152,7 @@ void MarkdownPreview::showBody()
         return;
     QString script = QStringLiteral("document.querySelector('article').innerHTML = %1;").arg(scriptString(body_));
     if (pendingRatio_ >= 0) {
-        script += QStringLiteral("window.scrollTo(0, %1 * (document.documentElement.scrollHeight - window.innerHeight));")
-                      .arg(pendingRatio_);
+        script += scrollToScript(pendingRatio_);
         pendingRatio_ = -1;
     }
     page()->runJavaScript(script, QWebEngineScript::ApplicationWorld, [this](const QVariant &) { emit rendered(); });
@@ -149,9 +164,7 @@ void MarkdownPreview::scrollToRatio(double ratio)
         pendingRatio_ = ratio;
         return;
     }
-    page()->runJavaScript(
-        QStringLiteral("window.scrollTo(0, %1 * (document.documentElement.scrollHeight - window.innerHeight));").arg(ratio),
-        QWebEngineScript::ApplicationWorld);
+    page()->runJavaScript(scrollToScript(ratio), QWebEngineScript::ApplicationWorld);
 }
 
 void MarkdownPreview::applyTheme(const Theme &theme)
@@ -163,8 +176,7 @@ void MarkdownPreview::applyTheme(const Theme &theme)
     if (folder_.isEmpty() && body_.isEmpty())
         return;
     // Another style sheet: the page is reloaded, at the same place.
-    page()->runJavaScript(QStringLiteral("window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)"),
-                          QWebEngineScript::ApplicationWorld, [this](const QVariant &ratio) {
+    page()->runJavaScript(QString::fromLatin1(scrollRatioScript), QWebEngineScript::ApplicationWorld, [this](const QVariant &ratio) {
                               pendingRatio_ = ratio.toDouble();
                               loadPage();
                           });
@@ -181,10 +193,100 @@ void MarkdownPreview::contextMenuEvent(QContextMenuEvent *event)
     menu.exec(event->globalPos());
 }
 
-MarkdownPage::MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *parent)
+HtmlPreview::HtmlPreview(QWidget *parent)
+    : QWebEngineView(parent)
+{
+    setPage(new LinkRoutingPage(this, [this](const QString &path) { emit openFileRequested(path); }));
+    // As in a browser, a page without a background of its own is white.
+    page()->setBackgroundColor(Qt::white);
+    connect(page(), &QWebEnginePage::loadFinished, this, [this] {
+        pageLoading_ = false;
+        loaded_ = true;
+        if (reloadPending_) {
+            // The text changed during the load: once more, with the new one.
+            reloadPending_ = false;
+            reload();
+            return;
+        }
+        if (pendingRatio_ >= 0) {
+            page()->runJavaScript(scrollToScript(pendingRatio_), QWebEngineScript::ApplicationWorld);
+            pendingRatio_ = -1;
+        }
+        emit rendered();
+    });
+}
+
+void HtmlPreview::render(const QString &text, const QString &filePath)
+{
+    if (text == text_ && filePath == filePath_ && (loaded_ || pageLoading_))
+        return;
+    text_ = text;
+    filePath_ = filePath;
+    if (pageLoading_) {
+        reloadPending_ = true;
+        return;
+    }
+    reload();
+}
+
+void HtmlPreview::reload()
+{
+    pageLoading_ = true;
+    if (!loaded_) {
+        loadPage();
+        return;
+    }
+    // The page is loaded again: it comes back where it was.
+    page()->runJavaScript(QString::fromLatin1(scrollRatioScript), QWebEngineScript::ApplicationWorld,
+                          [this](const QVariant &ratio) {
+                              if (pendingRatio_ < 0)
+                                  pendingRatio_ = ratio.toDouble();
+                              loadPage();
+                          });
+}
+
+void HtmlPreview::loadPage()
+{
+    loaded_ = false;
+    pageLoading_ = true;
+    // Relative style sheets and images: the page's address is the file's.
+    const QUrl address = QUrl::fromLocalFile(filePath_);
+    static_cast<LinkRoutingPage *>(page())->setAddress(address);
+    // setHtml() takes at most 2 MB: beyond, the file as saved.
+    if (text_.toUtf8().size() > 2 * 1000 * 1000 - 4096)
+        load(address);
+    else
+        setHtml(text_, address);
+}
+
+void HtmlPreview::scrollToRatio(double ratio)
+{
+    if (!loaded_) {
+        pendingRatio_ = ratio;
+        return;
+    }
+    page()->runJavaScript(scrollToScript(ratio), QWebEngineScript::ApplicationWorld);
+}
+
+// Copying, and the page in a real browser; without the navigation entries.
+void HtmlPreview::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu menu(this);
+    menu.addAction(pageAction(QWebEnginePage::Copy));
+    menu.addAction(pageAction(QWebEnginePage::CopyLinkToClipboard));
+    menu.addSeparator();
+    menu.addAction(pageAction(QWebEnginePage::SelectAll));
+    menu.addSeparator();
+    menu.addAction(tr("Open in Browser"), this,
+                   [this] { QDesktopServices::openUrl(QUrl::fromLocalFile(filePath_)); });
+    menu.exec(event->globalPos());
+}
+
+PreviewPage::PreviewPage(EditorWidget *editor, const Theme &theme, QWidget *parent)
     : QWidget(parent)
     , editor_(editor)
     , theme_(theme)
+    , kind_(LanguageRegistry::languageForFile(editor->filePath()) == QLatin1String("html") ? Kind::Html : Kind::Markdown)
 {
     editor_->setParent(this);
 
@@ -212,7 +314,7 @@ MarkdownPage::MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *pa
     }
     connect(group, &QButtonGroup::idClicked, this, [this](int id) {
         setMode(static_cast<Mode>(id));
-        QSettings().setValue(QStringLiteral("markdown/mode"), id);
+        QSettings().setValue(settingsKey(QStringLiteral("mode")), id);
     });
 
     auto *layout = new QVBoxLayout(this);
@@ -223,86 +325,114 @@ MarkdownPage::MarkdownPage(EditorWidget *editor, const Theme &theme, QWidget *pa
 
     updateTimer_.setSingleShot(true);
     updateTimer_.setInterval(updateDelayMs);
-    connect(&updateTimer_, &QTimer::timeout, this, &MarkdownPage::updatePreview);
+    connect(&updateTimer_, &QTimer::timeout, this, &PreviewPage::updatePreview);
     connect(editor_, &QsciScintilla::textChanged, this, [this] {
-        if (mode_ != Mode::Editor && preview_)
+        if (mode_ != Mode::Editor && preview())
             updateTimer_.start();
     });
-    connect(editor_->verticalScrollBar(), &QScrollBar::valueChanged, this, &MarkdownPage::syncScroll);
+    connect(editor_->verticalScrollBar(), &QScrollBar::valueChanged, this, &PreviewPage::syncScroll);
 
-    const int saved = QSettings().value(QStringLiteral("markdown/mode"), static_cast<int>(Mode::Preview)).toInt();
+    // An HTML file is mostly written: its code beside the page.
+    const Mode initial = kind_ == Kind::Html ? Mode::Split : Mode::Preview;
+    const int saved = QSettings().value(settingsKey(QStringLiteral("mode")), static_cast<int>(initial)).toInt();
     setMode(static_cast<Mode>(std::clamp(saved, 0, 2)));
     setFocusProxy(editor_);
 }
 
-void MarkdownPage::setMode(Mode mode)
+QString PreviewPage::settingsKey(const QString &name) const
+{
+    return (kind_ == Kind::Html ? QStringLiteral("html/") : QStringLiteral("markdown/")) + name;
+}
+
+QWidget *PreviewPage::preview() const
+{
+    return kind_ == Kind::Html ? static_cast<QWidget *>(html_) : markdown_;
+}
+
+void PreviewPage::setMode(Mode mode)
 {
     mode_ = mode;
     buttons_[static_cast<int>(mode)]->setChecked(true);
     if (mode != Mode::Editor && isVisible())
         ensurePreview();
-    editor_->setVisible(mode != Mode::Preview || !preview_);
-    if (preview_)
-        preview_->setVisible(mode != Mode::Editor);
-    setFocusProxy(mode == Mode::Preview && preview_ ? static_cast<QWidget *>(preview_) : editor_);
+    QWidget *shown = preview();
+    editor_->setVisible(mode != Mode::Preview || !shown);
+    if (shown)
+        shown->setVisible(mode != Mode::Editor);
+    setFocusProxy(mode == Mode::Preview && shown ? shown : editor_);
     if (mode == Mode::Split) {
         const int half = std::max(splitter_->width() / 2, 100);
         splitter_->setSizes({half, half});
     }
-    if (mode != Mode::Editor && preview_)
+    if (mode != Mode::Editor && shown)
         updatePreview();
 }
 
-void MarkdownPage::showEvent(QShowEvent *event)
+void PreviewPage::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
-    if (mode_ != Mode::Editor && !preview_)
+    if (mode_ != Mode::Editor && !preview())
         setMode(mode_);
 }
 
-void MarkdownPage::ensurePreview()
+void PreviewPage::ensurePreview()
 {
-    if (preview_)
+    if (preview())
         return;
-    preview_ = new MarkdownPreview(theme_, this);
-    connect(preview_, &MarkdownPreview::openFileRequested, this, &MarkdownPage::openFileRequested);
-    splitter_->addWidget(preview_);
+    if (kind_ == Kind::Html) {
+        html_ = new HtmlPreview(this);
+        connect(html_, &HtmlPreview::openFileRequested, this, &PreviewPage::openFileRequested);
+    } else {
+        markdown_ = new MarkdownPreview(theme_, this);
+        connect(markdown_, &MarkdownPreview::openFileRequested, this, &PreviewPage::openFileRequested);
+    }
+    splitter_->addWidget(preview());
 }
 
-void MarkdownPage::revealEditor()
+void PreviewPage::revealEditor()
 {
     if (mode_ == Mode::Preview)
         setMode(Mode::Split);
 }
 
-void MarkdownPage::updatePreview()
+void PreviewPage::updatePreview()
 {
     updateTimer_.stop();
-    if (!preview_)
+    if (html_)
+        html_->render(editor_->text(), QFileInfo(editor_->filePath()).absoluteFilePath());
+    else if (markdown_)
+        markdown_->render(editor_->text(), QFileInfo(editor_->filePath()).absolutePath());
+    else
         return;
-    preview_->render(editor_->text(), QFileInfo(editor_->filePath()).absolutePath());
     syncScroll();
 }
 
 // In Split mode, the preview shows the same share of the text as the editor.
-void MarkdownPage::syncScroll()
+void PreviewPage::syncScroll()
 {
-    if (mode_ != Mode::Split || !preview_)
+    if (mode_ != Mode::Split || !preview())
         return;
     const QScrollBar *source = editor_->verticalScrollBar();
-    if (source->maximum() > 0)
-        preview_->scrollToRatio(double(source->value()) / source->maximum());
+    if (source->maximum() <= 0)
+        return;
+    const double ratio = double(source->value()) / source->maximum();
+    if (html_)
+        html_->scrollToRatio(ratio);
+    else
+        markdown_->scrollToRatio(ratio);
 }
 
-void MarkdownPage::applyTheme(const Theme &theme)
+void PreviewPage::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     editor_->applyTheme(theme);
-    if (preview_)
-        preview_->applyTheme(theme);
+    // An HTML page has its own colors.
+    if (markdown_)
+        markdown_->applyTheme(theme);
 }
 
-bool MarkdownPage::isMarkdownFile(const QString &path)
+bool PreviewPage::hasPreview(const QString &path)
 {
-    return LanguageRegistry::languageForFile(path) == QLatin1String("markdown");
+    const QString language = LanguageRegistry::languageForFile(path);
+    return language == QLatin1String("markdown") || language == QLatin1String("html");
 }

@@ -150,6 +150,8 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
 
     message_->setOpenLinks(false);
     message_->setFrameShape(QFrame::NoFrame);
+    // Part of the pane, not a field: no border of its own.
+    message_->setStyleSheet(QStringLiteral("QTextBrowser { border: none; border-radius: 0; padding: 0; }"));
     message_->document()->setDocumentMargin(14);
     diff_->setToolTip({});
 
@@ -449,6 +451,24 @@ void HistoryView::showDetails()
                         .arg(CommitDelegate::refColor(ref).lighter(125).name(), ref.toHtmlEscaped());
         html += QStringLiteral("</p>");
     }
+
+    // "4 files changed  +120 −8", above the files.
+    QList<FilePatch> patches;
+    int added = 0;
+    int removed = 0;
+    for (const FileDiff &file : details.files) {
+        patches.append(FilePatch::parse(file.patch));
+        added += patches.last().addedLines();
+        removed += patches.last().removedLines();
+    }
+    const bool dark = palette().color(QPalette::Base).lightness() < 128;
+    html += QStringLiteral("<p style='margin-top:12px'><span style='color:%1'>%2</span>&nbsp;&nbsp; "
+                           "<span style='color:%3; font-weight:600'>+%4</span>&nbsp; "
+                           "<span style='color:%5; font-weight:600'>−%6</span></p>")
+                .arg(muted,
+                     details.files.size() == 1 ? tr("1 file changed") : tr("%1 files changed").arg(details.files.size()),
+                     dark ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37"), QString::number(added),
+                     dark ? QStringLiteral("#f85149") : QStringLiteral("#cf222e"), QString::number(removed));
     message_->setHtml(html);
     // Once the pane is laid out.
     QTimer::singleShot(0, this, &HistoryView::fitMessage);
@@ -457,6 +477,7 @@ void HistoryView::showDetails()
         const FileDiff &file = details.files[i];
         auto *item = new QTreeWidgetItem(files_);
         FileChangeDelegate::setChange(item, file.change);
+        FileChangeDelegate::setStats(item, patches[i]);
         item->setData(0, fileIndexRole, i);
     }
 }

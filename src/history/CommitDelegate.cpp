@@ -132,7 +132,9 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     initStyleOption(&item, index);
     const QWidget *widget = option.widget;
     QStyle *style = widget ? widget->style() : QApplication::style();
-    const bool selected = option.state & QStyle::State_Selected;
+    // Selected in the active window, the row is on the accent: white text.
+    // Otherwise its background is a soft gray and the text keeps its colors.
+    const bool selected = (option.state & QStyle::State_Selected) && (option.state & QStyle::State_Active);
     const QString summary = item.text;
     item.text.clear();
     style->drawControl(QStyle::CE_ItemViewItem, &item, painter, widget);

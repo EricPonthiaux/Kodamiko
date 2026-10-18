@@ -1,11 +1,13 @@
 #include "LocalCompletion.h"
 
+#include "CodeScan.h"
 #include "ExpectedType.h"
 #include "navigation/SymbolIndex.h"
 
 #include <QFileInfo>
 #include <QHash>
 #include <QObject>
+#include <QRegularExpression>
 #include <QSet>
 
 #include <algorithm>
@@ -200,6 +202,85 @@ QStringList KeywordProvider::keywords(const QString &languageId)
     return table.value(languageId);
 }
 
+namespace {
+
+enum class Scope {
+    File,  // the top of the file
+    Class, // a class body, between its members
+    Code,  // a function's body, an initializer, parameters
+};
+
+Scope scopeAt(const QByteArray &text, int position)
+{
+    const QByteArray blanked = CodeScan::blank(text.left(position));
+    const int brace = CodeScan::enclosingBrace(blanked, position);
+    // In the current declaration: "int x = |", "void f(|".
+    int start = position;
+    while (start > brace + 1 && !QByteArrayView(";{}").contains(blanked[start - 1]))
+        --start;
+    const QByteArray declaration = blanked.mid(start, position - start);
+    const bool expression = declaration.contains('=') || CodeScan::enclosingParenthesis(blanked, position) >= 0;
+    if (brace < 0)
+        return expression ? Scope::Code : Scope::File;
+    const CodeScan::ClassHeader header = CodeScan::classAt(blanked, brace);
+    // An anonymous class: "new Runnable() {".
+    static const QRegularExpression anonymous(QStringLiteral("\\bnew\\s+[\\w.<>, ?]+\\([^()]*\\)\\s*$"));
+    const int headerStart = CodeScan::headerStart(blanked, brace);
+    const bool inClass = !header.name.isEmpty()
+                      || anonymous.match(QString::fromUtf8(blanked.mid(headerStart, brace - headerStart))).hasMatch();
+    return inClass && !expression ? Scope::Class : Scope::Code;
+}
+
+} // namespace
+
+QStringList KeywordProvider::keywordsAt(const QString &languageId, const QByteArray &text, int position)
+{
+    QStringList all = keywords(languageId);
+    const bool java = languageId == QLatin1String("java");
+    const bool js = languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript")
+                 || languageId == QLatin1String("tsx");
+    if (!java && !js)
+        return all;
+    const Scope scope = scopeAt(text, position);
+    if (java) {
+        static const QSet<QString> file = {"abstract", "class", "enum", "extends", "final", "implements", "import",
+                                           "interface", "package", "public", "record", "sealed", "static"};
+        static const QSet<QString> member = {"abstract", "boolean", "byte", "char", "class", "default", "double",
+                                             "enum", "extends", "final", "float", "implements", "int", "interface",
+                                             "long", "native", "private", "protected", "public", "record", "sealed",
+                                             "short", "static", "synchronized", "throws", "transient", "void",
+                                             "volatile", "String", "Override"};
+        static const QSet<QString> notInCode = {"package", "import", "public", "private", "protected", "abstract",
+                                                "native", "transient", "volatile", "sealed", "implements", "throws"};
+        all.removeIf([scope](const QString &keyword) {
+            switch (scope) {
+            case Scope::File: return !file.contains(keyword);
+            case Scope::Class: return !member.contains(keyword);
+            case Scope::Code: return notInCode.contains(keyword);
+            }
+            return false;
+        });
+        return all;
+    }
+    static const QSet<QString> member = {"async", "static", "get", "set", "constructor", "abstract", "private",
+                                         "protected", "public", "readonly", "declare", "override"};
+    static const QSet<QString> notInCode = {"private", "protected", "public", "readonly"};
+    if (scope == Scope::Class) {
+        // The modifiers of TypeScript are not JavaScript's.
+        const bool typescript = languageId != QLatin1String("javascript");
+        QStringList members;
+        for (const QString &keyword : member) {
+            if (typescript || !QStringList{"abstract", "private", "protected", "public", "readonly", "declare",
+                                           "override"}.contains(keyword))
+                members.append(keyword);
+        }
+        members.sort();
+        return members;
+    }
+    all.removeIf([](const QString &keyword) { return notInCode.contains(keyword); });
+    return all;
+}
+
 bool KeywordProvider::handles(const CompletionContext &context) const
 {
     return !keywords(context.languageId).isEmpty();
@@ -234,7 +315,7 @@ void KeywordProvider::complete(const CompletionContext &context, const Callback 
     }
     // After ".", a member is expected, not a keyword.
     if (context.triggerCharacter.isNull()) {
-        for (const QString &keyword : keywords(context.languageId)) {
+        for (const QString &keyword : keywordsAt(context.languageId, context.text, context.prefixStart)) {
             CompletionItem item;
             item.label = keyword;
             item.kind = CompletionItem::Kind::Keyword;

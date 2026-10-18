@@ -3,6 +3,7 @@
 #include "Completion.h"
 
 #include <QHash>
+#include <QSet>
 
 #include <functional>
 
@@ -18,6 +19,9 @@ class SymbolIndex;
 // - At the top level of a C++ source file, the functions of its header
 //   still without a definition: "size" (or "Foo::si") inserts
 //   "int Foo::size() const\n{\n}".
+// - In a Java class body, the getters and setters of its fields still
+//   without one: "getN" offers "getName", which inserts
+//   "public String getName() {\n    return name;\n}".
 //
 // Base classes are looked for in the current file, then through the
 // project's index; implementations in the header next to the source
@@ -25,6 +29,13 @@ class SymbolIndex;
 class CodeGenerationProvider : public ICompletionProvider {
 public:
     using Counterpart = std::function<QString(const QString &filePath)>;
+    // A field of a Java class.
+    struct Field {
+        QString type;
+        QString name;
+        bool isStatic = false;
+        bool isFinal = false;
+    };
 
     CodeGenerationProvider(const SymbolIndex *index, Counterpart counterpart);
 
@@ -46,6 +57,9 @@ private:
     ClassSource findClass(const QString &name, const CompletionContext &context) const;
     void addOverrides(const CompletionContext &context, int brace, QList<CompletionItem> &items) const;
     void addImplementations(const CompletionContext &context, QList<CompletionItem> &items) const;
+    static void addAccessors(const QByteArray &blanked, int brace, const QString &className,
+                             const QSet<QString> &declared, const QString &indent, const QString &unit,
+                             QList<CompletionItem> &items);
     QByteArray readFile(const QString &path) const;
 
     const SymbolIndex *index_;

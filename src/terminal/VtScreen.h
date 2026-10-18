@@ -62,11 +62,16 @@ public:
     QPoint cursorPosition() const { return cursor_; } // x = column, y = row
     bool isCursorVisible() const { return cursorVisible_; }
     bool isAlternateScreen() const { return alternateScreen_; }
+    // The program asked for mouse events (full-screen programs that scroll
+    // themselves, such as Claude Code's).
+    bool isMouseReporting() const { return mouseReporting_; }
 
     // Key press. `key`: Qt::Key, `text`: produced text (QKeyEvent::text).
     // Returns false if the key has no terminal equivalent.
     bool sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text);
     void paste(const QString &text);
+    // A wheel notch at a screen cell, in the encoding the program asked for.
+    void sendWheel(int row, int column, bool up, Qt::KeyboardModifiers modifiers);
 
 signals:
     void outputReady(const QByteArray &data); // to be written to the program
@@ -96,6 +101,7 @@ private:
     QPoint cursor_;
     bool cursorVisible_ = true;
     bool alternateScreen_ = false;
+    bool mouseReporting_ = false;
     QColor defaultForeground_ = Qt::lightGray;
     QColor defaultBackground_ = Qt::black;
     QString titleBuffer_;
