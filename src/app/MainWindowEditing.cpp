@@ -19,9 +19,6 @@
 
 #include <QStatusBar>
 
-#include <array>
-#include <ranges>
-
 void MainWindow::onCurrentTabChanged()
 {
     EditorWidget *editor = editorTabs_->currentEditor();

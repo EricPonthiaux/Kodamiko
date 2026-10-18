@@ -4,6 +4,6 @@
       "command": "cmake --build --preset default",
       "kind": "build",
       "name": "CMake: build default"
-    }
+    } 
   ]
 }

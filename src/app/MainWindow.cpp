@@ -22,7 +22,6 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/FindBar.h"
-#include "git/Branches.h"
 #include "git/GitCommands.h"
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
@@ -73,7 +72,6 @@
 
 #include <algorithm>
 #include <array>
-#include <ranges>
 
 namespace {
 
