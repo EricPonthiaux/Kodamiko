@@ -14,5 +14,8 @@ QPalette palette(const Theme &theme);
 QString styleSheet(const Theme &theme);
 // Sets both on the application.
 void apply(const Theme &theme);
+// Selected menu items and rows: slate blue, the accent little saturated, on
+// which the theme's text stays readable.
+QColor selectionColor(const Theme &theme);
 
 } // namespace ThemeStyle

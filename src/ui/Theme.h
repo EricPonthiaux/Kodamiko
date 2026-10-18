@@ -51,15 +51,13 @@ struct Theme {
     QColor window; // panels, menu bar, status bar
     QColor button;
     QColor alternateBase;
-    QColor highlight;     // selection in lists
-    QColor accent;        // focus, current tab, links
-    QColor accentText;    // text of the current tab, of checked buttons
-    QColor mutedText;     // inactive tabs, headers, status bar
-    QColor border;        // fields, buttons, menus, scroll bar handles
-    QColor line;          // separators
-    QColor hover;         // rows under the mouse
-    QColor gradientStart; // selected menu items and rows, default buttons
-    QColor gradientEnd;
+    QColor highlight;  // selection in lists
+    QColor accent;     // focus, current tab, links
+    QColor accentText; // text of the current tab, of checked buttons
+    QColor mutedText;  // inactive tabs, headers, status bar
+    QColor border;     // fields, buttons, menus, scroll bar handles
+    QColor line;       // separators
+    QColor hover;      // rows under the mouse
 
     QList<std::pair<QString, TextStyle>> syntaxStyles;
 

@@ -2,9 +2,11 @@
 #include "editor/EditorWidget.h"
 #include "git/GitProcess.h"
 #include "ui/AppFonts.h"
+#include "ui/HoverCloseButtons.h"
 #include "ui/OverlayPopup.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
+#include "ui/TrailingLayout.h"
 #include "ui/TrailingTabButton.h"
 #include "ui/TreeMetrics.h"
 #include "ui/WindowFrame.h"
@@ -20,6 +22,7 @@
 #include <QClipboard>
 #include <QComboBox>
 #include <QFile>
+#include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -287,7 +290,7 @@ private slots:
         for (const QToolButton *button : titleBar->findChildren<QToolButton *>())
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
-        QVERIFY(texts.contains("duet  ▾"));
+        QVERIFY(texts.contains(" duet  ▾"));
         QVERIFY(texts.contains("Claude is working"));
         titleBar->setClaudeState({}, {}, {});
 
@@ -840,6 +843,73 @@ private slots:
 
         tabs.closeFilesUnder(dir.filePath("b.txt")); // unsaved changes discarded, no question
         QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("lib/a.txt")}));
+    }
+
+    void trailingLayoutSetsGroupsApart()
+    {
+        QWidget row;
+        auto *layout = new TrailingLayout(&row);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(4);
+        layout->setGroupSpacing(16);
+        const auto add = [&row, layout] {
+            auto *widget = new QWidget(&row);
+            widget->setFixedSize(10, 10);
+            layout->addWidget(widget);
+            return widget;
+        };
+        layout->startGroup();
+        const QWidget *anchor = add();
+        layout->startGroup();
+        const QWidget *first = add();
+        const QWidget *second = add();
+        layout->startGroup();
+        QWidget *hidden = add();
+        hidden->hide();
+        layout->startGroup();
+        const QWidget *last = add();
+        row.resize(200, 10);
+        row.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&row));
+
+        QCOMPARE(anchor->geometry().right(), 199);
+        QCOMPARE(anchor->x() - first->geometry().right() - 1, 16); // another group
+        QCOMPARE(first->x() - second->geometry().right() - 1, 4);  // the same group
+        // An empty group adds no space.
+        QCOMPARE(second->x() - last->geometry().right() - 1, 16);
+        QCOMPARE(layout->sizeHint().width(), 4 * 10 + 16 + 4 + 16);
+    }
+
+    void closeButtonsShowOnTheCurrentAndHoveredTabs()
+    {
+        QTabWidget tabs;
+        tabs.setTabsClosable(true);
+        for (const char *title : {"one", "two", "three"})
+            tabs.addTab(new QWidget, title);
+        new HoverCloseButtons(tabs.tabBar());
+        tabs.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&tabs));
+        QTabBar *bar = tabs.tabBar();
+        const auto side = static_cast<QTabBar::ButtonPosition>(
+            bar->style()->styleHint(QStyle::SH_TabBar_CloseButtonPosition, nullptr, bar));
+        const auto isShown = [bar, side](int index) {
+            const auto *effect = qobject_cast<QGraphicsOpacityEffect *>(bar->tabButton(index, side)->graphicsEffect());
+            return !effect || effect->opacity() > 0;
+        };
+        QTRY_VERIFY(isShown(0) && !isShown(1) && !isShown(2));
+
+        const QPointF overThree = bar->tabRect(2).center();
+        QHoverEvent move(QEvent::HoverMove, overThree, bar->mapToGlobal(overThree), overThree);
+        QApplication::sendEvent(bar, &move);
+        QVERIFY(isShown(2));
+        QHoverEvent leave(QEvent::HoverLeave, QPointF(-1, -1), QPointF(-1, -1), overThree);
+        QApplication::sendEvent(bar, &leave);
+        QVERIFY(!isShown(2));
+
+        tabs.setCurrentIndex(1);
+        QVERIFY(isShown(1) && !isShown(0));
+        tabs.addTab(new QWidget, "four"); // a new tab's button too
+        QTRY_VERIFY(!isShown(3));
     }
 
     void addButtonFollowsTheLastTab()

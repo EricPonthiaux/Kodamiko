@@ -6,6 +6,7 @@
 
 class DiffView;
 class GitActions;
+class PopupHeader;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -48,7 +49,7 @@ private:
     QString workDir_;
     QList<Stash> stashes_;
 
-    QLabel *headerIcon_;
+    PopupHeader *header_;
     QStackedWidget *body_;
     QListWidget *list_;
     DiffView *diff_;

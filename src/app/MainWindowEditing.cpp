@@ -4,6 +4,7 @@
 #include "MainWindow.h"
 #include "claude/EditorContext.h"
 #include "claude/mcp/DuetTools.h"
+#include "diagnostics/ProblemStore.h"
 #include "editor/ChangeGutter.h"
 #include "editor/EditorStatus.h"
 #include "editor/EditorTabs.h"
@@ -34,6 +35,31 @@ void MainWindow::onCurrentTabChanged()
     if (filesPanel_->alwaysSelectOpenedFile() && !path.isEmpty())
         fileTree_->select(path);
     updateServerNotice();
+}
+
+void MainWindow::connectTreeToEditor()
+{
+    connect(fileTree_, &FileTreeView::filePreviewRequested, editorTabs_, &EditorTabs::openPreview);
+    connect(editorTabs_, &EditorTabs::openFilesChanged, this, [this] {
+        const QStringList paths = editorTabs_->openFilePaths();
+        fileTree_->setOpenFiles(QSet<QString>(paths.cbegin(), paths.cend()));
+    });
+    connect(problemStore_, &ProblemStore::changed, this, &MainWindow::updateTreeProblems);
+}
+
+void MainWindow::updateTreeProblems()
+{
+    ProblemCounts counts;
+    for (const QString &path : problemStore_->files()) {
+        ProblemCount &count = counts[path];
+        for (const Problem &problem : problemStore_->problems(path)) {
+            if (problem.severity == Diagnostic::Severity::Error)
+                ++count.errors;
+            else
+                ++count.warnings;
+        }
+    }
+    fileTree_->setProblems(counts);
 }
 
 void MainWindow::warmUpLanguageServer(EditorWidget *editor)

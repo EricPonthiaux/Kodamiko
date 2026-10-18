@@ -16,6 +16,10 @@
 
 namespace {
 
+// The tab close button: Fusion's 20 px square, plus the right margin the
+// style sheet keeps between it and the edge of the tab (ThemeStyle).
+constexpr int closeButtonWidth = 20 + 8;
+
 // Fusion with roomier menus (taller items, wider menu bar entries and a
 // margin around the item list of each popup menu) and filled tabs on
 // every tab bar.
@@ -47,6 +51,8 @@ public:
         case PM_MenuBarVMargin:
         case PM_MenuBarItemSpacing:
             return 2;
+        case PM_TabCloseIndicatorWidth:
+            return closeButtonWidth;
         default:
             return QProxyStyle::pixelMetric(metric, option, widget);
         }

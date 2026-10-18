@@ -76,12 +76,10 @@ DiffColors colorsFor(const Theme &theme)
     return {mix(theme.background, green, theme.isDark ? 0.13 : 0.10),
             mix(theme.background, red, theme.isDark ? 0.13 : 0.09),
             mix(theme.background, green, theme.isDark ? 0.34 : 0.28),
-            mix(theme.background, red, theme.isDark ? 0.34 : 0.24),
-            green,
-            red,
+            mix(theme.background, red, theme.isDark ? 0.34 : 0.24), green, red,
             mix(theme.background, theme.foreground, theme.isDark ? 0.07 : 0.05),
-            mix(theme.background, theme.accent, theme.isDark ? 0.09 : 0.06),
-            theme.mutedText};
+            // The block separators: neutral, fainter than the code.
+            mix(theme.background, theme.foreground, theme.isDark ? 0.035 : 0.03), theme.mutedText};
 }
 
 // Scintilla's colors: red in the low byte.
@@ -452,8 +450,11 @@ void DiffView::setFiles(const QList<DiffFile> &files)
 {
     lines_ = layout(files);
     paths_.clear();
-    for (const DiffFile &file : files)
+    summaries_.clear();
+    for (const DiffFile &file : files) {
         paths_.append(file.path);
+        summaries_.append({file.path, file.status, file.patch.addedLines(), file.patch.removedLines()});
+    }
     fileStarts_.clear();
     int largest = 0;
     for (int i = 0; i < lines_.size(); ++i) {
@@ -463,6 +464,7 @@ void DiffView::setFiles(const QList<DiffFile> &files)
     }
     numberWidth_ = std::max(3, static_cast<int>(QString::number(largest).size()));
     render();
+    emit contentChanged();
 }
 
 void DiffView::showMessage(const QString &message)
@@ -470,6 +472,7 @@ void DiffView::showMessage(const QString &message)
     lines_.clear();
     fileStarts_.clear();
     paths_.clear();
+    summaries_.clear();
     if (!message.isEmpty()) {
         Line note;
         note.kind = LineKind::Note;
@@ -477,6 +480,7 @@ void DiffView::showMessage(const QString &message)
         lines_.append(note);
     }
     render();
+    emit contentChanged();
 }
 
 DiffView::Location DiffView::locate(int line) const
@@ -487,6 +491,41 @@ DiffView::Location DiffView::locate(int line) const
 int DiffView::fileStart(int file) const
 {
     return fileStarts_.value(file, 0);
+}
+
+int DiffView::hunkStart(int line) const
+{
+    const Location location = locate(line);
+    if (location.hunk < 0)
+        return -1;
+    for (int i = line; i >= 0; --i) {
+        if (lines_[i].kind == LineKind::HunkHeader)
+            return i;
+    }
+    return -1;
+}
+
+void DiffView::goToChange(bool forward)
+{
+    const int first = firstVisibleLine();
+    const int step = forward ? 1 : -1;
+    for (int i = first + step; i >= 0 && i < lines_.size(); i += step) {
+        if (lines_[i].kind == LineKind::HunkHeader) {
+            setFirstVisibleLine(i);
+            return;
+        }
+    }
+}
+
+int DiffView::lineTop(int line) const
+{
+    const long position = SendScintilla(SCI_POSITIONFROMLINE, line);
+    return int(SendScintilla(SCI_POINTYFROMPOSITION, 0UL, position));
+}
+
+int DiffView::lineHeight() const
+{
+    return int(SendScintilla(SCI_TEXTHEIGHT, 0UL));
 }
 
 void DiffView::render()

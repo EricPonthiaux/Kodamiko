@@ -8,20 +8,23 @@
 
 #include <optional>
 
+class DiffHeaderBar;
 class DiffView;
 class QAction;
 class QLabel;
 class QLineEdit;
 class QSplitter;
+class QStackedWidget;
 class QTextBrowser;
 class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 
 // "History" mode: commits of HEAD (those touching the open folder),
-// filterable, across the whole view. Choosing a commit reveals its message
-// and files below; choosing a file reveals on the right its diff against
-// the first parent. The repository is only read.
+// filterable. Three panes that stay put whatever is chosen: the commits;
+// the chosen commit (its summary, author, date and ID, its message, its
+// files); the diff of the chosen file against the first parent. A narrow
+// window puts the commit under the list. The repository is only read.
 class HistoryView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(HistoryView)
@@ -38,8 +41,11 @@ public:
     // Only the commits that modify `relativePath` (a file or folder of the
     // open folder); empty shows them all again. Reloads the history.
     void setPathFilter(const QString &relativePath);
-
     void applyTheme(const Theme &theme);
+
+    // Whether the three panes are side by side (a wide window).
+    bool isWide() const { return wide_; }
+
     // Pane proportions, for the settings.
     QByteArray saveState() const;
     void restoreState(const QByteArray &state);
@@ -52,7 +58,12 @@ signals:
     // The commit's context menu: check it out without a branch.
     void checkoutRequested(const QString &id);
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
+    QWidget *createCommitPane();
+    QWidget *createDiffPane();
     void onLogRead(const std::optional<CommitLog> &log, const QString &error, int generation);
     void showLog(std::optional<CommitLog> log, const QString &error);
     void onDetailsRead(const QString &id, const std::optional<CommitDetails> &details, const QString &error);
@@ -61,11 +72,17 @@ private:
     void onCommitSelectionChanged();
     void onFileSelectionChanged();
     void showCommit(const QString &id);
+    void forgetCommit();
     void showDetails();
-    void showPane(QSplitter *splitter, double &share);
-    void hidePanes();
-    void showCommitMenu(const QPoint &position);
+    // The message's body, its other details: a few lines, all of them once
+    // expanded.
+    QString messageHtml(const CommitDetails &details) const;
     void fitMessage();
+    void showCommitMenu(const QPoint &position);
+    // Side by side, or the commit under the list, for the view's width.
+    void arrangePanes();
+    void applyShares();
+    void rememberShares();
 
     QString folder_;
     QString pathFilter_;
@@ -75,7 +92,6 @@ private:
     std::optional<CommitLog> log_;
     QString error_; // why there is no log_
     std::optional<CommitDetails> details_;
-
     // Reading runs on pool_, in order (see ChangesView); generation_
     // changes with the folder and the path filter.
     QThreadPool pool_;
@@ -83,21 +99,31 @@ private:
     bool reading_ = false;
     bool refreshPending_ = false;
     QString detailsWanted_; // commit whose details are being read
-    // Share of each splitter's second pane when it is visible.
-    double panelShare_ = 0.5;
-    double diffShare_ = 0.6;
+
+    // The commit pane's share of the commits and the commit, the diff's of
+    // the whole: the same in both arrangements.
+    double commitShare_ = 0.45;
+    double diffShare_ = 0.45;
+    bool wide_ = false;
+    bool arranging_ = false; // splitterMoved, while the panes are placed
 
     QLabel *summary_;
     QLineEdit *filter_;
     QTreeWidget *commits_;
-    QTreeWidget *files_;
-    QTextBrowser *message_;
-    DiffView *diff_;
-    QSplitter *splitter_;     // commits and commit pane on the left, diff on the right
-    QSplitter *leftSplitter_; // commits above the commit pane
-    QSplitter *panel_;        // message above the files
-    QWidget *commitPane_;     // panel_ with its title bar
-    QWidget *diffPane_;       // diff_ with its title bar
-    QLabel *commitTitle_;
-    QLabel *diffTitle_;
+    QSplitter *splitter_;     // the commits (and the commit when narrow), the commit, the diff
+    QSplitter *leftSplitter_; // the commits, the commit under them when narrow
+    QWidget *commitPane_ = nullptr;
+    QStackedWidget *commitPages_ = nullptr; // a hint, or the chosen commit
+    QLabel *commitSummary_ = nullptr;
+    QLabel *avatar_ = nullptr;
+    QLabel *commitMeta_ = nullptr;
+    QLabel *commitId_ = nullptr;
+    QToolButton *copyId_ = nullptr;
+    QTextBrowser *message_ = nullptr;
+    QToolButton *moreMessage_ = nullptr;
+    bool messageExpanded_ = false;
+    QLabel *commitStats_ = nullptr;
+    QTreeWidget *files_ = nullptr;
+    DiffHeaderBar *diffHeader_ = nullptr;
+    DiffView *diff_ = nullptr;
 };

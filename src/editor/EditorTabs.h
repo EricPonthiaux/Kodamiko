@@ -3,6 +3,7 @@
 #include "CodeFormatter.h"
 #include "EditorWidget.h"
 #include "FileWatcher.h"
+#include "PreviewTab.h"
 #include "ui/Theme.h"
 
 #include <QHash>
@@ -27,6 +28,10 @@ public:
     // image in a viewer, or a diagram (Mermaid, PlantUML…) in the diagram editor. Returns
     // the tab, or nullptr on failure.
     QWidget *openFile(const QString &path);
+    // Shows the file in the preview tab (see PreviewTab), in place of the
+    // previous preview, leaving the focus where it is; a file already open
+    // is only brought to the front. Returns the tab, or nullptr on failure.
+    QWidget *openPreview(const QString &path);
     void showDiff(const QString &title, const QString &diffText);
     // A tab for `page`, which shows no file (Claude drawing a diagram…).
     void showPage(QWidget *page, const QString &title, const QString &iconName);
@@ -110,14 +115,21 @@ signals:
     void definitionRequested();
     // A file was opened in a new text editor (not emitted for diffs).
     void editorOpened(EditorWidget *editor);
+    // A tab was opened or closed: openFilePaths() may have changed.
+    void openFilesChanged();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void tabInserted(int index) override;
     void tabRemoved(int index) override;
 
 private:
     // Duet's mark, centered, when no file is open.
     void paintEmptyMark();
+    // Adds a tab, before the preview's.
+    int addPage(QWidget *page, const QString &title);
+    // The tab showing the file at `absolutePath`, null if none.
+    QWidget *pageFor(const QString &absolutePath) const;
     QWidget *openImage(const QString &absolutePath);
     // The diagram editor's tab; null, with `error`, if Duet cannot read the
     // diagram (the file then opens as text).
@@ -165,4 +177,5 @@ private:
     // Editors whose formatter is running, and whether to save them after.
     QHash<EditorWidget *, bool> formatting_;
     EditorOptions editorOptions_;
+    PreviewTab preview_{this};
 };

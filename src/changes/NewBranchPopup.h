@@ -4,10 +4,11 @@
 #include "ui/OverlayPopup.h"
 #include "ui/Theme.h"
 
+class PopupHeader;
 class QLabel;
 class QLineEdit;
 class QPushButton;
-class ToggleSwitch;
+class QCheckBox;
 
 // Git ▸ New Branch, a small popup over the window: the branch's name,
 // checked as it is typed, and whether to switch to it. The branch starts at
@@ -26,7 +27,7 @@ public:
 
     QLineEdit *nameField() const { return name_; }
 
-    ToggleSwitch *switchToggle() const { return switchTo_; }
+    QCheckBox *switchToggle() const { return switchTo_; }
 
     QPushButton *createButton() const { return create_; }
 
@@ -47,10 +48,9 @@ private:
 
     Theme theme_;
     QStringList existing_;
-    QLabel *headerIcon_;
-    QLabel *origin_;
+    PopupHeader *header_;
     QLineEdit *name_;
     QLabel *message_;
-    ToggleSwitch *switchTo_;
+    QCheckBox *switchTo_;
     QPushButton *create_;
 };

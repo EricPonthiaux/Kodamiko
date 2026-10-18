@@ -5,6 +5,7 @@
 #include "ui/Theme.h"
 
 class GitActions;
+class PopupHeader;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -64,8 +65,7 @@ private:
     QString current_; // the current branch, empty when detached
     QList<BranchInfo> branches_;
 
-    QLabel *headerIcon_;
-    QLabel *subtitle_;
+    PopupHeader *header_;
     QLineEdit *filter_;
     QListWidget *list_;
     QLabel *empty_;

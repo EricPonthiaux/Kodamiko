@@ -6,6 +6,7 @@
 #include "EditorWidget.h"
 #include "PreviewPage.h"
 #include "ui/BrandMark.h"
+#include "ui/HoverCloseButtons.h"
 #include "ui/UiIcons.h"
 #include "viewers/ImageView.h"
 #include "workspace/FileIcons.h"
@@ -13,6 +14,7 @@
 #include "viewers/DiagramView.h"
 #endif
 
+#include <QApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QMenu>
@@ -59,6 +61,7 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(tabBar(), &QWidget::customContextMenuRequested, this, &EditorTabs::showTabContextMenu);
     connect(&watcher_, &FileWatcher::fileChanged, this, &EditorTabs::syncWithDisk);
+    new HoverCloseButtons(tabBar());
 }
 
 void EditorTabs::paintEvent(QPaintEvent *event)
@@ -91,30 +94,75 @@ void EditorTabs::paintEmptyMark()
     BrandMark::paint(&painter, area, theme_.mutedText, theme_.accent);
 }
 
+void EditorTabs::tabInserted(int index)
+{
+    QTabWidget::tabInserted(index);
+    emit openFilesChanged();
+}
+
 void EditorTabs::tabRemoved(int index)
 {
     QTabWidget::tabRemoved(index);
+    preview_.tabRemoved();
     update(); // the last tab gone, the mark appears
+    emit openFilesChanged();
+}
+
+int EditorTabs::addPage(QWidget *page, const QString &title)
+{
+    return insertTab(preview_.insertionIndex(), page, title);
+}
+
+QWidget *EditorTabs::pageFor(const QString &absolutePath) const
+{
+    for (int i = 0; i < count(); ++i) {
+        if (filePathOf(widget(i)) == absolutePath)
+            return widget(i);
+    }
+    return nullptr;
+}
+
+QWidget *EditorTabs::openPreview(const QString &path)
+{
+    const QString absolutePath = QFileInfo(path).absoluteFilePath();
+    if (QWidget *open = pageFor(absolutePath)) {
+        setCurrentWidget(open);
+        return open;
+    }
+    if (const QWidget *previous = preview_.page())
+        closeTab(indexOf(previous)); // kept as soon as edited: nothing to save
+    QWidget *focused = QApplication::focusWidget();
+    QWidget *page = openFile(absolutePath);
+    if (!page)
+        return nullptr;
+    preview_.setPage(page);
+    // Edited: kept open.
+    if (const EditorWidget *editor = editorIn(page))
+        connect(editor, &EditorWidget::modificationChanged, this, [this, page] { preview_.keep(page); });
+#ifdef DUET_WITH_DIAGRAMS
+    if (const auto *diagram = qobject_cast<DiagramView *>(page))
+        connect(diagram, &DiagramView::modificationChanged, this, [this, page] { preview_.keep(page); });
+#endif
+    if (focused)
+        focused->setFocus();
+    return page;
 }
 
 QWidget *EditorTabs::openFile(const QString &path)
 {
     const QString absolutePath = QFileInfo(path).absoluteFilePath();
-    if (EditorWidget *existing = editorFor(absolutePath)) {
-        setCurrentWidget(pageOf(existing));
-        return pageOf(existing);
-    }
-    if (ImageView *existing = imageViewFor(absolutePath)) {
-        setCurrentWidget(existing);
-        return existing;
+    if (QWidget *open = pageFor(absolutePath)) {
+        // Opened for good: a preview is kept, and takes the focus as a new tab.
+        const bool wasPreview = open == preview_.page();
+        preview_.keep(open);
+        setCurrentWidget(open);
+        if (wasPreview)
+            open->setFocus();
+        return open;
     }
     if (ImageView::isImageFile(absolutePath))
         return openImage(absolutePath);
 #ifdef DUET_WITH_DIAGRAMS
-    if (DiagramView *existing = diagramViewFor(absolutePath)) {
-        setCurrentWidget(existing);
-        return existing;
-    }
     if (DiagramView::isDiagramFile(absolutePath)) {
         // A diagram Duet does not read (a Mermaid pie chart, a source with
         // errors) is still a text file.
@@ -144,7 +192,7 @@ QWidget *EditorTabs::openFile(const QString &path)
                 [this](const QString &linkedPath) { openFile(linkedPath); });
         page = previewed;
     }
-    const int index = addTab(page, QFileInfo(absolutePath).fileName());
+    const int index = addPage(page, QFileInfo(absolutePath).fileName());
     updateTabIcon(page);
     setTabToolTip(index, absolutePath);
     setCurrentIndex(index);
@@ -166,7 +214,7 @@ QWidget *EditorTabs::openImage(const QString &absolutePath)
         return nullptr;
     }
 
-    const int index = addTab(view, QFileInfo(absolutePath).fileName());
+    const int index = addPage(view, QFileInfo(absolutePath).fileName());
     updateTabIcon(view);
     setTabToolTip(index, absolutePath);
     setCurrentIndex(index);
@@ -189,7 +237,7 @@ QWidget *EditorTabs::openDiagram(const QString &absolutePath, QString *error)
         return nullptr;
     }
 
-    const int index = addTab(view, QFileInfo(absolutePath).fileName());
+    const int index = addPage(view, QFileInfo(absolutePath).fileName());
     updateTabIcon(view);
     setTabToolTip(index, absolutePath);
     setCurrentIndex(index);
@@ -209,7 +257,7 @@ void EditorTabs::showDiff(const QString &title, const QString &diffText)
     auto *view = new EditorWidget(theme_, this);
     view->setOptions(editorOptions_);
     view->showReadOnlyText(diffText.isEmpty() ? tr("(no textual differences)") : diffText, QStringLiteral("diff"));
-    const int index = addTab(view, title);
+    const int index = addPage(view, title);
     updateTabIcon(view);
     setCurrentIndex(index);
 }
@@ -217,7 +265,7 @@ void EditorTabs::showDiff(const QString &title, const QString &diffText)
 void EditorTabs::showPage(QWidget *page, const QString &title, const QString &iconName)
 {
     page->setProperty("iconName", iconName);
-    const int index = addTab(page, title);
+    const int index = addPage(page, title);
     updateTabIcon(page);
     setCurrentIndex(index);
 }
@@ -253,7 +301,7 @@ EditorWidget *EditorTabs::showText(const QString &title,
         view->setProperty("textTitle", title);
         view->setProperty("iconName", iconName);
         view->showReadOnlyText(text, languageId);
-        addTab(view, title);
+        addPage(view, title);
         updateTabIcon(view);
     }
     setCurrentWidget(view);
@@ -370,7 +418,7 @@ QList<QWidget *> EditorTabs::pagesUnder(const QString &path) const
 
 bool EditorTabs::hasUnsavedChangesUnder(const QString &path) const
 {
-    return std::ranges::any_of(pagesUnder(path), [this](QWidget *page) {
+    return std::ranges::any_of(pagesUnder(path), [](QWidget *page) {
         if (const auto *editor = editorIn(page); editor && editor->isModified())
             return true;
 #ifdef DUET_WITH_DIAGRAMS

@@ -3,7 +3,6 @@
 #include "DiffView.h"
 #include "GitActions.h"
 #include "SnapshotsPopup.h"
-#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -17,8 +16,8 @@
 namespace {
 
 constexpr const char *stashRules = R"(
-QListWidget#stashList { background: transparent; border: none; outline: 0; }
-QListWidget#stashList::item { padding: 8px 10px; border-radius: 8px; }
+QListWidget#stashList { background: transparent; border: none; border-right: 1px solid @line; outline: 0; }
+QListWidget#stashList::item { padding: 6px 8px; border-radius: 2px; }
 QListWidget#stashList::item:hover { background: @hover; }
 QListWidget#stashList::item:selected { background: @selection; color: @accentText; }
 QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
@@ -40,7 +39,7 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     : OverlayPopup(QStringLiteral("stashes"), QSizeF(0.7, 0.75), QSize(860, 540), parent)
     , theme_(theme)
     , actions_(actions)
-    , headerIcon_(new QLabel(this))
+    , header_(new PopupHeader(QStringLiteral("files"), tr("Stashes"), this))
     , body_(new QStackedWidget(this))
     , list_(new QListWidget(this))
     , diff_(new DiffView(theme, this))
@@ -49,26 +48,14 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     , apply_(new QPushButton(tr("Apply"), this))
     , pop_(new QPushButton(tr("Pop"), this))
 {
-    auto *title = new QLabel(tr("Stashes"), this);
-    AppFonts::setInterfaceFont(title, 1.5);
-    auto *description = new QLabel(tr("Changes put aside, to bring back on this branch or another one."), this);
-    description->setObjectName(QStringLiteral("pageDescription"));
-    description->setWordWrap(true);
-    auto *heading = new QVBoxLayout;
-    heading->setSpacing(4);
-    heading->addWidget(title);
-    heading->addWidget(description);
+    header_->setSubtitle(tr("Changes put aside, to bring back on this branch or another one."));
+    connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
     auto *stashChanges = new QPushButton(tr("Stash Changes…"), this);
     connect(stashChanges, &QPushButton::clicked, this, [this] {
         dismiss();
         actions_->stashChanges();
     });
-    auto *header = new QHBoxLayout;
-    header->setContentsMargins(28, 22, 28, 0);
-    header->setSpacing(14);
-    header->addWidget(headerIcon_, 0, Qt::AlignTop);
-    header->addLayout(heading, 1);
-    header->addWidget(stashChanges, 0, Qt::AlignTop);
+    header_->addButton(stashChanges);
 
     list_->setObjectName(QStringLiteral("stashList"));
     list_->setTextElideMode(Qt::ElideRight);
@@ -76,17 +63,11 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     connect(list_, &QListWidget::currentRowChanged, this, &StashesPopup::showSelected);
     connect(list_, &QListWidget::itemActivated, this,
             [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, true); }); });
-    auto *listCard = new QFrame(this);
-    listCard->setObjectName(QStringLiteral("settingsCard"));
-    auto *listLayout = new QVBoxLayout(listCard);
-    listLayout->setContentsMargins(4, 6, 4, 6);
-    listLayout->addWidget(list_);
-
     auto *columns = new QWidget(this);
     auto *columnsLayout = new QHBoxLayout(columns);
-    columnsLayout->setContentsMargins(28, 0, 28, 18);
-    columnsLayout->setSpacing(14);
-    columnsLayout->addWidget(listCard, 4);
+    columnsLayout->setContentsMargins(16, 12, 16, 12);
+    columnsLayout->setSpacing(12);
+    columnsLayout->addWidget(list_, 4);
     columnsLayout->addWidget(diff_, 7);
     body_->addWidget(columns);
     emptyText_->setObjectName(QStringLiteral("pageDescription"));
@@ -106,7 +87,7 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     connect(pop_, &QPushButton::clicked, this,
             [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, true); }); });
     auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(28, 12, 18, 14);
+    footerLayout->setContentsMargins(16, 10, 16, 10);
     footerLayout->setSpacing(8);
     footerLayout->addWidget(hint, 1);
     footerLayout->addWidget(drop_);
@@ -116,8 +97,7 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
-    layout->addLayout(header);
-    layout->addSpacing(18);
+    layout->addWidget(header_);
     layout->addWidget(body_, 1);
     layout->addWidget(footer);
 
@@ -128,7 +108,7 @@ void StashesPopup::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(stashRules)));
-    headerIcon_->setPixmap(iconTile(QStringLiteral("files"), theme, 40, devicePixelRatioF()));
+    header_->applyTheme(theme);
     diff_->applyTheme(theme);
 }
 

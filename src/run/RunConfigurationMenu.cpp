@@ -1,10 +1,10 @@
 #include "RunConfigurationMenu.h"
 
+#include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
 
 #include <QDir>
 #include <QLabel>
-#include <QLinearGradient>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -89,9 +89,9 @@ protected:
         if (highlighted)
             paintHighlight(painter);
         const QRectF tile(10, (height() - tileSize) / 2.0, tileSize, tileSize);
-        paintTile(painter, tile, highlighted);
-        const int right = paintState(painter, highlighted);
-        paintText(painter, {int(tile.right()) + 12, right}, highlighted);
+        paintTile(painter, tile);
+        const int right = paintState(painter);
+        paintText(painter, {int(tile.right()) + 12, right});
     }
 
 private:
@@ -104,60 +104,49 @@ private:
     void paintHighlight(QPainter &painter) const
     {
         const QRectF frame = QRectF(rect()).adjusted(0, 1, 0, -1);
-        QLinearGradient gradient(frame.topLeft(), frame.topRight());
-        gradient.setColorAt(0, content_.theme.gradientStart);
-        gradient.setColorAt(1, content_.theme.gradientEnd);
         QPainterPath path;
-        path.addRoundedRect(frame, 6, 6);
-        painter.fillPath(path, gradient);
+        path.addRoundedRect(frame, 2, 2);
+        painter.fillPath(path, ThemeStyle::selectionColor(content_.theme));
     }
 
-    QColor tileColor(bool highlighted) const
+    QColor tileColor() const
     {
-        if (highlighted)
-            return {255, 255, 255, 40};
         QColor color = content_.isRunning ? runningColor : content_.theme.accent;
         color.setAlpha(content_.isRunning ? 46 : 38);
         return color;
     }
 
-    QColor iconColor(bool highlighted) const
-    {
-        if (highlighted)
-            return Qt::white;
-        return content_.isRunning ? runningColor : content_.theme.accent;
-    }
+    QColor iconColor() const { return content_.isRunning ? runningColor : content_.theme.accent; }
 
     // The kind, on a rounded tile.
-    void paintTile(QPainter &painter, const QRectF &tile, bool highlighted) const
+    void paintTile(QPainter &painter, const QRectF &tile) const
     {
         QPainterPath tilePath;
-        tilePath.addRoundedRect(tile, 6, 6);
-        painter.fillPath(tilePath, tileColor(highlighted));
-        const QIcon icon = UiIcons::icon(iconOf(content_.configuration.kind), iconColor(highlighted));
+        tilePath.addRoundedRect(tile, 3, 3);
+        painter.fillPath(tilePath, tileColor());
+        const QIcon icon = UiIcons::icon(iconOf(content_.configuration.kind), iconColor());
         icon.paint(&painter, QRect(int(tile.center().x()) - iconSize / 2, int(tile.center().y()) - iconSize / 2,
                                    iconSize, iconSize));
     }
 
     // On the right: the state. Returns where the text must end.
-    int paintState(QPainter &painter, bool highlighted) const
+    int paintState(QPainter &painter) const
     {
         int right = width() - 12;
         if (content_.isSelected) {
             const QRect check(right - iconSize, (height() - iconSize) / 2, iconSize, iconSize);
-            UiIcons::icon(QStringLiteral("check"), highlighted ? QColor(Qt::white) : content_.theme.accent)
-                .paint(&painter, check);
+            UiIcons::icon(QStringLiteral("check"), content_.theme.accent).paint(&painter, check);
             right = check.left() - 8;
         }
         if (content_.isRunning)
-            right = paintRunning(painter, right, highlighted);
+            right = paintRunning(painter, right);
         return right;
     }
 
     // "Running" and its dot, ending at `right`. Returns where they start.
-    int paintRunning(QPainter &painter, int right, bool highlighted) const
+    int paintRunning(QPainter &painter, int right) const
     {
-        const QColor color = highlighted ? QColor(Qt::white) : runningColor;
+        const QColor &color = runningColor;
         QFont small = font();
         small.setPointSizeF(small.pointSizeF() * 0.85);
         painter.setFont(small);
@@ -173,7 +162,7 @@ private:
     }
 
     // Name above, command below.
-    void paintText(QPainter &painter, TextSpan span, bool highlighted) const
+    void paintText(QPainter &painter, TextSpan span) const
     {
         const int textWidth = span.right - span.left;
         QFont nameFont = font();
@@ -185,11 +174,11 @@ private:
         commandFont.setPointSizeF(commandFont.pointSizeF() * 0.85);
         const QFontMetrics commandMetrics(commandFont);
         const int top = (height() - nameMetrics.height() - commandMetrics.height() - 1) / 2;
-        painter.setPen(highlighted ? QColor(Qt::white) : content_.theme.foreground);
+        painter.setPen(content_.theme.foreground);
         painter.drawText(QRect(span.left, top, textWidth, nameMetrics.height()), Qt::AlignLeft | Qt::AlignVCenter,
                          nameMetrics.elidedText(content_.configuration.name, Qt::ElideRight, textWidth));
         painter.setFont(commandFont);
-        painter.setPen(highlighted ? QColor(255, 255, 255, 190) : content_.theme.mutedText);
+        painter.setPen(content_.theme.mutedText);
         QString command = content_.configuration.command;
         if (!content_.configuration.folder.isEmpty())
             command = content_.configuration.folder + QStringLiteral(" › ") + command;

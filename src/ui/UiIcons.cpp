@@ -146,6 +146,53 @@ const QHash<QString, Painter> &painters()
              p.drawEllipse(QRectF(7.5, 6.5, 5, 5));
              p.drawLine(QPointF(11.8, 11.8), QPointF(14, 14));
          }},
+        // Go to File: a page with a folded corner, a magnifier over it.
+        {QStringLiteral("find-file"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF({QPointF(11, 6.5), QPointF(11, 4.5), QPointF(8, 1.5), QPointF(2.5, 1.5),
+                                       QPointF(2.5, 14.5), QPointF(6.5, 14.5)}));
+             p.drawPolyline(QPolygonF({QPointF(7.5, 1.5), QPointF(7.5, 5), QPointF(11, 5)}));
+             p.drawEllipse(QPointF(10.2, 10.2), 2.7, 2.7);
+             p.drawLine(QPointF(12.2, 12.2), QPointF(14.5, 14.5));
+         }},
+        // Find in Files: a folder, a magnifier over it.
+        {QStringLiteral("find-in-folder"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF({QPointF(6.5, 13.5), QPointF(1.5, 13.5), QPointF(1.5, 2.5), QPointF(5.5, 2.5),
+                                       QPointF(7, 4.5), QPointF(14.5, 4.5), QPointF(14.5, 7)}));
+             p.drawEllipse(QPointF(10.2, 10.2), 2.7, 2.7);
+             p.drawLine(QPointF(12.2, 12.2), QPointF(14.5, 14.5));
+         }},
+        // Command palette: a bare prompt, ">_".
+        {QStringLiteral("command"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF({QPointF(2.5, 4), QPointF(7, 8), QPointF(2.5, 12)}));
+             p.drawLine(QPointF(8.5, 12.5), QPointF(13.5, 12.5));
+         }},
+        // A folder.
+        {QStringLiteral("folder"),
+         [](QPainter &p) {
+             p.drawPolygon(QPolygonF({QPointF(1.5, 13.5), QPointF(1.5, 2.5), QPointF(5.5, 2.5), QPointF(7, 4.5),
+                                      QPointF(14.5, 4.5), QPointF(14.5, 13.5)}));
+         }},
+        // Copy: two sheets, one over the other.
+        {QStringLiteral("copy"),
+         [](QPainter &p) {
+             p.drawRoundedRect(QRectF(5.5, 5.5, 8, 8), 1.5, 1.5);
+             p.drawPolyline(QPolygonF(
+                 {QPointF(10.5, 3.5), QPointF(10.5, 2.5), QPointF(2.5, 2.5), QPointF(2.5, 10.5), QPointF(3.5, 10.5)}));
+         }},
+        // Previous and next: chevrons up and down.
+        {QStringLiteral("up"),
+         [](QPainter &p) { p.drawPolyline(QPolygonF({QPointF(4, 10), QPointF(8, 6), QPointF(12, 10)})); }},
+        {QStringLiteral("down"),
+         [](QPainter &p) { p.drawPolyline(QPolygonF({QPointF(4, 6), QPointF(8, 10), QPointF(12, 6)})); }},
+        // Close: a cross.
+        {QStringLiteral("close"),
+         [](QPainter &p) {
+             p.drawLine(QPointF(4, 4), QPointF(12, 12));
+             p.drawLine(QPointF(12, 4), QPointF(4, 12));
+         }},
         {QStringLiteral("plus"),
          [](QPainter &p) {
              p.drawLine(QPointF(8, 3), QPointF(8, 13));

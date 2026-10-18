@@ -28,6 +28,8 @@ public:
     QToolButton *scopeButton() const { return scope_; }
 
     bool alwaysSelectOpenedFile() const;
+    // The speed search filters the tree (see FileTreeView); applied to the tree.
+    void setFilterWhileTyping(bool enabled);
     void setAlwaysSelectOpenedFile(bool enabled);
     // Options menu entries for the tree's layout; applied to the tree.
     void setTreeOptions(const ProjectTreeModel::Options &options);
@@ -38,6 +40,7 @@ signals:
     // Select Opened File: the window knows which file is open.
     void selectOpenedFileRequested();
     void alwaysSelectOpenedFileChanged(bool enabled);
+    void filterWhileTypingChanged(bool enabled);
     void treeOptionsChanged(const ProjectTreeModel::Options &options);
 
 private:
@@ -50,6 +53,7 @@ private:
     QToolButton *collapse_;
     QToolButton *options_;
     QAction *alwaysSelect_;
+    QAction *filterWhileTyping_;
     QAction *compactFolders_;
     QAction *nestFiles_;
     QAction *showIgnored_;

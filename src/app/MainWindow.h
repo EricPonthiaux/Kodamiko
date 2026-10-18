@@ -120,6 +120,10 @@ private:
     void createFilesPanel();
     // The Files tree's options, as the user last set them.
     void restoreTreeOptions();
+    // The file tree follows the editor and the problems: preview tab, open
+    // files, errors and warnings.
+    void connectTreeToEditor();
+    void updateTreeProblems();
     void createClaudeConfigView();
     void createProblemsAndOutline();
     // The editor tabs with the find bar and the notices above them.

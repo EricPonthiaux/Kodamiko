@@ -10,12 +10,12 @@
 #include <optional>
 #include <utility>
 
-class CommitMessageGenerator;
+class CommitPanel;
+class DiffHeaderBar;
+class HunkActions;
 class DiffView;
 class GitCommands;
-class QCheckBox;
 class QLabel;
-class QPlainTextEdit;
 class QPushButton;
 class QSplitter;
 class QToolButton;
@@ -118,12 +118,6 @@ private:
     void showDiffMenu(const QPoint &position);
     void showListMenu(const QPoint &position);
 
-    void onAmendToggled(bool amend);
-    void onGeneratingChanged(bool generating);
-    void showGeneratedMessage(const QString &message);
-    void commit();
-    void runCommit(const QString &message, bool amend, bool stageEverything);
-
     GitCommands *commands_;
     QString folder_;
     std::optional<RepositoryStatus> status_;
@@ -145,16 +139,14 @@ private:
     QPushButton *abortButton_;
     QTreeWidget *list_;
     DiffView *diff_;
+    DiffHeaderBar *diffHeader_;
+    HunkActions *hunkActions_;
     QSplitter *splitter_;
     QToolButton *stageButton_;
     QToolButton *unstageButton_;
     QToolButton *discardButton_;
     QToolButton *refreshButton_;
-    QPlainTextEdit *message_;
-    QCheckBox *amend_;
-    QToolButton *generateButton_;
-    QPushButton *commitButton_;
-    CommitMessageGenerator *generator_;
+    CommitPanel *commitPanel_;
 
     // Displayed diff: files of one section.
     Section shownSection_ = Section::Unstaged;

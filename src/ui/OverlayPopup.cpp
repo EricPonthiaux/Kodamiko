@@ -9,7 +9,11 @@
 
 namespace {
 
-constexpr int radius = 12;
+constexpr int radius = 4;
+// The shadow spreads this far, within the room kept for resizing
+// (shadowWidth), and drops this much below the panel.
+constexpr int shadowSpread = 8;
+constexpr int shadowDrop = 2;
 constexpr int windowMargin = 24; // between the panel and the window's edges
 
 } // namespace
@@ -191,12 +195,12 @@ void OverlayPopup::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::Antialiasing);
     const QRectF panel = QRectF(rect()).adjusted(shadowWidth, shadowWidth, -shadowWidth, -shadowWidth);
     const bool dark = palette().color(QPalette::Window).lightness() < 128;
-    // The shadow, a little lower than the panel.
+    // A short, discreet shadow, a little lower than the panel.
     painter.setPen(Qt::NoPen);
-    for (int i = shadowWidth; i > 0; --i) {
-        const qreal share = 1.0 - qreal(i) / shadowWidth;
-        painter.setBrush(QColor(0, 0, 0, qRound((dark ? 60 : 32) * share * share / 3.0)));
-        painter.drawRoundedRect(panel.adjusted(-i, -i + 3, i, i + 3), radius + i, radius + i);
+    for (int i = shadowSpread; i > 0; --i) {
+        const qreal share = 1.0 - qreal(i) / shadowSpread;
+        painter.setBrush(QColor(0, 0, 0, qRound((dark ? 48 : 24) * share * share / 3.0)));
+        painter.drawRoundedRect(panel.adjusted(-i, -i + shadowDrop, i, i + shadowDrop), radius + i, radius + i);
     }
     painter.setBrush(palette().color(QPalette::AlternateBase));
     painter.setPen(QPen(palette().color(QPalette::Mid), 1));

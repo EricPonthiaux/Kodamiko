@@ -3,11 +3,10 @@
 #include "git/GitProcess.h"
 #include "history/HistoryView.h"
 
+#include <QLabel>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
-#include <QTextBrowser>
-#include <QToolButton>
 #include <QTreeWidget>
 #include <QtTest>
 
@@ -217,29 +216,35 @@ private slots:
         QVERIFY(commits && files);
         const auto *diff = view.findChild<DiffView *>();
 
-        // Initially, the list alone, with no commit chosen.
+        // Initially, every pane in place, with no commit chosen.
         QCOMPARE(commits->topLevelItemCount(), 2);
         QVERIFY(commits->selectedItems().isEmpty());
-        QVERIFY(!files->isVisibleTo(&view));
-        QVERIFY(!diff->isVisibleTo(&view));
+        QVERIFY(!files->isVisibleTo(&view)); // a hint in its place
+        QVERIFY(diff->isVisibleTo(&view));
+        QVERIFY(diff->text().isEmpty());
 
         // A commit chosen: its message and files, no diff yet.
         commits->setCurrentItem(commits->topLevelItem(0));
-        QVERIFY(files->isVisibleTo(&view));
         QTRY_COMPARE(files->topLevelItemCount(), 2);
-        QVERIFY(view.findChild<QTextBrowser *>()->toPlainText().contains("second"));
-        QVERIFY(!diff->isVisibleTo(&view));
+        QVERIFY(files->isVisibleTo(&view));
+        const QStringList labels = [&view] {
+            QStringList texts;
+            for (const QLabel *label : view.findChildren<QLabel *>())
+                texts.append(label->text());
+            return texts;
+        }();
+        QVERIFY(labels.contains("second"));
+        QVERIFY(diff->text().isEmpty());
 
         // A file chosen: its diff, and only that one.
         files->setCurrentItem(files->topLevelItem(1));
-        QVERIFY(diff->isVisibleTo(&view));
         QVERIFY(diff->text().contains("b.txt"));
         QVERIFY(!diff->text().contains("a.txt"));
 
-        // Another commit: the diff disappears until a file is chosen.
+        // Another commit: the diff empties until a file is chosen.
         commits->setCurrentItem(commits->topLevelItem(1));
         QTRY_COMPARE(files->topLevelItemCount(), 1);
-        QVERIFY(!diff->isVisibleTo(&view));
+        QVERIFY(diff->text().isEmpty());
 
         // A new commit: the selection stays on the chosen commit.
         commit(dir, "third", {{"c.txt", "c\n"}});
@@ -249,27 +254,22 @@ private slots:
         QCOMPARE(commits->currentItem()->text(0), QStringLiteral("first"));
         QCOMPARE(files->topLevelItemCount(), 1);
         QVERIFY(files->isVisibleTo(&view));
+    }
 
-        // The diff's close button closes it, then the commit's.
-        const auto closeButton = [&view](const QString &tip) {
-            for (auto *button : view.findChildren<QToolButton *>())
-                if (button->toolTip() == tip)
-                    return button;
-            return static_cast<QToolButton *>(nullptr);
-        };
-        files->setCurrentItem(files->topLevelItem(0));
-        QVERIFY(diff->isVisibleTo(&view));
-        closeButton("Close diff")->click();
-        QVERIFY(!diff->isVisibleTo(&view));
-        QVERIFY(files->isVisibleTo(&view));
-        closeButton("Close commit")->click();
-        QVERIFY(!files->isVisibleTo(&view));
-        QVERIFY(commits->selectedItems().isEmpty());
+    void widePanesStandSideBySide()
+    {
+        HistoryView view(Theme::dark());
+        view.resize(1400, 700);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        QTRY_VERIFY(view.isWide());
+        const auto *files = view.findChild<QTreeWidget *>("files");
+        const auto *commits = view.findChild<QTreeWidget *>("commits");
+        // Side by side: the commit pane starts right of the commits.
+        QVERIFY(files->mapTo(&view, QPoint()).x() > commits->mapTo(&view, QPoint()).x() + commits->width() - 1);
 
-        // The closed pane stays closed after a refresh.
-        view.refresh();
-        QTRY_COMPARE(refreshed.size(), 3);
-        QVERIFY(!files->isVisibleTo(&view));
+        view.resize(900, 700);
+        QTRY_VERIFY(!view.isWide());
     }
 
 private:

@@ -4,6 +4,7 @@
 #include "EntryPopups.h"
 #include "FileIcons.h"
 #include "FileOperations.h"
+#include "LastCommits.h"
 #include "ProjectTreeModel.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/TreeMetrics.h"
@@ -18,6 +19,7 @@
 #include <QDragEnterEvent>
 #include <QFileInfo>
 #include <QHeaderView>
+#include <QHelpEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenu>
@@ -25,6 +27,7 @@
 #include <QPainter>
 #include <QSortFilterProxyModel>
 #include <QStyledItemDelegate>
+#include <QToolTip>
 #include <QUrl>
 
 #include <algorithm>
@@ -32,9 +35,6 @@
 
 namespace {
 
-constexpr int pathRole = Qt::UserRole + 100;
-// The git state of a file as one letter (M, A, U...), shown at the row's end.
-constexpr int statusLetterRole = Qt::UserRole + 101;
 // At most this many folders stay pinned at the top, and in at most this
 // share of the height (as VS Code).
 constexpr int maximumStickyRows = 7;
@@ -42,82 +42,9 @@ constexpr qreal maximumStickyShare = 0.4;
 // Clipboard marker of files cut in the tree: pasting them moves them.
 const QString cutFormat = QStringLiteral("application/x-duet-cut");
 
-// Colors of IntelliJ's file states (Darcula and light themes).
-QColor statusColor(FileStatus status, bool dark)
-{
-    switch (status) {
-    case FileStatus::Modified:
-    case FileStatus::Renamed:
-        return QColor::fromRgb(dark ? 0x6897bb : 0x0032a0);
-    case FileStatus::Added:
-        return QColor::fromRgb(dark ? 0x629755 : 0x067d17);
-    case FileStatus::Untracked:
-        return QColor::fromRgb(dark ? 0xd1675a : 0x993300);
-    case FileStatus::Conflicted:
-        return QColor::fromRgb(dark ? 0xd5756c : 0xc00000);
-    case FileStatus::Ignored:
-        return QColor::fromRgb(dark ? 0x848504 : 0x808000);
-    }
-    return {};
-}
-
-QString statusName(FileStatus status)
-{
-    switch (status) {
-    case FileStatus::Modified:
-        return FileTreeView::tr("modified");
-    case FileStatus::Renamed:
-        return FileTreeView::tr("renamed");
-    case FileStatus::Added:
-        return FileTreeView::tr("added");
-    case FileStatus::Untracked:
-        return FileTreeView::tr("not tracked by git");
-    case FileStatus::Conflicted:
-        return FileTreeView::tr("in conflict");
-    case FileStatus::Ignored:
-        return FileTreeView::tr("ignored by git");
-    }
-    return {};
-}
-
-// VS Code's letters for the git states.
-QString statusLetter(FileStatus status)
-{
-    switch (status) {
-    case FileStatus::Modified:
-        return QStringLiteral("M");
-    case FileStatus::Renamed:
-        return QStringLiteral("R");
-    case FileStatus::Added:
-        return QStringLiteral("A");
-    case FileStatus::Untracked:
-        return QStringLiteral("U");
-    case FileStatus::Conflicted:
-        return QStringLiteral("C");
-    case FileStatus::Ignored:
-        return {};
-    }
-    return {};
-}
-
 bool isDarkPalette(const QPalette &palette)
 {
     return palette.color(QPalette::Base).lightness() < 128;
-}
-
-// Roles that TreeDecorations answers itself, for the first column.
-bool isDecoratedRole(int role)
-{
-    switch (role) {
-    case Qt::ForegroundRole:
-    case Qt::DecorationRole:
-    case Qt::ToolTipRole:
-    case pathRole:
-    case statusLetterRole:
-        return true;
-    default:
-        return false;
-    }
 }
 
 // Whether moving `entry` into `destination` would put a folder inside itself.
@@ -163,155 +90,10 @@ QList<qsizetype> matchedPositions(const QString &text, const QString &query)
     return positions;
 }
 
+// Space between the counts and letters at the end of a row.
+constexpr int badgeSpacing = 6;
+
 } // namespace
-
-// Adds the git colors, Claude's dot and the cut files' dimming to the
-// project model, and filters the rows of a scope.
-class TreeDecorations : public QSortFilterProxyModel {
-public:
-    using QSortFilterProxyModel::QSortFilterProxyModel;
-
-    void setRootPath(const QString &rootPath)
-    {
-        rootPath_ = rootPath;
-        inIgnored_.clear();
-    }
-
-    void setStatuses(const FileStatusMap &statuses)
-    {
-        statuses_ = statuses;
-        folderStatuses_ = FileStatuses::folderStatuses(statuses, rootPath_);
-        hasIgnored_ =
-            std::any_of(statuses.cbegin(), statuses.cend(), [](FileStatus s) { return s == FileStatus::Ignored; });
-        inIgnored_.clear();
-    }
-
-    void setTouched(const QSet<QString> &paths) { touched_ = paths; }
-
-    void setCut(const QString &path) { cut_ = path; }
-
-    QString cut() const { return cut_; }
-
-    // nullopt: every row; otherwise only these files and the rows that
-    // lead to them (folders, main files of nested ones).
-    void setScope(const std::optional<QSet<QString>> &files, const QSet<QString> &ancestors)
-    {
-        beginFilterChange();
-        scopeFiles_ = files;
-        scopeAncestors_ = ancestors;
-        endFilterChange(Direction::Rows);
-    }
-
-    std::optional<FileStatus> statusOf(const QString &path, bool isDir) const
-    {
-        if (const auto it = statuses_.constFind(path); it != statuses_.cend())
-            return *it;
-        if (isDir) {
-            if (const auto it = folderStatuses_.constFind(path); it != folderStatuses_.cend())
-                return *it;
-        }
-        if (hasIgnored_ && isInIgnoredFolder(path))
-            return FileStatus::Ignored;
-        return std::nullopt;
-    }
-
-    // Asked for each role of each painted row: the walk up the folders is
-    // remembered until the statuses change.
-    bool isInIgnoredFolder(const QString &path) const
-    {
-        if (const auto it = inIgnored_.constFind(path); it != inIgnored_.cend())
-            return *it;
-        bool ignored = false;
-        for (qsizetype slash = path.lastIndexOf(QLatin1Char('/')); slash > rootPath_.size();
-             slash = path.lastIndexOf(QLatin1Char('/'), slash - 1)) {
-            if (statuses_.value(path.left(slash), FileStatus::Modified) == FileStatus::Ignored) {
-                ignored = true;
-                break;
-            }
-        }
-        inIgnored_.insert(path, ignored);
-        return ignored;
-    }
-
-    QVariant data(const QModelIndex &index, int role) const override
-    {
-        if (index.column() != 0 || !isDecoratedRole(role))
-            return QSortFilterProxyModel::data(index, role);
-        const auto *model = static_cast<ProjectTreeModel *>(sourceModel());
-        const QModelIndex source = mapToSource(index);
-        if (role == pathRole)
-            return model->filePath(source);
-        const QString path = model->filePath(source);
-        const bool isDir = model->isDir(source);
-        switch (role) {
-        case statusLetterRole:
-            return statusLetterOf(path, isDir);
-        case Qt::ToolTipRole:
-            return toolTipOf(path, isDir);
-        case Qt::ForegroundRole:
-            if (const std::optional<QColor> color = foregroundOf(path, isDir))
-                return *color;
-            break;
-        case Qt::DecorationRole:
-            if (touched_.contains(path))
-                return FileIcons::withClaudeDot(QSortFilterProxyModel::data(index, role).value<QIcon>());
-            break;
-        default:
-            break;
-        }
-        return QSortFilterProxyModel::data(index, role);
-    }
-
-protected:
-    bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override
-    {
-        if (!scopeFiles_)
-            return true;
-        const auto *model = static_cast<ProjectTreeModel *>(sourceModel());
-        const QString path = model->filePath(model->index(sourceRow, 0, sourceParent));
-        return path == rootPath_ || scopeFiles_->contains(path) || scopeAncestors_.contains(path);
-    }
-
-private:
-    // Files only: a folder's color says enough.
-    QString statusLetterOf(const QString &path, bool isDir) const
-    {
-        const std::optional<FileStatus> status = statusOf(path, isDir);
-        return status && !isDir ? statusLetter(*status) : QString();
-    }
-
-    std::optional<QColor> foregroundOf(const QString &path, bool isDir) const
-    {
-        if (!cut_.isEmpty() && FileOperations::isInside(path, cut_))
-            return QGuiApplication::palette().color(QPalette::Disabled, QPalette::Text);
-        if (const std::optional<FileStatus> status = statusOf(path, isDir))
-            return statusColor(*status, isDarkPalette(QGuiApplication::palette()));
-        return std::nullopt;
-    }
-
-    QString toolTipOf(const QString &path, bool isDir) const
-    {
-        QStringList lines{QDir::toNativeSeparators(path)};
-        if (const std::optional<FileStatus> status = statusOf(path, isDir)) {
-            // A folder colored by the files it contains.
-            const bool contains = isDir && !statuses_.contains(path) && *status != FileStatus::Ignored;
-            lines.append(contains ? FileTreeView::tr("contains changes") : statusName(*status));
-        }
-        if (touched_.contains(path))
-            lines.append(FileTreeView::tr("just edited by Claude"));
-        return lines.join(QLatin1Char('\n'));
-    }
-
-    QString rootPath_;
-    QString cut_;
-    FileStatusMap statuses_;
-    FileStatusMap folderStatuses_;
-    bool hasIgnored_ = false;
-    mutable QHash<QString, bool> inIgnored_; // isInIgnoredFolder(), by path
-    QSet<QString> touched_;
-    std::optional<QSet<QString>> scopeFiles_;
-    QSet<QString> scopeAncestors_;
-};
 
 // Highlights, during a speed search, the letters that match in each name.
 class FileTreeDelegate : public QStyledItemDelegate {
@@ -334,7 +116,7 @@ public:
         QStyledItemDelegate::paint(painter, option, index);
         if (index.column() != 0)
             return;
-        paintStatusLetter(painter, option, index);
+        paintBadges(painter, option, index);
         if (view_->speedSearch_.isEmpty())
             return;
         const QString name = index.data(Qt::DisplayRole).toString();
@@ -363,30 +145,37 @@ public:
     }
 
 private:
-    // The git letter at the right of the visible part of the row, in the
-    // state's color, if the name leaves room for it.
-    void paintStatusLetter(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+    // At the right of the visible part of the row, if the name leaves room
+    // for them: the git letter, and the count of problems before it.
+    void paintBadges(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
     {
-        const QString letter = index.data(statusLetterRole).toString();
-        if (letter.isEmpty())
+        QList<std::pair<QString, QColor>> badges; // from the right
+        if (const QString letter = index.data(TreeRoles::statusLetter).toString(); !letter.isEmpty())
+            badges.append({letter, index.data(TreeRoles::statusColor).value<QColor>()});
+        if (const int count = index.data(TreeRoles::problemCount).toInt(); count > 0)
+            badges.append({QString::number(count), index.data(TreeRoles::problemColor).value<QColor>()});
+        if (badges.isEmpty())
             return;
         QStyleOptionViewItem item = option;
         initStyleOption(&item, index);
         const QStyle *style = item.widget ? item.widget->style() : QApplication::style();
-        const QRect text = style->subElementRect(QStyle::SE_ItemViewItemText, &item, item.widget);
+        const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &item, item.widget);
         const QFontMetrics metrics(item.font);
-        const int nameEnd = text.left() + metrics.horizontalAdvance(item.text) + 8;
-        // The column is as wide as the names: the letter goes at the view's edge.
-        const int right = view_->viewport()->width() - 10;
-        const int width = metrics.horizontalAdvance(letter);
-        if (right - width < nameEnd)
-            return;
+        const int nameEnd = textRect.left() + metrics.horizontalAdvance(item.text) + 8;
+        // The column is as wide as the names: the badges go at the view's edge.
+        int right = view_->viewport()->width() - 10;
         const bool selected = (option.state & QStyle::State_Selected) && (option.state & QStyle::State_Active);
         painter->save();
         painter->setFont(item.font);
-        painter->setPen(selected ? QColor(Qt::white) : index.data(Qt::ForegroundRole).value<QColor>());
-        painter->drawText(QRect(right - width, option.rect.top(), width, option.rect.height()),
-                          Qt::AlignRight | Qt::AlignVCenter, letter);
+        for (const auto &[badge, color] : badges) {
+            const int width = metrics.horizontalAdvance(badge);
+            if (right - width < nameEnd)
+                break;
+            painter->setPen(selected ? QColor(Qt::white) : color);
+            painter->drawText(QRect(right - width, option.rect.top(), width, option.rect.height()),
+                              Qt::AlignRight | Qt::AlignVCenter, badge);
+            right -= width + badgeSpacing;
+        }
         painter->restore();
     }
 
@@ -397,12 +186,14 @@ FileTreeView::FileTreeView(QWidget *parent)
     : QTreeView(parent)
     , model_(new ProjectTreeModel(this))
     , proxy_(new TreeDecorations(this))
+    , lastCommits_(new LastCommits(this))
 {
     proxy_->setSourceModel(model_);
     setModel(proxy_);
     header()->hide();
     setAnimated(false);
     setUniformRowHeights(true);
+    setSelectionMode(QAbstractItemView::ExtendedSelection);
 
     new TreeColumnFit(this);
     setItemDelegate(new FileTreeDelegate(this));
@@ -431,6 +222,14 @@ FileTreeView::FileTreeView(QWidget *parent)
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QWidget::customContextMenuRequested, this, &FileTreeView::showContextMenu);
 
+    // A click without Ctrl or Shift, which extend the selection.
+    connect(this, &QTreeView::clicked, this, [this](const QModelIndex &index) {
+        const bool extendsSelection = QApplication::keyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier);
+        const QModelIndex source = proxy_->mapToSource(index);
+        if (!extendsSelection && !model_->isDir(source))
+            emit filePreviewRequested(model_->filePath(source));
+    });
+    connect(lastCommits_, &LastCommits::found, this, &FileTreeView::showLastCommit);
     connect(this, &QTreeView::activated, this, [this](const QModelIndex &index) {
         const QModelIndex source = proxy_->mapToSource(index);
         if (!model_->isDir(source))
@@ -450,6 +249,11 @@ void FileTreeView::setRootPath(const QString &path)
     proxy_->setStatuses(statuses_);
     proxy_->setCut({});
     projectExpanded_.clear();
+    undoStack_ = {};
+    lastCommits_->setFolder(rootPath_);
+    // The previous folder's layout is not restored.
+    filterExpanded_.reset();
+    proxy_->setNameFilter({});
     setSpeedSearch({});
     model_->setRootPath(rootPath_);
     updateScopeFiles();
@@ -569,10 +373,14 @@ void FileTreeView::showContextMenu(const QPoint &position)
     if (rootPath_.isEmpty())
         return;
     const QModelIndex index = indexAt(position);
-    if (index.isValid())
+    // A click in the selection acts on all of it.
+    if (index.isValid() && !selectionModel()->isSelected(index))
         setCurrentIndex(index);
+    else if (index.isValid())
+        selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
     const QString folder = targetFolder(index);
     const QString clicked = index.isValid() ? pathOf(index) : rootPath_;
+    const QStringList targets = index.isValid() ? selectedPaths() : QStringList{rootPath_};
 
     QMenu menu;
     menu.addAction(tr("New &File…"), this, [this, folder] { createEntry(folder, false); });
@@ -586,17 +394,7 @@ void FileTreeView::showContextMenu(const QPoint &position)
         diagram->addAction(tr("Drawn by &Claude…"), this, [this, folder] { emit generateDiagramRequested(folder); });
     }
     menu.addSeparator();
-    const QString path = editablePath(index);
-    menu.addAction(tr("Cu&t"), QKeySequence::Cut, this, &FileTreeView::cutCurrent)->setEnabled(!path.isEmpty());
-    menu.addAction(tr("&Copy"), QKeySequence::Copy, this, &FileTreeView::copyCurrent)->setEnabled(!path.isEmpty());
-    menu.addAction(tr("&Paste"), QKeySequence::Paste, this, &FileTreeView::paste)
-        ->setEnabled(!localPaths(QApplication::clipboard()->mimeData()).isEmpty());
-    if (!path.isEmpty()) {
-        menu.addAction(tr("Cop&y…"), QKeySequence(Qt::Key_F5), this, &FileTreeView::duplicateCurrent);
-        menu.addSeparator();
-        menu.addAction(tr("&Rename…"), QKeySequence(Qt::Key_F2), this, [this, path] { renameEntry(path); });
-        menu.addAction(tr("&Delete…"), QKeySequence::Delete, this, [this, path] { deleteEntry(path); });
-    }
+    addEntryActions(&menu, index);
 
     menu.addSeparator();
     QMenu *copy = menu.addMenu(tr("Copy Path/&Reference"));
@@ -606,17 +404,41 @@ void FileTreeView::showContextMenu(const QPoint &position)
                     [this, clicked] { copyPath(clicked, true); });
     copy->addAction(tr("File &Name"), this,
                     [clicked] { QApplication::clipboard()->setText(QFileInfo(clicked).fileName()); });
-    menu.addAction(tr("Send to &Claude"), QKeySequence(tr("Ctrl+Alt+K")), this,
-                   [this, clicked] { emit sendToClaudeRequested(clicked); });
+    menu.addAction(tr("Send to &Claude"), QKeySequence(tr("Ctrl+Alt+K")), this, [this, targets] {
+        for (const QString &target : targets)
+            emit sendToClaudeRequested(target);
+    });
     QMenu *open = menu.addMenu(tr("Open &In"));
     open->addAction(tr("&Terminal"), this, [this, folder] { emit openTerminalRequested(folder); });
     open->addAction(tr("&File Manager"), this, [folder] { QDesktopServices::openUrl(QUrl::fromLocalFile(folder)); });
     if (inRepository_)
-        addGitMenu(&menu, clicked);
+        addGitMenu(&menu, clicked, targets);
     menu.exec(viewport()->mapToGlobal(position));
 }
 
-void FileTreeView::addGitMenu(QMenu *menu, const QString &path)
+// Clipboard, undo, rename and delete.
+void FileTreeView::addEntryActions(QMenu *menu, const QModelIndex &index)
+{
+    const QStringList selection = index.isValid() ? editableSelection() : QStringList();
+    menu->addAction(tr("Cu&t"), QKeySequence::Cut, this, &FileTreeView::cutSelection)->setEnabled(!selection.isEmpty());
+    menu->addAction(tr("&Copy"), QKeySequence::Copy, this, &FileTreeView::copySelection)
+        ->setEnabled(!selection.isEmpty());
+    menu->addAction(tr("&Paste"), QKeySequence::Paste, this, &FileTreeView::paste)
+        ->setEnabled(!localPaths(QApplication::clipboard()->mimeData()).isEmpty());
+    if (const QString undoText = undoStack_.lastDescription(); !undoText.isEmpty())
+        menu->addAction(undoText, QKeySequence::Undo, this, &FileTreeView::undo);
+    if (selection.isEmpty())
+        return;
+    menu->addSeparator();
+    if (selection.size() == 1) {
+        menu->addAction(tr("Cop&y…"), QKeySequence(Qt::Key_F5), this, &FileTreeView::duplicateCurrent);
+        const QString &path = selection.first();
+        menu->addAction(tr("&Rename…"), QKeySequence(Qt::Key_F2), this, [this, path] { renameEntry(path); });
+    }
+    menu->addAction(tr("&Delete…"), QKeySequence::Delete, this, [this, selection] { deleteEntries(selection); });
+}
+
+void FileTreeView::addGitMenu(QMenu *menu, const QString &path, const QStringList &selection)
 {
     const bool isDir = QFileInfo(path).isDir();
     const std::optional<FileStatus> status = proxy_->statusOf(path, isDir);
@@ -625,7 +447,12 @@ void FileTreeView::addGitMenu(QMenu *menu, const QString &path)
     const bool trackedChange = changed && *status != FileStatus::Untracked;
     QMenu *git = menu->addMenu(tr("&Git"));
     git->addAction(tr("Show &Diff"), this, [this, path] { emit showDiffRequested(path); })->setEnabled(changed);
-    git->addAction(tr("&Add"), this, [this, path] { emit stageRequested(path); })->setEnabled(changed);
+    git->addAction(tr("&Add"), this,
+                   [this, selection] {
+                       for (const QString &entry : selection)
+                           emit stageRequested(entry);
+                   })
+        ->setEnabled(changed);
     git->addAction(tr("&Rollback…"), this, [this, path] { confirmRollback(path); })->setEnabled(trackedChange);
     git->addSeparator();
     git->addAction(tr("Show &History"), this, [this, path] { emit historyRequested(path); })
@@ -668,10 +495,10 @@ void FileTreeView::renameCurrent()
         renameEntry(path);
 }
 
-void FileTreeView::deleteCurrent()
+void FileTreeView::deleteSelection()
 {
-    if (const QString path = editablePath(currentIndex()); !path.isEmpty())
-        deleteEntry(path);
+    if (const QStringList paths = editableSelection(); !paths.isEmpty())
+        deleteEntries(paths);
 }
 
 void FileTreeView::keyPressEvent(QKeyEvent *event)
@@ -698,7 +525,9 @@ bool FileTreeView::handlePathKey(QKeyEvent *event)
         return true;
     }
     if (event->key() == Qt::Key_K && modifiers == (Qt::ControlModifier | Qt::AltModifier)) {
-        emit sendToClaudeRequested(current);
+        const QStringList selection = currentIndex().isValid() ? selectedPaths() : QStringList{rootPath_};
+        for (const QString &path : selection)
+            emit sendToClaudeRequested(path);
         return true;
     }
     return false;
@@ -710,15 +539,17 @@ bool FileTreeView::handleEntryKey(QKeyEvent *event)
     const bool isF2 = event->key() == Qt::Key_F2 && modifiers == Qt::NoModifier;
     const bool isShiftF6 = event->key() == Qt::Key_F6 && event->modifiers() == Qt::ShiftModifier; // IntelliJ's
     if (event->matches(QKeySequence::Cut))
-        cutCurrent();
+        cutSelection();
     else if (event->matches(QKeySequence::Copy))
-        copyCurrent();
+        copySelection();
     else if (event->matches(QKeySequence::Paste))
         paste();
+    else if (event->matches(QKeySequence::Undo))
+        undo();
     else if (event->key() == Qt::Key_F5 && modifiers == Qt::NoModifier)
         duplicateCurrent();
     else if (event->matches(QKeySequence::Delete))
-        deleteCurrent();
+        deleteSelection();
     else if (isF2 || isShiftF6)
         renameCurrent();
     else
@@ -732,6 +563,13 @@ QString FileTreeView::editablePath(const QModelIndex &index) const
         return {};
     const QString path = pathOf(index);
     return path == rootPath_ || !path.startsWith(rootPath_ + QLatin1Char('/')) ? QString() : path;
+}
+
+QStringList FileTreeView::editableSelection() const
+{
+    QStringList paths = selectedPaths();
+    paths.removeIf([this](const QString &path) { return !path.startsWith(rootPath_ + QLatin1Char('/')); });
+    return paths;
 }
 
 // The clicked folder, or the folder containing the clicked file.
@@ -791,6 +629,7 @@ QString FileTreeView::createEntryNamed(const QString &folder,
             return tr("Cannot create “%1”: %2").arg(QDir::toNativeSeparators(path), file.errorString());
     }
 
+    undoStack_.record({.kind = FileUndoStack::Step::Kind::Created, .path = path, .source = {}});
     reveal(path);
     emit entryCreated(path);
     if (!isFolder)
@@ -831,6 +670,7 @@ QString FileTreeView::renameEntryTo(const QString &path, const QString &name)
             folder = target.path + folder.mid(path.size());
     }
     restoreExpandedPaths(expanded);
+    undoStack_.record({.kind = FileUndoStack::Step::Kind::Moved, .path = target.path, .source = path});
     reveal(target.path);
     emit entryRenamed(path, target.path);
     return {};
@@ -865,10 +705,42 @@ void FileTreeView::deleteEntry(const QString &path)
     popup->popup();
 }
 
+void FileTreeView::deleteEntries(const QStringList &paths)
+{
+    if (paths.size() == 1) {
+        deleteEntry(paths.first());
+        return;
+    }
+    QString message = tr("Delete these %n items?", nullptr, int(paths.size())) + QLatin1Char('\n') +
+                      tr("They will be moved to the trash.");
+    const bool hasUnsaved = hasUnsavedChanges_ && std::ranges::any_of(paths, hasUnsavedChanges_);
+    if (hasUnsaved)
+        message += QLatin1Char(' ') + tr("Unsaved changes in the editor will be lost.");
+    const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(rootPath_);
+    auto *popup = new ConfirmPopup(
+        {tr("Delete"), QDir::toNativeSeparators(relative + QLatin1Char('/')), message, tr("Delete")},
+        [this, paths](ConfirmPopup *) {
+            QStringList kept;
+            for (const QString &path : paths) {
+                if (!moveToTrash(path))
+                    kept.append(QFileInfo(path).fileName());
+            }
+            if (!kept.isEmpty())
+                emit statusMessage(tr("Cannot move to the trash: %1").arg(kept.join(QStringLiteral(", "))));
+            return true;
+        },
+        this);
+    popup->popup();
+}
+
 bool FileTreeView::moveToTrash(const QString &path)
 {
-    if (!QFile::moveToTrash(path))
+    QString pathInTrash;
+    if (!QFile::moveToTrash(path, &pathInTrash))
         return false;
+    // Where the system does not say, the entry cannot be taken back.
+    if (!pathInTrash.isEmpty())
+        undoStack_.record({.kind = FileUndoStack::Step::Kind::Trashed, .path = path, .source = pathInTrash});
     emit entryDeleted(path);
     return true;
 }
@@ -918,6 +790,24 @@ QString FileTreeView::currentPath() const
     return currentIndex().isValid() ? pathOf(currentIndex()) : QString();
 }
 
+QStringList FileTreeView::selectedPaths() const
+{
+    QStringList paths;
+    for (const QModelIndex &index : selectionModel()->selectedRows())
+        paths.append(pathOf(index));
+    if (paths.isEmpty() && currentIndex().isValid())
+        paths.append(pathOf(currentIndex()));
+    // An entry inside a selected folder goes with it.
+    QStringList topmost;
+    for (const QString &path : paths) {
+        const bool isInSelectedFolder = std::ranges::any_of(
+            paths, [&path](const QString &other) { return other != path && FileOperations::isInside(path, other); });
+        if (!isInSelectedFolder)
+            topmost.append(path);
+    }
+    return topmost;
+}
+
 bool FileTreeView::select(const QString &path)
 {
     const QString cleanPath = QDir::cleanPath(path);
@@ -944,6 +834,18 @@ void FileTreeView::setStatuses(const FileStatusMap &statuses, bool inRepository)
 void FileTreeView::setClaudeTouched(const QSet<QString> &paths)
 {
     proxy_->setTouched(paths);
+    viewport()->update();
+}
+
+void FileTreeView::setProblems(const ProblemCounts &problems)
+{
+    proxy_->setProblems(problems);
+    viewport()->update();
+}
+
+void FileTreeView::setOpenFiles(const QSet<QString> &paths)
+{
+    proxy_->setOpenFiles(paths);
     viewport()->update();
 }
 
@@ -1037,9 +939,44 @@ QModelIndex FileTreeView::findMatch(const QModelIndex &from, bool forward) const
     return {};
 }
 
+void FileTreeView::setFilterWhileTyping(bool enabled)
+{
+    if (enabled == filterWhileTyping_)
+        return;
+    setSpeedSearch({});
+    filterWhileTyping_ = enabled;
+}
+
+void FileTreeView::applyNameFilter(const QString &text)
+{
+    if (!text.isEmpty() && !filterExpanded_) {
+        QStringList expanded;
+        collectExpanded(QModelIndex(), &expanded);
+        filterExpanded_ = expanded;
+    }
+    proxy_->setNameFilter(text);
+    if (!text.isEmpty()) {
+        expandScope(rootIndex()); // the matches in sight
+        return;
+    }
+    const std::optional<QStringList> expanded = std::exchange(filterExpanded_, std::nullopt);
+    if (!expanded)
+        return;
+    // Back as it was, on the item chosen.
+    const QString current = currentPath();
+    collapseAll();
+    restoreExpandedPaths(*expanded);
+    if (scope_ != Scope::Project)
+        expandScope(rootIndex());
+    if (!current.isEmpty())
+        reveal(current);
+}
+
 void FileTreeView::setSpeedSearch(const QString &text)
 {
     speedSearch_ = text;
+    if (filterWhileTyping_)
+        applyNameFilter(text);
     if (text.isEmpty()) {
         speedSearchLabel_->hide();
         viewport()->update();
@@ -1055,7 +992,7 @@ void FileTreeView::setSpeedSearch(const QString &text)
     labelPalette.setColor(QPalette::WindowText,
                           match.isValid() ? palette().color(QPalette::Text) : QColor(dark ? "#e06c75" : "#e45649"));
     speedSearchLabel_->setPalette(labelPalette);
-    speedSearchLabel_->setText(tr("Search for: %1").arg(text));
+    speedSearchLabel_->setText(filterWhileTyping_ ? tr("Filter: %1").arg(text) : tr("Search for: %1").arg(text));
     speedSearchLabel_->adjustSize();
     speedSearchLabel_->move(0, 0);
     speedSearchLabel_->show();
@@ -1132,7 +1069,9 @@ void FileTreeView::focusOutEvent(QFocusEvent *event)
 
 void FileTreeView::mousePressEvent(QMouseEvent *event)
 {
-    setSpeedSearch({});
+    // A filter stays while its results are clicked.
+    if (!filterExpanded_)
+        setSpeedSearch({});
     // A pinned folder: back to it.
     const int rowHeight = stickyRowHeight();
     const int row = rowHeight > 0 ? event->position().toPoint().y() / rowHeight : -1;
@@ -1233,6 +1172,22 @@ void FileTreeView::drawBranches(QPainter *painter, const QRect &rect, const QMod
 {
     QTreeView::drawBranches(painter, rect, index);
     drawIndentGuides(painter, rect, index);
+    drawOpenMark(painter, rect, index);
+}
+
+void FileTreeView::drawOpenMark(QPainter *painter, const QRect &rect, const QModelIndex &index) const
+{
+    // Where a folder has its arrow; a main file of nested ones has it too.
+    if (!index.data(TreeRoles::isOpen).toBool() || model()->hasChildren(index))
+        return;
+    constexpr qreal radius = 2.5;
+    const QPointF center(rect.right() + 1 - indentation() / 2.0, rect.top() + rect.height() / 2.0);
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(palette().color(QPalette::Link));
+    painter->drawEllipse(center, radius, radius);
+    painter->restore();
 }
 
 void FileTreeView::drawIndentGuides(QPainter *painter, const QRect &rect, const QModelIndex &index) const
@@ -1273,6 +1228,34 @@ QModelIndex FileTreeView::currentFolder() const
     return isExpanded(current) ? current : current.parent();
 }
 
+bool FileTreeView::viewportEvent(QEvent *event)
+{
+    if (event->type() == QEvent::ToolTip)
+        requestLastCommit(static_cast<QHelpEvent *>(event)->pos());
+    return QTreeView::viewportEvent(event);
+}
+
+void FileTreeView::requestLastCommit(const QPoint &position)
+{
+    const QModelIndex index = indexAt(position);
+    if (!inRepository_ || !index.isValid())
+        return;
+    if (const QString path = pathOf(index); !proxy_->hasLastCommit(path))
+        lastCommits_->request(path);
+}
+
+// The tooltip shown meanwhile gets the commit, if still on that file.
+void FileTreeView::showLastCommit(const QString &path, const QString &description)
+{
+    proxy_->setLastCommit(path, description);
+    if (description.isEmpty() || !QToolTip::isVisible())
+        return;
+    const QModelIndex index = indexAt(viewport()->mapFromGlobal(QCursor::pos()));
+    if (!index.isValid() || pathOf(index) != path)
+        return;
+    QToolTip::showText(QCursor::pos(), index.data(Qt::ToolTipRole).toString(), viewport(), visualRect(index));
+}
+
 QStringList FileTreeView::localPaths(const QMimeData *data)
 {
     QStringList paths;
@@ -1285,34 +1268,39 @@ QStringList FileTreeView::localPaths(const QMimeData *data)
     return paths;
 }
 
-void FileTreeView::cutCurrent()
+void FileTreeView::putOnClipboard(const QStringList &paths, bool cut)
 {
-    const QString path = editablePath(currentIndex());
-    if (path.isEmpty())
-        return;
+    QList<QUrl> urls;
+    QStringList nativePaths;
+    for (const QString &path : paths) {
+        urls.append(QUrl::fromLocalFile(path));
+        nativePaths.append(QDir::toNativeSeparators(path));
+    }
     auto *clipboardData = new QMimeData;
-    clipboardData->setUrls({QUrl::fromLocalFile(path)});
-    clipboardData->setText(QDir::toNativeSeparators(path));
-    clipboardData->setData(cutFormat, path.toUtf8());
+    clipboardData->setUrls(urls);
+    clipboardData->setText(nativePaths.join(QLatin1Char('\n')));
+    if (cut)
+        clipboardData->setData(cutFormat, paths.join(QLatin1Char('\n')).toUtf8());
     QApplication::clipboard()->setMimeData(clipboardData);
-    proxy_->setCut(path);
+    proxy_->setCut(cut ? paths : QStringList());
     viewport()->update();
-    emit statusMessage(tr("“%1” cut: paste it into a folder to move it").arg(QFileInfo(path).fileName()));
 }
 
-void FileTreeView::copyCurrent()
+void FileTreeView::cutSelection()
 {
-    const QString path = editablePath(currentIndex());
-    if (path.isEmpty())
+    const QStringList paths = editableSelection();
+    if (paths.isEmpty())
         return;
-    auto *clipboardData = new QMimeData;
-    clipboardData->setUrls({QUrl::fromLocalFile(path)});
-    clipboardData->setText(QDir::toNativeSeparators(path));
-    QApplication::clipboard()->setMimeData(clipboardData);
-    if (!proxy_->cut().isEmpty()) {
-        proxy_->setCut({});
-        viewport()->update();
-    }
+    putOnClipboard(paths, true);
+    emit statusMessage(paths.size() == 1
+                           ? tr("“%1” cut: paste it into a folder to move it").arg(QFileInfo(paths.first()).fileName())
+                           : tr("%n items cut: paste them into a folder to move them", nullptr, int(paths.size())));
+}
+
+void FileTreeView::copySelection()
+{
+    if (const QStringList paths = editableSelection(); !paths.isEmpty())
+        putOnClipboard(paths, false);
 }
 
 void FileTreeView::paste()
@@ -1321,15 +1309,55 @@ void FileTreeView::paste()
     const QStringList sources = localPaths(clipboardData);
     if (sources.isEmpty() || rootPath_.isEmpty())
         return;
-    const QString cut =
-        clipboardData->hasFormat(cutFormat) ? QString::fromUtf8(clipboardData->data(cutFormat)) : QString();
-    const bool move = !cut.isEmpty() && sources == QStringList{cut};
+    const QStringList cut = clipboardData->hasFormat(cutFormat)
+                                ? QString::fromUtf8(clipboardData->data(cutFormat)).split(QLatin1Char('\n'))
+                                : QStringList();
+    const bool move = !cut.isEmpty() && sources == cut;
     transfer(sources, targetFolder(currentIndex()), move);
     if (move) {
         // A cut is pasted once.
         proxy_->setCut({});
         QApplication::clipboard()->clear();
         viewport()->update();
+    }
+}
+
+void FileTreeView::undo()
+{
+    const std::optional<FileUndoStack::Step> step = undoStack_.last();
+    if (!step) {
+        emit statusMessage(tr("No file operation to undo"));
+        return;
+    }
+    // The step stays, to be undone once saved.
+    const bool movesAnEditedFile = step->kind != FileUndoStack::Step::Kind::Trashed;
+    if (movesAnEditedFile && hasUnsavedChanges_ && hasUnsavedChanges_(step->path)) {
+        emit statusMessage(tr("“%1” has unsaved changes: save them first").arg(QFileInfo(step->path).fileName()));
+        return;
+    }
+    const QString description = undoStack_.lastDescription();
+    if (const QString error = undoStack_.undo(); !error.isEmpty()) {
+        emit statusMessage(error);
+        return;
+    }
+    reportUndone(*step);
+    emit statusMessage(tr("Done: %1").arg(description));
+}
+
+void FileTreeView::reportUndone(const FileUndoStack::Step &step)
+{
+    switch (step.kind) {
+    case FileUndoStack::Step::Kind::Created:
+        emit entryDeleted(step.path);
+        break;
+    case FileUndoStack::Step::Kind::Moved:
+        reveal(step.source);
+        emit entryRenamed(step.path, step.source);
+        break;
+    case FileUndoStack::Step::Kind::Trashed:
+        reveal(step.path);
+        emit entryCreated(step.path);
+        break;
     }
 }
 
@@ -1426,6 +1454,7 @@ QString FileTreeView::transferOne(const QString &source, const QString &destinat
         }
         if (const QString error = FileOperations::move(source, destination); !error.isEmpty())
             return error;
+        undoStack_.record({.kind = FileUndoStack::Step::Kind::Moved, .path = destination, .source = source});
         reveal(destination);
         emit entryRenamed(source, destination);
         emit statusMessage(tr("“%1” moved").arg(QFileInfo(destination).fileName()));
@@ -1433,6 +1462,7 @@ QString FileTreeView::transferOne(const QString &source, const QString &destinat
     }
     if (const QString error = FileOperations::copy(source, destination); !error.isEmpty())
         return error;
+    undoStack_.record({.kind = FileUndoStack::Step::Kind::Created, .path = destination, .source = {}});
     reveal(destination);
     emit entryCreated(destination);
     emit statusMessage(tr("“%1” copied").arg(QFileInfo(destination).fileName()));

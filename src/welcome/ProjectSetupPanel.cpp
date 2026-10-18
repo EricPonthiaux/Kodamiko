@@ -5,7 +5,6 @@
 #include "projects/ProjectStore.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
-#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
 
 #include <QDir>
@@ -19,9 +18,7 @@
 ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, const QString &actionText, QWidget *parent)
     : QWidget(parent)
     , toolchains_(toolchains)
-    , headerIcon_(new QLabel(this))
-    , title_(new QLabel(this))
-    , location_(new QLabel(this))
+    , header_(new PopupHeader(QStringLiteral("files"), QString(), this))
     , pages_(new QStackedWidget(this))
     , form_(new ProjectSetupForm(toolchains, this))
     , provisioning_(new ProvisioningView(toolchains, this))
@@ -32,25 +29,19 @@ ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, const QString &acti
     , skip_(new QPushButton(tr("Continue Without Them"), this))
     , action_(new QPushButton(actionText, this))
 {
-    // The header: the project.
-    AppFonts::setInterfaceFont(title_, 1.5);
-    location_->setObjectName(QStringLiteral("pageDescription"));
-    auto *heading = new QVBoxLayout;
-    heading->setSpacing(4);
-    heading->addWidget(title_);
-    heading->addWidget(location_);
-    auto *header = new QHBoxLayout;
-    header->setContentsMargins(28, 22, 28, 0);
-    header->setSpacing(14);
-    header->addWidget(headerIcon_, 0, Qt::AlignTop);
-    header->addLayout(heading, 1);
+    // The header: the project, and where it is (see load()).
+    connect(header_, &PopupHeader::closeRequested, this, [this] {
+        if (provisioning_->isRunning())
+            provisioning_->cancel();
+        emit cancelled();
+    });
 
     // The pages: the languages, then the downloads.
     const auto scrolled = [this](QWidget *content) {
         auto *holder = new QWidget;
         holder->setObjectName(QStringLiteral("pageContent"));
         auto *layout = new QVBoxLayout(holder);
-        layout->setContentsMargins(28, 0, 28, 20);
+        layout->setContentsMargins(16, 12, 16, 16);
         layout->addWidget(content);
         auto *scroll = new QScrollArea(this);
         scroll->setObjectName(QStringLiteral("pageScroll"));
@@ -87,7 +78,7 @@ ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, const QString &acti
     connect(skip_, &QPushButton::clicked, this, [this] { emit done(project_); });
     connect(action_, &QPushButton::clicked, this, &ProjectSetupPanel::apply);
     auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(28, 12, 18, 14);
+    footerLayout->setContentsMargins(16, 10, 16, 10);
     footerLayout->setSpacing(8);
     footerLayout->addWidget(summary_, 1);
     footerLayout->addWidget(back_);
@@ -103,8 +94,7 @@ ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, const QString &acti
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addLayout(header);
-    layout->addSpacing(18);
+    layout->addWidget(header_);
     layout->addWidget(pages_, 1);
     layout->addWidget(footer);
 }
@@ -112,15 +102,15 @@ ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, const QString &acti
 void ProjectSetupPanel::applyTheme(const Theme &theme)
 {
     theme_ = theme;
-    headerIcon_->setPixmap(iconTile(QStringLiteral("files"), theme, 40, devicePixelRatioF()));
+    header_->applyTheme(theme);
 }
 
 void ProjectSetupPanel::load(const ProjectConfig &project, const QList<DetectedLanguage> &detected)
 {
     project_ = project;
-    title_->setText(project.configured ? tr("%1 — Project Settings").arg(project.name)
-                                       : tr("Set Up %1").arg(project.name));
-    location_->setText(QDir::toNativeSeparators(project.path));
+    header_->setTitle(project.configured ? tr("%1 — Project Settings").arg(project.name)
+                                         : tr("Set Up %1").arg(project.name));
+    header_->setSubtitle(QDir::toNativeSeparators(project.path));
     form_->setProject(project, detected);
     showForm();
 }
@@ -167,8 +157,8 @@ void ProjectSetupPanel::download(const ProjectConfig &project)
         emit done(project_);
         return;
     }
-    title_->setText(tr("Downloading the Tools of %1").arg(project_.name));
-    location_->setText(QDir::toNativeSeparators(project_.path));
+    header_->setTitle(tr("Downloading the Tools of %1").arg(project_.name));
+    header_->setSubtitle(QDir::toNativeSeparators(project_.path));
     startDownloads(steps);
 }
 

@@ -5,6 +5,7 @@
 #include "UiIcons.h"
 
 #include <QAction>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QMenuBar>
@@ -18,6 +19,14 @@ namespace {
 
 constexpr int barHeight = 40;
 constexpr int controlWidth = 46;
+// The height of every control but the window's: chips, buttons, the run
+// block; the menu titles' padding comes close (see ThemeStyle).
+constexpr int controlHeight = 30;
+// Between the run block and the search actions, then before the window
+// controls.
+constexpr int groupSpacing = 14;
+constexpr int windowControlsSpacing = 12;
+const QColor runColor("#4fa36b");
 const QColor stopColor("#d9534f");
 
 } // namespace
@@ -149,22 +158,20 @@ TitleBar::TitleBar(QWidget *parent)
     layout_->addWidget(menuBar_, 0, Qt::AlignVCenter);
     layout_->addSpacing(8);
     project_ = addChip();
+    project_->setObjectName(QStringLiteral("projectChip"));
+    project_->setIconSize(QSize(16, 16));
     AppFonts::setInterfaceFont(project_, 1);
     layout_->addStretch(1);
     claude_ = addChip();
     connect(claude_, &QToolButton::clicked, this, &TitleBar::claudeClicked);
     claude_->hide();
     layout_->addStretch(1);
-    run_ = addChip();
-    run_->hide();
-    runActions_ = new QHBoxLayout;
-    runActions_->setSpacing(2);
-    layout_->addLayout(runActions_);
-    layout_->addSpacing(8);
+    layout_->addWidget(createRunBlock());
+    layout_->addSpacing(groupSpacing);
     actions_ = new QHBoxLayout;
     actions_->setSpacing(2);
     layout_->addLayout(actions_);
-    layout_->addSpacing(8);
+    layout_->addSpacing(windowControlsSpacing);
 
     minimize_ = new WindowButton(WindowButton::Kind::Minimize, this);
     minimize_->setToolTip(tr("Minimize"));
@@ -190,13 +197,43 @@ QToolButton *TitleBar::addChip()
     chip->setPopupMode(QToolButton::InstantPopup);
     chip->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     chip->setObjectName(QStringLiteral("chip"));
+    chip->setFixedHeight(controlHeight);
     layout_->addWidget(chip);
     return chip;
 }
 
+// [ ⚒ CMake: build default ▾ │ ▶ ], its parts inside the block's border.
+QFrame *TitleBar::createRunBlock()
+{
+    runBlock_ = new QFrame(this);
+    runBlock_->setObjectName(QStringLiteral("runBlock"));
+    runBlock_->setFixedHeight(controlHeight);
+    auto *row = new QHBoxLayout(runBlock_);
+    row->setContentsMargins(1, 1, 1, 1);
+    row->setSpacing(0);
+    run_ = new QToolButton(runBlock_);
+    run_->setAutoRaise(true);
+    run_->setFocusPolicy(Qt::NoFocus);
+    run_->setPopupMode(QToolButton::InstantPopup);
+    run_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    run_->setFixedHeight(controlHeight - 2);
+    row->addWidget(run_);
+    auto *divider = new QFrame(runBlock_);
+    divider->setObjectName(QStringLiteral("runDivider"));
+    divider->setFixedSize(1, controlHeight - 12);
+    row->addWidget(divider, 0, Qt::AlignVCenter);
+    runActions_ = new QHBoxLayout;
+    runActions_->setSpacing(0);
+    row->addLayout(runActions_);
+    runBlock_->hide();
+    return runBlock_;
+}
+
 void TitleBar::setProject(const QString &name, const QString &toolTip, QMenu *menu)
 {
-    project_->setText(name + QStringLiteral("  ▾"));
+    // Spaces set the name apart from the folder icon and the chevron: a tool
+    // button has no spacing of its own between its icon and its text.
+    project_->setText(QStringLiteral(" %1  ▾").arg(name));
     project_->setToolTip(toolTip);
     project_->setMenu(menu);
 }
@@ -212,8 +249,10 @@ void TitleBar::setClaudeState(const QIcon &icon, const QString &text, const QStr
 QToolButton *TitleBar::actionButton(QAction *action, const QString &iconName, const QColor &color)
 {
     auto *button = new QToolButton(this);
+    button->setObjectName(QStringLiteral("titleAction"));
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
+    button->setFixedSize(controlHeight, controlHeight);
     button->setIcon(UiIcons::icon(iconName, color.isValid() ? color : theme_.foreground));
     actionButtons_.append({button, iconName, color});
     button->setIconSize(QSize(16, 16));
@@ -238,7 +277,7 @@ void TitleBar::addActionButton(QAction *action, const QString &iconName)
 void TitleBar::setRunConfiguration(const RunChip &chip)
 {
     const bool shown = !chip.name.isEmpty();
-    run_->setVisible(shown);
+    runBlock_->setVisible(shown);
     run_->setIcon(chip.icon);
     run_->setText(chip.name + QStringLiteral("  ▾"));
     run_->setToolTip(chip.toolTip);
@@ -252,12 +291,16 @@ void TitleBar::setRunConfiguration(const RunChip &chip)
 
 void TitleBar::setRunActions(QAction *run, QAction *stop)
 {
-    runButton_ = actionButton(run, QStringLiteral("run"));
+    runButton_ = actionButton(run, QStringLiteral("run"), runColor);
     stopButton_ = actionButton(stop, QStringLiteral("stop"), stopColor);
-    runButton_->setVisible(run_->isVisibleTo(this) && !running_);
-    stopButton_->setVisible(run_->isVisibleTo(this) && running_);
-    runActions_->addWidget(runButton_);
-    runActions_->addWidget(stopButton_);
+    // One shown at a time, at the same place and size: nothing moves.
+    for (QToolButton *button : {runButton_, stopButton_}) {
+        button->setObjectName(QStringLiteral("runAction"));
+        button->setFixedSize(controlHeight - 2, controlHeight - 2);
+        runActions_->addWidget(button);
+    }
+    runButton_->setVisible(runBlock_->isVisibleTo(this) && !running_);
+    stopButton_->setVisible(runBlock_->isVisibleTo(this) && running_);
 }
 
 void TitleBar::setWindowControlsVisible(bool visible)
@@ -287,6 +330,7 @@ WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const
 void TitleBar::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    project_->setIcon(UiIcons::icon(QStringLiteral("folder"), theme.mutedText));
     for (WindowButton *button : {minimize_, maximize_, close_})
         button->applyTheme(theme);
     for (const ActionButton &entry : std::as_const(actionButtons_))

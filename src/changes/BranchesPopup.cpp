@@ -2,8 +2,8 @@
 
 #include "GitActions.h"
 #include "SnapshotsPopup.h"
-#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
+#include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
 
 #include <QHBoxLayout>
@@ -27,15 +27,14 @@ constexpr int currentRole = Qt::UserRole + 4;
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *branchesRules = R"(
-QLineEdit#branchFilter { padding: 7px 10px; border-radius: 8px; }
-QListWidget#branchList { background: transparent; border: none; outline: 0; }
+QListWidget#branchList { background: transparent; border: none; border-top: 1px solid @line; outline: 0; }
 QLabel#branchesEmpty { color: @muted; }
 QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )";
 
-// A branch's row: the branch icon on a tinted tile, its name (with a
-// "current" badge), and below its last commit; on the right, how far it
-// is from its upstream. A heading row ("LOCAL", "REMOTE") is small caps.
+// A branch's row: the branch icon, its name (with a "current" badge), and
+// below its last commit; on the right, how far it is from its upstream. A
+// heading row ("Local", "Remote") is in demibold.
 class BranchDelegate : public QStyledItemDelegate {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
@@ -44,23 +43,22 @@ public:
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         if (index.data(headingRole).toBool())
-            return {0, option.fontMetrics.height() + 14};
-        return {0, option.fontMetrics.height() * 2 + 22};
+            return {0, option.fontMetrics.height() + 12};
+        return {0, option.fontMetrics.height() * 2 + 14};
     }
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
-        const QRectF row = QRectF(option.rect).adjusted(4, 1, -4, -1);
+        const QRectF row = QRectF(option.rect).adjusted(0, 1, 0, -1);
         if (index.data(headingRole).toBool()) {
             QFont heading = option.font;
-            heading.setPointSizeF(heading.pointSizeF() * 0.85);
             heading.setWeight(QFont::DemiBold);
             painter->setFont(heading);
             painter->setPen(theme.mutedText);
-            painter->drawText(row.adjusted(12, 4, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
-                              index.data(Qt::DisplayRole).toString().toUpper());
+            painter->drawText(row.adjusted(8, 4, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
+                              index.data(Qt::DisplayRole).toString());
             painter->restore();
             return;
         }
@@ -68,17 +66,13 @@ public:
         const bool selected = option.state & QStyle::State_Selected;
         if (selected || option.state & QStyle::State_MouseOver) {
             painter->setPen(Qt::NoPen);
-            painter->setBrush(selected ? theme.selection : theme.hover);
-            painter->drawRoundedRect(row, 8, 8);
+            painter->setBrush(selected ? ThemeStyle::selectionColor(theme) : theme.hover);
+            painter->drawRoundedRect(row, 2, 2);
         }
 
-        const QRectF tile(row.left() + 10, row.center().y() - 14, 28, 28);
-        QColor tint = theme.accent;
-        tint.setAlpha(theme.isDark ? 46 : 30);
-        painter->setPen(Qt::NoPen);
-        painter->setBrush(tint);
-        painter->drawRoundedRect(tile, 8, 8);
-        UiIcons::icon(QStringLiteral("branch"), theme.accent).paint(painter, tile.toRect().adjusted(7, 7, -7, -7));
+        // The icon, alone: 16 pixels, in the accent.
+        const QRectF tile(row.left() + 8, row.center().y() - 8, 16, 16);
+        UiIcons::icon(QStringLiteral("branch"), theme.accent).paint(painter, tile.toRect());
 
         // Tracking, at the right.
         const QString tracking = index.data(trackingRole).toString();
@@ -99,7 +93,7 @@ public:
         const QString name =
             titleMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideMiddle, int(text.width()));
         painter->setFont(title);
-        painter->setPen(selected ? theme.accentText : theme.foreground);
+        painter->setPen(theme.foreground);
         painter->drawText(QRectF(text.left(), top, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter, name);
         if (index.data(currentRole).toBool()) {
             const QString badge = BranchesPopup::tr("current");
@@ -108,9 +102,11 @@ public:
             const QFontMetrics smallMetrics(small);
             const QRectF pill(text.left() + titleMetrics.horizontalAdvance(name) + 8, top + 1,
                               smallMetrics.horizontalAdvance(badge) + 14, lineHeight - 2);
+            QColor tint = theme.accent;
+            tint.setAlpha(theme.isDark ? 46 : 30);
             painter->setPen(Qt::NoPen);
             painter->setBrush(tint);
-            painter->drawRoundedRect(pill, pill.height() / 2, pill.height() / 2);
+            painter->drawRoundedRect(pill, 2, 2);
             painter->setFont(small);
             painter->setPen(theme.accent);
             painter->drawText(pill, Qt::AlignCenter, badge);
@@ -200,8 +196,7 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     : OverlayPopup(QStringLiteral("branches"), QSizeF(0.5, 0.66), QSize(640, 460), parent)
     , theme_(theme)
     , actions_(actions)
-    , headerIcon_(new QLabel(this))
-    , subtitle_(new QLabel(this))
+    , header_(new PopupHeader(QStringLiteral("branch"), tr("Branches"), this))
     , filter_(new QLineEdit(this))
     , list_(new QListWidget(this))
     , empty_(new QLabel(this))
@@ -209,25 +204,13 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     , rebase_(new QPushButton(tr("Rebase Current onto It"), this))
     , switch_(new QPushButton(tr("Switch"), this))
 {
-    auto *title = new QLabel(tr("Branches"), this);
-    AppFonts::setInterfaceFont(title, 1.5);
-    subtitle_->setObjectName(QStringLiteral("pageDescription"));
-    subtitle_->setWordWrap(true);
-    auto *heading = new QVBoxLayout;
-    heading->setSpacing(4);
-    heading->addWidget(title);
-    heading->addWidget(subtitle_);
     auto *newBranch = new QPushButton(tr("New Branch…"), this);
     connect(newBranch, &QPushButton::clicked, this, [this] {
         dismiss();
         emit newBranchRequested();
     });
-    auto *header = new QHBoxLayout;
-    header->setContentsMargins(28, 22, 28, 0);
-    header->setSpacing(14);
-    header->addWidget(headerIcon_, 0, Qt::AlignTop);
-    header->addLayout(heading, 1);
-    header->addWidget(newBranch, 0, Qt::AlignTop);
+    header_->addButton(newBranch);
+    connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
     filter_->setObjectName(QStringLiteral("branchFilter"));
     filter_->setPlaceholderText(tr("Filter branches"));
@@ -248,18 +231,12 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     empty_->setAlignment(Qt::AlignCenter);
     empty_->setWordWrap(true);
 
-    auto *card = new QFrame(this);
-    card->setObjectName(QStringLiteral("settingsCard"));
-    auto *cardLayout = new QVBoxLayout(card);
-    cardLayout->setContentsMargins(4, 6, 4, 6);
-    cardLayout->addWidget(list_);
-    cardLayout->addWidget(empty_);
-
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(28, 0, 28, 18);
+    body->setContentsMargins(16, 12, 16, 12);
     body->setSpacing(10);
     body->addWidget(filter_);
-    body->addWidget(card, 1);
+    body->addWidget(list_, 1);
+    body->addWidget(empty_, 1);
 
     auto *footer = new QFrame(this);
     footer->setObjectName(QStringLiteral("popupFooter"));
@@ -270,7 +247,7 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     connect(rebase_, &QPushButton::clicked, this, &BranchesPopup::rebaseSelected);
     connect(switch_, &QPushButton::clicked, this, &BranchesPopup::switchToSelected);
     auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(28, 12, 18, 14);
+    footerLayout->setContentsMargins(16, 10, 16, 10);
     footerLayout->setSpacing(8);
     footerLayout->addWidget(hint, 1);
     footerLayout->addWidget(merge_);
@@ -280,8 +257,7 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
-    layout->addLayout(header);
-    layout->addSpacing(16);
+    layout->addWidget(header_);
     layout->addLayout(body, 1);
     layout->addWidget(footer);
 
@@ -292,7 +268,7 @@ void BranchesPopup::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(branchesRules)));
-    headerIcon_->setPixmap(iconTile(QStringLiteral("branch"), theme, 40, devicePixelRatioF()));
+    header_->applyTheme(theme);
     if (auto *delegate = dynamic_cast<BranchDelegate *>(list_->itemDelegate()))
         delegate->theme = theme;
     list_->viewport()->update();
@@ -321,12 +297,12 @@ void BranchesPopup::load(const QString &folder)
     }
 
     if (!repository) {
-        subtitle_->setText(error.isEmpty() ? tr("The folder is not in a git repository.") : error);
+        header_->setSubtitle(error.isEmpty() ? tr("The folder is not in a git repository.") : error);
     } else if (repository->detached) {
-        subtitle_->setText(tr("HEAD is detached at %1.").arg(repository->headId));
+        header_->setSubtitle(tr("HEAD is detached at %1.").arg(repository->headId));
     } else {
         current_ = repository->branch;
-        subtitle_->setText(branchSummary(*repository));
+        header_->setSubtitle(branchSummary(*repository));
     }
     empty_->setText(error.isEmpty() ? tr("No branches yet: make a first commit.") : error);
 

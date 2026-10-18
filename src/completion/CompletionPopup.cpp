@@ -185,7 +185,7 @@ public:
         if (selected) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(theme.selection);
-            painter->drawRoundedRect(row, 5, 5);
+            painter->drawRoundedRect(row, 2, 2);
         }
 
         // The badge: the kind's letter on a tint of its syntax color.
@@ -198,7 +198,7 @@ public:
         tint.setAlpha(theme.isDark ? 50 : 36);
         painter->setPen(Qt::NoPen);
         painter->setBrush(tint);
-        painter->drawRoundedRect(badge, 4, 4);
+        painter->drawRoundedRect(badge, 2, 2);
         QFont badgeFont = option.font;
         badgeFont.setPointSizeF(badgeFont.pointSizeF() * 0.82);
         badgeFont.setWeight(QFont::Bold);
@@ -361,14 +361,14 @@ void CompletionPopup::applyTheme(const Theme &theme)
     // Called each time the popup shows: a style sheet is only set when it
     // changes, setting one restyles the whole popup.
     const QString sheet =
-        QStringLiteral("QFrame#completionPopup { background: %1; border: 1px solid %2; border-radius: 8px; }"
+        QStringLiteral("QFrame#completionPopup { background: %1; border: 1px solid %2; border-radius: 4px; }"
                        "QListView { background: transparent; border: none; outline: 0; }"
                        "QLabel#completionHint { color: %3; border-top: 1px solid %4; }")
             .arg(theme.alternateBase.name(), theme.border.name(), theme.mutedText.name(), theme.line.name());
     if (sheet != styleSheet())
         setStyleSheet(sheet);
     const QString documentationSheet =
-        QStringLiteral("QFrame#completionDocumentation { background: %1; border: 1px solid %2; border-radius: 8px; }"
+        QStringLiteral("QFrame#completionDocumentation { background: %1; border: 1px solid %2; border-radius: 4px; }"
                        "QLabel { color: %3; background: transparent; }")
             .arg(theme.alternateBase.name(), theme.border.name(), theme.foreground.name());
     if (documentationSheet != documentation_->styleSheet())

@@ -1,9 +1,9 @@
 #include "NewBranchPopup.h"
 
 #include "git/Branches.h"
-#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
 
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -16,10 +16,8 @@ namespace {
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *branchRules = R"(
-QLineEdit#branchName { padding: 7px 10px; border-radius: 8px; }
 QLabel#branchMessage[error="true"] { color: #e06c75; }
 QLabel#branchMessage[error="false"] { color: @muted; }
-QLabel#branchOrigin { color: @muted; }
 QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )";
 
@@ -30,28 +28,16 @@ const QString switchSetting = QStringLiteral("newBranch/switchTo");
 NewBranchPopup::NewBranchPopup(const Theme &theme, QWidget *parent)
     : OverlayPopup(QStringLiteral("newBranch"), QSizeF(0.36, 0.3), QSize(540, 330), parent)
     , theme_(theme)
-    , headerIcon_(new QLabel(this))
-    , origin_(new QLabel(this))
+    , header_(new PopupHeader(QStringLiteral("branch"), tr("New Branch"), this))
     , name_(new QLineEdit(this))
     , message_(new QLabel(this))
-    , switchTo_(new ToggleSwitch(this))
+    , switchTo_(new QCheckBox(this))
     , create_(new QPushButton(tr("Create Branch"), this))
 {
-    // The header: where the branch starts.
-    auto *title = new QLabel(tr("New Branch"), this);
-    AppFonts::setInterfaceFont(title, 1.5);
-    origin_->setObjectName(QStringLiteral("branchOrigin"));
-    auto *heading = new QVBoxLayout;
-    heading->setSpacing(4);
-    heading->addWidget(title);
-    heading->addWidget(origin_);
-    auto *header = new QHBoxLayout;
-    header->setContentsMargins(28, 22, 28, 0);
-    header->setSpacing(14);
-    header->addWidget(headerIcon_, 0, Qt::AlignTop);
-    header->addLayout(heading, 1);
+    // The header says where the branch starts (see load()).
+    connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
-    // The card: the name, then the switch.
+    // The name, then whether to switch to it.
     name_->setObjectName(QStringLiteral("branchName"));
     name_->setPlaceholderText(tr("feature/my-change"));
     connect(name_, &QLineEdit::textEdited, this, &NewBranchPopup::onNameEdited);
@@ -76,7 +62,7 @@ NewBranchPopup::NewBranchPopup(const Theme &theme, QWidget *parent)
             [](bool checked) { QSettings().setValue(switchSetting, checked); });
 
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(28, 0, 28, 20);
+    body->setContentsMargins(16, 12, 16, 12);
     body->addWidget(card);
     body->addStretch();
 
@@ -92,7 +78,7 @@ NewBranchPopup::NewBranchPopup(const Theme &theme, QWidget *parent)
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(create_, &QPushButton::clicked, this, &NewBranchPopup::create);
     auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(28, 12, 18, 14);
+    footerLayout->setContentsMargins(16, 10, 16, 10);
     footerLayout->setSpacing(8);
     footerLayout->addWidget(hint, 1);
     footerLayout->addWidget(cancel);
@@ -101,8 +87,7 @@ NewBranchPopup::NewBranchPopup(const Theme &theme, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
-    layout->addLayout(header);
-    layout->addSpacing(18);
+    layout->addWidget(header_);
     layout->addLayout(body, 1);
     layout->addWidget(footer);
 
@@ -113,7 +98,7 @@ void NewBranchPopup::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(branchRules)));
-    headerIcon_->setPixmap(iconTile(QStringLiteral("branch"), theme, 40, devicePixelRatioF()));
+    header_->applyTheme(theme);
 }
 
 void NewBranchPopup::popup(const RepositoryInfo &repository, const QStringList &existing)
@@ -126,15 +111,17 @@ void NewBranchPopup::popup(const RepositoryInfo &repository, const QStringList &
 void NewBranchPopup::load(const RepositoryInfo &repository, const QStringList &existing)
 {
     existing_ = existing;
+    QString origin;
     if (repository.unborn)
-        origin_->setText(tr("In a repository without commits yet: the first commit will go to it."));
+        origin = tr("In a repository without commits yet: the first commit will go to it.");
     else if (repository.detached)
-        origin_->setText(tr("From the detached HEAD, commit %1").arg(repository.headId));
+        origin = tr("From the detached HEAD, commit %1").arg(repository.headId);
     else
-        origin_->setText(tr("From %1, commit %2 — %3")
-                             .arg(repository.branch, repository.headId,
-                                  repository.headMessage.section(QLatin1Char('\n'), 0, 0).trimmed()));
-    origin_->setToolTip(origin_->text());
+        origin = tr("From %1, commit %2 — %3")
+                     .arg(repository.branch, repository.headId,
+                          repository.headMessage.section(QLatin1Char('\n'), 0, 0).trimmed());
+    header_->setSubtitle(origin);
+    header_->setToolTip(origin);
     name_->clear();
     validate();
 }

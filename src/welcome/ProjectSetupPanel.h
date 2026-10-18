@@ -7,6 +7,7 @@
 
 #include <QWidget>
 
+class PopupHeader;
 class ProjectSetupForm;
 class ProvisioningView;
 class QLabel;
@@ -50,9 +51,7 @@ private:
 
     Toolchains *toolchains_;
     ProjectConfig project_;
-    QLabel *headerIcon_;
-    QLabel *title_;
-    QLabel *location_;
+    PopupHeader *header_;
     QStackedWidget *pages_;
     ProjectSetupForm *form_;
     ProvisioningView *provisioning_;

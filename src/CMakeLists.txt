@@ -3,9 +3,12 @@
 add_library(duet_core STATIC
     changes/BranchesPopup.cpp
     changes/ChangesView.cpp
+    changes/CommitPanel.cpp
+    changes/DiffHeaderBar.cpp
     changes/DiffView.cpp
     changes/FileChangeDelegate.cpp
     changes/GitActions.cpp
+    changes/HunkActions.cpp
     changes/NewBranchPopup.cpp
     changes/SnapshotsPopup.cpp
     changes/StashesPopup.cpp
@@ -62,6 +65,7 @@ add_library(duet_core STATIC
     editor/FindBar.cpp
     editor/MarkdownHtml.cpp
     editor/PreviewPage.cpp
+    editor/PreviewTab.cpp
     editor/ScrollBarMarks.cpp
     editor/SymbolOccurrences.cpp
     editor/TextFile.cpp
@@ -134,6 +138,7 @@ add_library(duet_core STATIC
     ui/AppFonts.cpp
     ui/BrandMark.cpp
     ui/GripSplitter.cpp
+    ui/HoverCloseButtons.cpp
     ui/NoticeBar.cpp
     ui/OverlayPopup.cpp
     ui/PopupWidgets.cpp
@@ -159,9 +164,12 @@ add_library(duet_core STATIC
     workspace/FileOperations.cpp
     workspace/FilesPanel.cpp
     workspace/FileTreeView.cpp
+    workspace/FileUndoStack.cpp
+    workspace/LastCommits.cpp
     workspace/ProjectFiles.cpp
     workspace/ProjectTreeModel.cpp
     workspace/SidePanel.cpp
+    workspace/TreeDecorations.cpp
 )
 
 # The PTY depends on the system: ConPTY on Windows, forkpty elsewhere.

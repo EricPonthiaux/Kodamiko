@@ -6,6 +6,7 @@
 
 #include <QAction>
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDoubleSpinBox>
@@ -41,19 +42,18 @@ QLabel *mutedLabel(const QString &text, const char *objectName = "pageDescriptio
 void addGroup(QVBoxLayout *layout, const QString &heading, QWidget *card)
 {
     if (layout->count() > 0)
-        layout->addSpacing(18);
+        layout->addSpacing(16);
     layout->addWidget(sectionHeading(heading));
-    layout->addSpacing(6);
     layout->addWidget(card);
 }
 
-// The icon in the side bar's colors: muted, and the accent's text color on
-// the selected page.
+// The icon in the side bar's colors: muted, and the text's color on the
+// selected page.
 QIcon sidebarIcon(const QString &name, const Theme &theme)
 {
     QIcon icon;
     for (const auto &[mode, color] :
-         {std::pair{QIcon::Normal, theme.mutedText}, std::pair{QIcon::Selected, theme.accentText}}) {
+         {std::pair{QIcon::Normal, theme.mutedText}, std::pair{QIcon::Selected, theme.foreground}}) {
         const QIcon drawn = UiIcons::icon(name, color);
         for (const QSize size : {QSize(16, 16), QSize(32, 32)})
             icon.addPixmap(drawn.pixmap(size), mode);
@@ -152,16 +152,14 @@ QStringList fillFontFamilies(QComboBox *combo)
 
 // The side bar and the keymap, besides the shared rules (popupStyleSheet).
 constexpr const char *preferencesRules = R"(
-QFrame#preferencesSidebar { background: @window; border: none; border-right: 1px solid @line;
-                            border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+QFrame#preferencesSidebar { background: @window; border: none; border-right: 1px solid @line; }
 QListWidget#preferencesNav { background: transparent; border: none; outline: 0; }
-QListWidget#preferencesNav::item { padding: 7px 10px; margin: 1px 0; border-radius: 7px; color: @text; }
+QListWidget#preferencesNav::item { padding: 5px 8px; margin: 1px 0; border-radius: 2px; color: @text; }
 QListWidget#preferencesNav::item:hover { background: @hover; }
-QListWidget#preferencesNav::item:selected { background: @selection; color: @accentText; }
+QListWidget#preferencesNav::item:selected { background: @slate; color: @text; }
 QLabel#keymapNote { color: @accent; }
-QTreeWidget#keymapList { background: transparent; border: none; border-radius: 10px; }
+QTreeWidget#keymapList { background: transparent; border: none; border-top: 1px solid @line; }
 QTreeWidget#keymapList::item { padding: 0 6px; }
-QLineEdit#keymapSearch { padding: 6px 10px; border-radius: 8px; }
 QKeySequenceEdit QLineEdit { padding: 4px 8px; }
 )";
 
@@ -196,25 +194,30 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
         dismiss();
     });
     auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(28, 12, 18, 14);
+    footerLayout->setContentsMargins(16, 10, 16, 10);
     footerLayout->setSpacing(8);
     footerLayout->addWidget(hint, 1);
     footerLayout->addWidget(cancel);
     footerLayout->addWidget(apply);
     footerLayout->addWidget(ok);
 
-    auto *main = new QVBoxLayout;
-    main->setContentsMargins(0, 0, 0, 0);
-    main->setSpacing(0);
-    main->addWidget(pages_, 1);
-    main->addWidget(footer);
+    // The header across, then the categories at the left of their page,
+    // then the footer across.
+    header_ = new PopupHeader(QStringLiteral("settings"), tr("Preferences"), this);
+    connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
+    auto *columns = new QHBoxLayout;
+    columns->setContentsMargins(0, 0, 0, 0);
+    columns->setSpacing(0);
+    columns->addWidget(sidebar);
+    columns->addWidget(pages_, 1);
 
-    auto *layout = new QHBoxLayout(this);
+    auto *layout = new QVBoxLayout(this);
     // 1 pixel: the panel's border stays visible around the side bar.
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
-    layout->addWidget(sidebar);
-    layout->addLayout(main, 1);
+    layout->addWidget(header_);
+    layout->addLayout(columns, 1);
+    layout->addWidget(footer);
 
     applyTheme(theme);
 }
@@ -223,16 +226,7 @@ QWidget *PreferencesPopup::createSidebar()
 {
     auto *sidebar = new QFrame(this);
     sidebar->setObjectName(QStringLiteral("preferencesSidebar"));
-    sidebar->setFixedWidth(210);
-
-    auto *title = new QLabel(tr("Preferences"), sidebar);
-    AppFonts::setInterfaceFont(title, 1.15);
-    auto *icon = new QLabel(sidebar);
-    icon->setObjectName(QStringLiteral("preferencesIcon"));
-    auto *header = new QHBoxLayout;
-    header->setSpacing(8);
-    header->addWidget(icon);
-    header->addWidget(title, 1);
+    sidebar->setFixedWidth(190);
 
     pageList_ = new QListWidget(sidebar);
     pageList_->setObjectName(QStringLiteral("preferencesNav"));
@@ -242,9 +236,7 @@ QWidget *PreferencesPopup::createSidebar()
     connect(pageList_, &QListWidget::currentRowChanged, pages_, &QStackedWidget::setCurrentIndex);
 
     auto *layout = new QVBoxLayout(sidebar);
-    layout->setContentsMargins(12, 18, 12, 12);
-    layout->setSpacing(14);
-    layout->addLayout(header);
+    layout->setContentsMargins(8, 10, 8, 10);
     layout->addWidget(pageList_, 1);
     return sidebar;
 }
@@ -252,7 +244,7 @@ QWidget *PreferencesPopup::createSidebar()
 void PreferencesPopup::addPage(const QString &icon, const QString &title, QWidget *page)
 {
     auto *item = new QListWidgetItem(title, pageList_);
-    item->setSizeHint(QSize(0, 34));
+    item->setSizeHint(QSize(0, 30));
     pageIcons_.append(icon);
     pages_->addWidget(page);
 }
@@ -261,22 +253,22 @@ QWidget *PreferencesPopup::page(const QString &title, const QString &description
 {
     auto *page = new QWidget;
     auto *titleLabel = new QLabel(title, page);
-    AppFonts::setInterfaceFont(titleLabel, 1.5);
+    AppFonts::setInterfaceFont(titleLabel, 1.05, QFont::DemiBold);
 
     auto *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 22, 0, 0);
+    layout->setContentsMargins(0, 14, 0, 0);
     layout->setSpacing(0);
     auto *heading = new QVBoxLayout;
-    heading->setContentsMargins(28, 0, 28, 0);
-    heading->setSpacing(4);
+    heading->setContentsMargins(16, 0, 16, 0);
+    heading->setSpacing(2);
     heading->addWidget(titleLabel);
     heading->addWidget(mutedLabel(description));
     layout->addLayout(heading);
-    layout->addSpacing(18);
+    layout->addSpacing(14);
 
     content->setObjectName(QStringLiteral("pageContent"));
     if (!scrolls) {
-        content->setContentsMargins(28, 0, 28, 18);
+        content->setContentsMargins(16, 0, 16, 16);
         layout->addWidget(content, 1);
         return page;
     }
@@ -284,7 +276,7 @@ QWidget *PreferencesPopup::page(const QString &title, const QString &description
     auto *holder = new QWidget;
     holder->setObjectName(QStringLiteral("pageContent"));
     auto *holderLayout = new QVBoxLayout(holder);
-    holderLayout->setContentsMargins(28, 0, 28, 22);
+    holderLayout->setContentsMargins(16, 0, 16, 16);
     holderLayout->addWidget(content);
     holderLayout->addStretch();
     auto *scroll = new QScrollArea(page);
@@ -348,7 +340,7 @@ QWidget *PreferencesPopup::createAppearancePage()
     lineHeight_->setSingleStep(0.1);
     lineHeight_->setDecimals(2);
     lineHeight_->setMinimumWidth(90);
-    ligatures_ = new ToggleSwitch;
+    ligatures_ = new QCheckBox;
     fontPreview_ = new QLabel;
     fontPreview_->setTextFormat(Qt::RichText);
     connect(fontFamily_, &QComboBox::currentIndexChanged, this, &PreferencesPopup::updateFontPreview);
@@ -377,7 +369,7 @@ QWidget *PreferencesPopup::createAppearancePage()
     interfaceCard->addRow(tr("Navigation trees"), tr("The files, the outline and the changes."), treeFontSize_);
     addGroup(layout, tr("Interface font"), interfaceCard);
 
-    systemTitleBar_ = new ToggleSwitch(content);
+    systemTitleBar_ = new QCheckBox(content);
 #ifdef Q_OS_MACOS
     systemTitleBar_->hide(); // macOS keeps its own frame and traffic lights
 #else
@@ -398,9 +390,9 @@ QWidget *PreferencesPopup::createEditorPage()
     layout->setSpacing(0);
 
     auto *display = new SettingsCard;
-    codeFolding_ = new ToggleSwitch;
-    wrapLines_ = new ToggleSwitch;
-    showWhitespace_ = new ToggleSwitch;
+    codeFolding_ = new QCheckBox;
+    wrapLines_ = new QCheckBox;
+    showWhitespace_ = new QCheckBox;
     display->addRow(tr("Code folding"), tr("Marks in the margin fold blocks, comments and #if sections."),
                     codeFolding_);
     display->addRow(tr("Wrap long lines"), tr("Long lines continue below instead of scrolling sideways."), wrapLines_);
@@ -417,11 +409,11 @@ QWidget *PreferencesPopup::createEditorPage()
                        tr("Off: only on Ctrl+Space. Calm: after a pause, from the third letter of a name. "
                           "Eager: as soon as you type a name or a member access."),
                        autoCompletion_);
-    completionAcceptsEnter_ = new ToggleSwitch;
+    completionAcceptsEnter_ = new QCheckBox;
     completion->addRow(tr("Enter inserts the suggestion"),
                        tr("Otherwise only Tab inserts it, and Enter always starts a new line."),
                        completionAcceptsEnter_);
-    languageServers_ = new ToggleSwitch;
+    languageServers_ = new QCheckBox;
     completion->addRow(tr("Language servers"),
                        tr("Members, signatures and types from clangd (C, C++), jdtls (Java), "
                           "typescript-language-server, pyright or pylsp, when installed."),
@@ -431,7 +423,7 @@ QWidget *PreferencesPopup::createEditorPage()
     addGroup(layout, tr("Completion"), completion);
 
     auto *fullLine = new SettingsCard;
-    fullLine_ = new ToggleSwitch;
+    fullLine_ = new QCheckBox;
     fullLine->addRow(tr("Full Line completion"),
                      tr("A code model on this machine suggests the rest of the line in gray; Tab inserts it. "
                         "The code around the cursor is sent to the server below."),
@@ -452,7 +444,7 @@ QWidget *PreferencesPopup::createEditorPage()
     fullLineModel_->setMinimumWidth(220);
     fullLineModelRow_ =
         fullLine->addRow(tr("Model"), tr("Ollama's model name, such as qwen2.5-coder:1.5b."), fullLineModel_);
-    connect(fullLine_, &ToggleSwitch::toggled, this, &PreferencesPopup::updateFullLineRows);
+    connect(fullLine_, &QCheckBox::toggled, this, &PreferencesPopup::updateFullLineRows);
     connect(fullLineServer_, &QComboBox::currentIndexChanged, this, [this] {
         // Each server's usual port, unless another was set.
         const QString endpoint = fullLineEndpoint_->text().trimmed();
@@ -466,7 +458,7 @@ QWidget *PreferencesPopup::createEditorPage()
     addGroup(layout, tr("Full Line"), fullLine);
 
     auto *saving = new SettingsCard;
-    formatOnSave_ = new ToggleSwitch;
+    formatOnSave_ = new QCheckBox;
     saving->addRow(tr("Format on save"),
                    tr("Formats each file before writing it, with clang-format, prettier, ruff, black, shfmt or "
                       "cmake-format, whichever is installed for its language."),
@@ -484,7 +476,7 @@ QWidget *PreferencesPopup::createFilesPage()
     layout->setSpacing(0);
 
     auto *tree = new SettingsCard;
-    alwaysSelectOpenedFile_ = new ToggleSwitch;
+    alwaysSelectOpenedFile_ = new QCheckBox;
     tree->addRow(tr("Always select the opened file"), tr("The Files tree reveals each file you open."),
                  alwaysSelectOpenedFile_);
     addGroup(layout, tr("Files panel"), tree);
@@ -500,10 +492,10 @@ QWidget *PreferencesPopup::createClaudePage()
     layout->setSpacing(0);
 
     auto *session = new SettingsCard;
-    snapshotBeforePrompt_ = new ToggleSwitch;
-    shareEditorContext_ = new ToggleSwitch;
-    exposeTools_ = new ToggleSwitch;
-    claudeNotifications_ = new ToggleSwitch;
+    snapshotBeforePrompt_ = new QCheckBox;
+    shareEditorContext_ = new QCheckBox;
+    exposeTools_ = new QCheckBox;
+    claudeNotifications_ = new QCheckBox;
     session->addRow(tr("Snapshot before each prompt"),
                     tr("Keeps a copy of the working directory before Claude works on a prompt, to undo its "
                        "changes."),
@@ -617,8 +609,7 @@ void PreferencesPopup::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(preferencesRules)));
-    if (auto *icon = findChild<QLabel *>(QStringLiteral("preferencesIcon")))
-        icon->setPixmap(UiIcons::icon(QStringLiteral("settings"), theme.accent).pixmap(QSize(18, 18)));
+    header_->applyTheme(theme);
     for (int i = 0; i < pageList_->count(); ++i)
         pageList_->item(i)->setIcon(sidebarIcon(pageIcons_.value(i), theme));
     if (!commandFilter_->actions().isEmpty())
@@ -662,7 +653,7 @@ void PreferencesPopup::updateFontPreview()
     font.codeFontWeight = fontWeight_->currentData().toInt();
     fontPreview_->setFont(AppFonts::withLigatures(font.codeFont(), ligatures_->isChecked()));
     fontPreview_->setStyleSheet(QStringLiteral("QLabel { background: %1; color: %2; border: 1px solid %3; "
-                                               "border-radius: 8px; padding: 12px 14px; }")
+                                               "border-radius: 3px; padding: 10px 12px; }")
                                     .arg(shown.background.name(), shown.foreground.name(), shown.line.name()));
 }
 

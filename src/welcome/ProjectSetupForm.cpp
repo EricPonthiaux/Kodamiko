@@ -4,6 +4,7 @@
 #include "toolchains/Toolchains.h"
 #include "ui/PopupWidgets.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QLabel>
@@ -85,7 +86,7 @@ void ProjectSetupForm::build(Card &card)
 {
     layout_->addWidget(sectionHeading(ProjectLanguages::title(card.family)));
     auto *settings = new SettingsCard(this);
-    card.enabled = new ToggleSwitch(this);
+    card.enabled = new QCheckBox(this);
     card.runtime = new QComboBox(this);
     card.server = new QComboBox(this);
     card.serverVersion = new QComboBox(this);

@@ -46,9 +46,9 @@ void MainWindow::createMenus()
 
     // Actions at the right of the title bar.
     titleBar_->setRunActions(runAction_, stopAction_);
-    titleBar_->addActionButton(goToFileAction_, QStringLiteral("search"));
-    titleBar_->addActionButton(findInFilesAction_, QStringLiteral("find-in-files"));
-    titleBar_->addActionButton(paletteAction_, QStringLiteral("palette"));
+    titleBar_->addActionButton(goToFileAction_, QStringLiteral("find-file"));
+    titleBar_->addActionButton(findInFilesAction_, QStringLiteral("find-in-folder"));
+    titleBar_->addActionButton(paletteAction_, QStringLiteral("command"));
 }
 
 void MainWindow::createFileMenu()

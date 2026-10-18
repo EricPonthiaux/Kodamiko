@@ -1,0 +1,285 @@
+#include "editor/EditorTabs.h"
+#include "editor/EditorWidget.h"
+#include "workspace/EntryPopups.h"
+#include "workspace/FileTreeView.h"
+#include "workspace/FileUndoStack.h"
+#include "workspace/TreeDecorations.h"
+
+#include <QApplication>
+#include <QClipboard>
+#include <QDir>
+#include <QFile>
+#include <QItemSelectionModel>
+#include <QLineEdit>
+#include <QPointer>
+#include <QSignalSpy>
+#include <QTabBar>
+#include <QTemporaryDir>
+#include <QtTest>
+
+namespace {
+
+void write(const QString &path, const QByteArray &content = {})
+{
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(content);
+}
+
+// Names of the rows the tree shows, top to bottom.
+QStringList shownNames(const FileTreeView &tree)
+{
+    QStringList names;
+    for (QModelIndex index = tree.model()->index(0, 0, tree.rootIndex()); index.isValid();
+         index = tree.indexBelow(index))
+        names.append(QFileInfo(index.data(TreeRoles::path).toString()).fileName());
+    return names;
+}
+
+// Selects `paths` in the tree, as Ctrl+clicks would.
+void selectAll(FileTreeView &tree, const QStringList &paths)
+{
+    // select() makes each row the only selected one: the rows first.
+    QList<QPersistentModelIndex> rows;
+    for (const QString &path : paths) {
+        QVERIFY(tree.select(path));
+        QTRY_COMPARE(tree.currentPath(), path);
+        rows.append(tree.currentIndex());
+    }
+    for (const QPersistentModelIndex &row : rows)
+        tree.selectionModel()->select(row, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+}
+
+} // namespace
+
+class TestFileTree : public QObject {
+    Q_OBJECT
+
+private slots:
+
+    void problemsColorFilesAndTheirFoldersBeforeGitStates()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.path());
+        write(root + "/src/broken.cpp");
+        write(root + "/src/fine.cpp");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.setStatuses(
+            {{root + "/src/broken.cpp", FileStatus::Modified}, {root + "/src/fine.cpp", FileStatus::Modified}}, true);
+        tree.setProblems({{root + "/src/broken.cpp", {.errors = 2, .warnings = 1}}});
+        tree.show();
+
+        QVERIFY(tree.select(root + "/src/broken.cpp"));
+        QTRY_COMPARE(tree.currentPath(), root + "/src/broken.cpp");
+        const QModelIndex broken = tree.currentIndex();
+        QCOMPARE(broken.data(TreeRoles::problemCount).toInt(), 3);
+        QCOMPARE(broken.data(TreeRoles::statusLetter).toString(), QString("M"));
+        const auto errorColor = broken.data(Qt::ForegroundRole).value<QColor>();
+        QCOMPARE(errorColor, broken.data(TreeRoles::problemColor).value<QColor>());
+        QVERIFY(errorColor != broken.data(TreeRoles::statusColor).value<QColor>());
+        QVERIFY(broken.data(Qt::ToolTipRole).toString().contains("2 error(s)"));
+        QCOMPARE(broken.parent().data(Qt::ForegroundRole).value<QColor>(), errorColor);
+        QVERIFY(broken.parent().data(Qt::ToolTipRole).toString().contains("error(s) in its files"));
+
+        QVERIFY(tree.select(root + "/src/fine.cpp"));
+        QTRY_COMPARE(tree.currentPath(), root + "/src/fine.cpp");
+        QCOMPARE(tree.currentIndex().data(TreeRoles::problemCount).toInt(), 0);
+        QCOMPARE(tree.currentIndex().data(Qt::ForegroundRole).value<QColor>(),
+                 tree.currentIndex().data(TreeRoles::statusColor).value<QColor>());
+    }
+
+    void openFilesAreMarked()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.path());
+        write(root + "/open.txt");
+        write(root + "/closed.txt");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.setOpenFiles({root + "/open.txt"});
+        tree.show();
+        QVERIFY(tree.select(root + "/open.txt"));
+        QTRY_COMPARE(tree.currentPath(), root + "/open.txt");
+        QVERIFY(tree.currentIndex().data(TreeRoles::isOpen).toBool());
+        QVERIFY(tree.select(root + "/closed.txt"));
+        QTRY_COMPARE(tree.currentPath(), root + "/closed.txt");
+        QVERIFY(!tree.currentIndex().data(TreeRoles::isOpen).toBool());
+    }
+
+    void tooltipGivesSizeAndDate()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.path());
+        write(root + "/notes.txt", QByteArray(2048, 'x'));
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.show();
+        QVERIFY(tree.select(root + "/notes.txt"));
+        QTRY_COMPARE(tree.currentPath(), root + "/notes.txt");
+        const QString toolTip = tree.currentIndex().data(Qt::ToolTipRole).toString();
+        QVERIFY(toolTip.contains(QLocale().formattedDataSize(2048)));
+        QVERIFY(toolTip.contains("modified"));
+    }
+
+    void previewTabGivesWayToTheNextPreview()
+    {
+        const QTemporaryDir dir;
+        for (const char *name : {"a.txt", "b.txt", "c.txt"})
+            write(dir.filePath(name), "text\n");
+        EditorTabs tabs(Theme::dark());
+
+        QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
+        QVERIFY(tabs.tabBar()->property("preview").toBool());
+        QVERIFY(tabs.openPreview(dir.filePath("b.txt")));
+        QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("b.txt")}));
+
+        // A file opened for good goes before the preview, which stays last.
+        QVERIFY(tabs.openFile(dir.filePath("c.txt")));
+        QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("c.txt"), dir.filePath("b.txt")}));
+
+        // Opened for good: no longer a preview.
+        QVERIFY(tabs.openFile(dir.filePath("b.txt")));
+        QVERIFY(!tabs.tabBar()->property("preview").toBool());
+        QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
+        QCOMPARE(tabs.openFilePaths().size(), 3);
+    }
+
+    void editingThePreviewKeepsItOpen()
+    {
+        const QTemporaryDir dir;
+        for (const char *name : {"a.txt", "b.txt"})
+            write(dir.filePath(name), "text\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
+        tabs.editorFor(dir.filePath("a.txt"))->insert("x");
+        QVERIFY(!tabs.tabBar()->property("preview").toBool());
+        QVERIFY(tabs.openPreview(dir.filePath("b.txt")));
+        QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("a.txt"), dir.filePath("b.txt")}));
+    }
+
+    void severalSelectedEntriesAreCutAndPastedTogether()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.filePath("project"));
+        write(root + "/src/a.cpp");
+        write(root + "/src/b.cpp");
+        write(root + "/lib/keep.txt");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.show();
+        selectAll(tree, {root + "/src/a.cpp", root + "/src/b.cpp"});
+        QCOMPARE(tree.selectedPaths().size(), 2);
+
+        const QSignalSpy send(&tree, &FileTreeView::sendToClaudeRequested);
+        QTest::keyClick(&tree, Qt::Key_K, Qt::ControlModifier | Qt::AltModifier);
+        QCOMPARE(send.size(), 2);
+
+        QTest::keyClick(&tree, Qt::Key_X, Qt::ControlModifier);
+        QVERIFY(tree.select(root + "/lib"));
+        QTRY_COMPARE(tree.currentPath(), root + "/lib");
+        QTest::keyClick(&tree, Qt::Key_V, Qt::ControlModifier);
+        QVERIFY(QFileInfo::exists(root + "/lib/a.cpp"));
+        QVERIFY(QFileInfo::exists(root + "/lib/b.cpp"));
+        QVERIFY(!QFileInfo::exists(root + "/src/a.cpp"));
+    }
+
+    void entriesInsideASelectedFolderGoWithIt()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.path());
+        write(root + "/src/a.cpp");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.show();
+        selectAll(tree, {root + "/src", root + "/src/a.cpp"});
+        QCOMPARE(tree.selectedPaths(), QStringList({root + "/src"}));
+    }
+
+    void filterWhileTypingShowsOnlyTheMatches()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.filePath("project"));
+        write(root + "/src/parser.cpp");
+        write(root + "/src/lexer.cpp");
+        write(root + "/docs/guide.md");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.setFilterWhileTyping(true);
+        tree.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&tree));
+        tree.restoreExpandedPaths({root + "/src", root + "/docs"});
+        QTRY_VERIFY(shownNames(tree).contains("guide.md") && shownNames(tree).contains("lexer.cpp"));
+        QVERIFY(tree.select(root + "/docs"));
+        QTRY_COMPARE(tree.currentPath(), root + "/docs");
+
+        QTest::keyClicks(&tree, "pars");
+        QTRY_COMPARE(shownNames(tree), QStringList({"project", "src", "parser.cpp"}));
+        QCOMPARE(tree.currentPath(), root + "/src/parser.cpp");
+
+        // Back as it was, on the match chosen.
+        QTest::keyClick(&tree, Qt::Key_Escape);
+        QTRY_VERIFY(shownNames(tree).contains("guide.md") && shownNames(tree).contains("lexer.cpp"));
+        QTRY_COMPARE(tree.currentPath(), root + "/src/parser.cpp");
+    }
+
+    void undoBringsBackARenamedFile()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.path());
+        write(root + "/old.txt");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.show();
+        QSignalSpy renamed(&tree, &FileTreeView::entryRenamed);
+        QVERIFY(tree.select(root + "/old.txt"));
+        QTRY_COMPARE(tree.currentPath(), root + "/old.txt");
+        QTest::keyClick(&tree, Qt::Key_F2);
+        const QPointer<NamePopup> popup = tree.findChild<NamePopup *>();
+        QVERIFY(popup);
+        popup->field()->setText("new.txt");
+        QTest::keyClick(popup->field(), Qt::Key_Return);
+        QVERIFY(QFileInfo::exists(root + "/new.txt"));
+
+        QTest::keyClick(&tree, Qt::Key_Z, Qt::ControlModifier);
+        QVERIFY(QFileInfo::exists(root + "/old.txt"));
+        QVERIFY(!QFileInfo::exists(root + "/new.txt"));
+        QCOMPARE(renamed.size(), 2);
+        QCOMPARE(renamed.last().at(1).toString(), root + "/old.txt");
+    }
+
+    void undoTakesBackFromTheTrash()
+    {
+        // A freedesktop.org trash of our own: the system's stays untouched.
+        const QTemporaryDir dir;
+        write(dir.filePath("Trash/files/a.txt"));
+        write(dir.filePath("Trash/info/a.txt.trashinfo"));
+        FileUndoStack stack;
+        stack.record({.kind = FileUndoStack::Step::Kind::Trashed,
+                      .path = dir.filePath("project/a.txt"),
+                      .source = dir.filePath("Trash/files/a.txt")});
+        QVERIFY(QDir().mkpath(dir.filePath("project")));
+        QCOMPARE(stack.lastDescription(), QString("Undo Deletion of “a.txt”"));
+        QCOMPARE(stack.undo(), QString());
+        QVERIFY(QFileInfo::exists(dir.filePath("project/a.txt")));
+        QVERIFY(!QFileInfo::exists(dir.filePath("Trash/info/a.txt.trashinfo")));
+        QVERIFY(!stack.last());
+    }
+
+    void undoNeverOverwrites()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("a.txt"));
+        write(dir.filePath("b.txt"));
+        FileUndoStack stack;
+        stack.record(
+            {.kind = FileUndoStack::Step::Kind::Moved, .path = dir.filePath("b.txt"), .source = dir.filePath("a.txt")});
+        QVERIFY(!stack.undo().isEmpty()); // a.txt exists again
+        QVERIFY(QFileInfo::exists(dir.filePath("b.txt")));
+        QVERIFY(!stack.last()); // forgotten all the same
+    }
+};
+
+QTEST_MAIN(TestFileTree)
+#include "tst_filetree.moc"

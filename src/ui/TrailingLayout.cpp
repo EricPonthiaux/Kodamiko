@@ -15,6 +15,7 @@ TrailingLayout::~TrailingLayout()
 void TrailingLayout::addItem(QLayoutItem *item)
 {
     items_.append(item);
+    groups_.append(currentGroup_);
 }
 
 QLayoutItem *TrailingLayout::itemAt(int index) const
@@ -26,6 +27,7 @@ QLayoutItem *TrailingLayout::takeAt(int index)
 {
     if (index < 0 || index >= items_.size())
         return nullptr;
+    groups_.removeAt(index);
     return items_.takeAt(index);
 }
 
@@ -38,16 +40,15 @@ QSize TrailingLayout::sizeHint() const
 {
     int width = 0;
     int height = 0;
-    int shown = 0;
-    for (const QLayoutItem *item : items_) {
-        if (item->isEmpty())
+    qsizetype previous = -1; // the last shown item
+    for (qsizetype i = 0; i < items_.size(); ++i) {
+        if (items_.at(i)->isEmpty())
             continue;
-        const QSize hint = item->sizeHint();
-        width += hint.width();
+        const QSize hint = items_.at(i)->sizeHint();
+        width += hint.width() + (previous >= 0 ? gapBetween(previous, i) : 0);
         height = qMax(height, hint.height());
-        ++shown;
+        previous = i;
     }
-    width += qMax(0, shown - 1) * gap();
     const QMargins margins = contentsMargins();
     return {width + margins.left() + margins.right(), height + margins.top() + margins.bottom()};
 }
@@ -76,9 +77,14 @@ void TrailingLayout::setGeometry(const QRect &rect)
     // Once a widget has no room, those further left have none either: the
     // row keeps its order instead of filling the gap with a smaller one.
     bool full = false;
-    for (QLayoutItem *item : items_) {
+    qsizetype previous = -1; // the last shown item, at the right of this one
+    for (qsizetype i = 0; i < items_.size(); ++i) {
+        QLayoutItem *item = items_.at(i);
         if (item->isEmpty())
             continue;
+        if (previous >= 0)
+            right -= gapBetween(previous, i);
+        previous = i;
         const QSize hint = item->sizeHint();
         const int height = qMin(hint.height(), area.height());
         const int top = area.top() + ((area.height() - height) / 2);
@@ -92,8 +98,12 @@ void TrailingLayout::setGeometry(const QRect &rect)
         }
         right -= hint.width();
         item->setGeometry(QRect(right, top, hint.width(), height));
-        right -= gap();
     }
+}
+
+int TrailingLayout::gapBetween(qsizetype left, qsizetype right) const
+{
+    return groups_.at(left) == groups_.at(right) ? gap() : qMax(0, groupSpacing_);
 }
 
 int TrailingLayout::gap() const

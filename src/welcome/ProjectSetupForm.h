@@ -13,7 +13,7 @@ class QVBoxLayout;
 struct RuntimeInstall;
 class SettingsCard;
 class Toolchains;
-class ToggleSwitch;
+class QCheckBox;
 
 // The setup of a project's languages, one card each: whether it is used,
 // its runtime (JDK, Node, Python, C++ standard), its language server and
@@ -45,7 +45,7 @@ private:
     struct Card {
         QString family;
         QLabel *evidence{};
-        ToggleSwitch *enabled{};
+        QCheckBox *enabled{};
         QComboBox *runtime{};
         QComboBox *server{};
         QComboBox *serverVersion{};

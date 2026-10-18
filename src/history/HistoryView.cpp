@@ -1,6 +1,7 @@
 #include "HistoryView.h"
 
 #include "CommitDelegate.h"
+#include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
 #include "git/ChangeKindStyle.h"
@@ -21,6 +22,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QSplitter>
+#include <QStackedWidget>
 #include <QStyledItemDelegate>
 #include <QTextBrowser>
 #include <QTimer>
@@ -29,49 +31,21 @@
 #include <QVBoxLayout>
 #include <QtMath>
 
-#include <functional>
+#include <numeric>
 
 namespace {
 
 constexpr int idRole = Qt::UserRole;
 constexpr int fileIndexRole = Qt::UserRole;
+// From this width, the three panes side by side.
+constexpr int wideLayoutWidth = 1180;
+// The message shows this many lines until expanded.
+constexpr int collapsedMessageLines = 5;
+constexpr int avatarSize = 18;
 
 QString formatDate(const QDateTime &date)
 {
     return QLocale().toString(date.toLocalTime(), QLocale::ShortFormat);
-}
-
-struct ClosablePaneParts {
-    QLabel *title = nullptr;
-    QWidget *content = nullptr;
-    QString closeTip;
-    std::function<void()> onClose;
-};
-
-// Closable pane: a bar with its title and a close button, above the content.
-QWidget *closablePane(const ClosablePaneParts &parts, QWidget *parent)
-{
-    QLabel *title = parts.title;
-    auto *pane = new QWidget(parent);
-    auto *close = new QToolButton(pane);
-    close->setText(QStringLiteral("✕"));
-    close->setToolTip(parts.closeTip);
-    close->setAutoRaise(true);
-    QObject::connect(close, &QToolButton::clicked, pane, parts.onClose);
-
-    title->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    AppFonts::setInterfaceFont(title, 1);
-    auto *bar = new QHBoxLayout;
-    bar->setContentsMargins(14, 6, 6, 6);
-    bar->addWidget(title, 1);
-    bar->addWidget(close);
-
-    auto *layout = new QVBoxLayout(pane);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
-    layout->addLayout(bar);
-    layout->addWidget(parts.content, 1);
-    return pane;
 }
 
 // "12 commits", "Last 500 commits"…
@@ -86,6 +60,13 @@ QString commitCountText(const CommitLog &log)
     return QObject::tr("%1 commits").arg(log.commits.size());
 }
 
+QLabel *mutedLabel(QWidget *parent)
+{
+    auto *label = new QLabel(parent);
+    label->setObjectName(QStringLiteral("historyMuted"));
+    return label;
+}
+
 } // namespace
 
 HistoryView::HistoryView(const Theme &theme, QWidget *parent)
@@ -93,14 +74,8 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     , summary_(new QLabel(this))
     , filter_(new QLineEdit(this))
     , commits_(new QTreeWidget(this))
-    , files_(new QTreeWidget(this))
-    , message_(new QTextBrowser(this))
-    , diff_(new DiffView(theme, this))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
     , leftSplitter_(new GripSplitter(Qt::Vertical, this))
-    , panel_(new GripSplitter(Qt::Vertical, this))
-    , commitTitle_(new QLabel(this))
-    , diffTitle_(new QLabel(this))
 {
     refreshButton_ = new QToolButton(this);
     refreshButton_->setToolTip(tr("Reload the history"));
@@ -135,7 +110,8 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     header->addWidget(filter_, 1);
     header->addWidget(refreshButton_);
 
-    // Commits on two lines: avatar, branches and tags, summary; author, date, ID.
+    // Commits on two lines: the summary and the branches and tags; the
+    // avatar, author and date, and the ID.
     commits_->setObjectName(QStringLiteral("commits"));
     commits_->setHeaderHidden(true);
     commits_->setRootIsDecorated(false);
@@ -149,7 +125,82 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     connect(commits_, &QTreeWidget::itemSelectionChanged, this, &HistoryView::onCommitSelectionChanged);
     connect(commits_, &QTreeWidget::customContextMenuRequested, this, &HistoryView::showCommitMenu);
 
-    // Files of the commit: choosing one shows its diff on the right.
+    commitPane_ = createCommitPane();
+    leftSplitter_->addWidget(commits_);
+    leftSplitter_->addWidget(commitPane_);
+    leftSplitter_->setChildrenCollapsible(false);
+    splitter_->addWidget(leftSplitter_);
+    splitter_->addWidget(createDiffPane());
+    splitter_->setChildrenCollapsible(false);
+    // Remembers the proportions set with the mouse.
+    connect(splitter_, &QSplitter::splitterMoved, this, &HistoryView::rememberShares);
+    connect(leftSplitter_, &QSplitter::splitterMoved, this, &HistoryView::rememberShares);
+
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addLayout(header);
+    layout->addWidget(splitter_);
+    showDetails();
+    applyTheme(theme);
+}
+
+// A hint until a commit is chosen; then its summary in demibold, the
+// author, date and ID on one line (the ID with a copy button), the message
+// (a few lines until expanded), the counts, and the files.
+QWidget *HistoryView::createCommitPane()
+{
+    auto *pane = new QFrame(this);
+    pane->setObjectName(QStringLiteral("historyPane"));
+    commitPages_ = new QStackedWidget(pane);
+
+    auto *hint = mutedLabel(commitPages_);
+    hint->setText(tr("Choose a commit to see its message and files."));
+    hint->setAlignment(Qt::AlignCenter);
+    hint->setWordWrap(true);
+    commitPages_->addWidget(hint);
+
+    auto *details = new QWidget(commitPages_);
+    commitSummary_ = new QLabel(details);
+    AppFonts::setInterfaceFont(commitSummary_, 1.05, QFont::DemiBold);
+    commitSummary_->setWordWrap(true);
+    commitSummary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    avatar_ = new QLabel(details);
+    commitMeta_ = mutedLabel(details);
+    commitId_ = mutedLabel(details);
+    commitId_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    copyId_ = new QToolButton(details);
+    copyId_->setAutoRaise(true);
+    copyId_->setFocusPolicy(Qt::NoFocus);
+    copyId_->setToolTip(tr("Copy the commit's ID"));
+    connect(copyId_, &QToolButton::clicked, this, [this] {
+        if (details_)
+            QApplication::clipboard()->setText(details_->summary.id);
+    });
+    auto *meta = new QHBoxLayout;
+    meta->setSpacing(6);
+    meta->addWidget(avatar_);
+    meta->addWidget(commitMeta_, 1);
+    meta->addWidget(commitId_);
+    meta->addWidget(copyId_);
+
+    message_ = new QTextBrowser(details);
+    message_->setOpenLinks(false);
+    message_->setFrameShape(QFrame::NoFrame);
+    // Part of the pane, not a field: no border of its own.
+    message_->setStyleSheet(QStringLiteral("QTextBrowser { border: none; border-radius: 0; padding: 0; }"));
+    message_->document()->setDocumentMargin(0);
+    moreMessage_ = new QToolButton(details);
+    moreMessage_->setObjectName(QStringLiteral("linkButton"));
+    moreMessage_->setAutoRaise(true);
+    moreMessage_->setFocusPolicy(Qt::NoFocus);
+    connect(moreMessage_, &QToolButton::clicked, this, [this] {
+        messageExpanded_ = !messageExpanded_;
+        fitMessage();
+    });
+    commitStats_ = new QLabel(details);
+
+    files_ = new QTreeWidget(details);
     files_->setObjectName(QStringLiteral("files"));
     files_->setHeaderHidden(true);
     files_->setRootIsDecorated(false);
@@ -167,58 +218,42 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
             emit openFileRequested(change.path);
     });
 
-    message_->setOpenLinks(false);
-    message_->setFrameShape(QFrame::NoFrame);
-    // Part of the pane, not a field: no border of its own.
-    message_->setStyleSheet(QStringLiteral("QTextBrowser { border: none; border-radius: 0; padding: 0; }"));
-    message_->document()->setDocumentMargin(14);
+    auto *text = new QVBoxLayout;
+    text->setContentsMargins(12, 10, 12, 6);
+    text->setSpacing(6);
+    text->addWidget(commitSummary_);
+    text->addLayout(meta);
+    text->addWidget(message_);
+    text->addWidget(moreMessage_, 0, Qt::AlignLeft);
+    text->addWidget(commitStats_);
+    auto *detailsLayout = new QVBoxLayout(details);
+    detailsLayout->setContentsMargins(0, 0, 0, 0);
+    detailsLayout->setSpacing(0);
+    detailsLayout->addLayout(text);
+    detailsLayout->addWidget(files_, 1);
+    commitPages_->addWidget(details);
+
+    auto *layout = new QVBoxLayout(pane);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(commitPages_);
+    return pane;
+}
+
+// The chosen file's diff under its header; a hint until one is chosen.
+QWidget *HistoryView::createDiffPane()
+{
+    auto *pane = new QFrame(this);
+    pane->setObjectName(QStringLiteral("historyPane"));
+    diff_ = new DiffView(Theme::dark(), pane);
     diff_->setToolTip({});
+    diffHeader_ = new DiffHeaderBar(diff_, pane);
 
-    panel_->addWidget(message_);
-    panel_->addWidget(files_);
-    panel_->setStretchFactor(1, 1);
-    panel_->setSizes({210, 180});
-
-    // A pane's close button deselects whatever made it appear, which hides it.
-    commitPane_ = closablePane({.title = commitTitle_,
-                                .content = panel_,
-                                .closeTip = tr("Close commit"),
-                                .onClose = [this] { commits_->clearSelection(); }},
-                               this);
-    diffPane_ = closablePane({.title = diffTitle_,
-                              .content = diff_,
-                              .closeTip = tr("Close diff"),
-                              .onClose = [this] { files_->clearSelection(); }},
-                             this);
-
-    leftSplitter_->addWidget(commits_);
-    leftSplitter_->addWidget(commitPane_);
-    leftSplitter_->setChildrenCollapsible(false);
-
-    splitter_->addWidget(leftSplitter_);
-    splitter_->addWidget(diffPane_);
-    splitter_->setChildrenCollapsible(false);
-
-    // Remembers the proportions set with the mouse, for the next time it appears.
-    const auto trackShare = [](QSplitter *splitter, double &share) {
-        connect(splitter, &QSplitter::splitterMoved, splitter, [splitter, &share] {
-            const QList<int> sizes = splitter->sizes();
-            if (sizes.value(0) > 0 && sizes.value(1) > 0)
-                share = double(sizes[1]) / (sizes[0] + sizes[1]);
-        });
-    };
-    trackShare(leftSplitter_, panelShare_);
-    trackShare(splitter_, diffShare_);
-
-    // Initially, the commit list alone.
-    hidePanes();
-
-    auto *layout = new QVBoxLayout(this);
+    auto *layout = new QVBoxLayout(pane);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addLayout(header);
-    layout->addWidget(splitter_);
-    applyTheme(theme);
+    layout->addWidget(diffHeader_);
+    layout->addWidget(diff_, 1);
+    return pane;
 }
 
 void HistoryView::setFolder(const QString &folder)
@@ -229,11 +264,8 @@ void HistoryView::setFolder(const QString &folder)
     showAll_->hide();
     log_.reset();
     error_.clear();
-    details_.reset();
-    detailsWanted_.clear();
     rebuildList();
-    showDetails();
-    hidePanes();
+    forgetCommit();
     summary_->clear();
 }
 
@@ -300,10 +332,7 @@ void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
 
     if (!log_) {
         summary_->setText(error);
-        details_.reset();
-        detailsWanted_.clear();
-        showDetails();
-        hidePanes();
+        forgetCommit();
         return;
     }
     QString summary = commitCountText(*log_);
@@ -313,17 +342,14 @@ void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
         summary += tr(" touching %1").arg(log_->info.prefix);
     summary_->setText(summary);
 
-    // The chosen commit stays chosen if it still exists; otherwise, back to the list alone.
+    // The chosen commit stays chosen if it still exists.
     for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
         if (commits_->topLevelItem(i)->data(0, idRole).toString() == current) {
             commits_->setCurrentItem(commits_->topLevelItem(i));
             return;
         }
     }
-    details_.reset();
-    detailsWanted_.clear();
-    showDetails();
-    hidePanes();
+    forgetCommit();
 }
 
 void HistoryView::rebuildList()
@@ -363,44 +389,29 @@ void HistoryView::applyFilter()
 void HistoryView::onCommitSelectionChanged()
 {
     const QList<QTreeWidgetItem *> selected = commits_->selectedItems();
-    if (selected.isEmpty()) {
-        detailsWanted_.clear();
-        hidePanes();
-        return;
-    }
-    showCommit(selected.first()->data(0, idRole).toString());
-    showPane(leftSplitter_, panelShare_);
+    if (selected.isEmpty())
+        forgetCommit();
+    else
+        showCommit(selected.first()->data(0, idRole).toString());
 }
 
 void HistoryView::onFileSelectionChanged()
 {
     const QList<QTreeWidgetItem *> selected = files_->selectedItems();
     if (selected.isEmpty() || !details_) {
-        diffPane_->hide();
+        diffHeader_->setPlaceholder(details_ ? tr("Choose a file of the commit") : QString());
+        diff_->showMessage({});
         return;
     }
     const FileDiff &file = details_->files.at(selected.first()->data(0, fileIndexRole).toInt());
-    diffTitle_->setText(changeLabel(file.change));
     diff_->setFiles({{file.change.path, changeStatusText(file.change), FilePatch::parse(file.patch)}});
-    showPane(splitter_, diffShare_);
 }
 
-// Shows a splitter's second pane, with the share it had last time.
-void HistoryView::showPane(QSplitter *splitter, double &share)
+void HistoryView::forgetCommit()
 {
-    QWidget *pane = splitter->widget(1);
-    if (!pane->isHidden())
-        return;
-    pane->show();
-    const int total = splitter->orientation() == Qt::Horizontal ? splitter->width() : splitter->height();
-    const int second = qRound(total * share);
-    splitter->setSizes({total - second, second});
-}
-
-void HistoryView::hidePanes()
-{
-    commitPane_->hide();
-    diffPane_->hide();
+    details_.reset();
+    detailsWanted_.clear();
+    showDetails();
 }
 
 // Every patch of a large commit: read off the UI thread.
@@ -409,7 +420,6 @@ void HistoryView::showCommit(const QString &id)
     if ((details_ && details_->summary.id == id) || detailsWanted_ == id)
         return;
     detailsWanted_ = id;
-    diffPane_->hide(); // the diff of another commit
     pool_.start([this, folder = folder_, id] {
         std::optional<CommitDetails> details;
         QString error;
@@ -430,57 +440,34 @@ void HistoryView::onDetailsRead(const QString &id, const std::optional<CommitDet
     detailsWanted_.clear();
     details_ = details;
     showDetails();
-    if (!details)
-        message_->setPlainText(error);
+    if (!details) {
+        auto *hint = static_cast<QLabel *>(commitPages_->widget(0));
+        hint->setText(error);
+    }
 }
 
 void HistoryView::showDetails()
 {
     files_->clear();
-    diffPane_->hide(); // until a file of this commit is chosen
+    onFileSelectionChanged(); // nothing chosen in the new list
+    auto *hint = static_cast<QLabel *>(commitPages_->widget(0));
+    hint->setText(tr("Choose a commit to see its message and files."));
     if (!details_) {
+        commitPages_->setCurrentIndex(0);
         message_->clear();
-        diff_->showMessage({});
         return;
     }
 
     const CommitDetails &details = *details_;
     const CommitSummary &commit = details.summary;
-    commitTitle_->setText(tr("Commit %1").arg(commit.shortId));
-    // The author's avatar, then the summary, the body, and the details.
-    const QString muted = palette().color(QPalette::PlaceholderText).name();
-    const qreal ratio = devicePixelRatioF();
-    message_->document()->addResource(QTextDocument::ImageResource, QUrl(QStringLiteral("avatar://author")),
-                                      CommitDelegate::avatar(commit.author, 32, ratio).toImage());
-    const QString body = details.message.section(QLatin1Char('\n'), 1).trimmed();
-    QString html =
-        QStringLiteral("<table cellspacing='0' cellpadding='0'><tr>"
-                       "<td style='padding-right:10px'><img src='avatar://author' width='32' height='32'></td>"
-                       "<td><b>%1</b><br><span style='color:%2'>%3 · %4</span></td></tr></table>")
-            .arg(commit.author.toHtmlEscaped(), muted, CommitDelegate::relativeDate(commit.date),
-                 formatDate(commit.date));
-    html += QStringLiteral("<p style='font-size:large; font-weight:600; margin-top:14px'>%1</p>")
-                .arg(commit.summary.toHtmlEscaped());
-    if (!body.isEmpty())
-        html += QStringLiteral("<p style='white-space:pre-wrap; margin-top:6px'>%1</p>").arg(body.toHtmlEscaped());
-    html += QStringLiteral("<p style='color:%1; margin-top:12px'>").arg(muted);
-    html += QStringLiteral("<span style='font-family:monospace'>%1</span> · %2")
-                .arg(commit.id.left(10), commit.email.toHtmlEscaped());
-    if (!details.committer.isEmpty())
-        html += QStringLiteral("<br>") +
-                tr("Committed by %1 on %2").arg(details.committer.toHtmlEscaped(), formatDate(details.commitDate));
-    if (details.parentIds.size() > 1)
-        html +=
-            QStringLiteral("<br>") + tr("Merge of %1 — diff against %2")
-                                         .arg(details.parentIds.join(QStringLiteral(", ")), details.parentIds.first());
-    html += QStringLiteral("</p>");
-    if (!commit.refs.isEmpty()) {
-        html += QStringLiteral("<p>");
-        for (const QString &ref : commit.refs)
-            html += QStringLiteral("<span style='color:%1; font-weight:600'>%2</span>&nbsp;&nbsp; ")
-                        .arg(CommitDelegate::refColor(ref).lighter(125).name(), ref.toHtmlEscaped());
-        html += QStringLiteral("</p>");
-    }
+    commitSummary_->setText(commit.summary);
+    avatar_->setPixmap(CommitDelegate::avatar(commit.author, avatarSize, devicePixelRatioF()));
+    commitMeta_->setText(QStringLiteral("%1 · %2").arg(commit.author, CommitDelegate::relativeDate(commit.date)));
+    commitMeta_->setToolTip(QStringLiteral("%1 <%2>\n%3").arg(commit.author, commit.email, formatDate(commit.date)));
+    commitId_->setText(commit.shortId);
+    commitId_->setToolTip(commit.id);
+    messageExpanded_ = false;
+    message_->setHtml(messageHtml(details));
 
     // "4 files changed  +120 −8", above the files.
     QList<FilePatch> patches;
@@ -492,18 +479,13 @@ void HistoryView::showDetails()
         removed += patches.last().removedLines();
     }
     const bool dark = palette().color(QPalette::Base).lightness() < 128;
-    html +=
-        QStringLiteral("<p style='margin-top:12px'><span style='color:%1'>%2</span>&nbsp;&nbsp; "
-                       "<span style='color:%3; font-weight:600'>+%4</span>&nbsp; "
-                       "<span style='color:%5; font-weight:600'>−%6</span></p>")
-            .arg(muted,
+    commitStats_->setText(
+        QStringLiteral("<span style='color:%1'>%2</span>&nbsp;&nbsp; <span style='color:%3; font-weight:600'>+%4</span>"
+                       "&nbsp; <span style='color:%5; font-weight:600'>−%6</span>")
+            .arg(palette().color(QPalette::PlaceholderText).name(),
                  details.files.size() == 1 ? tr("1 file changed") : tr("%1 files changed").arg(details.files.size()),
                  dark ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37"), QString::number(added),
-                 dark ? QStringLiteral("#f85149") : QStringLiteral("#cf222e"), QString::number(removed));
-    message_->setHtml(html);
-    // Once the pane is laid out.
-    QTimer::singleShot(0, this, &HistoryView::fitMessage);
-
+                 dark ? QStringLiteral("#f85149") : QStringLiteral("#cf222e"), QString::number(removed)));
     for (int i = 0; i < details.files.size(); ++i) {
         const FileDiff &file = details.files[i];
         auto *item = new QTreeWidgetItem(files_);
@@ -511,19 +493,54 @@ void HistoryView::showDetails()
         FileChangeDelegate::setStats(item, patches[i]);
         item->setData(0, fileIndexRole, i);
     }
+    commitPages_->setCurrentIndex(1);
+    // Once the pane is laid out.
+    QTimer::singleShot(0, this, &HistoryView::fitMessage);
 }
 
-// The message as tall as its text (within reason), the files below it.
+QString HistoryView::messageHtml(const CommitDetails &details) const
+{
+    const CommitSummary &commit = details.summary;
+    const QString muted = palette().color(QPalette::PlaceholderText).name();
+    QString html;
+    const QString body = details.message.section(QLatin1Char('\n'), 1).trimmed();
+    if (!body.isEmpty())
+        html += QStringLiteral("<p style='white-space:pre-wrap; margin:0 0 8px 0'>%1</p>").arg(body.toHtmlEscaped());
+    QStringList notes{commit.email.toHtmlEscaped() + QStringLiteral(" · ") + formatDate(commit.date)};
+    if (!details.committer.isEmpty())
+        notes.append(
+            tr("Committed by %1 on %2").arg(details.committer.toHtmlEscaped(), formatDate(details.commitDate)));
+    if (details.parentIds.size() > 1)
+        notes.append(tr("Merge of %1 — diff against %2")
+                         .arg(details.parentIds.join(QStringLiteral(", ")), details.parentIds.first()));
+    html += QStringLiteral("<p style='color:%1; margin:0'>%2</p>").arg(muted, notes.join(QStringLiteral("<br>")));
+    if (!commit.refs.isEmpty()) {
+        QStringList refs;
+        for (const QString &ref : commit.refs)
+            refs.append(QStringLiteral("<span style='color:%1; font-weight:600'>%2</span>")
+                            .arg(CommitDelegate::refColor(ref).lighter(125).name(), ref.toHtmlEscaped()));
+        html += QStringLiteral("<p style='margin:6px 0 0 0'>%1</p>").arg(refs.join(QStringLiteral("&nbsp;&nbsp; ")));
+    }
+    return html;
+}
+
+// As tall as the message, up to a few lines until expanded.
 void HistoryView::fitMessage()
 {
-    const int total = panel_->height();
-    if (total <= 0 || commitPane_->isHidden())
+    if (!details_)
         return;
     message_->document()->setTextWidth(message_->viewport()->width());
-    const int wanted = qCeil(message_->document()->size().height()) + 2 * message_->frameWidth() + 2;
-    const int filesMinimum = std::min(120, total / 3);
-    const int shown = std::clamp(wanted, 60, std::max(60, total - filesMinimum));
-    panel_->setSizes({shown, std::max(total - shown, 0)});
+    const int wanted = qCeil(message_->document()->size().height()) + 2;
+    const int collapsed = message_->fontMetrics().lineSpacing() * collapsedMessageLines;
+    const bool isLong = wanted > collapsed;
+    moreMessage_->setVisible(isLong);
+    moreMessage_->setText(messageExpanded_ ? tr("Show less") : tr("Show more"));
+    // Expanded, still leaving the files room.
+    const int expanded = std::min(wanted, std::max(collapsed, commitPane_->height() / 2));
+    const bool isCollapsed = isLong && !messageExpanded_;
+    message_->setFixedHeight(isCollapsed ? collapsed : expanded);
+    // Cut, it reads as cut: "Show more" says the rest is there.
+    message_->setVerticalScrollBarPolicy(isCollapsed ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAsNeeded);
 }
 
 void HistoryView::showCommitMenu(const QPoint &position)
@@ -551,29 +568,89 @@ void HistoryView::focusFilter()
 void HistoryView::applyTheme(const Theme &theme)
 {
     diff_->applyTheme(theme);
+    diffHeader_->applyTheme(theme);
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
     searchIcon_->setIcon(UiIcons::icon(QStringLiteral("search"), theme.mutedText));
+    copyId_->setIcon(UiIcons::icon(QStringLiteral("copy"), theme.mutedText));
+    commitId_->setFont(AppFonts::codeFont(font().pointSizeF() * 0.95));
+}
+
+void HistoryView::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    arrangePanes();
+    fitMessage(); // its width changed
+}
+
+void HistoryView::arrangePanes()
+{
+    const bool wide = width() >= wideLayoutWidth;
+    if (wide == wide_ && commitPane_->parentWidget() == (wide ? splitter_ : leftSplitter_))
+        return;
+    arranging_ = true;
+    wide_ = wide;
+    if (wide)
+        splitter_->insertWidget(1, commitPane_);
+    else
+        leftSplitter_->insertWidget(1, commitPane_);
+    commitPane_->show();
+    applyShares();
+    arranging_ = false;
+}
+
+void HistoryView::applyShares()
+{
+    const int total = splitter_->width();
+    if (total <= 0)
+        return;
+    const int diff = qRound(total * diffShare_);
+    const int rest = total - diff;
+    if (wide_) {
+        const int commit = qRound(rest * commitShare_);
+        splitter_->setSizes({rest - commit, commit, diff});
+        return;
+    }
+    splitter_->setSizes({rest, diff});
+    const int height = leftSplitter_->height();
+    const int commit = qRound(height * commitShare_);
+    leftSplitter_->setSizes({height - commit, commit});
+}
+
+void HistoryView::rememberShares()
+{
+    if (arranging_)
+        return;
+    const QList<int> sizes = splitter_->sizes();
+    const int total = std::accumulate(sizes.begin(), sizes.end(), 0);
+    if (total <= 0 || sizes.last() <= 0)
+        return;
+    diffShare_ = double(sizes.last()) / total;
+    const QList<int> commitSizes = wide_ ? sizes.mid(0, 2) : leftSplitter_->sizes();
+    const int both = commitSizes.value(0) + commitSizes.value(1);
+    if (both > 0 && commitSizes.value(1) > 0)
+        commitShare_ = double(commitSizes.value(1)) / both;
 }
 
 QByteArray HistoryView::saveState() const
 {
     QByteArray state;
     QDataStream stream(&state, QIODevice::WriteOnly);
-    stream << panelShare_ << diffShare_ << panel_->saveState();
+    // The empty array once held a splitter's state: the format stays readable.
+    stream << commitShare_ << diffShare_ << QByteArray();
     return state;
 }
 
 void HistoryView::restoreState(const QByteArray &state)
 {
     QDataStream stream(state);
-    double panelShare = 0;
+    double commitShare = 0;
     double diffShare = 0;
-    QByteArray panel;
-    stream >> panelShare >> diffShare >> panel;
+    QByteArray unused;
+    stream >> commitShare >> diffShare >> unused;
     // Also rejects the old format (raw QSplitter state).
-    if (stream.status() != QDataStream::Ok || panelShare <= 0 || panelShare >= 1 || diffShare <= 0 || diffShare >= 1)
+    if (stream.status() != QDataStream::Ok || commitShare <= 0 || commitShare >= 1 || diffShare <= 0 || diffShare >= 1)
         return;
-    panelShare_ = panelShare;
+    commitShare_ = commitShare;
     diffShare_ = diffShare;
-    panel_->restoreState(panel);
+    applyShares();
 }

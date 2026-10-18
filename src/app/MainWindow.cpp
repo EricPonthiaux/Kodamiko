@@ -40,6 +40,7 @@
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
 #include "ui/GripSplitter.h"
+#include "ui/HoverCloseButtons.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -74,6 +75,10 @@
 #include <array>
 
 namespace {
+
+// Between the status bar's groups: four times the space within a group, so
+// that the eye reads groups first.
+constexpr int statusGroupSpacing = 16;
 
 // The folder asked for, else the last one opened, else the home folder.
 QString startFolder(const QString &requested)
@@ -379,6 +384,7 @@ void MainWindow::createFilesPanel()
         afterFilesChanged();
     });
     connect(fileTree_, &FileTreeView::entryDeleted, this, &MainWindow::forgetDeletedFiles);
+    connectTreeToEditor();
 }
 
 void MainWindow::restoreTreeOptions()
@@ -389,6 +395,9 @@ void MainWindow::restoreTreeOptions()
     treeOptions.nestFiles = settings.value(QStringLiteral("tree/nestFiles"), true).toBool();
     treeOptions.showIgnored = settings.value(QStringLiteral("tree/showIgnored"), true).toBool();
     filesPanel_->setTreeOptions(treeOptions);
+    filesPanel_->setFilterWhileTyping(settings.value(QStringLiteral("tree/filterWhileTyping"), false).toBool());
+    connect(filesPanel_, &FilesPanel::filterWhileTypingChanged, this,
+            [](bool enabled) { QSettings().setValue(QStringLiteral("tree/filterWhileTyping"), enabled); });
     connect(filesPanel_, &FilesPanel::treeOptionsChanged, this, [](const ProjectTreeModel::Options &options) {
         QSettings changed;
         changed.setValue(QStringLiteral("tree/compactFolders"), options.compactFolders);
@@ -499,8 +508,10 @@ QString MainWindow::projectRelativePath(const QString &path) const
 QWidget *MainWindow::createTerminalPage()
 {
     terminalTabs_ = new QTabWidget(this);
+    terminalTabs_->setObjectName(QStringLiteral("terminalTabs"));
     terminalTabs_->setTabsClosable(true);
     terminalTabs_->setDocumentMode(true);
+    new HoverCloseButtons(terminalTabs_->tabBar());
     connect(terminalTabs_, &QTabWidget::tabCloseRequested, this, [this](int index) {
         QWidget *terminal = terminalTabs_->widget(index);
         if (terminal == claudeTerminal_)
@@ -549,6 +560,7 @@ QWidget *MainWindow::createTerminalPage()
 void MainWindow::createModeTabs()
 {
     modeTabs_ = new QTabBar(this);
+    modeTabs_->setObjectName(QStringLiteral("modeTabs"));
     modeTabs_->setDocumentMode(true);
     modeTabs_->setDrawBase(false);
     modeTabs_->setExpanding(false);
@@ -570,11 +582,12 @@ void MainWindow::createModeTabs()
     createStatusBar();
 }
 
-// The bottom bar, built from the right edge leftwards: mode tabs, Sync,
-// branch, stop of the git operation, Claude usage, then the editor's
-// cursor, line ending, encoding and indentation. On a narrow window the
-// widgets furthest left give up their place first, whole; the status
-// messages take what is left on the left.
+// The bottom bar, built from the right edge leftwards, in groups set apart:
+// the mode tabs; git (Sync, the branch, stop of the git operation);
+// Claude's usage; the position in the file (cursor, line ending, encoding
+// and indentation). On a narrow window the widgets furthest left give up
+// their place first, whole; the status messages take what is left on the
+// left.
 void MainWindow::createStatusBar()
 {
     syncButton_ = new QToolButton(this);
@@ -607,10 +620,18 @@ void MainWindow::createStatusBar()
     auto *layout = new TrailingLayout(trailing);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(4);
-    for (QWidget *widget : {static_cast<QWidget *>(modeTabs_), static_cast<QWidget *>(syncButton_),
-                            static_cast<QWidget *>(branchButton_), static_cast<QWidget *>(cancelGitButton_),
-                            static_cast<QWidget *>(usageLabel_), static_cast<QWidget *>(editorStatus_)})
-        layout->addWidget(widget);
+    layout->setGroupSpacing(statusGroupSpacing);
+    const QList<QList<QWidget *>> groups = {
+        {modeTabs_},
+        {syncButton_, branchButton_, cancelGitButton_},
+        {usageLabel_},
+        {editorStatus_},
+    };
+    for (const QList<QWidget *> &group : groups) {
+        layout->startGroup();
+        for (QWidget *widget : group)
+            layout->addWidget(widget);
+    }
     statusBar()->addPermanentWidget(trailing);
 }
 

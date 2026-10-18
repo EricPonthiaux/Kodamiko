@@ -1,0 +1,101 @@
+#include "DiffHeaderBar.h"
+
+#include "DiffView.h"
+#include "ui/AppFonts.h"
+#include "ui/UiIcons.h"
+
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QScrollBar>
+#include <QToolButton>
+
+#include <algorithm>
+#include <tuple>
+
+DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
+    : QFrame(parent)
+    , diff_(diff)
+    , name_(new QLabel(this))
+    , details_(new QLabel(this))
+    , stats_(new QLabel(this))
+    , previous_(new QToolButton(this))
+    , next_(new QToolButton(this))
+{
+    setObjectName(QStringLiteral("diffHeader"));
+    AppFonts::setInterfaceFont(name_, 1, QFont::DemiBold);
+    name_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    details_->setObjectName(QStringLiteral("historyMuted"));
+    details_->setMinimumWidth(0);
+    details_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    for (const auto &[button, toolTip, forward] :
+         {std::tuple{previous_, tr("Previous change"), false}, std::tuple{next_, tr("Next change"), true}}) {
+        button->setAutoRaise(true);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setToolTip(toolTip);
+        const bool isForward = forward;
+        connect(button, &QToolButton::clicked, this, [this, isForward] { diff_->goToChange(isForward); });
+    }
+
+    auto *layout = new QHBoxLayout(this);
+    layout->setContentsMargins(12, 4, 6, 4);
+    layout->setSpacing(8);
+    layout->addWidget(name_);
+    layout->addWidget(details_, 1);
+    layout->addWidget(stats_);
+    layout->addSpacing(4);
+    layout->addWidget(previous_);
+    layout->addWidget(next_);
+
+    connect(diff_, &DiffView::contentChanged, this, &DiffHeaderBar::follow);
+    connect(diff_->verticalScrollBar(), &QScrollBar::valueChanged, this, &DiffHeaderBar::follow);
+    follow();
+}
+
+void DiffHeaderBar::setPlaceholder(const QString &text)
+{
+    placeholder_ = text;
+    follow();
+}
+
+void DiffHeaderBar::applyTheme(const Theme &theme)
+{
+    dark_ = theme.isDark;
+    previous_->setIcon(UiIcons::icon(QStringLiteral("up"), theme.foreground));
+    next_->setIcon(UiIcons::icon(QStringLiteral("down"), theme.foreground));
+    follow();
+}
+
+void DiffHeaderBar::follow()
+{
+    const QList<DiffView::FileSummary> &files = diff_->fileSummaries();
+    const bool hasFile = !files.isEmpty();
+    for (QWidget *widget :
+         {static_cast<QWidget *>(stats_), static_cast<QWidget *>(previous_), static_cast<QWidget *>(next_)})
+        widget->setVisible(hasFile);
+    if (!hasFile) {
+        name_->clear();
+        details_->setText(placeholder_);
+        return;
+    }
+    const int file = std::max(0, diff_->locate(diff_->firstVisibleLine()).file);
+    const DiffView::FileSummary &shown = files.value(file, files.first());
+    const qsizetype slash = shown.path.lastIndexOf(QLatin1Char('/'));
+    name_->setText(shown.path.mid(slash + 1));
+    QStringList details;
+    if (slash >= 0)
+        details.append(shown.path.left(slash));
+    if (!shown.status.isEmpty())
+        details.append(shown.status);
+    if (files.size() > 1)
+        details.append(tr("file %1 of %2").arg(file + 1).arg(files.size()));
+    details_->setText(details.join(QStringLiteral("  ·  ")));
+    details_->setToolTip(shown.path);
+    const QString green = dark_ ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37");
+    const QString red = dark_ ? QStringLiteral("#f85149") : QStringLiteral("#cf222e");
+    stats_->setText(QStringLiteral("<span style='color:%1; font-weight:600'>+%2</span>&nbsp; "
+                                   "<span style='color:%3; font-weight:600'>−%4</span>")
+                        .arg(green)
+                        .arg(shown.added)
+                        .arg(red)
+                        .arg(shown.removed));
+}

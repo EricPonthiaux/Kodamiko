@@ -35,6 +35,16 @@ void write(const QTemporaryDir &dir, const QString &path, const QByteArray &cont
     file.write(content);
 }
 
+// The Commit button, among the view's others.
+QPushButton *commitButton(const QWidget &view)
+{
+    for (QPushButton *button : view.findChildren<QPushButton *>()) {
+        if (button->text() == QLatin1String("Commit"))
+            return button;
+    }
+    return nullptr;
+}
+
 QStringList sectionTitles(const QTreeWidget *list)
 {
     QStringList titles;
@@ -153,7 +163,7 @@ private slots:
         QTRY_COMPARE(refreshed.size(), 1);
         const auto *list = view.findChild<QTreeWidget *>();
         QVERIFY(list->topLevelItem(0)->isHidden());
-        QVERIFY(!view.findChild<QPushButton *>()->isEnabled());
+        QVERIFY(!commitButton(view)->isEnabled());
     }
 
     void stageAllThenCommit()
@@ -174,15 +184,15 @@ private slots:
         view.refresh(); // off the UI thread
         QTRY_COMPARE(refreshed.size(), 1);
         const auto *list = view.findChild<QTreeWidget *>();
-        QCOMPARE(sectionTitles(list), QStringList({"Staged (0)", "Unstaged (2)"}));
-        QCOMPARE(list->topLevelItem(1)->child(0)->text(0), QString("a.txt"));
-        QCOMPARE(list->topLevelItem(1)->child(0)->data(0, FileChangeDelegate::kindRole).toInt(),
+        QCOMPARE(sectionTitles(list), QStringList({"Unstaged (2)", "Staged (0)"}));
+        QCOMPARE(list->topLevelItem(0)->child(0)->text(0), QString("a.txt"));
+        QCOMPARE(list->topLevelItem(0)->child(0)->data(0, FileChangeDelegate::kindRole).toInt(),
                  static_cast<int>(ChangeKind::Modified));
-        QCOMPARE(list->topLevelItem(1)->child(1)->data(0, FileChangeDelegate::kindRole).toInt(),
+        QCOMPARE(list->topLevelItem(0)->child(1)->data(0, FileChangeDelegate::kindRole).toInt(),
                  static_cast<int>(ChangeKind::Added));
 
         view.stageAll();
-        QTRY_COMPARE(sectionTitles(list), QStringList({"Staged (2)", "Unstaged (0)"}));
+        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (0)", "Staged (2)"}));
 
         // The last commit's message is offered for "amend", then removed.
         auto *message = view.findChild<QPlainTextEdit *>();
@@ -193,8 +203,8 @@ private slots:
         QVERIFY(message->toPlainText().isEmpty());
 
         message->setPlainText("second");
-        view.findChild<QPushButton *>()->click();
-        QTRY_COMPARE(sectionTitles(list), QStringList({"Staged (0)", "Unstaged (0)"}));
+        commitButton(view)->click();
+        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (0)", "Staged (0)"}));
         QVERIFY(message->toPlainText().isEmpty());
         QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("second\n"));
     }

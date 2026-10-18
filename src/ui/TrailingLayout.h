@@ -8,6 +8,10 @@
 // runs short of width, the widgets furthest left give up their place first,
 // whole: none is ever squeezed, elided or cut. The first widget is the
 // anchor: the layout's minimum width keeps room for it.
+//
+// The widgets can form groups: startGroup() before adding the first one of
+// a group. Two shown widgets of different groups are groupSpacing() apart,
+// two of the same group spacing() apart.
 class TrailingLayout : public QLayout {
 public:
     explicit TrailingLayout(QWidget *parent = nullptr);
@@ -16,6 +20,13 @@ public:
     TrailingLayout &operator=(const TrailingLayout &) = delete;
     TrailingLayout(TrailingLayout &&) = delete;
     TrailingLayout &operator=(TrailingLayout &&) = delete;
+
+    // The widgets added next form a new group.
+    void startGroup() { ++currentGroup_; }
+
+    void setGroupSpacing(int spacing) { groupSpacing_ = spacing; }
+
+    int groupSpacing() const { return groupSpacing_; }
 
     void addItem(QLayoutItem *item) override;
     QLayoutItem *itemAt(int index) const override;
@@ -29,6 +40,11 @@ public:
 
 private:
     int gap() const;
+    // Between the items at `left` and `right`, both shown.
+    int gapBetween(qsizetype left, qsizetype right) const;
 
     QList<QLayoutItem *> items_;
+    QList<int> groups_; // the group of each item
+    int currentGroup_ = 0;
+    int groupSpacing_ = 0;
 };

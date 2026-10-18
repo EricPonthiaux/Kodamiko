@@ -6,6 +6,7 @@
 #include <QIcon>
 #include <QWidget>
 
+class QFrame;
 class QHBoxLayout;
 class QLabel;
 class QMenu;
@@ -40,8 +41,10 @@ private:
 };
 
 // Duet's own title bar, in the manner of IntelliJ's main toolbar: the
-// menu, the project (with the recent folders), Claude's state, a few actions,
-// and the window controls. Dragging its empty parts moves the
+// menu, the project (with the recent folders), Claude's state,
+// the run block (the configuration and its Run or Stop button, on a tinted
+// background), the search actions, and the window controls, in groups set
+// apart. Its controls share one height. Dragging its empty parts moves the
 // window, a double-click maximizes it.
 class TitleBar : public QWidget {
     Q_OBJECT
@@ -57,9 +60,9 @@ public:
     // UiIcons (drawn in the theme's colors).
     void addActionButton(QAction *action, const QString &iconName);
 
-    // The run configuration chip (its menu chooses one), followed by one
-    // button: Run while the configuration is stopped, Stop while it runs.
-    // Hidden while `name` is empty.
+    // The run block: the configuration (its menu chooses one), then one
+    // button in the same place: Run while the configuration is stopped, Stop
+    // while it runs. Hidden while `name` is empty.
     struct RunChip {
         QIcon icon;
         QString name;
@@ -91,6 +94,7 @@ protected:
 
 private:
     QToolButton *addChip();
+    QFrame *createRunBlock();
     // `color` defaults to the theme's foreground.
     QToolButton *actionButton(QAction *action, const QString &iconName, const QColor &color = {});
     void toggleMaximized();
@@ -102,8 +106,9 @@ private:
     QMenuBar *menuBar_;
     QToolButton *project_;
     QToolButton *claude_;
-    QToolButton *run_;
-    QHBoxLayout *runActions_;
+    QFrame *runBlock_ = nullptr;
+    QToolButton *run_ = nullptr;
+    QHBoxLayout *runActions_ = nullptr;
     QToolButton *runButton_ = nullptr;
     QToolButton *stopButton_ = nullptr;
     bool running_ = false;

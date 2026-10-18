@@ -63,6 +63,14 @@ public:
         QList<Range> changes;
     };
 
+    // What a file's title bar says, for a header above the view.
+    struct FileSummary {
+        QString path;
+        QString status;
+        int added = 0;
+        int removed = 0;
+    };
+
     explicit DiffView(const Theme &theme, QWidget *parent = nullptr);
 
     void setFiles(const QList<DiffFile> &files);
@@ -73,10 +81,26 @@ public:
     // Line of a file's title bar.
     int fileStart(int file) const;
 
+    const QList<FileSummary> &fileSummaries() const { return summaries_; }
+
+    // The block separator of the block holding displayed line `line`; -1
+    // outside a block.
+    int hunkStart(int line) const;
+    // Scrolls the next (or previous) block of changes to the top.
+    void goToChange(bool forward);
+    // Where displayed line `line` is in the viewport, and the lines' height.
+    int lineTop(int line) const;
+    int lineHeight() const;
+
     const QList<Line> &displayedLines() const { return lines_; }
 
     void applyTheme(const Theme &theme);
 
+signals:
+    // setFiles() or showMessage() changed what is shown.
+    void contentChanged();
+
+public:
     // The displayed lines for `files`.
     static QList<Line> layout(const QList<DiffFile> &files);
     // Words that differ between a removed line and the line added in its
@@ -105,6 +129,7 @@ private:
     QList<Line> lines_;
     QList<int> fileStarts_;
     QStringList paths_;
+    QList<FileSummary> summaries_;
     int numberWidth_ = 3;             // digits of the largest line number
     QHash<qint64, int> syntaxStyles_; // color, bold and italic → style
 };

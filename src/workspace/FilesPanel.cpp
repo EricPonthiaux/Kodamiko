@@ -89,6 +89,13 @@ FilesPanel::FilesPanel(QWidget *parent)
         if (checked)
             emit selectOpenedFileRequested();
     });
+    filterWhileTyping_ = menu->addAction(tr("Filter While Typing"));
+    filterWhileTyping_->setCheckable(true);
+    filterWhileTyping_->setToolTip(tr("Letters typed in the tree hide the files whose names do not match"));
+    connect(filterWhileTyping_, &QAction::toggled, this, [this](bool checked) {
+        tree_->setFilterWhileTyping(checked);
+        emit filterWhileTypingChanged(checked);
+    });
     menu->addSeparator();
     const auto addOption = [this, menu](const QString &text, const QString &toolTip) {
         QAction *action = menu->addAction(text);
@@ -176,6 +183,13 @@ void FilesPanel::setAlwaysSelectOpenedFile(bool enabled)
 {
     const QSignalBlocker blocker(alwaysSelect_);
     alwaysSelect_->setChecked(enabled);
+}
+
+void FilesPanel::setFilterWhileTyping(bool enabled)
+{
+    const QSignalBlocker blocker(filterWhileTyping_);
+    filterWhileTyping_->setChecked(enabled);
+    tree_->setFilterWhileTyping(enabled);
 }
 
 void FilesPanel::setIconColor(const QColor &color)

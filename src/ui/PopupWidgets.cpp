@@ -1,19 +1,24 @@
 #include "PopupWidgets.h"
 
 #include "AppFonts.h"
+#include "ThemeStyle.h"
 #include "UiIcons.h"
 
 #include <QApplication>
+#include <QCheckBox>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QToolButton>
 #include <QVBoxLayout>
-#include <QVariantAnimation>
 
+#include <algorithm>
 #include <array>
+#include <utility>
 
 namespace {
 
@@ -21,11 +26,6 @@ QColor mix(const QColor &a, const QColor &b, qreal share)
 {
     return QColor::fromRgbF(a.redF() * (1 - share) + b.redF() * share, a.greenF() * (1 - share) + b.greenF() * share,
                             a.blueF() * (1 - share) + b.blueF() * share, a.alphaF() * (1 - share) + b.alphaF() * share);
-}
-
-bool isDark(const QPalette &palette)
-{
-    return palette.color(QPalette::Window).lightness() < 128;
 }
 
 // A click on a settings row presses its switch.
@@ -134,7 +134,7 @@ void drawKeycap(QPainter &painter, const QRectF &cap, const QString &key, const 
 {
     painter.setPen(QPen(colors.border, 1));
     painter.setBrush(colors.fill);
-    painter.drawRoundedRect(cap.adjusted(0.5, 0.5, -0.5, -0.5), 4, 4);
+    painter.drawRoundedRect(cap.adjusted(0.5, 0.5, -0.5, -0.5), 3, 3);
     // The key's lower edge, slightly thicker.
     painter.setPen(QPen(colors.border, 1.5));
     painter.drawLine(QPointF(cap.left() + 3, cap.bottom() - 0.5), QPointF(cap.right() - 3, cap.bottom() - 0.5));
@@ -147,109 +147,30 @@ void drawKeycap(QPainter &painter, const QRectF &cap, const QString &key, const 
 QString popupStyleSheet(const Theme &theme, const QString &extra)
 {
     QString sheet = QStringLiteral(R"(
-QLabel#pageDescription, QLabel#settingsDescription, QLabel#settingsSection, QLabel#footerHint { color: @muted; }
-QFrame#settingsCard { background: @base; border: 1px solid @line; border-radius: 10px; }
-QFrame#settingsSeparator { background: @line; border: none; margin: 0 16px; }
+QLabel#pageDescription, QLabel#settingsDescription, QLabel#footerHint { color: @muted; }
+QFrame#popupHeader { border: none; border-bottom: 1px solid @line; }
+QLabel#settingsSection { border: none; border-bottom: 1px solid @line; padding-bottom: 4px; }
+QFrame#settingsCard { background: transparent; border: none; border-radius: 0; }
+QFrame#settingsSeparator { background: @line; border: none; margin: 0; }
 QScrollArea#pageScroll, QWidget#pageContent { background: transparent; border: none; }
 QFrame#popupFooter { border: none; border-top: 1px solid @line; }
 )") + extra;
     const QList<std::pair<QString, QColor>> colors = {
-        {"@accentText", theme.accentText}, {"@accent", theme.accent}, {"@text", theme.foreground},
-        {"@muted", theme.mutedText},       {"@window", theme.window}, {"@panel", theme.alternateBase},
-        {"@base", theme.background},       {"@line", theme.line},     {"@hover", theme.hover},
+        {"@accentText", theme.accentText},
+        {"@accent", theme.accent},
+        {"@text", theme.foreground},
+        {"@muted", theme.mutedText},
+        {"@window", theme.window},
+        {"@panel", theme.alternateBase},
+        {"@base", theme.background},
+        {"@line", theme.line},
+        {"@hover", theme.hover},
         {"@selection", theme.selection},
+        {"@slate", ThemeStyle::selectionColor(theme)},
     };
     for (const auto &[name, color] : colors)
         sheet.replace(name, color.name());
     return sheet;
-}
-
-// ToggleSwitch
-
-ToggleSwitch::ToggleSwitch(QWidget *parent)
-    : QAbstractButton(parent)
-    , animation_(new QVariantAnimation(this))
-{
-    setCheckable(true);
-    setCursor(Qt::PointingHandCursor);
-    setFocusPolicy(Qt::TabFocus);
-    animation_->setDuration(140);
-    animation_->setEasingCurve(QEasingCurve::OutCubic);
-    connect(animation_, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
-        position_ = value.toReal();
-        update();
-    });
-    connect(this, &QAbstractButton::toggled, this, [this](bool checked) {
-        animation_->stop();
-        if (!isVisible()) { // filled before showing: no animation
-            position_ = checked ? 1 : 0;
-            update();
-            return;
-        }
-        animation_->setStartValue(position_);
-        animation_->setEndValue(checked ? 1.0 : 0.0);
-        animation_->start();
-    });
-}
-
-QSize ToggleSwitch::sizeHint() const
-{
-    return {38, 22};
-}
-
-bool ToggleSwitch::hitButton(const QPoint &pos) const
-{
-    return rect().contains(pos);
-}
-
-void ToggleSwitch::enterEvent(QEnterEvent *event)
-{
-    hovered_ = true;
-    update();
-    QAbstractButton::enterEvent(event);
-}
-
-void ToggleSwitch::leaveEvent(QEvent *event)
-{
-    hovered_ = false;
-    update();
-    QAbstractButton::leaveEvent(event);
-}
-
-void ToggleSwitch::paintEvent(QPaintEvent *)
-{
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    const QPalette &colors = palette();
-    const QRectF track = QRectF(rect()).adjusted(1, 2, -1, -2);
-    const qreal radius = track.height() / 2;
-
-    QColor off = colors.color(QPalette::Mid);
-    if (hovered_)
-        off = off.lighter(isDark(colors) ? 125 : 95);
-    QColor on = colors.color(QPalette::Accent);
-    if (hovered_)
-        on = on.lighter(110);
-    QColor fill = mix(off, on, position_);
-    if (!isEnabled())
-        fill.setAlphaF(0.4);
-
-    if (hasFocus()) { // keyboard focus: a ring
-        painter.setPen(QPen(colors.color(QPalette::Accent), 1.5));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(track.adjusted(-1.5, -1.5, 1.5, 1.5), radius + 1.5, radius + 1.5);
-    }
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(fill);
-    painter.drawRoundedRect(track, radius, radius);
-
-    const qreal knob = track.height() - 4;
-    const qreal x = track.left() + 2 + position_ * (track.width() - knob - 4);
-    const QRectF knobRect(x, track.top() + 2, knob, knob);
-    painter.setBrush(QColor(0, 0, 0, 40)); // a hint of shadow
-    painter.drawEllipse(knobRect.translated(0, 0.8));
-    painter.setBrush(Qt::white);
-    painter.drawEllipse(knobRect);
 }
 
 // ThemeCard
@@ -262,11 +183,18 @@ ThemeCard::ThemeCard(const Theme &theme, QWidget *parent)
     setCursor(Qt::PointingHandCursor);
     setFocusPolicy(Qt::TabFocus);
     setToolTip(theme.title);
+    // Narrower in a narrow popup: the four themes stay side by side.
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 }
 
 QSize ThemeCard::sizeHint() const
 {
     return {176, 132};
+}
+
+QSize ThemeCard::minimumSizeHint() const
+{
+    return {120, 132};
 }
 
 void ThemeCard::enterEvent(QEnterEvent *event)
@@ -290,7 +218,7 @@ void ThemeCard::paintEvent(QPaintEvent *)
     const QPalette &colors = palette();
     const QColor accent = colors.color(QPalette::Accent);
     const QRectF card = QRectF(rect()).adjusted(2, 2, -2, -2);
-    constexpr qreal radius = 10;
+    constexpr qreal radius = 4;
     constexpr qreal labelHeight = 30;
 
     // The miniature: a title bar, a gutter, lines of code.
@@ -373,10 +301,22 @@ QWidget *SettingsCard::addRow(const QString &title, const QString &description, 
         text->addWidget(descriptionLabel);
     }
     auto *layout = new QHBoxLayout(row);
-    layout->setContentsMargins(16, 11, 16, 11);
-    layout->setSpacing(24);
-    layout->addLayout(text, 1);
-    layout->addWidget(control, 0, Qt::AlignVCenter);
+    layout->setContentsMargins(0, 8, 0, 8);
+    // A check box is a classic one: before its title, aligned on its first line.
+    if (qobject_cast<QCheckBox *>(control)) {
+        // Centered on the title's line.
+        auto *box = new QVBoxLayout;
+        box->addSpacing(std::max(0, (titleLabel->sizeHint().height() - control->sizeHint().height()) / 2));
+        box->addWidget(control);
+        box->addStretch();
+        layout->setSpacing(10);
+        layout->addLayout(box);
+        layout->addLayout(text, 1);
+    } else {
+        layout->setSpacing(24);
+        layout->addLayout(text, 1);
+        layout->addWidget(control, 0, Qt::AlignVCenter);
+    }
     // A click on the text toggles a switch, like a check box's label.
     if (auto *button = qobject_cast<QAbstractButton *>(control)) {
         titleLabel->setBuddy(button);
@@ -392,37 +332,75 @@ void SettingsCard::addWidget(QWidget *widget)
     addSeparator();
     auto *holder = new QWidget(this);
     auto *layout = new QVBoxLayout(holder);
-    layout->setContentsMargins(16, 12, 16, 12);
+    layout->setContentsMargins(0, 10, 0, 10);
     layout->addWidget(widget);
     layout_->addWidget(holder);
 }
 
-QPixmap iconTile(const QString &icon, const Theme &theme, int size, qreal devicePixelRatio)
+// PopupHeader
+
+PopupHeader::PopupHeader(QString iconName, const QString &title, QWidget *parent)
+    : QFrame(parent)
+    , iconName_(std::move(iconName))
+    , icon_(new QLabel(this))
+    , title_(new QLabel(title, this))
+    , subtitle_(new QLabel(this))
+    , buttons_(new QHBoxLayout)
+    , close_(new QToolButton(this))
 {
-    QPixmap pixmap(QSize(size, size) * devicePixelRatio);
-    pixmap.setDevicePixelRatio(devicePixelRatio);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    QColor tint = theme.accent;
-    tint.setAlpha(theme.isDark ? 46 : 30);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(tint);
-    painter.drawRoundedRect(QRectF(0, 0, size, size), size * 0.27, size * 0.27);
-    // The icons are drawn at 16 pixels: scaled up to half the tile.
-    const qreal margin = size / 4.0;
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    painter.drawPixmap(QRectF(margin, margin, size - 2 * margin, size - 2 * margin),
-                       UiIcons::icon(icon, theme.accent).pixmap(QSize(16, 16), 2.0), QRectF());
-    return pixmap;
+    setObjectName(QStringLiteral("popupHeader"));
+    AppFonts::setInterfaceFont(title_, 1.1, QFont::DemiBold);
+    subtitle_->setObjectName(QStringLiteral("pageDescription"));
+    subtitle_->setWordWrap(true);
+    subtitle_->hide();
+    close_->setAutoRaise(true);
+    close_->setFocusPolicy(Qt::NoFocus);
+    close_->setToolTip(tr("Close (Esc)"));
+    close_->setFixedSize(26, 26);
+    connect(close_, &QToolButton::clicked, this, &PopupHeader::closeRequested);
+    buttons_->setSpacing(6);
+
+    auto *layout = new QGridLayout(this);
+    layout->setContentsMargins(16, 10, 10, 10);
+    layout->setHorizontalSpacing(8);
+    layout->setVerticalSpacing(2);
+    layout->addWidget(icon_, 0, 0, Qt::AlignVCenter);
+    layout->addWidget(title_, 0, 1, Qt::AlignVCenter);
+    layout->addLayout(buttons_, 0, 2, Qt::AlignVCenter);
+    layout->addWidget(close_, 0, 3, Qt::AlignVCenter);
+    layout->addWidget(subtitle_, 1, 1, 1, 2);
+    layout->setColumnStretch(1, 1);
+}
+
+void PopupHeader::setTitle(const QString &title)
+{
+    title_->setText(title);
+}
+
+void PopupHeader::setSubtitle(const QString &text)
+{
+    subtitle_->setText(text);
+    subtitle_->setVisible(!text.isEmpty());
+}
+
+void PopupHeader::addButton(QWidget *button)
+{
+    buttons_->addWidget(button);
+}
+
+void PopupHeader::applyTheme(const Theme &theme)
+{
+    icon_->setPixmap(UiIcons::icon(iconName_, theme.accent).pixmap(QSize(16, 16), devicePixelRatioF()));
+    close_->setIcon(UiIcons::icon(QStringLiteral("close"), theme.mutedText));
 }
 
 QWidget *sectionHeading(const QString &text)
 {
-    auto *label = new QLabel(text.toUpper());
+    auto *label = new QLabel(text);
     label->setObjectName(QStringLiteral("settingsSection"));
-    AppFonts::setInterfaceFont(label, 0.82, QFont::DemiBold, 0.9);
-    label->setContentsMargins(4, 0, 0, 0);
+    AppFonts::setInterfaceFont(label, 1, QFont::DemiBold);
+    // Its underline would otherwise indent the text by half an "x".
+    label->setIndent(0);
     return label;
 }
 

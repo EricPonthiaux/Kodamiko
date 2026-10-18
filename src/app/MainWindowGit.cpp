@@ -35,9 +35,6 @@
 #include <QStatusBar>
 #include <QToolButton>
 
-#include <array>
-#include <ranges>
-
 namespace {
 
 // The changed files git knows under `path`, as repository paths: untracked

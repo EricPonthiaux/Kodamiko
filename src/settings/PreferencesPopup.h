@@ -17,7 +17,8 @@ class QPushButton;
 class QSpinBox;
 class QStackedWidget;
 class QTreeWidget;
-class ToggleSwitch;
+class PopupHeader;
+class QCheckBox;
 
 // File ▸ Preferences, a popup over the window like Find in Files: a side
 // bar of pages (Appearance, Editor, Files, Claude, Keymap), each made of
@@ -86,6 +87,7 @@ private:
 
     Theme theme_;
     QListWidget *pageList_ = nullptr;
+    PopupHeader *header_ = nullptr;
     QStackedWidget *pages_ = nullptr;
     QStringList pageIcons_;
 
@@ -95,31 +97,31 @@ private:
     QSpinBox *fontSize_ = nullptr;
     QComboBox *fontWeight_ = nullptr;
     QDoubleSpinBox *lineHeight_ = nullptr;
-    ToggleSwitch *ligatures_ = nullptr;
+    QCheckBox *ligatures_ = nullptr;
     QLabel *fontPreview_ = nullptr;
     QSpinBox *interfaceFontSize_ = nullptr;
     QSpinBox *treeFontSize_ = nullptr;
-    ToggleSwitch *systemTitleBar_ = nullptr;
-    ToggleSwitch *codeFolding_ = nullptr;
-    ToggleSwitch *wrapLines_ = nullptr;
-    ToggleSwitch *showWhitespace_ = nullptr;
+    QCheckBox *systemTitleBar_ = nullptr;
+    QCheckBox *codeFolding_ = nullptr;
+    QCheckBox *wrapLines_ = nullptr;
+    QCheckBox *showWhitespace_ = nullptr;
     QComboBox *autoCompletion_ = nullptr;
-    ToggleSwitch *completionAcceptsEnter_ = nullptr;
-    ToggleSwitch *languageServers_ = nullptr;
+    QCheckBox *completionAcceptsEnter_ = nullptr;
+    QCheckBox *languageServers_ = nullptr;
     QLabel *serversFound_ = nullptr;
-    ToggleSwitch *fullLine_ = nullptr;
+    QCheckBox *fullLine_ = nullptr;
     QComboBox *fullLineServer_ = nullptr;
     QLineEdit *fullLineEndpoint_ = nullptr;
     QLineEdit *fullLineModel_ = nullptr;
     QWidget *fullLineServerRow_ = nullptr;
     QWidget *fullLineEndpointRow_ = nullptr;
     QWidget *fullLineModelRow_ = nullptr;
-    ToggleSwitch *formatOnSave_ = nullptr;
-    ToggleSwitch *alwaysSelectOpenedFile_ = nullptr;
-    ToggleSwitch *snapshotBeforePrompt_ = nullptr;
-    ToggleSwitch *shareEditorContext_ = nullptr;
-    ToggleSwitch *exposeTools_ = nullptr;
-    ToggleSwitch *claudeNotifications_ = nullptr;
+    QCheckBox *formatOnSave_ = nullptr;
+    QCheckBox *alwaysSelectOpenedFile_ = nullptr;
+    QCheckBox *snapshotBeforePrompt_ = nullptr;
+    QCheckBox *shareEditorContext_ = nullptr;
+    QCheckBox *exposeTools_ = nullptr;
+    QCheckBox *claudeNotifications_ = nullptr;
 
     QList<Keymap::Command> commands_;
     Keymap::Overrides overrides_;

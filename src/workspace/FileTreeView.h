@@ -1,6 +1,8 @@
 #pragma once
 
+#include "FileUndoStack.h"
 #include "ProjectTreeModel.h"
+#include "TreeDecorations.h"
 #include "git/FileStatuses.h"
 
 #include <QSet>
@@ -10,13 +12,16 @@
 #include <optional>
 
 class ConfirmPopup;
+class LastCommits;
 class QLabel;
-class TreeDecorations;
 
-// Tree of the working folder; a double-click opens the file.
+// Tree of the working folder; a click shows the file in the editor's
+// preview tab, a double-click opens it.
 // The context menu creates files and folders in the clicked folder, renames
-// (F2, Shift+F6) and deletes (Delete) the clicked entry, copies its path,
-// sends it to Claude, opens a terminal there, and runs git commands on it.
+// (F2, Shift+F6) and deletes (Delete) the selected entries, copies their
+// path, sends them to Claude, opens a terminal there, and runs git commands
+// on them. Several entries are selected with Ctrl and Shift, as in a file
+// manager. Ctrl+Z undoes the last file operation (see FileUndoStack).
 // The folder itself is the first row, expanded on opening.
 // Names are never truncated: when too wide, a horizontal scroll bar
 // appears at the bottom.
@@ -26,6 +31,11 @@ class TreeDecorations;
 // speed search, and a scope restricts the tree to the changed files or to
 // those edited by Claude. A dot on the icon marks the files Claude has
 // just written.
+//
+// As in VS Code: the files with errors or warnings, and the folders holding
+// them, are colored by their worst problem, with their count at the row's
+// end; a dot left of a file marks it open in the editor; the speed search
+// can filter the tree instead of jumping from match to match.
 class FileTreeView : public QTreeView {
     Q_OBJECT
 
@@ -68,17 +78,22 @@ public:
     void createDiagram(const QString &kindId);
     // Emits generateDiagramRequested() for the folder of the current item.
     void generateDiagram();
-    // Ask for a new name, or for confirmation, for the current item (never
-    // the working folder itself). Deleting moves to the trash when possible.
+    // Ask for a new name for the current item, or for confirmation for the
+    // selected ones (never the working folder itself). Deleting moves to the
+    // trash when possible.
     void renameCurrent();
-    void deleteCurrent();
+    void deleteSelection();
 
-    // Clipboard, as in a file manager: Ctrl+X, Ctrl+C, Ctrl+V. Pasting a cut
-    // item moves it, otherwise copies (files copied in a file manager too).
-    // A name already taken is asked for again in a popup.
-    void cutCurrent();
-    void copyCurrent();
+    // Clipboard, as in a file manager: Ctrl+X, Ctrl+C, Ctrl+V, on the
+    // selected entries. Pasting cut entries moves them, otherwise copies
+    // (files copied in a file manager too). A name already taken by a
+    // single entry is asked for again in a popup.
+    void cutSelection();
+    void copySelection();
     void paste();
+    // Ctrl+Z: reverts the last creation, copy, rename, move or deletion to
+    // the trash done in the tree.
+    void undo();
     // F5: copy of the current item in the same folder, under a new name.
     void duplicateCurrent();
 
@@ -94,6 +109,10 @@ public:
 
     // Files Claude has just written: a dot on their icon.
     void setClaudeTouched(const QSet<QString> &paths);
+    // Errors and warnings of the files (absolute paths).
+    void setProblems(const ProblemCounts &problems);
+    // Files open in the editor: a dot left of them.
+    void setOpenFiles(const QSet<QString> &paths);
     // Files of the Edited by Claude scope.
     void setClaudeEdited(const QStringList &paths);
 
@@ -107,6 +126,9 @@ public:
     bool select(const QString &path);
     // Absolute path of the current item, empty if none.
     QString currentPath() const;
+    // Absolute paths of the selected entries, without those inside a
+    // selected folder; the current item when nothing is selected.
+    QStringList selectedPaths() const;
 
     // Color of the letters found by the speed search (the theme's).
     void setSearchHighlight(const QColor &color) { searchHighlight_ = color; }
@@ -114,8 +136,16 @@ public:
     // Speed search in progress (typed letters), empty if none.
     QString speedSearch() const { return speedSearch_; }
 
+    // The speed search hides the rows that do not match (among the folders
+    // read so far), rather than jumping from match to match.
+    void setFilterWhileTyping(bool enabled);
+
+    bool filterWhileTyping() const { return filterWhileTyping_; }
+
 signals:
     void fileActivated(const QString &path);
+    // A single click on a file: shown in the editor's preview tab.
+    void filePreviewRequested(const QString &path);
     void entryRenamed(const QString &oldPath, const QString &newPath);
     void entryDeleted(const QString &path);
     // A file or folder appeared through the tree (created, copied, pasted).
@@ -143,10 +173,13 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    bool viewportEvent(QEvent *event) override;
 
 private:
     ProjectTreeModel *model_;
     TreeDecorations *proxy_;
+    LastCommits *lastCommits_;
+    FileUndoStack undoStack_;
     QStringList pendingExpansions_;
     QString rootPath_;
     QString pendingSelection_;
@@ -157,6 +190,9 @@ private:
     Scope scope_ = Scope::Project;
     QStringList projectExpanded_; // while another scope is shown
     QString speedSearch_;
+    bool filterWhileTyping_ = false;
+    // The folders expanded when the filter started; nullopt when not filtering.
+    std::optional<QStringList> filterExpanded_;
     QColor searchHighlight_{229, 192, 123};
     QLabel *speedSearchLabel_;
     // Folders pinned at the top while their contents scroll (sticky
@@ -166,6 +202,8 @@ private:
     int stickyRowHeight() const;
     // A fine line under each folder holding `index`, in its branches' `rect`.
     void drawIndentGuides(QPainter *painter, const QRect &rect, const QModelIndex &index) const;
+    // A dot left of a file open in the editor, in its branches' `rect`.
+    void drawOpenMark(QPainter *painter, const QRect &rect, const QModelIndex &index) const;
     // Folder whose guide is brighter: the current item when it is an
     // expanded folder, else its parent.
     QModelIndex currentFolder() const;
@@ -173,7 +211,9 @@ private:
     void collectExpanded(const QModelIndex &parent, QStringList *paths) const;
     void expandPending();
     void showContextMenu(const QPoint &position);
-    void addGitMenu(QMenu *menu, const QString &path);
+    void addEntryActions(QMenu *menu, const QModelIndex &index);
+    // Git commands on `path`; Add on every entry of `selection`.
+    void addGitMenu(QMenu *menu, const QString &path, const QStringList &selection);
     QString targetFolder(const QModelIndex &index) const;
     QString pathOf(const QModelIndex &index) const;
     void createEntry(const QString &folder, bool isFolder);
@@ -183,13 +223,20 @@ private:
     QString createEntryNamed(const QString &folder, const QString &name, bool isFolder, const QByteArray &content = {});
     // Path of the item, empty for none or for the working folder.
     QString editablePath(const QModelIndex &index) const;
+    // selectedPaths() but the working folder.
+    QStringList editableSelection() const;
     void renameEntry(const QString &path);
     QString renameEntryTo(const QString &path, const QString &name);
     void deleteEntry(const QString &path);
+    void deleteEntries(const QStringList &paths);
     // Both emit entryDeleted once done; false otherwise (an error shown in
     // `confirm` for the permanent deletion).
     bool moveToTrash(const QString &path);
     bool deletePermanently(ConfirmPopup *confirm, const QString &path, bool isFolder);
+    // The editor follows an undone step, and the tree shows its result.
+    void reportUndone(const FileUndoStack::Step &step);
+    // The entries, as a file manager puts them on the clipboard.
+    void putOnClipboard(const QStringList &paths, bool cut);
     void confirmRollback(const QString &path);
     void expandRoot();
     // Folder a drop at `position` goes to; empty if none.
@@ -222,6 +269,12 @@ private:
     std::optional<bool> handleActiveSearchKey(QKeyEvent *event);
     // Up or Down during a search: the previous or next match.
     void stepSpeedSearch(bool forward);
+    // Filter while typing: the tree shows the matches of `text` only, then
+    // comes back as it was once the search ends.
+    void applyNameFilter(const QString &text);
+    // Asks for the last commit of the file under the mouse, for its tooltip.
+    void requestLastCommit(const QPoint &position);
+    void showLastCommit(const QString &path, const QString &description);
     // Tree shortcuts that copy a path or send it to Claude.
     bool handlePathKey(QKeyEvent *event);
     // Shortcuts acting on the current entry: clipboard, duplicate, delete, rename.

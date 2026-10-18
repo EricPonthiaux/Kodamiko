@@ -55,10 +55,9 @@ private slots:
         QVERIFY(!Theme::named("light").isDark);
         // Every theme has the interface colors the controls' style sheet uses.
         for (const Theme &theme : Theme::all()) {
-            for (const QColor &color :
-                 {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent, theme.accentText,
-                  theme.mutedText, theme.border, theme.line, theme.hover, theme.gradientStart, theme.gradientEnd,
-                  theme.currentLineNumber, theme.error, theme.warning})
+            for (const QColor &color : {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent,
+                                        theme.accentText, theme.mutedText, theme.border, theme.line, theme.hover,
+                                        theme.currentLineNumber, theme.error, theme.warning})
                 QVERIFY2(color.isValid(), qPrintable(theme.name));
         }
         QCOMPARE(Theme::named("unknown").name, QString("duet"));

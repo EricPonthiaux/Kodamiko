@@ -18,48 +18,41 @@ bool isDark(const QPalette &palette)
     return palette.color(QPalette::Base).lightness() < 128;
 }
 
-QColor muted(const QStyleOptionViewItem &option, bool selected)
+QColor muted(const QStyleOptionViewItem &option)
 {
-    QColor color = option.palette.color(selected ? QPalette::HighlightedText : QPalette::Text);
-    color.setAlphaF(selected ? 0.75 : 0.5);
+    QColor color = option.palette.color(QPalette::Text);
+    color.setAlphaF(0.5);
     return color;
 }
 
-// A row being painted.
+// A row being painted. A selected row is slate blue (see ThemeStyle): the
+// text and the git colors stay as they are.
 struct Row {
     QPainter *painter = nullptr;
     const QStyleOptionViewItem &option;
     QRect rect; // the row less its padding
-    // Selected in the active window, the row is on the accent: white text.
-    // Otherwise its background is a soft gray and the text keeps its colors.
-    bool onAccent = false;
 };
 
-// "STAGED  2": small capitals, dimmed, on the row's lower part.
-void paintSectionTitle(const Row &row, const QString &title, int count)
+// "Unstaged  2", in demibold, the count dimmed at the right; a hairline
+// above a section that follows another sets them apart.
+void paintSectionTitle(const Row &row, const QString &title, int count, bool isFirst)
 {
     QPainter *painter = row.painter;
+    if (!isFirst) {
+        QColor line = row.option.palette.color(QPalette::Text);
+        line.setAlphaF(0.12);
+        painter->fillRect(QRect(row.option.rect.left(), row.option.rect.top() + 3, row.option.rect.width(), 1), line);
+    }
     QFont font = row.option.font;
-    font.setCapitalization(QFont::AllUppercase);
-    font.setPointSizeF(font.pointSizeF() * 0.82);
     font.setWeight(QFont::DemiBold);
-    font.setLetterSpacing(QFont::PercentageSpacing, 108);
     painter->setFont(font);
-    painter->setPen(muted(row.option, row.onAccent));
+    painter->setPen(row.option.palette.color(QPalette::Text));
     const QFontMetrics metrics(font);
     const QRect text(row.rect.left(), row.rect.bottom() - metrics.height() - 4, row.rect.width(), metrics.height());
     painter->drawText(text, Qt::AlignLeft | Qt::AlignVCenter, title);
-    const QString countText = QString::number(count);
-    const int x = row.rect.left() + metrics.horizontalAdvance(title) + 8;
-    const QRectF bubble(x, text.center().y() - metrics.height() / 2.0 - 1, metrics.horizontalAdvance(countText) + 12,
-                        metrics.height() + 2);
-    QColor bubbleColor = row.option.palette.color(QPalette::Text);
-    bubbleColor.setAlphaF(0.08);
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(bubbleColor);
-    painter->drawRoundedRect(bubble, bubble.height() / 2, bubble.height() / 2);
-    painter->setPen(muted(row.option, row.onAccent));
-    painter->drawText(bubble, Qt::AlignCenter, countText);
+    painter->setFont(row.option.font);
+    painter->setPen(muted(row.option));
+    painter->drawText(text, Qt::AlignRight | Qt::AlignVCenter, QString::number(count));
 }
 
 // The folder shown after the name; a renamed file adds where it was.
@@ -82,15 +75,15 @@ qreal paintBadge(const Row &row, ChangeKind kind)
     const int badge = QFontMetrics(row.option.font).height();
     const QRectF badgeRect(row.rect.right() - badge, row.rect.center().y() - badge / 2.0, badge, badge);
     QColor tile = changeKindColor(kind);
-    tile.setAlphaF(row.onAccent ? 0.35 : 0.18);
+    tile.setAlphaF(0.18);
     painter->setPen(Qt::NoPen);
     painter->setBrush(tile);
-    painter->drawRoundedRect(badgeRect, 4, 4);
+    painter->drawRoundedRect(badgeRect, 2, 2);
     QFont badgeFont = row.option.font;
     badgeFont.setWeight(QFont::Bold);
     badgeFont.setPointSizeF(row.option.font.pointSizeF() * 0.8);
     painter->setFont(badgeFont);
-    painter->setPen(row.onAccent ? row.option.palette.color(QPalette::HighlightedText) : changeKindColor(kind));
+    painter->setPen(changeKindColor(kind));
     painter->drawText(badgeRect, Qt::AlignCenter, changeKindLetter(kind));
     return badgeRect.left();
 }
@@ -100,26 +93,25 @@ QString countLabel(const QString &sign, int count)
     return count > 0 ? sign + QString::number(count) : QString();
 }
 
-// "+12 −3", ending at `right`. Returns where it starts.
+// "+12 −3", ending at `right`, in two columns of fixed width (room for
+// "−9999"): the counts line up from row to row. Returns where they start.
 int paintStats(const Row &row, int added, int removed, int right)
 {
     QFont statsFont = row.option.font;
     statsFont.setPointSizeF(row.option.font.pointSizeF() * 0.86);
     statsFont.setWeight(QFont::DemiBold);
     const QFontMetrics statsMetrics(statsFont);
+    const int column = statsMetrics.horizontalAdvance(QStringLiteral("−9999"));
     const bool dark = isDark(row.option.palette);
     const QColor red = dark ? QColor("#f85149") : QColor("#cf222e");
     const QColor green = dark ? QColor("#3fb950") : QColor("#1a7f37");
     row.painter->setFont(statsFont);
     for (const auto &[text, color] : {std::pair{countLabel(QStringLiteral("−"), removed), red},
                                       std::pair{countLabel(QStringLiteral("+"), added), green}}) {
-        if (text.isEmpty())
-            continue;
-        const int width = statsMetrics.horizontalAdvance(text);
-        row.painter->setPen(row.onAccent ? row.option.palette.color(QPalette::HighlightedText) : color);
-        row.painter->drawText(QRect(right - width, row.rect.top(), width, row.rect.height()),
+        row.painter->setPen(color);
+        row.painter->drawText(QRect(right - column, row.rect.top(), column, row.rect.height()),
                               Qt::AlignRight | Qt::AlignVCenter, text);
-        right -= width + 6;
+        right -= column + 4;
     }
     return right - 4;
 }
@@ -131,7 +123,7 @@ void paintNameAndFolder(const Row &row, const QRect &area, const QString &name, 
     const QFontMetrics metrics(row.option.font);
     const int available = area.width();
     painter->setFont(row.option.font);
-    painter->setPen(row.option.palette.color(row.onAccent ? QPalette::HighlightedText : QPalette::Text));
+    painter->setPen(row.option.palette.color(QPalette::Text));
     const QString shownName = metrics.elidedText(name, Qt::ElideMiddle, available);
     painter->drawText(area, Qt::AlignLeft | Qt::AlignVCenter, shownName);
     const int nameWidth = metrics.horizontalAdvance(shownName) + 10;
@@ -141,7 +133,7 @@ void paintNameAndFolder(const Row &row, const QRect &area, const QString &name, 
     QFont small = row.option.font;
     small.setPointSizeF(row.option.font.pointSizeF() * 0.92);
     painter->setFont(small);
-    painter->setPen(muted(row.option, row.onAccent));
+    painter->setPen(muted(row.option));
     const QFontMetrics smallMetrics(small);
     painter->drawText(QRect(area.left() + nameWidth, area.top(), available - nameWidth, area.height()),
                       Qt::AlignLeft | Qt::AlignVCenter,
@@ -192,8 +184,7 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     const QWidget *widget = option.widget;
     const QStyle *style = widget ? widget->style() : QApplication::style();
     const bool selected = option.state & QStyle::State_Selected;
-    const bool onAccent = selected && (option.state & QStyle::State_Active);
-    const Row row{painter, option, option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0), onAccent};
+    const Row row{painter, option, option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0)};
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
@@ -205,7 +196,7 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
             background.text.clear();
             style->drawControl(QStyle::CE_ItemViewItem, &background, painter, widget);
         }
-        paintSectionTitle(row, item.text, index.data(sectionCountRole).toInt());
+        paintSectionTitle(row, item.text, index.data(sectionCountRole).toInt(), index.row() == 0);
         painter->restore();
         return;
     }

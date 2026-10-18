@@ -58,8 +58,6 @@ Theme Theme::duet()
     theme.hover = QColor("#262b35");
     // Flat: the same color at both ends, a shade darker than the accent for
     // white text.
-    theme.gradientStart = QColor("#4570e4");
-    theme.gradientEnd = QColor("#4570e4");
     theme.syntaxStyles = {
         {"comment", italic("#6b7489")},         {"string", plain("#a8d67e")},
         {"string.special", plain("#5fd4e8")},   {"escape", plain("#5fd4e8")},
@@ -107,8 +105,6 @@ Theme Theme::dark()
     theme.border = QColor("#3b414d");
     theme.line = QColor("#2c313a");
     theme.hover = QColor("#262a31");
-    theme.gradientStart = QColor("#3e6fd8");
-    theme.gradientEnd = QColor("#5c8eff");
     theme.syntaxStyles = {
         {"comment", italic("#7f848e")},         {"string", plain("#98c379")},
         {"string.special", plain("#56b6c2")},   {"escape", plain("#56b6c2")},
@@ -156,8 +152,6 @@ Theme Theme::purple()
     theme.border = QColor("#3a3058");
     theme.line = QColor("#251f36");
     theme.hover = QColor("#201a2e");
-    theme.gradientStart = QColor("#6d4fd8");
-    theme.gradientEnd = QColor("#a855f7");
     theme.syntaxStyles = {
         {"comment", italic("#6e6790")},         {"string", plain("#9fe0c0")},
         {"string.special", plain("#7dd3fc")},   {"escape", plain("#7dd3fc")},
@@ -203,8 +197,6 @@ Theme Theme::light()
     theme.border = QColor("#c8ccd4");
     theme.line = QColor("#dfe2e7");
     theme.hover = QColor("#eceef2");
-    theme.gradientStart = QColor("#3d63f2");
-    theme.gradientEnd = QColor("#6a8bff");
     theme.findHighlight = QColor("#c18401");
     theme.error = QColor("#d1242f");
     theme.warning = QColor("#9a6700");

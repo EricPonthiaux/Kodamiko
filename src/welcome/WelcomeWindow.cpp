@@ -42,7 +42,7 @@ constexpr int missingRole = Qt::UserRole + 2;
 constexpr const char *welcomeRules = R"(
 QWidget#welcomeSide { background: @panel; border-right: 1px solid @line; }
 QLabel#welcomeVersion { color: @muted; }
-QLineEdit#welcomeSearch { padding: 6px 10px; border-radius: 8px; }
+QLineEdit#welcomeSearch { padding: 4px 8px; border-radius: 3px; }
 QListWidget#welcomeProjects { background: transparent; border: none; outline: none; }
 )";
 
@@ -79,11 +79,11 @@ public:
         if (option.state & QStyle::State_Selected) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(theme_.selection);
-            painter->drawRoundedRect(area, 8, 8);
+            painter->drawRoundedRect(area, 2, 2);
         } else if (option.state & QStyle::State_MouseOver) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(theme_.hover);
-            painter->drawRoundedRect(area, 8, 8);
+            painter->drawRoundedRect(area, 2, 2);
         }
         const bool missing = index.data(missingRole).toBool();
         const QRect text = option.rect.adjusted(14, 9, -14, -9);
@@ -103,7 +103,7 @@ public:
                               smallMetrics.height() + 6);
             painter->setPen(QPen(theme_.line, 1));
             painter->setBrush(Qt::NoBrush);
-            painter->drawRoundedRect(chip, chip.height() / 2, chip.height() / 2);
+            painter->drawRoundedRect(chip, 2, 2);
             painter->setPen(languages.isEmpty() || missing ? theme_.mutedText : theme_.foreground);
             painter->drawText(chip, Qt::AlignCenter, it);
             right -= width + 6;

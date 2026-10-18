@@ -1,6 +1,7 @@
 #include "CommitDelegate.h"
 
 #include "git/CommitLog.h"
+#include "ui/AppFonts.h"
 
 #include <QApplication>
 #include <QHash>
@@ -13,7 +14,9 @@
 namespace {
 
 constexpr int padding = 12;
-constexpr int avatarSize = 28;
+constexpr int avatarSize = 20;
+// The badges take at most this share of the first line: the summary first.
+constexpr qreal maximumBadgesShare = 0.4;
 
 // Item data roles of a commit row.
 constexpr int authorRole = Qt::UserRole + 60;
@@ -25,11 +28,18 @@ constexpr int refsRole = Qt::UserRole + 63;
 const std::array avatarColors{QColor("#7c6cf0"), QColor("#4c9be8"), QColor("#2fae8f"), QColor("#e07b53"),
                               QColor("#d65d8f"), QColor("#9a7d4f"), QColor("#5a8f3c"), QColor("#c55bd8")};
 
-QColor dimmed(const QStyleOptionViewItem &option, bool selected)
+QColor dimmed(const QStyleOptionViewItem &option)
 {
-    QColor color = option.palette.color(selected ? QPalette::HighlightedText : QPalette::Text);
-    color.setAlphaF(selected ? 0.75 : 0.52);
+    QColor color = option.palette.color(QPalette::Text);
+    color.setAlphaF(0.52);
     return color;
+}
+
+// Less saturated, to stay discreet next to the text.
+QColor muted(const QColor &color)
+{
+    const QColor hsl = color.toHsl();
+    return QColor::fromHslF(hsl.hslHueF(), hsl.hslSaturationF() * 0.55, hsl.lightnessF() * 0.9);
 }
 
 QString initials(const QString &name)
@@ -99,8 +109,9 @@ QPixmap CommitDelegate::avatar(const QString &name, int size, qreal ratio)
 QPixmap CommitDelegate::drawAvatar(const QString &name, int size, qreal ratio)
 {
     // Claude in its own orange.
-    const QColor color = name.startsWith(QLatin1String("Claude")) ? QColor("#d97757")
-                                                                  : avatarColors.at(qHash(name) % avatarColors.size());
+    const QColor color =
+        muted(name.startsWith(QLatin1String("Claude")) ? QColor("#d97757")
+                                                       : avatarColors.at(qHash(name) % avatarColors.size()));
     QPixmap pixmap(QSize(size, size) * ratio);
     pixmap.setDevicePixelRatio(ratio);
     pixmap.fill(Qt::transparent);
@@ -108,7 +119,7 @@ QPixmap CommitDelegate::drawAvatar(const QString &name, int size, qreal ratio)
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
     painter.setBrush(color);
-    painter.drawEllipse(QRectF(0, 0, size, size));
+    painter.drawRoundedRect(QRectF(0, 0, size, size), size * 0.2, size * 0.2);
     QFont font = QApplication::font();
     font.setPixelSize(qRound(size * 0.4));
     font.setWeight(QFont::DemiBold);
@@ -141,9 +152,7 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     initStyleOption(&item, index);
     const QWidget *widget = option.widget;
     const QStyle *style = widget ? widget->style() : QApplication::style();
-    // Selected in the active window, the row is on the accent: white text.
-    // Otherwise its background is a soft gray and the text keeps its colors.
-    const bool selected = (option.state & QStyle::State_Selected) && (option.state & QStyle::State_Active);
+    // A selected row is slate blue (see ThemeStyle): the text keeps its colors.
     const QString summary = item.text;
     item.text.clear();
     style->drawControl(QStyle::CE_ItemViewItem, &item, painter, widget);
@@ -157,48 +166,73 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     painter->drawPixmap(avatarRect, avatar(author, avatarSize, ratio));
 
     const QFontMetrics metrics(option.font);
-    const int left = avatarRect.right() + 12;
+    const int left = avatarRect.right() + 10;
     const int lineHeight = metrics.height();
-    const int top = rect.center().y() - lineHeight - 1;
-    int x = left;
+    const QRect firstLine(left, rect.center().y() - lineHeight - 1, rect.right() - left, lineHeight);
+    const QRect secondLine(left, rect.center().y() + 3, rect.right() - left, lineHeight);
 
-    // First line: pills, then the summary.
-    QFont pillFont = option.font;
-    pillFont.setPointSizeF(option.font.pointSizeF() * 0.82);
-    pillFont.setWeight(QFont::DemiBold);
-    const QFontMetrics pillMetrics(pillFont);
-    for (const QString &name : index.data(refsRole).toStringList()) {
-        const int width = pillMetrics.horizontalAdvance(name) + 12;
-        const QRectF pill(x, top + (lineHeight - pillMetrics.height() - 2) / 2.0, width, pillMetrics.height() + 2);
-        QColor fill = refColor(name);
-        fill.setAlphaF(0.22);
-        painter->setPen(QPen(refColor(name), 1));
-        painter->setBrush(fill);
-        painter->drawRoundedRect(pill, pill.height() / 2, pill.height() / 2);
-        painter->setFont(pillFont);
-        painter->setPen(selected ? option.palette.color(QPalette::HighlightedText) : refColor(name).lighter(130));
-        painter->drawText(pill, Qt::AlignCenter, name);
-        x += width + 6;
-    }
+    // First line: the badges at the right, then the summary in what is left.
+    const int badgesLeft = paintBadges(painter, option, index.data(refsRole).toStringList(), firstLine);
     QFont summaryFont = option.font;
     summaryFont.setWeight(QFont::Medium);
     painter->setFont(summaryFont);
-    painter->setPen(option.palette.color(selected ? QPalette::HighlightedText : QPalette::Text));
-    const int available = rect.right() - x;
-    painter->drawText(QRect(x, top, available, lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
+    painter->setPen(option.palette.color(QPalette::Text));
+    const int available = badgesLeft - firstLine.left() - 8;
+    painter->drawText(QRect(firstLine.left(), firstLine.top(), available, lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(summaryFont).elidedText(summary, Qt::ElideRight, available));
 
-    // Second line: author · date · ID.
+    // Second line: the ID at the right, author · date before it.
+    const QFont idFont = AppFonts::codeFont(option.font.pointSizeF() * 0.88);
+    const QString id = index.data(shortIdRole).toString();
+    const int idWidth = QFontMetrics(idFont).horizontalAdvance(id);
+    painter->setFont(idFont);
+    painter->setPen(dimmed(option));
+    painter->drawText(secondLine, Qt::AlignRight | Qt::AlignVCenter, id);
     QFont detailFont = option.font;
     detailFont.setPointSizeF(option.font.pointSizeF() * 0.92);
     painter->setFont(detailFont);
-    painter->setPen(dimmed(option, selected));
-    const QString details =
-        QStringLiteral("%1  ·  %2  ·  %3")
-            .arg(author, relativeDate(index.data(dateRole).toDateTime()), index.data(shortIdRole).toString());
-    const QFontMetrics detailMetrics(detailFont);
-    painter->drawText(QRect(left, rect.center().y() + 3, rect.right() - left, detailMetrics.height()),
+    const QString details = QStringLiteral("%1  ·  %2").arg(author, relativeDate(index.data(dateRole).toDateTime()));
+    const int detailsWidth = secondLine.width() - idWidth - 12;
+    painter->drawText(QRect(secondLine.left(), secondLine.top(), detailsWidth, secondLine.height()),
                       Qt::AlignLeft | Qt::AlignVCenter,
-                      detailMetrics.elidedText(details, Qt::ElideRight, rect.right() - left));
+                      QFontMetrics(detailFont).elidedText(details, Qt::ElideRight, detailsWidth));
     painter->restore();
+}
+
+int CommitDelegate::paintBadges(QPainter *painter,
+                                const QStyleOptionViewItem &option,
+                                const QStringList &refs,
+                                const QRect &line)
+{
+    QFont badgeFont = option.font;
+    badgeFont.setPointSizeF(option.font.pointSizeF() * 0.82);
+    badgeFont.setWeight(QFont::DemiBold);
+    const QFontMetrics badgeMetrics(badgeFont);
+    const int leftmost = line.right() - int(line.width() * maximumBadgesShare);
+    int right = line.right() + 1;
+    painter->setFont(badgeFont);
+    for (qsizetype i = 0; i < refs.size(); ++i) {
+        const QString &name = refs.at(i);
+        const int width = badgeMetrics.horizontalAdvance(name) + 10;
+        // No room left: how many more, instead.
+        if (right - width < leftmost) {
+            const QString more = QStringLiteral("+%1").arg(refs.size() - i);
+            const int moreWidth = badgeMetrics.horizontalAdvance(more);
+            painter->setPen(dimmed(option));
+            painter->drawText(QRect(right - moreWidth, line.top(), moreWidth, line.height()),
+                              Qt::AlignRight | Qt::AlignVCenter, more);
+            return right - moreWidth;
+        }
+        const QRectF badge(right - width, line.top() + (line.height() - badgeMetrics.height() - 2) / 2.0, width,
+                           badgeMetrics.height() + 2);
+        QColor fill = refColor(name);
+        fill.setAlphaF(0.2);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(fill);
+        painter->drawRoundedRect(badge, 2, 2);
+        painter->setPen(refColor(name).lighter(130));
+        painter->drawText(badge, Qt::AlignCenter, name);
+        right -= width + 4;
+    }
+    return right;
 }

@@ -6,8 +6,10 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QFontMetricsF>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QScrollBar>
@@ -631,6 +633,18 @@ void TerminalWidget::mouseReleaseEvent(QMouseEvent *event)
         copySelection(QClipboard::Selection);
     }
     viewport()->update();
+}
+
+// Copy and paste with the mouse: the terminal's keyboard shortcuts differ
+// from the editor's (see isCopyShortcut).
+void TerminalWidget::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu menu(this);
+    QAction *copy = menu.addAction(tr("Copy"), this, [this] { copySelection(QClipboard::Clipboard); });
+    copy->setEnabled(!selectedText().isEmpty());
+    QAction *paste = menu.addAction(tr("Paste"), this, &TerminalWidget::pasteClipboard);
+    paste->setEnabled(!QApplication::clipboard()->text().isEmpty());
+    menu.exec(event->globalPos());
 }
 
 void TerminalWidget::focusInEvent(QFocusEvent *event)

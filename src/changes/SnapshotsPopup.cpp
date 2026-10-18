@@ -3,6 +3,7 @@
 #include "git/GitCommands.h"
 #include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
+#include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
 #include "workspace/FileIcons.h"
 
@@ -26,17 +27,18 @@ constexpr int iconRole = Qt::UserRole + 1;
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *snapshotRules = R"(
 QListWidget#snapshotList, QListWidget#snapshotFiles { background: transparent; border: none; outline: 0; }
-QListWidget#snapshotFiles::item { padding: 3px 4px; border-radius: 5px; }
+QListWidget#snapshotList { border-right: 1px solid @line; }
+QListWidget#snapshotFiles::item { padding: 3px 4px; border-radius: 2px; }
 QListWidget#snapshotFiles::item:hover { background: @hover; }
 QListWidget#snapshotFiles::item:selected { background: @selection; color: @text; }
-QLabel#snapshotBadge { color: @accentText; background: @selection; border-radius: 9px; padding: 2px 10px; }
+QLabel#snapshotBadge { color: @accentText; background: @selection; border-radius: 2px; padding: 2px 8px; }
 QLabel#snapshotCommit { color: @muted; }
 QLabel#snapshotDate { color: @muted; }
 QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )";
 
-// Row of a snapshot: an icon on a tinted tile, the reason, and below, when
-// and how many files.
+// Row of a snapshot: an icon, the reason, and below, when and how many
+// files.
 class SnapshotDelegate : public QStyledItemDelegate {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
@@ -44,40 +46,35 @@ public:
 
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &) const override
     {
-        return {0, option.fontMetrics.height() * 2 + 26};
+        return {0, option.fontMetrics.height() * 2 + 14};
     }
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
-        const QRectF row = QRectF(option.rect).adjusted(4, 2, -4, -2);
+        const QRectF row = QRectF(option.rect).adjusted(0, 1, -4, -1);
         const bool selected = option.state & QStyle::State_Selected;
         if (selected || option.state & QStyle::State_MouseOver) {
             painter->setPen(Qt::NoPen);
-            painter->setBrush(selected ? theme.selection : theme.hover);
-            painter->drawRoundedRect(row, 8, 8);
+            painter->setBrush(selected ? ThemeStyle::selectionColor(theme) : theme.hover);
+            painter->drawRoundedRect(row, 2, 2);
         }
 
-        // The tile.
-        const QRectF tile(row.left() + 10, row.center().y() - 15, 30, 30);
-        QColor tint = theme.accent;
-        tint.setAlpha(theme.isDark ? 46 : 30);
-        painter->setPen(Qt::NoPen);
-        painter->setBrush(tint);
-        painter->drawRoundedRect(tile, 8, 8);
+        // The icon, alone: 16 pixels, in the accent.
+        const QRectF tile(row.left() + 8, row.center().y() - 8, 16, 16);
         const QIcon icon = UiIcons::icon(index.data(iconRole).toString(), theme.accent);
-        icon.paint(painter, tile.toRect().adjusted(7, 7, -7, -7));
+        icon.paint(painter, tile.toRect());
 
         // The text.
-        const QRectF text(tile.right() + 12, row.top(), row.right() - tile.right() - 22, row.height());
+        const QRectF text(tile.right() + 10, row.top(), row.right() - tile.right() - 20, row.height());
         QFont title = option.font;
         title.setWeight(QFont::DemiBold);
         const QFontMetrics titleMetrics(title);
         const qreal lineHeight = option.fontMetrics.height();
         const qreal top = text.center().y() - lineHeight - 1;
         painter->setFont(title);
-        painter->setPen(selected ? theme.accentText : theme.foreground);
+        painter->setPen(theme.foreground);
         painter->drawText(
             QRectF(text.left(), top, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
             titleMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, int(text.width())));
@@ -121,24 +118,13 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
     , theme_(theme)
     , commands_(commands)
     , body_(new QStackedWidget(this))
-    , headerIcon_(new QLabel(this))
+    , header_(new PopupHeader(QStringLiteral("history"), tr("Restore a Snapshot"), this))
     , list_(new QListWidget(this))
 {
-    // The header: an icon, the title and what snapshots are.
-    auto *title = new QLabel(tr("Restore a Snapshot"), this);
-    AppFonts::setInterfaceFont(title, 1.5);
-    auto *description = wrapped(QStringLiteral("pageDescription"), this);
-    description->setText(tr("Duet keeps a copy of your files before discarding changes, and of the whole working "
+    // The header says what snapshots are.
+    header_->setSubtitle(tr("Duet keeps a copy of your files before discarding changes, and of the whole working "
                             "directory before each Claude prompt."));
-    auto *heading = new QVBoxLayout;
-    heading->setSpacing(4);
-    heading->addWidget(title);
-    heading->addWidget(description);
-    auto *header = new QHBoxLayout;
-    header->setContentsMargins(28, 22, 28, 0);
-    header->setSpacing(14);
-    header->addWidget(headerIcon_, 0, Qt::AlignTop);
-    header->addLayout(heading, 1);
+    connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
     // The list and the selected snapshot, side by side.
     list_->setObjectName(QStringLiteral("snapshotList"));
@@ -146,17 +132,11 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
     list_->setMouseTracking(true);
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     connect(list_, &QListWidget::currentRowChanged, this, &SnapshotsPopup::showDetails);
-    auto *listCard = new QFrame(this);
-    listCard->setObjectName(QStringLiteral("settingsCard"));
-    auto *listLayout = new QVBoxLayout(listCard);
-    listLayout->setContentsMargins(4, 6, 4, 6);
-    listLayout->addWidget(list_);
-
     auto *columns = new QWidget(this);
     auto *columnsLayout = new QHBoxLayout(columns);
-    columnsLayout->setContentsMargins(28, 0, 28, 18);
-    columnsLayout->setSpacing(14);
-    columnsLayout->addWidget(listCard, 5);
+    columnsLayout->setContentsMargins(16, 12, 16, 12);
+    columnsLayout->setSpacing(12);
+    columnsLayout->addWidget(list_, 5);
     columnsLayout->addWidget(createDetails(), 6);
     body_->addWidget(columns);
     body_->addWidget(createEmptyState());
@@ -173,7 +153,7 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
     connect(close, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(restore_, &QPushButton::clicked, this, &SnapshotsPopup::restoreSelected);
     auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(28, 12, 18, 14);
+    footerLayout->setContentsMargins(16, 10, 16, 10);
     footerLayout->setSpacing(8);
     footerLayout->addWidget(hint, 1);
     footerLayout->addWidget(close);
@@ -182,8 +162,7 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
-    layout->addLayout(header);
-    layout->addSpacing(18);
+    layout->addWidget(header_);
     layout->addWidget(body_, 1);
     layout->addWidget(footer);
 
@@ -192,11 +171,11 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
 
 QWidget *SnapshotsPopup::createDetails()
 {
-    auto *card = new QFrame(this);
-    card->setObjectName(QStringLiteral("settingsCard"));
+    // Flush with the list, no card around.
+    auto *card = new QWidget(this);
 
     title_ = wrapped(QStringLiteral("snapshotTitle"), card);
-    AppFonts::setInterfaceFont(title_, 1.12);
+    AppFonts::setInterfaceFont(title_, 1.05);
     title_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     date_ = wrapped(QStringLiteral("snapshotDate"), card);
     badge_ = new QLabel(card);
@@ -221,7 +200,7 @@ QWidget *SnapshotsPopup::createDetails()
     commit_->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     auto *layout = new QVBoxLayout(card);
-    layout->setContentsMargins(18, 16, 18, 14);
+    layout->setContentsMargins(4, 2, 0, 0);
     layout->setSpacing(6);
     layout->addWidget(title_);
     layout->addWidget(date_);
@@ -242,13 +221,13 @@ QWidget *SnapshotsPopup::createEmptyState()
     emptyIcon_->setAlignment(Qt::AlignCenter);
     emptyTitle_ = new QLabel(page);
     emptyTitle_->setAlignment(Qt::AlignCenter);
-    AppFonts::setInterfaceFont(emptyTitle_, 1.2);
+    AppFonts::setInterfaceFont(emptyTitle_, 1.05);
     emptyText_ = wrapped(QStringLiteral("pageDescription"), page);
     emptyText_->setAlignment(Qt::AlignCenter);
     emptyText_->setContentsMargins(60, 0, 60, 0);
 
     auto *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(28, 0, 28, 40);
+    layout->setContentsMargins(16, 0, 16, 32);
     layout->setSpacing(10);
     layout->addStretch();
     layout->addWidget(emptyIcon_);
@@ -264,8 +243,8 @@ void SnapshotsPopup::applyTheme(const Theme &theme)
     theme_ = theme;
     setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(snapshotRules)));
     const qreal ratio = devicePixelRatioF();
-    headerIcon_->setPixmap(iconTile(QStringLiteral("history"), theme, 40, ratio));
-    emptyIcon_->setPixmap(iconTile(QStringLiteral("history"), theme, 64, ratio));
+    header_->applyTheme(theme);
+    emptyIcon_->setPixmap(UiIcons::icon(QStringLiteral("history"), theme.mutedText).pixmap(QSize(32, 32), ratio));
     const QFont mono = AppFonts::codeFont(font().pointSizeF() * 0.9);
     commit_->setFont(mono);
     if (auto *delegate = dynamic_cast<SnapshotDelegate *>(list_->itemDelegate()))

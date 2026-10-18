@@ -1,8 +1,10 @@
 #include "ChangesView.h"
 
+#include "CommitPanel.h"
+#include "DiffHeaderBar.h"
 #include "DiffView.h"
 #include "FileChangeDelegate.h"
-#include "claude/CommitMessage.h"
+#include "HunkActions.h"
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
@@ -11,18 +13,14 @@
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
 
-#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
-#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSet>
-#include <QShortcut>
 #include <QSplitter>
-#include <QTextCursor>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -71,15 +69,13 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     , summary_(new QLabel(this))
     , list_(new QTreeWidget(this))
     , diff_(new DiffView(theme, this))
+    , diffHeader_(new DiffHeaderBar(diff_, this))
+    , hunkActions_(new HunkActions(diff_))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
     , stageButton_(new QToolButton(this))
     , unstageButton_(new QToolButton(this))
     , discardButton_(new QToolButton(this))
-    , message_(new QPlainTextEdit(this))
-    , amend_(new QCheckBox(tr("Amend last commit"), this))
-    , generateButton_(new QToolButton(this))
-    , commitButton_(new QPushButton(tr("Commit"), this))
-    , generator_(new CommitMessageGenerator(this))
+    , commitPanel_(new CommitPanel(commands, this))
 {
     const auto toolButton = [](QToolButton *button, const QString &text, const QString &toolTip) {
         button->setText(text);
@@ -101,7 +97,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     refreshButton->setShortcut(QKeySequence(Qt::Key_F5));
     connect(refreshButton, &QToolButton::clicked, this, &ChangesView::refresh);
 
-    // "Changes" and the summary, the actions at the right.
+    // "Changes" and the summary, the refresh at the right.
     auto *title = new QLabel(tr("Changes"), this);
     AppFonts::setInterfaceFont(title, 1.15);
     summary_->setEnabled(false); // dimmed
@@ -111,11 +107,18 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     header->addWidget(title);
     header->addWidget(summary_);
     header->addStretch();
-    header->addWidget(stageButton_);
-    header->addWidget(unstageButton_);
-    header->addWidget(discardButton_);
-    header->addSpacing(6);
     header->addWidget(refreshButton);
+
+    // The selected files' actions, right above the list.
+    auto *fileActions = new QFrame(this);
+    fileActions->setObjectName(QStringLiteral("fileActions"));
+    auto *fileActionsLayout = new QHBoxLayout(fileActions);
+    fileActionsLayout->setContentsMargins(4, 4, 4, 4);
+    fileActionsLayout->setSpacing(2);
+    fileActionsLayout->addWidget(stageButton_);
+    fileActionsLayout->addWidget(unstageButton_);
+    fileActionsLayout->addStretch();
+    fileActionsLayout->addWidget(discardButton_);
 
     // A merge or rebase stopped on conflicts: what to do, and the way on.
     operationBar_ = new QFrame(this);
@@ -140,7 +143,8 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     operationRow->setContentsMargins(8, 0, 8, 8);
     operationRow->addWidget(operationBar_);
 
-    // List: two sections, "Staged" then "Unstaged".
+    // List: two sections, "Unstaged" then "Staged", the one nearer the
+    // commit area.
     list_->setHeaderHidden(true);
     list_->setRootIsDecorated(false);
     list_->setIndentation(0);
@@ -150,7 +154,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     list_->setContextMenuPolicy(Qt::CustomContextMenu);
     list_->setToolTip(tr("Double-click: open the file in the editor\nRight-click: stage, unstage, discard"));
-    for (const Section section : {Section::Staged, Section::Unstaged}) {
+    for (const Section section : {Section::Unstaged, Section::Staged}) {
         auto *item = new QTreeWidgetItem(list_);
         item->setData(0, sectionRole, static_cast<int>(section));
         item->setData(0, indexRole, -1);
@@ -169,57 +173,41 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
             emit openFileRequested(change.path);
     });
 
-    // Commit message and button, in a card below the list.
-    message_->setPlaceholderText(tr("Commit message (Ctrl+Enter to commit)"));
-    message_->setTabChangesFocus(true);
-    message_->setFixedHeight(96);
-    commitButton_->setDefault(true);
-    commitButton_->setToolTip(tr("Commit the staged changes (Ctrl+Enter)"));
-    for (const int key : {Qt::Key_Return, Qt::Key_Enter}) {
-        const auto *shortcut =
-            new QShortcut(QKeySequence(Qt::CTRL | key), message_, nullptr, nullptr, Qt::WidgetShortcut);
-        connect(shortcut, &QShortcut::activated, this, &ChangesView::commit);
-    }
-    connect(amend_, &QCheckBox::toggled, this, &ChangesView::onAmendToggled);
-    connect(commitButton_, &QPushButton::clicked, this, &ChangesView::commit);
+    connect(commitPanel_, &CommitPanel::statusMessage, this, &ChangesView::statusMessage);
 
-    toolButton(generateButton_, {}, {});
-    onGeneratingChanged(false);
-    connect(generateButton_, &QToolButton::clicked, this, &ChangesView::generateCommitMessage);
-    connect(generator_, &CommitMessageGenerator::runningChanged, this, &ChangesView::onGeneratingChanged);
-    connect(generator_, &CommitMessageGenerator::finished, this, &ChangesView::showGeneratedMessage);
-    connect(generator_, &CommitMessageGenerator::failed, this, [this](const QString &error) {
-        emit statusMessage(
-            tr("Claude could not write the commit message: %1").arg(error.section(QLatin1Char('\n'), 0, 0)));
-    });
-
-    auto *commitRow = new QHBoxLayout;
-    commitRow->addWidget(amend_);
-    commitRow->addStretch();
-    commitRow->addWidget(generateButton_);
-    commitRow->addWidget(commitButton_);
-
-    auto *card = new QFrame(this);
-    card->setObjectName(QStringLiteral("card"));
-    auto *cardLayout = new QVBoxLayout(card);
-    cardLayout->setContentsMargins(10, 10, 10, 10);
-    cardLayout->setSpacing(8);
-    cardLayout->addWidget(message_);
-    cardLayout->addLayout(commitRow);
-
-    auto *left = new QWidget(this);
+    // The column: the file actions, the list, the commit area fixed below.
+    auto *left = new QFrame(this);
+    left->setObjectName(QStringLiteral("changesColumn"));
     auto *leftLayout = new QVBoxLayout(left);
-    leftLayout->setContentsMargins(8, 0, 8, 10);
-    leftLayout->setSpacing(10);
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+    leftLayout->setSpacing(0);
+    leftLayout->addWidget(fileActions);
     leftLayout->addWidget(list_, 1);
-    leftLayout->addWidget(card);
+    leftLayout->addWidget(commitPanel_);
 
     diff_->setContextMenuPolicy(Qt::CustomContextMenu);
     diff_->setToolTip({});
     connect(diff_, &QWidget::customContextMenuRequested, this, &ChangesView::showDiffMenu);
+    // A block's buttons act on the whole block, whatever lines are selected.
+    connect(hunkActions_, &HunkActions::applyRequested, this, [this](int line) {
+        diff_->selectAll(false);
+        applyDiffSelection(line, false);
+    });
+    connect(hunkActions_, &HunkActions::discardRequested, this, [this](int line) {
+        diff_->selectAll(false);
+        applyDiffSelection(line, true);
+    });
+
+    // The diff under its header, which follows the file at the top.
+    auto *right = new QWidget(this);
+    auto *rightLayout = new QVBoxLayout(right);
+    rightLayout->setContentsMargins(0, 0, 0, 0);
+    rightLayout->setSpacing(0);
+    rightLayout->addWidget(diffHeader_);
+    rightLayout->addWidget(diff_, 1);
 
     splitter_->addWidget(left);
-    splitter_->addWidget(diff_);
+    splitter_->addWidget(right);
     splitter_->setStretchFactor(1, 1);
     splitter_->setSizes({320, 1080});
 
@@ -256,9 +244,7 @@ void ChangesView::setFolder(const QString &folder)
     showSection(Section::Unstaged);
     showOperation();
     summary_->clear();
-    generator_->cancel();
-    message_->clear();
-    amend_->setChecked(false);
+    commitPanel_->reset();
     updateActions();
 }
 
@@ -272,7 +258,7 @@ const QList<FileDiff> &ChangesView::files(Section section) const
 
 QTreeWidgetItem *ChangesView::sectionItem(Section section) const
 {
-    return list_->topLevelItem(section == Section::Staged ? 0 : 1);
+    return list_->topLevelItem(section == Section::Unstaged ? 0 : 1);
 }
 
 void ChangesView::refresh()
@@ -437,6 +423,7 @@ void ChangesView::rebuildList()
 void ChangesView::showSection(Section section)
 {
     shownSection_ = section;
+    hunkActions_->setStaged(section == Section::Staged);
     shownPatches_.clear();
     QList<DiffFile> shown;
     if (status_) {
@@ -527,8 +514,8 @@ void ChangesView::updateActions()
     stageButton_->setEnabled(!busy && any(Section::Unstaged));
     unstageButton_->setEnabled(!busy && any(Section::Staged));
     discardButton_->setEnabled(!busy && any(Section::Unstaged));
-    commitButton_->setEnabled(!busy && status_.has_value());
-    amend_->setEnabled(status_ && !status_->info.unborn);
+    hunkActions_->setEnabled(!busy);
+    commitPanel_->setStatus(status_ ? &*status_ : nullptr, folderPathspec());
 }
 
 void ChangesView::showOperation()
@@ -774,108 +761,12 @@ void ChangesView::showListMenu(const QPoint &position)
 
 void ChangesView::focusCommitMessage()
 {
-    message_->setFocus();
-}
-
-void ChangesView::onAmendToggled(bool amend)
-{
-    if (!status_)
-        return;
-    const QString lastMessage = status_->info.headMessage.trimmed();
-    if (amend && message_->toPlainText().trimmed().isEmpty())
-        message_->setPlainText(lastMessage);
-    else if (!amend && message_->toPlainText().trimmed() == lastMessage)
-        message_->clear();
+    commitPanel_->focusMessage();
 }
 
 void ChangesView::generateCommitMessage()
 {
-    if (generator_->isRunning()) {
-        generator_->cancel();
-        emit statusMessage(tr("Commit message not written"));
-        return;
-    }
-    if (!status_)
-        return;
-    const bool amend = amend_->isChecked();
-    // As commit(): with nothing staged, everything will be.
-    const bool stageEverything = status_->staged.isEmpty() && !amend;
-    if (stageEverything && status_->unstaged.isEmpty()) {
-        emit statusMessage(tr("Nothing to commit"));
-        return;
-    }
-    generator_->start(status_->info, amend, stageEverything, folderPathspec());
-    emit statusMessage(tr("Claude is writing the commit message…"));
-}
-
-void ChangesView::onGeneratingChanged(bool generating)
-{
-    generateButton_->setText(generating ? tr("Stop") : tr("Generate"));
-    generateButton_->setToolTip(generating ? tr("Stop writing the commit message")
-                                           : tr("Have Claude write the commit message from the changes to commit "
-                                                "(Ctrl+Alt+G)"));
-    message_->setReadOnly(generating);
-    message_->setPlaceholderText(generating ? tr("Claude is writing the commit message…")
-                                            : tr("Commit message (Ctrl+Enter to commit)"));
-}
-
-void ChangesView::showGeneratedMessage(const QString &message)
-{
-    // Through a cursor, so that Ctrl+Z brings back what was written before.
-    QTextCursor cursor(message_->document());
-    cursor.select(QTextCursor::Document);
-    cursor.insertText(message);
-    message_->setTextCursor(cursor);
-    message_->setFocus();
-    emit statusMessage(tr("Commit message written by Claude: review it, then commit (Ctrl+Enter)"));
-}
-
-void ChangesView::commit()
-{
-    if (!status_ || commands_->isBusy())
-        return;
-    generator_->cancel();
-    const QString message = message_->toPlainText().trimmed();
-    const bool amend = amend_->isChecked();
-    if (message.isEmpty()) {
-        emit statusMessage(tr("Write the commit message first"));
-        message_->setFocus();
-        return;
-    }
-    if (status_->staged.isEmpty() && !amend) {
-        if (status_->unstaged.isEmpty()) {
-            emit statusMessage(tr("Nothing to commit"));
-            return;
-        }
-        const auto answer =
-            QMessageBox::question(this, tr("Commit"),
-                                  tr("No changes are staged. Stage all changes (%n file(s)) and commit them?", nullptr,
-                                     static_cast<int>(status_->unstaged.size())));
-        if (answer != QMessageBox::Yes)
-            return;
-        runCommit(message, false, true);
-        return;
-    }
-    runCommit(message, amend, false);
-}
-
-void ChangesView::runCommit(const QString &message, bool amend, bool stageEverything)
-{
-    if (!status_)
-        return;
-    commands_->run(
-        tr("Commit"),
-        [info = status_->info, message, amend, stageEverything, path = folderPathspec()] {
-            if (stageEverything)
-                GitOperations::stage(info, {path});
-            const QString id = GitOperations::commit(info, message, amend);
-            return amend ? QObject::tr("Last commit replaced by %1").arg(id) : QObject::tr("Created commit %1").arg(id);
-        },
-        [this] {
-            const QSignalBlocker blocker(amend_);
-            amend_->setChecked(false);
-            message_->clear();
-        });
+    commitPanel_->generateMessage();
 }
 
 void ChangesView::applyTheme(const Theme &theme)
@@ -886,5 +777,6 @@ void ChangesView::applyTheme(const Theme &theme)
     unstageButton_->setIcon(UiIcons::icon(QStringLiteral("minus"), color));
     discardButton_->setIcon(UiIcons::icon(QStringLiteral("discard"), color));
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
-    generateButton_->setIcon(UiIcons::icon(QStringLiteral("claude"), color));
+    commitPanel_->applyTheme(theme);
+    diffHeader_->applyTheme(theme);
 }

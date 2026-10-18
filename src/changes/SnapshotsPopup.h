@@ -5,6 +5,7 @@
 #include "ui/Theme.h"
 
 class GitCommands;
+class PopupHeader;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -53,7 +54,7 @@ private:
     QList<Snapshot> snapshots_;
 
     QStackedWidget *body_;
-    QLabel *headerIcon_;
+    PopupHeader *header_;
     QListWidget *list_;
     QLabel *title_ = nullptr;
     QLabel *date_ = nullptr;
