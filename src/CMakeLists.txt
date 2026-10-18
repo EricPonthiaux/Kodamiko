@@ -16,6 +16,7 @@ add_library(duet_core STATIC
     claude/ClaudeLinter.cpp
     claude/ClaudeLauncher.cpp
     claude/ClaudeUsage.cpp
+    claude/CodeRequest.cpp
     claude/CommitMessage.cpp
     claude/DiagramRequest.cpp
     claude/DiagramRequestPopup.cpp
@@ -61,6 +62,8 @@ add_library(duet_core STATIC
     editor/FindBar.cpp
     editor/MarkdownHtml.cpp
     editor/PreviewPage.cpp
+    editor/ScrollBarMarks.cpp
+    editor/SymbolOccurrences.cpp
     editor/TextFile.cpp
     git/Askpass.cpp
     git/Branches.cpp

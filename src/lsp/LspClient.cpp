@@ -45,6 +45,7 @@ QJsonObject clientCapabilities()
         {"definition", QJsonObject{{"linkSupport", true}}},
         {"declaration", QJsonObject{{"linkSupport", true}}},
         {"references", QJsonObject{}},
+        {"documentHighlight", QJsonObject{}},
         {"rename", QJsonObject{{"prepareSupport", false}}},
         {"codeAction", codeAction},
     };

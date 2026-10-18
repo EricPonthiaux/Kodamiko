@@ -45,6 +45,13 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   so that "fix this" or "why is this line wrong?" needs no `@path`. Claude
   receives it as context, not as part of your prompt; *Claude ▸ Share
   Editor Context With Each Prompt* turns it off.
+- **Ask Claude about the code**: the editor's context menu (and the
+  *Claude* menu) offers *Explain This Code*, *Review This Code* and *Write
+  Tests for This Code*, sent at once to the Claude session about the
+  selected lines, or the word at the cursor without a selection;
+  *Add to Claude's Prompt* (Ctrl+Alt+K in the editor) types a mention of
+  those lines (`@src/main.cpp#L10-24`) in the prompt for you to complete.
+  A right click outside the selection moves the cursor there first.
 - **Claude works in the editor**: Duet's own MCP server gives its Claude
   session tools that see what you see and act in the editor. Claude reads
   your open files with their unsaved changes, the selection, the problems
@@ -144,6 +151,12 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   edits included. A click on a mark shows the previous lines, with *Rollback*
   (undone by Ctrl+Z) and *Show Diff*; Ctrl+Alt+Shift+↓ / ↑ go to the next or
   previous change, Ctrl+Alt+Z rolls back the one at the cursor.
+- **Occurrences of a name**: with the cursor on a variable, a function or
+  any name, its other occurrences in the file are highlighted, and marked
+  along the scroll bar to find the ones off screen. They show at once as the
+  same whole word; when the file's language server runs, they become the
+  occurrences of that very symbol (not a homonym in another scope, nor the
+  word in a comment).
 - **Find / Replace** (Ctrl+F / Ctrl+R): a bar above the editor that searches as
   you type, highlights every match and shows "3/12"; match case, whole words
   and regular expressions (`\1` references in the replacement).
@@ -383,6 +396,7 @@ hook output.
 | Select the opened file in the tree | Alt+F1 |
 | In the tree: copy the path / the path from the project root | Ctrl+Shift+C / Ctrl+Alt+Shift+C |
 | In the tree: send the file to Claude | Ctrl+Alt+K |
+| In the editor: add the selected lines to Claude's prompt | Ctrl+Alt+K |
 | In the tree: cut / copy / paste, copy under a new name | Ctrl+X / Ctrl+C / Ctrl+V, F5 |
 | Next / previous change, rollback | Ctrl+Alt+Shift+↓ / Ctrl+Alt+Shift+↑, Ctrl+Alt+Z |
 | Refresh the diff | F5 |

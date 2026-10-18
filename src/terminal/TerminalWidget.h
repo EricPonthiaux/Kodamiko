@@ -40,6 +40,8 @@ public:
     void applyTheme(const Theme &theme);
     // Types `text` as a paste (bracketed if the program asked for it).
     void paste(const QString &text);
+    // Presses Enter, as typed.
+    void pressEnter();
     // The last `count` lines shown (scrollback included), without the
     // blank lines at the end.
     QStringList lastLines(int count) const;

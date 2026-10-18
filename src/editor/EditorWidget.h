@@ -8,14 +8,17 @@
 
 #include <QKeySequence>
 #include <QList>
+#include <QMenu>
 
 #include <functional>
 #include <memory>
 #include <utility>
 
+class QAction;
 class QPainter;
 
 class ChangeGutter;
+class SymbolOccurrences;
 class ISyntaxHighlighter;
 
 // Display settings shared by every editor (Preferences ▸ Editor).
@@ -92,6 +95,11 @@ public:
     // formatter keeps to; 0 hides it.
     void showColumnLimit(int columnLimit);
     void setOptions(const EditorOptions &options);
+    // Actions at the top of the context menu when the editor shows a file
+    // (Claude's requests about the code). Not owned.
+    void setFileActions(const QList<QAction *> &actions) { fileActions_ = actions; }
+    // The context menu: QScintilla's, with the file actions on top.
+    std::unique_ptr<QMenu> createContextMenu();
     const EditorOptions &options() const { return options_; }
 
     // Folds (or unfolds) the innermost block around the cursor.
@@ -114,6 +122,8 @@ public:
 
     // Marks of the lines that differ from the git index.
     ChangeGutter *changeGutter() const { return changeGutter_; }
+    // The occurrences of the name at the cursor, highlighted.
+    SymbolOccurrences *symbolOccurrences() const { return symbolOccurrences_; }
     void applyTheme(const Theme &theme);
     const Theme &theme() const { return theme_; }
 
@@ -126,6 +136,7 @@ signals:
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
@@ -163,12 +174,14 @@ private:
     Theme theme_;
     std::unique_ptr<ISyntaxHighlighter> highlighter_;
     ChangeGutter *changeGutter_;
+    SymbolOccurrences *symbolOccurrences_;
     EditorOptions options_;
     Diagnostics diagnostics_;
     bool openFoldMarksShown_ = false;
     // The line whose number paintEvent brightens.
     int numberedLine_ = -1;
     ActiveGuide activeGuide_;
+    QList<QAction *> fileActions_;
     std::function<QString(int)> hoverHelp_;
     // QScintilla's keys for each of its commands, before releaseReservedKeys.
     QList<std::pair<int, int>> defaultCommandKeys_;

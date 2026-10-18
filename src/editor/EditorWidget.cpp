@@ -2,6 +2,7 @@
 
 #include "ChangeGutter.h"
 #include "CodeFormatter.h"
+#include "SymbolOccurrences.h"
 #include "syntax/ScintillaStyles.h"
 
 #include "syntax/HighlighterFactory.h"
@@ -10,7 +11,9 @@
 
 #include <Qsci/qscicommandset.h>
 
+#include <QContextMenuEvent>
 #include <QFile>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -154,6 +157,7 @@ EditorWidget::EditorWidget(const Theme &theme, QWidget *parent)
     : QsciScintilla(parent)
     , theme_(theme)
     , changeGutter_(new ChangeGutter(this))
+    , symbolOccurrences_(new SymbolOccurrences(this, theme))
 {
     configureEditing();
     installHighlighter(LanguageRegistry::plainText);
@@ -334,6 +338,33 @@ void EditorWidget::mousePressEvent(QMouseEvent *event)
         }
     }
     QsciScintilla::mousePressEvent(event);
+}
+
+void EditorWidget::contextMenuEvent(QContextMenuEvent *event)
+{
+    // A right click outside the selection moves the cursor there first, as
+    // in other editors: the file actions are about what was clicked.
+    if (event->reason() == QContextMenuEvent::Mouse) {
+        const long position = SendScintilla(SCI_POSITIONFROMPOINTCLOSE, event->pos().x(), event->pos().y());
+        const long selectionStart = SendScintilla(SCI_GETSELECTIONSTART);
+        const long selectionEnd = SendScintilla(SCI_GETSELECTIONEND);
+        const bool insideSelection = position >= selectionStart && position <= selectionEnd;
+        if (position >= 0 && !insideSelection)
+            SendScintilla(SCI_GOTOPOS, position);
+    }
+
+    createContextMenu()->exec(event->globalPos());
+}
+
+std::unique_ptr<QMenu> EditorWidget::createContextMenu()
+{
+    std::unique_ptr<QMenu> menu(createStandardContextMenu());
+    if (!filePath_.isEmpty() && !fileActions_.isEmpty()) {
+        QAction *first = menu->actions().value(0);
+        menu->insertActions(first, fileActions_);
+        menu->insertSeparator(first);
+    }
+    return menu;
 }
 
 void EditorWidget::mouseMoveEvent(QMouseEvent *event)
@@ -604,6 +635,7 @@ void EditorWidget::applyTheme(const Theme &theme)
     theme_ = theme;
     highlighter_->applyTheme(theme);
     changeGutter_->applyTheme(theme);
+    symbolOccurrences_->applyTheme(theme);
 
     // After the highlighter: a QScintilla lexer resets these colors.
     setCaretForegroundColor(theme.caret);

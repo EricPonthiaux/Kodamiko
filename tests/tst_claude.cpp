@@ -4,6 +4,7 @@
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeLint.h"
 #include "claude/ClaudeUsage.h"
+#include "claude/CodeRequest.h"
 #include "claude/CommitMessage.h"
 #include "claude/DiagramRequest.h"
 #include "claude/EditorContext.h"
@@ -11,6 +12,8 @@
 #include "claude/HookEvent.h"
 #include "claude/HookServer.h"
 #include "claude/UnsavedEditGuard.h"
+#include "editor/EditorWidget.h"
+#include "ui/Theme.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -20,6 +23,17 @@
 #include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QtTest>
+
+namespace {
+
+void writeFile(const QString &path, const QByteArray &content)
+{
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(content);
+}
+
+} // namespace
 
 class TestClaude : public QObject {
     Q_OBJECT
@@ -346,6 +360,71 @@ private slots:
         const QJsonObject specific = output.value("hookSpecificOutput").toObject();
         QCOMPARE(specific.value("hookEventName").toString(), QStringLiteral("UserPromptSubmit"));
         QCOMPARE(specific.value("additionalContext").toString(), QStringLiteral("Open file: a.cpp"));
+    }
+
+    void codeRequestNamesTheSelectedLines()
+    {
+        QTemporaryDir project;
+        QDir(project.path()).mkpath("src");
+        const QString path = project.filePath("src/a.cpp");
+        writeFile(path, "int a;\nint b;\nint c;\nint d;\n");
+        EditorWidget editor(Theme::dark());
+        QVERIFY(editor.load(path, nullptr));
+        editor.setSelection(1, 0, 3, 0); // whole lines 2 and 3
+
+        const std::optional<CodeRequest::Target> target = CodeRequest::targetIn(editor, project.path());
+
+        QVERIFY(target);
+        QCOMPARE(CodeRequest::mention(*target), QStringLiteral("@src/a.cpp#L2-3"));
+        QCOMPARE(CodeRequest::prompt(CodeRequest::Kind::Review, *target),
+                 QStringLiteral("Review @src/a.cpp#L2-3: point out problems with their line, then propose fixes, "
+                                "applying nothing until I agree."));
+    }
+
+    void codeRequestWithoutSelectionNamesTheSymbol()
+    {
+        QTemporaryDir project;
+        const QString path = project.filePath("a.cpp");
+        writeFile(path, "int parse();\n");
+        EditorWidget editor(Theme::dark());
+        QVERIFY(editor.load(path, nullptr));
+        editor.setCursorPosition(0, 6);
+
+        const std::optional<CodeRequest::Target> target = CodeRequest::targetIn(editor, project.path());
+
+        QVERIFY(target);
+        QCOMPARE(target->symbol, QStringLiteral("parse"));
+        const QString prompt = CodeRequest::prompt(CodeRequest::Kind::Explain, *target);
+        QVERIFY(prompt.startsWith(QStringLiteral("Explain `parse` at @a.cpp#L1: ")));
+        QVERIFY(!prompt.contains(QStringLiteral("unsaved")));
+    }
+
+    void codeRequestWarnsOfUnsavedChanges()
+    {
+        QTemporaryDir project;
+        const QString path = project.filePath("a.cpp");
+        writeFile(path, "int a;\n");
+        EditorWidget editor(Theme::dark());
+        QVERIFY(editor.load(path, nullptr));
+        editor.insertAt(QStringLiteral("// new\n"), 0, 0);
+
+        const std::optional<CodeRequest::Target> target = CodeRequest::targetIn(editor, project.path());
+
+        QVERIFY(target && target->unsaved);
+        QVERIFY(CodeRequest::prompt(CodeRequest::Kind::WriteTests, *target).contains(QStringLiteral("unsaved")));
+    }
+
+    void codeRequestMentionsQuotePathsWithSpaces()
+    {
+        const CodeRequest::Target target{.path = QStringLiteral("my dir/a.cpp"), .firstLine = 4, .lastLine = 4};
+        QCOMPARE(CodeRequest::mention(target), QStringLiteral("@\"my dir/a.cpp\"#L4"));
+    }
+
+    void codeRequestNeedsAFile()
+    {
+        EditorWidget view(Theme::dark());
+        view.showReadOnlyText(QStringLiteral("diff"), QString());
+        QVERIFY(!CodeRequest::targetIn(view, QString()));
     }
 
     void describesTheEditorContext()

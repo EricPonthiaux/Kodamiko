@@ -8,9 +8,12 @@
 #include "editor/FindBar.h"
 #include "editor/MarkdownHtml.h"
 #include "editor/PreviewPage.h"
+#include "editor/ScrollBarMarks.h"
+#include "editor/SymbolOccurrences.h"
 #include "git/GitProcess.h"
 
 #include <QLineEdit>
+#include <QScrollBar>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QStandardPaths>
@@ -237,6 +240,85 @@ private slots:
         emit editor->changeGutter()->diffRequested("Change", editor->changeGutter()->diffText(change));
         QCOMPARE(tabs.count(), 2);
         QCOMPARE(tabs.unsavedTexts().value(dir.filePath("a.txt")), QString("two\n"));
+    }
+
+    void contextMenuOffersTheFileActionsOnlyForAFile()
+    {
+        QTemporaryDir dir;
+        write(dir.filePath("a.txt"), "one\n");
+        QAction explain(QStringLiteral("Explain This Code"));
+        EditorWidget editor(Theme::dark());
+        editor.setFileActions({&explain});
+
+        QVERIFY(!editor.createContextMenu()->actions().contains(&explain));
+        QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
+        QCOMPARE(editor.createContextMenu()->actions().value(0), &explain);
+    }
+
+    void highlightsEveryOccurrenceOfTheNameAtTheCursor()
+    {
+        EditorWidget editor(Theme::dark());
+        editor.setText("int count = 0;\ncount += 1; // count\nint counter;\n");
+        SymbolOccurrences *occurrences = editor.symbolOccurrences();
+
+        editor.setCursorPosition(1, 2);
+        occurrences->refreshNow();
+
+        // Whole words, the comment's too, but not "counter".
+        using Range = SymbolOccurrences::Range;
+        QCOMPARE(occurrences->occurrences(), (QList<Range>{{4, 9}, {15, 20}, {30, 35}}));
+        auto *marks = editor.verticalScrollBar()->findChild<ScrollBarMarks *>();
+        QVERIFY(marks);
+        QCOMPARE(marks->marks().size(), 3);
+    }
+
+    void clearsTheOccurrencesOffAName()
+    {
+        EditorWidget editor(Theme::dark());
+        editor.setText("int count = 0;\nint x = 42;\n");
+        SymbolOccurrences *occurrences = editor.symbolOccurrences();
+        editor.setCursorPosition(0, 5);
+        occurrences->refreshNow();
+        QCOMPARE(occurrences->occurrences().size(), 1);
+
+        editor.setCursorPosition(1, 9); // in a number
+        occurrences->refreshNow();
+        QVERIFY(occurrences->occurrences().isEmpty());
+
+        editor.setSelection(0, 0, 0, 9); // more than a word
+        occurrences->refreshNow();
+        QVERIFY(occurrences->occurrences().isEmpty());
+
+        editor.setSelection(0, 4, 0, 9); // the word, as a double click selects it
+        occurrences->refreshNow();
+        QCOMPARE(occurrences->occurrences().size(), 1);
+
+        editor.insertAt("// ", 0, 0); // the ranges no longer hold
+        QVERIFY(occurrences->occurrences().isEmpty());
+    }
+
+    void serverOccurrencesReplaceTheTextOnes()
+    {
+        EditorWidget editor(Theme::dark());
+        editor.setText("int count;\nint f() { int count; return count; }\n");
+        SymbolOccurrences *occurrences = editor.symbolOccurrences();
+        QSignalSpy settled(occurrences, &SymbolOccurrences::nameSettled);
+        editor.setCursorPosition(0, 5);
+        occurrences->refreshNow();
+        QCOMPARE(occurrences->occurrences().size(), 3);
+        QCOMPARE(settled.size(), 1);
+        const int position = settled.first().first().toInt();
+        using Range = SymbolOccurrences::Range;
+
+        occurrences->showServerOccurrences(position + 1, {}); // another name's answer
+        QCOMPARE(occurrences->occurrences().size(), 3);
+        occurrences->showServerOccurrences(position, {{4, 9}});
+        QCOMPARE(occurrences->occurrences(), (QList<Range>{{4, 9}}));
+
+        // Back on the same name: the server's occurrences stay.
+        editor.setCursorPosition(0, 6);
+        occurrences->refreshNow();
+        QCOMPARE(occurrences->occurrences(), (QList<Range>{{4, 9}}));
     }
 
     void showsTheMarkOnlyWhenNoFileIsOpen()

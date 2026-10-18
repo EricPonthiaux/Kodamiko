@@ -121,6 +121,8 @@
 namespace {
 
 constexpr int statusMessageMs = 5000;
+// Between a prompt pasted in Claude's terminal and the Enter that sends it.
+constexpr int submitDelayMs = 150;
 constexpr int notificationMs = 10000;
 constexpr qsizetype snapshotPromptLength = 60;
 
@@ -359,6 +361,7 @@ void MainWindow::createWidgets()
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
     applyFullLine(Preferences::load());
     connect(editorTabs_, &EditorTabs::editorOpened, this, [this](EditorWidget *editor) {
+        editor->setFileActions(codeRequestActions_);
         auto *controller = new CompletionController(editor, completion_);
         // The parameters of the function just chosen.
         connect(controller, &CompletionController::callInserted, this, [this, editor] {
@@ -844,6 +847,8 @@ void MainWindow::createMenus()
     claude->addAction(tr("New &Terminal"), QKeySequence(tr("Ctrl+Shift+T")), this, &MainWindow::newShell);
     if (!DiagramKinds::available().isEmpty())
         claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); });
+    claude->addSeparator();
+    createCodeRequestActions(claude);
     claude->addSeparator();
     claude->addAction(tr("Restore the State Before a &Prompt…"), this, &MainWindow::showSnapshots);
     QSettings settings;
@@ -2309,13 +2314,6 @@ void MainWindow::selectOpenedFile()
 
 void MainWindow::sendToClaude(const QString &path)
 {
-    if (!claudeTerminal_ || !claudeTerminal_->isRunning()) {
-        QString error;
-        if (!startClaudeSession(&error)) {
-            QMessageBox::warning(this, tr("Claude Session"), error);
-            return;
-        }
-    }
     QString relative = QDir(folder_).relativeFilePath(path);
     if (relative.startsWith(QLatin1String(".."))) // outside the project (~/.claude...)
         relative = path;
@@ -2324,7 +2322,61 @@ void MainWindow::sendToClaude(const QString &path)
     else if (QFileInfo(path).isDir())
         relative += QLatin1Char('/');
     // A file mention in Claude Code's prompt, typed where the cursor is.
-    claudeTerminal_->paste(QStringLiteral("@%1 ").arg(QDir::toNativeSeparators(relative)));
+    typeInClaudePrompt(QStringLiteral("@%1 ").arg(QDir::toNativeSeparators(relative)), PromptEntry::Typed);
+}
+
+void MainWindow::createCodeRequestActions(QMenu *claude)
+{
+    const auto add = [this, claude](const QString &text, const QKeySequence &shortcut, auto slot) {
+        QAction *action = claude->addAction(text, shortcut, this, slot);
+        // Only while the editor has the focus: in the file tree, Ctrl+Alt+K
+        // sends the selected file instead.
+        action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+        editorTabs_->addAction(action);
+        codeRequestActions_.append(action);
+    };
+    add(tr("&Explain This Code"), {}, [this] { askClaude(CodeRequest::Kind::Explain); });
+    add(tr("Re&view This Code"), {}, [this] { askClaude(CodeRequest::Kind::Review); });
+    add(tr("Write T&ests for This Code"), {}, [this] { askClaude(CodeRequest::Kind::WriteTests); });
+    add(tr("&Add to Claude's Prompt"), QKeySequence(tr("Ctrl+Alt+K")), [this] { addCodeToClaudePrompt(); });
+}
+
+void MainWindow::askClaude(CodeRequest::Kind kind)
+{
+    if (const std::optional<CodeRequest::Target> target = currentCodeTarget())
+        typeInClaudePrompt(CodeRequest::prompt(kind, *target), PromptEntry::Submitted);
+}
+
+void MainWindow::addCodeToClaudePrompt()
+{
+    if (const std::optional<CodeRequest::Target> target = currentCodeTarget())
+        typeInClaudePrompt(CodeRequest::mention(*target) + QLatin1Char(' '), PromptEntry::Typed);
+}
+
+std::optional<CodeRequest::Target> MainWindow::currentCodeTarget()
+{
+    const EditorWidget *editor = editorTabs_->currentEditor();
+    std::optional<CodeRequest::Target> target = editor ? CodeRequest::targetIn(*editor, folder_) : std::nullopt;
+    if (!target)
+        statusBar()->showMessage(tr("Open a file to ask Claude about its code"), statusMessageMs);
+    return target;
+}
+
+void MainWindow::typeInClaudePrompt(const QString &text, PromptEntry entry)
+{
+    if (!claudeTerminal_ || !claudeTerminal_->isRunning()) {
+        QString error;
+        if (!startClaudeSession(&error)) {
+            QMessageBox::warning(this, tr("Claude Session"), error);
+            return;
+        }
+    }
+    claudeTerminal_->paste(text);
+    if (entry == PromptEntry::Submitted) {
+        // Apart from the paste: an Enter read with the pasted text may be
+        // taken for a new line in the prompt.
+        QTimer::singleShot(submitDelayMs, claudeTerminal_, &TerminalWidget::pressEnter);
+    }
     terminalTabs_->setCurrentWidget(claudeTerminal_);
     setMode(Mode::Terminal);
 }

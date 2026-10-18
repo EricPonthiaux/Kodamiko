@@ -1,6 +1,7 @@
 #pragma once
 
 #include "claude/ClaudeActivity.h"
+#include "claude/CodeRequest.h"
 #include "claude/HookServer.h"
 #include "claude/mcp/McpRegistry.h"
 #include "navigation/RecentFiles.h"
@@ -212,6 +213,21 @@ private:
     void selectOpenedFile();
     // File tree commands.
     void sendToClaude(const QString &path);
+    // Claude's requests about the code at the editor's cursor or selection:
+    // the editor's context menu and the Claude menu.
+    void createCodeRequestActions(QMenu *claude);
+    void askClaude(CodeRequest::Kind kind);
+    void addCodeToClaudePrompt();
+    // The code the requests are about; nullopt, with a message, without a
+    // file in front of the user.
+    std::optional<CodeRequest::Target> currentCodeTarget();
+    enum class PromptEntry {
+        Typed,     // left in the prompt for the user to complete
+        Submitted, // sent at once
+    };
+    // Types `text` in the Claude session's prompt, starting the session if
+    // needed, and shows it.
+    void typeInClaudePrompt(const QString &text, PromptEntry entry);
     void runGitOnTree(const QString &title, const QString &path, bool rollback);
     void updateClaudeMarks();
     // Rereads the current branch and watches the project's git folder.
@@ -334,6 +350,7 @@ private:
     QSystemTrayIcon *trayIcon_ = nullptr;
     QAction *snapshotBeforePrompt_ = nullptr;
     QAction *shareEditorContext_ = nullptr;
+    QList<QAction *> codeRequestActions_; // also in the editor's context menu
     QAction *exposeTools_ = nullptr;
     QAction *claudeNotifications_ = nullptr;
     QSplitter *editSplitter_ = nullptr;

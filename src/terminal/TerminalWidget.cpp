@@ -641,6 +641,14 @@ void TerminalWidget::paste(const QString &text)
     scrollToBottom();
 }
 
+void TerminalWidget::pressEnter()
+{
+    if (!screen_)
+        return;
+    screen_->sendKey(Qt::Key_Return, Qt::NoModifier, QStringLiteral("\r"));
+    scrollToBottom();
+}
+
 QStringList TerminalWidget::lastLines(int count) const
 {
     QStringList lines;

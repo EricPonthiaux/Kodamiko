@@ -5,6 +5,7 @@
 #include "diagnostics/ProblemStore.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/SymbolOccurrences.h"
 #include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
@@ -143,6 +144,8 @@ void CodeIntelligence::attach(EditorWidget *editor)
             editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPCANCEL);
         }
     });
+    connect(editor->symbolOccurrences(), &SymbolOccurrences::nameSettled, this,
+            [this, editor](int position) { requestOccurrences(editor, position); });
     // The parameters only show on the line of the call.
     connect(editor, &QsciScintilla::cursorPositionChanged, this, [editor](int line, int) {
         if (!editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPACTIVE))
@@ -207,6 +210,34 @@ void CodeIntelligence::syncOpenEditors(LspClient *client, const QString &languag
             continue;
         servers_->syncDocument(client, path, editor->languageId(), editor->utf8Bytes().toByteArray());
     }
+}
+
+void CodeIntelligence::requestOccurrences(EditorWidget *editor, int bytePosition)
+{
+    // Never starts a server: highlighting follows every click.
+    LspClient *client = servers_->runningClientFor(editor->languageId());
+    if (!client || !client->isReady() || editor->filePath().isEmpty())
+        return;
+    // true or an options object.
+    const QJsonValue provider = client->capabilities().value("documentHighlightProvider");
+    const bool highlightsSymbols = provider.isObject() || provider.toBool();
+    if (!highlightsSymbols)
+        return;
+    servers_->syncDocument(client, editor->filePath(), editor->languageId(), editor->utf8Bytes().toByteArray());
+    client->request(
+        QStringLiteral("textDocument/documentHighlight"), positionParams(editor, bytePosition),
+        [guard = QPointer<EditorWidget>(editor), bytePosition](const QJsonValue &result, const QString &error) {
+            // A server that fails keeps the text's occurrences.
+            if (!guard || !error.isEmpty())
+                return;
+            QList<SymbolOccurrences::Range> ranges;
+            for (const QJsonValue &highlight : result.toArray()) {
+                const Range range = rangeFrom(highlight.toObject().value("range"));
+                ranges.append({positionOf(guard, range.start), positionOf(guard, range.end)});
+            }
+            std::ranges::sort(ranges, {}, &SymbolOccurrences::Range::start);
+            guard->symbolOccurrences()->showServerOccurrences(bytePosition, ranges);
+        });
 }
 
 // Documentation

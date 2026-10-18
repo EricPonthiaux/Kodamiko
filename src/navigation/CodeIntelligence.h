@@ -73,6 +73,9 @@ private:
     // Shows the problems of `path` in its editor.
     void showProblems(const QString &path);
     void showHover(EditorWidget *editor, int bytePosition, const QPoint &where, bool explicitRequest);
+    // The occurrences of the symbol at `bytePosition`, from a server that
+    // already runs, highlighted in place of the text's whole words.
+    void requestOccurrences(EditorWidget *editor, int bytePosition);
     // Menu under the cursor of `editor`; returns the chosen entry or -1.
     int chooseFrom(EditorWidget *editor, const QStringList &entries) const;
     void jumpTo(const LspProtocol::Location &location);

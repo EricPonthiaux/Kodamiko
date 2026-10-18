@@ -1,6 +1,7 @@
 #include "diagnostics/ProblemStore.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/SymbolOccurrences.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "lsp/LspProtocol.h"
@@ -225,6 +226,43 @@ private slots:
         QVERIFY(header && header->text().contains("int product(int count"));
         QVERIFY(!tabs.editorFor(root + "/total.cpp"));
         QVERIFY(read(root + "/total.cpp").contains("int product(int count"));
+    }
+
+    // clangd tells the occurrences of the very symbol: not the homonym in
+    // another scope, nor the word in a comment.
+    void highlightsTheSymbolsOccurrencesWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        QTemporaryDir dir;
+        const QString root = dir.path();
+        write(root + "/compile_flags.txt", "-std=c++20\n");
+        write(root + "/count.cpp", "int count = 0; // count\n"
+                                   "int next() { return ++count; }\n"
+                                   "int other() { int count = 2; return count; }\n");
+        EditorTabs tabs(Theme::dark());
+        tabs.show();
+        SymbolIndex index;
+        index.setFolder(root);
+        LanguageServers servers;
+        servers.setFolder(root);
+        CodeNavigator navigator(&tabs, &index);
+        ProblemStore problems(&servers);
+        CodeIntelligence intelligence(&tabs, &servers, &navigator, &problems);
+        connect(&tabs, &EditorTabs::editorOpened, &intelligence, &CodeIntelligence::attach);
+        auto *editor = EditorTabs::editorIn(tabs.openFile(root + "/count.cpp"));
+        QVERIFY(editor);
+        LspClient *client = servers.clientFor("cpp");
+        QVERIFY(client);
+        servers.syncDocument(client, editor->filePath(), "cpp", editor->utf8Bytes().toByteArray());
+        QTRY_VERIFY_WITH_TIMEOUT(client->isReady(), 30000);
+
+        editor->setCursorPosition(0, 5);
+        editor->symbolOccurrences()->refreshNow();
+
+        QTRY_COMPARE_WITH_TIMEOUT(editor->symbolOccurrences()->occurrences().size(), 2, 30000);
+        const QByteArray text = editor->utf8Bytes().toByteArray();
+        QCOMPARE(editor->symbolOccurrences()->occurrences().last().start, int(text.indexOf("count; }")));
     }
 };
 
