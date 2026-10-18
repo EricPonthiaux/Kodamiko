@@ -5,6 +5,7 @@
 #include "CodeFormatter.h"
 #include "EditorWidget.h"
 #include "PreviewPage.h"
+#include "ui/BrandMark.h"
 #include "ui/UiIcons.h"
 #include "viewers/ImageView.h"
 #include "workspace/FileIcons.h"
@@ -22,6 +23,17 @@
 
 #include <algorithm>
 
+namespace {
+
+// The mark shown when no file is open: a fraction of the area's short side,
+// within bounds so it stays a discreet watermark.
+constexpr qreal EmptyMarkShare = 0.22;
+constexpr qreal EmptyMarkMinimumSize = 48;
+constexpr qreal EmptyMarkMaximumSize = 160;
+constexpr qreal EmptyMarkOpacity = 0.35;
+
+} // namespace
+
 EditorTabs::EditorTabs(const Theme &theme, QWidget *parent)
     : QTabWidget(parent)
     , theme_(theme)
@@ -38,14 +50,37 @@ EditorTabs::EditorTabs(const Theme &theme, QWidget *parent)
 void EditorTabs::paintEvent(QPaintEvent *event)
 {
     QTabWidget::paintEvent(event);
-    if (count() == 0)
+    if (count() == 0) {
+        paintEmptyMark();
         return;
+    }
     // A line under the tabs, the whole width: the page starts below. The
     // tabs are transparent but the current one, which has its own line.
     QPainter painter(this);
     painter.setPen(palette().color(QPalette::Mid));
     const int y = tabBar()->geometry().bottom();
     painter.drawLine(0, y, width(), y);
+}
+
+void EditorTabs::paintEmptyMark()
+{
+    const qreal shortSide = std::min(width(), height());
+    const qreal size = std::clamp(shortSide * EmptyMarkShare, EmptyMarkMinimumSize, EmptyMarkMaximumSize);
+    QRectF area(0, 0, size, size);
+    area.moveCenter(QRectF(rect()).center());
+
+    // In the theme's colors rather than the icon's: the icon's light caret
+    // would vanish on a light background.
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setOpacity(EmptyMarkOpacity);
+    BrandMark::paint(&painter, area, theme_.mutedText, theme_.accent);
+}
+
+void EditorTabs::tabRemoved(int index)
+{
+    QTabWidget::tabRemoved(index);
+    update(); // the last tab gone, the mark appears
 }
 
 QWidget *EditorTabs::openFile(const QString &path)
@@ -785,6 +820,7 @@ void EditorTabs::updateTabIcon(QWidget *page)
 void EditorTabs::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    update();
     for (int i = 0; i < count(); ++i)
         updateTabIcon(widget(i));
     for (int i = 0; i < count(); ++i) {

@@ -108,8 +108,11 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void tabRemoved(int index) override;
 
 private:
+    // Duet's mark, centered, when no file is open.
+    void paintEmptyMark();
     QWidget *openImage(const QString &absolutePath);
     // The diagram editor's tab; null, with `error`, if Duet cannot read the
     // diagram (the file then opens as text).

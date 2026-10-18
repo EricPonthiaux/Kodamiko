@@ -239,6 +239,30 @@ private slots:
         QCOMPARE(tabs.unsavedTexts().value(dir.filePath("a.txt")), QString("two\n"));
     }
 
+    void showsTheMarkOnlyWhenNoFileIsOpen()
+    {
+        QTemporaryDir dir;
+        write(dir.filePath("empty.txt"), "");
+        EditorTabs tabs(Theme::dark());
+        tabs.resize(600, 400);
+        const auto markIsDrawn = [&tabs] {
+            const QImage image = tabs.grab().toImage();
+            const QRect center(image.width() / 3, image.height() / 3, image.width() / 3, image.height() / 3);
+            const QRgb background = image.pixel(center.topLeft());
+            for (int y = center.top(); y <= center.bottom(); ++y) {
+                for (int x = center.left(); x <= center.right(); ++x) {
+                    if (image.pixel(x, y) != background)
+                        return true;
+                }
+            }
+            return false;
+        };
+
+        QVERIFY(markIsDrawn());
+        QVERIFY(tabs.openFile(dir.filePath("empty.txt")));
+        QVERIFY(!markIsDrawn());
+    }
+
     void codeCategoriesComeFromTheEditor()
     {
         QCOMPARE(CodeColorizer::languageOfFence("cpp"), QString("cpp"));
