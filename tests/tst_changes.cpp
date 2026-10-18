@@ -41,7 +41,7 @@ QStringList sectionTitles(const QTreeWidget *list)
     for (int i = 0; i < list->topLevelItemCount(); ++i)
         titles << QStringLiteral("%1 (%2)")
                       .arg(list->topLevelItem(i)->text(0))
-                      .arg(list->topLevelItem(i)->data(0, FileChangeDelegate::SectionCountRole).toInt());
+                      .arg(list->topLevelItem(i)->data(0, FileChangeDelegate::sectionCountRole).toInt());
     return titles;
 }
 
@@ -107,8 +107,8 @@ private slots:
         DiffView view(Theme::dark());
         view.setFiles(
             {{"src/x.cpp", "modified", patch}, {"y.bin", "added", FilePatch::parse("Binary files differ\n")}});
-        QCOMPARE(view.lines()[1].text, QString("x.cpp   src  ·  modified   +1 −2"));
-        QCOMPARE(view.lines().size(), lines.size() + 3);
+        QCOMPARE(view.displayedLines()[1].text, QString("x.cpp   src  ·  modified   +1 −2"));
+        QCOMPARE(view.displayedLines().size(), lines.size() + 3);
         QCOMPARE(view.fileStart(1), static_cast<int>(lines.size()) + 1);
         QCOMPARE(view.locate(5).line, 2);
         QVERIFY(view.text().contains("Binary file"));
@@ -176,9 +176,9 @@ private slots:
         const auto *list = view.findChild<QTreeWidget *>();
         QCOMPARE(sectionTitles(list), QStringList({"Staged (0)", "Unstaged (2)"}));
         QCOMPARE(list->topLevelItem(1)->child(0)->text(0), QString("a.txt"));
-        QCOMPARE(list->topLevelItem(1)->child(0)->data(0, FileChangeDelegate::KindRole).toInt(),
+        QCOMPARE(list->topLevelItem(1)->child(0)->data(0, FileChangeDelegate::kindRole).toInt(),
                  static_cast<int>(ChangeKind::Modified));
-        QCOMPARE(list->topLevelItem(1)->child(1)->data(0, FileChangeDelegate::KindRole).toInt(),
+        QCOMPARE(list->topLevelItem(1)->child(1)->data(0, FileChangeDelegate::kindRole).toInt(),
                  static_cast<int>(ChangeKind::Added));
 
         view.stageAll();
@@ -243,8 +243,8 @@ private slots:
     {
         const QDateTime now(QDate(2026, 10, 16), QTime(15, 0)); // a Friday
         QCOMPARE(SnapshotsPopup::describeDate(now.addSecs(-20), now), QString("Just now"));
-        QCOMPARE(SnapshotsPopup::describeDate(now.addSecs(-12 * 60), now), QString("12 min ago"));
-        QVERIFY(SnapshotsPopup::describeDate(now.addSecs(-3 * 3600), now).startsWith("Today at "));
+        QCOMPARE(SnapshotsPopup::describeDate(now.addSecs(-12LL * 60), now), QString("12 min ago"));
+        QVERIFY(SnapshotsPopup::describeDate(now.addSecs(-3LL * 3600), now).startsWith("Today at "));
         QVERIFY(SnapshotsPopup::describeDate(now.addDays(-1), now).startsWith("Yesterday at "));
         QVERIFY(SnapshotsPopup::describeDate(now.addDays(-3), now).startsWith(QLocale().dayName(2)));
     }

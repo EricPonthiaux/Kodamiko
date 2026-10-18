@@ -24,17 +24,6 @@
 #include <QTreeWidget>
 #include <QtTest>
 
-namespace {
-
-void writeFile(const QString &path, const QByteArray &content)
-{
-    QFile file(path);
-    QVERIFY(file.open(QIODevice::WriteOnly));
-    file.write(content);
-}
-
-} // namespace
-
 class TestClaude : public QObject {
     Q_OBJECT
 
@@ -482,7 +471,7 @@ private slots:
 
         QTRY_COMPARE(received.size(), 1);
         QTRY_COMPARE_WITH_TIMEOUT(hook.state(), QProcess::NotRunning, 5000);
-        const HookEvent event = received.first().first().value<HookEvent>();
+        const auto event = received.first().first().value<HookEvent>();
         QCOMPARE(event.kind, HookEvent::Kind::StatusUpdated);
         QCOMPARE(event.status["model"].toObject()["display_name"].toString(), QStringLiteral("Opus"));
         QCOMPARE(hook.readAllStandardOutput().trimmed(), QByteArray("Opus · context 42%"));

@@ -664,7 +664,7 @@ private slots:
             // Undoing the changes one by one, from the last, gives the base back.
             const QList<LineChange> changes = LineChanges::compute(base, text);
             QVERIFY2(!changes.isEmpty(), current.constData());
-            for (auto change : std::views::reverse(changes))
+            for (const auto &change : std::views::reverse(changes))
                 text = LineChanges::revert(base, text, change);
             QCOMPARE(text, base);
         }

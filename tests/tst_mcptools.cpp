@@ -95,9 +95,9 @@ struct Editor {
         const int requestId = ++id;
         QJsonObject result;
         const QMetaObject::Connection connection =
-            QObject::connect(&session, &McpSession::sent, [&result, requestId](const QJsonObject &message) {
-                if (message.value(QStringLiteral("id")).toInt() == requestId)
-                    result = message;
+            QObject::connect(&session, &McpSession::sent, [&result, requestId](const QJsonObject &sent) {
+                if (sent.value(QStringLiteral("id")).toInt() == requestId)
+                    result = sent;
             });
         session.handleMessage(
             QJsonObject{{QStringLiteral("jsonrpc"), QStringLiteral("2.0")},

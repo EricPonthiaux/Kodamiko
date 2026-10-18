@@ -56,3 +56,17 @@ if(DUET_CLANG_TIDY)
     # that could fire there.
     file(WRITE ${CMAKE_BINARY_DIR}/.clang-tidy "Checks: '-*,misc-definitions-in-headers'\n")
 endif()
+
+# The compiler warnings Duet's own code must not trigger (see CLAUDE.md).
+function(duet_enable_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+    else()
+        # -Wno-missing-field-initializers: an aggregate initialized with
+        # some of its fields leaves the others to their default member
+        # initializers, which every member has.
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual
+            -Wcast-qual -Wimplicit-fallthrough -Wno-missing-field-initializers)
+    endif()
+endfunction()

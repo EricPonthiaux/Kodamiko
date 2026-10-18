@@ -14,6 +14,8 @@
 #include <QPainter>
 #include <QtTest>
 
+#include <optional>
+
 using namespace diagram;
 using namespace diagram::classes;
 
@@ -76,14 +78,15 @@ ClassShape *byKey(const Board &board, const QString &key)
 
 bool loadInto(Board &board, const QString &name, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, name, content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, name, content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
 graphviz::ArrangeOptions options(const Board &board)
@@ -536,7 +539,7 @@ private slots:
         QCOMPARE(again.shapes().size(), board.shapes().size());
         QCOMPARE(again.links().size(), board.links().size());
         for (const auto &s : board.shapes()) {
-            const ClassShape *before = dynamic_cast<const ClassShape *>(s.get());
+            const auto *before = dynamic_cast<const ClassShape *>(s.get());
             const ClassShape *after = byKey(again, s->key);
             QVERIFY(after);
             QCOMPARE(after->name, before->name);

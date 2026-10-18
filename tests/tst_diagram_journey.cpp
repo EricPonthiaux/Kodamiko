@@ -14,6 +14,8 @@
 #include <QPainter>
 #include <QtTest>
 
+#include <optional>
+
 using namespace diagram;
 using namespace diagram::journey;
 
@@ -37,21 +39,22 @@ Model parse(const QString &source)
 {
     Model model;
     QString error;
-    const bool ok = codec().parse(source, model, &error);
-    Q_ASSERT(ok);
+    if (!codec().parse(source, model, &error))
+        qFatal("cannot parse the test model: %s", qPrintable(error));
     return model;
 }
 
 bool loadInto(Board &board, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, QStringLiteral("journey.mmd"), content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, QStringLiteral("journey.mmd"), content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
 JourneyTaskShape *step(const Board &board, const QString &key)

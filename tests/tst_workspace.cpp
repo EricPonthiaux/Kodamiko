@@ -556,7 +556,7 @@ private slots:
 
         const QModelIndex file = tree.currentIndex();
         const QModelIndex src = file.parent();
-        const QColor modified = file.data(Qt::ForegroundRole).value<QColor>();
+        const auto modified = file.data(Qt::ForegroundRole).value<QColor>();
         QVERIFY(modified.isValid());
         QCOMPARE(src.data(Qt::ForegroundRole).value<QColor>(), modified); // the folder that contains it
         QVERIFY(src.data(Qt::ToolTipRole).toString().contains("contains changes"));
@@ -774,11 +774,11 @@ private slots:
 
         int calls = 0;
         QPointer<ConfirmPopup> popup = new ConfirmPopup(
-            "Delete File", "project/", "Delete “a.txt”?", "Delete",
-            [&calls](ConfirmPopup *popup) {
+            {"Delete File", "project/", "Delete “a.txt”?", "Delete"},
+            [&calls](ConfirmPopup *asking) {
                 // First call: asks something else, as when the trash fails.
                 if (++calls == 1) {
-                    popup->setMessage("Delete it permanently?", "Delete Permanently");
+                    asking->setMessage("Delete it permanently?", "Delete Permanently");
                     return false;
                 }
                 return true;
@@ -797,7 +797,7 @@ private slots:
 
         bool applied = false;
         popup = new ConfirmPopup(
-            "Delete File", "project/", "Delete?", "Delete", [&applied](ConfirmPopup *) { return applied = true; },
+            {"Delete File", "project/", "Delete?", "Delete"}, [&applied](ConfirmPopup *) { return applied = true; },
             &window);
         popup->popup();
         QVERIFY(QTest::qWaitForWindowExposed(popup));

@@ -13,6 +13,8 @@
 #include <QPainter>
 #include <QtTest>
 
+#include <optional>
+
 using namespace diagram;
 using namespace diagram::c4;
 
@@ -70,14 +72,15 @@ Shape *byKey(const Board &board, const QString &key)
 
 bool load(Board &board, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, QStringLiteral("c4.mmd"), content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, QStringLiteral("c4.mmd"), content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
 graphviz::ArrangeOptions familyOptions(const Board &board)
@@ -361,8 +364,9 @@ private slots:
         QCOMPARE(board.containerAt(QPointF(220, 150)), boundary);
         QCOMPARE(boundary->layoutLabelFontPx(), 12.0);
         QCOMPARE(boundary->layoutLabel(), QStringLiteral("Boundary · Software system"));
-        QVERIFY(boundary->layoutMinimumSize()->width() >= 340);
-        QCOMPARE(boundary->layoutMinimumSize()->height(), 220.0);
+        const QSizeF floor = boundary->layoutMinimumSize().value_or(QSizeF());
+        QVERIFY(floor.width() >= 340);
+        QCOMPARE(floor.height(), 220.0);
         // A fresh boundary has room for its title, never less than 340 × 220.
         const Shape *small =
             board.addShape(QStringLiteral("c4boundary"), {{QStringLiteral("w"), 10}, {QStringLiteral("h"), 10}});

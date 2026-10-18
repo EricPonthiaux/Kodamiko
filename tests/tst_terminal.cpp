@@ -150,10 +150,10 @@ private slots:
 
     void encodesKeys()
     {
-        QFETCH(int, key);
-        QFETCH(int, modifiers);
-        QFETCH(QString, text);
-        QFETCH(QByteArray, expected);
+        QFETCH(const int, key);
+        QFETCH(const int, modifiers);
+        QFETCH(const QString, text);
+        QFETCH(const QByteArray, expected);
 
         VtScreen screen(2, 10);
         QByteArray output;

@@ -102,7 +102,7 @@ private slots:
     void flattenGivesSimpleNamesAndContainers()
     {
         const QList<SymbolLocation> symbols = symbolsOf(QStringLiteral("a.cpp"), source);
-        const SymbolLocation &load = find(symbols, QStringLiteral("load"), QStringLiteral("a.cpp"), false);
+        const SymbolLocation load = find(symbols, QStringLiteral("load"), QStringLiteral("a.cpp"), false);
         QCOMPARE(load.container, QStringLiteral("Widget"));
         QCOMPARE(load.kind, SymbolKind::Method);
         // The cursor will go to "load", not to "Widget::".
@@ -126,7 +126,7 @@ private slots:
     void definitionTogglesWithDeclaration()
     {
         const auto all = project();
-        const SymbolLocation &declaration = find(all, "load", "Widget.h", true);
+        const SymbolLocation declaration = find(all, "load", "Widget.h", true);
         auto result =
             Definitions::resolve(request("load", declaration.filePath, declaration.position), named(all, "load"), {});
         QCOMPARE(result.targets.size(), 1);

@@ -1,4 +1,5 @@
 add_executable(duet-askpass main.cpp)
+duet_enable_warnings(duet-askpass)
 target_link_libraries(duet-askpass PRIVATE Qt6::Core Qt6::Network)
 
 # Installed next to the editor, where AskpassServer looks for it.

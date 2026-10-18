@@ -297,15 +297,19 @@ To create an install folder (used by the packages):
 cmake --install build --component duet --prefix <folder>
 ```
 
-**Formatting and static analysis (optional).** `.clang-format` and
-`.clang-tidy` describe the code style and the checks. With clang-format and
-clang-tidy (and its `run-clang-tidy` script) installed:
+**Code style, formatting and static analysis.** `CLAUDE.md` holds the
+conventions (cognitive complexity, naming, ownership, errors…);
+`.clang-format` and `.clang-tidy` enforce what tools can, and Duet's code
+builds without a compiler warning (`-Wall -Wextra -Wpedantic -Wshadow…`).
+With clang-format and clang-tidy (and its `run-clang-tidy` script)
+installed:
 
 ```sh
 cmake --build build --target format        # reformat src/, tests/ and tools/
 cmake --build build --target format-check  # fail on an unformatted source
-cmake --build build --target tidy          # analyze every source
+cmake --build build --target tidy          # analyze every source: it reports nothing
 cmake --preset debug -DDUET_CLANG_TIDY=ON  # analyze each source as it compiles
+git config core.hooksPath tools/git-hooks  # refuse commits of unformatted sources
 ```
 
 The CI (`.github/workflows/ci.yml`) builds and tests on all three systems,
@@ -474,7 +478,7 @@ soon as you click in a file.
 
 ```
 src/
-  app/        main window, wiring of the modules
+  app/        main window, wiring of the modules (MainWindow*.cpp, one file per area: menus, run, git, Claude…)
   ui/         shared UI foundation: theme, fonts, icons, window frame, popups, splitters
   editor/     QScintilla editor, tabs, file reading/writing, disk watching, find bar, change marks, Markdown preview
   viewers/    non-text tabs: images, diagrams (diagram/: model, Graphviz layout, canvas, files; families/: one per kind of diagram)
@@ -499,8 +503,9 @@ tools/duet-hook/   Claude Code hooks → editor relay
 tools/duet-mcp/    Claude Code's MCP server → editor relay
 tools/duet-askpass/ git and ssh credential prompts → editor relay
 tools/claude-plugin/ Duet's plugin for its Claude session: skills (diagrams)
+tools/git-hooks/   pre-commit check of the formatting
 tests/                 Qt Test tests (ctest)
-cmake/                 third-party dependencies
+cmake/                 third-party dependencies, warnings, format and tidy targets
 ```
 
 Modules depend on interfaces (`ISyntaxHighlighter`, `IOutlineProvider`, `IPty`). Adding a

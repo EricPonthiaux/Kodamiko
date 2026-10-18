@@ -313,7 +313,13 @@ private slots:
                                 "        m.\n"
                                 "    }\n"
                                 "}\n";
-        const QList<CompletionItem> items = completeAt(dir, "src/Main.java", "java", text, 5, 10, '.', 120000);
+        const QList<CompletionItem> items = completeAt(dir, {.name = "src/Main.java",
+                                                             .languageId = "java",
+                                                             .text = text,
+                                                             .line = 5,
+                                                             .column = 10,
+                                                             .trigger = '.',
+                                                             .timeoutMs = 120000});
         const QStringList labels = labelsOf(items);
         QVERIFY2(labels.contains("count") && labels.contains("increment"), qPrintable(labels.join(", ")));
         const CompletionItem increment = itemNamed(items, "increment");
@@ -332,7 +338,13 @@ private slots:
                                 "        ArrayLi\n"
                                 "    }\n"
                                 "}\n";
-        const QList<CompletionItem> items = completeAt(dir, "src/Main.java", "java", text, 2, 15, {}, 120000);
+        const QList<CompletionItem> items = completeAt(dir, {.name = "src/Main.java",
+                                                             .languageId = "java",
+                                                             .text = text,
+                                                             .line = 2,
+                                                             .column = 15,
+                                                             .trigger = {},
+                                                             .timeoutMs = 120000});
         const CompletionItem list = itemNamed(items, "ArrayList");
         QVERIFY2(!list.label.isEmpty(), qPrintable(labelsOf(items).join(", ")));
         QList<TextEdit> edits = list.additionalEdits;
@@ -364,7 +376,13 @@ private slots:
                                 "        return names.stream().collect(toLi);\n"
                                 "    }\n"
                                 "}\n";
-        const QList<CompletionItem> items = completeAt(dir, "src/Main.java", "java", text, 3, 42, {}, 120000);
+        const QList<CompletionItem> items = completeAt(dir, {.name = "src/Main.java",
+                                                             .languageId = "java",
+                                                             .text = text,
+                                                             .line = 3,
+                                                             .column = 42,
+                                                             .trigger = {},
+                                                             .timeoutMs = 120000});
         const CompletionItem toList = itemNamed(items, "toList");
         QVERIFY2(!toList.label.isEmpty(), qPrintable(labelsOf(items).join(", ")));
         QVERIFY2(toList.detail.contains("Collector<"), qPrintable(toList.detail));
@@ -374,7 +392,13 @@ private slots:
                                   "        name.\n"
                                   "    }\n"
                                   "}\n";
-        const QList<CompletionItem> members = completeAt(dir, "src/Main.java", "java", member, 2, 13, '.', 120000);
+        const QList<CompletionItem> members = completeAt(dir, {.name = "src/Main.java",
+                                                               .languageId = "java",
+                                                               .text = member,
+                                                               .line = 2,
+                                                               .column = 13,
+                                                               .trigger = '.',
+                                                               .timeoutMs = 120000});
         QVERIFY2(itemNamed(members, "length").kind == CompletionItem::Kind::Method,
                  qPrintable(labelsOf(members).join(", ")));
         for (const CompletionItem &item : members)
@@ -399,22 +423,26 @@ private:
         return {};
     }
 
-    // Candidates the language server of `languageId` proposes at (line,
-    // column) of `text`, saved as `name` in `dir`. The servers stay alive
-    // with the test object (resolving needs them).
-    QList<CompletionItem> completeAt(const QTemporaryDir &dir,
-                                     const QString &name,
-                                     const QString &languageId,
-                                     const QByteArray &text,
-                                     int line,
-                                     int column,
-                                     QChar trigger,
-                                     int timeoutMs)
+    // What completeAt asks the language server.
+    struct CompletionRequest {
+        QString name;       // the file, saved in the test's directory
+        QString languageId; // the server to ask
+        QByteArray text;
+        int line = 0;
+        int column = 0;
+        QChar trigger;
+        int timeoutMs = 0;
+    };
+
+    // Candidates the language server of `request.languageId` proposes at
+    // (line, column) of `request.text`, saved as `request.name` in `dir`.
+    // The servers stay alive with the test object (resolving needs them).
+    QList<CompletionItem> completeAt(const QTemporaryDir &dir, const CompletionRequest &request)
     {
-        QFile file(dir.filePath(name));
+        QFile file(dir.filePath(request.name));
         if (!file.open(QIODevice::WriteOnly))
             return {};
-        file.write(text);
+        file.write(request.text);
         file.close();
 
         servers_ = std::make_unique<LanguageServers>();
@@ -422,25 +450,25 @@ private:
         servers.setFolder(dir.path());
         LspCompletionProvider provider(&servers);
         CompletionContext context;
-        context.filePath = dir.filePath(name);
-        context.languageId = languageId;
-        context.text = text;
-        context.line = line;
-        context.column = column;
-        context.triggerCharacter = trigger;
+        context.filePath = dir.filePath(request.name);
+        context.languageId = request.languageId;
+        context.text = request.text;
+        context.line = request.line;
+        context.column = request.column;
+        context.triggerCharacter = request.trigger;
 
         // A server still loading the project may answer with nothing: ask
         // again until something comes or the time is up.
         QElapsedTimer elapsed;
         elapsed.start();
         QList<CompletionItem> found;
-        while (found.isEmpty() && elapsed.elapsed() < timeoutMs) {
+        while (found.isEmpty() && elapsed.elapsed() < request.timeoutMs) {
             bool answered = false;
             provider.complete(context, [&](const QList<CompletionItem> &items, bool) {
                 found = items;
                 answered = true;
             });
-            while (!answered && elapsed.elapsed() < timeoutMs)
+            while (!answered && elapsed.elapsed() < request.timeoutMs)
                 QTest::qWait(50);
             if (found.isEmpty())
                 QTest::qWait(1000);

@@ -15,6 +15,8 @@
 #include <QRegularExpression>
 #include <QtTest>
 
+#include <optional>
+
 using namespace diagram;
 using namespace diagram::states;
 
@@ -128,14 +130,15 @@ void build(Board &board, const Codec &codec, const QString &source)
 bool load(Board &board, const QString &name, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
     board.setStyle(Style::printed());
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, name, content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, name, content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
 graphviz::ArrangeOptions familyOptions(const Board &board)
@@ -160,6 +163,49 @@ qreal overlapArea(const QRectF &a, const QRectF &b)
 {
     const QRectF i = a.intersected(b);
     return i.isValid() ? i.width() * i.height() : 0;
+}
+
+// Laid out: no two shapes overlap, except a composite and what it holds;
+// children are inside.
+void verifyLaidOut(const Board &board, const QString &name)
+{
+    for (const auto &s : board.shapes()) {
+        if (!s->parentBoundary.isEmpty())
+            QVERIFY2(insideComposite(board, *s), qPrintable(name + ": " + s->key));
+        for (const auto &t : board.shapes()) {
+            const bool isNested =
+                board.descendantShapes(s.get()).contains(t.get()) || board.descendantShapes(t.get()).contains(s.get());
+            if (s == t || isNested)
+                continue;
+            QVERIFY2(!s->rect().intersects(t->rect()), qPrintable(name + ": " + s->key + " / " + t->key));
+        }
+    }
+}
+
+// Every shape of the board is in the copy, with the same text, nesting and
+// geometry.
+void verifySameShapes(const Board &board, const Board &again)
+{
+    for (const auto &s : board.shapes()) {
+        const Shape *copy = byKey(again, s->key);
+        QVERIFY2(copy, qPrintable(s->key));
+        QCOMPARE(copy->type, s->type);
+        QCOMPARE(copy->displayText(), s->displayText());
+        QCOMPARE(copy->parentBoundary, s->parentBoundary);
+        QVERIFY(std::abs(copy->x - s->x) < 0.1 && std::abs(copy->y - s->y) < 0.1);
+        QVERIFY2(
+            std::abs(copy->w - s->w) < 0.6 && std::abs(copy->h - s->h) < 0.6,
+            qPrintable(QStringLiteral("%1 %2x%3 %4x%5").arg(s->key).arg(s->w).arg(s->h).arg(copy->w).arg(copy->h)));
+    }
+}
+
+QStringList sortedLinkLabels(const Board &board)
+{
+    QStringList labels;
+    for (const auto &l : board.links())
+        labels.append(board.shape(l->from)->key + ">" + board.shape(l->to)->key + ":" + l->label);
+    labels.sort();
+    return labels;
 }
 
 } // namespace
@@ -567,18 +613,9 @@ private slots:
             QVERIFY2(loaded.warnings.isEmpty(), qPrintable(loaded.warnings.join(", ")));
             QVERIFY(graphviz::autoArrange(board, familyOptions(board)));
 
-            // Laid out: no two shapes overlap, except a composite and what it
-            // holds; children are inside.
-            for (const auto &s : board.shapes()) {
-                if (!s->parentBoundary.isEmpty())
-                    QVERIFY2(insideComposite(board, *s), qPrintable(name + ": " + s->key));
-                for (const auto &t : board.shapes()) {
-                    if (s == t || board.descendantShapes(s.get()).contains(t.get()) ||
-                        board.descendantShapes(t.get()).contains(s.get()))
-                        continue;
-                    QVERIFY2(!s->rect().intersects(t->rect()), qPrintable(name + ": " + s->key + " / " + t->key));
-                }
-            }
+            verifyLaidOut(board, name);
+            if (QTest::currentTestFailed())
+                return;
             QImage image(1200, 900, QImage::Format_ARGB32_Premultiplied);
             image.fill(Qt::white);
             {
@@ -595,28 +632,11 @@ private slots:
             QVERIFY(reloaded.unplaced.isEmpty());
             QCOMPARE(again.shapes().size(), board.shapes().size());
             QCOMPARE(again.links().size(), board.links().size());
-            for (const auto &s : board.shapes()) {
-                const Shape *copy = byKey(again, s->key);
-                QVERIFY2(copy, qPrintable(s->key));
-                QCOMPARE(copy->type, s->type);
-                QCOMPARE(copy->displayText(), s->displayText());
-                QCOMPARE(copy->parentBoundary, s->parentBoundary);
-                QVERIFY(std::abs(copy->x - s->x) < 0.1 && std::abs(copy->y - s->y) < 0.1);
-                QVERIFY2(
-                    std::abs(copy->w - s->w) < 0.6 && std::abs(copy->h - s->h) < 0.6,
-                    qPrintable(
-                        QStringLiteral("%1 %2x%3 %4x%5").arg(s->key).arg(s->w).arg(s->h).arg(copy->w).arg(copy->h)));
-            }
-            QStringList labels;
-            QStringList labelsAgain;
-            for (const auto &l : board.links())
-                labels.append(board.shape(l->from)->key + ">" + board.shape(l->to)->key + ":" + l->label);
-            for (const auto &l : again.links())
-                labelsAgain.append(again.shape(l->from)->key + ">" + again.shape(l->to)->key + ":" + l->label);
+            verifySameShapes(board, again);
+            if (QTest::currentTestFailed())
+                return;
             // Written scope by scope: the order may change, not the relations.
-            labels.sort();
-            labelsAgain.sort();
-            QCOMPARE(labelsAgain, labels);
+            QCOMPARE(sortedLinkLabels(again), sortedLinkLabels(board));
             QCOMPARE(document::source(again, *codec), document::source(board, *codec));
         }
     }

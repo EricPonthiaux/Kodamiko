@@ -81,8 +81,8 @@ private slots:
 
     void languageForFile()
     {
-        QFETCH(QString, path);
-        QFETCH(QString, language);
+        QFETCH(const QString, path);
+        QFETCH(const QString, language);
         QCOMPARE(LanguageRegistry::languageForFile(path), language);
     }
 
@@ -95,7 +95,7 @@ private slots:
 
     void everyGrammarQueryCompiles()
     {
-        QFETCH(QString, language);
+        QFETCH(const QString, language);
         QVERIFY(TreeSitterGrammars::forLanguage(language) != nullptr);
     }
 

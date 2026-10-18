@@ -16,6 +16,8 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include <optional>
+
 using namespace diagram;
 
 namespace {
@@ -40,7 +42,7 @@ const char *const kFlowboard = R"({
 
 QString writeFile(const QTemporaryDir &dir, const QString &name, const QByteArray &content)
 {
-    const QString path = dir.filePath(name);
+    QString path = dir.filePath(name);
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly))
         return {};
@@ -59,14 +61,15 @@ Shape *byKey(const Board &board, const QString &key)
 
 bool loadInto(Board &board, const QString &name, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, name, content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, name, content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
 } // namespace
@@ -188,21 +191,23 @@ private slots:
         const QString source = document::source(board, *loaded.codec);
 
         // Same elements: they keep their place.
-        document::Loaded applied;
-        QVERIFY(document::applySource(board, *loaded.codec, source, applied, nullptr));
-        QVERIFY(!applied.needsArrange);
+        const std::optional<document::Loaded> applied = document::applySource(board, *loaded.codec, source, nullptr);
+        QVERIFY(applied);
+        QVERIFY(!applied->needsArrange);
         // The layout is kept to a tenth of a pixel.
         QVERIFY(std::abs(byKey(board, QStringLiteral("A"))->x - before.x()) < 0.1);
         QVERIFY(std::abs(byKey(board, QStringLiteral("A"))->y - before.y()) < 0.1);
         // One step of history.
-        QVERIFY(document::applySource(board, *loaded.codec, source + "\n  B --> C[New]", applied, nullptr));
-        QCOMPARE(applied.unplaced.size(), 1);
+        const std::optional<document::Loaded> extended =
+            document::applySource(board, *loaded.codec, source + "\n  B --> C[New]", nullptr);
+        QVERIFY(extended);
+        QCOMPARE(extended->unplaced.size(), 1);
         QCOMPARE(board.shapes().size(), size_t(3));
         board.undo();
         QCOMPARE(board.shapes().size(), size_t(2));
 
         QString error;
-        QVERIFY(!document::applySource(board, *loaded.codec, "not a diagram", applied, &error));
+        QVERIFY(!document::applySource(board, *loaded.codec, "not a diagram", &error));
         QVERIFY(!error.isEmpty());
     }
 

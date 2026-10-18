@@ -56,9 +56,9 @@ public:
 // Records what it is asked, and answers at once.
 class RecordingProvider : public ICompletionProvider {
 public:
-    explicit RecordingProvider(QList<CompletionItem> items, bool smart = false)
-        : items(std::move(items))
-        , smart(smart)
+    explicit RecordingProvider(QList<CompletionItem> answers, bool isSmart = false)
+        : items(std::move(answers))
+        , smart(isSmart)
     {
     }
 
@@ -161,7 +161,7 @@ private slots:
     void acceptedSnippetSelectsTheArgumentAndAddsTheImport()
     {
         const auto late = std::make_shared<LateProvider>();
-        const Fixture f("class A {\n    void f() {\n        \n    }\n}\n", 2, 8, late);
+        const Fixture f("class A {\n    void f() {\n        \n    }\n}\n", {2, 8}, late);
         QTest::keyClicks(f.editor, "Arr");
         QTRY_VERIFY(late->pending);
         CompletionItem list{"ArrayList", "ArrayList<${1:E}>()", "java.util", CompletionItem::Kind::Class, 10};
@@ -181,7 +181,7 @@ private slots:
     void editsResolvedOnceChosen()
     {
         const auto late = std::make_shared<LateProvider>();
-        const Fixture f("class A {\n    void f() {\n        \n    }\n}\n", 2, 8, late);
+        const Fixture f("class A {\n    void f() {\n        \n    }\n}\n", {2, 8}, late);
         QTest::keyClicks(f.editor, "Lis");
         QTRY_VERIFY(late->pending);
         CompletionItem::EditsCallback resolved;
@@ -199,7 +199,7 @@ private slots:
 
     void typingOpensAndEnterInserts()
     {
-        const Fixture f("int printValue(int value);\nint main() {\n    \n}\n", 2, 4);
+        const Fixture f("int printValue(int value);\nint main() {\n    \n}\n", {2, 4});
         QTest::keyClicks(f.editor, "pri");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("printValue"));
@@ -213,7 +213,7 @@ private slots:
 
     void popupFollowsTheTyping()
     {
-        const Fixture f("int printValue;\nint process;\nint main() {\n    \n}\n", 3, 4);
+        const Fixture f("int printValue;\nint process;\nint main() {\n    \n}\n", {3, 4});
         QTest::keyClicks(f.editor, "p");
         QTRY_VERIFY(f.controller->isActive());
         QVERIFY(f.controller->popup()->labels().contains("process"));
@@ -231,7 +231,7 @@ private slots:
     void modesDecideWhenThePopupOpens()
     {
         {
-            const Fixture f("int printValue;\nint main() {\n    \n}\n", 2, 4);
+            const Fixture f("int printValue;\nint main() {\n    \n}\n", {2, 4});
             f.editor->setOptions({.autoCompletion = AutoCompletion::Off});
             QTest::keyClicks(f.editor, "pri");
             QTest::qWait(150);
@@ -240,7 +240,7 @@ private slots:
             QTRY_VERIFY(f.controller->isActive());
         }
         {
-            const Fixture f("int printValue;\nint main() {\n    \n}\n", 2, 4);
+            const Fixture f("int printValue;\nint main() {\n    \n}\n", {2, 4});
             f.editor->setOptions({.autoCompletion = AutoCompletion::Calm});
             QTest::keyClicks(f.editor, "pr");
             QTest::qWait(500);
@@ -254,7 +254,7 @@ private slots:
 
     void enterCanBeLeftToNewLines()
     {
-        const Fixture f("int printValue;\nint main() {\n    \n}\n", 2, 4);
+        const Fixture f("int printValue;\nint main() {\n    \n}\n", {2, 4});
         f.editor->setOptions({.completionAcceptsEnter = false});
         QTest::keyClicks(f.editor, "pri");
         QTRY_VERIFY(f.controller->isActive());
@@ -270,7 +270,7 @@ private slots:
 
     void ctrlRightInsertsTheNextWord()
     {
-        const Fixture f("int getSelectedValue;\nint main() {\n    \n}\n", 2, 4);
+        const Fixture f("int getSelectedValue;\nint main() {\n    \n}\n", {2, 4});
         QTest::keyClicks(f.editor, "get");
         QTRY_VERIFY(f.controller->isActive());
         QTest::keyClick(f.editor, Qt::Key_Right, Qt::ControlModifier);
@@ -283,7 +283,7 @@ private slots:
 
     void previewShowsTheRestAtTheEndOfALine()
     {
-        const Fixture f("int printValue;\nint main() {\n    \n    x = 1;\n}\n", 2, 4);
+        const Fixture f("int printValue;\nint main() {\n    \n    x = 1;\n}\n", {2, 4});
         QTest::keyClicks(f.editor, "pri");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->previewText(), QString("ntValue"));
@@ -299,7 +299,7 @@ private slots:
     void documentationBesideTheList()
     {
         const auto late = std::make_shared<LateProvider>();
-        const Fixture f("int main() {\n    \n}\n", 1, 4, late);
+        const Fixture f("int main() {\n    \n}\n", {1, 4}, late);
         f.controller->complete();
         QTRY_VERIFY(late->pending);
         int resolved = 0;
@@ -338,7 +338,7 @@ private slots:
                 announced.append(static_cast<QAccessibleAnnouncementEvent *>(event)->message());
         });
         QAccessible::setActive(true);
-        const Fixture f("int printValue;\nint process;\nint main() {\n    \n}\n", 3, 4);
+        const Fixture f("int printValue;\nint process;\nint main() {\n    \n}\n", {3, 4});
         QTest::keyClicks(f.editor, "p");
         QTRY_VERIFY(f.controller->isActive());
         QTRY_VERIFY(!announced.isEmpty());
@@ -385,7 +385,7 @@ private slots:
 
     void chosenCandidatesRankHigherAndUndoneOnesLower()
     {
-        Fixture f("int printAlpha;\nint printBeta;\nint main() {\n    \n}\n", 3, 4);
+        Fixture f("int printAlpha;\nint printBeta;\nint main() {\n    \n}\n", {3, 4});
         QTest::keyClicks(f.editor, "print");
         QTRY_VERIFY(f.controller->isActive());
         const QString first = f.controller->popup()->labels().first();
@@ -437,7 +437,7 @@ private slots:
 
     void tabReplacesTheWholeIdentifier()
     {
-        const Fixture f("int printValue;\nint x = prinOld;\n", 1, 11);
+        const Fixture f("int printValue;\nint x = prinOld;\n", {1, 11});
         f.controller->complete();
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("printValue"));
@@ -447,7 +447,7 @@ private slots:
 
     void noPopupInCommentsOrStrings()
     {
-        const Fixture f("int printValue;\n// \nconst char *s = \"\";\n", 1, 3);
+        const Fixture f("int printValue;\n// \nconst char *s = \"\";\n", {1, 3});
         QTest::keyClicks(f.editor, "pri");
         QTest::qWait(150);
         QVERIFY(!f.controller->isActive());
@@ -463,7 +463,7 @@ private slots:
     void lateAnswersJoinTheList()
     {
         const auto late = std::make_shared<LateProvider>();
-        const Fixture f("int printValue;\nint main() {\n    \n}\n", 2, 4, late);
+        const Fixture f("int printValue;\nint main() {\n    \n}\n", {2, 4}, late);
         QTest::keyClicks(f.editor, "pri");
         QTRY_VERIFY(f.controller->isActive());
         QVERIFY(late->pending);
@@ -499,7 +499,7 @@ private slots:
     void tabFillsThePlaceholdersInTurn()
     {
         const auto late = std::make_shared<LateProvider>();
-        const Fixture f("int main() {\n    \n}\n", 1, 4, late);
+        const Fixture f("int main() {\n    \n}\n", {1, 4}, late);
         QTest::keyClicks(f.editor, "lo");
         QTRY_VERIFY(late->pending);
         CompletionItem loop{
@@ -536,7 +536,7 @@ private slots:
     void snippetEndsWhenTheCursorLeaves()
     {
         const auto late = std::make_shared<LateProvider>();
-        const Fixture f("int main() {\n    \n}\n", 1, 4, late);
+        const Fixture f("int main() {\n    \n}\n", {1, 4}, late);
         QTest::keyClicks(f.editor, "pri");
         QTRY_VERIFY(late->pending);
         CompletionItem call{"print", "print(${1:int a}, ${2:int b})", {}, CompletionItem::Kind::Function, 10};
@@ -580,7 +580,7 @@ private slots:
 
     void postfixWrapsTheExpression()
     {
-        Fixture f("int main() {\n    items\n}\n", 1, 9);
+        Fixture f("int main() {\n    items\n}\n", {1, 9});
         f.service.addProvider(std::make_shared<PostfixTemplateProvider>());
         QTest::keyClicks(f.editor, ".if");
         QTRY_VERIFY(f.controller->isActive());
@@ -598,7 +598,7 @@ private slots:
 
     void postfixVarNamesTheValue()
     {
-        Fixture f("int main() {\n    widget.getSelectedItem()\n}\n", 1, 28);
+        Fixture f("int main() {\n    widget.getSelectedItem()\n}\n", {1, 28});
         f.service.addProvider(std::make_shared<PostfixTemplateProvider>());
         QTest::keyClicks(f.editor, ".var");
         QTRY_VERIFY(f.controller->isActive());
@@ -612,7 +612,7 @@ private slots:
 
     void postfixStatementsOnlyStartStatements()
     {
-        Fixture f("int main() {\n    int n = items\n}\n", 1, 17);
+        Fixture f("int main() {\n    int n = items\n}\n", {1, 17});
         f.service.addProvider(std::make_shared<PostfixTemplateProvider>());
         QTest::keyClicks(f.editor, "."); // opens the list
         QTRY_VERIFY(f.controller->isActive());
@@ -629,7 +629,7 @@ private slots:
 
     void liveTemplatesExpand()
     {
-        Fixture f("int main() {\n    \n}\n", 1, 4);
+        Fixture f("int main() {\n    \n}\n", {1, 4});
         f.service.addProvider(std::make_shared<LiveTemplateProvider>());
         QTest::keyClicks(f.editor, "iter");
         QTRY_VERIFY(f.controller->isActive());
@@ -657,13 +657,13 @@ private slots:
 
     void secondCompletionShowsMore()
     {
-        Fixture g("int widget;\nint getValue;\nint main() {\n    \n}\n", 3, 4);
+        Fixture g("int widget;\nint getValue;\nint main() {\n    \n}\n", {3, 4});
         // Another open file of the language.
-        auto *more = new EditorWidget(Theme::dark(), &g.window);
         QFile moreFile(g.dir.filePath("b.cpp"));
         QVERIFY(moreFile.open(QIODevice::WriteOnly));
         moreFile.write("int getterElsewhere;\n");
         moreFile.close();
+        auto *more = new EditorWidget(Theme::dark(), &g.window);
         more->load(g.dir.filePath("b.cpp"), nullptr);
         g.editor->setFocus();
         QTest::keyClicks(g.editor, "get");
@@ -729,7 +729,7 @@ private slots:
         // Only the smart providers, told the type.
         const auto smart = std::make_shared<RecordingProvider>(QList<CompletionItem>{count, name}, true);
         smart->items.removeIf([](const CompletionItem &item) { return item.label != "count"; });
-        Fixture f("int main() {\n    int total = \n}\n", 1, 16, smart);
+        Fixture f("int main() {\n    int total = \n}\n", {1, 16}, smart);
         f.service.addProvider(std::make_shared<PostfixTemplateProvider>());
         f.controller->completeSmart();
         QTRY_VERIFY(f.controller->isActive());
@@ -740,7 +740,7 @@ private slots:
         QTest::keyClick(f.editor, Qt::Key_Return);
         QCOMPARE(f.editor->text(1), QString("    int total = count\n"));
         // A boolean: the keywords "true" and "false".
-        const Fixture g("int main() {\n    bool ok = \n}\n", 1, 14);
+        const Fixture g("int main() {\n    bool ok = \n}\n", {1, 14});
         g.controller->completeSmart();
         QTRY_VERIFY(g.controller->isActive());
         QCOMPARE(g.controller->popup()->labels(), QStringList({"true", "false"}));
@@ -752,7 +752,7 @@ private slots:
         QCOMPARE(FullLineModel::lineOf("value);  ", ");"), QString("value"));
         QCOMPARE(FullLineModel::lineOf("   \n", QString()), QString());
 
-        Fixture f("int main() {\n    \n}\n", 1, 4);
+        Fixture f("int main() {\n    \n}\n", {1, 4});
         f.editor->setOptions({.autoCompletion = AutoCompletion::Off});
         FakeFullLineModel model;
         model.answer = "Value(total);";
@@ -855,7 +855,7 @@ private slots:
         QCOMPARE(DocComments::commentStart("/** a */ x", 10, "cpp"), -1);
         QCOMPARE(DocComments::commentStart("    /// see @", 13, "cpp"), 4);
 
-        const Fixture f("\ntemplate <typename T>\nint add(int a, const T &b = {});\n", 0, 0);
+        const Fixture f("\ntemplate <typename T>\nint add(int a, const T &b = {});\n", {0, 0});
         QTest::keyClicks(f.editor, "/**");
         QTest::keyClick(f.editor, Qt::Key_Return);
         QCOMPARE(f.editor->text(), QString("/**\n * \n *\n * @tparam T \n * @param a \n * @param b \n * @return \n */\n"
@@ -866,12 +866,12 @@ private slots:
         QTest::keyClick(f.editor, Qt::Key_Tab);
         QCOMPARE(cursorLine(f.editor), 3); // the template parameter's text
         // Java: "@throws".
-        const Fixture java("\npublic int read(byte[] buffer) throws IOException {\n}\n", 0, 0, {}, "A.java");
+        const Fixture java("\npublic int read(byte[] buffer) throws IOException {\n}\n", {0, 0}, {}, "A.java");
         QTest::keyClicks(java.editor, "/**");
         QTest::keyClick(java.editor, Qt::Key_Return);
         QVERIFY(java.editor->text().contains(" * @param buffer \n * @return \n * @throws IOException \n */\n"));
         // Nothing to document: the summary only.
-        const Fixture empty("\n", 0, 0);
+        const Fixture empty("\n", {0, 0});
         QTest::keyClicks(empty.editor, "/**");
         QTest::keyClick(empty.editor, Qt::Key_Return);
         QCOMPARE(empty.editor->text(), QString("/**\n * \n */\n"));
@@ -879,7 +879,7 @@ private slots:
 
     void docCommentTagsAndParameters()
     {
-        Fixture f("/**\n * \n */\nint add(int first, int second);\n", 1, 3);
+        Fixture f("/**\n * \n */\nint add(int first, int second);\n", {1, 3});
         f.service.addProvider(std::make_shared<DocCommentProvider>());
         QTest::keyClicks(f.editor, "@");
         QTRY_VERIFY(f.controller->isActive());
@@ -990,7 +990,7 @@ private slots:
     void javaPostfixTemplatesImportWhatTheyUse()
     {
         const Fixture f("package app;\n\nimport java.util.List;\n\nclass A {\n    void f() {\n        name\n    }\n}\n",
-                        6, 12, std::make_shared<PostfixTemplateProvider>(), "A.java");
+                        {6, 12}, std::make_shared<PostfixTemplateProvider>(), "A.java");
         QTest::keyClicks(f.editor, ".opt");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("opt"));
@@ -1003,7 +1003,7 @@ private slots:
         QCOMPARE(f.editor->text(6), QString("        name.opt\n"));
 
         // Imported already: once.
-        const Fixture g("import java.util.*;\nclass A {\n    void f() {\n        items\n    }\n}\n", 3, 13,
+        const Fixture g("import java.util.*;\nclass A {\n    void f() {\n        items\n    }\n}\n", {3, 13},
                         std::make_shared<PostfixTemplateProvider>(), "A.java");
         QTest::keyClicks(g.editor, ".stream");
         QTRY_VERIFY(g.controller->isActive());
@@ -1014,7 +1014,7 @@ private slots:
 
     void javaSoutvQuotesTheExpression()
     {
-        const Fixture f("class A {\n    void f() {\n        map.get(\"a\")\n    }\n}\n", 2, 20,
+        const Fixture f("class A {\n    void f() {\n        map.get(\"a\")\n    }\n}\n", {2, 20},
                         std::make_shared<PostfixTemplateProvider>(), "A.java");
         QTest::keyClicks(f.editor, ".soutv");
         QTRY_VERIFY(f.controller->isActive());
@@ -1030,7 +1030,7 @@ private slots:
             "class Account {\n    void deposit(long amount, String note) {\n        int total = 3;\n"
             "        \n    }\n}\n";
         const auto expand = [&text](const QString &key) {
-            Fixture f(text, 3, 8, std::make_shared<LiveTemplateProvider>(), "Account.java");
+            Fixture f(text, {3, 8}, std::make_shared<LiveTemplateProvider>(), "Account.java");
             QTest::keyClicks(f.editor, key);
             if (!QTest::qWaitFor([&] { return f.controller->isActive(); }))
                 return QStringLiteral("(no list)");
@@ -1068,7 +1068,7 @@ private slots:
         QVERIFY(!generated.contains("getActive")); // "isActive" for a boolean
         QVERIFY(!generated.contains("setAge"));    // final
 
-        const Fixture f(text, 5, 4, provider, "Person.java");
+        const Fixture f(text, {5, 4}, provider, "Person.java");
         QTest::keyClicks(f.editor, "getAg");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("getAge"));
@@ -1105,7 +1105,7 @@ private slots:
 
         const auto paths =
             std::make_shared<Paths>(QList<CompletionItem>{{"components", {}, {}, CompletionItem::Kind::Module, 10}});
-        const Fixture f("import Button from '';\n", 0, 20, paths, "a.js");
+        const Fixture f("import Button from '';\n", {0, 20}, paths, "a.js");
         f.controller->complete();
         QTRY_VERIFY(f.controller->isActive());
         QVERIFY(paths->last.inModulePath);
@@ -1129,7 +1129,7 @@ private slots:
             "    virtual int size() const = 0;\n    void plain();\n    virtual void done() final;\n};\n"
             "class Derived : public Base {\npublic:\n    \n};\n";
         const auto provider = std::make_shared<CodeGenerationProvider>(nullptr, CodeGenerationProvider::Counterpart());
-        const Fixture f(text, 10, 4, provider);
+        const Fixture f(text, {10, 4}, provider);
         QTest::keyClicks(f.editor, "pai");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("paint"));
@@ -1154,7 +1154,7 @@ private slots:
         QTRY_VERIFY(f.controller->isActive());
         QVERIFY(!f.controller->popup()->labels().contains("done")); // final
         // In a header: the declaration only.
-        const Fixture h(text, 10, 4, provider, "a.h");
+        const Fixture h(text, {10, 4}, provider, "a.h");
         QTest::keyClicks(h.editor, "si");
         QTRY_VERIFY(h.controller->isActive());
         QCOMPARE(h.controller->popup()->labels().first(), QString("size"));
@@ -1163,7 +1163,7 @@ private slots:
         // Java.
         const QByteArray java = "interface Shape {\n    double area();\n    static Shape unit() { return null; }\n}\n"
                                 "class Circle implements Shape {\n    \n}\n";
-        const Fixture j(java, 5, 4, provider, "Circle.java");
+        const Fixture j(java, {5, 4}, provider, "Circle.java");
         QTest::keyClicks(j.editor, "are");
         QTRY_VERIFY(j.controller->isActive());
         QCOMPARE(j.controller->popup()->labels().first(), QString("area"));
@@ -1188,10 +1188,9 @@ private slots:
             "    virtual int size() const override;\n    void clear();\n    int inlined() const { return 0; }\n"
             "    virtual void abstract() = 0;\nsignals:\n    void changed();\n};\nint helper(double x);\n");
         header.close();
-        const QString headerPath = headers.filePath("a.h");
-        const auto provider =
-            std::make_shared<CodeGenerationProvider>(nullptr, [headerPath](const QString &) { return headerPath; });
-        const Fixture f("#include \"a.h\"\n\nvoid Foo::clear()\n{\n}\n\n", 5, 0, provider);
+        const auto provider = std::make_shared<CodeGenerationProvider>(
+            nullptr, [&headers](const QString &) { return headers.filePath("a.h"); });
+        const Fixture f("#include \"a.h\"\n\nvoid Foo::clear()\n{\n}\n\n", {5, 0}, provider);
         QTest::keyClicks(f.editor, "si");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("size"));
@@ -1239,7 +1238,7 @@ private slots:
         QCOMPARE(P::declaredTypeAt("    Widget", 10, "cpp"), QString()); // the type itself
         QCOMPARE(P::declaredTypeAt("    private final Widget ", 25, "java"), QString("Widget"));
 
-        const Fixture f("int main() {\n    QListWidget \n}\n", 1, 16, std::make_shared<NameSuggestionProvider>());
+        const Fixture f("int main() {\n    QListWidget \n}\n", {1, 16}, std::make_shared<NameSuggestionProvider>());
         QTest::keyClicks(f.editor, "w");
         QTRY_VERIFY(f.controller->isActive());
         QCOMPARE(f.controller->popup()->labels().first(), QString("widget"));
@@ -1252,7 +1251,7 @@ private slots:
     void parameterInfoAfterAFunction()
     {
         const auto late = std::make_shared<LateProvider>();
-        const Fixture f("int main() {\n    \n}\n", 1, 4, late);
+        const Fixture f("int main() {\n    \n}\n", {1, 4}, late);
         const QSignalSpy calls(f.controller, &CompletionController::callInserted);
         QTest::keyClicks(f.editor, "pri");
         QTRY_VERIFY(late->pending);
@@ -1289,7 +1288,7 @@ private slots:
         QCOMPARE(starts("total += b."), QList<QByteArray>({"b"}));
         QCOMPARE(starts("return a.b."), QList<QByteArray>({"a.b"}));
 
-        Fixture f("int main() {\n    a + b\n}\n", 1, 9);
+        Fixture f("int main() {\n    a + b\n}\n", {1, 9});
         f.service.addProvider(std::make_shared<PostfixTemplateProvider>());
         // "if" only fits the whole: no choice.
         QTest::keyClicks(f.editor, ".if");
@@ -1339,11 +1338,16 @@ private:
     }
 
     // An editor showing a C++ file, with completion, the cursor at
-    // (line, index).
+    // the given position.
+    // Where the cursor starts in a fixture's editor.
+    struct Cursor {
+        int line = 0;
+        int index = 0;
+    };
+
     struct Fixture {
         Fixture(const QByteArray &text,
-                int line,
-                int index,
+                Cursor cursor,
                 const std::shared_ptr<ICompletionProvider> &extra = {},
                 const QString &name = QStringLiteral("a.cpp"))
         {
@@ -1365,7 +1369,7 @@ private:
             if (!QTest::qWaitForWindowExposed(&window))
                 qFatal("no window");
             editor->setFocus();
-            editor->setCursorPosition(line, index);
+            editor->setCursorPosition(cursor.line, cursor.index);
         }
 
         QTemporaryDir dir;

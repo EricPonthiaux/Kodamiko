@@ -18,6 +18,7 @@
 #include <QLocalSocket>
 #include <QSet>
 
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -158,9 +159,9 @@ int main(int argc, char *argv[])
     // on it in the event loop); each line is handed to the relay.
     std::thread reader([&relay] {
         std::string line;
-        char buffer[65536];
-        while (std::fgets(buffer, sizeof buffer, stdin)) {
-            line += buffer;
+        std::array<char, 65536> buffer{};
+        while (std::fgets(buffer.data(), int(buffer.size()), stdin)) {
+            line += buffer.data();
             if (line.empty() || line.back() != '\n')
                 continue;
             const QByteArray message = QByteArray::fromStdString(line).trimmed();

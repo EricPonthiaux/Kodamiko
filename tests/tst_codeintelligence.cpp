@@ -144,7 +144,7 @@ private slots:
         servers.setFolder(root);
         CodeNavigator navigator(&tabs, &index);
         ProblemStore problems(&servers);
-        CodeIntelligence intelligence(&tabs, &servers, &navigator, &problems);
+        CodeIntelligence intelligence({&tabs, &servers, &navigator, &problems});
         connect(&tabs, &EditorTabs::editorOpened, &intelligence, &CodeIntelligence::attach);
         QStringList messages;
         connect(&intelligence, &CodeIntelligence::statusMessage, this,
@@ -250,7 +250,7 @@ private slots:
         servers.setFolder(root);
         CodeNavigator navigator(&tabs, &index);
         ProblemStore problems(&servers);
-        const CodeIntelligence intelligence(&tabs, &servers, &navigator, &problems);
+        const CodeIntelligence intelligence({&tabs, &servers, &navigator, &problems});
         connect(&tabs, &EditorTabs::editorOpened, &intelligence, &CodeIntelligence::attach);
         auto *editor = EditorTabs::editorIn(tabs.openFile(root + "/count.cpp"));
         QVERIFY(editor);

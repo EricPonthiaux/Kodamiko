@@ -60,9 +60,10 @@ private slots:
 
     void everyOutlineQueryCompiles()
     {
-        QFETCH(QString, language);
+        QFETCH(const QString, language);
         const TreeSitterGrammar *grammar = TreeSitterGrammars::forLanguage(language);
-        QVERIFY(grammar != nullptr);
+        if (grammar == nullptr)
+            QFAIL(qPrintable(QStringLiteral("no grammar for %1").arg(language)));
         QVERIFY(grammar->outline != nullptr);
     }
 

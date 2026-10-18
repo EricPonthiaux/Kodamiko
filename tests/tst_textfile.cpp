@@ -20,7 +20,7 @@ private slots:
 
     void roundTripsBytesExactly()
     {
-        QFETCH(QByteArray, bytes);
+        QFETCH(const QByteArray, bytes);
         const DecodedText decoded = TextFile::decode(bytes);
         QCOMPARE(TextFile::encode(decoded.text, decoded.format), bytes);
     }

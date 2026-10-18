@@ -12,7 +12,10 @@
 
 #include <QImage>
 #include <QPainter>
+#include <QPointF>
 #include <QtTest>
+
+#include <optional>
 
 using namespace diagram;
 using namespace diagram::datamodel;
@@ -41,8 +44,8 @@ Model parse(const QString &source)
 {
     Model model;
     QString error;
-    const bool ok = codec().parse(source, model, &error);
-    Q_ASSERT(ok);
+    if (!codec().parse(source, model, &error))
+        qFatal("cannot parse the test model: %s", qPrintable(error));
     return model;
 }
 
@@ -57,29 +60,33 @@ Shape *byKey(const Board &board, const QString &key)
 
 bool loadInto(Board &board, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, QStringLiteral("model.mmd"), content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, QStringLiteral("model.mmd"), content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
-EntityShape *addTable(Board &board,
-                      const QString &id,
-                      qreal x,
-                      qreal y,
-                      const QString &name,
-                      const QStringList &attributes)
+// What a test table is made of.
+struct Table {
+    QString id;
+    QPointF position;
+    QString name;
+    QStringList attributes;
+};
+
+EntityShape *addTable(Board &board, const Table &table)
 {
-    Shape *s =
-        board.addShape(QStringLiteral("entity"), QJsonObject{{QStringLiteral("id"), id},
-                                                             {QStringLiteral("x"), x},
-                                                             {QStringLiteral("y"), y},
-                                                             {QStringLiteral("name"), name},
-                                                             {QStringLiteral("attributes"), toJsonArray(attributes)}});
+    Shape *s = board.addShape(QStringLiteral("entity"),
+                              QJsonObject{{QStringLiteral("id"), table.id},
+                                          {QStringLiteral("x"), table.position.x()},
+                                          {QStringLiteral("y"), table.position.y()},
+                                          {QStringLiteral("name"), table.name},
+                                          {QStringLiteral("attributes"), toJsonArray(table.attributes)}});
     return dynamic_cast<EntityShape *>(s);
 }
 
@@ -94,11 +101,15 @@ struct CustomerOrder {
     CustomerOrder()
     {
         board.setFamily(&families::dataModel());
-        customer = addTable(board, QStringLiteral("customer"), 10, 20, QStringLiteral("CUSTOMER"),
-                            {QStringLiteral("uuid id PK"), QStringLiteral("string email UK")});
-        order = addTable(
-            board, QStringLiteral("order"), 500, 70, QStringLiteral("ORDER"),
-            {QStringLiteral("uuid id PK"), QStringLiteral("uuid customer_id FK"), QStringLiteral("decimal total")});
+        customer = addTable(board, {.id = QStringLiteral("customer"),
+                                    .position = {10, 20},
+                                    .name = QStringLiteral("CUSTOMER"),
+                                    .attributes = {QStringLiteral("uuid id PK"), QStringLiteral("string email UK")}});
+        order = addTable(board, {.id = QStringLiteral("order"),
+                                 .position = {500, 70},
+                                 .name = QStringLiteral("ORDER"),
+                                 .attributes = {QStringLiteral("uuid id PK"), QStringLiteral("uuid customer_id FK"),
+                                                QStringLiteral("decimal total")}});
         relation = dynamic_cast<RelationshipLink *>(
             board.addLink(QStringLiteral("relationship"), customer->id, order->id,
                           QJsonObject{{QStringLiteral("fromCard"), QStringLiteral("||")},
@@ -228,9 +239,12 @@ private slots:
         Board board;
         board.setFamily(&families::dataModel());
         const EntityShape *table =
-            addTable(board, QStringLiteral("t"), 0, 0, QStringLiteral("CUSTOMER"),
-                     {QStringLiteral("uuid id PK"), QStringLiteral("varchar(255) email UK \"Adresse de connexion\""),
-                      QStringLiteral("uuid account_id FK")});
+            addTable(board, {.id = QStringLiteral("t"),
+                             .position = {0, 0},
+                             .name = QStringLiteral("CUSTOMER"),
+                             .attributes = {QStringLiteral("uuid id PK"),
+                                            QStringLiteral("varchar(255) email UK \"Adresse de connexion\""),
+                                            QStringLiteral("uuid account_id FK")}});
         QVERIFY(table);
         const QList<Field> &fields = table->databaseFields();
         QCOMPARE(fields[1].constraints, QStringList{QStringLiteral("UK")});
@@ -240,7 +254,9 @@ private slots:
         QCOMPARE(table->h, 48 + 25 + 3 * 31 + 1.0);
 
         // A table without columns keeps one empty row.
-        const EntityShape *empty = addTable(board, QStringLiteral("e"), 0, 400, QStringLiteral("EMPTY"), {});
+        const EntityShape *empty = addTable(
+            board,
+            {.id = QStringLiteral("e"), .position = {0, 400}, .name = QStringLiteral("EMPTY"), .attributes = {}});
         QCOMPARE(empty->h, 48 + 25 + 31 + 1.0);
         QCOMPARE(empty->connectionPorts(board).size(), 4); // the four sides
 
@@ -345,10 +361,16 @@ private slots:
     {
         Board board;
         board.setFamily(&families::dataModel());
-        const EntityShape *source = addTable(board, QStringLiteral("source"), 0, 0, QStringLiteral("SOURCE"),
-                                             {QStringLiteral("uuid id PK"), QStringLiteral("uuid owner_id FK")});
-        const EntityShape *target = addTable(board, QStringLiteral("target"), 500, 0, QStringLiteral("TARGET"),
-                                             {QStringLiteral("uuid id PK"), QStringLiteral("uuid public_id UK")});
+        const EntityShape *source =
+            addTable(board, {.id = QStringLiteral("source"),
+                             .position = {0, 0},
+                             .name = QStringLiteral("SOURCE"),
+                             .attributes = {QStringLiteral("uuid id PK"), QStringLiteral("uuid owner_id FK")}});
+        const EntityShape *target =
+            addTable(board, {.id = QStringLiteral("target"),
+                             .position = {500, 0},
+                             .name = QStringLiteral("TARGET"),
+                             .attributes = {QStringLiteral("uuid id PK"), QStringLiteral("uuid public_id UK")}});
         const auto *relation = dynamic_cast<RelationshipLink *>(
             board.addLink(QStringLiteral("relationship"), source->id, target->id,
                           QJsonObject{{QStringLiteral("fromPort"), QStringLiteral("owner_id")},
@@ -361,8 +383,11 @@ private slots:
 
         // The FK comment names the referenced column.
         EntityShape *line =
-            addTable(board, QStringLiteral("line"), 0, 300, QStringLiteral("order_lines"),
-                     {QStringLiteral("uuid id PK"), QStringLiteral("uuid product FK \"references target.public_id\"")});
+            addTable(board, {.id = QStringLiteral("line"),
+                             .position = {0, 300},
+                             .name = QStringLiteral("order_lines"),
+                             .attributes = {QStringLiteral("uuid id PK"),
+                                            QStringLiteral("uuid product FK \"references target.public_id\"")}});
         const auto *reference =
             dynamic_cast<RelationshipLink *>(board.addLink(QStringLiteral("relationship"), target->id, line->id, {}));
         const RelationshipLink::Endpoints referenced = reference->relationshipEndpoints(*target, *line);
@@ -484,7 +509,9 @@ private slots:
     void drawsWithoutCrashing()
     {
         CustomerOrder f;
-        addTable(f.board, QStringLiteral("empty"), 0, 400, QStringLiteral("EMPTY"), {});
+        addTable(
+            f.board,
+            {.id = QStringLiteral("empty"), .position = {0, 400}, .name = QStringLiteral("EMPTY"), .attributes = {}});
         f.customer->customFill = QStringLiteral("#ffcdd2");
         f.board.selectShape(f.order->id);
         f.board.selectLink(f.relation->id, true);

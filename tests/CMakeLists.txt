@@ -2,6 +2,7 @@
 # widgets run without a display (Qt "offscreen" platform).
 function(duet_add_test name)
     add_executable(${name} ${name}.cpp)
+    duet_enable_warnings(${name})
     target_link_libraries(${name} PRIVATE duet_core Qt6::Test)
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

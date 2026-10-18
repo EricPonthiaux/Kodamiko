@@ -17,6 +17,8 @@
 #include <QPainter>
 #include <QtTest>
 
+#include <optional>
+
 using namespace diagram;
 using namespace diagram::explainer;
 
@@ -155,19 +157,21 @@ private slots:
         QVERIFY(model.meta.value(QStringLiteral("steps")).toArray().isEmpty());
 
         Board board;
-        document::Loaded loaded;
         QString error;
-        QVERIFY(document::load(board, QStringLiteral("new.board"), document::blank(QStringLiteral("explainer")), loaded,
-                               &error));
-        QCOMPARE(loaded.codec, &codec());
+        const std::optional<document::Loaded> loaded =
+            document::load(board, QStringLiteral("new.board"), document::blank(QStringLiteral("explainer")), &error);
+        QVERIFY(loaded);
+        QCOMPARE(loaded->codec, &codec());
         QVERIFY(board.isEmpty());
-        QVERIFY(!loaded.needsArrange);
+        QVERIFY(!loaded->needsArrange);
         // An empty board is written exactly as sidecar writes its draft.
         QCOMPARE(codec().serialize(board, board.meta), codec().blank());
 
         Board empty;
-        QVERIFY(document::load(empty, QStringLiteral("empty.board"), QByteArray(), loaded, &error));
-        QCOMPARE(loaded.codec, &codec());
+        const std::optional<document::Loaded> loadedEmpty =
+            document::load(empty, QStringLiteral("empty.board"), QByteArray(), &error);
+        QVERIFY(loadedEmpty);
+        QCOMPARE(loadedEmpty->codec, &codec());
     }
 
     // sciilo-board round-trips public elements and free-point edges
@@ -436,8 +440,11 @@ private slots:
                 QVERIFY2(!frame->rect().intersects(a->rect()), qPrintable(a->key));
         }
         // A frame leaves the layout no smaller than its floor.
-        QVERIFY(frame->w >= frame->layoutMinimumSize()->width());
-        QVERIFY(frame->h >= frame->layoutMinimumSize()->height());
+        // An invalid size (none given) fails the comparisons.
+        const QSizeF floor = frame->layoutMinimumSize().value_or(QSizeF());
+        QVERIFY(floor.isValid());
+        QVERIFY(frame->w >= floor.width());
+        QVERIFY(frame->h >= floor.height());
     }
 
     // frames and free strokes reserve enough room for their labels
@@ -552,11 +559,9 @@ private slots:
 
         // The document refuses it with that message.
         Board board;
-        document::Loaded loaded;
         QVERIFY(!document::load(
             board, QStringLiteral("bad.board"),
-            scene({element(R"({"id":"a","type":"node","x":0,"y":0,"tone":"x","fill":"red"})")}).toUtf8(), loaded,
-            &error));
+            scene({element(R"({"id":"a","type":"node","x":0,"y":0,"tone":"x","fill":"red"})")}).toUtf8(), &error));
         QCOMPARE(error, QStringLiteral("Invalid sciilo-board: a.fill must be a six-digit hex color"));
     }
 
@@ -584,7 +589,7 @@ private slots:
                                                         {QStringLiteral("w"), 124},
                                                         {QStringLiteral("h"), 108},
                                                         {QStringLiteral("label"), QStringLiteral("Key")}});
-        QCOMPARE(*triangle->graphvizLayoutSize(), QSizeF(triangle->w, triangle->h / 0.75));
+        QCOMPARE(triangle->graphvizLayoutSize().value_or(QSizeF()), QSizeF(triangle->w, triangle->h / 0.75));
         QVERIFY(!board.addShape(QStringLiteral("freeNode"), {{QStringLiteral("shape"), QStringLiteral("circle")}})
                      ->graphvizLayoutSize());
 
@@ -695,12 +700,12 @@ private slots:
     void documentRoundTrip()
     {
         Board board;
-        document::Loaded loaded;
         QString error;
-        QVERIFY2(document::load(board, QStringLiteral("rich.board"), QByteArray(kRich), loaded, &error),
-                 qPrintable(error));
-        QCOMPARE(loaded.codec, &codec());
-        QVERIFY(!loaded.needsArrange);
+        const std::optional<document::Loaded> loaded =
+            document::load(board, QStringLiteral("rich.board"), QByteArray(kRich), &error);
+        QVERIFY2(loaded, qPrintable(error));
+        QCOMPARE(loaded->codec, &codec());
+        QVERIFY(!loaded->needsArrange);
         Shape *query = byKey(board, QStringLiteral("query"));
         query->x += 15;
         auto *node = static_cast<FreeNodeShape *>(query);
@@ -711,7 +716,7 @@ private slots:
         QVERIFY(saved.endsWith('\n'));
 
         Board reloaded;
-        QVERIFY2(document::load(reloaded, QStringLiteral("rich.board"), saved, loaded, &error), qPrintable(error));
+        QVERIFY2(document::load(reloaded, QStringLiteral("rich.board"), saved, &error), qPrintable(error));
         QCOMPARE(int(reloaded.shapes().size()), int(board.shapes().size()));
         QCOMPARE(int(reloaded.links().size()), 1);
         for (const auto &s : board.shapes()) {
@@ -741,10 +746,11 @@ private slots:
                                          element(R"({"id":"bc","type":"edge","from":"b","to":"c"})")})
                                       .toUtf8();
         Board board;
-        document::Loaded loaded;
         QString error;
-        QVERIFY2(document::load(board, QStringLiteral("agent.board"), source, loaded, &error), qPrintable(error));
-        QVERIFY(loaded.needsArrange);
+        const std::optional<document::Loaded> loaded =
+            document::load(board, QStringLiteral("agent.board"), source, &error);
+        QVERIFY2(loaded, qPrintable(error));
+        QVERIFY(loaded->needsArrange);
         QVERIFY2(graphviz::autoArrange(board, familyOptions(), &error), qPrintable(error));
         for (const auto &a : board.shapes()) {
             for (const auto &b : board.shapes()) {
@@ -756,9 +762,10 @@ private slots:
         QVERIFY(inside(*frame->childBounds(board), byKey(board, QStringLiteral("d"))->rect()));
         // Once saved, the places are source data.
         Board reloaded;
-        QVERIFY(
-            document::load(reloaded, QStringLiteral("agent.board"), document::save(board, codec()), loaded, &error));
-        QVERIFY(!loaded.needsArrange);
+        const std::optional<document::Loaded> reloadedResult =
+            document::load(reloaded, QStringLiteral("agent.board"), document::save(board, codec()), &error);
+        QVERIFY(reloadedResult);
+        QVERIFY(!reloadedResult->needsArrange);
         QCOMPARE(byKey(reloaded, QStringLiteral("c"))->rect(), byKey(board, QStringLiteral("c"))->rect());
     }
 

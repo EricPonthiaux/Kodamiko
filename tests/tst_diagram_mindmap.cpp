@@ -18,6 +18,9 @@
 #include <QRegularExpression>
 #include <QtTest>
 
+#include <array>
+#include <optional>
+
 using namespace diagram;
 
 namespace {
@@ -105,14 +108,15 @@ Shape *byKey(const Board &board, const QString &key)
 
 bool loadInto(Board &board, const QString &name, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, name, content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, name, content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
 bool overlaps(const Board &board)
@@ -293,14 +297,14 @@ private slots:
     {
         Board board;
         board.setFamily(&families::mindmap());
-        const Font fonts[] = {Font(16, 600), Font(14, 500), Font(13)};
-        const qreal padX[] = {24, 18, 10};
-        const qreal padY[] = {16, 12, 6};
-        const qreal lineHeights[] = {23, 20, 19};
+        const std::array fonts{Font(16, 600), Font(14, 500), Font(13)};
+        const std::array<qreal, 3> padX{24, 18, 10};
+        const std::array<qreal, 3> padY{16, 12, 6};
+        const std::array<qreal, 3> lineHeights{23, 20, 19};
         for (int depth : {0, 1, 2, 5}) {
             const Shape *s = board.addShape(
                 {}, {{QStringLiteral("text"), QStringLiteral("Idea")}, {QStringLiteral("depth"), depth}});
-            const int l = mindmap::level(depth);
+            const auto l = std::size_t(mindmap::level(depth));
             QCOMPARE(s->w, text::width(fonts[l], QStringLiteral("Idea")) + padX[l] * 2);
             QCOMPARE(s->h, lineHeights[l] + padY[l] * 2);
         }

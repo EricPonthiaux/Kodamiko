@@ -15,6 +15,8 @@
 #include <QPainter>
 #include <QtTest>
 
+#include <optional>
+
 using namespace diagram;
 using namespace diagram::sequence;
 
@@ -86,14 +88,15 @@ QList<MessageLink *> messagesOf(const Board &board)
 
 bool load(Board &board, const QString &name, const QByteArray &content, document::Loaded *loaded = nullptr)
 {
-    document::Loaded result;
     QString error;
-    const bool ok = document::load(board, name, content, result, &error);
-    if (!ok)
+    std::optional<document::Loaded> result = document::load(board, name, content, &error);
+    if (!result) {
         qWarning() << error;
+        return false;
+    }
     if (loaded)
-        *loaded = std::move(result);
-    return ok;
+        *loaded = std::move(*result);
+    return true;
 }
 
 // What a file open does: the family's layout when elements have no place.
@@ -598,9 +601,9 @@ private slots:
         Fragment parBranch = par;
         parBranch.branchLabel = QStringLiteral("two");
         QStringList out;
-        QList<Fragment> active = syncFragments(out, {}, {loop, par}, QStringLiteral("  "), true);
-        active = syncFragments(out, active, {loop, parBranch}, QStringLiteral("  "), true);
-        active = syncFragments(out, active, {}, QStringLiteral("  "), true);
+        QList<Fragment> active = syncFragments(out, {}, {loop, par}, {QStringLiteral("  "), true});
+        active = syncFragments(out, active, {loop, parBranch}, {QStringLiteral("  "), true});
+        active = syncFragments(out, active, {}, {QStringLiteral("  "), true});
         QCOMPARE(out, (QStringList{QStringLiteral("  loop again"), QStringLiteral("  par one"),
                                    QStringLiteral("  and two"), QStringLiteral("  end"), QStringLiteral("  end")}));
         out.clear();
