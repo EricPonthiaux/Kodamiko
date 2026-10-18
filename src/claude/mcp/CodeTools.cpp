@@ -267,8 +267,8 @@ void positionalRequest(const DuetToolContext &context,
                        const QJsonObject &arguments,
                        const QString &method,
                        const QJsonObject &extraParams,
-                       const McpReply &reply,
-                       const std::function<McpResult(const QJsonValue &)> &convert)
+                       McpReply reply,
+                       std::function<McpResult(const QJsonValue &)> convert)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     QString error;
@@ -280,9 +280,11 @@ void positionalRequest(const DuetToolContext &context,
     QJsonObject params = positionParams(arguments, path);
     for (auto it = extraParams.begin(); it != extraParams.end(); ++it)
         params.insert(it.key(), it.value());
-    client->request(method, params, [reply, convert](const QJsonValue &result, const QString &failure) {
-        reply(failure.isEmpty() ? convert(result) : McpResult::error(failure));
-    });
+    client->request(
+        method, params,
+        [reply = std::move(reply), convert = std::move(convert)](const QJsonValue &result, const QString &failure) {
+            reply(failure.isEmpty() ? convert(result) : McpResult::error(failure));
+        });
 }
 
 // The code actions at a position, for a list or to apply one.

@@ -36,6 +36,7 @@ void write(const QTemporaryDir &dir, const QString &path, const QByteArray &cont
 
 // The editor's objects a tool context needs, on a project folder.
 struct Editor {
+    Q_DISABLE_COPY_MOVE(Editor)
     QTemporaryDir folder;
     EditorTabs tabs{Theme::dark()};
     SymbolIndex symbols;

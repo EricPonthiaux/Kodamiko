@@ -16,6 +16,7 @@ class QTimer;
 // error stays with Try Again and Close.
 class DiagramGenerationView : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(DiagramGenerationView)
 
 public:
     // Claude draws a `kindTitle` in `path`, inside `workDir`, showing

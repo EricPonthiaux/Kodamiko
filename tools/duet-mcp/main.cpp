@@ -87,6 +87,7 @@ void answerAlone(const QJsonObject &message)
 }
 
 class Relay : public QObject {
+    Q_DISABLE_COPY_MOVE(Relay)
 public:
     Relay()
     {

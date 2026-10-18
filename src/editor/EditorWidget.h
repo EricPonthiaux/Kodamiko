@@ -44,6 +44,7 @@ struct EditorOptions {
 // for the language detected from the file name.
 class EditorWidget : public QsciScintilla {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(EditorWidget)
 
 public:
     // The indentation guide of the caret's block: its column and the lines

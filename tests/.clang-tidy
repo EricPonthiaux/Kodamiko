@@ -2,11 +2,13 @@
 # macros cause:
 # - QVERIFY(optional) returns from the test when the optional is empty,
 #   which clang-tidy cannot see: every access after it would be reported.
+# - A test class serves only its file's QTEST_MAIN: an anonymous namespace
+#   around it would add a level for nothing.
 # - QTRY_VERIFY and QTRY_COMPARE expand to nested loops: any of them would
 #   pass the nesting threshold.
 ---
 InheritParentConfig: true
-Checks: '-bugprone-unchecked-optional-access'
+Checks: '-bugprone-unchecked-optional-access,-misc-use-internal-linkage'
 CheckOptions:
   readability-function-size.NestingThreshold: 'none'
 ...

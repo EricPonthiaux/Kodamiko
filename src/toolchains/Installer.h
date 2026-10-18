@@ -22,6 +22,7 @@ class Toolchains;
 // with the Node Duet has. A step that fails does not stop the others.
 class Installer : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(Installer)
 
 public:
     explicit Installer(Toolchains *toolchains, QObject *parent = nullptr);

@@ -54,6 +54,7 @@ struct Camera {
 
 class Canvas : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(Canvas)
 
 public:
     explicit Canvas(Board *board, QWidget *parent = nullptr);

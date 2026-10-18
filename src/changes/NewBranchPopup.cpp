@@ -15,7 +15,7 @@
 namespace {
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
-const char *branchRules = R"(
+constexpr const char *branchRules = R"(
 QLineEdit#branchName { padding: 7px 10px; border-radius: 8px; }
 QLabel#branchMessage[error="true"] { color: #e06c75; }
 QLabel#branchMessage[error="false"] { color: @muted; }

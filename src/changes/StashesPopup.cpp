@@ -16,7 +16,7 @@
 
 namespace {
 
-const char *stashRules = R"(
+constexpr const char *stashRules = R"(
 QListWidget#stashList { background: transparent; border: none; outline: 0; }
 QListWidget#stashList::item { padding: 8px 10px; border-radius: 8px; }
 QListWidget#stashList::item:hover { background: @hover; }

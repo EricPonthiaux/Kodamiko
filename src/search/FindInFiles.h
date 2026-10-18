@@ -48,6 +48,7 @@ QList<FindMatch> search(const QString &text, const QRegularExpression &pattern, 
 // search abandons the previous one.
 class FindInFilesSearch : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(FindInFilesSearch)
 
 public:
     static constexpr int matchLimit = 1000;

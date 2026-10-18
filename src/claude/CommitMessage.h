@@ -50,6 +50,7 @@ std::optional<QString> parseReply(const QByteArray &json, QString *error);
 // finished() or failed(); start() again or cancel() drops the one running.
 class CommitMessageGenerator : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(CommitMessageGenerator)
 
 public:
     explicit CommitMessageGenerator(QObject *parent = nullptr);

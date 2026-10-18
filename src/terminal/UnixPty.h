@@ -2,6 +2,8 @@
 
 #include "IPty.h"
 
+#include <QtGlobal>
+
 #include <sys/types.h>
 
 class QSocketNotifier;
@@ -10,6 +12,7 @@ class QSocketNotifier;
 // child process; we read and write on the master side, non-blocking.
 class UnixPty : public IPty {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(UnixPty)
 
 public:
     using IPty::IPty;

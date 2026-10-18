@@ -47,6 +47,7 @@ class SnippetSession;
 // erased right after being inserted lower (see CompletionHistory).
 class CompletionController : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(CompletionController)
 
 public:
     CompletionController(EditorWidget *editor, CompletionService *service);

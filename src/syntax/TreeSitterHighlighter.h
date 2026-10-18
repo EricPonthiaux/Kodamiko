@@ -21,6 +21,7 @@ struct TreeSitterGrammar;
 // Scintilla positions and tree-sitter bytes coincide.
 class TreeSitterHighlighter : public QObject, public ISyntaxHighlighter {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(TreeSitterHighlighter)
 
 public:
     explicit TreeSitterHighlighter(const TreeSitterGrammar &grammar);

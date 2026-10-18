@@ -32,6 +32,7 @@ struct LanguageServerSpec {
 // for the project's runtime (its JDK, Python, C++ standard).
 class LanguageServers : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LanguageServers)
 
 public:
     explicit LanguageServers(QObject *parent = nullptr);

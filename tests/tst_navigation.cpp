@@ -17,7 +17,7 @@
 
 namespace {
 
-const char *header = R"(
+constexpr const char *header = R"(
 namespace app {
 class Widget {
 public:
@@ -28,7 +28,7 @@ public:
 } // namespace app
 )";
 
-const char *source = R"(
+constexpr const char *source = R"(
 namespace app {
 Widget::Widget() {}
 void Widget::load() { size_ = 0; }

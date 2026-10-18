@@ -92,7 +92,7 @@ void setFontSizeValue(QSpinBox *size, int value)
 }
 
 // The side bar and the keymap, besides the shared rules (popupStyleSheet).
-const char *preferencesRules = R"(
+constexpr const char *preferencesRules = R"(
 QFrame#preferencesSidebar { background: @window; border: none; border-right: 1px solid @line;
                             border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
 QListWidget#preferencesNav { background: transparent; border: none; outline: 0; }

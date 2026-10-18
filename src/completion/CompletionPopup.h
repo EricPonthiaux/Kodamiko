@@ -21,6 +21,7 @@ class CompletionListModel;
 // and opening the list or moving in it is announced (see announce()).
 class CompletionPopup : public QFrame {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(CompletionPopup)
 
 public:
     explicit CompletionPopup(QWidget *parent);

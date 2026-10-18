@@ -40,9 +40,13 @@ constexpr qreal foldMarkRatio = 2;
 constexpr int guideSearchLines = 2000;
 
 // Navigation shortcuts (see CodeNavigator) until MainWindow passes the
-// menu's shortcuts.
+// menu's shortcuts. Shared by every editor: the keymap is the
+// application's.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 QList<int> reservedKeys = {(Qt::CTRL | Qt::Key_B).toCombined(), (Qt::ALT | Qt::Key_Left).toCombined(),
                            (Qt::ALT | Qt::Key_Right).toCombined()};
+// The editors alive, which a keymap change reaches.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::vector<EditorWidget *> liveEditors;
 
 // A thin chevron pointing right (a folded block) or down (an open one).

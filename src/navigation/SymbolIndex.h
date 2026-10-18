@@ -31,6 +31,7 @@ struct SymbolLocation {
 // files ignored by git are not read.
 class SymbolIndex : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(SymbolIndex)
 
 public:
     explicit SymbolIndex(QObject *parent = nullptr);

@@ -7,6 +7,7 @@ Checks: >
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
+  -bugprone-signed-bitwise,
   -bugprone-throwing-static-initialization,
   clang-analyzer-*,
   -clang-analyzer-optin.cplusplus.VirtualCall,
@@ -20,6 +21,7 @@ Checks: >
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-prefer-member-initializer,
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -cppcoreguidelines-pro-type-static-cast-downcast,
   -cppcoreguidelines-pro-type-vararg,
@@ -38,6 +40,7 @@ Checks: >
   -modernize-use-ranges,
   performance-*,
   -performance-enum-size,
+  -performance-implicit-conversion-in-loop,
   readability-*,
   -readability-braces-around-statements,
   -readability-identifier-length,
@@ -70,6 +73,11 @@ Checks: >
 #   std::cmp_greater_equal(row, list.size()).
 # - use-ranges: std::sort(list.begin(), list.end()) is as clear, and the
 #   rewrite breaks comparators that compare two types.
+# - signed-bitwise: Scintilla's and Qt's flags and masks are ints.
+# - prefer-member-initializer: a constructor creates its child widgets in
+#   its body, in the order of the layout, which sets their tab order.
+# - implicit-conversion-in-loop: QJsonArray's iterators yield proxies;
+#   `const QJsonValue &item` is the readable loop over them.
 # - enum-size: an enum class's int is no cost worth a uint8_t everywhere.
 # - pointer arithmetic, reinterpret_cast, varargs: Scintilla, libgit2 and
 #   libvterm are C APIs.

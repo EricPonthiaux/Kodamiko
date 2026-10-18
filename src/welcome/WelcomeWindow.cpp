@@ -39,7 +39,7 @@ constexpr int pathRole = Qt::UserRole;
 constexpr int languagesRole = Qt::UserRole + 1;
 constexpr int missingRole = Qt::UserRole + 2;
 
-const char *welcomeRules = R"(
+constexpr const char *welcomeRules = R"(
 QWidget#welcomeSide { background: @panel; border-right: 1px solid @line; }
 QLabel#welcomeVersion { color: @muted; }
 QLineEdit#welcomeSearch { padding: 6px 10px; border-radius: 8px; }

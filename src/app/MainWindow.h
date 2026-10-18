@@ -75,6 +75,7 @@ struct RunConfiguration;
 // signals.
 class MainWindow : public QMainWindow {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MainWindow)
 
 public:
     enum class Mode {

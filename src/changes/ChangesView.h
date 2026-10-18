@@ -26,6 +26,7 @@ class QTreeWidgetItem;
 // lines, discard changes and commit. Operations go through GitCommands.
 class ChangesView : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ChangesView)
 
 public:
     ChangesView(const Theme &theme, GitCommands *commands, QWidget *parent = nullptr);

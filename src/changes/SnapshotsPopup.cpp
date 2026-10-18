@@ -26,7 +26,7 @@ enum Role {
 };
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
-const char *snapshotRules = R"(
+constexpr const char *snapshotRules = R"(
 QListWidget#snapshotList, QListWidget#snapshotFiles { background: transparent; border: none; outline: 0; }
 QListWidget#snapshotFiles::item { padding: 3px 4px; border-radius: 5px; }
 QListWidget#snapshotFiles::item:hover { background: @hover; }

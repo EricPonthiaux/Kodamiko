@@ -75,9 +75,9 @@ QJsonObject commitJson(const CommitSummary &commit)
 
 // Runs a git job with the editor's other git work (one at a time, off the
 // UI thread), then tells the editor the repository changed.
-void runGit(const DuetToolContext &context, GitCommands::Job job, const McpReply &reply)
+void runGit(const DuetToolContext &context, GitCommands::Job job, McpReply reply)
 {
-    const auto done = [context, reply](const QString &message, const QString &error) {
+    const auto done = [context, reply = std::move(reply)](const QString &message, const QString &error) {
         if (context.repositoryChanged)
             context.repositoryChanged();
         reply(error.isEmpty() ? McpResult::message(message) : McpResult::error(error));
@@ -94,18 +94,18 @@ void runGit(const DuetToolContext &context, GitCommands::Job job, const McpReply
 
 // Same for a job that talks to a remote: git may ask the user for
 // credentials (see AskpassServer).
-void runRemoteGit(const DuetToolContext &context, GitCommands::LongJob job, const McpReply &reply)
+void runRemoteGit(const DuetToolContext &context, GitCommands::LongJob job, McpReply reply)
 {
-    const auto done = [context, reply](const QString &message, const QString &error) {
+    if (!context.git) {
+        runGit(context, [job] { return job({}); }, std::move(reply));
+        return;
+    }
+    const auto done = [context, reply = std::move(reply)](const QString &message, const QString &error) {
         if (context.repositoryChanged)
             context.repositoryChanged();
         reply(error.isEmpty() ? McpResult::message(message) : McpResult::error(error));
     };
-    if (context.git) {
-        context.git->runLongQuietly(std::move(job), done);
-        return;
-    }
-    runGit(context, [job] { return job({}); }, reply);
+    context.git->runLongQuietly(std::move(job), done);
 }
 
 // "origin/main ↑2 ↓1" and the like, for get_git_status.

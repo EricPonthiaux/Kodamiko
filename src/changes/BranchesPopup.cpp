@@ -28,7 +28,7 @@ enum Role {
 };
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
-const char *branchesRules = R"(
+constexpr const char *branchesRules = R"(
 QLineEdit#branchFilter { padding: 7px 10px; border-radius: 8px; }
 QListWidget#branchList { background: transparent; border: none; outline: 0; }
 QLabel#branchesEmpty { color: @muted; }

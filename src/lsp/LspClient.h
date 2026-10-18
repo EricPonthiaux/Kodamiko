@@ -16,6 +16,7 @@
 // answered "initialize" wait for it.
 class LspClient : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LspClient)
 
 public:
     using ResponseHandler = std::function<void(const QJsonValue &result, const QString &error)>;

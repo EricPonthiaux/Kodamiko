@@ -39,6 +39,7 @@ FileStatusMap folderStatuses(const FileStatusMap &statuses, const QString &root)
 // progress are merged into a single new read.
 class FileStatusReader : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(FileStatusReader)
 
 public:
     explicit FileStatusReader(QObject *parent = nullptr);

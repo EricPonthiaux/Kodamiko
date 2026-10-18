@@ -15,6 +15,7 @@
 // freeze the editor.
 class GitCommands : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(GitCommands)
 
 public:
     // Runs off the UI thread: must not touch any widget.

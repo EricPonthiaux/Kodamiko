@@ -19,6 +19,7 @@ class RecentFiles;
 // wrote instead of those opened.
 class GoToPopup : public OverlayPopup {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(GoToPopup)
 
 public:
     enum class Tab {

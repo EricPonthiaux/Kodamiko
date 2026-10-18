@@ -24,6 +24,7 @@ class QTreeWidgetItem;
 // the first parent. The repository is only read.
 class HistoryView : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(HistoryView)
 
 public:
     explicit HistoryView(const Theme &theme, QWidget *parent = nullptr);

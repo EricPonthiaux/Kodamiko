@@ -33,6 +33,7 @@ struct TerminalCell {
 // cell() accesses them with negative row numbers.
 class VtScreen : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(VtScreen)
 
 public:
     VtScreen(int rows, int columns, QObject *parent = nullptr);
