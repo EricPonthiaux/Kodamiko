@@ -24,22 +24,31 @@ public:
     QJsonObject toJson() const override;
     void measure(const Board &board) override;
     void resizeTo(qreal width, qreal height, const Board &board) override;
+
     bool staysInsideParent() const override { return true; }
+
     void onDoubleClick(Board &board) override;
     QPointF borderPoint(QPointF toward) const override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
     std::optional<QSizeF> graphvizLayoutSize() const override;
-    QStringList graphvizNodeAttributes(const Board &board, const QString &rankdir, qreal width,
+    QStringList graphvizNodeAttributes(const Board &board,
+                                       const QString &rankdir,
+                                       qreal width,
                                        qreal height) const override;
+
     QString displayText() const override { return label; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
 
     // Where the text lives inside the outline, in world coordinates.
     QRectF textRect() const;
+
     const QStringList &lines() const { return lines_; }
+
     qreal minWidth() const { return minWidth_; }
+
     qreal minHeight() const { return minHeight_; }
 
     QString label;
@@ -72,13 +81,21 @@ public:
     bool hitTest(QPointF point) const override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     bool drawBehindLinks() const override { return true; }
+
     bool staysInsideParent() const override { return true; }
+
     bool movesChildren() const override { return true; }
+
     bool isCreationContainer() const override { return true; }
+
     std::optional<QRectF> childBounds(const Board &board) const override;
+
     bool isGraphvizCluster() const override { return true; }
+
     QString layoutLabel() const override { return title; }
+
     // The band Graphviz leaves free at the top of the cluster is the one the
     // frame really paints; otherwise it reserves room for a smaller title and
     // the children are pushed down after the placement.
@@ -87,13 +104,17 @@ public:
     // deduced from its content: announced, it does not grow after the
     // placement into the neighboring frame.
     std::optional<QSizeF> layoutMinimumSize() const override;
+
     bool routingObstacle() const override { return false; }
+
     QString displayText() const override { return title; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
 
     const QStringList &titleLines() const { return titleLines_; }
+
     qreal titleHeight() const { return titleHeight_; }
 
     QString title;
@@ -116,8 +137,11 @@ public:
 
     void load(const QJsonObject &props) override;
     QJsonObject toJson() const override;
+
     bool resizable() const override { return false; }
+
     bool hitTest(QPointF) const override { return false; }
+
     void draw(QPainter &, const Board &, const ShapeState &) const override { }
 
     QString sourceEdgeId;
@@ -132,14 +156,19 @@ public:
 
     void load(const QJsonObject &props) override;
     QJsonObject toJson() const override;
+
     bool resizable() const override { return false; }
+
     void measure(const Board &board) override;
     std::optional<QRectF> bounds(const Board &board) const override;
     bool hitTest(QPointF point) const override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     bool routingObstacle() const override { return false; }
+
     QString displayText() const override { return label; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;

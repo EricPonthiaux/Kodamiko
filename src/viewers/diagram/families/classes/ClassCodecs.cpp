@@ -5,7 +5,6 @@
 // end: `A <|-- B` (the triangle at A) becomes from=B, to=A, kind=extension.
 
 #include "Classes.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -47,8 +46,13 @@ struct ClassNodes {
     }
 };
 
-void addRelation(Model &model, const ClassNode &a, const ClassNode &b, const QString &token, const QString &leftCard,
-                 const QString &rightCard, const QString &label)
+void addRelation(Model &model,
+                 const ClassNode &a,
+                 const ClassNode &b,
+                 const QString &token,
+                 const QString &leftCard,
+                 const QString &rightCard,
+                 const QString &label)
 {
     const UmlRelation *relation = nullptr;
     for (const UmlRelation &candidate : umlRelations()) {
@@ -141,8 +145,11 @@ const QRegularExpression &mermaidHeader()
 class MermaidClass : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-class"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("Class diagram"); }
+
     const Family &family() const override { return families::classes(); }
 
     bool matches(const QString &source) const override
@@ -325,8 +332,11 @@ QString canonicalArrows(QString stmt)
 class PlantumlClass : public Codec {
 public:
     QString id() const override { return QStringLiteral("plantuml-class"); }
+
     QString language() const override { return QStringLiteral("plantuml"); }
+
     QString title() const override { return QStringLiteral("Class diagram"); }
+
     const Family &family() const override { return families::classes(); }
 
     bool matches(const QString &source) const override

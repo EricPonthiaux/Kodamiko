@@ -29,8 +29,11 @@ public:
     void applyTheme(const Theme &theme);
 
     QLineEdit *filterField() const { return filter_; }
+
     QListWidget *list() const { return list_; }
+
     QPushButton *switchButton() const { return switch_; }
+
     // The selected branch, if any.
     const BranchInfo *selected() const;
     void switchToSelected();

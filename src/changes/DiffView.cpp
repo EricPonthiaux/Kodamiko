@@ -29,8 +29,10 @@ enum Style {
     FileMarginStyle,
     HunkMarginStyle
 };
+
 constexpr int firstSyntaxStyle = 64;
 constexpr int lastSyntaxStyle = 255;
+
 // Markers: full-line backgrounds, and a stronger strip in the side margin.
 enum Marker {
     AddedBackground = 0,
@@ -42,11 +44,13 @@ enum Marker {
     FileHeaderStrip,
     HunkHeaderStrip
 };
+
 // Indicators: the words that changed within a line.
 enum Indicator {
     AddedWords = 8,
     RemovedWords
 };
+
 constexpr int numberMargin = 0;
 constexpr int stripMargin = 1;
 // Beyond this, a file's code is not colored: the diff appears at once.
@@ -473,11 +477,13 @@ void DiffView::highlightSyntax(int file)
     // between them: removed lines are colored in the old one, the others in
     // the new one, each where it stands in its own code.
     QByteArray sides[2];
+
     struct Place {
         int line;
         int side;
         qsizetype offset;
     };
+
     QList<Place> places;
     int hunk = -1;
     for (int i = fileStarts_[file]; i < lines_.size() && lines_[i].location.file == file; ++i) {

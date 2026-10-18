@@ -61,7 +61,9 @@ QList<SymbolLocation> named(const QList<SymbolLocation> &symbols, const QString 
     return result;
 }
 
-const SymbolLocation &find(const QList<SymbolLocation> &symbols, const QString &name, const QString &file,
+const SymbolLocation &find(const QList<SymbolLocation> &symbols,
+                           const QString &name,
+                           const QString &file,
                            bool declarationOnly)
 {
     for (const SymbolLocation &symbol : symbols) {
@@ -96,6 +98,7 @@ class TestNavigation : public QObject {
     Q_OBJECT
 
 private slots:
+
     void flattenGivesSimpleNamesAndContainers()
     {
         const QList<SymbolLocation> symbols = symbolsOf(QStringLiteral("a.cpp"), source);

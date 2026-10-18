@@ -29,6 +29,7 @@ public:
     void resizeTo(qreal width, qreal height, const Board &board) override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     QString displayText() const override { return text; }
 
     QString text;

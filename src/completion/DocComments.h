@@ -27,5 +27,6 @@ class DocCommentProvider : public ICompletionProvider {
 public:
     bool handles(const CompletionContext &context) const override;
     void complete(const CompletionContext &context, const Callback &done) override;
+
     bool servesComments() const override { return true; }
 };

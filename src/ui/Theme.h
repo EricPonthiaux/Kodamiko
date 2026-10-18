@@ -1,8 +1,8 @@
 #pragma once
 
 #include "AppFonts.h"
-#include <QColor>
 
+#include <QColor>
 #include <QFont>
 #include <QList>
 #include <QString>

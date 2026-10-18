@@ -149,7 +149,11 @@ struct Line {
 // Lines of `node`; its scope is written only where it differs from the
 // scope of the line above it in the tree (`shown`), or where it replaced
 // something.
-void renderNode(const Node &node, const QString &indent, const QString &prefix, bool comma, std::optional<Scope> shown,
+void renderNode(const Node &node,
+                const QString &indent,
+                const QString &prefix,
+                bool comma,
+                std::optional<Scope> shown,
                 QList<Line> *lines)
 {
     const QString end = comma ? QStringLiteral(",") : QString();

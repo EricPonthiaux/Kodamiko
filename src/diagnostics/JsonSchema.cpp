@@ -187,6 +187,7 @@ struct JsonSchema::Result {
     {
         diagnostics.append({Diagnostic::Severity::Warning, start, std::max(end, start + 1), message});
     }
+
     void add(const JsonNode &node, const QString &message)
     {
         const auto [start, end] = rangeOf(node);

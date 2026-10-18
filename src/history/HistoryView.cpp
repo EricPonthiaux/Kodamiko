@@ -42,7 +42,10 @@ QString formatDate(const QDateTime &date)
 }
 
 // Closable pane: a bar with its title and a close button, above the content.
-QWidget *closablePane(QLabel *title, QWidget *content, const QString &closeTip, QWidget *parent,
+QWidget *closablePane(QLabel *title,
+                      QWidget *content,
+                      const QString &closeTip,
+                      QWidget *parent,
                       const std::function<void()> &onClose)
 {
     auto *pane = new QWidget(parent);

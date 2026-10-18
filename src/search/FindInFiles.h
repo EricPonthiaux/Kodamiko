@@ -59,6 +59,7 @@ public:
     // `buffers`: text of files open with unsaved changes, by absolute path.
     void start(const QString &folder, const FindQuery &query, const QHash<QString, QString> &buffers = {});
     void cancel();
+
     bool isRunning() const { return running_ > 0; }
 
 signals:

@@ -7,7 +7,7 @@ Checks: >
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
-  cert-err58-cpp,
+  -bugprone-throwing-static-initialization,
   clang-analyzer-*,
   -clang-analyzer-optin.cplusplus.VirtualCall,
   cppcoreguidelines-*,
@@ -20,8 +20,8 @@ Checks: >
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
-  -performance-enum-size,
   -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-static-cast-downcast,
   -cppcoreguidelines-pro-type-vararg,
   -cppcoreguidelines-narrowing-conversions,
   misc-*,
@@ -29,24 +29,39 @@ Checks: >
   -misc-no-recursion,
   -misc-non-private-member-variables-in-classes,
   modernize-*,
+  -modernize-avoid-c-style-cast,
   -modernize-use-trailing-return-type,
   -modernize-use-nodiscard,
   -modernize-use-designated-initializers,
   performance-*,
+  -performance-enum-size,
   readability-*,
   -readability-braces-around-statements,
   -readability-identifier-length,
   -readability-implicit-bool-conversion,
   -readability-magic-numbers,
+  -readability-math-missing-parentheses,
+  -readability-named-parameter,
   -readability-redundant-access-specifiers,
   -readability-convert-member-functions-to-static,
   -readability-trailing-comma
 
-# Why some checks are off:
+# Why some checks are off (a check removed with `-` must come after the
+# group that adds it):
 # - owning-memory: Qt widgets are created with `new` and owned by their parent.
 # - redundant-access-specifiers: `public slots:` / `signals:` sections.
 # - braces-around-statements: single-statement `if` without braces is the style.
 # - implicit-bool-conversion: `if (pointer)` is idiomatic with Qt.
+# - avoid-c-style-cast: it also reports functional casts (`int(x)`), the
+#   style for arithmetic conversions; true C-style casts are still reported
+#   by cppcoreguidelines-pro-type-cstyle-cast.
+# - pro-type-static-cast-downcast: Qt hands events as QEvent, to be cast to
+#   the type their type() names; QObjects go down with qobject_cast.
+# - throwing-static-initialization (and cert-err58-cpp): a static QString or
+#   QRegularExpression throws only when memory runs out.
+# - math-missing-parentheses: `a * b + c` reads as it computes.
+# - named-parameter: an override does not name what it does not use.
+# - enum-size: an enum class's int is no cost worth a uint8_t everywhere.
 # - pointer arithmetic, reinterpret_cast, varargs: Scintilla, libgit2 and
 #   libvterm are C APIs.
 

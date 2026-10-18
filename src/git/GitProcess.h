@@ -35,7 +35,9 @@ struct RunOptions {
 // program), and paths passed after "--" are taken literally.
 // Throws GitError (with git's error output) on failure.
 QByteArray run(const QString &workDir, const QStringList &arguments, const RunOptions &options);
-QByteArray run(const QString &workDir, const QStringList &arguments, const QByteArray &input = {},
+QByteArray run(const QString &workDir,
+               const QStringList &arguments,
+               const QByteArray &input = {},
                const QHash<QString, QString> &environment = {});
 
 // Environment for the commands whose error messages are read (to tell a

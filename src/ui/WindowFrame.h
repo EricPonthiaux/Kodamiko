@@ -22,7 +22,9 @@ public:
 
     // Frameless: Duet's frame; otherwise the system's.
     void setFrameless(bool frameless);
+
     bool isFrameless() const { return frameless_; }
+
     void applyTheme(const Theme &theme);
 
     // Edges to resize from at `position` in a window of `size` whose

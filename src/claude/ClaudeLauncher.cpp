@@ -184,7 +184,9 @@ QString findClaudeExecutable()
                                                                      home + QStringLiteral("/.npm-global/bin")});
 }
 
-std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName, QString *error,
+std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
+                                         const QString &hookServerName,
+                                         QString *error,
                                          const QStringList &extraArguments,
                                          const std::optional<QStringList> &mcpReadOnlyTools)
 {

@@ -19,7 +19,9 @@ public:
 
     // Checks the programs again and updates the dialog.
     void recheck();
+
     const QList<Prerequisite> &prerequisites() const { return prerequisites_; }
+
     bool allOk() const;
 
 signals:

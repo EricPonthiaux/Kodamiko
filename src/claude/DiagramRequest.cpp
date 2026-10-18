@@ -49,7 +49,9 @@ QString prompt(const QString &kindTitle, const QString &relativePath, const QStr
         .arg(kindTitle, relativePath, description.trimmed());
 }
 
-QStringList arguments(const QString &prompt, const QString &relativePath, const QString &pluginPath,
+QStringList arguments(const QString &prompt,
+                      const QString &relativePath,
+                      const QString &pluginPath,
                       const QString &hookCommand)
 {
     // The prompt first: --allowedTools takes every argument that follows.

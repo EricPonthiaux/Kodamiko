@@ -53,6 +53,7 @@ class TestRun : public QObject {
     Q_OBJECT
 
 private slots:
+
     void initTestCase()
     {
         QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));

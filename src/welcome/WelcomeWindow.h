@@ -33,6 +33,7 @@ public:
     void open(const QString &path);
     // Shows the setup of `path`, detected again if it was never set up.
     void configure(const QString &path);
+
     QListWidget *projectList() const { return list_; }
 
 signals:

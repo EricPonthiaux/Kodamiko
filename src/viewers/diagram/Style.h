@@ -58,24 +58,30 @@ struct Style {
     qreal minScale = 0.15;
     qreal maxScale = 4;
     qreal fitMaxScale = 1.25;
+
     struct {
         qreal radius = 4;
         QColor fill, stroke, selectedStroke, guide;
     } shape;
+
     struct {
         QColor color;
         qreal width = 2;
         qreal arrow = 9;
     } link;
+
     Tones tones;
+
     struct {
         qreal fontPx = 12, padX = 6, padY = 3;
         QColor bg, stroke, color;
     } linkLabel;
+
     struct {
         qreal radius = 6;
         QColor fill, stroke;
     } port;
+
     // True for the light, printable palette of exports.
     bool print = false;
 
@@ -113,6 +119,7 @@ struct Font {
     bool mono = false; // the code font (sidecar's fontMono is its sans font)
 
     Font() = default;
+
     constexpr Font(qreal px_, int weight_ = 400, bool italic_ = false, bool mono_ = false)
         : px(px_)
         , weight(weight_)
@@ -148,8 +155,13 @@ QStringList wrap(const Font &font, const QString &text, qreal maxWidth);
 // Widest of these lines.
 qreal widest(const Font &font, const QStringList &lines);
 // fillText: `text` at `position`, aligned and on the baseline given.
-void draw(QPainter &painter, const Font &font, const QString &text, QPointF position, const QColor &color,
-          Align align = Align::Left, Baseline baseline = Baseline::Alphabetic);
+void draw(QPainter &painter,
+          const Font &font,
+          const QString &text,
+          QPointF position,
+          const QColor &color,
+          Align align = Align::Left,
+          Baseline baseline = Baseline::Alphabetic);
 // The ellipsized text that fits `maxWidth`.
 QString elided(const Font &font, const QString &text, qreal maxWidth);
 
@@ -165,10 +177,17 @@ QPainterPath ellipse(QPointF center, qreal rx, qreal ry);
 // Fills `path` with sidecar's short shadow under it.
 void shadowFill(QPainter &painter, const QPainterPath &path, const QColor &fill, const Style &style);
 // Strokes `path` in world units; `dash` in world units, as setLineDash().
-void stroke(QPainter &painter, const QPainterPath &path, const QColor &color, qreal width,
+void stroke(QPainter &painter,
+            const QPainterPath &path,
+            const QColor &color,
+            qreal width,
             const QList<qreal> &dash = {});
 // A polyline or curve with an optional dash.
-void strokeLine(QPainter &painter, QPointF from, QPointF to, const QColor &color, qreal width,
+void strokeLine(QPainter &painter,
+                QPointF from,
+                QPointF to,
+                const QColor &color,
+                qreal width,
                 const QList<qreal> &dash = {});
 
 // ---------------------------------------------------------------------------

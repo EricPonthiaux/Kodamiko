@@ -75,6 +75,7 @@ class TestDiagramView : public QObject {
     Q_OBJECT
 
 private slots:
+
     // The model, its history and selection, without a window.
     void editsAndUndoesTheDocument()
     {

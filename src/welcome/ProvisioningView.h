@@ -21,6 +21,7 @@ public:
     void start(const QList<InstallStep> &steps);
     void cancel();
     bool isRunning() const;
+
     // The steps that failed in the last run.
     QList<InstallStep> failedSteps() const { return failed_; }
 
@@ -32,6 +33,7 @@ private:
         QLabel *status;
         QProgressBar *bar;
     };
+
     void onProgress(int index, qint64 received, qint64 total);
     void onStepFinished(int index, const QString &error);
 

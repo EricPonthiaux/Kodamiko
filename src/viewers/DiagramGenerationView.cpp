@@ -70,8 +70,11 @@ QString errorColor(const QPalette &palette)
 
 } // namespace
 
-DiagramGenerationView::DiagramGenerationView(const QString &workDir, const QString &path, const QString &kindTitle,
-                                             const QString &description, QWidget *parent)
+DiagramGenerationView::DiagramGenerationView(const QString &workDir,
+                                             const QString &path,
+                                             const QString &kindTitle,
+                                             const QString &description,
+                                             QWidget *parent)
     : QWidget(parent)
     , workDir_(workDir)
     , path_(path)

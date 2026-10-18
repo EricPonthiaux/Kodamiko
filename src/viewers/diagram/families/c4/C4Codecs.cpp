@@ -3,7 +3,6 @@
 // nested enterprise / system / container / deployment boundaries.
 
 #include "C4.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -139,8 +138,11 @@ QString quote(const QString &value)
 class MermaidC4 : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-c4"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("C4 architecture"); }
+
     const Family &family() const override { return families::c4(); }
 
     bool matches(const QString &source) const override

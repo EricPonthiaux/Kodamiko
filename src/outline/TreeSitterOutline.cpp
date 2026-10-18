@@ -51,7 +51,8 @@ void blankWord(QByteArray &text, const QByteArray &word)
 
 } // namespace
 
-TreeSitterOutline::TreeSitterOutline(const TSLanguage *language, const HighlightQuery &query,
+TreeSitterOutline::TreeSitterOutline(const TSLanguage *language,
+                                     const HighlightQuery &query,
                                      QByteArrayList blankedMacros)
     : query_(query)
     , blankedMacros_(std::move(blankedMacros))

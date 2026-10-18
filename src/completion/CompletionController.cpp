@@ -12,12 +12,11 @@
 #include "editor/EditorWidget.h"
 #include "syntax/ScintillaStyles.h"
 
-#include <Qsci/qscilexer.h>
-
 #include <QKeyEvent>
 #include <QPainter>
 #include <QRegularExpression>
 #include <QScrollBar>
+#include <Qsci/qscilexer.h>
 
 namespace {
 
@@ -53,7 +52,11 @@ public:
         hide();
     }
 
-    void show(const QString &text, const QString &key, const QFont &font, const QColor &color, QPoint topLeft,
+    void show(const QString &text,
+              const QString &key,
+              const QFont &font,
+              const QColor &color,
+              QPoint topLeft,
               int lineHeight)
     {
         text_ = text;
@@ -70,6 +73,7 @@ public:
         raise();
         update();
     }
+
     QString text() const { return isVisible() ? text_ : QString(); }
 
 protected:
@@ -990,7 +994,9 @@ int CompletionController::positionOf(int line, int column) const
     return lineStart + int(editor_->text(line).left(column).toUtf8().size());
 }
 
-void CompletionController::applyEdits(const QList<TextEdit> &edits, int insertStart, int insertedBytes,
+void CompletionController::applyEdits(const QList<TextEdit> &edits,
+                                      int insertStart,
+                                      int insertedBytes,
                                       int replacedBytes)
 {
     struct Range {
@@ -998,6 +1004,7 @@ void CompletionController::applyEdits(const QList<TextEdit> &edits, int insertSt
         int end;
         QByteArray text;
     };
+
     QList<Range> ranges;
     for (const TextEdit &edit : edits) {
         // Positions of the text before the insertion: those after it move.

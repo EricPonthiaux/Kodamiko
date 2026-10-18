@@ -106,6 +106,7 @@ class TestDiagramC4 : public QObject {
     Q_OBJECT
 
 private slots:
+
     void exposesEveryElementAndRelation()
     {
         const Family &f = families::c4();

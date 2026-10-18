@@ -106,7 +106,9 @@ QByteArray run(const QString &workDir, const QStringList &arguments, const RunOp
     return output;
 }
 
-QByteArray run(const QString &workDir, const QStringList &arguments, const QByteArray &input,
+QByteArray run(const QString &workDir,
+               const QStringList &arguments,
+               const QByteArray &input,
                const QHash<QString, QString> &environment)
 {
     return run(workDir, arguments, RunOptions{input, environment, {}});

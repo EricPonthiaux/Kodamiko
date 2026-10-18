@@ -157,6 +157,7 @@ class TestDiagramSequence : public QObject {
     Q_OBJECT
 
 private slots:
+
     void familyIsRegistered()
     {
         const Family *family = findFamily(QStringLiteral("sequence"));

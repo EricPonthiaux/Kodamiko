@@ -179,7 +179,11 @@ Snap snapAlignment(const QRectF &moving, const std::vector<QRectF> &targets, qre
     return snap;
 }
 
-void drawArrowPreview(QPainter &painter, QPointF a, QPointF b, const Style &style, const QList<qreal> &dash = {},
+void drawArrowPreview(QPainter &painter,
+                      QPointF a,
+                      QPointF b,
+                      const Style &style,
+                      const QList<qreal> &dash = {},
                       bool head = true)
 {
     const qreal angle = std::atan2(b.y() - a.y(), b.x() - a.x());
@@ -452,10 +456,12 @@ void Canvas::withVisualGeometry(Fn draw)
         return;
     }
     const qreal t = easeOut((clock_.elapsed() - geometryStart_) / geometryMs);
+
     struct Saved {
         Shape *shape;
         QRectF box;
     };
+
     std::vector<Saved> shapes;
     for (const auto &s : board_->shapes()) {
         const auto from = geometryFrom_.constFind(s->id);
@@ -469,6 +475,7 @@ void Canvas::withVisualGeometry(Fn draw)
         s->w = view.width();
         s->h = view.height();
     }
+
     // Each final curve is warped with its two ends, so that no arrow ever
     // detaches from its node.
     struct SavedLink {
@@ -476,6 +483,7 @@ void Canvas::withVisualGeometry(Fn draw)
         std::optional<Spline> spline;
         std::optional<Link::ReservedLabel> label;
     };
+
     std::vector<SavedLink> links;
     for (const auto &l : board_->links()) {
         links.push_back({l.get(), l->spline, l->layoutLabelPoint});

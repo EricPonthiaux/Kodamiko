@@ -25,9 +25,13 @@ public:
     void applyTheme(const Theme &theme);
 
     QLineEdit *nameField() const { return name_; }
+
     ToggleSwitch *switchToggle() const { return switchTo_; }
+
     QPushButton *createButton() const { return create_; }
+
     QLabel *message() const { return message_; }
+
     // Emits createRequested if the name is valid.
     void create();
 

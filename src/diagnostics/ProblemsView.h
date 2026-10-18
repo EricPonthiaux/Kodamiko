@@ -25,7 +25,9 @@ public:
     void setDarkIcons(bool dark);
 
     QTreeWidget *tree() const { return tree_; }
+
     int errorCount() const { return errors_; }
+
     int warningCount() const { return warnings_; }
 
 signals:

@@ -21,6 +21,7 @@ public:
     // The strip, the full height of the window's edge, for the caller to
     // place there; its tabs at the top.
     QWidget *strip() const { return strip_; }
+
     QTabBar *tabBar() const;
 
     int addView(QWidget *view, const QIcon &icon, const QString &title);
@@ -31,6 +32,7 @@ public:
     void showView(QWidget *view);
 
     bool isPanelVisible() const { return !isHidden(); }
+
     void setPanelVisible(bool visible);
 
 signals:

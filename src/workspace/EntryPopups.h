@@ -47,6 +47,7 @@ protected:
     virtual void focusContent() = 0;
 
     QVBoxLayout *content() const { return content_; }
+
     // Called when the error appears or disappears.
     virtual void errorChanged(bool shown) { Q_UNUSED(shown); }
 
@@ -63,7 +64,9 @@ class NamePopup : public EntryPopup {
 public:
     // `apply` receives the typed name (trimmed) and returns an error
     // message, or an empty string once done: the popup then closes.
-    NamePopup(const QString &title, const QString &location, std::function<QString(const QString &)> apply,
+    NamePopup(const QString &title,
+              const QString &location,
+              std::function<QString(const QString &)> apply,
               QWidget *parent);
 
     // Initial name; for a file, the part before the extension is selected,
@@ -91,12 +94,18 @@ public:
     // `apply` returns true once done (the popup then closes), false to keep
     // the popup open: it may then show an error, or change the message to
     // ask something else.
-    ConfirmPopup(const QString &title, const QString &location, const QString &message, const QString &actionText,
-                 std::function<bool(ConfirmPopup *)> apply, QWidget *parent);
+    ConfirmPopup(const QString &title,
+                 const QString &location,
+                 const QString &message,
+                 const QString &actionText,
+                 std::function<bool(ConfirmPopup *)> apply,
+                 QWidget *parent);
 
     void setMessage(const QString &message, const QString &actionText);
     QString message() const;
+
     QPushButton *actionButton() const { return action_; }
+
     QPushButton *cancelButton() const { return cancel_; }
 
 protected:

@@ -46,6 +46,7 @@ class TestCodeIntelligence : public QObject {
     Q_OBJECT
 
 private slots:
+
     void parsesLocationsAndLinks()
     {
         const QString uri = uriOf("/p/a.cpp");

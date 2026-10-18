@@ -50,6 +50,7 @@ class TestOutline : public QObject {
     Q_OBJECT
 
 private slots:
+
     void everyOutlineQueryCompiles_data()
     {
         QTest::addColumn<QString>("language");

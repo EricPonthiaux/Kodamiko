@@ -29,6 +29,7 @@ public:
     void applyTheme(const Theme &theme);
 
     QListWidget *list() const { return list_; }
+
     DiffView *diff() const { return diff_; }
 
     // A stash's patch, one DiffFile per file.

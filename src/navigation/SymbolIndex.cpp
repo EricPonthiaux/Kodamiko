@@ -121,7 +121,8 @@ void SymbolIndex::apply(int generation, const ScanResult &result)
         emit indexingFinished();
 }
 
-SymbolIndex::ScanResult SymbolIndex::scan(const QString &folder, const QHash<QString, QDateTime> &known,
+SymbolIndex::ScanResult SymbolIndex::scan(const QString &folder,
+                                          const QHash<QString, QDateTime> &known,
                                           Providers &providers)
 {
     ScanResult result;
@@ -183,7 +184,8 @@ QList<SymbolLocation> SymbolIndex::symbolsIn(const QString &path) const
     return files_.value(path).symbols;
 }
 
-QList<SymbolLocation> SymbolIndex::flatten(const std::vector<OutlineSymbol> &symbols, const QString &filePath,
+QList<SymbolLocation> SymbolIndex::flatten(const std::vector<OutlineSymbol> &symbols,
+                                           const QString &filePath,
                                            const QString &languageId)
 {
     QList<SymbolLocation> result;

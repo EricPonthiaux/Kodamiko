@@ -128,6 +128,7 @@ struct Alert {
     const char *title;
     const char *icon;
 };
+
 const Alert alerts[] = {
     {"[!NOTE]", "note", "Note", "info"},
     {"[!TIP]", "tip", "Tip", "light-bulb"},

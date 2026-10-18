@@ -1,8 +1,7 @@
 #pragma once
 
-#include <QString>
-
 #include <QList>
+#include <QString>
 
 #include <functional>
 #include <utility>

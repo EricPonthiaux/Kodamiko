@@ -38,9 +38,13 @@ public:
     std::optional<Port> connectionPortAt(const Board &board, QPointF point) const override;
     QPointF connectionPoint(const Board &board, QPointF from, QPointF pointer) const override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
-    QStringList graphvizNodeAttributes(const Board &board, const QString &rankdir, qreal width,
+    QStringList graphvizNodeAttributes(const Board &board,
+                                       const QString &rankdir,
+                                       qreal width,
                                        qreal height) const override;
+
     QString displayText() const override { return name; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -51,10 +55,12 @@ public:
     const Field *column(const QString &name) const;
     // The PK, else a column named id, else the first one.
     const Field *primaryColumn() const;
+
     struct ForeignKey {
         const Field *field = nullptr;
         int score = 0;
     };
+
     // The FK column of this table that most likely references `table`: by
     // its comment (`references customer.id`), then by its name
     // (`customer_id`); a single FK is taken even without a clue.
@@ -86,13 +92,17 @@ public:
     QJsonObject toJson() const override;
     std::optional<Route> route(const Board &board) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
+
     // In a physical schema the line already joins the visible FK and target
     // columns: the Mermaid verb stays in the source, but is neither drawn
     // nor given room by Graphviz.
     void drawLabel(QPainter &, const Board &, bool) const override { }
+
     QString layoutLabel(const Board &) const override { return {}; }
-    std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>>
-    graphvizEndpoints(const Board &board, const QString &rankdir) const override;
+
+    std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>> graphvizEndpoints(
+        const Board &board,
+        const QString &rankdir) const override;
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -105,6 +115,7 @@ public:
         QString fromColumn;
         QString toColumn;
     };
+
     Endpoints relationshipEndpoints(const EntityShape &fromShape, const EntityShape &toShape) const;
 
     struct End {
@@ -112,12 +123,14 @@ public:
         bool left = false;
         QPointF point;
     };
+
     struct ColumnEndpoints {
         const EntityShape *fromShape = nullptr;
         const EntityShape *toShape = nullptr;
         End from;
         End to;
     };
+
     std::optional<ColumnEndpoints> columnEndpoints(const Board &board) const;
 
     QString fromCard = QStringLiteral("||");

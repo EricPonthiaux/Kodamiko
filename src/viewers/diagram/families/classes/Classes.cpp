@@ -34,6 +34,7 @@ struct Classifier {
     const char *defaultName;
     const char *stereotype; // null: a plain class
 };
+
 const Classifier classifiers[] = {
     {"class", QT_TRANSLATE_NOOP("ClassDiagram", "Class"), QT_TRANSLATE_NOOP("ClassDiagram", "Class"), nullptr},
     {"abstract", QT_TRANSLATE_NOOP("ClassDiagram", "Abstract class"),
@@ -69,6 +70,7 @@ struct Relation {
     const char *edgeLabel; // the label the new link gets
     const char *help;
 };
+
 const Relation relations[] = {
     {"link", QT_TRANSLATE_NOOP("ClassDiagram", "Association —"), QT_TRANSLATE_NOOP("ClassDiagram", "Association"),
      nullptr},
@@ -376,7 +378,10 @@ void ClassLink::draw(QPainter &painter, const Board &board, bool selected) const
     drawCards(painter, board, *r, angle);
 }
 
-void ClassLink::drawMarker(QPainter &painter, const Board &board, const Route &r, qreal angle,
+void ClassLink::drawMarker(QPainter &painter,
+                           const Board &board,
+                           const Route &r,
+                           qreal angle,
                            const LinkStyle &style) const
 {
     const qreal bx = r.b.x(), by = r.b.y();

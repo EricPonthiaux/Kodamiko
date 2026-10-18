@@ -46,6 +46,7 @@ public:
 
     void setFolder(const QString &folder);
     void refresh();
+
     const FileStatusMap &statuses() const { return statuses_; }
 
 signals:

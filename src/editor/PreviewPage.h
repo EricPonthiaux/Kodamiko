@@ -33,8 +33,10 @@ public:
     void applyTheme(const Theme &theme);
     // Scrolls to the share `ratio` (0 to 1) of the page.
     void scrollToRatio(double ratio);
+
     // HTML of the rendered body, as last set.
     QString bodyHtml() const { return body_; }
+
     // The page is loaded and shows the last rendered text.
     bool isReady() const { return loaded_; }
 
@@ -72,6 +74,7 @@ public:
     void render(const QString &text, const QString &filePath);
     // Scrolls to the share `ratio` (0 to 1) of the page.
     void scrollToRatio(double ratio);
+
     // The page is loaded and shows the last rendered text.
     bool isReady() const { return loaded_; }
 
@@ -118,13 +121,18 @@ public:
     PreviewPage(EditorWidget *editor, const Theme &theme, QWidget *parent = nullptr);
 
     EditorWidget *editor() const { return editor_; }
+
     Kind kind() const { return kind_; }
+
     // Created the first time the page shows in Split or Preview mode: a
     // web engine for each tab restored at startup would slow it down.
     // nullptr until then, and for the other kind.
     MarkdownPreview *markdownPreview() const { return markdown_; }
+
     HtmlPreview *htmlPreview() const { return html_; }
+
     Mode mode() const { return mode_; }
+
     void setMode(Mode mode);
     // The editor hidden by the Preview mode becomes visible (Split): to show
     // a position or a search in it.

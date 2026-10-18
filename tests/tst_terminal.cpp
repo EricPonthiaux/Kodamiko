@@ -10,6 +10,7 @@ class TestTerminal : public QObject {
     Q_OBJECT
 
 private slots:
+
     void applicationShortcutsPassTheTerminal()
     {
         const auto passes = [](int key, Qt::KeyboardModifiers modifiers, const QString &text = {}) {

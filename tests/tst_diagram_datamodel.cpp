@@ -67,7 +67,11 @@ bool loadInto(Board &board, const QByteArray &content, document::Loaded *loaded 
     return ok;
 }
 
-EntityShape *addTable(Board &board, const QString &id, qreal x, qreal y, const QString &name,
+EntityShape *addTable(Board &board,
+                      const QString &id,
+                      qreal x,
+                      qreal y,
+                      const QString &name,
                       const QStringList &attributes)
 {
     Shape *s =
@@ -120,6 +124,7 @@ class TestDiagramDataModel : public QObject {
     Q_OBJECT
 
 private slots:
+
     void registersTheFamily()
     {
         const Family *family = findFamily(QStringLiteral("datamodel"));

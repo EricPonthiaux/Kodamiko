@@ -6,7 +6,6 @@
 // between the two apps.
 
 #include "Explainer.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/families/Families.h"
@@ -558,8 +557,12 @@ qreal cleanNumber(qreal value)
     return std::round(value * 100) / 100;
 }
 
-void optionalCommon(QJsonObject &target, const QString &description, const QString &tone, int appearAt,
-                    const QString &fill, const QString &parent)
+void optionalCommon(QJsonObject &target,
+                    const QString &description,
+                    const QString &tone,
+                    int appearAt,
+                    const QString &fill,
+                    const QString &parent)
 {
     if (!description.isEmpty())
         target.insert(QStringLiteral("description"), description);
@@ -582,12 +585,17 @@ bool isPublic(const Shape &shape)
 class ExplainerBoard : public Codec {
 public:
     QString id() const override { return QStringLiteral("explainer-board"); }
+
     QString language() const override { return QStringLiteral("board"); }
+
     QString title() const override { return QStringLiteral("Explainer board"); }
+
     const Family &family() const override { return families::explainer(); }
+
     // The scene carries its coordinates: they are source data, never laid
     // out again (only elements written without a place are).
     bool arrangeWithGraphviz() const override { return false; }
+
     bool sourceOwnsLayout() const override { return true; }
 
     bool matches(const QString &source) const override

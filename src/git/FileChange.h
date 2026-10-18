@@ -41,6 +41,7 @@ public:
     }
 
     Kind kind() const { return kind_; }
+
     QString message() const { return QString::fromStdString(what()); }
 
 private:

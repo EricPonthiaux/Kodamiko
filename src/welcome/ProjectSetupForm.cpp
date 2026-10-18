@@ -114,7 +114,8 @@ void ProjectSetupForm::build(Card &card)
     connect(card.serverVersion, &QComboBox::currentIndexChanged, this, &ProjectSetupForm::changed);
 }
 
-ProjectConfig ProjectSetupForm::detectedProject(const QString &folder, const Toolchains &toolchains,
+ProjectConfig ProjectSetupForm::detectedProject(const QString &folder,
+                                                const Toolchains &toolchains,
                                                 QList<DetectedLanguage> *detected)
 {
     ProjectConfig project;

@@ -38,7 +38,9 @@ public:
     ~SymbolIndex() override;
 
     void setFolder(const QString &folder);
+
     QString folder() const { return folder_; }
+
     // Rereads modified, added or removed files in the background.
     void refresh();
     // Replaces a file's symbols based on its text (unsaved, for
@@ -51,12 +53,15 @@ public:
     QList<SymbolLocation> symbols() const;
     // Symbols of a file, in text order.
     QList<SymbolLocation> symbolsIn(const QString &path) const;
+
     bool isIndexing() const { return running_; }
+
     // Changes whenever the symbols change, for caches built from them.
     quint64 revision() const { return revision_; }
 
     // Flattened symbols of a file outline.
-    static QList<SymbolLocation> flatten(const std::vector<OutlineSymbol> &symbols, const QString &filePath,
+    static QList<SymbolLocation> flatten(const std::vector<OutlineSymbol> &symbols,
+                                         const QString &filePath,
                                          const QString &languageId);
 
 signals:
@@ -67,6 +72,7 @@ private:
         QDateTime modified;
         QList<SymbolLocation> symbols;
     };
+
     using Providers = std::map<QString, std::unique_ptr<IOutlineProvider>>;
     struct ScanResult;
 

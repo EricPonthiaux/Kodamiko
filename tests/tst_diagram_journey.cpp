@@ -80,6 +80,7 @@ class TestDiagramJourney : public QObject {
     Q_OBJECT
 
 private slots:
+
     void registersTheFamily()
     {
         const Family *family = findFamily(QStringLiteral("journey"));

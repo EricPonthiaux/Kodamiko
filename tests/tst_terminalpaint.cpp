@@ -11,6 +11,7 @@ class TestTerminalPaint : public QObject {
     Q_OBJECT
 
 private slots:
+
     void scrollBarShowsTheHistory()
     {
 #ifdef Q_OS_WIN

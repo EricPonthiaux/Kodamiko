@@ -29,6 +29,7 @@ class SymbolIndex;
 class CodeGenerationProvider : public ICompletionProvider {
 public:
     using Counterpart = std::function<QString(const QString &filePath)>;
+
     // A field of a Java class.
     struct Field {
         QString type;
@@ -52,13 +53,18 @@ private:
         int body = -1;
         bool java = false;
     };
+
     // The body of the class `name`: in `context`'s text, else in the file
     // the index has it in.
     ClassSource findClass(const QString &name, const CompletionContext &context) const;
     void addOverrides(const CompletionContext &context, int brace, QList<CompletionItem> &items) const;
     void addImplementations(const CompletionContext &context, QList<CompletionItem> &items) const;
-    static void addAccessors(const QByteArray &blanked, int brace, const QString &className,
-                             const QSet<QString> &declared, const QString &indent, const QString &unit,
+    static void addAccessors(const QByteArray &blanked,
+                             int brace,
+                             const QString &className,
+                             const QSet<QString> &declared,
+                             const QString &indent,
+                             const QString &unit,
                              QList<CompletionItem> &items);
     QByteArray readFile(const QString &path) const;
 

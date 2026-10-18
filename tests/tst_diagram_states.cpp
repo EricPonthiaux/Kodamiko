@@ -168,6 +168,7 @@ class TestDiagramStates : public QObject {
     Q_OBJECT
 
 private slots:
+
     void exposesUmlStatesAndPseudoStates()
     {
         const Family &family = families::states();

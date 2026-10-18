@@ -46,7 +46,9 @@ class ThemeCard : public QAbstractButton {
 
 public:
     explicit ThemeCard(const Theme &theme, QWidget *parent = nullptr);
+
     QString themeName() const { return theme_.name; }
+
     QSize sizeHint() const override;
 
 protected:

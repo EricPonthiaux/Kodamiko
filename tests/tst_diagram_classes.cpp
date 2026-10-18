@@ -128,6 +128,7 @@ class TestDiagramClasses : public QObject {
     Q_OBJECT
 
 private slots:
+
     void exposesTheUmlClassifiersAndRelations()
     {
         const Family &f = families::classes();

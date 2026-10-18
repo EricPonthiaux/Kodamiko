@@ -40,8 +40,11 @@ int nextMessageOrder(const Board &board);
 // Mermaid and PlantUML differ only by indentation and Mermaid's implicit
 // `and` branch of parallel fragments; `encode` escapes the labels for the
 // notation.
-QList<Fragment> syncFragments(QStringList &out, const QList<Fragment> &active, const QList<Fragment> &next,
-                              const QString &indent = {}, bool parallelBranches = false,
+QList<Fragment> syncFragments(QStringList &out,
+                              const QList<Fragment> &active,
+                              const QList<Fragment> &next,
+                              const QString &indent = {},
+                              bool parallelBranches = false,
                               const std::function<QString(const QString &)> &encode = {});
 
 // Header + dashed lifeline. `kind` keeps the Mermaid/PlantUML participant
@@ -54,14 +57,18 @@ public:
     QJsonObject toJson() const override;
     void measure(const Board &board) override;
     void resizeTo(qreal width, qreal height, const Board &board) override;
+
     bool showConnectionPortsOnHover() const override { return true; }
+
     QList<Port> connectionPorts(const Board &board) const override;
     bool connectionHitTest(const Board &board, QPointF point) const override;
     QPointF connectionPoint(const Board &board, QPointF from, QPointF pointer) const override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
     std::optional<QRectF> bounds(const Board &board) const override;
+
     QString displayText() const override { return text; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -95,7 +102,9 @@ public:
     QPointF labelPos(const Route &route, const Board &board) const override;
     std::optional<QRectF> bounds(const Board &board) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
+
     bool routesItself() const override { return true; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -110,7 +119,11 @@ public:
     QList<Fragment> fragments;
 
 private:
-    void drawHead(QPainter &painter, const Board &board, QPointF tip, qreal angle, const LinkStyle &style,
+    void drawHead(QPainter &painter,
+                  const Board &board,
+                  QPointF tip,
+                  qreal angle,
+                  const LinkStyle &style,
                   const QString &kind) const;
 };
 

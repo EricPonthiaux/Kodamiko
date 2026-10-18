@@ -3,7 +3,6 @@
 // the order they are written.
 
 #include "Journey.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -33,8 +32,11 @@ const QRegularExpression &header()
 class MermaidJourney : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-journey"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("User journey"); }
+
     const Family &family() const override { return families::journey(); }
 
     bool matches(const QString &source) const override

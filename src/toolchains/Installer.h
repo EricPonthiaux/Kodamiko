@@ -29,11 +29,14 @@ public:
 
     void run(const QList<InstallStep> &steps);
     void cancel();
+
     bool isRunning() const { return running_; }
+
     QList<InstallStep> steps() const { return steps_; }
 
     // For tests: where each step's archive is, instead of ToolCatalog.
     using SourceResolver = std::function<DownloadSource(const InstallStep &)>;
+
     void setSourceResolver(SourceResolver resolver) { resolver_ = std::move(resolver); }
 
     // The command unpacking `archive` into `destination`: program first.

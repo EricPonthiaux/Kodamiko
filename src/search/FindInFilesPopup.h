@@ -33,11 +33,17 @@ public:
     void applyTheme(const Theme &theme);
 
     QLineEdit *searchField() const { return search_; }
+
     QLineEdit *maskField() const { return mask_; }
+
     QTreeWidget *results() const { return results_; }
+
     void setOptions(bool matchCase, bool wholeWords, bool regularExpression);
+
     const QList<FindMatch> &matches() const { return matches_; }
+
     bool isSearching() const { return engine_.isRunning(); }
+
     // Runs the search now instead of after the typing pause.
     void searchNow();
 

@@ -96,7 +96,11 @@ public:
     }
 
 private:
-    static Entry makeEntry(Category category, Scope scope, const QString &name, const QString &path, bool exists,
+    static Entry makeEntry(Category category,
+                           Scope scope,
+                           const QString &name,
+                           const QString &path,
+                           bool exists,
                            bool readOnly)
     {
         Entry entry;

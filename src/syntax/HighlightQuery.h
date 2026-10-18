@@ -23,9 +23,11 @@ public:
     HighlightQuery &operator=(const HighlightQuery &) = delete;
 
     bool isValid() const { return query_ != nullptr; }
+
     const QString &errorMessage() const { return errorMessage_; }
 
     const TSQuery *query() const { return query_; }
+
     uint32_t captureCount() const;
     QString captureName(uint32_t captureIndex) const;
 

@@ -4,7 +4,6 @@
 // instead of a generic mind map.
 
 #include "ProductVision.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -68,8 +67,11 @@ QStringList descendants(const QString &key, const Model &tree)
 class MermaidProductVision : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-product-vision"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("Product vision"); }
+
     const Family &family() const override { return families::productVision(); }
 
     bool matches(const QString &source) const override { return isProductVisionSource(source); }

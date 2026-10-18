@@ -4,10 +4,10 @@
 
 #include <QWinEventNotifier>
 
+#include <windows.h>
+
 #include <mutex>
 #include <thread>
-
-#include <windows.h>
 
 // Windows PTY (ConPTY, Windows 10 1809+). Reading the output is blocking:
 // it runs in a dedicated thread that forwards the bytes to the UI thread.
@@ -25,6 +25,7 @@ public:
     bool start(const ProcessSpec &spec, QSize cells) override;
     void write(const QByteArray &data) override;
     void resize(QSize cells) override;
+
     QString errorString() const override { return errorString_; }
 
 private:

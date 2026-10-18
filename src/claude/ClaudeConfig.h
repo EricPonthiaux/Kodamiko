@@ -62,6 +62,7 @@ struct SettingsFile {
     Scope scope;
     QString path;
 };
+
 // The settings files Claude Code merges, from the lowest precedence to the
 // highest: User, Project, Local, Duet's --settings (`sessionSettings`, if
 // not empty), Managed; existing or not.

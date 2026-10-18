@@ -5,7 +5,6 @@
 #include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
-
 #include <QtTest>
 
 class TestSyntax : public QObject {
@@ -27,8 +26,10 @@ private:
     }
 
     // Loads `code` into an editor highlighted for `languageId`, with the whole text styled.
-    static std::unique_ptr<ISyntaxHighlighter> highlight(QsciScintilla &editor, const QString &languageId,
-                                                         const char *code, const Theme &theme)
+    static std::unique_ptr<ISyntaxHighlighter> highlight(QsciScintilla &editor,
+                                                         const QString &languageId,
+                                                         const char *code,
+                                                         const Theme &theme)
     {
         editor.setUtf8(true);
         editor.setText(QString::fromUtf8(code));
@@ -40,6 +41,7 @@ private:
     }
 
 private slots:
+
     void themesAreListedByName()
     {
         QStringList names;

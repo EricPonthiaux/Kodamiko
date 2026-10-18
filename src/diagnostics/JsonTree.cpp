@@ -43,6 +43,7 @@ public:
 
 private:
     bool atEnd() const { return pos_ >= text_.size(); }
+
     char peek() const { return atEnd() ? '\0' : text_[pos_]; }
 
     std::nullopt_t fail(const QString &message) { return fail(message, int(pos_)); }

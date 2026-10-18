@@ -60,8 +60,11 @@ QPoint belowCaret(EditorWidget *editor)
 
 } // namespace
 
-CodeIntelligence::CodeIntelligence(EditorTabs *tabs, LanguageServers *servers, CodeNavigator *navigator,
-                                   ProblemStore *problems, QObject *parent)
+CodeIntelligence::CodeIntelligence(EditorTabs *tabs,
+                                   LanguageServers *servers,
+                                   CodeNavigator *navigator,
+                                   ProblemStore *problems,
+                                   QObject *parent)
     : QObject(parent)
     , tabs_(tabs)
     , servers_(servers)

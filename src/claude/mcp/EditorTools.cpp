@@ -2,7 +2,6 @@
 
 #include "DuetTools.h"
 #include "McpRegistry.h"
-
 #include "claude/EditorContext.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"

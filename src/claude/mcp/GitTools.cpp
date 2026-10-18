@@ -3,7 +3,6 @@
 #include "DuetTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
-
 #include "git/Branches.h"
 #include "git/CommitLog.h"
 #include "git/GitCommands.h"

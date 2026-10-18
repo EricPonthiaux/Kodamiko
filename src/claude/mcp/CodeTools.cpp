@@ -6,7 +6,6 @@
 #include "DuetTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
-
 #include "diagnostics/ProblemStore.h"
 #include "editor/CodeFormatter.h"
 #include "editor/EditorTabs.h"
@@ -262,8 +261,11 @@ private:
 
 // Sends a positional request to the file's server and replies with
 // `convert`'s result.
-void positionalRequest(const DuetToolContext &context, const QJsonObject &arguments, const QString &method,
-                       const QJsonObject &extraParams, McpReply reply,
+void positionalRequest(const DuetToolContext &context,
+                       const QJsonObject &arguments,
+                       const QString &method,
+                       const QJsonObject &extraParams,
+                       McpReply reply,
                        std::function<McpResult(const QJsonValue &)> convert)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
@@ -282,7 +284,8 @@ void positionalRequest(const DuetToolContext &context, const QJsonObject &argume
 }
 
 // The code actions at a position, for a list or to apply one.
-void requestCodeActions(const DuetToolContext &context, const QJsonObject &arguments,
+void requestCodeActions(const DuetToolContext &context,
+                        const QJsonObject &arguments,
                         std::function<void(LspClient *, QList<QJsonObject>, const QString &)> done)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());

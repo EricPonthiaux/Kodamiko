@@ -135,11 +135,13 @@ void ProblemsView::scheduleRefresh()
 void ProblemsView::refresh()
 {
     refreshTimer_.stop();
+
     struct File {
         QString path;
         Problems problems;
         int errors = 0;
     };
+
     QList<File> files;
     int errors = 0;
     int warnings = 0;

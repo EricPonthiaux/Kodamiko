@@ -174,7 +174,9 @@ void EntryPopup::keyPressEvent(QKeyEvent *event)
     QFrame::keyPressEvent(event);
 }
 
-NamePopup::NamePopup(const QString &title, const QString &location, std::function<QString(const QString &)> apply,
+NamePopup::NamePopup(const QString &title,
+                     const QString &location,
+                     std::function<QString(const QString &)> apply,
                      QWidget *parent)
     : EntryPopup(title, location, parent)
     , apply_(std::move(apply))
@@ -217,8 +219,12 @@ void NamePopup::errorChanged(bool shown)
                               : QString());
 }
 
-ConfirmPopup::ConfirmPopup(const QString &title, const QString &location, const QString &message,
-                           const QString &actionText, std::function<bool(ConfirmPopup *)> apply, QWidget *parent)
+ConfirmPopup::ConfirmPopup(const QString &title,
+                           const QString &location,
+                           const QString &message,
+                           const QString &actionText,
+                           std::function<bool(ConfirmPopup *)> apply,
+                           QWidget *parent)
     : EntryPopup(title, location, parent)
     , apply_(std::move(apply))
     , message_(new QLabel(message, this))

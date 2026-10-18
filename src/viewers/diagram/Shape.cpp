@@ -341,10 +341,12 @@ std::vector<QPointF> trimPolyline(const std::vector<QPointF> &points, qreal trim
         return points;
     const qreal requested = trimStart + trimEnd;
     const qreal scale = requested > total ? total / requested : 1;
+
     struct At {
         size_t index;
         QPointF point;
     };
+
     const auto pointAt = [&](qreal distance) -> At {
         qreal travelled = 0;
         for (size_t i = 0; i < lengths.size(); ++i) {

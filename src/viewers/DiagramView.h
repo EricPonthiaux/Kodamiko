@@ -35,7 +35,9 @@ public:
     bool save(QString *error);
     // Reloads the file; unsaved changes are lost.
     bool reloadFromDisk(QString *error);
+
     QString filePath() const { return filePath_; }
+
     bool isModified() const;
     // True if the file on disk is the one last loaded or saved here.
     bool matchesDisk() const;
@@ -48,7 +50,9 @@ public:
     void applyTheme(const Theme &theme);
 
     diagram::Board *board() const { return board_; }
+
     diagram::Canvas *canvas() const { return canvas_; }
+
     const diagram::Codec *codec() const { return codec_; }
 
 signals:

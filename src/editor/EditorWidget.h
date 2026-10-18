@@ -4,11 +4,10 @@
 #include "diagnostics/Diagnostic.h"
 #include "ui/Theme.h"
 
-#include <Qsci/qsciscintilla.h>
-
 #include <QKeySequence>
 #include <QList>
 #include <QMenu>
+#include <Qsci/qsciscintilla.h>
 
 #include <functional>
 #include <memory>
@@ -82,10 +81,13 @@ public:
     QByteArray utf8Range(int start, int end) const;
 
     QString filePath() const { return filePath_; }
+
     // LanguageRegistry identifier of the displayed text.
     QString languageId() const { return languageId_; }
+
     // Encoding and line ending of the file, kept when saving.
     TextFileFormat format() const { return format_; }
+
     // Converts every line ending of the text and uses `lineEnding` for new
     // lines; the conversion can be undone.
     void setLineEnding(LineEnding lineEnding);
@@ -95,11 +97,14 @@ public:
     // formatter keeps to; 0 hides it.
     void showColumnLimit(int columnLimit);
     void setOptions(const EditorOptions &options);
+
     // Actions at the top of the context menu when the editor shows a file
     // (Claude's requests about the code). Not owned.
     void setFileActions(const QList<QAction *> &actions) { fileActions_ = actions; }
+
     // The context menu: QScintilla's, with the file actions on top.
     std::unique_ptr<QMenu> createContextMenu();
+
     const EditorOptions &options() const { return options_; }
 
     // Folds (or unfolds) the innermost block around the cursor.
@@ -115,16 +120,21 @@ public:
     // Problems found in the text: a wavy underline, red for an error, amber
     // for a warning, and their messages when the mouse rests on them.
     void setDiagnostics(const Diagnostics &diagnostics);
+
     const Diagnostics &diagnostics() const { return diagnostics_; }
+
     // Text shown when the mouse rests where there is no problem (the
     // documentation of a setting...), from a byte position; empty: nothing.
     void setHoverHelp(std::function<QString(int)> help);
 
     // Marks of the lines that differ from the git index.
     ChangeGutter *changeGutter() const { return changeGutter_; }
+
     // The occurrences of the name at the cursor, highlighted.
     SymbolOccurrences *symbolOccurrences() const { return symbolOccurrences_; }
+
     void applyTheme(const Theme &theme);
+
     const Theme &theme() const { return theme_; }
 
 signals:

@@ -2,7 +2,6 @@
 // blocks and the cardinality relations between them.
 
 #include "DataModel.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -66,8 +65,11 @@ QString roleText(const QString &label)
 class MermaidEr : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-er"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("Data model"); }
+
     const Family &family() const override { return families::dataModel(); }
 
     bool matches(const QString &source) const override

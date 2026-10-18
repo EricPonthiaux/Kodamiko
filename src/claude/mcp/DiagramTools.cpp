@@ -4,7 +4,6 @@
 
 #include "DuetTools.h"
 #include "McpRegistry.h"
-
 #include "editor/EditorTabs.h"
 #include "viewers/DiagramCheck.h"
 #include "viewers/DiagramKinds.h"

@@ -177,7 +177,9 @@ CommitMessageGenerator::~CommitMessageGenerator()
     pool_.waitForDone();
 }
 
-void CommitMessageGenerator::start(const RepositoryInfo &repository, bool amend, bool stageEverything,
+void CommitMessageGenerator::start(const RepositoryInfo &repository,
+                                   bool amend,
+                                   bool stageEverything,
                                    const QString &pathspec)
 {
     cancel();
@@ -214,8 +216,10 @@ void CommitMessageGenerator::cancel()
     setRunning(false);
 }
 
-void CommitMessageGenerator::onChangesRead(const std::optional<CommitMessage::Changes> &changes, const QString &error,
-                                           const QString &workDir, int generation)
+void CommitMessageGenerator::onChangesRead(const std::optional<CommitMessage::Changes> &changes,
+                                           const QString &error,
+                                           const QString &workDir,
+                                           int generation)
 {
     if (generation != generation_)
         return;

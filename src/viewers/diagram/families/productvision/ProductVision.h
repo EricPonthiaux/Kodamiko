@@ -34,8 +34,10 @@ public:
 
 private:
     bool isRoot() const { return role == QLatin1String("product"); }
+
     // The momentum card stands out under the product.
     bool isFeatured() const { return role == QLatin1String("emotions"); }
+
     // Lays the text out for the current width; returns the height it needs.
     qreal layoutText();
 

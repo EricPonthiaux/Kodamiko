@@ -1,0 +1,12 @@
+# The tests follow the project's rules, with two exceptions that Qt Test's
+# macros cause:
+# - QVERIFY(optional) returns from the test when the optional is empty,
+#   which clang-tidy cannot see: every access after it would be reported.
+# - QTRY_VERIFY and QTRY_COMPARE expand to nested loops: any of them would
+#   pass the nesting threshold.
+---
+InheritParentConfig: true
+Checks: '-bugprone-unchecked-optional-access'
+CheckOptions:
+  readability-function-size.NestingThreshold: 'none'
+...

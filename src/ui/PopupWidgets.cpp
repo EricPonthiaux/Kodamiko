@@ -223,11 +223,13 @@ void ThemeCard::paintEvent(QPaintEvent *)
         const int index = theme_.syntaxStyleIndex(QString::fromLatin1(category));
         return index >= 0 ? theme_.syntaxStyles[index].second.foreground : theme_.foreground;
     };
+
     // Each line: indentation, then (category, width) runs.
     struct Run {
         const char *category;
         qreal width;
     };
+
     const QList<std::pair<int, QList<Run>>> lines = {
         {0, {{"comment", 70}}},
         {0, {{"keyword", 26}, {"type", 22}, {"function", 34}, {"punctuation", 8}}},

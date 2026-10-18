@@ -20,6 +20,7 @@ public:
     // Marks at `positions`, from 0 (the document's start) to 1 (its end).
     void setMarks(const QList<qreal> &positions, const QColor &color);
     void clear();
+
     const QList<qreal> &marks() const { return positions_; }
 
     bool eventFilter(QObject *watched, QEvent *event) override;

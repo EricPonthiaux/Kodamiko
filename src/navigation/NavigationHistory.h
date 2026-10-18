@@ -22,6 +22,7 @@ public:
     std::optional<Location> forward(const Location &current);
 
     bool canGoBack() const { return !back_.isEmpty(); }
+
     bool canGoForward() const { return !forward_.isEmpty(); }
 
 private:

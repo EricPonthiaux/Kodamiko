@@ -32,19 +32,25 @@ public:
     // The family whose elements the board holds; it decides the shape and
     // link types and their defaults. Clears the board.
     void setFamily(const Family *family);
+
     const Family *family() const { return family_; }
+
     const Style &style() const { return style_; }
+
     void setStyle(const Style &style);
 
     // In paint order: the last shape is drawn on top.
     const std::vector<std::unique_ptr<Shape>> &shapes() const { return shapes_; }
+
     const std::vector<std::unique_ptr<Link>> &links() const { return links_; }
+
     Shape *shape(const QString &id) const;
     Link *link(const QString &id) const;
     // A shape by id, or else by key.
     Shape *shapeByReference(const QString &reference) const;
     QList<Shape *> childShapes(const Shape *parent) const;
     QList<Shape *> descendantShapes(const Shape *parent) const;
+
     bool isEmpty() const { return shapes_.empty(); }
 
     // --- Model
@@ -90,8 +96,11 @@ public:
 
     // --- Selection
     const QSet<QString> &selection() const { return selection_; }
+
     const QSet<QString> &linkSelection() const { return linkSelection_; }
+
     bool hasSelection() const { return !selection_.isEmpty() || !linkSelection_.isEmpty(); }
+
     void clearSelection();
     void selectShape(const QString &id, bool add = false);
     void selectLink(const QString &id, bool add = false);
@@ -110,8 +119,11 @@ public:
     // Records a change: the snapshot taken before it, if the model moved.
     void pushHistory(const QByteArray &before);
     void applySnapshot(const QByteArray &snapshot);
+
     bool canUndo() const { return !undo_.empty(); }
+
     bool canRedo() const { return !redo_.empty(); }
+
     void undo();
     void redo();
     void clearHistory();
@@ -122,7 +134,9 @@ public:
     bool copySelection();
     bool cutSelection();
     bool pasteClipboard();
+
     bool hasClipboard() const { return !clipboardShapes_.isEmpty(); }
+
     // The selection as JSON (shapes, links), for the system clipboard.
     QJsonObject selectionJson() const;
     // Shapes and links from such JSON, pasted near `center`.
@@ -148,7 +162,9 @@ public:
 
     // --- Text editing, done by the canvas.
     using TextEditor = std::function<void(Shape *, Link *, const TextEditSpec &)>;
+
     void setTextEditor(TextEditor editor) { textEditor_ = std::move(editor); }
+
     void beginTextEdit(Shape *shape, const TextEditSpec &spec);
     void beginTextEdit(Link *link, const TextEditSpec &spec);
     void editLinkLabel(Link &link);
@@ -160,6 +176,7 @@ public:
     void resolveLabels();
     // The model changed outside of the history helpers (a gesture frame).
     void touch();
+
     // Whether gestures may move the board's contents (false while showing
     // an older version).
     quint64 version() const { return version_; }

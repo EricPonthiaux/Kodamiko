@@ -236,7 +236,8 @@ QList<RuntimeInstall> Toolchains::runtimes(const QString &tool) const
     return all;
 }
 
-std::optional<RuntimeInstall> Toolchains::runtime(const QString &tool, const QString &version,
+std::optional<RuntimeInstall> Toolchains::runtime(const QString &tool,
+                                                  const QString &version,
                                                   const QString &path) const
 {
     const QList<RuntimeInstall> all = runtimes(tool);

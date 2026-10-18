@@ -3,9 +3,8 @@
 #include "git/FilePatch.h"
 #include "ui/Theme.h"
 
-#include <Qsci/qsciscintilla.h>
-
 #include <QHash>
+#include <Qsci/qsciscintilla.h>
 
 // File shown by a DiffView.
 struct DiffFile {
@@ -71,6 +70,7 @@ public:
     Location locate(int line) const;
     // Line of a file's title bar.
     int fileStart(int file) const;
+
     const QList<Line> &lines() const { return lines_; }
 
     void applyTheme(const Theme &theme);

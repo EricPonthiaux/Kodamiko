@@ -6,10 +6,10 @@
 #include <QRect>
 #include <QString>
 
+#include <vterm.h>
+
 #include <deque>
 #include <vector>
-
-#include <vterm.h>
 
 // One cell of the terminal grid, ready to draw.
 struct TerminalCell {
@@ -43,7 +43,9 @@ public:
     void setDefaultColors(const QColor &foreground, const QColor &background);
 
     int rows() const { return rows_; }
+
     int columns() const { return columns_; }
+
     int scrollbackSize() const { return static_cast<int>(scrollback_.size()); }
 
     // `row` in [-scrollbackSize(), rows()[; 0 = first row of the screen.
@@ -60,8 +62,11 @@ public:
     QRect takeDamage();
 
     QPoint cursorPosition() const { return cursor_; } // x = column, y = row
+
     bool isCursorVisible() const { return cursorVisible_; }
+
     bool isAlternateScreen() const { return alternateScreen_; }
+
     // The program asked for mouse events (full-screen programs that scroll
     // themselves, such as Claude Code's).
     bool isMouseReporting() const { return mouseReporting_; }

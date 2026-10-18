@@ -21,7 +21,9 @@ public:
     static bool isImageFile(const QString &path);
 
     bool load(const QString &path, QString *error);
+
     QString filePath() const { return filePath_; }
+
     // Description for the status bar: "640 × 480, zoom 50%".
     QString description() const;
 

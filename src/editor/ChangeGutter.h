@@ -32,6 +32,7 @@ public:
     void reloadBase();
     // Sets the base text directly (in the file's encoding).
     void setBase(const std::optional<QByteArray> &base);
+
     bool hasBase() const { return base_.has_value(); }
 
     // Changes of the current text, up to date.

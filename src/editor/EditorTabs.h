@@ -35,7 +35,9 @@ public:
     void closePage(QWidget *page);
     // A read-only text in the tab named `title`, opened or, if it is open,
     // updated in place; `iconName` is a UiIcons name.
-    EditorWidget *showText(const QString &title, const QString &text, const QString &languageId,
+    EditorWidget *showText(const QString &title,
+                           const QString &text,
+                           const QString &languageId,
                            const QString &iconName);
     // The tab showText() opened under `title`, or nullptr.
     EditorWidget *textView(const QString &title) const;
@@ -62,14 +64,17 @@ public:
 
     // Display settings of every editor, open now or later.
     void setEditorOptions(const EditorOptions &options);
+
     const EditorOptions &editorOptions() const { return editorOptions_; }
 
     // Formats the current editor with its language's formatter (see
     // CodeFormatter), without blocking; the result is reported by
     // statusMessage.
     void formatCurrent();
+
     // Formats each text file before saving it.
     void setFormatOnSave(bool enabled) { formatOnSave_ = enabled; }
+
     bool formatOnSave() const { return formatOnSave_; }
 
     // With format on save, a file is written once its formatter has
@@ -139,7 +144,9 @@ private:
     // once formatted, whatever the outcome.
     void formatEditor(EditorWidget *editor, bool quiet, bool saveAfter = false);
     std::optional<CodeFormatter::Command> formatterFor(EditorWidget *editor, bool quiet);
-    void applyFormatted(EditorWidget *editor, const std::optional<QString> &formatted, const QString &error,
+    void applyFormatted(EditorWidget *editor,
+                        const std::optional<QString> &formatted,
+                        const QString &error,
                         bool quiet);
     // Indents `editor` as clang-format lays its file out, when clang-format
     // is its formatter.

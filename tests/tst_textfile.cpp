@@ -6,6 +6,7 @@ class TestTextFile : public QObject {
     Q_OBJECT
 
 private slots:
+
     void roundTripsBytesExactly_data()
     {
         QTest::addColumn<QByteArray>("bytes");

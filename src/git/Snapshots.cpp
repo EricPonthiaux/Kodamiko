@@ -95,8 +95,11 @@ void parseMessage(const QString &message, Snapshot &snapshot)
 // too (`paths` must then list every changed file). With `skipIfUnchanged`,
 // nothing is recorded (and an empty string returned) if the most recent
 // snapshot has the same paths, the same scope and the same content.
-QString createSnapshot(const RepositoryInfo &repository, const QString &reason, const QStringList &paths,
-                       bool wholeWorkingTree, bool skipIfUnchanged)
+QString createSnapshot(const RepositoryInfo &repository,
+                       const QString &reason,
+                       const QStringList &paths,
+                       bool wholeWorkingTree,
+                       bool skipIfUnchanged)
 {
     // A temporary index, copied from the real one, receives the files' state:
     // the real index is not touched.

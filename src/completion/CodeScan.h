@@ -45,6 +45,7 @@ struct Parameter {
     QString defaultValue; // after "="
     QString text;         // as written, the default value left out
 };
+
 // "const QString &name = {}" → type "const QString &", name "name".
 Parameter parseParameter(const QString &text, bool typed = true);
 
@@ -67,6 +68,7 @@ struct Function {
     QString qualifiers() const;
     bool returnsValue() const;
 };
+
 // An empty name when `header` is no function ("if (x)", "int x = f(y)").
 Function parseFunction(const QString &header);
 
@@ -84,6 +86,7 @@ struct Declaration {
     int body = -1;  // its "{"
     QString access; // the label it is under: "public", "signals"...
 };
+
 QList<Declaration> declarationsIn(const QByteArray &blanked, int open);
 
 // The class, struct, interface or enum whose body is opened at `brace`:
@@ -95,6 +98,7 @@ struct ClassHeader {
     QString name;
     QStringList bases;
 };
+
 ClassHeader classAt(const QByteArray &blanked, int brace);
 
 // The body ("{" position) of the class `name` declared in `text`, -1 if

@@ -37,7 +37,9 @@ public:
     void run(const QString &title, Job job, std::function<void()> onSuccess = {}, FailureHandler onFailure = {});
     // Same, for an operation the user may wait on: progress() reports its
     // progress and cancel() stops it.
-    void runLong(const QString &title, LongJob job, std::function<void()> onSuccess = {},
+    void runLong(const QString &title,
+                 LongJob job,
+                 std::function<void()> onSuccess = {},
                  FailureHandler onFailure = {});
     // Same queue, for background work the user did not ask for: no busy
     // state, no succeeded()/failed(). `done` runs on the UI thread with the
@@ -48,6 +50,7 @@ public:
     void runLongQuietly(LongJob job, std::function<void(const QString &message, const QString &error)> done);
     // Stops the long operation that is running, if any.
     void cancel();
+
     bool isBusy() const { return pending_ > 0; }
 
     // Added to git's environment for the long jobs: the askpass program

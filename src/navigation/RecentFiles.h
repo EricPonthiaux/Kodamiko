@@ -17,7 +17,9 @@ public:
     void rename(const QString &oldPath, const QString &newPath);
 
     QStringList opened() const { return opened_; }
+
     QStringList editedByClaude() const { return editedByClaude_; }
+
     bool isEditedByClaude(const QString &path) const { return editedByClaude_.contains(path); }
 
     void restore(const QStringList &opened, const QStringList &editedByClaude);

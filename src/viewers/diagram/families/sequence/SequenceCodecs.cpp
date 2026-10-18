@@ -2,7 +2,6 @@
 // PlantUML ones (fence/plantuml-sequence.js).
 
 #include "Sequence.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -107,6 +106,7 @@ struct Arrow {
     const char *head;
     const char *startHead;
 };
+
 // Longest first, so that `-->>` never reads as `-->` + `>`.
 const Arrow arrows[] = {
     {"<<-->>", "dashed", "arrow", "arrow"}, {"<<->>", "solid", "arrow", "arrow"}, {"-->>", "dashed", "arrow", "none"},
@@ -178,9 +178,13 @@ QString mermaidText(const QString &text)
 class MermaidSequence : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-sequence"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("Sequence diagram"); }
+
     const Family &family() const override { return families::sequence(); }
+
     // Participants on a row; messages derive their own lanes.
     bool arrangeWithGraphviz() const override { return false; }
 
@@ -429,9 +433,13 @@ QString plantumlEscape(const QString &text)
 class PlantumlSequence : public Codec {
 public:
     QString id() const override { return QStringLiteral("plantuml-sequence"); }
+
     QString language() const override { return QStringLiteral("plantuml"); }
+
     QString title() const override { return QStringLiteral("Sequence diagram"); }
+
     const Family &family() const override { return families::sequence(); }
+
     bool arrangeWithGraphviz() const override { return false; }
 
     bool matches(const QString &source) const override

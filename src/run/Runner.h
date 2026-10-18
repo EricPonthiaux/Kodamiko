@@ -31,6 +31,7 @@ public:
     // The project's folder and its runtimes (JDK, Node, Python), which the
     // commands find first in their PATH.
     void setProject(const ProjectConfig &project, const Toolchains *toolchains);
+
     QString folder() const { return project_.path; }
 
     // Read again from the project's files each time.

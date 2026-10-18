@@ -18,6 +18,7 @@ public:
 
     // Git folder to watch; empty to stop watching.
     void setGitDir(const QString &gitDir);
+
     QString gitDir() const { return gitDir_; }
 
 signals:

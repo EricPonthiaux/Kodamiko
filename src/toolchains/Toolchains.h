@@ -27,6 +27,7 @@ public:
     explicit Toolchains(const QString &root = defaultRoot(), bool lookOnMachine = true);
     // <application data>/toolchains.
     static QString defaultRoot();
+
     QString root() const { return root_; }
 
     // Duet's own installs.

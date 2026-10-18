@@ -43,6 +43,7 @@ struct UmlRelation {
     QString kind;
     bool targetOnLeft; // the semantic target is written on the left
 };
+
 const QList<UmlRelation> &umlRelations();
 // An alternation of the relation tokens, longest first, for a regex.
 QString umlRelationPattern();

@@ -17,7 +17,9 @@ QString prompt(const QString &kindTitle, const QString &relativePath, const QStr
 // The arguments that follow --print. `hookCommand`, when given, checks the
 // diagram after each write (PostToolUse hook, see DiagramCheck);
 // `pluginPath` provides the diagrams skill.
-QStringList arguments(const QString &prompt, const QString &relativePath, const QString &pluginPath,
+QStringList arguments(const QString &prompt,
+                      const QString &relativePath,
+                      const QString &pluginPath,
                       const QString &hookCommand);
 
 // One line of the stream-json output.
@@ -32,6 +34,7 @@ struct Event {
     bool failed = false; // Finished
     QString text;        // Finished: Claude's answer, or the error
 };
+
 // File paths in steps are shown relative to `workDir`.
 Event parseLine(const QByteArray &line, const QString &workDir);
 

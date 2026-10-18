@@ -97,11 +97,13 @@ private:
     QToolButton *stopButton_ = nullptr;
     bool running_ = false;
     QHBoxLayout *actions_;
+
     struct ActionButton {
         QToolButton *button;
         QString iconName;
         QColor color;
     };
+
     QList<ActionButton> actionButtons_;
     WindowButton *minimize_;
     WindowButton *maximize_;

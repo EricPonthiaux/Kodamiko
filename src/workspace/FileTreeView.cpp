@@ -1,14 +1,13 @@
 #include "FileTreeView.h"
 
-#include "EntryPopups.h"
-#include "ui/TreeColumnFit.h"
-#include "ui/TreeMetrics.h"
-#include "viewers/DiagramKinds.h"
-
 #include "CommandPalette.h"
+#include "EntryPopups.h"
 #include "FileIcons.h"
 #include "FileOperations.h"
 #include "ProjectTreeModel.h"
+#include "ui/TreeColumnFit.h"
+#include "ui/TreeMetrics.h"
+#include "viewers/DiagramKinds.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -146,8 +145,11 @@ public:
             std::any_of(statuses.cbegin(), statuses.cend(), [](FileStatus s) { return s == FileStatus::Ignored; });
         inIgnored_.clear();
     }
+
     void setTouched(const QSet<QString> &paths) { touched_ = paths; }
+
     void setCut(const QString &path) { cut_ = path; }
+
     QString cut() const { return cut_; }
 
     // nullopt: every row; otherwise only these files and the rows that
@@ -713,7 +715,9 @@ void FileTreeView::createDiagramIn(const QString &folder, const QString &kindId)
     popup->popup();
 }
 
-QString FileTreeView::createEntryNamed(const QString &folder, const QString &name, bool isFolder,
+QString FileTreeView::createEntryNamed(const QString &folder,
+                                       const QString &name,
+                                       bool isFolder,
                                        const QByteArray &content)
 {
     const EntryTarget target = resolveNewEntry(rootPath_, folder, name, isFolder);

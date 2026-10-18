@@ -53,6 +53,7 @@ class TestProjects : public QObject {
     Q_OBJECT
 
 private slots:
+
     void initTestCase()
     {
         // Settings of the tests, not the user's.

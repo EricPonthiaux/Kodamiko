@@ -238,7 +238,12 @@ qreal widest(const Font &font, const QStringList &lines)
     return result;
 }
 
-void draw(QPainter &painter, const Font &font, const QString &value, QPointF position, const QColor &color, Align align,
+void draw(QPainter &painter,
+          const Font &font,
+          const QString &value,
+          QPointF position,
+          const QColor &color,
+          Align align,
           Baseline baseline)
 {
     if (value.isEmpty())

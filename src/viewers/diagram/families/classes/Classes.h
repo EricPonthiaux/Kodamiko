@@ -21,7 +21,9 @@ public:
     void measure(const Board &board) override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     QString displayText() const override { return name; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -56,7 +58,10 @@ public:
     QString toCard;   // near the marker end
 
 private:
-    void drawMarker(QPainter &painter, const Board &board, const Route &route, qreal angle,
+    void drawMarker(QPainter &painter,
+                    const Board &board,
+                    const Route &route,
+                    qreal angle,
                     const LinkStyle &style) const;
     void drawCards(QPainter &painter, const Board &board, const Route &route, qreal angle) const;
 };

@@ -31,7 +31,8 @@ public:
     void detectAgain();
 
     // A setup for `folder` from what its files say.
-    static ProjectConfig detectedProject(const QString &folder, const Toolchains &toolchains,
+    static ProjectConfig detectedProject(const QString &folder,
+                                         const Toolchains &toolchains,
                                          QList<DetectedLanguage> *detected = nullptr);
 
 signals:
@@ -47,6 +48,7 @@ private:
         QComboBox *serverVersion;
         QList<QWidget *> rows; // hidden when turned off
     };
+
     void build(Card &card);
     void fill(Card &card, const LanguageSetup &setup, const QString &evidence);
     void fillRuntimes(Card &card, const LanguageSetup &setup);

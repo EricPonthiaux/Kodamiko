@@ -39,6 +39,7 @@ class TestClaude : public QObject {
     Q_OBJECT
 
 private slots:
+
     void parsesEditedFiles()
     {
         const auto event = HookEvent::fromJson(

@@ -640,7 +640,8 @@ void PreferencesPopup::updateFontPreview()
                                     .arg(shown.background.name(), shown.foreground.name(), shown.line.name()));
 }
 
-void PreferencesPopup::popup(const Preferences &preferences, const QList<Keymap::Command> &commands,
+void PreferencesPopup::popup(const Preferences &preferences,
+                             const QList<Keymap::Command> &commands,
                              const Keymap::Overrides &overrides)
 {
     load(preferences, commands, overrides);
@@ -648,7 +649,8 @@ void PreferencesPopup::popup(const Preferences &preferences, const QList<Keymap:
     pageList_->setFocus();
 }
 
-void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::Command> &commands,
+void PreferencesPopup::load(const Preferences &preferences,
+                            const QList<Keymap::Command> &commands,
                             const Keymap::Overrides &overrides)
 {
     for (QAbstractButton *button : themes_->buttons()) {

@@ -44,6 +44,7 @@ public:
     void scheduleRefresh();
 
     QTreeWidget *tree() const { return tree_; }
+
     // The entry shown by `item`, or nullptr for a category.
     const ClaudeConfig::Entry *entryOf(const QTreeWidgetItem *item) const;
     // Opens `item`'s file, creating it first if needed (as a double-click).
@@ -59,6 +60,7 @@ public:
     // Moves `target` to the trash, or deletes it for good: an error
     // message, or an empty string.
     QString removeTarget(const QString &target, bool permanently);
+
     void setUnsavedChangesCheck(std::function<bool(const QString &)> check) { hasUnsavedChanges_ = std::move(check); }
 
 signals:

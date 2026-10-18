@@ -21,7 +21,9 @@ public:
     // Follows `snippet`, just inserted at byte `start`, and selects its
     // first stop. Nothing to follow without a numbered stop.
     void start(const ExpandedSnippet &snippet, int start);
+
     bool isActive() const { return !stops_.isEmpty(); }
+
     // Selects the next stop; on the last one, the session ends.
     void next();
     void previous();
@@ -34,6 +36,7 @@ private:
         int start = 0; // bytes
         int end = 0;
     };
+
     struct Stop {
         int index = 0;
         QList<Range> ranges;

@@ -18,6 +18,7 @@ public:
     bool start(const ProcessSpec &spec, QSize cells) override;
     void write(const QByteArray &data) override;
     void resize(QSize cells) override;
+
     QString errorString() const override { return errorString_; }
 
 private:

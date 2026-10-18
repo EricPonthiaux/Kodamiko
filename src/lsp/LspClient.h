@@ -24,26 +24,36 @@ public:
 
     // `program` and `arguments` start the server; `rootFolder` is the
     // workspace it works on.
-    LspClient(const QString &program, const QStringList &arguments, const QString &rootFolder,
+    LspClient(const QString &program,
+              const QStringList &arguments,
+              const QString &rootFolder,
               QObject *parent = nullptr);
     // Before start(): the server's environment (JAVA_HOME for jdtls...).
     void setEnvironment(const QProcessEnvironment &environment);
+
     // Before start(): the "initializationOptions" of "initialize".
     void setInitializationOptions(const QJsonObject &options) { initializationOptions_ = options; }
+
     // The workspace settings ({"python": {"pythonPath": ...}}): the answer
     // to the server's "workspace/configuration" requests, also sent once
     // it is initialized.
     void setSettings(const QJsonObject &settings) { settings_ = settings; }
+
     // How to answer the server's requests of `method`; the others get null.
     void setRequestHandler(const QString &method, RequestHandler handler) { requestHandlers_.insert(method, handler); }
+
     // Asks the server to stop, and kills it if it does not.
     ~LspClient() override;
 
     void start();
     bool isRunning() const;
+
     bool isReady() const { return ready_; }
+
     bool hasFailed() const { return failed_; }
+
     QString program() const { return program_; }
+
     // The server's capabilities, from its answer to "initialize".
     QJsonObject capabilities() const { return capabilities_; }
 

@@ -290,10 +290,12 @@ private:
     // Claude asks to run a sensitive tool (restore a snapshot, commit…):
     // above every mode, one request at a time.
     NoticeBar *toolRequestBar_ = nullptr;
+
     struct ToolRequest {
         QString text;
         std::function<void(bool)> answer;
     };
+
     QList<ToolRequest> toolRequests_;
     CodeNavigator *navigator_ = nullptr;
     CodeIntelligence *intelligence_ = nullptr;

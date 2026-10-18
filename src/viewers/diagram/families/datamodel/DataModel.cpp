@@ -619,8 +619,9 @@ std::optional<RelationshipLink::ColumnEndpoints> RelationshipLink::columnEndpoin
                            {relationship.toColumn, leftToRight, *b}};
 }
 
-std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>>
-RelationshipLink::graphvizEndpoints(const Board &board, const QString &rankdir) const
+std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>> RelationshipLink::graphvizEndpoints(
+    const Board &board,
+    const QString &rankdir) const
 {
     const auto *fromShape = dynamic_cast<const EntityShape *>(board.shape(from));
     const auto *toShape = dynamic_cast<const EntityShape *>(board.shape(to));

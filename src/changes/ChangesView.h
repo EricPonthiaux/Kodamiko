@@ -48,10 +48,14 @@ public:
     void generateCommitMessage();
 
     void applyTheme(const Theme &theme);
+
     QSplitter *splitter() const { return splitter_; }
+
     // The bar shown while a merge or rebase is in progress.
     QWidget *operationBar() const { return operationBar_; }
+
     QLabel *operationText() const { return operationText_; }
+
     QPushButton *continueButton() const { return continueButton_; }
 
 signals:
@@ -71,6 +75,7 @@ private:
         Staged,
         Unstaged
     };
+
     struct FileRef {
         Section section;
         int index; // in RepositoryStatus::staged or ::unstaged

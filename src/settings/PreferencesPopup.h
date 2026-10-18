@@ -30,23 +30,28 @@ public:
     explicit PreferencesPopup(const Theme &theme, QWidget *parent);
 
     // Shows the popup with these settings.
-    void popup(const Preferences &preferences, const QList<Keymap::Command> &commands,
+    void popup(const Preferences &preferences,
+               const QList<Keymap::Command> &commands,
                const Keymap::Overrides &overrides);
     // Fills the pages with these settings (popup() without showing).
-    void load(const Preferences &preferences, const QList<Keymap::Command> &commands,
+    void load(const Preferences &preferences,
+              const QList<Keymap::Command> &commands,
               const Keymap::Overrides &overrides);
     void applyTheme(const Theme &theme);
     // Names of the language servers found on this machine, for the Editor page.
     void setInstalledServers(const QStringList &names);
 
     Preferences preferences() const;
+
     Keymap::Overrides shortcutOverrides() const { return overrides_; }
 
     // Keymap page, public for tests: gives the selected command `shortcut`,
     // taking it from the commands that had it.
     void assignShortcut(const QKeySequence &shortcut);
     void selectCommand(const QString &id);
+
     QTreeWidget *commandList() const { return commandList_; }
+
     QLabel *keymapNote() const { return keymapNote_; }
 
 signals:

@@ -53,6 +53,7 @@ struct RecommendedFont {
     QStringList families; // the names it is installed under
     QString url;          // where to get it
 };
+
 QList<RecommendedFont> recommendedFonts();
 // The family `font` is installed under, or an empty string.
 QString installedFamily(const RecommendedFont &font);

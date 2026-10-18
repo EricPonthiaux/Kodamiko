@@ -50,6 +50,7 @@ public:
     // and the runtimes. Stops the servers if either changed.
     void setProject(const ProjectConfig &project, Toolchains *toolchains);
     void setEnabled(bool enabled);
+
     bool isEnabled() const { return enabled_; }
 
     // The installed server for `languageId`, if any.
@@ -74,6 +75,7 @@ public:
 
     // The open folder, the servers' workspace.
     QString folder() const { return folder_; }
+
     // How every server, started now or later, answers the requests of
     // `method` it sends ("workspace/applyEdit").
     void setRequestHandler(const QString &method, LspClient::RequestHandler handler);
@@ -86,6 +88,7 @@ public:
     // The problems the servers last reported for `path` (LSP Diagnostic
     // objects), and the files they reported problems for.
     QJsonArray diagnostics(const QString &path) const { return diagnostics_.value(path); }
+
     QStringList filesWithDiagnostics() const;
     // Starts the server of `languageId` before the first completion needs
     // it, and gives it `path` to read: clangd builds the file's preamble,
@@ -103,8 +106,11 @@ public:
         QStringList arguments;
         QString javaHome;
     };
-    static std::optional<Launch> jdtlsLaunch(const QString &jdtlsProgram, const QString &dataFolder,
-                                             const std::optional<JavaRuntime> &java, QString *error);
+
+    static std::optional<Launch> jdtlsLaunch(const QString &jdtlsProgram,
+                                             const QString &dataFolder,
+                                             const std::optional<JavaRuntime> &java,
+                                             QString *error);
 
     // What a server is told about the project's setup: its
     // initializationOptions and its workspace settings. Public for tests.
@@ -112,8 +118,11 @@ public:
         QJsonObject initialization;
         QJsonObject settings;
     };
+
     // `runtimeHome` and `runtimeExecutable` are the project's JDK or Python.
-    static Options optionsFor(const QString &server, const LanguageSetup &setup, const QString &runtimeHome,
+    static Options optionsFor(const QString &server,
+                              const LanguageSetup &setup,
+                              const QString &runtimeHome,
                               const QString &runtimeExecutable);
 
 signals:
@@ -141,11 +150,13 @@ private:
     QHash<QString, LspClient *> clients_;                       // by server name
     QHash<QString, LspClient::RequestHandler> requestHandlers_; // by method
     QHash<QString, QString> failures_;                          // by server name
+
     struct Document {
         QString server;
         int version = 0;
         size_t hash = 0;
     };
+
     QHash<QString, Document> documents_;           // by path
     QHash<QString, QJsonArray> diagnostics_;       // by path
     QSet<QString> warmed_;                         // servers already asked a completion, by name

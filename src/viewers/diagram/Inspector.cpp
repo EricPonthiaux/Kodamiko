@@ -240,7 +240,9 @@ namespace {
 
 // Widgets for the properties of a shape or a link; `get` and `set` reach the
 // element (looked up again each time: it may have been rebuilt).
-void addPropertyFields(QWidget *section, QVBoxLayout *layout, const QList<Property> &properties,
+void addPropertyFields(QWidget *section,
+                       QVBoxLayout *layout,
+                       const QList<Property> &properties,
                        const std::function<QVariant(const QString &)> &get,
                        const std::function<void(const QString &, const QVariant &, bool typing)> &set)
 {

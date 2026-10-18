@@ -2,7 +2,6 @@
 
 #include "Completion.h"
 #include "CompletionHistory.h"
-
 #include "FullLine.h"
 
 #include <QObject>
@@ -25,12 +24,15 @@ public:
     ~CompletionService() override;
 
     void addProvider(std::shared_ptr<ICompletionProvider> provider);
+
     // What the user chose before, to rank the candidates (see
     // CompletionController).
     CompletionHistory *history() { return &history_; }
+
     // The model that suggests the rest of the line (Full Line
     // completion); nullptr when it is off.
     void setFullLineModel(FullLineModel *model) { fullLineModel_ = model; }
+
     FullLineModel *fullLineModel() const { return fullLineModel_; }
 
     // Asks the providers; calls `update` with all the candidates gathered so

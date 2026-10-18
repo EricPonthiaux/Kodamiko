@@ -16,8 +16,10 @@ public:
 
     void load(const QJsonObject &props) override;
     QJsonObject toJson() const override;
+
     // A child is kept inside its composite, as Mermaid scopes it there.
     bool staysInsideParent() const override { return true; }
+
     // The text the source writes for it (`state "text" as id`); empty for
     // the pseudo-states, whose symbol is their meaning.
     virtual QString sourceText() const { return {}; }
@@ -35,8 +37,11 @@ public:
     void resizeTo(qreal width, qreal height, const Board &board) override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     QString displayText() const override { return text; }
+
     QString sourceText() const override { return text; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -66,15 +71,24 @@ public:
     bool hitTest(QPointF point) const override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     bool drawBehindLinks() const override { return true; }
+
     bool movesChildren() const override { return true; }
+
     bool isCreationContainer() const override { return true; }
+
     std::optional<QRectF> childBounds(const Board &board) const override;
+
     bool isGraphvizCluster() const override { return true; }
+
     QString layoutLabel() const override { return text; }
+
     qreal layoutLabelFontPx() const override;
     std::optional<QSizeF> layoutMinimumSize() const override;
+
     QString displayText() const override { return text; }
+
     QString sourceText() const override { return text; }
 
     QString text;
@@ -95,6 +109,7 @@ public:
     RoundShape(const QString &type, qreal size);
 
     bool resizable() const override { return false; }
+
     bool hitTest(QPointF point) const override;
     QPointF borderPoint(QPointF toward) const override;
     QString displayText() const override;
@@ -112,10 +127,14 @@ public:
     void resizeTo(qreal width, qreal height, const Board &board) override;
     void onDoubleClick(Board &board) override;
     QPointF borderPoint(QPointF toward) const override;
-    QStringList graphvizNodeAttributes(const Board &board, const QString &rankdir, qreal width,
+    QStringList graphvizNodeAttributes(const Board &board,
+                                       const QString &rankdir,
+                                       qreal width,
                                        qreal height) const override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     QString displayText() const override { return text; }
+
     QString sourceText() const override { return text; }
 
     QString text;
@@ -136,6 +155,7 @@ public:
     explicit ForkJoinShape(const QString &type);
 
     bool resizable() const override { return false; }
+
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
     QString displayText() const override;
     QList<Property> properties() const override;
@@ -166,6 +186,7 @@ public:
         QPointF fromAnchor;
         QPointF toAnchor;
     };
+
     mutable std::optional<Placement> placement;
 
 private:

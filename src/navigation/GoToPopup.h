@@ -36,9 +36,13 @@ public:
 
     Tab tab() const;
     void setTab(Tab tab);
+
     QLineEdit *searchField() const { return search_; }
+
     QTreeWidget *list() const { return list_; }
+
     QCheckBox *editedByClaude() const { return editedByClaude_; }
+
     // Lists are complete (the file list has been read).
     bool isReady() const { return !scanning_; }
 

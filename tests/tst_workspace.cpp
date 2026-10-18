@@ -71,6 +71,7 @@ class TestWorkspace : public QObject {
     Q_OBJECT
 
 private slots:
+
     void paletteMatchesLettersInOrder()
     {
         QVERIFY(CommandPalette::matchScore("Git: Stage All", "stall") > 0);

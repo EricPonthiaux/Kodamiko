@@ -127,6 +127,7 @@ class TestDiagramExplainer : public QObject {
     Q_OBJECT
 
 private slots:
+
     void registersTheFamily()
     {
         const Family &family = families::explainer();

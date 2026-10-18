@@ -3,10 +3,9 @@
 #include "ui/AppFonts.h"
 #include "ui/Theme.h"
 
-#include <Qsci/qsciscintilla.h>
-
 #include <QFontInfo>
 #include <QFontMetricsF>
+#include <Qsci/qsciscintilla.h>
 
 #include <algorithm>
 

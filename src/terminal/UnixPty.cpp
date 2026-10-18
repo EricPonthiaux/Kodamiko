@@ -4,14 +4,15 @@
 #include <QSocketNotifier>
 #include <QStandardPaths>
 
-#include <algorithm>
-#include <cerrno>
-#include <csignal>
-#include <cstring>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include <algorithm>
+#include <cerrno>
+#include <csignal>
+#include <cstring>
 
 #if defined(Q_OS_MACOS)
 #include <util.h>

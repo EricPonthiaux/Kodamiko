@@ -124,7 +124,9 @@ QList<TextEdit> LspCompletionProvider::parseEdits(const QJsonArray &edits)
     return result;
 }
 
-QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, bool *incomplete, LspClient *client,
+QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result,
+                                                   bool *incomplete,
+                                                   LspClient *client,
                                                    const CompletionContext *context)
 {
     // Only a server that resolves items is asked to.
@@ -146,6 +148,7 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result, boo
         QString sortText;
         int index;
     };
+
     std::vector<Ranked> order;
     order.reserve(list.size());
     for (int i = 0; i < list.size(); ++i)
@@ -301,7 +304,9 @@ void LspCompletionProvider::complete(const CompletionContext &context, const Cal
         });
 }
 
-void LspCompletionProvider::request(LspClient *client, const CompletionContext &context, const QString &expectedType,
+void LspCompletionProvider::request(LspClient *client,
+                                    const CompletionContext &context,
+                                    const QString &expectedType,
                                     const Callback &done)
 {
     QJsonObject completionContext{{"triggerKind", context.triggerCharacter.isNull() ? 1 : 2}};

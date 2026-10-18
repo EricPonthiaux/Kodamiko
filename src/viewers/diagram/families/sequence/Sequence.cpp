@@ -137,12 +137,14 @@ struct FragmentSpan {
     Fragment fragment;
     int startOrder = 0;
     int endOrder = 0;
+
     struct Branch {
         QString signature;
         int order = 0;
         QString keyword;
         QString label;
     };
+
     QList<Branch> branches;
 };
 
@@ -224,8 +226,11 @@ int nextMessageOrder(const Board &board)
     return maxOrder(board) + 1;
 }
 
-QList<Fragment> syncFragments(QStringList &out, const QList<Fragment> &active, const QList<Fragment> &next,
-                              const QString &indent, bool parallelBranches,
+QList<Fragment> syncFragments(QStringList &out,
+                              const QList<Fragment> &active,
+                              const QList<Fragment> &next,
+                              const QString &indent,
+                              bool parallelBranches,
                               const std::function<QString(const QString &)> &encode)
 {
     const auto text = [&](const QString &value) { return encode ? encode(value) : value; };
@@ -568,7 +573,11 @@ void MessageLink::draw(QPainter &painter, const Board &board, bool selected) con
         drawHead(painter, board, r->a, departureAngle(*r) + M_PI, style, startHead);
 }
 
-void MessageLink::drawHead(QPainter &painter, const Board &board, QPointF tip, qreal angle, const LinkStyle &style,
+void MessageLink::drawHead(QPainter &painter,
+                           const Board &board,
+                           QPointF tip,
+                           qreal angle,
+                           const LinkStyle &style,
                            const QString &kind) const
 {
     if (kind == QLatin1String("arrow")) {

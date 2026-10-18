@@ -24,6 +24,7 @@ struct NestingRule {
     const char *parent;
     const char *child;
 };
+
 const NestingRule nestingRules[] = {
     {".cpp", ".h"},
     {".cpp", ".hpp"},

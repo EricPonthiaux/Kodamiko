@@ -3,13 +3,10 @@
 #include "ChangeGutter.h"
 #include "CodeFormatter.h"
 #include "SymbolOccurrences.h"
-#include "syntax/ScintillaStyles.h"
-
 #include "syntax/HighlighterFactory.h"
 #include "syntax/ISyntaxHighlighter.h"
 #include "syntax/LanguageRegistry.h"
-
-#include <Qsci/qscicommandset.h>
+#include "syntax/ScintillaStyles.h"
 
 #include <QContextMenuEvent>
 #include <QFile>
@@ -19,6 +16,7 @@
 #include <QPainter>
 #include <QTimer>
 #include <QToolTip>
+#include <Qsci/qscicommandset.h>
 
 #include <algorithm>
 #include <utility>

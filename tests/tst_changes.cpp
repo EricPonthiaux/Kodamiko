@@ -51,6 +51,7 @@ class TestChanges : public QObject {
     Q_OBJECT
 
 private slots:
+
     void initTestCase()
     {
         if (QStandardPaths::findExecutable("git").isEmpty())

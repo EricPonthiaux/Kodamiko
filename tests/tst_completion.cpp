@@ -45,8 +45,11 @@ QStringList ranked(const QString &pattern, const QStringList &candidates)
 class LateProvider : public ICompletionProvider {
 public:
     bool handles(const CompletionContext &) const override { return true; }
+
     void complete(const CompletionContext &, const Callback &done) override { pending = done; }
+
     QString triggerCharacters(const QString &) const override { return QStringLiteral("."); }
+
     Callback pending;
 };
 
@@ -58,14 +61,18 @@ public:
         , smart(smart)
     {
     }
+
     bool handles(const CompletionContext &) const override { return true; }
+
     bool servesSmart() const override { return smart; }
+
     void complete(const CompletionContext &context, const Callback &done) override
     {
         last = context;
         ++calls;
         done(items, false);
     }
+
     QList<CompletionItem> items;
     bool smart;
     CompletionContext last;
@@ -82,6 +89,7 @@ public:
         ++requests;
         done(lineOf(answer, after));
     }
+
     QString answer;
     QString lastBefore;
     QString lastAfter;
@@ -94,6 +102,7 @@ class TestCompletion : public QObject {
     Q_OBJECT
 
 private slots:
+
     void fuzzyMatchesWordStarts()
     {
         QVERIFY(FuzzyMatch::match("gsv", "getSelectedValue"));
@@ -1090,8 +1099,10 @@ private slots:
         class Paths : public RecordingProvider {
         public:
             using RecordingProvider::RecordingProvider;
+
             bool servesModulePaths() const override { return true; }
         };
+
         auto paths =
             std::make_shared<Paths>(QList<CompletionItem>{{"components", {}, {}, CompletionItem::Kind::Module, 10}});
         Fixture f("import Button from '';\n", 0, 20, paths, "a.js");
@@ -1330,7 +1341,10 @@ private:
     // An editor showing a C++ file, with completion, the cursor at
     // (line, index).
     struct Fixture {
-        Fixture(const QByteArray &text, int line, int index, std::shared_ptr<ICompletionProvider> extra = {},
+        Fixture(const QByteArray &text,
+                int line,
+                int index,
+                std::shared_ptr<ICompletionProvider> extra = {},
                 const QString &name = QStringLiteral("a.cpp"))
         {
             QFile file(dir.filePath(name));
@@ -1353,6 +1367,7 @@ private:
             editor->setFocus();
             editor->setCursorPosition(line, index);
         }
+
         QTemporaryDir dir;
         CompletionService service; // outlives the editor, destroyed with the window
         QWidget window;

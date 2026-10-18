@@ -25,8 +25,11 @@ McpResult McpResult::error(const QString &text)
     return result;
 }
 
-McpTool McpTool::reading(const QString &name, const QString &title, const QString &description,
-                         const QJsonObject &inputSchema, Run run)
+McpTool McpTool::reading(const QString &name,
+                         const QString &title,
+                         const QString &description,
+                         const QJsonObject &inputSchema,
+                         Run run)
 {
     McpTool tool;
     tool.name = name;
@@ -39,8 +42,12 @@ McpTool McpTool::reading(const QString &name, const QString &title, const QStrin
     return tool;
 }
 
-McpTool McpTool::acting(const QString &name, const QString &title, const QString &description,
-                        const QJsonObject &inputSchema, Run run, bool idempotent)
+McpTool McpTool::acting(const QString &name,
+                        const QString &title,
+                        const QString &description,
+                        const QJsonObject &inputSchema,
+                        Run run,
+                        bool idempotent)
 {
     McpTool tool = reading(name, title, description, inputSchema, std::move(run));
     tool.readOnly = false;
@@ -48,8 +55,11 @@ McpTool McpTool::acting(const QString &name, const QString &title, const QString
     return tool;
 }
 
-McpTool McpTool::sensitive(const QString &name, const QString &title, const QString &description,
-                           const QJsonObject &inputSchema, std::function<QString(const QJsonObject &)> describe,
+McpTool McpTool::sensitive(const QString &name,
+                           const QString &title,
+                           const QString &description,
+                           const QJsonObject &inputSchema,
+                           std::function<QString(const QJsonObject &)> describe,
                            Run run)
 {
     McpTool tool = acting(name, title, description, inputSchema, std::move(run));

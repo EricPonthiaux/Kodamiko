@@ -471,8 +471,10 @@ QJsonObject typescriptInitialization()
 
 } // namespace
 
-LanguageServers::Options LanguageServers::optionsFor(const QString &server, const LanguageSetup &setup,
-                                                     const QString &runtimeHome, const QString &runtimeExecutable)
+LanguageServers::Options LanguageServers::optionsFor(const QString &server,
+                                                     const LanguageSetup &setup,
+                                                     const QString &runtimeHome,
+                                                     const QString &runtimeExecutable)
 {
     Options options;
     if (server == QLatin1String("clangd")) {
@@ -516,7 +518,9 @@ void LanguageServers::setRequestHandler(const QString &method, LspClient::Reques
         client->setRequestHandler(method, handler);
 }
 
-bool LanguageServers::syncDocument(LspClient *client, const QString &path, const QString &languageId,
+bool LanguageServers::syncDocument(LspClient *client,
+                                   const QString &path,
+                                   const QString &languageId,
                                    const QByteArray &text)
 {
     const QString server = clients_.key(client);

@@ -1,5 +1,6 @@
 # Code style of Duet: 4-space indentation, 120 columns, function braces on
-# their own line, `Type *pointer`. Close to Qt's own style.
+# their own line, `Type *pointer`, `const` on the left. Close to Qt's own
+# style. Requires clang-format 20 or newer.
 ---
 Language: Cpp
 BasedOnStyle: WebKit
@@ -31,6 +32,8 @@ NamespaceIndentation: None
 FixNamespaceComments: true
 CompactNamespaces: false
 
+QualifierAlignment: Left
+
 AllowShortFunctionsOnASingleLine: InlineOnly
 AllowShortLambdasOnASingleLine: All
 AllowShortIfStatementsOnASingleLine: Never
@@ -43,7 +46,11 @@ AlignAfterOpenBracket: Align
 AlignOperands: Align
 AlignTrailingComments: true
 BinPackArguments: true
-BinPackParameters: true
+# A signature too long for one line gets one parameter per line, aligned
+# after the parenthesis; the return type stays on the name's line.
+BinPackParameters: OnePerLine
+AllowAllParametersOfDeclarationOnNextLine: false
+PenaltyReturnTypeOnItsOwnLine: 10000
 BreakBeforeBinaryOperators: None
 BreakConstructorInitializers: BeforeComma
 PackConstructorInitializers: Never
@@ -53,13 +60,23 @@ Cpp11BracedListStyle: true
 SpaceBeforeCpp11BracedList: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
-SeparateDefinitionBlocks: Leave
+SeparateDefinitionBlocks: Always
 InsertNewlineAtEOF: true
 
-# Own header first, then project headers, Qt, third-party C APIs and the
-# standard library, each group separated by a blank line.
+# Own header first, then project headers, Qt (QScintilla included),
+# third-party and system C APIs, and the standard library, each group
+# separated by a blank line.
 SortIncludes: CaseSensitive
-IncludeBlocks: Preserve
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<Q'
+    Priority: 2
+  - Regex: '^<.*\.h>$'
+    Priority: 3
+  - Regex: '^<'
+    Priority: 4
 
 # Qt macros that read as statements or declarations.
 StatementMacros: [Q_OBJECT, Q_GADGET, Q_UNUSED, QT_REQUIRE_VERSION]

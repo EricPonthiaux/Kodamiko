@@ -789,11 +789,13 @@ bool autoArrange(Board &board, const ArrangeOptions &options, QString *error)
                 outgoing.insert(l->from);
                 incoming.insert(l->to);
             }
+
             struct Group {
                 qreal top, left;
                 Shape *entry;
                 Shape *exit;
             };
+
             std::vector<Group> ordered;
             for (const QString &r : order) {
                 std::vector<Shape *> members = groups[r];

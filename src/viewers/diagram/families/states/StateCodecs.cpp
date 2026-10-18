@@ -4,7 +4,6 @@
 // `state "desc" as id` and nested composites `state X { … }`.
 
 #include "States.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -249,8 +248,11 @@ QStringList serializeStates(const Board &board, QStringList out)
 class MermaidState : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-state"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("State diagram"); }
+
     const Family &family() const override { return families::states(); }
 
     static const QRegularExpression &header()
@@ -376,8 +378,11 @@ public:
 class PlantumlState : public Codec {
 public:
     QString id() const override { return QStringLiteral("plantuml-state"); }
+
     QString language() const override { return QStringLiteral("plantuml"); }
+
     QString title() const override { return QStringLiteral("State diagram"); }
+
     const Family &family() const override { return families::states(); }
 
     bool matches(const QString &source) const override

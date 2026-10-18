@@ -7,7 +7,6 @@
 #include <QSet>
 
 #include <optional>
-
 #include <vector>
 
 namespace {
@@ -267,7 +266,10 @@ int angleOpenerOf(const QByteArray &text, int close, int limit)
 // The candidate of a template: matched on its key, described by what it
 // gives (with "expr" for the expression), showing the real result beside
 // the list.
-CompletionItem itemOf(const Template &entry, const QString &snippet, const QString &sample, const QString &kindLabel,
+CompletionItem itemOf(const Template &entry,
+                      const QString &snippet,
+                      const QString &sample,
+                      const QString &kindLabel,
                       int priority)
 {
     CompletionItem item;
@@ -559,6 +561,7 @@ void PostfixTemplateProvider::complete(const CompletionContext &context, const C
         QString indent;
         QString name;
     };
+
     QList<Candidate> candidates;
     for (int i = 0; i < starts.size(); ++i) {
         const QString expression = QString::fromUtf8(context.text.mid(starts[i], end - starts[i]));

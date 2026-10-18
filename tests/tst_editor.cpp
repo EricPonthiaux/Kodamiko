@@ -45,6 +45,7 @@ class TestEditor : public QObject {
     Q_OBJECT
 
 private slots:
+
     void initTestCase()
     {
         QVERIFY(config_.open());
@@ -713,4 +714,5 @@ int main(int argc, char *argv[])
     TestEditor test;
     return QTest::qExec(&test, argc, argv);
 }
+
 #include "tst_editor.moc"

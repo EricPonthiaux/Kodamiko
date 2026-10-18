@@ -10,6 +10,7 @@ class TestImageView : public QObject {
     Q_OBJECT
 
 private slots:
+
     void opensImagesInAViewer()
     {
         QTemporaryDir dir;

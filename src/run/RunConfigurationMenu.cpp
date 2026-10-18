@@ -36,8 +36,12 @@ QString iconOf(RunConfiguration::Kind kind)
 // makes its action the menu's active one.
 class ConfigurationRow : public QWidget {
 public:
-    ConfigurationRow(QWidgetAction *action, QMenu *menu, const RunConfiguration &configuration, bool selected,
-                     bool running, const Theme &theme)
+    ConfigurationRow(QWidgetAction *action,
+                     QMenu *menu,
+                     const RunConfiguration &configuration,
+                     bool selected,
+                     bool running,
+                     const Theme &theme)
         : QWidget(menu)
         , action_(action)
         , menu_(menu)
@@ -182,7 +186,10 @@ QLabel *label(QMenu *menu, const QString &text, const QString &style)
 
 namespace RunConfigurationMenu {
 
-QWidgetAction *addConfiguration(QMenu *menu, const RunConfiguration &configuration, bool selected, bool running,
+QWidgetAction *addConfiguration(QMenu *menu,
+                                const RunConfiguration &configuration,
+                                bool selected,
+                                bool running,
                                 const Theme &theme)
 {
     auto *action = new QWidgetAction(menu);

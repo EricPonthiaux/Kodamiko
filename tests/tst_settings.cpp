@@ -5,20 +5,20 @@
 #include "ui/AppFonts.h"
 #include "ui/Theme.h"
 
-#include <Qsci/qsciscintilla.h>
-
 #include <QAction>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
 #include <QSettings>
 #include <QTreeWidget>
+#include <Qsci/qsciscintilla.h>
 #include <QtTest>
 
 class TestSettings : public QObject {
     Q_OBJECT
 
 private slots:
+
     void initTestCase()
     {
         // Settings of the tests, not the user's.
@@ -213,6 +213,7 @@ private:
             fold->setShortcut(QKeySequence("Ctrl+-"));
             folding->addAction("Fold &All"); // no shortcut
         }
+
         QAction *find;
         QAction *fold;
     };

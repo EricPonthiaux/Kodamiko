@@ -20,18 +20,22 @@ public:
 
     // The file of the open project's history; empty: in memory only.
     void setFile(const QString &path);
+
     QString file() const { return file_; }
+
     // Where the history of `folder` is kept, among the application's data.
     static QString fileFor(const QString &folder);
 
-    void recordAccepted(const QString &languageId, const QString &label,
+    void recordAccepted(const QString &languageId,
+                        const QString &label,
                         const QDateTime &when = QDateTime::currentDateTime());
     // Inserted, then erased at once.
     void recordRejected(const QString &languageId, const QString &label);
 
     // Added to a candidate's rank: up to +14 for a frequent and recent
     // choice, down to -9 for one erased each time.
-    int boost(const QString &languageId, const QString &label,
+    int boost(const QString &languageId,
+              const QString &label,
               const QDateTime &now = QDateTime::currentDateTime()) const;
 
     void save();
@@ -42,6 +46,7 @@ private:
         int rejected = 0;
         qint64 lastUsed = 0; // seconds since the epoch
     };
+
     static QString keyOf(const QString &languageId, const QString &label);
     void load();
     void changed();

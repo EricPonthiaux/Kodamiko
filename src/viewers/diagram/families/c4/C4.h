@@ -25,7 +25,9 @@ public:
     void resizeTo(qreal width, qreal height, const Board &board) override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     QString displayText() const override { return name; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -39,14 +41,18 @@ public:
 
     // The lines laid out by the last measure (tests check they fit).
     QStringList titleLines() const { return titleLines_; }
+
     QStringList typeLines() const { return typeLines_; }
+
     QStringList technologyLines() const { return technologyLines_; }
+
     QStringList descriptionLines() const { return descriptionLines_; }
 
 private:
     struct BodyStyle {
         QColor fill, stroke, ink, muted;
     };
+
     BodyStyle bodyStyle(const Style &style) const;
     QString typeText() const;
     qreal contentTop() const;
@@ -73,15 +79,21 @@ public:
     bool hitTest(QPointF point) const override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     bool drawBehindLinks() const override { return true; }
+
     // Sidecar recognises its boundaries by type, both as Graphviz clusters
     // and as the frames a created element joins.
     bool isGraphvizCluster() const override { return true; }
+
     bool isCreationContainer() const override { return true; }
+
     QString layoutLabel() const override;
     qreal layoutLabelFontPx() const override;
     std::optional<QSizeF> layoutMinimumSize() const override;
+
     QString displayText() const override { return name; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;

@@ -53,7 +53,9 @@ public:
         }
     }
 
-    QSize sizeFromContents(ContentsType type, const QStyleOption *option, const QSize &size,
+    QSize sizeFromContents(ContentsType type,
+                           const QStyleOption *option,
+                           const QSize &size,
                            const QWidget *widget) const override
     {
         QSize result = QProxyStyle::sizeFromContents(type, option, size, widget);
@@ -75,7 +77,9 @@ public:
         return result;
     }
 
-    void drawControl(ControlElement element, const QStyleOption *option, QPainter *painter,
+    void drawControl(ControlElement element,
+                     const QStyleOption *option,
+                     QPainter *painter,
                      const QWidget *widget) const override
     {
         // Fusion only fills the tabs of a QTabWidget; a standalone tab bar

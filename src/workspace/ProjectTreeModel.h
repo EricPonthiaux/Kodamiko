@@ -39,10 +39,14 @@ public:
     ~ProjectTreeModel() override;
 
     void setRootPath(const QString &path);
+
     QString rootPath() const { return rootPath_; }
+
     // Rebuilds the tree (a model reset).
     void setOptions(const Options &options);
+
     Options options() const { return options_; }
+
     // Icons for a dark or light background; the view must be repainted.
     void setDarkIcons(bool dark);
 

@@ -28,8 +28,11 @@ public:
     void applyTheme(const Theme &theme);
 
     QListWidget *list() const { return list_; }
+
     QLabel *detailsTitle() const { return title_; }
+
     QListWidget *files() const { return files_; }
+
     void restoreSelected();
 
     // "Just now", "12 min ago", "Today at 14:32", "Yesterday at 9:05",

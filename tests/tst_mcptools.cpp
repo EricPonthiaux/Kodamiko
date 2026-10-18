@@ -134,6 +134,7 @@ class TestMcpTools : public QObject {
     Q_OBJECT
 
 private slots:
+
     // Files as the user has them, unsaved changes included.
     void readsTheEditor()
     {

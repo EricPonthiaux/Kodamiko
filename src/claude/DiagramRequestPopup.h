@@ -21,8 +21,11 @@ public:
     // started: the popup then closes.
     using Apply = std::function<QString(const QString &kindId, const QString &name, const QString &description)>;
 
-    DiagramRequestPopup(const QString &location, const QList<DiagramKind> &kinds, const QString &initialName,
-                        Apply apply, QWidget *parent);
+    DiagramRequestPopup(const QString &location,
+                        const QList<DiagramKind> &kinds,
+                        const QString &initialName,
+                        Apply apply,
+                        QWidget *parent);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;

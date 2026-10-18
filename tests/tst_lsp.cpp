@@ -15,6 +15,7 @@ class TestLsp : public QObject {
     Q_OBJECT
 
 private slots:
+
     void framesAndSplitsMessages()
     {
         const QJsonObject first{{"jsonrpc", "2.0"}, {"id", 1}, {"result", "é"}};
@@ -401,8 +402,14 @@ private:
     // Candidates the language server of `languageId` proposes at (line,
     // column) of `text`, saved as `name` in `dir`. The servers stay alive
     // with the test object (resolving needs them).
-    QList<CompletionItem> completeAt(const QTemporaryDir &dir, const QString &name, const QString &languageId,
-                                     const QByteArray &text, int line, int column, QChar trigger, int timeoutMs)
+    QList<CompletionItem> completeAt(const QTemporaryDir &dir,
+                                     const QString &name,
+                                     const QString &languageId,
+                                     const QByteArray &text,
+                                     int line,
+                                     int column,
+                                     QChar trigger,
+                                     int timeoutMs)
     {
         QFile file(dir.filePath(name));
         if (!file.open(QIODevice::WriteOnly))

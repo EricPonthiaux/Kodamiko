@@ -232,7 +232,10 @@ void BuildOutputParser::flushPending()
     pending_ = Pending::None;
 }
 
-void BuildOutputParser::add(const QString &path, int line, int column, Diagnostic::Severity severity,
+void BuildOutputParser::add(const QString &path,
+                            int line,
+                            int column,
+                            Diagnostic::Severity severity,
                             const QString &message)
 {
     const QString resolved = resolve(path);

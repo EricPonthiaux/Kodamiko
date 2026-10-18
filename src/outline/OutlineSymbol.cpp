@@ -15,7 +15,8 @@ bool isFunction(SymbolKind kind)
     return kind == SymbolKind::Function || kind == SymbolKind::Method;
 }
 
-std::vector<OutlineSymbol> build(std::vector<RangedSymbol> &flat, const std::vector<std::vector<size_t>> &children,
+std::vector<OutlineSymbol> build(std::vector<RangedSymbol> &flat,
+                                 const std::vector<std::vector<size_t>> &children,
                                  const std::vector<size_t> &indices)
 {
     std::vector<OutlineSymbol> result;

@@ -26,7 +26,10 @@ class CodeIntelligence : public QObject {
     Q_OBJECT
 
 public:
-    CodeIntelligence(EditorTabs *tabs, LanguageServers *servers, CodeNavigator *navigator, ProblemStore *problems,
+    CodeIntelligence(EditorTabs *tabs,
+                     LanguageServers *servers,
+                     CodeNavigator *navigator,
+                     ProblemStore *problems,
                      QObject *parent = nullptr);
 
     // Documentation when the mouse rests on a name, parameters while a

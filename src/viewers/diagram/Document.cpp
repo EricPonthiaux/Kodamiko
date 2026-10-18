@@ -228,8 +228,13 @@ QStringList layoutLines(const Board &board, const Codec &codec)
     return lines;
 }
 
-bool build(Board &board, const Codec &codec, const QString &source, const SavedLayout &layout, Loaded &loaded,
-           QString *error, bool keepHistory = false)
+bool build(Board &board,
+           const Codec &codec,
+           const QString &source,
+           const SavedLayout &layout,
+           Loaded &loaded,
+           QString *error,
+           bool keepHistory = false)
 {
     Model model;
     QString message;

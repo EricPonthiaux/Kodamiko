@@ -4,7 +4,6 @@
 // id[text], id(text)…; `::icon(…)` and `:::class` decorations are ignored.
 
 #include "Mindmap.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -74,6 +73,7 @@ void parseTree(const QString &source, Model &model)
         int indent;
         NodeText node;
     };
+
     static const QRegularExpression icon(QStringLiteral("::icon\\([^)]*\\)"));
     static const QRegularExpression cssClass(QStringLiteral(":::.*$"));
     static const QRegularExpression headerLine(QStringLiteral("^\\s*mindmap\\s*$"));
@@ -104,10 +104,12 @@ void parseTree(const QString &source, Model &model)
             used.insert(entry.node.key);
     }
     QSet<QString> assigned;
+
     struct Open {
         int indent;
         QString key;
     };
+
     QList<Open> stack; // the path to the current branch
     for (const Entry &entry : entries) {
         QString key;
@@ -134,8 +136,11 @@ namespace {
 class MermaidMindmap : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-mindmap"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("Mind map"); }
+
     const Family &family() const override { return families::mindmap(); }
 
     bool matches(const QString &source) const override

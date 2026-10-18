@@ -8,8 +8,11 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 
-DiagramRequestPopup::DiagramRequestPopup(const QString &location, const QList<DiagramKind> &kinds,
-                                         const QString &initialName, Apply apply, QWidget *parent)
+DiagramRequestPopup::DiagramRequestPopup(const QString &location,
+                                         const QList<DiagramKind> &kinds,
+                                         const QString &initialName,
+                                         Apply apply,
+                                         QWidget *parent)
     : EntryPopup(tr("Diagram Drawn by Claude"), location, parent)
     , apply_(std::move(apply))
     , kind_(new QComboBox(this))

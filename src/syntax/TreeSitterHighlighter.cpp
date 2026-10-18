@@ -80,8 +80,16 @@ void TreeSitterHighlighter::applyTheme(const Theme &theme)
     editor_->recolor();
 }
 
-void TreeSitterHighlighter::onModified(int position, int modificationType, const char *, int length, int, int, int, int,
-                                       int, int)
+void TreeSitterHighlighter::onModified(int position,
+                                       int modificationType,
+                                       const char *,
+                                       int length,
+                                       int,
+                                       int,
+                                       int,
+                                       int,
+                                       int,
+                                       int)
 {
     // Without a tree, the next parse will be a full one: nothing to apply.
     if (!tree_)

@@ -126,6 +126,7 @@ public:
     using QAbstractListModel::QAbstractListModel;
 
     int rowCount(const QModelIndex &parent = {}) const override { return parent.isValid() ? 0 : int(entries.size()); }
+
     QVariant data(const QModelIndex &index, int role) const override
     {
         if (!index.isValid())
@@ -146,6 +147,7 @@ public:
             return {};
         }
     }
+
     void reset(std::vector<Entry> newEntries)
     {
         beginResetModel();
@@ -348,6 +350,7 @@ int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString 
         int score;
         FuzzyMatch::Match match;
     };
+
     std::vector<Scored> scored;
     for (int i = 0; i < items.size(); ++i) {
         const CompletionItem &item = items[i];

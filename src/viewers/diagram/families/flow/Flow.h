@@ -23,9 +23,13 @@ public:
     QList<Port> ports(const Board &board) const override;
     QPointF borderPoint(QPointF toward) const override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
-    QStringList graphvizNodeAttributes(const Board &board, const QString &rankdir, qreal width,
+    QStringList graphvizNodeAttributes(const Board &board,
+                                       const QString &rankdir,
+                                       qreal width,
                                        qreal height) const override;
+
     QString displayText() const override { return text; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -62,6 +66,7 @@ public:
     void resizeTo(qreal width, qreal height, const Board &board) override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     QString displayText() const override { return text; }
 
     QString text;

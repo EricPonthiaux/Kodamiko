@@ -40,16 +40,21 @@ public:
     void applyTheme(const Theme &theme);
 
     QLineEdit *searchField() const { return search_; }
+
     QLineEdit *replaceField() const { return replace_; }
+
     int matchCount() const { return static_cast<int>(matches_.size()); }
+
     // Number of the selected match, from 1; 0 if the selection is not a match.
     int currentMatch() const;
+
     bool isPatternValid() const { return valid_; }
 
     struct Match {
         long start;
         long end;
     };
+
     // Matches of `query` in the editor, up to `limit`. `flags`: SCFIND_*.
     // `valid` is set to false for an invalid regular expression.
     static QList<Match> findAll(EditorWidget *editor, const QString &query, int flags, bool *valid, int limit);

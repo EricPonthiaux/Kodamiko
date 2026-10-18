@@ -2,7 +2,6 @@
 
 #include "AppFonts.h"
 #include "BrandMark.h"
-
 #include "UiIcons.h"
 
 #include <QAction>
@@ -236,7 +235,10 @@ void TitleBar::addActionButton(QAction *action, const QString &iconName)
     actions_->addWidget(actionButton(action, iconName));
 }
 
-void TitleBar::setRunConfiguration(const QIcon &icon, const QString &name, const QString &toolTip, QMenu *menu,
+void TitleBar::setRunConfiguration(const QIcon &icon,
+                                   const QString &name,
+                                   const QString &toolTip,
+                                   QMenu *menu,
                                    bool running)
 {
     run_->setVisible(!name.isEmpty());

@@ -51,7 +51,8 @@ void GitCommands::cancel()
     cancelled_ = true;
 }
 
-GitCommands::Done GitCommands::finishing(const QString &title, std::function<void()> onSuccess,
+GitCommands::Done GitCommands::finishing(const QString &title,
+                                         std::function<void()> onSuccess,
                                          FailureHandler onFailure)
 {
     return [this, title, onSuccess = std::move(onSuccess),

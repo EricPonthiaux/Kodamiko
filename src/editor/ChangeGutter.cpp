@@ -20,6 +20,7 @@ enum Marker {
     ModifiedMarker,
     DeletedMarker
 };
+
 constexpr int markerMask = (1 << AddedMarker) | (1 << ModifiedMarker) | (1 << DeletedMarker);
 constexpr int marginWidth = 8;
 constexpr int updateDelayMs = 250;

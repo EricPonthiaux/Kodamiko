@@ -6,11 +6,11 @@
 #include <QClipboard>
 #include <QFont>
 
+#include <vterm.h>
+
 #include <array>
 #include <memory>
 #include <vector>
-
-#include <vterm.h>
 
 class IPty;
 class VtScreen;
@@ -30,8 +30,11 @@ public:
     ~TerminalWidget() override;
 
     bool start(const ProcessSpec &spec);
+
     QString errorString() const { return errorString_; }
+
     bool isRunning() const { return running_; }
+
     // Ctrl+C, as typed: the program is asked to stop.
     void interrupt();
     // Ends the program at once (the terminal hangs up).

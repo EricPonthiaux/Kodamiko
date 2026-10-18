@@ -49,7 +49,9 @@ public:
     // The documentation beside the list (Ctrl+Space shows or hides it; the
     // choice is remembered).
     void setDocumentationVisible(bool visible);
+
     bool isDocumentationVisible() const { return documentationVisible_; }
+
     // Its text, for tests: empty when it is hidden.
     QString documentationText() const;
 

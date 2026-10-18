@@ -1,8 +1,7 @@
 #pragma once
 
-#include <QString>
-
 #include <QList>
+#include <QString>
 
 // A language server snippet ("printValue(${1:int value})$0"), made into
 // plain text: placeholders keep their text, tab stops and variables
@@ -21,12 +20,14 @@ struct ExpandedSnippet {
         int start = 0;
         int length = 0;
     };
+
     // A tab stop and its occurrences: what is typed in one is copied to
     // the others (see SnippetSession).
     struct Stop {
         int index = 0; // $1, $2...; 0 for $0
         QList<Range> ranges;
     };
+
     // In the order Tab visits them: $1, $2... then $0, when there is one.
     QList<Stop> stops;
 };

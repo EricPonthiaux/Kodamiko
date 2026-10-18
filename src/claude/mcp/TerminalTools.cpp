@@ -3,7 +3,6 @@
 
 #include "DuetTools.h"
 #include "McpRegistry.h"
-
 #include "terminal/ProcessSpec.h"
 #include "terminal/TerminalWidget.h"
 

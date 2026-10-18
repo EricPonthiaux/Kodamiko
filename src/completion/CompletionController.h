@@ -63,10 +63,13 @@ public:
     // Shows or hides the documentation beside the list (Ctrl+Q).
     void toggleDocumentation();
     bool isActive() const;
+
     // The kind of completion shown.
     CompletionContext::Mode mode() const { return mode_; }
+
     // Whether the list shows the expressions to choose from.
     bool isChoosing() const { return choosing_; }
+
     CompletionPopup *popup() const;
     void close();
     // Inserts the selected candidate; `replaceWord` also replaces the rest
@@ -77,8 +80,10 @@ public:
     void acceptNextWord();
     // The gray rest of the selected candidate, empty when hidden. For tests.
     QString previewText() const;
+
     // The Full Line suggestion shown, empty when none. For tests.
     QString fullLineText() const { return fullLine_; }
+
     // The placeholders of the snippet last inserted.
     SnippetSession *snippet() const { return snippet_; }
 
@@ -153,6 +158,7 @@ private:
         int length = 0; // bytes of the label
         QElapsedTimer age;
     };
+
     std::optional<Inserted> inserted_;
 
     // The session: from opening to closing the popup.

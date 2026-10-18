@@ -50,7 +50,9 @@ QString mcpConfigPath();
 // ("--continue" to resume the last conversation). With `mcpReadOnlyTools`,
 // the session gets the editor's MCP server (duet-mcp), those of its tools
 // allowed without asking.
-std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory, const QString &hookServerName, QString *error,
+std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
+                                         const QString &hookServerName,
+                                         QString *error,
                                          const QStringList &extraArguments = {},
                                          const std::optional<QStringList> &mcpReadOnlyTools = std::nullopt);
 

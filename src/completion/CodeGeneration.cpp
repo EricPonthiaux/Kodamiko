@@ -223,7 +223,8 @@ void CodeGenerationProvider::complete(const CompletionContext &context, const Ca
     done(items, false);
 }
 
-void CodeGenerationProvider::addOverrides(const CompletionContext &context, int brace,
+void CodeGenerationProvider::addOverrides(const CompletionContext &context,
+                                          int brace,
                                           QList<CompletionItem> &items) const
 {
     const bool java = context.languageId == QLatin1String("java");
@@ -330,8 +331,12 @@ void CodeGenerationProvider::addOverrides(const CompletionContext &context, int 
     }
 }
 
-void CodeGenerationProvider::addAccessors(const QByteArray &blanked, int brace, const QString &className,
-                                          const QSet<QString> &declared, const QString &indent, const QString &unit,
+void CodeGenerationProvider::addAccessors(const QByteArray &blanked,
+                                          int brace,
+                                          const QString &className,
+                                          const QSet<QString> &declared,
+                                          const QString &indent,
+                                          const QString &unit,
                                           QList<CompletionItem> &items)
 {
     const QString getterTitle = QObject::tr("Getter");

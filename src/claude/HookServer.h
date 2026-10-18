@@ -32,8 +32,10 @@ public:
     explicit HookServer(QObject *parent = nullptr);
 
     bool listen();
+
     // Full name to pass to the hook (DUET_SOCKET variable).
     QString serverName() const { return server_.fullServerName(); }
+
     QString errorString() const { return server_.errorString(); }
 
     // Only from a hookReceived() slot: the reply is sent when the returned

@@ -4,7 +4,6 @@
 #include "DuetTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
-
 #include "editor/EditorTabs.h"
 #include "lsp/LanguageServers.h"
 #include "navigation/GoToPopup.h"

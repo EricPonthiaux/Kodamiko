@@ -97,6 +97,7 @@ class TestMcp : public QObject {
     Q_OBJECT
 
 private slots:
+
     // The protocol, without a socket.
     void servesTheProtocol()
     {

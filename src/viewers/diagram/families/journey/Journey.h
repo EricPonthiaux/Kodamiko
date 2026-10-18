@@ -16,7 +16,9 @@ public:
     void measure(const Board &board) override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+
     QString displayText() const override { return text; }
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &id) const override;
     void setPropertyValue(const QString &id, const QVariant &value) override;
@@ -26,6 +28,7 @@ public:
         QStringList title;
         QStringList actors;
     };
+
     TextLayout textLayout(qreal maxWidth) const;
 
     QString text;

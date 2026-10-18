@@ -28,6 +28,7 @@ class KeywordProvider : public ICompletionProvider {
 public:
     bool handles(const CompletionContext &context) const override;
     void complete(const CompletionContext &context, const Callback &done) override;
+
     // "true", "nullptr"... where their type is expected.
     bool servesSmart() const override { return true; }
 

@@ -13,10 +13,12 @@ TextStyle plain(const char *color)
 {
     return {QColor(color)};
 }
+
 TextStyle bold(const char *color)
 {
     return {QColor(color), true, false};
 }
+
 TextStyle italic(const char *color)
 {
     return {QColor(color), false, true};

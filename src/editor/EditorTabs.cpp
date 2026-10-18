@@ -222,7 +222,9 @@ void EditorTabs::closePage(QWidget *page)
         closeTab(index, false);
 }
 
-EditorWidget *EditorTabs::showText(const QString &title, const QString &text, const QString &languageId,
+EditorWidget *EditorTabs::showText(const QString &title,
+                                   const QString &text,
+                                   const QString &languageId,
                                    const QString &iconName)
 {
     EditorWidget *view = textView(title);
@@ -500,7 +502,9 @@ std::optional<CodeFormatter::Command> EditorTabs::formatterFor(EditorWidget *edi
     return command;
 }
 
-void EditorTabs::applyFormatted(EditorWidget *editor, const std::optional<QString> &formatted, const QString &error,
+void EditorTabs::applyFormatted(EditorWidget *editor,
+                                const std::optional<QString> &formatted,
+                                const QString &error,
                                 bool quiet)
 {
     const QString name = QFileInfo(editor->filePath()).fileName();

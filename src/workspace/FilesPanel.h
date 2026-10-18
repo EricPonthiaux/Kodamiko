@@ -20,10 +20,13 @@ public:
     explicit FilesPanel(QWidget *parent = nullptr);
 
     FileTreeView *tree() const { return tree_; }
+
     // The view shown: 0 Project, 1 Changed Files, 2 Edited by Claude.
     int scopeIndex() const;
     void setScopeIndex(int index);
+
     QToolButton *scopeButton() const { return scope_; }
+
     bool alwaysSelectOpenedFile() const;
     void setAlwaysSelectOpenedFile(bool enabled);
     // Options menu entries for the tree's layout; applied to the tree.

@@ -42,6 +42,7 @@ bool FindQuery::acceptsFile(const QString &fileName) const
         QRegularExpression wildcard;
         bool exclusion;
     };
+
     thread_local QString compiledFor;
     thread_local QList<Mask> masks;
     if (masks.isEmpty() || compiledFor != fileMask) {

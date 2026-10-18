@@ -89,25 +89,33 @@ public:
     virtual QJsonObject toJson() const;
 
     qreal cx() const { return x + w / 2; }
+
     qreal cy() const { return y + h / 2; }
+
     QRectF rect() const { return QRectF(x, y, w, h); }
 
     // --- Size
     virtual bool resizable() const { return true; }
+
     virtual void resizeTo(qreal width, qreal height, const Board &board);
     // Recomputes the size from the content (text growth…). Default: none.
     virtual void measure(const Board &board);
     // The smallest size a resize can reach; default: the measured size.
     virtual std::optional<QSizeF> resizeMinimum(const Board &board) const;
+
     // A note grows downwards while typed; others stay centered.
     virtual bool editResizeAnchorTopLeft() const { return false; }
 
     // --- Connections
     virtual bool showConnectionPorts() const { return false; }
+
     virtual bool showConnectionPortsOnHover() const { return false; }
+
     // In world coordinates. Default: the middles of the four sides.
     virtual QList<Port> ports(const Board &board) const;
+
     virtual QList<Port> connectionPorts(const Board &board) const { return ports(board); }
+
     virtual bool connectionHitTest(const Board &board, QPointF point) const;
     // Where a link being dragged from `from` meets this shape.
     virtual QPointF connectionPoint(const Board &board, QPointF from, QPointF pointer) const;
@@ -129,31 +137,43 @@ public:
     virtual void draw(QPainter &painter, const Board &board, const ShapeState &state) const;
     // Bounds wider than the box (a lifeline under its header).
     virtual std::optional<QRectF> bounds(const Board &board) const;
+
     // Containers drawn under the links.
     virtual bool drawBehindLinks() const { return false; }
 
     // --- Containers
     // Whether the shape is kept inside its parent frame.
     virtual bool staysInsideParent() const { return false; }
+
     // Whether moving the shape carries its children along.
     virtual bool movesChildren() const { return false; }
+
     // Whether a shape can be created or dropped into it.
     virtual bool isCreationContainer() const { return false; }
+
     // Where children may lie, in world coordinates.
     virtual std::optional<QRectF> childBounds(const Board &board) const;
+
     // Shapes Graphviz lays out as clusters (subgraphs).
     virtual bool isGraphvizCluster() const { return false; }
+
     virtual QString layoutLabel() const { return {}; }
+
     // The font size of the cluster's title; 0 for Graphviz's default.
     virtual qreal layoutLabelFontPx() const { return 0; }
+
     virtual std::optional<QSizeF> layoutMinimumSize() const { return std::nullopt; }
 
     // --- Layout
     // A box Graphviz should reserve instead of the drawn one.
     virtual std::optional<QSizeF> graphvizLayoutSize() const { return std::nullopt; }
+
     // The node's DOT attributes, replacing the default fixed-size box.
-    virtual QStringList graphvizNodeAttributes(const Board &board, const QString &rankdir, qreal width,
+    virtual QStringList graphvizNodeAttributes(const Board &board,
+                                               const QString &rankdir,
+                                               qreal width,
                                                qreal height) const;
+
     // Whether links are routed around the shape.
     virtual bool routingObstacle() const { return true; }
 
@@ -161,7 +181,9 @@ public:
     // What the shape is called, for menus and descriptions (its text, name,
     // label or key).
     virtual QString displayText() const;
+
     virtual QList<Property> properties() const { return {}; }
+
     virtual QVariant propertyValue(const QString &id) const;
     virtual void setPropertyValue(const QString &id, const QVariant &value);
     // An image dropped or pasted on it (notes); false if refused.
@@ -267,6 +289,7 @@ public:
         qreal width = 0;
         qreal height = 0;
     };
+
     virtual LabelBox labelBox(const Board &board) const;
     // Where the label lives: on the line, at the middle of the curve, or the
     // place the layout reserved for it.
@@ -280,14 +303,17 @@ public:
         qreal trim = 0;      // at the head
         qreal trimStart = 0; // at the tail
     };
+
     void strokeBody(QPainter &painter, const Route &route, const BodyOptions &options) const;
     qreal arrivalAngle(const Route &route) const;
     qreal departureAngle(const Route &route) const;
+
     // This link's rank among those joining the same two shapes, both ways.
     struct ParallelGroup {
         int index = 0;
         int count = 1;
     };
+
     ParallelGroup parallelGroup(const Board &board) const;
     // The offset of this link from the pair's axis; families with tall
     // labels (state transitions) widen it.
@@ -310,17 +336,23 @@ public:
     virtual QString layoutLabel(const Board &board) const;
     // An HTML label replacing the default fixed-size box (multi-part labels).
     virtual QString graphvizHtmlLabel(const Board &board) const;
+
     virtual QString graphvizFontName() const { return {}; }
+
     virtual qreal graphvizFontSize() const { return 0; }
+
     // Endpoints more precise than the nodes (columns, lifelines).
-    virtual std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>>
-    graphvizEndpoints(const Board &board, const QString &rankdir) const;
+    virtual std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>> graphvizEndpoints(
+        const Board &board,
+        const QString &rankdir) const;
+
     // A link drawing a route of its own (a sequence message along its lane):
     // Graphviz's routing leaves it alone.
     virtual bool routesItself() const { return false; }
 
     // --- Text and properties
     virtual QList<Property> properties() const { return {}; }
+
     virtual QVariant propertyValue(const QString &id) const;
     virtual void setPropertyValue(const QString &id, const QVariant &value);
     // Double-click: edits the label in place.
@@ -336,12 +368,14 @@ public:
     QString customColor;     // "#rrggbb" or empty
     std::optional<qreal> customWidth;
     std::optional<Spline> spline;
+
     // A label place reserved by the layout, kept apart from the curve.
     struct ReservedLabel {
         QPointF point;
         QPointF fromAnchor;
         QPointF toAnchor;
     };
+
     std::optional<ReservedLabel> layoutLabelPoint;
 
 protected:
@@ -357,7 +391,11 @@ private:
 // The dash a user's line style asks for, over a family's own.
 QList<qreal> linkDash(const Link &link, const QList<qreal> &fallback = {});
 // A filled arrowhead with its tip at `tip`, pointing along `angle`.
-void fillArrowHead(QPainter &painter, QPointF tip, qreal angle, qreal size, const QColor &color,
+void fillArrowHead(QPainter &painter,
+                   QPointF tip,
+                   qreal angle,
+                   qreal size,
+                   const QColor &color,
                    qreal spread = GraphvizNormalArrowSpread);
 QPointF bezierPoint(QPointF p0, QPointF p1, QPointF p2, QPointF p3, qreal t);
 qreal distanceToSegment(QPointF point, QPointF a, QPointF b);

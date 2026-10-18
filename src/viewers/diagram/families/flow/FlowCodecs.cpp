@@ -2,7 +2,6 @@
 // files.
 
 #include "Flow.h"
-
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/SourceText.h"
@@ -28,6 +27,7 @@ struct Delimiter {
     const char *close;
     const char *variant;
 };
+
 const Delimiter delimiters[] = {
     {"(((", ")))", "doublecircle"},
     {"((", "))", "circle"},
@@ -342,8 +342,11 @@ Node *parseNodeRef(const QString &ref, Nodes &nodes, const QStringList &quoted)
 class MermaidFlow : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-flow"); }
+
     QString language() const override { return QStringLiteral("mermaid"); }
+
     QString title() const override { return QStringLiteral("Flowchart"); }
+
     const Family &family() const override { return families::flowchart(); }
 
     bool matches(const QString &source) const override
@@ -479,9 +482,13 @@ public:
 class FlowboardJson : public Codec {
 public:
     QString id() const override { return QStringLiteral("flowboard-json"); }
+
     QString language() const override { return QStringLiteral("flowboard"); }
+
     QString title() const override { return QStringLiteral("Flowchart"); }
+
     const Family &family() const override { return families::flowchart(); }
+
     bool sourceOwnsLayout() const override { return true; }
 
     bool matches(const QString &source) const override

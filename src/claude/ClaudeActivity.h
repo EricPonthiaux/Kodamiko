@@ -21,6 +21,7 @@ public:
     explicit ClaudeActivity(QObject *parent = nullptr);
 
     State state() const { return state_; }
+
     // Explanation for the tab tooltip ("Waiting for permission: Bash").
     QString description() const;
 

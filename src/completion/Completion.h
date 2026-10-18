@@ -60,6 +60,7 @@ struct CompletionItem {
     // before the dot ("items.for" → "for (auto &item : items)"). -1: the
     // prefix's start.
     int replaceStart = -1;
+
     // Other ways to insert it, one of which the user picks once the
     // candidate is chosen: the expression a postfix template wraps ("b" or
     // "a + b" in "a + b.if"), nearest first. Empty: none to choose.
@@ -68,6 +69,7 @@ struct CompletionItem {
         QString insertText;
         int replaceStart = -1;
     };
+
     QList<Choice> choices;
     // Applied with the candidate, elsewhere in the file (imports).
     QList<TextEdit> additionalEdits;
@@ -144,15 +146,19 @@ public:
     // language server answers asynchronously). `done` may be dropped
     // when the request is outdated.
     virtual void complete(const CompletionContext &context, const Callback &done) = 0;
+
     // Whether it serves documentation comments (tags, parameter names);
     // those that do serve nothing else.
     virtual bool servesComments() const { return false; }
+
     // Whether it serves the module names of imports (a language server
     // knows the files and packages).
     virtual bool servesModulePaths() const { return false; }
+
     // Whether it takes part in smart completion, offering only what has
     // the expected type.
     virtual bool servesSmart() const { return false; }
+
     // Characters that open completion after them, such as "." for members.
     virtual QString triggerCharacters(const QString &languageId) const
     {

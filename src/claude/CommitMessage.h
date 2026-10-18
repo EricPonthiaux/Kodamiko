@@ -57,6 +57,7 @@ public:
 
     void start(const RepositoryInfo &repository, bool amend, bool stageEverything, const QString &pathspec);
     void cancel();
+
     bool isRunning() const { return running_; }
 
 signals:
@@ -65,8 +66,10 @@ signals:
     void failed(const QString &error);
 
 private:
-    void onChangesRead(const std::optional<CommitMessage::Changes> &changes, const QString &error,
-                       const QString &workDir, int generation);
+    void onChangesRead(const std::optional<CommitMessage::Changes> &changes,
+                       const QString &error,
+                       const QString &workDir,
+                       int generation);
     void onProcessFinished(int generation);
     void fail(const QString &error);
     void setRunning(bool running);

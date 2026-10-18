@@ -38,6 +38,7 @@ public:
     ~FileTreeView() override;
 
     void setRootPath(const QString &path);
+
     QString rootPath() const { return rootPath_; }
 
     // Compact folders, file nesting, ignored files (see ProjectTreeModel).
@@ -86,13 +87,16 @@ public:
     // Git states of the files (absolute paths), for the colors and the
     // Changed Files scope. `inRepository`: the Git submenu is offered.
     void setStatuses(const FileStatusMap &statuses, bool inRepository);
+
     FileStatusMap statuses() const { return statuses_; }
+
     // Files Claude has just written: a dot on their icon.
     void setClaudeTouched(const QSet<QString> &paths);
     // Files of the Edited by Claude scope.
     void setClaudeEdited(const QStringList &paths);
 
     void setScope(Scope scope);
+
     Scope scope() const { return scope_; }
 
     // Expands the folders leading to `path` and selects it (once the tree

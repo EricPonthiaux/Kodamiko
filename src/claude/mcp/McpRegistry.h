@@ -37,15 +37,25 @@ struct McpTool {
     using Run = std::function<void(const QJsonObject &arguments, McpReply reply, McpProgress progress)>;
 
     // A tool that only reads.
-    static McpTool reading(const QString &name, const QString &title, const QString &description,
-                           const QJsonObject &inputSchema, Run run);
+    static McpTool reading(const QString &name,
+                           const QString &title,
+                           const QString &description,
+                           const QJsonObject &inputSchema,
+                           Run run);
     // A tool that acts in the editor (opens, lays out…), without asking.
-    static McpTool acting(const QString &name, const QString &title, const QString &description,
-                          const QJsonObject &inputSchema, Run run, bool idempotent = false);
+    static McpTool acting(const QString &name,
+                          const QString &title,
+                          const QString &description,
+                          const QJsonObject &inputSchema,
+                          Run run,
+                          bool idempotent = false);
     // A tool that changes the project or runs something: the user is asked
     // first, with `describe`'s text.
-    static McpTool sensitive(const QString &name, const QString &title, const QString &description,
-                             const QJsonObject &inputSchema, std::function<QString(const QJsonObject &)> describe,
+    static McpTool sensitive(const QString &name,
+                             const QString &title,
+                             const QString &description,
+                             const QJsonObject &inputSchema,
+                             std::function<QString(const QJsonObject &)> describe,
                              Run run);
     // A Run from a function answering at once.
     static Run immediate(std::function<McpResult(const QJsonObject &arguments)> function);
@@ -105,8 +115,11 @@ public:
     void addPrompt(McpPrompt prompt);
 
     const QList<McpTool> &tools() const { return tools_; }
+
     const QList<McpResource> &resources() const { return resources_; }
+
     const QList<McpPrompt> &prompts() const { return prompts_; }
+
     const McpTool *tool(const QString &name) const;
     const McpPrompt *prompt(const QString &name) const;
     // The resource (fixed or template) serving `uri`.
@@ -118,7 +131,9 @@ public:
     // Asks the user whether a tool may do `what`; `answer` is called once.
     // Without a confirmer, tools that need one are refused.
     using Confirmer = std::function<void(const QString &tool, const QString &what, std::function<void(bool)> answer)>;
+
     void setConfirmer(Confirmer confirmer) { confirmer_ = std::move(confirmer); }
+
     void confirm(const QString &tool, const QString &what, std::function<void(bool)> answer) const;
 
     // Names of the read-only tools, as Claude Code names them

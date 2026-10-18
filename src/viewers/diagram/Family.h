@@ -102,12 +102,14 @@ struct Model {
         QString key;
         QJsonObject props;
     };
+
     struct Edge {
         QString type;
         QString from; // node keys
         QString to;
         QJsonObject props;
     };
+
     QList<Node> nodes;
     QList<Edge> links;
     QJsonObject meta;
@@ -123,9 +125,11 @@ public:
     virtual QString language() const = 0; // "mermaid", "plantuml", "board", "flowboard"
     virtual QString title() const = 0;    // "Flowchart"
     virtual const Family &family() const = 0;
+
     // Laid out by Graphviz (rather than the family's own layout or the
     // source's coordinates).
     virtual bool arrangeWithGraphviz() const { return true; }
+
     // The source carries the coordinates (a JSON scene): no layout to keep
     // beside it.
     virtual bool sourceOwnsLayout() const { return false; }

@@ -31,9 +31,11 @@ namespace diagram {
 
 class Board;
 struct ElementPreset;
+
 namespace document {
 struct Loaded;
 }
+
 namespace graphviz {
 struct ArrangeOptions;
 }
@@ -46,6 +48,7 @@ struct Camera {
     qreal scale = 1;
 
     QPointF toScreen(QPointF world) const { return {world.x() * scale + x, world.y() * scale + y}; }
+
     QPointF toWorld(QPointF screen) const { return {(screen.x() - x) / scale, (screen.y() - y) / scale}; }
 };
 
@@ -57,18 +60,25 @@ public:
     ~Canvas() override;
 
     Board *board() const { return board_; }
+
     void setGridVisible(bool visible);
+
     bool isGridVisible() const { return gridVisible_; }
+
     qreal zoom() const { return camera_.scale; }
+
     const Camera &camera() const { return camera_; }
+
     // The world point at the center of the view.
     QPointF viewCenter() const;
     bool isEditingText() const;
 
     // Frames the whole diagram (at most 125 %).
     void fitView(bool animate);
+
     // Fits the view once the canvas has its size (after loading a file).
     void fitWhenShown() { needsFit_ = true; }
+
     void zoomBy(qreal factor);
     void resetZoom();
     // Lays the diagram out (Graphviz, or the family's own layout), animated,
@@ -123,14 +133,17 @@ private:
         Trace,
         RightPending
     };
+
     struct Guide {
         bool vertical;
         qreal value, from, to;
     };
+
     struct Appear {
         qreal start; // ms on the animation clock
         qreal duration;
     };
+
     // A removed element, drawn fading out.
     struct Ghost {
         std::shared_ptr<Shape> shape;
@@ -140,6 +153,7 @@ private:
     };
 
     QPointF world(QPointF screen) const { return camera_.toWorld(screen); }
+
     void render(QPainter &painter, const QRectF &area);
     void drawGrid(QPainter &painter, const QRectF &area) const;
     void drawSelectionHalo(QPainter &painter, const Shape &shape) const;
@@ -207,10 +221,12 @@ private:
     QString dropTarget_;
     std::vector<Guide> guides_;
     QPointF pointer_; // world
+
     struct Trace {
         QString type;
         QJsonObject props;
     };
+
     std::optional<Trace> trace_;
 
     QString hoverShape_;

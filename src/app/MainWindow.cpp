@@ -249,7 +249,9 @@ QColor problemsIconColor(int errorCount, int warningCount, const QColor &noProbl
 
 // The changed files git knows under `path`, as repository paths: untracked
 // and ignored files stay.
-QStringList trackedChangesUnder(const QString &path, const FileStatusMap &statuses, const RepositoryInfo &info,
+QStringList trackedChangesUnder(const QString &path,
+                                const FileStatusMap &statuses,
+                                const RepositoryInfo &info,
                                 const QDir &folder)
 {
     QStringList paths;

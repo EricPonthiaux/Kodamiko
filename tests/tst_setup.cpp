@@ -6,6 +6,7 @@ class TestSetup : public QObject {
     Q_OBJECT
 
 private slots:
+
     void parsesVersionOutputs()
     {
         QCOMPARE(Prerequisites::parseVersion("git version 2.47.1"), QVersionNumber(2, 47, 1));
