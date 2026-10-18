@@ -18,8 +18,25 @@ struct FileChange {
 
 class GitError : public std::runtime_error {
 public:
-    explicit GitError(const QString &message)
+    // The failures the interface offers a way out of; General for the others.
+    enum class Kind {
+        General,
+        Cancelled,    // stopped by the user
+        LocalChanges, // local changes would be overwritten (switch, merge…)
+        Rejected,     // push refused: the remote branch has commits we lack
+        Diverged,     // pull cannot fast-forward: both sides have new commits
+        Unmerged,     // branch deletion refused: its commits are merged nowhere
+    };
+
+    explicit GitError(const QString &message, Kind kind = Kind::General)
         : std::runtime_error(message.toStdString())
+        , kind_(kind)
     {
     }
+
+    Kind kind() const { return kind_; }
+    QString message() const { return QString::fromStdString(what()); }
+
+private:
+    Kind kind_;
 };

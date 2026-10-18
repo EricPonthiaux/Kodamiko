@@ -212,11 +212,18 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   (Shift: by 10). *More* exports the source, SVG and PNG (in a light,
   printable palette) and shows or hides the grid and the properties. A
   Mermaid file Duet does not read (a pie chart) opens as text.
-- Three themes, in *View ▸ Theme*: Dark, **Purple** (deep violet in the
-  manner of AI tools: plum background, lavender text, pastel syntax colors,
-  violet accents) and Light. All three share the same controls: rounded
-  fields and menus, focus outlines in the accent color, gradient selections,
-  underlined current tab, thin scroll bars.
+- Four themes, in *View ▸ Theme*: **Duet**, the default, on the brand's
+  colors (the icon's dark slate, its blue as the accent, its white as the
+  caret; flat selections, panels a level below the editor and menus a level
+  above), Dark, **Purple** (deep violet in the manner of AI tools: plum
+  background, lavender text, pastel syntax colors, violet accents) and
+  Light. All four share the same controls: rounded fields and menus, focus
+  outlines in the accent color, accent selections (a gradient in Dark,
+  Purple and Light), underlined current tab, thin scroll bars. The fold
+  marks are thin chevrons: those of the folded blocks always show, those of
+  the open blocks only while the mouse is over the margin. The caret's line
+  number is brighter than the others, and the indentation guide of the
+  block holding the caret lights up.
 - **Duet's own window**, in the manner of IntelliJ: one bar at the top
   holds the menus, the project (with the recent folders), Claude's state (a
   click shows the session), Go to File, Find in Files and the command
@@ -429,6 +436,7 @@ src/
   setup/      prerequisites check (git, Claude Code) and installation
 tools/duet-hook/   Claude Code hooks → editor relay
 tools/duet-mcp/    Claude Code's MCP server → editor relay
+tools/duet-askpass/ git and ssh credential prompts → editor relay
 tools/claude-plugin/ Duet's plugin for its Claude session: skills (diagrams)
 tests/                 Qt Test tests (ctest)
 cmake/                 third-party dependencies

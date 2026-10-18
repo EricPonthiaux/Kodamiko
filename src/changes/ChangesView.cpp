@@ -6,6 +6,7 @@
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
+#include "git/Integration.h"
 #include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
@@ -18,6 +19,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSet>
 #include <QShortcut>
 #include <QSplitter>
 #include <QTextCursor>
@@ -105,6 +107,29 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     header->addSpacing(6);
     header->addWidget(refreshButton);
 
+    // A merge or rebase stopped on conflicts: what to do, and the way on.
+    operationBar_ = new QFrame(this);
+    operationBar_->setObjectName(QStringLiteral("card"));
+    operationText_ = new QLabel(operationBar_);
+    operationText_->setWordWrap(true);
+    continueButton_ = new QPushButton(tr("Continue"), operationBar_);
+    skipButton_ = new QPushButton(tr("Skip Commit"), operationBar_);
+    abortButton_ = new QPushButton(tr("Abort"), operationBar_);
+    connect(continueButton_, &QPushButton::clicked, this, &ChangesView::continueRequested);
+    connect(skipButton_, &QPushButton::clicked, this, &ChangesView::skipRequested);
+    connect(abortButton_, &QPushButton::clicked, this, &ChangesView::abortRequested);
+    auto *operationLayout = new QHBoxLayout(operationBar_);
+    operationLayout->setContentsMargins(14, 8, 10, 8);
+    operationLayout->setSpacing(8);
+    operationLayout->addWidget(operationText_, 1);
+    operationLayout->addWidget(abortButton_);
+    operationLayout->addWidget(skipButton_);
+    operationLayout->addWidget(continueButton_);
+    operationBar_->hide();
+    auto *operationRow = new QHBoxLayout;
+    operationRow->setContentsMargins(8, 0, 8, 8);
+    operationRow->addWidget(operationBar_);
+
     // List: two sections, "Staged" then "Unstaged".
     list_->setHeaderHidden(true);
     list_->setRootIsDecorated(false);
@@ -190,6 +215,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addLayout(header);
+    layout->addLayout(operationRow);
     layout->addWidget(splitter_);
 
     connect(commands_, &GitCommands::busyChanged, this, [this](bool busy) {
@@ -216,6 +242,7 @@ void ChangesView::setFolder(const QString &folder)
     error_.clear();
     rebuildList();
     showSection(Section::Unstaged);
+    showOperation();
     summary_->clear();
     generator_->cancel();
     message_->clear();
@@ -310,6 +337,7 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
         }
     }
 
+    showOperation();
     if (!status_) {
         summary_->setText(error);
         showSection(Section::Unstaged);
@@ -470,6 +498,38 @@ void ChangesView::updateActions()
     discardButton_->setEnabled(!busy && any(Section::Unstaged));
     commitButton_->setEnabled(!busy && status_.has_value());
     amend_->setEnabled(status_ && !status_->info.unborn);
+}
+
+void ChangesView::showOperation()
+{
+    const QString operation = status_ ? status_->info.operation : QString();
+    operationBar_->setVisible(!operation.isEmpty());
+    if (operation.isEmpty())
+        return;
+    // A conflicted file shows on both sides of the index.
+    QSet<QString> conflicted;
+    for (const QList<FileDiff> *section : {&status_->staged, &status_->unstaged}) {
+        for (const FileDiff &diff : *section) {
+            if (diff.change.kind == ChangeKind::Conflicted)
+                conflicted.insert(diff.change.path);
+        }
+    }
+    const int conflicts = static_cast<int>(conflicted.size());
+    const QString name = operation.left(1).toUpper() + operation.mid(1);
+    if (!Integration::canContinue(operation)) {
+        operationText_->setText(tr("%1 in progress: finish it from a terminal.").arg(name));
+    } else if (conflicts > 0) {
+        operationText_->setText((conflicts == 1 ? tr("%1 in progress · 1 conflict.").arg(name)
+                                                : tr("%1 in progress · %2 conflicts.").arg(name).arg(conflicts))
+                                + tr(" Edit the files, stage them once resolved, then continue."));
+    } else {
+        operationText_->setText(tr("%1 in progress · no conflicts left. Continue to commit the result.").arg(name));
+    }
+    continueButton_->setVisible(Integration::canContinue(operation));
+    continueButton_->setEnabled(conflicts == 0);
+    continueButton_->setDefault(conflicts == 0);
+    skipButton_->setVisible(Integration::canSkip(operation));
+    abortButton_->setVisible(Integration::canContinue(operation));
 }
 
 void ChangesView::stageFiles(const QList<FileRef> &refs)

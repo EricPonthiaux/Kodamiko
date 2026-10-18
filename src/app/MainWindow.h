@@ -13,7 +13,10 @@
 #include <QMainWindow>
 
 #include <memory>
+#include <optional>
 
+class AskpassServer;
+class BranchesPopup;
 class ChangesView;
 class ClaudeConfigView;
 class CodeIntelligence;
@@ -28,6 +31,7 @@ class FileTreeView;
 class FilesPanel;
 class FindBar;
 class FindInFilesPopup;
+class GitActions;
 class GitCommands;
 class GoToPopup;
 class HistoryView;
@@ -54,6 +58,7 @@ class RepositoryWatcher;
 class Runner;
 class SidePanel;
 class SnapshotsPopup;
+class StashesPopup;
 class SymbolIndex;
 class TerminalWidget;
 class TitleBar;
@@ -139,7 +144,7 @@ private:
     void setRunTabIcon(TerminalWidget *terminal, const QString &iconName, const QColor &color);
     // F2 / Shift+F2: the next or previous problem of the current file.
     void goToProblem(bool forward);
-    // "dark", "purple" or "light" (see Theme::all), applied everywhere.
+    // "duet", "dark", "purple" or "light" (see Theme::all), applied everywhere.
     void setTheme(const QString &name);
     static QString savedThemeName();
     void setMode(Mode mode);
@@ -207,6 +212,12 @@ private:
     // Git ▸ New Branch: the popup, then the branch created at HEAD.
     void showNewBranch();
     void createBranch(const QString &name, bool switchTo);
+    // Git ▸ Branches and Git ▸ Stashes.
+    void showBranches();
+    void showStashes();
+    // What git or ssh asks while talking to a remote: a password, a key
+    // passphrase, whether to trust a host. Nothing when the user cancels.
+    std::optional<QString> askCredentials(const QString &prompt);
     // Help ▸ Check Prerequisites, also shown at startup if git or claude is missing.
     void showPrerequisites();
     // File ▸ Preferences.
@@ -277,12 +288,18 @@ private:
     ChangesView *changesView_ = nullptr;
     HistoryView *historyView_ = nullptr;
     GitCommands *gitCommands_ = nullptr;
+    GitActions *gitActions_ = nullptr;
+    AskpassServer *askpass_ = nullptr;
     RepositoryWatcher *repositoryWatcher_ = nullptr;
     TitleBar *titleBar_ = nullptr;
-    QToolButton *branchButton_ = nullptr; // status bar: branch, Git menu
+    QToolButton *branchButton_ = nullptr; // status bar: branch, Branches popup
+    QToolButton *syncButton_ = nullptr;   // status bar: fetch, pull, push
+    QToolButton *cancelGitButton_ = nullptr; // status bar: stops a fetch, push…
+    QAction *continueAction_ = nullptr; // Git menu: the operation in progress
+    QAction *skipAction_ = nullptr;
+    QAction *abortAction_ = nullptr;
     WindowFrame *frame_ = nullptr;
     QMenu *projectMenu_ = nullptr;
-    QMenu *gitMenu_ = nullptr;
     QAction *goToFileAction_ = nullptr;
     QAction *findInFilesAction_ = nullptr;
     QAction *paletteAction_ = nullptr;
@@ -298,6 +315,8 @@ private:
     PreferencesPopup *preferencesPopup_ = nullptr;
     SnapshotsPopup *snapshotsPopup_ = nullptr;
     NewBranchPopup *newBranchPopup_ = nullptr;
+    BranchesPopup *branchesPopup_ = nullptr;
+    StashesPopup *stashesPopup_ = nullptr;
     RecentFiles recentFiles_;
     PrerequisitesDialog *prerequisitesDialog_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;

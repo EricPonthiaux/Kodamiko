@@ -222,6 +222,12 @@ QString createOfWorkingTree(const RepositoryInfo &repository, const QString &rea
     return createSnapshot(repository, reason, changedPaths(repository), true, true);
 }
 
+QString createIfChanged(const RepositoryInfo &repository, const QString &reason)
+{
+    const QStringList paths = changedPaths(repository);
+    return paths.isEmpty() ? QString() : createSnapshot(repository, reason, paths, true, true);
+}
+
 QList<Snapshot> list(const QString &folder)
 {
     const libgit2::Session session;

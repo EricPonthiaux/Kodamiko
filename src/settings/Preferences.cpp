@@ -12,9 +12,9 @@ Preferences Preferences::load()
     Preferences preferences;
     if (settings.contains(QStringLiteral("theme")))
         preferences.theme = settings.value(QStringLiteral("theme")).toString();
-    else // before the theme menu: a "Dark Theme" checkbox
-        preferences.theme = settings.value(QStringLiteral("darkTheme"), true).toBool() ? QStringLiteral("dark")
-                                                                                        : QStringLiteral("light");
+    else if (settings.contains(QStringLiteral("darkTheme"))) // before the theme menu: a "Dark Theme" checkbox
+        preferences.theme = settings.value(QStringLiteral("darkTheme")).toBool() ? QStringLiteral("dark")
+                                                                                 : QStringLiteral("light");
     preferences.codeFontFamily = settings.value(QStringLiteral("codeFont/family")).toString();
     preferences.codeFontSize = std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(),
                                           minimumFontSize, maximumFontSize);

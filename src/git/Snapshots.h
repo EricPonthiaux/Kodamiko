@@ -37,6 +37,11 @@ QString create(const RepositoryInfo &repository, const QString &reason, const QS
 // identical to the most recent snapshot. Throws GitError.
 QString createOfWorkingTree(const RepositoryInfo &repository, const QString &reason);
 
+// Same, before an operation that rewrites the working directory (branch
+// switch, merge…): nothing is taken, and an empty string returned, when
+// the working directory does not differ from the last commit.
+QString createIfChanged(const RepositoryInfo &repository, const QString &reason);
+
 // Snapshots of the repository containing `folder`, newest first.
 // Throws GitError.
 QList<Snapshot> list(const QString &folder);

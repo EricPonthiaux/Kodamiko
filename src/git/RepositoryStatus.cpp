@@ -57,6 +57,26 @@ QString operationName(int state)
     }
 }
 
+// The branch `head` tracks, and how far apart they are. A branch without
+// upstream, or whose upstream is gone (deleted on the remote), has none.
+void readUpstream(git_repository *repository, git_reference *head, RepositoryInfo &info)
+{
+    git_reference *upstream = nullptr;
+    if (git_branch_upstream(&upstream, head) != 0)
+        return;
+    const Ptr<git_reference> upstreamGuard(upstream);
+    const git_oid *local = git_reference_target(head);
+    const git_oid *remote = git_reference_target(upstream);
+    if (!local || !remote)
+        return;
+    size_t ahead = 0;
+    size_t behind = 0;
+    check(git_graph_ahead_behind(&ahead, &behind, repository, local, remote), "Comparing with the upstream branch");
+    info.upstream = QString::fromUtf8(git_reference_shorthand(upstream));
+    info.ahead = static_cast<int>(ahead);
+    info.behind = static_cast<int>(behind);
+}
+
 RepositoryInfo readInfo(git_repository *repository, const QString &folder)
 {
     RepositoryInfo info;
@@ -81,8 +101,10 @@ RepositoryInfo readInfo(git_repository *repository, const QString &folder)
     check(git_repository_head(&head, repository), "Reading HEAD");
     const Ptr<git_reference> headGuard(head);
     info.detached = git_repository_head_detached(repository) == 1;
-    if (!info.detached)
+    if (!info.detached) {
         info.branch = QString::fromUtf8(git_reference_shorthand(head));
+        readUpstream(repository, head, info);
+    }
 
     git_object *commit = nullptr;
     check(git_reference_peel(&commit, head, GIT_OBJECT_COMMIT), "Reading the last commit");

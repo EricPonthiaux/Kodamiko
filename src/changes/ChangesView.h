@@ -49,6 +49,10 @@ public:
 
     void applyTheme(const Theme &theme);
     QSplitter *splitter() const { return splitter_; }
+    // The bar shown while a merge or rebase is in progress.
+    QWidget *operationBar() const { return operationBar_; }
+    QLabel *operationText() const { return operationText_; }
+    QPushButton *continueButton() const { return continueButton_; }
 
 signals:
     // Path relative to the project folder.
@@ -56,6 +60,11 @@ signals:
     void statusMessage(const QString &message);
     // The state read by refresh() is shown.
     void refreshed();
+    // The operation in progress (merge, rebase…): go on, leave out the
+    // commit that stopped it, or give up.
+    void continueRequested();
+    void skipRequested();
+    void abortRequested();
 
 private:
     enum class Section { Staged, Unstaged };
@@ -79,6 +88,7 @@ private:
     void showSection(Section section);
     void onCurrentItemChanged();
     void updateActions();
+    void showOperation();
 
     void stageFiles(const QList<FileRef> &files);
     void unstageFiles(const QList<FileRef> &files);
@@ -111,6 +121,11 @@ private:
     std::optional<QString> pendingSelection_; // for selectFile()
 
     QLabel *summary_;
+    QWidget *operationBar_;
+    QLabel *operationText_;
+    QPushButton *continueButton_;
+    QPushButton *skipButton_;
+    QPushButton *abortButton_;
     QTreeWidget *list_;
     DiffView *diff_;
     QSplitter *splitter_;

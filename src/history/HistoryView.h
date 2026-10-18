@@ -48,6 +48,8 @@ signals:
     void openFileRequested(const QString &relativePath);
     // The history read by refresh() is shown.
     void refreshed();
+    // The commit's context menu: check it out without a branch.
+    void checkoutRequested(const QString &id);
 
 private:
     void onLogRead(const std::optional<CommitLog> &log, const QString &error, int generation);

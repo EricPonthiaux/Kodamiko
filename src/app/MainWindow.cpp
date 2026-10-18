@@ -1,8 +1,11 @@
 #include "MainWindow.h"
 
+#include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
+#include "changes/GitActions.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
+#include "changes/StashesPopup.h"
 #include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeLinter.h"
@@ -27,10 +30,12 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/FindBar.h"
+#include "git/Askpass.h"
 #include "git/Branches.h"
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
+#include "git/Integration.h"
 #include "git/RepositoryStatus.h"
 #include "git/RepositoryWatcher.h"
 #include "git/Snapshots.h"
@@ -84,11 +89,14 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -275,6 +283,24 @@ void MainWindow::createWidgets()
         QMessageBox::warning(this, tr("%1: failed").arg(title), error);
         updateRepositoryInfo();
     });
+    // A fetch, pull or push: its progress in the status bar, with a button
+    // to stop it, until the queue is done.
+    connect(gitCommands_, &GitCommands::progress, this, [this](const QString &title, const QString &line) {
+        statusBar()->showMessage(line.isEmpty() ? tr("%1…").arg(title) : tr("%1: %2").arg(title, line));
+        cancelGitButton_->show();
+    });
+    connect(gitCommands_, &GitCommands::busyChanged, this, [this](bool busy) {
+        if (!busy)
+            cancelGitButton_->hide();
+    });
+    // git and ssh ask for credentials through duet-askpass.
+    askpass_ = new AskpassServer([this](const QString &prompt) { return askCredentials(prompt); }, this);
+    if (askpass_->listen())
+        gitCommands_->setRemoteEnvironment(askpass_->environment());
+    gitActions_ = new GitActions(gitCommands_, this, [this] { return folder_; }, this);
+    connect(gitActions_, &GitActions::changed, this, &MainWindow::onRepositoryChanged);
+    connect(gitActions_, &GitActions::statusMessage, this,
+            [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
     repositoryWatcher_ = new RepositoryWatcher(this);
     connect(repositoryWatcher_, &RepositoryWatcher::changed, this, &MainWindow::onRepositoryChanged);
 
@@ -285,8 +311,12 @@ void MainWindow::createWidgets()
     });
     connect(changesView_, &ChangesView::statusMessage, this,
             [this](const QString &message) { statusBar()->showMessage(message, statusMessageMs); });
+    connect(changesView_, &ChangesView::continueRequested, gitActions_, &GitActions::continueOperation);
+    connect(changesView_, &ChangesView::skipRequested, gitActions_, &GitActions::skipCommit);
+    connect(changesView_, &ChangesView::abortRequested, gitActions_, &GitActions::abortOperation);
 
     historyView_ = new HistoryView(theme_, this);
+    connect(historyView_, &HistoryView::checkoutRequested, gitActions_, &GitActions::checkoutCommit);
     connect(historyView_, &HistoryView::openFileRequested, this, [this](const QString &relativePath) {
         setMode(Mode::Edit);
         editorTabs_->openFile(absolutePath(relativePath));
@@ -338,6 +368,9 @@ void MainWindow::createWidgets()
     });
     snapshotsPopup_ = new SnapshotsPopup(gitCommands_, theme_, this);
     newBranchPopup_ = new NewBranchPopup(theme_, this);
+    branchesPopup_ = new BranchesPopup(gitActions_, theme_, this);
+    connect(branchesPopup_, &BranchesPopup::newBranchRequested, this, &MainWindow::showNewBranch);
+    stashesPopup_ = new StashesPopup(gitActions_, theme_, this);
     projectSettings_ = new ProjectSettingsPopup(toolchains_.get(), theme_, this);
     connect(projectSettings_, &ProjectSettingsPopup::applied, this, &MainWindow::applyProject);
     connect(newBranchPopup_, &NewBranchPopup::createRequested, this, &MainWindow::createBranch);
@@ -592,15 +625,30 @@ void MainWindow::createModeTabs()
     usageLabel_->setContentsMargins(8, 0, 8, 0);
     usageLabel_->hide();
     statusBar()->addPermanentWidget(usageLabel_);
-    // The branch, at the bottom; a click opens the Git menu.
+    // Stops the fetch, pull or push that is running.
+    cancelGitButton_ = new QToolButton(this);
+    cancelGitButton_->setAutoRaise(true);
+    cancelGitButton_->setFocusPolicy(Qt::NoFocus);
+    cancelGitButton_->setToolTip(tr("Stop the git operation"));
+    cancelGitButton_->hide();
+    connect(cancelGitButton_, &QToolButton::clicked, gitCommands_, &GitCommands::cancel);
+    statusBar()->addPermanentWidget(cancelGitButton_);
+    // The branch and how far it is from its upstream, at the bottom; a
+    // click opens the Branches popup. Next to it, Sync.
     branchButton_ = new QToolButton(this);
     branchButton_->setObjectName(QStringLiteral("chip"));
     branchButton_->setAutoRaise(true);
     branchButton_->setFocusPolicy(Qt::NoFocus);
-    branchButton_->setPopupMode(QToolButton::InstantPopup);
     branchButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     branchButton_->hide();
+    connect(branchButton_, &QToolButton::clicked, this, &MainWindow::showBranches);
     statusBar()->addPermanentWidget(branchButton_);
+    syncButton_ = new QToolButton(this);
+    syncButton_->setAutoRaise(true);
+    syncButton_->setFocusPolicy(Qt::NoFocus);
+    syncButton_->hide();
+    connect(syncButton_, &QToolButton::clicked, gitActions_, &GitActions::sync);
+    statusBar()->addPermanentWidget(syncButton_);
     // On a narrow window the mode tabs keep their full width, without
     // scroll arrows or elided titles: the other widgets give up their
     // space first and get clipped.
@@ -608,7 +656,7 @@ void MainWindow::createModeTabs()
     modeTabs_->setElideMode(Qt::ElideNone);
     modeTabs_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     for (QWidget *widget : {static_cast<QWidget *>(editorStatus_), static_cast<QWidget *>(usageLabel_),
-                            static_cast<QWidget *>(branchButton_)})
+                            static_cast<QWidget *>(branchButton_), static_cast<QWidget *>(syncButton_)})
         widget->setMinimumWidth(1);
     statusBar()->addPermanentWidget(modeTabs_);
 }
@@ -1181,7 +1229,6 @@ void MainWindow::goToProblem(bool forward)
 void MainWindow::createGitMenu()
 {
     QMenu *git = titleBar_->menuBar()->addMenu(tr("&Git"));
-    gitMenu_ = git;
     git->addAction(tr("&Prepare Commit"), QKeySequence(tr("Ctrl+Shift+G")), this, [this] {
         setMode(Mode::Diff);
         changesView_->focusCommitMessage();
@@ -1199,7 +1246,22 @@ void MainWindow::createGitMenu()
         changesView_->unstageAll();
     });
     git->addSeparator();
+    git->addAction(tr("&Fetch"), gitActions_, &GitActions::fetch);
+    git->addAction(tr("P&ull"), QKeySequence(tr("Ctrl+Alt+U")), gitActions_, &GitActions::pull);
+    git->addAction(tr("Pu&sh"), QKeySequence(tr("Ctrl+Alt+P")), gitActions_, &GitActions::push);
+    git->addAction(tr("S&ync (Pull, then Push)"), gitActions_, &GitActions::sync);
+    git->addSeparator();
+    git->addAction(tr("&Branches…"), QKeySequence(tr("Ctrl+Alt+B")), this, &MainWindow::showBranches);
     git->addAction(tr("&New Branch…"), this, &MainWindow::showNewBranch);
+    git->addSeparator();
+    continueAction_ = git->addAction(tr("&Continue Merge or Rebase"), gitActions_, &GitActions::continueOperation);
+    skipAction_ = git->addAction(tr("S&kip Commit"), gitActions_, &GitActions::skipCommit);
+    abortAction_ = git->addAction(tr("&Abort Merge or Rebase…"), gitActions_, &GitActions::abortOperation);
+    for (QAction *action : {continueAction_, skipAction_, abortAction_})
+        action->setEnabled(false);
+    git->addSeparator();
+    git->addAction(tr("S&tash Changes…"), gitActions_, &GitActions::stashChanges);
+    git->addAction(tr("Stas&hes…"), this, &MainWindow::showStashes);
     git->addSeparator();
     git->addAction(tr("Restore a S&napshot…"), this, &MainWindow::showSnapshots);
 }
@@ -1535,6 +1597,8 @@ void MainWindow::setTheme(const QString &name)
         preferencesPopup_->applyTheme(theme_);
     snapshotsPopup_->applyTheme(theme_);
     newBranchPopup_->applyTheme(theme_);
+    branchesPopup_->applyTheme(theme_);
+    stashesPopup_->applyTheme(theme_);
     if (modeTabs_) {
         updateTabIcons();
         updateClaudeIndicator();
@@ -1762,6 +1826,8 @@ void MainWindow::updateTabIcons()
                                                        : problemsView_->warningCount() > 0 ? QColor("#d4a72c")
                                                                                            : color));
     newTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
+    syncButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
+    cancelGitButton_->setIcon(UiIcons::icon(QStringLiteral("stop"), color));
     emptyNewTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     for (int i = 0; i < terminalTabs_->count(); ++i) {
         QWidget *terminal = terminalTabs_->widget(i);
@@ -2269,22 +2335,41 @@ void MainWindow::updateRepositoryInfo()
         fileTree_->setStatuses(fileStatuses_->statuses(), inRepository_);
     }
     fileStatuses_->refresh();
+    const QString operation = info ? info->operation : QString();
+    continueAction_->setEnabled(Integration::canContinue(operation));
+    abortAction_->setEnabled(Integration::canContinue(operation));
+    skipAction_->setEnabled(Integration::canSkip(operation));
     if (!info) {
         branchButton_->hide();
+        syncButton_->hide();
         return;
     }
 
     QString text = info->detached ? tr("Detached HEAD (%1)").arg(info->headId) : info->branch;
+    if (info->ahead > 0)
+        text += QStringLiteral(" ↑%1").arg(info->ahead);
+    if (info->behind > 0)
+        text += QStringLiteral(" ↓%1").arg(info->behind);
     if (info->unborn)
         text += tr(" — no commits");
-    if (!info->operation.isEmpty())
-        text += tr(" — %1 in progress").arg(info->operation);
+    if (!operation.isEmpty())
+        text += tr(" — %1 in progress").arg(operation);
     branchButton_->setText(text);
-    branchButton_->setToolTip(info->unborn ? tr("Repository %1").arg(info->workDir)
-                                           : tr("Repository %1\nLast commit %2: %3")
-                                                 .arg(info->workDir, info->headId, info->headMessage.section(QLatin1Char('\n'), 0, 0)));
-    branchButton_->setMenu(gitMenu_);
+    QString tooltip = info->unborn ? tr("Repository %1").arg(info->workDir)
+                                   : tr("Repository %1\nLast commit %2: %3")
+                                         .arg(info->workDir, info->headId, info->headMessage.section(QLatin1Char('\n'), 0, 0));
+    if (!info->upstream.isEmpty())
+        tooltip += tr("\nTracking %1: %2 ahead, %3 behind as of the last fetch")
+                       .arg(info->upstream)
+                       .arg(info->ahead)
+                       .arg(info->behind);
+    branchButton_->setToolTip(tooltip + tr("\nClick for the branches (Ctrl+Alt+B)"));
     branchButton_->show();
+
+    syncButton_->setVisible(!info->detached && !info->unborn);
+    syncButton_->setToolTip(info->upstream.isEmpty()
+                                ? tr("Publish %1 to the remote").arg(info->branch)
+                                : tr("Sync with %1: fetch, pull, then push").arg(info->upstream));
 }
 
 void MainWindow::onRepositoryChanged()
@@ -2331,6 +2416,37 @@ void MainWindow::createBranch(const QString &name, bool switchTo)
                             : QObject::tr("Branch %1 created").arg(name);
         },
         [this] { onRepositoryChanged(); });
+}
+
+void MainWindow::showBranches()
+{
+    branchesPopup_->popup(folder_);
+}
+
+void MainWindow::showStashes()
+{
+    stashesPopup_->popup(folder_);
+}
+
+std::optional<QString> MainWindow::askCredentials(const QString &prompt)
+{
+    // ssh's unknown host: "Are you sure you want to continue connecting
+    // (yes/no/[fingerprint])?", after the key's fingerprint.
+    if (AskpassServer::isConfirmation(prompt)) {
+        QMessageBox box(QMessageBox::Question, tr("Unknown Host"), prompt.trimmed(), QMessageBox::Cancel, this);
+        QPushButton *trust = box.addButton(tr("Trust and Connect"), QMessageBox::AcceptRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        return box.clickedButton() == trust ? QStringLiteral("yes") : QStringLiteral("no");
+    }
+    // A user name is shown as typed; passwords and passphrases are not.
+    const bool secret = !prompt.startsWith(QLatin1String("Username"), Qt::CaseInsensitive);
+    bool accepted = false;
+    const QString answer = QInputDialog::getText(this, tr("Git Credentials"), prompt.trimmed(),
+                                                 secret ? QLineEdit::Password : QLineEdit::Normal, {}, &accepted);
+    if (!accepted)
+        return std::nullopt;
+    return answer;
 }
 
 void MainWindow::showSnapshots()

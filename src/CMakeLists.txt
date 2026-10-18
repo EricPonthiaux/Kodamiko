@@ -1,11 +1,14 @@
 # Library containing the whole editor except main(): the executable and the
 # tests link against it.
 add_library(duet_core STATIC
+    changes/BranchesPopup.cpp
     changes/ChangesView.cpp
     changes/DiffView.cpp
     changes/FileChangeDelegate.cpp
+    changes/GitActions.cpp
     changes/NewBranchPopup.cpp
     changes/SnapshotsPopup.cpp
+    changes/StashesPopup.cpp
     claude/ClaudeActivity.cpp
     claude/ClaudeConfig.cpp
     claude/ClaudeConfigView.cpp
@@ -58,6 +61,7 @@ add_library(duet_core STATIC
     editor/MarkdownHtml.cpp
     editor/PreviewPage.cpp
     editor/TextFile.cpp
+    git/Askpass.cpp
     git/Branches.cpp
     git/CommitLog.cpp
     git/FilePatch.cpp
@@ -66,10 +70,13 @@ add_library(duet_core STATIC
     git/GitOperations.cpp
     git/GitProcess.cpp
     git/IgnoreRules.cpp
+    git/Integration.cpp
     git/LineChanges.cpp
+    git/Remotes.cpp
     git/RepositoryStatus.cpp
     git/RepositoryWatcher.cpp
     git/Snapshots.cpp
+    git/Stashes.cpp
     history/CommitDelegate.cpp
     history/HistoryView.cpp
     lsp/LanguageServers.cpp
@@ -241,9 +248,10 @@ endif()
 target_link_libraries(duet PRIVATE duet_core)
 target_compile_definitions(duet PRIVATE DUET_VERSION="${PROJECT_VERSION}")
 set_target_properties(duet PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-add_dependencies(duet duet-hook duet-mcp)
+add_dependencies(duet duet-hook duet-mcp duet-askpass)
 
-# ClaudeLauncher looks for duet-hook and duet-mcp next to the executable: on macOS,
+# ClaudeLauncher looks for duet-hook and duet-mcp next to the executable, and
+# AskpassServer for duet-askpass: on macOS,
 # that is inside the bundle (Duet.app/Contents/MacOS), with Duet's Claude
 # plugin in Contents/Resources.
 if(APPLE)
@@ -251,6 +259,7 @@ if(APPLE)
     add_custom_command(TARGET duet POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-mcp> $<TARGET_FILE_DIR:duet>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-askpass> $<TARGET_FILE_DIR:duet>
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/claude-plugin
                 $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin)
 endif()

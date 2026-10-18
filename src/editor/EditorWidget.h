@@ -13,6 +13,8 @@
 #include <memory>
 #include <utility>
 
+class QPainter;
+
 class ChangeGutter;
 class ISyntaxHighlighter;
 
@@ -42,6 +44,15 @@ class EditorWidget : public QsciScintilla {
   Q_OBJECT
 
 public:
+  // The indentation guide of the caret's block: its column and the lines
+  // it runs along. Column 0: none.
+  struct ActiveGuide {
+    int column = 0;
+    int firstLine = 0;
+    int lastLine = 0;
+    bool operator==(const ActiveGuide &) const = default;
+  };
+
   explicit EditorWidget(const Theme &theme, QWidget *parent = nullptr);
   ~EditorWidget() override;
 
@@ -112,6 +123,9 @@ signals:
 
 protected:
   void mousePressEvent(QMouseEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
+  void leaveEvent(QEvent *event) override;
+  void paintEvent(QPaintEvent *event) override;
 
 private:
   void configureEditing();
@@ -119,6 +133,14 @@ private:
   // their other keys.
   void releaseReservedKeys();
   void applyFoldColors();
+  // The open blocks' chevrons show only while the mouse is over the
+  // margins; those of the folded blocks always.
+  void showOpenFoldMarks(bool shown);
+  // The caret moved: its block's indentation guide lights up and its line
+  // number brightens.
+  void followCaretLine();
+  void paintActiveGuide(QPainter &painter);
+  void paintCurrentLineNumber(QPainter &painter, const QRect &dirty);
   // The cursor got into a folded block (search, jump to a line): the block
   // opens.
   void revealCursorLine(int line);
@@ -140,6 +162,10 @@ private:
   ChangeGutter *changeGutter_;
   EditorOptions options_;
   Diagnostics diagnostics_;
+  bool openFoldMarksShown_ = false;
+  // The line whose number paintEvent brightens.
+  int numberedLine_ = -1;
+  ActiveGuide activeGuide_;
   std::function<QString(int)> hoverHelp_;
   // QScintilla's keys for each of its commands, before releaseReservedKeys.
   QList<std::pair<int, int>> defaultCommandKeys_;

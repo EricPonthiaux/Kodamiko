@@ -507,6 +507,8 @@ void HistoryView::showCommitMenu(const QPoint &position)
                    [id = commit.shortId] { QApplication::clipboard()->setText(id); });
     menu.addAction(tr("Copy Summary"), this,
                    [summary = commit.summary] { QApplication::clipboard()->setText(summary); });
+    menu.addSeparator();
+    menu.addAction(tr("Check Out This Commit…"), this, [this, id = commit.shortId] { emit checkoutRequested(id); });
     menu.exec(commits_->viewport()->mapToGlobal(position));
 }
 

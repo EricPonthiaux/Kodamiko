@@ -45,7 +45,7 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        QCOMPARE(names, QStringList({"dark", "purple", "light"}));
+        QCOMPARE(names, QStringList({"duet", "dark", "purple", "light"}));
         const Theme purple = Theme::named("purple");
         QVERIFY(purple.isDark);
         QVERIFY(purple.accent.isValid() && purple.window.isValid() && purple.findHighlight.isValid());
@@ -55,10 +55,11 @@ private slots:
         for (const Theme &theme : Theme::all()) {
             for (const QColor &color : {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent,
                                         theme.accentText, theme.mutedText, theme.border, theme.line, theme.hover,
-                                        theme.gradientStart, theme.gradientEnd})
+                                        theme.gradientStart, theme.gradientEnd, theme.currentLineNumber, theme.error,
+                                        theme.warning})
                 QVERIFY2(color.isValid(), qPrintable(theme.name));
         }
-        QCOMPARE(Theme::named("unknown").name, QString("dark"));
+        QCOMPARE(Theme::named("unknown").name, QString("duet"));
     }
 
     void languageForFile_data()

@@ -1,13 +1,17 @@
+#include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
+#include "changes/GitActions.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
+#include "changes/StashesPopup.h"
 #include "claude/CommitMessage.h"
 #include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
+#include "git/Stashes.h"
 #include "ui/PopupWidgets.h"
 
 #include <QCheckBox>
@@ -270,6 +274,111 @@ private slots:
         QCOMPARE(requested.first().at(0).toString(), QString("feature/y"));
         QCOMPARE(requested.first().at(1).toBool(), false);
         popup.switchToggle()->setChecked(true); // the saved choice back to its default
+    }
+
+    void branchesPopupFiltersAndSwitches()
+    {
+        QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        Git::run(project.path(), {"branch", "feature/a"});
+        Git::run(project.path(), {"branch", "feature/b"});
+
+        QWidget window;
+        GitCommands commands;
+        GitActions actions(&commands, &window, [&] { return project.path(); });
+        BranchesPopup popup(&actions, Theme::dark(), &window);
+        popup.load(project.path());
+        QStringList rows;
+        for (int i = 0; i < popup.list()->count(); ++i)
+            rows.append(popup.list()->item(i)->text());
+        QCOMPARE(rows, QStringList({"Local", "feature/a", "feature/b", "main"}));
+        QCOMPARE(popup.selected()->name, QString("feature/a")); // not the current branch
+
+        QTest::keyClicks(popup.filterField(), "/B");
+        QCOMPARE(popup.list()->count(), 2); // the heading, feature/b
+        QCOMPARE(popup.selected()->name, QString("feature/b"));
+        QTest::keyClick(popup.filterField(), Qt::Key_Return);
+        QTRY_COMPARE(RepositoryInfo::read(project.path())->branch, QString("feature/b"));
+
+        popup.load(project.path());
+        popup.filterField()->setText("main");
+        QVERIFY(popup.switchButton()->isEnabled());
+        popup.filterField()->setText("feature/b");
+        QVERIFY(popup.selected()->current);
+        QVERIFY(!popup.switchButton()->isEnabled());
+    }
+
+    void stashesPopupShowsTheirChanges()
+    {
+        QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "changed\n");
+        write(project, "new.txt", "new\n");
+        Stashes::push(*RepositoryInfo::read(project.path()), "work in progress", true);
+
+        QWidget window;
+        GitCommands commands;
+        GitActions actions(&commands, &window, [&] { return project.path(); });
+        StashesPopup popup(&actions, Theme::dark(), &window);
+        popup.load(project.path());
+        QCOMPARE(popup.list()->count(), 1);
+        QVERIFY(popup.list()->item(0)->text().startsWith("On main: work in progress"));
+
+        const QList<DiffFile> files = StashesPopup::splitPatch(Stashes::patch(project.path(), 0));
+        QCOMPARE(files.size(), 2);
+        QCOMPARE(files[0].path, QString("a.txt"));
+        QCOMPARE(files[0].status, QString("modified"));
+        QCOMPARE(files[1].path, QString("new.txt"));
+        QCOMPARE(files[1].status, QString("added"));
+        QCOMPARE(files[1].patch.addedLines(), 1);
+    }
+
+    void operationBarDuringAMerge()
+    {
+        QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        Git::run(project.path(), {"switch", "-qc", "other"});
+        write(project, "a.txt", "other\n");
+        Git::run(project.path(), {"commit", "-qam", "other"});
+        Git::run(project.path(), {"switch", "-q", "main"});
+        write(project, "a.txt", "main\n");
+        Git::run(project.path(), {"commit", "-qam", "main"});
+        QVERIFY_THROWS_EXCEPTION(GitError, Git::run(project.path(), {"merge", "other"}));
+
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        QVERIFY(!view.operationBar()->isVisible());
+        QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        QVERIFY(view.operationBar()->isVisible());
+        QVERIFY2(view.operationText()->text().contains("1 conflict"), qPrintable(view.operationText()->text()));
+        QVERIFY(!view.continueButton()->isEnabled());
+
+        write(project, "a.txt", "resolved\n");
+        Git::run(project.path(), {"add", "a.txt"});
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 2);
+        QVERIFY(view.continueButton()->isEnabled());
+        QSignalSpy continued(&view, &ChangesView::continueRequested);
+        view.continueButton()->click();
+        QCOMPARE(continued.size(), 1);
+
+        Git::run(project.path(), {"commit", "--no-edit", "-q"});
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 3);
+        QVERIFY(!view.operationBar()->isVisible());
     }
 
     void readsTheChangesOfTheNextCommit()

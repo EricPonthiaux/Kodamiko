@@ -20,7 +20,7 @@ struct TextStyle {
 // Categories are named after tree-sitter captures ("keyword",
 // "string.special", "function.method"...).
 struct Theme {
-    QString name; // "dark", "purple", "light"
+    QString name; // "duet", "dark", "purple", "light"
     QString title; // as shown in View ▸ Theme
     bool isDark = true;
     QFont font;
@@ -32,8 +32,11 @@ struct Theme {
     QColor selection;
     QColor marginBackground;
     QColor marginForeground;
+    QColor currentLineNumber; // the caret's line, brighter than the others
     QColor braceMatch;
     QColor findHighlight; // occurrences of a search
+    QColor error;   // diagnostics' squiggles, unmatched braces
+    QColor warning;
 
     // Interface around the editor: the application's palette and the
     // controls' style sheet (see ThemeStyle).
@@ -52,6 +55,10 @@ struct Theme {
 
     QList<std::pair<QString, TextStyle>> syntaxStyles;
 
+    // The default, on the brand's colors: the dark slate of the icon's
+    // tile, its blue as the accent and its white as the caret; flat
+    // selections and panels a level below the editor.
+    static Theme duet();
     static Theme dark();
     // Deep violet, the look of AI tools: dark plum background, lavender
     // text, violet accents and pastel syntax colors.
@@ -59,7 +66,7 @@ struct Theme {
     static Theme light();
     // Every theme, in menu order.
     static QList<Theme> all();
-    // The theme called `name`; the dark one if there is none.
+    // The theme called `name`; Duet if there is none.
     static Theme named(const QString &name);
 
     // Index in `syntaxStyles` of the most specific style for a capture:

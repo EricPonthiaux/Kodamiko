@@ -10,7 +10,7 @@
 // Title Bar, Claude ▸ Notifications...), so both stay in step.
 struct Preferences {
     // Appearance
-    QString theme = QStringLiteral("dark"); // Theme::name
+    QString theme = QStringLiteral("duet"); // Theme::name
     QString codeFontFamily; // empty: the embedded JetBrains Mono
     int codeFontSize = 11;
     // Menus, tabs, panels and dialogs; 0: the system's size.

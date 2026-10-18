@@ -12,10 +12,13 @@
 
 #include <QFile>
 #include <QMouseEvent>
+#include <QPaintEvent>
+#include <QPainter>
 #include <QTimer>
 #include <QToolTip>
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -28,12 +31,109 @@ constexpr int errorIndicator = 13;
 constexpr int warningIndicator = 14;
 // As long as the documentation's hover (CodeIntelligence).
 constexpr int hoverDelayMs = 600;
+// The fold marks are drawn at twice their size, sharp on high density
+// screens.
+constexpr int foldMarkSize = 14;
+constexpr qreal foldMarkRatio = 2;
+// How far up the active indentation guide looks for its block's header.
+constexpr int guideSearchLines = 2000;
 
 // Navigation shortcuts (see CodeNavigator) until MainWindow passes the
 // menu's shortcuts.
 QList<int> reservedKeys = {(Qt::CTRL | Qt::Key_B).toCombined(), (Qt::ALT | Qt::Key_Left).toCombined(),
                            (Qt::ALT | Qt::Key_Right).toCombined()};
 std::vector<EditorWidget *> liveEditors;
+
+// A thin chevron pointing right (a folded block) or down (an open one).
+QImage foldChevron(const QColor &color, bool open)
+{
+    QImage image(QSize(foldMarkSize, foldMarkSize) * foldMarkRatio, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(foldMarkRatio, foldMarkRatio);
+    painter.setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    const qreal center = foldMarkSize / 2.0;
+    const QPointF right[] = {{center - 1.5, center - 3.5}, {center + 2, center}, {center - 1.5, center + 3.5}};
+    const QPointF down[] = {{center - 3.5, center - 1.5}, {center, center + 2}, {center + 3.5, center - 1.5}};
+    painter.drawPolyline(open ? down : right, 3);
+    return image;
+}
+
+bool isBlankLine(QsciScintilla &editor, int line)
+{
+    return editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line)
+        == editor.SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line);
+}
+
+int lineIndentation(QsciScintilla &editor, int line)
+{
+    return static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTATION, line));
+}
+
+// The nearest non-blank line from `line` in the direction `step`; -1 if
+// there is none.
+int nonBlankLine(QsciScintilla &editor, int line, int step)
+{
+    const int count = editor.lines();
+    for (; line >= 0 && line < count; line += step) {
+        if (!isBlankLine(editor, line))
+            return line;
+    }
+    return -1;
+}
+
+// The indentation guide of the block holding `line`, at the indentation of
+// the block's header. On a header the block it opens, on a closing bracket
+// the block it closes; a blank line belongs to the deeper of its neighbors.
+// None (column 0) for a block at the top level: Scintilla draws no guide
+// there.
+EditorWidget::ActiveGuide activeGuide(QsciScintilla &editor, int line)
+{
+    const int previous = nonBlankLine(editor, line - 1, -1);
+    const int next = nonBlankLine(editor, line + 1, 1);
+    const bool blank = isBlankLine(editor, line);
+    const int indentation = !blank ? lineIndentation(editor, line)
+                                   : std::max(previous >= 0 ? lineIndentation(editor, previous) : 0,
+                                              next >= 0 ? lineIndentation(editor, next) : 0);
+    int column = -1;
+    int inside = line; // a line of the block
+    if (next >= 0 && lineIndentation(editor, next) > indentation) {
+        column = indentation;
+        inside = next;
+    } else if (!blank && previous >= 0 && lineIndentation(editor, previous) > indentation) {
+        const auto first = editor.SendScintilla(QsciScintillaBase::SCI_GETCHARAT,
+                                                editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line));
+        if (first == '}' || first == ')' || first == ']') {
+            column = indentation;
+            inside = previous;
+        }
+    }
+    if (column < 0) {
+        column = 0;
+        for (int above = line - 1; above >= std::max(0, line - guideSearchLines); --above) {
+            if (!isBlankLine(editor, above) && lineIndentation(editor, above) < indentation) {
+                column = lineIndentation(editor, above);
+                break;
+            }
+        }
+    }
+    if (column <= 0)
+        return {};
+    // The block: the lines around `inside` indented deeper than its header.
+    const auto inBlock = [&](int other) { return lineIndentation(editor, other) > column; };
+    int first = nonBlankLine(editor, inside, isBlankLine(editor, inside) ? -1 : 1);
+    if (first < 0 || !inBlock(first))
+        return {};
+    int last = first;
+    for (int above = nonBlankLine(editor, first - 1, -1); above >= 0 && inBlock(above) && first - above < guideSearchLines;
+         above = nonBlankLine(editor, above - 1, -1))
+        first = above;
+    for (int below = nonBlankLine(editor, last + 1, 1); below >= 0 && inBlock(below) && below - last < guideSearchLines;
+         below = nonBlankLine(editor, below + 1, 1))
+        last = below;
+    return {column, first, last};
+}
 
 QsciScintilla::EolMode toEolMode(LineEnding lineEnding)
 {
@@ -66,6 +166,8 @@ EditorWidget::EditorWidget(const Theme &theme, QWidget *parent)
         if (margin == foldMargin)
             QTimer::singleShot(0, this, &EditorWidget::moveCursorOutOfFolds);
     });
+    // On every move of the caret, edit and scroll.
+    connect(this, &QsciScintillaBase::SCN_UPDATEUI, this, &EditorWidget::followCaretLine);
     liveEditors.push_back(this);
 }
 
@@ -129,7 +231,7 @@ void EditorWidget::setOptions(const EditorOptions &options)
     if (!options.codeFolding && options_.codeFolding)
         foldEverything(false); // no hidden lines without the margin to show them
     options_ = options;
-    setFolding(options.codeFolding ? QsciScintilla::BoxedTreeFoldStyle : QsciScintilla::NoFoldStyle, foldMargin);
+    setFolding(options.codeFolding ? QsciScintilla::PlainFoldStyle : QsciScintilla::NoFoldStyle, foldMargin);
     setWrapMode(options.wrapLines ? QsciScintilla::WrapWord : QsciScintilla::WrapNone);
     setWrapIndentMode(QsciScintilla::WrapIndentIndented);
     setWhitespaceVisibility(options.showWhitespace ? QsciScintilla::WsVisible : QsciScintilla::WsInvisible);
@@ -138,14 +240,30 @@ void EditorWidget::setOptions(const EditorOptions &options)
 
 void EditorWidget::applyFoldColors()
 {
-    // QScintilla's fold marks are black and white: those of the margin
-    // instead, the boxes filled with the margin's background.
+    // QScintilla's fold marks are a black and white plus and minus:
+    // chevrons in the margin's colors instead, brighter on a folded block.
     setFoldMarginColors(theme_.marginBackground, theme_.marginBackground);
-    for (int marker = SC_MARKNUM_FOLDEREND; marker <= int(SC_MARKNUM_FOLDEROPEN); ++marker) {
-        SendScintilla(SCI_MARKERSETFORE, marker, theme_.marginBackground);
-        SendScintilla(SCI_MARKERSETBACK, marker, theme_.marginForeground);
+    if (options_.codeFolding) {
+        SendScintilla(SCI_RGBAIMAGESETSCALE, qRound(100 * foldMarkRatio));
+        markerDefine(foldChevron(theme_.mutedText, false), SC_MARKNUM_FOLDER);
+        SendScintilla(SCI_RGBAIMAGESETSCALE, 100);
+        showOpenFoldMarks(openFoldMarksShown_);
     }
     setWhitespaceForegroundColor(theme_.marginForeground);
+}
+
+void EditorWidget::showOpenFoldMarks(bool shown)
+{
+    openFoldMarksShown_ = shown;
+    if (!options_.codeFolding)
+        return;
+    if (!shown) {
+        SendScintilla(SCI_MARKERDEFINE, SC_MARKNUM_FOLDEROPEN, SC_MARK_EMPTY);
+        return;
+    }
+    SendScintilla(SCI_RGBAIMAGESETSCALE, qRound(100 * foldMarkRatio));
+    markerDefine(foldChevron(theme_.marginForeground, true), SC_MARKNUM_FOLDEROPEN);
+    SendScintilla(SCI_RGBAIMAGESETSCALE, 100);
 }
 
 void EditorWidget::foldBlock(bool fold)
@@ -213,6 +331,100 @@ void EditorWidget::mousePressEvent(QMouseEvent *event)
         }
     }
     QsciScintilla::mousePressEvent(event);
+}
+
+void EditorWidget::mouseMoveEvent(QMouseEvent *event)
+{
+    int marginsWidth = 0;
+    for (int margin = 0; margin <= foldMargin; ++margin)
+        marginsWidth += marginWidth(margin);
+    const bool overMargins = event->position().x() < marginsWidth;
+    if (overMargins != openFoldMarksShown_)
+        showOpenFoldMarks(overMargins);
+    QsciScintilla::mouseMoveEvent(event);
+}
+
+void EditorWidget::paintEvent(QPaintEvent *event)
+{
+    QsciScintilla::paintEvent(event);
+    QPainter painter(viewport());
+    paintActiveGuide(painter);
+    paintCurrentLineNumber(painter, event->rect());
+}
+
+void EditorWidget::paintActiveGuide(QPainter &painter)
+{
+    // Scintilla lights a guide up only between two matching braces: the
+    // caret's block's is drawn again over the faint ones, brighter.
+    if (activeGuide_.column <= 0 || activeGuide_.lastLine >= lines())
+        return;
+    const long guidePosition = SendScintilla(SCI_FINDCOLUMN, activeGuide_.firstLine, activeGuide_.column);
+    const int x = static_cast<int>(SendScintilla(SCI_POINTXFROMPOSITION, 0, guidePosition));
+    int marginsWidth = 0;
+    for (int margin = 0; margin <= foldMargin; ++margin)
+        marginsWidth += marginWidth(margin);
+    if (x < marginsWidth || x >= viewport()->width())
+        return;
+    const auto top = [this](int line) {
+        return static_cast<int>(SendScintilla(SCI_POINTYFROMPOSITION, 0, SendScintilla(SCI_POSITIONFROMLINE, line)));
+    };
+    const int bottomLine = activeGuide_.lastLine;
+    const int y1 = std::max(0, top(activeGuide_.firstLine));
+    const int y2 = std::min(viewport()->height(), top(bottomLine) + static_cast<int>(SendScintilla(SCI_TEXTHEIGHT, bottomLine))
+                                                      * static_cast<int>(SendScintilla(SCI_WRAPCOUNT, bottomLine)));
+    if (y2 <= y1)
+        return;
+    painter.fillRect(QRect(x, y1, 1, y2 - y1), theme_.marginForeground);
+}
+
+void EditorWidget::paintCurrentLineNumber(QPainter &painter, const QRect &dirty)
+{
+    // Scintilla gives every line number the same color: the caret's is
+    // painted again over it, brighter.
+    const int line = numberedLine_;
+    const int numbersWidth = marginWidth(0);
+    if (line < 0 || line >= lines() || numbersWidth <= 0 || !SendScintilla(SCI_GETLINEVISIBLE, line))
+        return;
+    const int top = static_cast<int>(SendScintilla(SCI_POINTYFROMPOSITION, 0, SendScintilla(SCI_POSITIONFROMLINE, line)));
+    const QRect row(0, top, numbersWidth, static_cast<int>(SendScintilla(SCI_TEXTHEIGHT, line)));
+    if (!dirty.intersects(row))
+        return;
+    painter.fillRect(row, theme_.marginBackground);
+    painter.setFont(theme_.font);
+    painter.setPen(theme_.currentLineNumber);
+    // Where Scintilla draws the numbers: right-aligned, 3 pixels from the
+    // margin's edge, on the line's baseline.
+    const QString number = QString::number(line + 1);
+    const QFontMetrics metrics(theme_.font);
+    const int baseline = top + static_cast<int>(SendScintilla(SCI_GETEXTRAASCENT)) + metrics.ascent();
+    painter.drawText(numbersWidth - 3 - metrics.horizontalAdvance(number), baseline, number);
+}
+
+void EditorWidget::followCaretLine()
+{
+    int line = 0, index = 0;
+    getCursorPosition(&line, &index);
+    const ActiveGuide guide = activeGuide(*this, line);
+    if (guide != activeGuide_) {
+        activeGuide_ = guide;
+        viewport()->update();
+    }
+    if (line == numberedLine_)
+        return;
+    const int previous = std::exchange(numberedLine_, line);
+    for (const int changed : {previous, line}) {
+        if (changed < 0 || changed >= lines())
+            continue;
+        const int top = static_cast<int>(SendScintilla(SCI_POINTYFROMPOSITION, 0, SendScintilla(SCI_POSITIONFROMLINE, changed)));
+        viewport()->update(0, top, marginWidth(0), static_cast<int>(SendScintilla(SCI_TEXTHEIGHT, changed)));
+    }
+}
+
+void EditorWidget::leaveEvent(QEvent *event)
+{
+    if (openFoldMarksShown_)
+        showOpenFoldMarks(false);
+    QsciScintilla::leaveEvent(event);
 }
 
 void EditorWidget::installHighlighter(const QString &languageId)
@@ -391,10 +603,12 @@ void EditorWidget::applyTheme(const Theme &theme)
     setMarginsFont(theme.font);
     setMatchedBraceBackgroundColor(theme.braceMatch);
     setMatchedBraceForegroundColor(theme.foreground);
-    setUnmatchedBraceForegroundColor(QColor("#e06c75"));
+    setUnmatchedBraceForegroundColor(theme.error);
     setIndentationGuidesBackgroundColor(theme.background);
     setIndentationGuidesForegroundColor(theme.caretLine);
     ScintillaStyles::applyTypography(*this, theme.font);
+    SendScintilla(SCI_INDICSETFORE, errorIndicator, theme.error);
+    SendScintilla(SCI_INDICSETFORE, warningIndicator, theme.warning);
     applyFoldColors();
     updateLineNumberMargin();
 }
@@ -405,8 +619,8 @@ void EditorWidget::setDiagnostics(const Diagnostics &diagnostics)
         return;
     diagnostics_ = diagnostics;
     const long length = SendScintilla(SCI_GETLENGTH);
-    for (const auto &[indicator, color] : {std::pair{errorIndicator, QColor("#e5534b")},
-                                           std::pair{warningIndicator, QColor("#d4a72c")}}) {
+    for (const auto &[indicator, color] : {std::pair{errorIndicator, theme_.error},
+                                           std::pair{warningIndicator, theme_.warning}}) {
         SendScintilla(SCI_INDICSETSTYLE, indicator, INDIC_SQUIGGLEPIXMAP);
         SendScintilla(SCI_INDICSETFORE, indicator, color);
         SendScintilla(SCI_INDICSETUNDER, indicator, true);

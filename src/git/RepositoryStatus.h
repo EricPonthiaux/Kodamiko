@@ -21,6 +21,12 @@ struct RepositoryInfo {
     bool unborn = false; // repository without commits
     // Operation in progress ("merge", "rebase"…), empty otherwise.
     QString operation;
+    // Remote branch the current branch tracks ("origin/main"), empty if
+    // none; and the number of commits on either side only, as of the last
+    // fetch.
+    QString upstream;
+    int ahead = 0;
+    int behind = 0;
 
     // Repository path of a path relative to the open folder.
     QString repoPath(const QString &relativePath) const { return prefix + relativePath; }
