@@ -1,6 +1,7 @@
 #include "Preferences.h"
 
 #include "ui/AppFonts.h"
+#include "ui/Theme.h"
 
 #include <QSettings>
 
@@ -18,6 +19,12 @@ Preferences Preferences::load()
     preferences.codeFontFamily = settings.value(QStringLiteral("codeFont/family")).toString();
     preferences.codeFontSize = std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(),
                                           minimumFontSize, maximumFontSize);
+    preferences.codeFontWeight = std::clamp(settings.value(QStringLiteral("codeFont/weight"), int(QFont::Normal)).toInt(),
+                                            int(QFont::Thin), int(QFont::Black));
+    preferences.codeLineHeight =
+        std::clamp(settings.value(QStringLiteral("codeFont/lineHeight"), AppFonts::defaultLineHeight).toDouble(),
+                   AppFonts::minimumLineHeight, AppFonts::maximumLineHeight);
+    preferences.ligatures = settings.value(QStringLiteral("codeFont/ligatures"), false).toBool();
     // 0 (the default size) or a size in the range.
     const auto fontSize = [&settings](const QString &key) {
         const int size = settings.value(key, 0).toInt();
@@ -62,6 +69,9 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("theme"), theme);
     settings.setValue(QStringLiteral("codeFont/family"), codeFontFamily);
     settings.setValue(QStringLiteral("codeFont/size"), codeFontSize);
+    settings.setValue(QStringLiteral("codeFont/weight"), codeFontWeight);
+    settings.setValue(QStringLiteral("codeFont/lineHeight"), codeLineHeight);
+    settings.setValue(QStringLiteral("codeFont/ligatures"), ligatures);
     settings.setValue(QStringLiteral("interfaceFont/size"), interfaceFontSize);
     settings.setValue(QStringLiteral("treeFont/size"), treeFontSize);
     settings.setValue(QStringLiteral("systemTitleBar"), systemTitleBar);
@@ -91,7 +101,16 @@ QFont Preferences::codeFont() const
     QFont font = AppFonts::codeFont(codeFontSize);
     if (!codeFontFamily.isEmpty())
         font.setFamily(codeFontFamily);
-    return font;
+    font.setWeight(QFont::Weight(codeFontWeight));
+    // The terminal keeps each character in its cell.
+    return AppFonts::withLigatures(font, false);
+}
+
+void Preferences::applyTypography(Theme &theme) const
+{
+    theme.font = codeFont();
+    theme.lineHeight = codeLineHeight;
+    theme.editorLigatures = ligatures;
 }
 
 QFont Preferences::interfaceFont() const

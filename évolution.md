@@ -10,6 +10,10 @@ tuned line height, popups with shadows, file icons.
 
 ## Progress
 
+Done in section 4: ligatures in the editor (QScintilla's PlatQt.cpp is
+patched at configure time to read a "#liga" family suffix), the code font's
+weight and line height, and the recommended fonts in Preferences.
+
 Done: the "Duet" theme as the default (brand colors, flat selections, three
 surface levels), chevron fold marks, the active indentation guide, the
 brighter current line number, and the editor's diagnostic and unmatched

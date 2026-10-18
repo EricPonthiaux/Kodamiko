@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QColor>
+#include "AppFonts.h"
+
 #include <QFont>
 #include <QList>
 #include <QString>
@@ -23,7 +25,13 @@ struct Theme {
     QString name; // "duet", "dark", "purple", "light"
     QString title; // as shown in View ▸ Theme
     bool isDark = true;
+    // The code font, without ligatures; its weight is the user's choice.
     QFont font;
+    // The code's lines, at this multiple of the font size (not in the
+    // terminal, whose cells follow the font).
+    qreal lineHeight = AppFonts::defaultLineHeight;
+    // Programming ligatures, in the editor only.
+    bool editorLigatures = false;
 
     QColor background;
     QColor foreground;

@@ -235,10 +235,15 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   (tiling window managers); on macOS, the traffic lights stay, over
   Duet's bar.
 - **Typography**: the interface is set in [Inter](https://rsms.me/inter/) and the code
-  (editor, diffs, terminal) in [JetBrains Mono](https://www.jetbrains.com/lp/mono/)
-  without ligatures, both embedded so that Duet looks the same on every
-  system; lines of code at 1.5 times the font size, with room between the
-  line numbers and the text.
+  (editor, diffs, terminal) in [JetBrains Mono](https://www.jetbrains.com/lp/mono/),
+  both embedded so that Duet looks the same on every system; lines of code
+  at 1.5 times the font size, with room between the line numbers and the
+  text. *Preferences ▸ Appearance* sets the code font's weight (Light,
+  Regular, Medium), the line height, and programming ligatures in the
+  editor ("->" drawn as an arrow; the terminal keeps one character per
+  cell). Geist Mono, Commit Mono, Monaspace and Iosevka are offered first
+  when installed, with where to get them otherwise. Ligatures need Qt 6.7
+  for fonts other than the embedded one.
 
 ## Building
 
@@ -301,7 +306,8 @@ The window has four full-screen modes, chosen with the tabs at the bottom right:
   field at the top filters by message, author, hash or branch. For the
   selected commit: its message, its files and its diff against its first
   parent; clicking a file scrolls to its diff, double-clicking opens it in
-  the editor. Right-click on a commit: copy its hash.
+  the editor. Right-click on a commit: copy its hash, or check it out
+  without a branch.
 
 ### Targeted commits
 
@@ -317,15 +323,45 @@ The window has four full-screen modes, chosen with the tabs at the bottom right:
   (untracked files are deleted). A copy is taken beforehand:
   *Git ▸ Restore a Snapshot* puts it back on disk.
 
+### Branches and remotes
+
+- **Status bar**: the current branch, with `↑2 ↓1` when it has commits its
+  upstream lacks and the reverse (as of the last fetch). Clicking it opens
+  the **Branches** popup (Ctrl+Alt+B); the ↻ button next to it syncs.
+- **Fetch, Pull, Push, Sync** (Git menu): their progress shows in the
+  status bar, with a button to stop them. *Pull* follows your `pull.rebase`
+  and `pull.ff` settings; without either it only fast-forwards, and when
+  both sides have new commits it offers to rebase or merge. *Push* publishes
+  a branch without upstream to `origin`; when the remote rejects it, it
+  offers to pull first or to overwrite (`--force-with-lease`). *Sync*
+  fetches, pulls if needed, then pushes.
+- **Credentials**: when git or ssh needs a password, a key passphrase or
+  your word on an unknown host, the editor asks in a dialog (through
+  `duet-askpass`, shipped with it). Nothing is stored: your credential
+  helper and ssh-agent keep working as usual.
+- **Branches popup**: local then remote branches, filtered as you type;
+  Enter switches. Switching keeps the uncommitted changes that do not
+  conflict, after a snapshot; when they do conflict, the editor offers to
+  stash them and bring them back on the other branch. A remote branch gets
+  a local branch tracking it. Right-click: merge into the current branch,
+  rebase onto it, rename, delete (on the remote too), track.
+- **Merge and rebase**: when they stop on conflicts, Diff mode shows a bar
+  with the number of conflicts and *Continue*, *Skip Commit* (rebase) and
+  *Abort*; stage each file once resolved. The same actions are in the Git
+  menu.
+- **Stashes**: *Git ▸ Stash Changes…* puts the changes aside (new files
+  included unless unchecked); *Git ▸ Stashes…* lists them with their diff,
+  to *Pop*, *Apply* or *Drop*.
+
 Operations go through the `git` command, which must be installed: the
 repository's hooks (pre-commit…), commit signing and your configuration
 apply just as in a terminal. A failure shows git's message, including
-hook output. The current branch is shown in the status
-bar.
+hook output.
 
 | Action | Shortcut |
 |---|---|
 | Command palette | Ctrl+Shift+P |
+| Branches / Pull / Push | Ctrl+Alt+B / Ctrl+Alt+U / Ctrl+Alt+P |
 | Terminal / Edit / Diff / History mode | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 |
 | Switch to the terminal and back | F11 |
 | File outline (filter) | Ctrl+Shift+O |

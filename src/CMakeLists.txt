@@ -197,7 +197,8 @@ qt_add_resources(duet_core schemas
     FILES
         ${PROJECT_SOURCE_DIR}/third_party/schemastore/claude-code-settings.json)
 
-# Interface and code fonts, the same on every system.
+# Interface and code fonts, the same on every system. JetBrains Mono comes
+# without ligatures (NL) and with them (the editor's option).
 qt_add_resources(duet_core fonts
     PREFIX /fonts
     BASE ${PROJECT_SOURCE_DIR}/third_party/fonts
@@ -205,8 +206,20 @@ qt_add_resources(duet_core fonts
         ${PROJECT_SOURCE_DIR}/third_party/fonts/Inter-Variable.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Regular.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Italic.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Light.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-LightItalic.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Medium.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-MediumItalic.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Bold.ttf
-        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-BoldItalic.ttf)
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-BoldItalic.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-Regular.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-Italic.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-Light.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-LightItalic.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-Medium.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-MediumItalic.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-Bold.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMono-BoldItalic.ttf)
 
 # The diagram editor: diagram families ported from sidecar, laid out by
 # Graphviz. Without Graphviz, diagram files open as text.

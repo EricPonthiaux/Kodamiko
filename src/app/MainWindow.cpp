@@ -162,7 +162,7 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
 {
     // The saved theme from the start: the widgets are styled as they are
     // created, rather than all restyled when restoreSettings() applies it.
-    theme_.font = Preferences::load().codeFont();
+    Preferences::load().applyTypography(theme_);
     ThemeStyle::apply(theme_);
     createWidgets();
     createMenus();
@@ -286,12 +286,18 @@ void MainWindow::createWidgets()
     // A fetch, pull or push: its progress in the status bar, with a button
     // to stop it, until the queue is done.
     connect(gitCommands_, &GitCommands::progress, this, [this](const QString &title, const QString &line) {
-        statusBar()->showMessage(line.isEmpty() ? tr("%1…").arg(title) : tr("%1: %2").arg(title, line));
+        gitProgress_ = line.isEmpty() ? tr("%1…").arg(title) : tr("%1: %2").arg(title, line);
+        statusBar()->showMessage(gitProgress_);
         cancelGitButton_->show();
     });
     connect(gitCommands_, &GitCommands::busyChanged, this, [this](bool busy) {
-        if (!busy)
-            cancelGitButton_->hide();
+        if (busy)
+            return;
+        cancelGitButton_->hide();
+        // Failed or cancelled: no success message took its place.
+        if (!gitProgress_.isEmpty() && statusBar()->currentMessage() == gitProgress_)
+            statusBar()->clearMessage();
+        gitProgress_.clear();
     });
     // git and ssh ask for credentials through duet-askpass.
     askpass_ = new AskpassServer([this](const QString &prompt) { return askCredentials(prompt); }, this);
@@ -1565,7 +1571,7 @@ QString MainWindow::savedThemeName()
 void MainWindow::setTheme(const QString &name)
 {
     theme_ = Theme::named(name);
-    theme_.font = Preferences::load().codeFont();
+    Preferences::load().applyTypography(theme_);
     for (QAction *action : themeActions_->actions())
         action->setChecked(action->data().toString() == theme_.name);
     ThemeStyle::apply(theme_);
@@ -1636,7 +1642,8 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     preferences.save();
     if (preferences.interfaceFont() != previous.interfaceFont())
         QApplication::setFont(preferences.interfaceFont());
-    if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont())
+    if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont()
+        || preferences.codeLineHeight != previous.codeLineHeight || preferences.ligatures != previous.ligatures)
         setTheme(preferences.theme);
     if (preferences.treeFont() != previous.treeFont())
         applyTreeFont(preferences.treeFont());

@@ -133,7 +133,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
 {
     const Preferences preferences = Preferences::load();
     theme_ = Theme::named(preferences.theme);
-    theme_.font = preferences.codeFont();
+    preferences.applyTypography(theme_);
     ThemeStyle::apply(theme_);
     setWindowTitle(tr("Welcome to Duet"));
     resize(960, 640);

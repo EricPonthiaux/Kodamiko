@@ -4,11 +4,15 @@
 #include "McpRegistry.h"
 #include "McpWork.h"
 
+#include "git/Branches.h"
 #include "git/CommitLog.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
+#include "git/Integration.h"
+#include "git/Remotes.h"
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
+#include "git/Stashes.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -80,6 +84,30 @@ void runGit(const DuetToolContext &context, GitCommands::Job job, McpReply reply
                                                         result.isError ? result.text : QString()); });
 }
 
+// Same for a job that talks to a remote: git may ask the user for
+// credentials (see AskpassServer).
+void runRemoteGit(const DuetToolContext &context, GitCommands::LongJob job, McpReply reply)
+{
+    const auto done = [context, reply](const QString &message, const QString &error) {
+        if (context.repositoryChanged)
+            context.repositoryChanged();
+        reply(error.isEmpty() ? McpResult::message(message) : McpResult::error(error));
+    };
+    if (context.git) {
+        context.git->runLongQuietly(std::move(job), done);
+        return;
+    }
+    runGit(context, [job] { return job({}); }, reply);
+}
+
+// "origin/main ↑2 ↓1" and the like, for get_git_status.
+void addTracking(QJsonObject &json, const RepositoryInfo &info)
+{
+    json.insert(QStringLiteral("upstream"), info.upstream);
+    json.insert(QStringLiteral("ahead"), info.ahead);
+    json.insert(QStringLiteral("behind"), info.behind);
+}
+
 RepositoryInfo repositoryOf(const QString &folder)
 {
     const std::optional<RepositoryInfo> repository = RepositoryInfo::read(folder);
@@ -102,9 +130,10 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
 {
     registry.addTool(McpTool::reading(
         QStringLiteral("get_git_status"), QStringLiteral("Git status"),
-        QStringLiteral("The project's git state as Duet's Diff mode shows it: branch, last commit, operation in "
-                       "progress, staged and unstaged changes (untracked files included), optionally with their "
-                       "patches."),
+        QStringLiteral("The project's git state as Duet's Diff mode shows it: branch, the remote branch it tracks "
+                       "and how many commits each side has that the other lacks (as of the last fetch), last "
+                       "commit, operation in progress, staged and unstaged changes (untracked files included), "
+                       "optionally with their patches."),
         object({{QStringLiteral("patches"), boolean(QStringLiteral("Include each file's unified diff"))}}),
         [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
             const QString folder = context.folder();
@@ -115,14 +144,15 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                     if (!status)
                         return McpResult::error(QStringLiteral("The project is not in a git repository"));
                     const RepositoryInfo &info = status->info;
-                    return McpResult::json(QJsonObject{
-                        {QStringLiteral("branch"), info.detached ? QString() : info.branch},
-                        {QStringLiteral("detached"), info.detached},
-                        {QStringLiteral("head"), info.headId},
-                        {QStringLiteral("headMessage"), info.headMessage},
-                        {QStringLiteral("operation"), info.operation},
-                        {QStringLiteral("staged"), diffsJson(status->staged, patches)},
-                        {QStringLiteral("unstaged"), diffsJson(status->unstaged, patches)}});
+                    QJsonObject json{{QStringLiteral("branch"), info.detached ? QString() : info.branch},
+                                     {QStringLiteral("detached"), info.detached},
+                                     {QStringLiteral("head"), info.headId},
+                                     {QStringLiteral("headMessage"), info.headMessage},
+                                     {QStringLiteral("operation"), info.operation},
+                                     {QStringLiteral("staged"), diffsJson(status->staged, patches)},
+                                     {QStringLiteral("unstaged"), diffsJson(status->unstaged, patches)}};
+                    addTracking(json, info);
+                    return McpResult::json(json);
                 },
                 reply);
         }));
@@ -201,19 +231,19 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
         false,
         QStringLiteral("git-status"),
         QStringLiteral("Git status"),
-        QStringLiteral("Branch, last commit, staged and unstaged files"),
+        QStringLiteral("Branch and its upstream, last commit, staged and unstaged files"),
         QStringLiteral("application/json"),
         [context](const QString &) -> std::optional<QString> {
             try {
                 const std::optional<RepositoryStatus> status = RepositoryStatus::read(context.folder());
                 if (!status)
                     return QStringLiteral("{}");
-                return QString::fromUtf8(QJsonDocument(QJsonObject{
-                                                           {QStringLiteral("branch"), status->info.branch},
-                                                           {QStringLiteral("head"), status->info.headId},
-                                                           {QStringLiteral("staged"), diffsJson(status->staged, false)},
-                                                           {QStringLiteral("unstaged"), diffsJson(status->unstaged, false)}})
-                                             .toJson(QJsonDocument::Compact));
+                QJsonObject json{{QStringLiteral("branch"), status->info.branch},
+                                 {QStringLiteral("head"), status->info.headId},
+                                 {QStringLiteral("staged"), diffsJson(status->staged, false)},
+                                 {QStringLiteral("unstaged"), diffsJson(status->unstaged, false)}};
+                addTracking(json, status->info);
+                return QString::fromUtf8(QJsonDocument(json).toJson(QJsonDocument::Compact));
             } catch (const GitError &) {
                 return std::nullopt;
             }
@@ -318,6 +348,261 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
             const bool amend = arguments.value(QStringLiteral("amend")).toBool();
             runGit(context, [folder, message, amend] {
                 return GitOperations::commit(repositoryOf(folder), message, amend);
+            }, reply);
+        }));
+
+    registerBranchTools(registry, context);
+}
+
+void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
+{
+    registry.addTool(McpTool::reading(
+        QStringLiteral("list_branches"), QStringLiteral("Branches"),
+        QStringLiteral("The local branches, then the remote ones as of the last fetch: for each, whether it is the "
+                       "current one, the remote branch it tracks, how many commits it has that its upstream lacks "
+                       "(ahead) and the reverse (behind), and its last commit."),
+        object({}),
+        [context](const QJsonObject &, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            inBackground(
+                [folder] {
+                    QJsonArray branches;
+                    for (const BranchInfo &branch : Branches::list(repositoryOf(folder).workDir)) {
+                        QJsonObject item{{QStringLiteral("name"), branch.name},
+                                         {QStringLiteral("remote"), branch.remote},
+                                         {QStringLiteral("current"), branch.current},
+                                         {QStringLiteral("date"), branch.date.toString(Qt::ISODate)},
+                                         {QStringLiteral("subject"), branch.subject}};
+                        if (!branch.upstream.isEmpty()) {
+                            item.insert(QStringLiteral("upstream"), branch.upstream);
+                            item.insert(QStringLiteral("upstreamGone"), branch.upstreamGone);
+                            item.insert(QStringLiteral("ahead"), branch.ahead);
+                            item.insert(QStringLiteral("behind"), branch.behind);
+                        }
+                        branches.append(item);
+                    }
+                    return McpResult::json(QJsonObject{{QStringLiteral("branches"), branches}});
+                },
+                reply);
+        }));
+
+    registry.addTool(McpTool::reading(
+        QStringLiteral("list_stashes"), QStringLiteral("Stashes"),
+        QStringLiteral("The changes put aside with git stash, newest first (index 0), optionally with their patches."),
+        object({{QStringLiteral("patches"), boolean(QStringLiteral("Include each stash's unified diff"))}}),
+        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            const bool patches = arguments.value(QStringLiteral("patches")).toBool();
+            inBackground(
+                [folder, patches] {
+                    const QString workDir = repositoryOf(folder).workDir;
+                    QJsonArray stashes;
+                    for (const Stash &stash : Stashes::list(workDir)) {
+                        QJsonObject item{{QStringLiteral("index"), stash.index},
+                                         {QStringLiteral("message"), stash.message},
+                                         {QStringLiteral("date"), stash.date.toString(Qt::ISODate)}};
+                        if (patches) {
+                            QString patch = QString::fromUtf8(Stashes::patch(workDir, stash.index));
+                            if (patch.size() > maximumPatch) {
+                                patch.truncate(maximumPatch);
+                                patch += QStringLiteral("\n[… cut]");
+                            }
+                            item.insert(QStringLiteral("patch"), patch);
+                        }
+                        stashes.append(item);
+                    }
+                    return McpResult::json(QJsonObject{{QStringLiteral("stashes"), stashes}});
+                },
+                reply);
+        }));
+
+    registry.addTool(McpTool::acting(
+        QStringLiteral("fetch"), QStringLiteral("Fetch"),
+        QStringLiteral("Updates the remote branches from every remote (git fetch --all --prune), without touching "
+                       "the local branches or the files: then get_git_status tells how far behind the branch is."),
+        object({}),
+        [context](const QJsonObject &, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            runRemoteGit(context, [folder](const Git::Feedback &feedback) {
+                return Remotes::fetch(repositoryOf(folder), feedback);
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("pull"), QStringLiteral("Pull"),
+        QStringLiteral("Brings the upstream's new commits into the current branch, following the user's pull.rebase "
+                       "and pull.ff settings; without either, only a fast-forward (it fails when both sides have new "
+                       "commits: then merge_branch or rebase). The user is asked first."),
+        object({}),
+        [](const QJsonObject &) { return QStringLiteral("pull the upstream's commits into the current branch"); },
+        [context](const QJsonObject &, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            runRemoteGit(context, [folder](const Git::Feedback &feedback) {
+                return Remotes::pull(repositoryOf(folder), feedback);
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("push"), QStringLiteral("Push"),
+        QStringLiteral("Sends the current branch's commits to its upstream; a branch without one is published to "
+                       "\"origin\" (or the only remote) under the same name. Never forces: a push the remote "
+                       "rejects needs a pull first. The user is asked first."),
+        object({}),
+        [context](const QJsonObject &) {
+            QString branch;
+            try {
+                if (const std::optional<RepositoryInfo> info = RepositoryInfo::read(context.folder()))
+                    branch = info->upstream.isEmpty() ? info->branch : info->branch + QStringLiteral(" to ") + info->upstream;
+            } catch (const GitError &) {
+            }
+            return QStringLiteral("push %1").arg(branch.isEmpty() ? QStringLiteral("the current branch") : branch);
+        },
+        [context](const QJsonObject &, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            runRemoteGit(context, [folder](const Git::Feedback &feedback) {
+                return Remotes::push(repositoryOf(folder), feedback);
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("switch_branch"), QStringLiteral("Switch branch"),
+        QStringLiteral("Makes a branch the current one; uncommitted changes come along when they do not conflict "
+                       "(a Duet snapshot is taken first). A remote branch (\"origin/x\") gets a local branch "
+                       "tracking it. With create, makes a new branch at the current commit. The user is asked first."),
+        object({{QStringLiteral("name"), string(QStringLiteral("Branch: local (\"feature/x\") or remote (\"origin/x\")"))},
+                {QStringLiteral("create"), boolean(QStringLiteral("Create it at the current commit first"))}},
+               {QStringLiteral("name")}),
+        [](const QJsonObject &arguments) {
+            return QStringLiteral("%1 %2")
+                .arg(arguments.value(QStringLiteral("create")).toBool() ? QStringLiteral("create and switch to")
+                                                                         : QStringLiteral("switch to"),
+                     arguments.value(QStringLiteral("name")).toString());
+        },
+        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            const QString name = arguments.value(QStringLiteral("name")).toString();
+            const bool create = arguments.value(QStringLiteral("create")).toBool();
+            runGit(context, [folder, name, create] {
+                const RepositoryInfo repository = repositoryOf(folder);
+                if (create) {
+                    if (const QString problem = Branches::nameError(name); !problem.isEmpty())
+                        throw GitError(problem);
+                    Branches::create(repository, name, true);
+                    return QStringLiteral("Switched to the new branch %1").arg(name);
+                }
+                // A remote branch only when no local one has the name.
+                bool remote = false;
+                for (const BranchInfo &branch : Branches::list(repository.workDir)) {
+                    if (branch.name == name) {
+                        remote = branch.remote;
+                        if (!remote)
+                            break;
+                    }
+                }
+                Branches::switchTo(repository, name, remote);
+                return QStringLiteral("Switched to %1").arg(remote ? Branches::nameOnRemote(name) : name);
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("merge_branch"), QStringLiteral("Merge or rebase"),
+        QStringLiteral("Brings another branch's commits into the current branch: a merge (git's default message), "
+                       "or with rebase, replays the current branch's own commits on top of it. On conflicts it stops "
+                       "with the operation in progress (get_git_status): resolve the files, stage them, then "
+                       "continue_operation, or abort_operation. The user is asked first."),
+        object({{QStringLiteral("branch"), string(QStringLiteral("Branch to bring in (\"main\", \"origin/main\")"))},
+                {QStringLiteral("rebase"), boolean(QStringLiteral("Rebase onto it instead of merging"))}},
+               {QStringLiteral("branch")}),
+        [](const QJsonObject &arguments) {
+            return QStringLiteral("%1 %2")
+                .arg(arguments.value(QStringLiteral("rebase")).toBool() ? QStringLiteral("rebase the current branch onto")
+                                                                         : QStringLiteral("merge into the current branch"),
+                     arguments.value(QStringLiteral("branch")).toString());
+        },
+        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            const QString branch = arguments.value(QStringLiteral("branch")).toString();
+            const bool rebase = arguments.value(QStringLiteral("rebase")).toBool();
+            runGit(context, [folder, branch, rebase] {
+                const RepositoryInfo repository = repositoryOf(folder);
+                const QString output = rebase ? Integration::rebase(repository, branch) : Integration::merge(repository, branch);
+                return output.isEmpty() ? QStringLiteral("Done") : output;
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("continue_operation"), QStringLiteral("Continue merge or rebase"),
+        QStringLiteral("Goes on with the merge, rebase, cherry-pick or revert in progress once its conflicts are "
+                       "resolved and staged, committing the result. The user is asked first."),
+        object({}),
+        [](const QJsonObject &) { return QStringLiteral("continue the operation in progress"); },
+        [context](const QJsonObject &, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            runGit(context, [folder] {
+                const RepositoryInfo repository = repositoryOf(folder);
+                Integration::continueOperation(repository);
+                return QStringLiteral("The %1 went on").arg(repository.operation);
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("abort_operation"), QStringLiteral("Abort merge or rebase"),
+        QStringLiteral("Gives up the merge, rebase, cherry-pick or revert in progress: the branch and the files go "
+                       "back to how they were before it. The user is asked first."),
+        object({}),
+        [](const QJsonObject &) { return QStringLiteral("abort the operation in progress"); },
+        [context](const QJsonObject &, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            runGit(context, [folder] {
+                const RepositoryInfo repository = repositoryOf(folder);
+                Integration::abortOperation(repository);
+                return QStringLiteral("The %1 was aborted").arg(repository.operation);
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("stash_changes"), QStringLiteral("Stash changes"),
+        QStringLiteral("Puts the uncommitted changes aside (git stash), new files included unless asked otherwise: "
+                       "the files go back to the last commit. apply_stash brings them back. The user is asked first."),
+        object({{QStringLiteral("message"), string(QStringLiteral("What the changes are, shown in the list"))},
+                {QStringLiteral("keepNewFiles"), boolean(QStringLiteral("Leave untracked files in place"))}}),
+        [](const QJsonObject &arguments) {
+            const QString message = arguments.value(QStringLiteral("message")).toString();
+            return message.isEmpty() ? QStringLiteral("stash the uncommitted changes")
+                                     : QStringLiteral("stash the uncommitted changes as \u201c%1\u201d").arg(message);
+        },
+        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            const QString message = arguments.value(QStringLiteral("message")).toString();
+            const bool includeUntracked = !arguments.value(QStringLiteral("keepNewFiles")).toBool();
+            runGit(context, [folder, message, includeUntracked] {
+                Stashes::push(repositoryOf(folder), message, includeUntracked);
+                return QStringLiteral("Changes stashed");
+            }, reply);
+        }));
+
+    registry.addTool(McpTool::sensitive(
+        QStringLiteral("apply_stash"), QStringLiteral("Apply a stash"),
+        QStringLiteral("Brings a stash's changes back (see list_stashes), and drops it unless keep is set. The "
+                       "user is asked first."),
+        object({{QStringLiteral("index"), integer(QStringLiteral("Stash index (0: the most recent)"))},
+                {QStringLiteral("keep"), boolean(QStringLiteral("Keep the stash after applying it"))}}),
+        [](const QJsonObject &arguments) {
+            return QStringLiteral("%1 stash@{%2}")
+                .arg(arguments.value(QStringLiteral("keep")).toBool() ? QStringLiteral("apply") : QStringLiteral("pop"))
+                .arg(arguments.value(QStringLiteral("index")).toInt());
+        },
+        [context](const QJsonObject &arguments, McpReply reply, McpProgress) {
+            const QString folder = context.folder();
+            const int index = arguments.value(QStringLiteral("index")).toInt();
+            const bool keep = arguments.value(QStringLiteral("keep")).toBool();
+            runGit(context, [folder, index, keep] {
+                const RepositoryInfo repository = repositoryOf(folder);
+                if (keep)
+                    Stashes::apply(repository, index);
+                else
+                    Stashes::pop(repository, index);
+                return keep ? QStringLiteral("Stash applied") : QStringLiteral("Stash applied and dropped");
             }, reply);
         }));
 }

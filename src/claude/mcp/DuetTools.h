@@ -67,8 +67,10 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
 void registerCodeTools(McpRegistry &registry, const DuetToolContext &context);
 // Terminals: reading them, running a command.
 void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context);
-// Git status, history, commits, snapshots.
+// Git status, history, commits, snapshots; then the branch tools.
 void registerGitTools(McpRegistry &registry, const DuetToolContext &context);
+// Branches, remotes, stashes, merge and rebase.
+void registerBranchTools(McpRegistry &registry, const DuetToolContext &context);
 // Diagrams: their content and selection, changes in the open diagram.
 void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context);
 

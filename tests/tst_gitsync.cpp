@@ -533,6 +533,22 @@ private slots:
         QCOMPARE(exitCode, 1);
         QCOMPARE(prompts, QStringList({"Password for 'https://u@example.com': ", "Cancel me"}));
 
+        // End to end: git itself asks through duet-askpass.
+        prompts.clear();
+        QTemporaryDir project;
+        git(project, {"init", "-q", "-b", "main"});
+        QByteArray filled;
+        std::thread asking([&] {
+            Git::RunOptions options;
+            options.input = "protocol=https\nhost=example.com\n\n";
+            options.feedback.environment = environment;
+            filled = Git::run(project.path(), {"credential", "fill"}, options);
+        });
+        QTRY_VERIFY_WITH_TIMEOUT(prompts.size() == 2, 10000); // user name, then password
+        asking.join();
+        QVERIFY2(filled.contains("username=s3cret\n") && filled.contains("password=s3cret\n"), filled.constData());
+        QVERIFY(prompts.at(0).startsWith("Username for 'https://example.com'"));
+
         QVERIFY(AskpassServer::isConfirmation("Are you sure you want to continue connecting (yes/no/[fingerprint])? "));
         QVERIFY(!AskpassServer::isConfirmation("Enter passphrase for key '/home/u/.ssh/id_ed25519': "));
     }

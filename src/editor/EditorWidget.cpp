@@ -606,7 +606,7 @@ void EditorWidget::applyTheme(const Theme &theme)
     setUnmatchedBraceForegroundColor(theme.error);
     setIndentationGuidesBackgroundColor(theme.background);
     setIndentationGuidesForegroundColor(theme.caretLine);
-    ScintillaStyles::applyTypography(*this, theme.font);
+    ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     SendScintilla(SCI_INDICSETFORE, errorIndicator, theme.error);
     SendScintilla(SCI_INDICSETFORE, warningIndicator, theme.warning);
     applyFoldColors();

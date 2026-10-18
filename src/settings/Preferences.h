@@ -1,9 +1,12 @@
 #pragma once
 
 #include "editor/EditorWidget.h"
+#include "ui/AppFonts.h"
 
 #include <QFont>
 #include <QString>
+
+struct Theme;
 
 // The user's settings (File ▸ Preferences), stored with QSettings. The keys
 // are those the menus' checkable commands already use (View ▸ Use System
@@ -13,6 +16,11 @@ struct Preferences {
     QString theme = QStringLiteral("duet"); // Theme::name
     QString codeFontFamily; // empty: the embedded JetBrains Mono
     int codeFontSize = 11;
+    int codeFontWeight = QFont::Normal; // QFont::Light, Normal or Medium
+    // Lines of code at this multiple of the font size.
+    double codeLineHeight = AppFonts::defaultLineHeight;
+    // Programming ligatures in the editor ("->" drawn as an arrow).
+    bool ligatures = false;
     // Menus, tabs, panels and dialogs; 0: the system's size.
     int interfaceFontSize = 0;
     // The side trees (files, outline, changes); 0: the code font's size,
@@ -48,8 +56,11 @@ struct Preferences {
     static Preferences load();
     void save() const;
 
-    // Font of code (editor, terminal, diffs) for these preferences.
+    // Font of code (editor, terminal, diffs) for these preferences,
+    // without ligatures.
     QFont codeFont() const;
+    // The code font, line height and ligatures given to `theme`.
+    void applyTypography(Theme &theme) const;
     // Font of the interface (menus, tabs, panels, dialogs).
     QFont interfaceFont() const;
     // Font of the side trees.

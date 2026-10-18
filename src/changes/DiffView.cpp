@@ -532,7 +532,7 @@ int DiffView::syntaxStyle(long foreground, bool bold, bool italic)
     SendScintilla(SCI_STYLESETBACK, style, theme_.background);
     SendScintilla(SCI_STYLESETFONT, style, family.constData());
     SendScintilla(SCI_STYLESETSIZEFRACTIONAL, style, qRound(theme_.font.pointSizeF() * int(SC_FONT_SIZE_MULTIPLIER)));
-    SendScintilla(SCI_STYLESETBOLD, style, bold);
+    SendScintilla(SCI_STYLESETWEIGHT, style, ScintillaStyles::styleWeight(theme_.font, bold));
     SendScintilla(SCI_STYLESETITALIC, style, italic);
     syntaxStyles_.insert(key, style);
     return style;
@@ -557,7 +557,7 @@ void DiffView::defineStyles()
         SendScintilla(SCI_STYLESETBACK, style, background);
         SendScintilla(SCI_STYLESETFONT, style, font.family().toUtf8().constData());
         SendScintilla(SCI_STYLESETSIZEFRACTIONAL, style, qRound(font.pointSizeF() * int(SC_FONT_SIZE_MULTIPLIER)));
-        SendScintilla(SCI_STYLESETBOLD, style, font.bold());
+        SendScintilla(SCI_STYLESETWEIGHT, style, font.weight());
         SendScintilla(SCI_STYLESETITALIC, style, font.italic());
     };
     // The default style first: STYLECLEARALL copies it to every style.
@@ -618,7 +618,7 @@ void DiffView::applyTheme(const Theme &theme)
     setMarginsBackgroundColor(theme.marginBackground);
     setMarginsForegroundColor(theme.marginForeground);
     setMarginsFont(theme.font);
-    ScintillaStyles::applyTypography(*this, theme.font);
+    ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     defineStyles();
     render(); // the styles of the text are set line by line
 }

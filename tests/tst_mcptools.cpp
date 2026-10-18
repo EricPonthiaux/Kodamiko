@@ -4,6 +4,7 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/GitProcess.h"
+#include "git/RepositoryStatus.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/SymbolIndex.h"
 #include "terminal/ProcessSpec.h"
@@ -20,6 +21,7 @@
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QTemporaryFile>
 #include <QtTest>
 
 namespace {
@@ -239,6 +241,78 @@ private slots:
 
         editor.call(QStringLiteral("show_changes"), {{QStringLiteral("path"), QStringLiteral("a.txt")}});
         QCOMPARE(editor.changesShown, QStringLiteral("a.txt"));
+    }
+
+    // Branches, a remote, stashes and merges; what changes is asked first.
+    void actsOnBranchesAndRemotes()
+    {
+        QTemporaryFile config;
+        QVERIFY(config.open());
+        qputenv("GIT_CONFIG_GLOBAL", config.fileName().toUtf8());
+        qputenv("GIT_CONFIG_NOSYSTEM", "1");
+        for (const char *name : {"GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"})
+            qputenv(name, "t");
+
+        QTemporaryDir bare;
+        Git::run(bare.path(), {"init", "-q", "--bare", "-b", "main"});
+        Editor editor;
+        write(editor.folder, QStringLiteral("a.txt"), "one\n");
+        Git::run(editor.folder.path(), {"init", "-q", "-b", "main"});
+        Git::run(editor.folder.path(), {"add", "-A"});
+        Git::run(editor.folder.path(), {"commit", "-qm", "init"});
+        Git::run(editor.folder.path(), {"remote", "add", "origin", bare.path()});
+
+        // Publishing main: asked, then tracked.
+        editor.call(QStringLiteral("push"));
+        QCOMPARE(editor.asked.last(), QStringLiteral("push main"));
+        QJsonObject status = structured(editor.call(QStringLiteral("get_git_status")));
+        QCOMPARE(status.value(QStringLiteral("upstream")).toString(), QStringLiteral("origin/main"));
+        QCOMPARE(status.value(QStringLiteral("ahead")).toInt(), 0);
+        QVERIFY(!editor.call(QStringLiteral("fetch")).value(QStringLiteral("isError")).toBool());
+
+        // A new branch, refused then allowed.
+        editor.allow = false;
+        editor.call(QStringLiteral("switch_branch"), {{QStringLiteral("name"), QStringLiteral("topic")},
+                                                      {QStringLiteral("create"), true}});
+        QCOMPARE(editor.asked.last(), QStringLiteral("create and switch to topic"));
+        QCOMPARE(RepositoryInfo::read(editor.folder.path())->branch, QStringLiteral("main"));
+        editor.allow = true;
+        editor.call(QStringLiteral("switch_branch"), {{QStringLiteral("name"), QStringLiteral("topic")},
+                                                      {QStringLiteral("create"), true}});
+        QCOMPARE(RepositoryInfo::read(editor.folder.path())->branch, QStringLiteral("topic"));
+        const QJsonArray branches = structured(editor.call(QStringLiteral("list_branches"))).value(QStringLiteral("branches")).toArray();
+        QCOMPARE(branches.size(), 3); // main, topic, origin/main
+        QVERIFY(branches.at(1).toObject().value(QStringLiteral("current")).toBool());
+        QVERIFY(branches.at(2).toObject().value(QStringLiteral("remote")).toBool());
+
+        // Stash and bring back.
+        write(editor.folder, QStringLiteral("a.txt"), "two\n");
+        editor.call(QStringLiteral("stash_changes"), {{QStringLiteral("message"), QStringLiteral("wip")}});
+        QCOMPARE(editor.asked.last(), QStringLiteral("stash the uncommitted changes as “wip”"));
+        const QJsonArray stashes = structured(editor.call(QStringLiteral("list_stashes"), {{QStringLiteral("patches"), true}}))
+                                       .value(QStringLiteral("stashes")).toArray();
+        QCOMPARE(stashes.size(), 1);
+        QVERIFY(stashes.first().toObject().value(QStringLiteral("patch")).toString().contains(QStringLiteral("+two")));
+        editor.call(QStringLiteral("apply_stash"), {{QStringLiteral("index"), 0}});
+        QCOMPARE(editor.asked.last(), QStringLiteral("pop stash@{0}"));
+        QFile file(editor.folder.filePath(QStringLiteral("a.txt")));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("two\n"));
+        file.close();
+
+        // A conflicting merge, then aborted.
+        Git::run(editor.folder.path(), {"commit", "-qam", "topic"});
+        Git::run(editor.folder.path(), {"switch", "-q", "main"});
+        write(editor.folder, QStringLiteral("a.txt"), "three\n");
+        Git::run(editor.folder.path(), {"commit", "-qam", "main"});
+        QVERIFY(editor.call(QStringLiteral("merge_branch"), {{QStringLiteral("branch"), QStringLiteral("topic")}})
+                    .value(QStringLiteral("isError")).toBool());
+        QCOMPARE(editor.asked.last(), QStringLiteral("merge into the current branch topic"));
+        status = structured(editor.call(QStringLiteral("get_git_status")));
+        QCOMPARE(status.value(QStringLiteral("operation")).toString(), QStringLiteral("merge"));
+        QCOMPARE(status.value(QStringLiteral("ahead")).toInt(), 1);
+        editor.call(QStringLiteral("abort_operation"));
+        QVERIFY(RepositoryInfo::read(editor.folder.path())->operation.isEmpty());
     }
 
     // A command in a terminal the user sees, once allowed.

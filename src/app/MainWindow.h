@@ -295,6 +295,7 @@ private:
     QToolButton *branchButton_ = nullptr; // status bar: branch, Branches popup
     QToolButton *syncButton_ = nullptr;   // status bar: fetch, pull, push
     QToolButton *cancelGitButton_ = nullptr; // status bar: stops a fetch, push…
+    QString gitProgress_; // the status bar message of a fetch, push… in progress
     QAction *continueAction_ = nullptr; // Git menu: the operation in progress
     QAction *skipAction_ = nullptr;
     QAction *abortAction_ = nullptr;

@@ -1,7 +1,11 @@
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"
+#include "syntax/ScintillaStyles.h"
+#include "ui/AppFonts.h"
 #include "ui/Theme.h"
+
+#include <Qsci/qsciscintilla.h>
 
 #include <QAction>
 #include <QLabel>
@@ -33,6 +37,9 @@ private slots:
         preferences.codeFontSize = 14;
         preferences.interfaceFontSize = 12;
         preferences.treeFontSize = 15;
+        preferences.codeFontWeight = QFont::Light;
+        preferences.codeLineHeight = 1.6;
+        preferences.ligatures = true;
         preferences.editor.wrapLines = true;
         preferences.editor.codeFolding = false;
         preferences.claudeNotifications = false;
@@ -55,6 +62,65 @@ private slots:
         QCOMPARE(preferences.treeFont().pointSize(), 9);
         preferences.treeFontSize = 14;
         QCOMPARE(preferences.treeFont().pointSize(), 14);
+    }
+
+    void typographyReachesTheTheme()
+    {
+        Preferences preferences;
+        preferences.codeFontWeight = QFont::Light;
+        preferences.codeLineHeight = 1.8;
+        preferences.ligatures = true;
+        Theme theme = Theme::dark();
+        preferences.applyTypography(theme);
+        QCOMPARE(theme.font.weight(), QFont::Light);
+        QCOMPARE(theme.lineHeight, 1.8);
+        QVERIFY(theme.editorLigatures);
+        // The theme's font itself has none: the terminal uses it.
+        QVERIFY(AppFonts::isBuiltInCode(theme.font.family()));
+        QCOMPARE(AppFonts::withLigatures(theme.font, false).family(), theme.font.family());
+        QVERIFY(AppFonts::withLigatures(theme.font, true).family() != theme.font.family());
+        QVERIFY(AppFonts::scintillaFamily(theme.font, true).endsWith("#liga"));
+        QVERIFY(!AppFonts::scintillaFamily(theme.font, false).contains('#'));
+    }
+
+    // Through QScintilla, as the editor draws: ligatures, weight and line
+    // height each change what is drawn.
+    void editorDrawsTheTypography()
+    {
+        QsciScintilla editor;
+        editor.resize(400, 120);
+        editor.setText("a -> b != c\nnext line");
+        editor.setCaretWidth(0);
+        editor.setMarginWidth(1, 0);
+        editor.show();
+        const auto draw = [&editor](const Preferences &preferences) {
+            Theme theme = Theme::dark();
+            preferences.applyTypography(theme);
+            ScintillaStyles::applyDefaultStyle(editor, theme);
+            ScintillaStyles::applyTypography(editor, theme.font, theme.lineHeight);
+            return editor.viewport()->grab().toImage();
+        };
+        Preferences preferences;
+        const QImage plain = draw(preferences);
+        const long plainHeight = editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0);
+        preferences.ligatures = true;
+        QVERIFY(draw(preferences) != plain);
+        preferences.ligatures = false;
+        QCOMPARE(draw(preferences), plain);
+        // Without anything to join, the same letters: the family behind
+        // "#liga" is found, not a fallback.
+        editor.setText("abc def\nnext line");
+        const QImage letters = draw(preferences);
+        preferences.ligatures = true;
+        QCOMPARE(draw(preferences), letters);
+        preferences.ligatures = false;
+        editor.setText("a -> b != c\nnext line");
+        preferences.codeFontWeight = QFont::Light;
+        QVERIFY(draw(preferences) != plain);
+        preferences.codeFontWeight = QFont::Normal;
+        preferences.codeLineHeight = 2.0;
+        draw(preferences);
+        QVERIFY(editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0) > plainHeight);
     }
 
     void oldDarkThemeSettingIsRead()
@@ -100,6 +166,9 @@ private slots:
         preferences.interfaceFontSize = 10;
         preferences.editor.showWhitespace = true;
         preferences.snapshotBeforePrompt = false;
+        preferences.codeFontWeight = QFont::Medium;
+        preferences.codeLineHeight = 1.75;
+        preferences.ligatures = true;
         QWidget window;
         PreferencesPopup popup(Theme::dark(), &window);
         popup.load(preferences, {}, {});

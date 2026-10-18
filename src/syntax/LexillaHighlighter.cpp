@@ -1,5 +1,6 @@
 #include "LexillaHighlighter.h"
 
+#include "ScintillaStyles.h"
 #include "ui/Theme.h"
 
 #include <Qsci/qscilexer.h>
@@ -61,14 +62,18 @@ void LexillaHighlighter::attach(QsciScintilla *editor)
 
 void LexillaHighlighter::applyTheme(const Theme &theme)
 {
-    lexer_->setDefaultFont(theme.font);
+    // The family Scintilla is given carries the ligatures' choice (see
+    // AppFonts::scintillaFamily).
+    QFont font = theme.font;
+    font.setFamily(QString::fromUtf8(AppFonts::scintillaFamily(theme.font, theme.editorLigatures)));
+    lexer_->setDefaultFont(font);
     lexer_->setDefaultColor(theme.foreground);
     lexer_->setDefaultPaper(theme.background);
 
-    QFont italicFont = theme.font;
+    QFont italicFont = font;
     italicFont.setItalic(true);
-    QFont boldFont = theme.font;
-    boldFont.setBold(true);
+    QFont boldFont = font;
+    boldFont.setWeight(QFont::Weight(ScintillaStyles::styleWeight(theme.font, true)));
 
     for (int style = 0; style < 128; ++style) {
         const QString description = lexer_->description(style);
@@ -79,12 +84,12 @@ void LexillaHighlighter::applyTheme(const Theme &theme)
         const int themeIndex = theme.syntaxStyleIndex(categoryForLexerStyle(description));
         if (themeIndex < 0) {
             lexer_->setColor(theme.foreground, style);
-            lexer_->setFont(theme.font, style);
+            lexer_->setFont(font, style);
             continue;
         }
         const TextStyle &textStyle = theme.syntaxStyles[themeIndex].second;
         lexer_->setColor(textStyle.foreground, style);
-        lexer_->setFont(textStyle.bold ? boldFont : textStyle.italic ? italicFont : theme.font, style);
+        lexer_->setFont(textStyle.bold ? boldFont : textStyle.italic ? italicFont : font, style);
     }
 
     // QsciScintilla only rereads the lexer's styles on setLexer().

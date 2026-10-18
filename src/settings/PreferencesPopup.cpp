@@ -8,6 +8,7 @@
 #include <QButtonGroup>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QDoubleSpinBox>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -20,6 +21,7 @@
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QStandardItemModel>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -264,23 +266,79 @@ QWidget *PreferencesPopup::createAppearancePage()
 
     // Code font, with a sample in the chosen theme.
     auto *fontCard = new SettingsCard;
+    // The built-in font, the recommended ones (those not installed shown
+    // but disabled, with where to get them), then the other monospaced
+    // fonts installed.
     fontFamily_ = new QComboBox;
     fontFamily_->setMinimumWidth(240);
     fontFamily_->addItem(tr("JetBrains Mono (built in)"), QString());
+    fontFamily_->insertSeparator(fontFamily_->count());
+    QStringList recommended;
+    // Missing fonts by download page: the Monaspace family shares one.
+    QList<std::pair<QString, QStringList>> missing;
+    for (const AppFonts::RecommendedFont &font : AppFonts::recommendedFonts()) {
+        const QString family = AppFonts::installedFamily(font);
+        if (!family.isEmpty()) {
+            fontFamily_->addItem(font.name, family);
+            recommended.append(family);
+            continue;
+        }
+        fontFamily_->addItem(tr("%1 — not installed").arg(font.name));
+        if (auto *model = qobject_cast<QStandardItemModel *>(fontFamily_->model()))
+            model->item(fontFamily_->count() - 1)->setEnabled(false);
+        if (missing.isEmpty() || missing.last().first != font.url)
+            missing.append({font.url, {}});
+        missing.last().second.append(font.name);
+    }
+    QStringList sources;
+    for (const auto &[url, names] : std::as_const(missing)) {
+        // "Monaspace" for its five styles.
+        const QString name = names.size() > 1 ? names.first().section(QLatin1Char(' '), 0, 0) : names.first();
+        sources.append(QStringLiteral("<a href=\"%1\">%2</a>").arg(url, name.toHtmlEscaped()));
+    }
+    fontFamily_->insertSeparator(fontFamily_->count());
     for (const QString &family : QFontDatabase::families()) {
-        if (QFontDatabase::isFixedPitch(family) && !QFontDatabase::isPrivateFamily(family))
+        if (QFontDatabase::isFixedPitch(family) && !QFontDatabase::isPrivateFamily(family)
+            && !AppFonts::isBuiltInCode(family) && !recommended.contains(family))
             fontFamily_->addItem(family, family);
     }
+    fontSources_ = new QLabel;
+    fontSources_->setObjectName(QStringLiteral("settingsDescription"));
+    fontSources_->setWordWrap(true);
+    fontSources_->setOpenExternalLinks(true);
+    fontSources_->setText(tr("Recommended, to install: %1.").arg(sources.join(QStringLiteral(", "))));
+    fontSources_->setVisible(!sources.isEmpty());
     fontSize_ = new QSpinBox;
     fontSize_->setRange(Preferences::minimumFontSize, Preferences::maximumFontSize);
     fontSize_->setSuffix(tr(" pt"));
     fontSize_->setMinimumWidth(90);
+    fontWeight_ = new QComboBox;
+    fontWeight_->addItem(tr("Light"), int(QFont::Light));
+    fontWeight_->addItem(tr("Regular"), int(QFont::Normal));
+    fontWeight_->addItem(tr("Medium"), int(QFont::Medium));
+    lineHeight_ = new QDoubleSpinBox;
+    lineHeight_->setRange(AppFonts::minimumLineHeight, AppFonts::maximumLineHeight);
+    lineHeight_->setSingleStep(0.1);
+    lineHeight_->setDecimals(2);
+    lineHeight_->setMinimumWidth(90);
+    ligatures_ = new ToggleSwitch;
     fontPreview_ = new QLabel;
     fontPreview_->setTextFormat(Qt::RichText);
     connect(fontFamily_, &QComboBox::currentIndexChanged, this, &PreferencesPopup::updateFontPreview);
     connect(fontSize_, &QSpinBox::valueChanged, this, &PreferencesPopup::updateFontPreview);
+    connect(fontWeight_, &QComboBox::currentIndexChanged, this, &PreferencesPopup::updateFontPreview);
+    connect(lineHeight_, &QDoubleSpinBox::valueChanged, this, &PreferencesPopup::updateFontPreview);
+    connect(ligatures_, &QAbstractButton::toggled, this, &PreferencesPopup::updateFontPreview);
     fontCard->addRow(tr("Font"), tr("The editor, the terminals and the diffs use it."), fontFamily_);
+    fontCard->addWidget(fontSources_);
     fontCard->addRow(tr("Size"), QString(), fontSize_);
+    fontCard->addRow(tr("Weight"), tr("Light reads finer on a bright screen; Medium, bolder."), fontWeight_);
+    fontCard->addRow(tr("Line height"), tr("Lines of code, as a multiple of the font size (not in the terminals)."),
+                     lineHeight_);
+    fontCard->addRow(tr("Ligatures"),
+                     tr("In the editor, \"->\", \"!=\" or \"=>\" drawn as one sign. The terminals keep one "
+                        "character per cell."),
+                     ligatures_);
     fontCard->addWidget(fontPreview_);
     addGroup(layout, tr("Code font"), fontCard);
 
@@ -560,17 +618,20 @@ void PreferencesPopup::updateFontPreview()
         return QStringLiteral("<span style=\"color:%1\">%2</span>").arg(color(category), text.toHtmlEscaped());
     };
     const QString html =
-        QStringLiteral("<pre style=\"margin:0\">%1\n%2 %3 %4 %5(%6, %7);</pre>")
+        QStringLiteral("<pre style=\"margin:0; line-height:%8%\">%1\n%2 %3 %4 %5(%6, %7);\n%9</pre>")
             .arg(span("comment", QStringLiteral("// The quick brown fox jumps over 0O 1lI {}[]")),
                  span("keyword", QStringLiteral("const auto")), span("variable", QStringLiteral("answer")),
                  span("operator", QStringLiteral("=")), span("function", QStringLiteral("compute")),
-                 span("string", QStringLiteral("\"=> != <=\"")), span("number", QStringLiteral("42")));
+                 span("string", QStringLiteral("\"text\"")), span("number", QStringLiteral("42")))
+            .arg(qRound(lineHeight_->value() * 100))
+            .arg(span("operator", QStringLiteral("if (a != b && c >= d) return x => x->next;")));
     fontPreview_->setText(html);
 
     Preferences font;
     font.codeFontFamily = fontFamily_->currentData().toString();
     font.codeFontSize = fontSize_->value();
-    fontPreview_->setFont(font.codeFont());
+    font.codeFontWeight = fontWeight_->currentData().toInt();
+    fontPreview_->setFont(AppFonts::withLigatures(font.codeFont(), ligatures_->isChecked()));
     fontPreview_->setStyleSheet(QStringLiteral("QLabel { background: %1; color: %2; border: 1px solid %3; "
                                                "border-radius: 8px; padding: 12px 14px; }")
                                     .arg(shown.background.name(), shown.foreground.name(), shown.line.name()));
@@ -595,6 +656,16 @@ void PreferencesPopup::load(const Preferences &preferences, const QList<Keymap::
         themes_->buttons().first()->setChecked(true);
     fontFamily_->setCurrentIndex(std::max(fontFamily_->findData(preferences.codeFontFamily), 0));
     fontSize_->setValue(preferences.codeFontSize);
+    // A weight set by hand in the settings: the closest offered.
+    int weight = 0;
+    for (int i = 1; i < fontWeight_->count(); ++i) {
+        if (std::abs(fontWeight_->itemData(i).toInt() - preferences.codeFontWeight)
+            < std::abs(fontWeight_->itemData(weight).toInt() - preferences.codeFontWeight))
+            weight = i;
+    }
+    fontWeight_->setCurrentIndex(weight);
+    lineHeight_->setValue(preferences.codeLineHeight);
+    ligatures_->setChecked(preferences.ligatures);
     setFontSizeValue(interfaceFontSize_, preferences.interfaceFontSize);
     setFontSizeValue(treeFontSize_, preferences.treeFontSize);
     systemTitleBar_->setChecked(preferences.systemTitleBar);
@@ -651,6 +722,9 @@ Preferences PreferencesPopup::preferences() const
         preferences.theme = card->themeName();
     preferences.codeFontFamily = fontFamily_->currentData().toString();
     preferences.codeFontSize = fontSize_->value();
+    preferences.codeFontWeight = fontWeight_->currentData().toInt();
+    preferences.codeLineHeight = lineHeight_->value();
+    preferences.ligatures = ligatures_->isChecked();
     preferences.interfaceFontSize = fontSizeValue(interfaceFontSize_);
     preferences.treeFontSize = fontSizeValue(treeFontSize_);
     preferences.systemTitleBar = systemTitleBar_->isChecked();

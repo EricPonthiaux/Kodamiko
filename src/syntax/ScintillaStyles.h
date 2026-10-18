@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QtGlobal>
+
 class QFont;
 class QsciScintilla;
 struct Theme;
@@ -17,8 +19,12 @@ void applyDefaultStyle(QsciScintilla &editor, const Theme &theme);
 // Syntax category styles (firstSyntaxStyle + index in the theme).
 void applySyntaxStyles(QsciScintilla &editor, const Theme &theme);
 
-// Lines set at AppFonts::codeLineHeight times the font size, some room
-// between the margin and the text, a caret two pixels wide.
-void applyTypography(QsciScintilla &editor, const QFont &font);
+// Lines set at `lineHeight` times the font size, some room between the
+// margin and the text, a caret two pixels wide.
+void applyTypography(QsciScintilla &editor, const QFont &font, qreal lineHeight);
+
+// The weight of a style in `font`'s weight, bold or not: bold stays bold
+// whatever the weight chosen for the code (Light, Medium…).
+int styleWeight(const QFont &font, bool bold);
 
 } // namespace ScintillaStyles

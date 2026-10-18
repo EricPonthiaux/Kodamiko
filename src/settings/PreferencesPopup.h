@@ -8,6 +8,7 @@
 class QAbstractButton;
 class QButtonGroup;
 class QComboBox;
+class QDoubleSpinBox;
 class QKeySequenceEdit;
 class QLabel;
 class QLineEdit;
@@ -85,7 +86,11 @@ private:
 
     QButtonGroup *themes_ = nullptr;
     QComboBox *fontFamily_ = nullptr;
+    QLabel *fontSources_ = nullptr; // where to get the recommended fonts missing
     QSpinBox *fontSize_ = nullptr;
+    QComboBox *fontWeight_ = nullptr;
+    QDoubleSpinBox *lineHeight_ = nullptr;
+    ToggleSwitch *ligatures_ = nullptr;
     QLabel *fontPreview_ = nullptr;
     QSpinBox *interfaceFontSize_ = nullptr;
     QSpinBox *treeFontSize_ = nullptr;
