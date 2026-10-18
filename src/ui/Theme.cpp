@@ -1,6 +1,7 @@
 #include "Theme.h"
 
 #include "AppFonts.h"
+#include "KdeThemes.h"
 
 namespace {
 
@@ -221,7 +222,9 @@ Theme Theme::light()
 
 QList<Theme> Theme::all()
 {
-    return {duet(), dark(), purple(), light()};
+    QList<Theme> themes{duet(), dark(), purple(), light()};
+    themes += KdeThemes::all();
+    return themes;
 }
 
 Theme Theme::named(const QString &name)

@@ -11,6 +11,7 @@
 #include <QCoreApplication>
 #include <QDoubleSpinBox>
 #include <QFontDatabase>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -290,6 +291,24 @@ QWidget *PreferencesPopup::page(const QString &title, const QString &description
     return page;
 }
 
+QWidget *PreferencesPopup::themeGrid(const QList<Theme> &themes)
+{
+    constexpr int columns = 4;
+    auto *grid = new QWidget;
+    auto *layout = new QGridLayout(grid);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(12);
+    for (int i = 0; i < themes.size(); ++i) {
+        auto *card = new ThemeCard(themes[i], grid);
+        themes_->addButton(card);
+        layout->addWidget(card, i / columns, i % columns);
+    }
+    // A short last row keeps the cards' width.
+    for (int column = 0; column < columns; ++column)
+        layout->setColumnStretch(column, 1);
+    return grid;
+}
+
 QWidget *PreferencesPopup::createAppearancePage()
 {
     auto *content = new QWidget;
@@ -297,24 +316,21 @@ QWidget *PreferencesPopup::createAppearancePage()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    // Theme: one miniature per theme.
-    auto *themeRow = new QWidget;
-    auto *themeLayout = new QHBoxLayout(themeRow);
-    themeLayout->setContentsMargins(0, 0, 0, 0);
-    themeLayout->setSpacing(12);
+    // Theme: one miniature per theme, Duet's then KDE's, four in a row.
     themes_ = new QButtonGroup(this);
     themes_->setExclusive(true);
-    for (const Theme &theme : Theme::all()) {
-        auto *card = new ThemeCard(theme, themeRow);
-        themes_->addButton(card);
-        themeLayout->addWidget(card);
-    }
-    themeLayout->addStretch();
     connect(themes_, &QButtonGroup::buttonToggled, this, [this](QAbstractButton *, bool checked) {
         if (checked)
             updateFontPreview();
     });
-    addGroup(layout, tr("Theme"), themeRow);
+    QList<Theme> duetThemes;
+    QList<Theme> kdeThemes;
+    for (const Theme &theme : Theme::all())
+        (theme.isKde() ? kdeThemes : duetThemes).append(theme);
+    addGroup(layout, tr("Theme"), themeGrid(duetThemes));
+    addGroup(layout, tr("KDE themes"), themeGrid(kdeThemes));
+    layout->addWidget(mutedLabel(tr("The editor themes of Kate and KDevelop; the panels around the editor take "
+                                    "their colors.")));
 
     // Code font, with a sample in the chosen theme.
     auto *fontCard = new SettingsCard;

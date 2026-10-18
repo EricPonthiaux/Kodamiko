@@ -135,8 +135,14 @@ void MainWindow::createViewMenu()
     QMenu *themes = view->addMenu(tr("T&heme"));
     auto *themeGroup = new QActionGroup(themes);
     themeActions_ = themeGroup;
+    // Duet's own, then KDE's in a menu of their own: they are many.
+    QMenu *kdeThemes = nullptr;
     for (const Theme &theme : Theme::all()) {
-        QAction *action = themes->addAction(theme.title);
+        if (theme.isKde() && !kdeThemes) {
+            themes->addSeparator();
+            kdeThemes = themes->addMenu(tr("&KDE Themes"));
+        }
+        QAction *action = (theme.isKde() ? kdeThemes : themes)->addAction(theme.title);
         action->setCheckable(true);
         action->setChecked(theme.name == savedThemeName());
         action->setData(theme.name);

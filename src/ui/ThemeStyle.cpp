@@ -148,7 +148,7 @@ QTabBar QToolButton:disabled { background: @window; }
 QWidget#sideStrip { background: @window; border-right: 1px solid @border; }
 QWidget#viewToolbar { background: @window; border-bottom: 1px solid @border; }
 QTabBar#sideTabs { background: transparent; }
-QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 3px; background: transparent; border: 1px solid transparent; border-radius: 3px; color: @muted; }
+QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 4px; background: transparent; border: 1px solid transparent; border-radius: 3px; color: @muted; }
 QTabBar#sideTabs::tab:hover { background: transparent; border-color: @accent; color: @text; }
 QTabBar#sideTabs::tab:selected { background: @checked; border-color: @border; color: @accentText; }
 QTabBar#sideTabs::tab:selected:hover { border-color: @accent; }
@@ -158,6 +158,7 @@ QTreeView::item:selected, QTreeWidget::item:selected { background: @selection; c
 QTreeView::item:selected:active, QTreeWidget::item:selected:active { color: @text; background: @slate; }
 QTreeView::item:hover { background: @hover; }
 QFrame#card { background: @panel; border: 1px solid @line; border-radius: 4px; }
+QFrame#viewTitleBar { border: none; border-bottom: 1px solid @line; }
 QFrame#fileActions { border: none; border-bottom: 1px solid @line; }
 QFrame#commitPanel { border: none; border-top: 1px solid @line; }
 QLabel#historyMuted { color: @muted; }

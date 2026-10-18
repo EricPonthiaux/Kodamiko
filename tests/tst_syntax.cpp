@@ -2,6 +2,7 @@
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
 #include "syntax/TreeSitterGrammars.h"
+#include "ui/KdeThemes.h"
 #include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
@@ -47,7 +48,9 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        QCOMPARE(names, QStringList({"duet", "dark", "purple", "light"}));
+        // Duet's first, then KDE's.
+        QCOMPARE(names.mid(0, 4), QStringList({"duet", "dark", "purple", "light"}));
+        QVERIFY(std::ranges::all_of(names.mid(4), [](const QString &name) { return name.startsWith("kde-"); }));
         const Theme purple = Theme::named("purple");
         QVERIFY(purple.isDark);
         QVERIFY(purple.accent.isValid() && purple.window.isValid() && purple.findHighlight.isValid());
@@ -61,6 +64,23 @@ private slots:
                 QVERIFY2(color.isValid(), qPrintable(theme.name));
         }
         QCOMPARE(Theme::named("unknown").name, QString("duet"));
+    }
+
+    void kdeThemesTakeKateColors()
+    {
+        // Those of KSyntaxHighlighting's data/themes, embedded.
+        QCOMPARE(KdeThemes::all().size(), 30);
+        const Theme breeze = Theme::named("kde-breeze-dark");
+        QCOMPARE(breeze.title, QString("Breeze Dark"));
+        QVERIFY(breeze.isDark && breeze.isKde());
+        QCOMPARE(breeze.background, QColor("#232629"));
+        QCOMPARE(breeze.selection, QColor("#2d5c76"));
+        const TextStyle &keyword = breeze.syntaxStyles.at(breeze.syntaxStyleIndex(u"keyword")).second;
+        QCOMPARE(keyword.foreground, QColor("#cfcfc2"));
+        QVERIFY(keyword.bold);
+        QVERIFY(!Theme::named("kde-solarized-light").isDark);
+        // Unreadable: no theme.
+        QVERIFY(!KdeThemes::fromJson("{}", "kde-none"));
     }
 
     void languageForFile_data()

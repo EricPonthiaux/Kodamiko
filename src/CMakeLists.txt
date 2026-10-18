@@ -139,6 +139,7 @@ add_library(duet_core STATIC
     ui/BrandMark.cpp
     ui/GripSplitter.cpp
     ui/HoverCloseButtons.cpp
+    ui/KdeThemes.cpp
     ui/NoticeBar.cpp
     ui/OverlayPopup.cpp
     ui/PopupWidgets.cpp
@@ -209,6 +210,13 @@ qt_add_resources(duet_core schemas
     BASE ${PROJECT_SOURCE_DIR}/third_party/schemastore
     FILES
         ${PROJECT_SOURCE_DIR}/third_party/schemastore/claude-code-settings.json)
+
+# KDE's editor themes, those of Kate and KDevelop (see KdeThemes).
+file(GLOB kde_themes CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/third_party/ksyntaxhighlighting-themes/*.theme)
+qt_add_resources(duet_core kde_themes
+    PREFIX /themes/kde
+    BASE ${PROJECT_SOURCE_DIR}/third_party/ksyntaxhighlighting-themes
+    FILES ${kde_themes})
 
 # Interface and code fonts, the same on every system. JetBrains Mono comes
 # without ligatures (NL) and with them (the editor's option).

@@ -100,7 +100,12 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     auto *title = new QLabel(tr("History"), this);
     AppFonts::setInterfaceFont(title, 1.15);
     summary_->setEnabled(false); // dimmed
-    auto *header = new QHBoxLayout;
+    // The title bar, a line under it.
+    auto *titleBar = new QFrame(this);
+    titleBar->setObjectName(QStringLiteral("viewTitleBar"));
+    // As tall as its contents: the panes below take the rest.
+    titleBar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    auto *header = new QHBoxLayout(titleBar);
     header->setContentsMargins(16, 10, 12, 10);
     header->setSpacing(10);
     header->addWidget(title);
@@ -139,7 +144,7 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addLayout(header);
+    layout->addWidget(titleBar);
     layout->addWidget(splitter_);
     showDetails();
     applyTheme(theme);

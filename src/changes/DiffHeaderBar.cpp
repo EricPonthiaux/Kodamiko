@@ -6,7 +6,6 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QScrollBar>
 #include <QToolButton>
 
 #include <algorithm>
@@ -47,7 +46,8 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     layout->addWidget(next_);
 
     connect(diff_, &DiffView::contentChanged, this, &DiffHeaderBar::follow);
-    connect(diff_->verticalScrollBar(), &QScrollBar::valueChanged, this, &DiffHeaderBar::follow);
+    // Scintilla scrolls without the scroll bar telling: its own notice.
+    connect(diff_, &QsciScintillaBase::SCN_UPDATEUI, this, &DiffHeaderBar::follow);
     follow();
 }
 

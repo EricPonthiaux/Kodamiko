@@ -66,6 +66,8 @@ private:
     // The Full Line rows shown while it is on, the model for Ollama only.
     void updateFullLineRows();
     QWidget *createSidebar();
+    // Miniatures of `themes`, four in a row, added to themes_.
+    QWidget *themeGrid(const QList<Theme> &themes);
     QWidget *createAppearancePage();
     QWidget *createEditorPage();
     QWidget *createFilesPage();

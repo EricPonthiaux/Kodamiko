@@ -22,7 +22,7 @@ struct TextStyle {
 // Categories are named after tree-sitter captures ("keyword",
 // "string.special", "function.method"...).
 struct Theme {
-    QString name;  // "duet", "dark", "purple", "light"
+    QString name;  // "duet", "dark", "purple", "light", "kde-breeze-dark"…
     QString title; // as shown in View ▸ Theme
     bool isDark = true;
     // The code font, without ligatures; its weight is the user's choice.
@@ -70,8 +70,12 @@ struct Theme {
     // text, violet accents and pastel syntax colors.
     static Theme purple();
     static Theme light();
-    // Every theme, in menu order.
+    // Every theme, in menu order: Duet's own, then KDE's (see KdeThemes).
     static QList<Theme> all();
+
+    // Whether the theme is one of KDE's.
+    bool isKde() const { return name.startsWith(QLatin1String("kde-")); }
+
     // The theme called `name`; Duet if there is none.
     static Theme named(const QString &name);
 

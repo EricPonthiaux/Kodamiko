@@ -1,8 +1,10 @@
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
+#include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
 #include "changes/GitActions.h"
+#include "changes/HunkActions.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
@@ -18,10 +20,12 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QtTest>
 
@@ -150,6 +154,83 @@ private slots:
         const FilePatch patch = FilePatch::parse("@@ -10 +10 @@ a sentence cut\n-a\n+b\n");
         QCOMPARE(DiffView::layout({{"x.md", "", patch}})[2].text, QString("⋯ line 10"));
         QCOMPARE(DiffView::layout({{"x.cpp", "", patch}})[2].text, QString("⋯ line 10  ·  a sentence cut"));
+    }
+
+    void diffHeaderFollowsTheFileAtTheTop()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        const QList<DiffFile> files = {{"src/one.cpp", "modified", FilePatch::parse(patch)},
+                                       {"src/two.cpp", "modified", FilePatch::parse(patch)}};
+        DiffView diff(Theme::dark());
+        DiffHeaderBar header(&diff);
+        diff.resize(600, 30); // a line or two: the second file needs scrolling
+        diff.show();
+        diff.setFiles(files);
+        const auto texts = [&header] {
+            QStringList all;
+            for (const QLabel *label : header.findChildren<QLabel *>())
+                all.append(label->text());
+            return all;
+        };
+        QVERIFY(texts().contains("one.cpp"));
+        diff.setFirstVisibleLine(diff.fileStart(1));
+        QTRY_VERIFY(texts().contains("two.cpp")); // Scintilla tells once it has painted
+        QVERIFY(texts().join(' ').contains("file 2 of 2"));
+    }
+
+    void goToChangeScrollsBlockByBlock()
+    {
+        const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n@@ -40 +40 @@\n-c\n+d\n";
+        DiffView diff(Theme::dark());
+        diff.resize(600, 40);
+        diff.show();
+        diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
+        const QList<DiffView::Line> &lines = diff.displayedLines();
+        QList<int> blocks;
+        for (int i = 0; i < lines.size(); ++i) {
+            if (lines[i].kind == DiffView::LineKind::HunkHeader)
+                blocks.append(i);
+        }
+        QCOMPARE(blocks.size(), 2);
+        diff.goToChange(true);
+        QCOMPARE(diff.firstVisibleLine(), blocks[0]);
+        diff.goToChange(true);
+        QCOMPARE(diff.firstVisibleLine(), blocks[1]);
+        diff.goToChange(false);
+        QCOMPARE(diff.firstVisibleLine(), blocks[0]);
+    }
+
+    void blockButtonsActOnTheBlockUnderTheMouse()
+    {
+        const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n";
+        DiffView diff(Theme::dark());
+        const HunkActions actions(&diff);
+        diff.resize(600, 300);
+        diff.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&diff));
+        diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
+        int block = -1;
+        for (int i = 0; i < diff.displayedLines().size(); ++i) {
+            if (diff.displayedLines()[i].kind == DiffView::LineKind::Added)
+                block = diff.hunkStart(i);
+        }
+        QVERIFY(block >= 0);
+        const QSignalSpy applied(&actions, &HunkActions::applyRequested);
+        const QPoint over(100, diff.lineTop(block + 1) + 2);
+        QMouseEvent move(QEvent::MouseMove, over, diff.viewport()->mapToGlobal(over), Qt::NoButton, Qt::NoButton,
+                         Qt::NoModifier);
+        QApplication::sendEvent(diff.viewport(), &move);
+        QToolButton *stage = nullptr;
+        for (QToolButton *button : diff.viewport()->findChildren<QToolButton *>()) {
+            if (button->text() == "Stage")
+                stage = button;
+        }
+        if (!stage)
+            QFAIL("no Stage button over the block");
+        QVERIFY(stage->isVisible());
+        stage->click();
+        QCOMPARE(applied.size(), 1);
+        QCOMPARE(applied.first().at(0).toInt(), block);
     }
 
     void outsideARepository()

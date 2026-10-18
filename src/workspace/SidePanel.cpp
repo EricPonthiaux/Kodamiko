@@ -97,7 +97,10 @@ SidePanel::SidePanel(QWidget *parent)
     strip_->setObjectName(QStringLiteral("sideStrip"));
     strip_->setAttribute(Qt::WA_StyledBackground);
     auto *layout = new QVBoxLayout(strip_);
-    layout->setContentsMargins(0, 4, 0, 4);
+    // With the tabs' own margins (see ThemeStyle: 2 pixels above and below,
+    // 4 at the sides), the first tab is as far from the bar above, and from
+    // the strip's sides, as the tabs are from each other.
+    layout->setContentsMargins(0, 2, 0, 2);
     layout->setSpacing(0);
     layout->addWidget(tabBar_);
     layout->addStretch(1);
