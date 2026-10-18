@@ -38,17 +38,23 @@ public:
     const BranchInfo *selected() const;
     void switchToSelected();
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     void newBranchRequested();
 
 protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
     void rebuildList();
     void updateButtons();
     void showMenu(const QPoint &position);
+    void mergeSelected();
+    void rebaseSelected();
+    void trackSelected();
+    void renameSelected();
+    void deleteSelected();
     // Runs `action` on the selected branch, closing the popup.
     void act(const std::function<void(const BranchInfo &)> &action);
 

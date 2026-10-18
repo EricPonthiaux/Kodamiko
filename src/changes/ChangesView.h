@@ -8,6 +8,7 @@
 #include <QWidget>
 
 #include <optional>
+#include <utility>
 
 class CommitMessageGenerator;
 class DiffView;
@@ -91,6 +92,13 @@ private:
     QString folderPathspec() const;
 
     void onStatusRead(const std::optional<RepositoryStatus> &status, const QString &error, int generation);
+    // An item of the list as its section and file path, which survive a
+    // rebuild of the list; the path is empty on a section title.
+    using ItemKey = std::pair<int, QString>;
+    ItemKey keyOf(const QTreeWidgetItem *item) const;
+    void restoreSelection(const QList<ItemKey> &selected, const std::optional<ItemKey> &current);
+    // `preferred`, unless only the other section has changes.
+    Section sectionToShow(Section preferred) const;
     void showStatus(std::optional<RepositoryStatus> status, const QString &error);
     void selectNow(const QString &relativePath);
     void rebuildList();

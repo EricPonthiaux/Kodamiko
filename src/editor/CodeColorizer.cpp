@@ -23,7 +23,9 @@ int utf8Length(const QString &text, qsizetype index, qsizetype *characters)
         return 4;
     }
     *characters = 1;
-    return unit < 0x80 ? 1 : unit < 0x800 ? 2 : 3;
+    if (unit < 0x80)
+        return 1;
+    return unit < 0x800 ? 2 : 3;
 }
 
 } // namespace

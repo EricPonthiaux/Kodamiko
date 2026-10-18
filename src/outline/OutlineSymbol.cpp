@@ -15,6 +15,21 @@ bool isFunction(SymbolKind kind)
     return kind == SymbolKind::Function || kind == SymbolKind::Method;
 }
 
+bool encloses(const RangedSymbol &outer, const RangedSymbol &inner)
+{
+    const bool sameRange = outer.start == inner.start && outer.end == inner.end;
+    return outer.start <= inner.start && inner.end <= outer.end && !sameRange;
+}
+
+// Pops the containers that end before `current` (or share its exact range).
+void dropNonEnclosingAncestors(const std::vector<RangedSymbol> &flat,
+                               const RangedSymbol &current,
+                               std::vector<size_t> &ancestors)
+{
+    while (!ancestors.empty() && !encloses(flat[ancestors.back()], current))
+        ancestors.pop_back();
+}
+
 std::vector<OutlineSymbol> build(std::vector<RangedSymbol> &flat,
                                  const std::vector<std::vector<size_t>> &children,
                                  const std::vector<size_t> &indices)
@@ -53,23 +68,16 @@ std::vector<OutlineSymbol> nest(std::vector<RangedSymbol> flat)
     std::vector<size_t> ancestors; // chain of containers of the current symbol
     for (size_t i = 0; i < flat.size(); ++i) {
         RangedSymbol &current = flat[i];
-        while (!ancestors.empty()) {
-            const RangedSymbol &top = flat[ancestors.back()];
-            const bool sameRange = top.start == current.start && top.end == current.end;
-            if (top.start <= current.start && current.end <= top.end && !sameRange)
-                break;
-            ancestors.pop_back();
-        }
-
-        if (!ancestors.empty()) {
+        dropNonEnclosingAncestors(flat, current, ancestors);
+        if (ancestors.empty()) {
+            roots.push_back(i);
+        } else {
             const SymbolKind parentKind = flat[ancestors.back()].symbol.kind;
             if (current.declarationOnly && isFunction(parentKind))
                 continue;
             if (current.symbol.kind == SymbolKind::Function && isTypeContainer(parentKind))
                 current.symbol.kind = SymbolKind::Method;
             children[ancestors.back()].push_back(i);
-        } else {
-            roots.push_back(i);
         }
         ancestors.push_back(i);
     }

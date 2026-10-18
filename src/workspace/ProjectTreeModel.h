@@ -5,6 +5,7 @@
 #include <QFileSystemWatcher>
 #include <QTimer>
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -89,19 +90,39 @@ private:
 
     Node *nodeOf(const QModelIndex &index) const;
     QModelIndex indexOf(Node *node) const;
+
+    // Where stepToward() leads: the row of the path, or the folder to read
+    // next; neither when the path is not in the tree.
+    struct PathStep {
+        Node *found = nullptr;
+        Node *next = nullptr;
+    };
+
     // Entries of a folder as rows: compact chains, nested files.
     std::vector<Entry> list(const QString &folder) const;
+    Entry makeEntry(const QFileInfo &info, bool compact) const;
+    // Extends a folder's row down its chain of single subfolders.
+    void followChain(Entry &entry) const;
     // Visible entries of a folder, folders first.
     QFileInfoList visibleEntries(const QString &folder) const;
     void load(Node *node);
     // Brings the children of `node` in line with `entries`, keeping the
     // rows that still exist.
     void update(Node *node, std::vector<Entry> entries);
+    void removeGoneRows(Node *node, const std::vector<Entry> &entries);
+    void insertNewRows(Node *node, std::vector<Entry> entries);
     void setChildren(Node *node, std::vector<Entry> entries);
     std::unique_ptr<Node> makeNode(Entry entry, Node *parent);
     void watch(Node *node);
     void onDirectoryChanged(const QString &path);
     void reloadPending();
+    QStringList foldersToUpdate(const QStringList &changed) const;
+    // Walks down the loaded folders toward `path`: the first row for which
+    // `isTarget` holds, or null.
+    Node *findRow(const QString &path, const std::function<bool(const Node &)> &isTarget) const;
+    static PathStep stepToward(const Node &node, const QString &target);
+    // `row` itself, or its nested file, when it shows `target`; else null.
+    static Node *rowShowing(Node *row, const QString &target);
     void reset();
 
     QString rootPath_;

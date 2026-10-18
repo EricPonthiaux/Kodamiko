@@ -21,11 +21,14 @@ class DiagramGenerationView : public QWidget {
 public:
     // Claude draws a `kindTitle` in `path`, inside `workDir`, showing
     // `description`.
-    DiagramGenerationView(QString workDir,
-                          QString path,
-                          QString kindTitle,
-                          QString description,
-                          QWidget *parent = nullptr);
+    struct Request {
+        QString workDir;
+        QString path;
+        QString kindTitle;
+        QString description;
+    };
+
+    explicit DiagramGenerationView(Request drawing, QWidget *parent = nullptr);
     ~DiagramGenerationView() override;
 
     QString filePath() const { return path_; }

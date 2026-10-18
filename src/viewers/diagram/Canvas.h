@@ -6,12 +6,14 @@
 #include <QHash>
 #include <QIcon>
 #include <QPointer>
+#include <QSet>
 #include <QWidget>
 
 #include <memory>
 #include <optional>
 #include <vector>
 
+class QKeyEvent;
 class QMenu;
 class QPlainTextEdit;
 class QTimer;
@@ -98,6 +100,9 @@ public:
     void deleteSelection();
     void editSelection();
 
+    // Watches the in-place text editor: its keys and its loss of focus.
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
     // Draws the board in world coordinates (no grid, no selection): image
     // and SVG exports.
     static void paintBoard(QPainter &painter, const Board &board);
@@ -121,7 +126,6 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void leaveEvent(QEvent *event) override;
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     enum class Drag {
@@ -153,16 +157,45 @@ private:
         qreal start;
     };
 
+    // Which selection a property menu reads and edits.
+    enum class PropertyTarget {
+        Shapes,
+        Links
+    };
+
+    // The shapes in their drawing order.
+    struct Layers {
+        std::vector<const Shape *> background; // containers, behind the links
+        std::vector<const Shape *> foreground;
+    };
+
     QPointF world(QPointF screen) const { return camera_.toWorld(screen); }
 
+    // Reactions to the editor and the board (Canvas.cpp).
+    void onEditorTextChanged();
+    void fadeOutRemoved(const QList<const Shape *> &shapes, const QList<const Link *> &links);
+
+    // Painting (CanvasPainting.cpp).
     void render(QPainter &painter, const QRectF &area);
+    void drawScene(QPainter &painter) const;
+    Layers layers() const;
+    void drawShape(QPainter &painter, const Shape &shape, qreal now) const;
+    // The selection halo, the ports and the resize handle of `shape`.
+    void drawHandles(QPainter &painter, const Shape &shape) const;
+    // The link or the arrow being dragged out.
+    void drawConnectPreview(QPainter &painter) const;
+    void drawTracePreview(QPainter &painter) const;
+    void drawGhosts(QPainter &painter, qreal now) const;
+    void drawGuides(QPainter &painter) const;
+    void drawLinkOverlays(QPainter &painter) const;
+    void drawRubberBand(QPainter &painter) const;
     void drawGrid(QPainter &painter, const QRectF &area) const;
     void drawSelectionHalo(QPainter &painter, const Shape &shape) const;
     void drawResizeHandle(QPainter &painter, const Shape &shape) const;
     void drawPorts(QPainter &painter, const Shape &shape) const;
     bool portsVisible(const Shape &shape) const;
 
-    // Hit tests, in world coordinates.
+    // Hit tests, in world coordinates (CanvasInput.cpp).
     Shape *shapeAt(QPointF point) const;
     Shape *connectionShapeAt(QPointF point) const;
     Link *linkAt(QPointF point) const;
@@ -170,9 +203,31 @@ private:
     Shape *resizeHandleAt(QPointF point) const;
     void updateHover(QPointF screen);
 
-    graphviz::ArrangeOptions arrangeOptions() const;
+    // Pointer gestures (CanvasInput.cpp).
+    void pressLeft(QPointF point, Qt::KeyboardModifiers modifiers);
+    void startResize(Shape &shape);
+    void startMove(QPointF point);
+    // The contents of the selected frames, which follow them.
+    QSet<QString> carriedBySelection() const;
+    QSet<QString> draggedIds() const;
     void moveDragged(QPointF point, bool snap);
+    void placeDragged(QPointF point);
+    void snapDragged();
+    QString dropTargetOfDragged() const;
+    void containDragged();
+    void finishTrace(QPointF point);
+    void finishMove();
+    void reparentDragged();
     void finishConnect(QPointF screen);
+
+    // Keyboard (CanvasInput.cpp).
+    bool runControlShortcut(int key, Qt::KeyboardModifiers modifiers);
+    bool runEditingKey(const QKeyEvent &event, Qt::KeyboardModifiers modifiers);
+    void nudgeSelection(QPointF delta);
+    QSet<QString> nudgedShapes() const;
+
+    // View, layout and animations (Canvas.cpp).
+    graphviz::ArrangeOptions arrangeOptions() const;
     void zoomAt(QPointF screen, qreal factor);
     void animateCamera(const Camera &to);
     void startAnimation();
@@ -180,19 +235,31 @@ private:
     // The positions before a change, to slide from.
     QHash<QString, QRectF> captureGeometry() const;
     void animateGeometry(const QHash<QString, QRectF> &before, const Camera *cameraTo = nullptr);
-    // Paints with the shapes where the animation shows them.
+    // Paints with the shapes where the animation shows them
+    // (CanvasPainting.cpp).
     template <typename Fn>
     void withVisualGeometry(Fn draw);
 
+    // In-place text editing (Canvas.cpp).
     void beginTextEdit(Shape *shape, Link *link, const TextEditSpec &spec);
     void endTextEdit(bool commit);
+    // Escape and Enter in the editor; false for the keys it types.
+    bool handleEditorKey(const QKeyEvent &key);
     void syncEditor();
     void keepVisible(const Shape &shape);
 
+    // Menus (CanvasMenus.cpp).
     void showContextMenu(QPointF screen);
+    void addShapeActions(QMenu &menu, const Shape &shape);
+    void addLinkActions(QMenu &menu, const Link &link);
+    void addCanvasActions(QMenu &menu, QPointF point);
     void addFillMenu(QMenu *menu);
     void addLinkStyleMenu(QMenu *menu);
-    void addPropertyMenus(QMenu *menu, const QList<Property> &properties, bool links);
+    void addPropertyMenus(QMenu *menu, const QList<Property> &properties, PropertyTarget target);
+    void addChoiceMenu(QMenu *menu, const Property &property, PropertyTarget target);
+    void addToggleAction(QMenu *menu, const Property &property, PropertyTarget target);
+    QVariant selectedPropertyValue(const QString &id, PropertyTarget target) const;
+    void setSelectionProperty(const QString &id, const QVariant &value, PropertyTarget target);
     // Asks which element to add at `point`, linked from `from` if given.
     void chooseElement(QPointF screen, QPointF point, const QString &from);
     // Asks which relation joins `from` to `to`.

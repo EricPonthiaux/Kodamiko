@@ -6,6 +6,8 @@
 #include <QHash>
 #include <Qsci/qsciscintilla.h>
 
+#include <functional>
+
 // File shown by a DiffView.
 struct DiffFile {
     QString path;   // as shown in its title bar
@@ -71,7 +73,7 @@ public:
     // Line of a file's title bar.
     int fileStart(int file) const;
 
-    const QList<Line> &lines() const { return lines_; }
+    const QList<Line> &displayedLines() const { return lines_; }
 
     void applyTheme(const Theme &theme);
 
@@ -83,9 +85,19 @@ public:
 
 private:
     void render();
+    // Markers and margin text of displayed line `line`; returns the style of its text.
+    int decorateLine(int line);
+    void styleLine(int line, int style);
+    // "+12" in green, "−3" in red, on a file's title bar.
+    void styleStats(const Line &title, long start, long length);
+    // A line number right-justified for the margin; blank when `value` is 0.
+    QString marginNumber(int value) const;
     void defineStyles();
     // Colors the code of file `file` as the editor would.
     void highlightSyntax(int file);
+    // Styles displayed line `line` from the scratch editor's styles of its
+    // bytes, through `diffStyle`.
+    void styleRuns(int line, QByteArrayView scratchStyles, const std::function<int(int)> &diffStyle);
     // Style of the diff for a syntax color, defined on first use.
     int syntaxStyle(long foreground, bool bold, bool italic);
 

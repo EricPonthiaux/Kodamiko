@@ -43,6 +43,9 @@ private:
     };
 
     void onModified(int position, int modificationType, int length);
+    // Keep the ranges on their text after a change of the document.
+    void moveForDeletion(int position, int length);
+    void moveForInsertion(int position, int length);
     void onCursorMoved();
     // Copies the edited occurrence of the current stop to the others,
     // then redraws the boxes.

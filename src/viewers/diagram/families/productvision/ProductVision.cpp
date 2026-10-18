@@ -33,6 +33,108 @@ QString tr(const char *text)
     return QCoreApplication::translate("ProductVisionDiagram", text);
 }
 
+// A card's rank: the product, the momentum card that stands out under it,
+// or an ordinary section.
+enum class Tier {
+    Root,
+    Featured,
+    Section
+};
+
+Tier tierOf(const QString &role)
+{
+    if (role == QLatin1String("product"))
+        return Tier::Root;
+    if (role == QLatin1String("emotions"))
+        return Tier::Featured;
+    return Tier::Section;
+}
+
+const Font &bodyFontOf(Tier tier)
+{
+    switch (tier) {
+    case Tier::Root:
+        return rootBodyFont;
+    case Tier::Featured:
+        return momentumBodyFont;
+    case Tier::Section:
+        return sectionBodyFont;
+    }
+    return sectionBodyFont;
+}
+
+qreal itemLineHeightOf(Tier tier)
+{
+    switch (tier) {
+    case Tier::Root:
+        return rootLineHeight;
+    case Tier::Featured:
+        return momentumLineHeight;
+    case Tier::Section:
+        return bodyLineHeight;
+    }
+    return bodyLineHeight;
+}
+
+qreal minimumHeightOf(Tier tier)
+{
+    switch (tier) {
+    case Tier::Root:
+        return 138;
+    case Tier::Featured:
+        return 122;
+    case Tier::Section:
+        return 120;
+    }
+    return 120;
+}
+
+qreal measuredWidthOf(Tier tier)
+{
+    switch (tier) {
+    case Tier::Root:
+        return 430;
+    case Tier::Featured:
+        return 390;
+    case Tier::Section:
+        return 280;
+    }
+    return 280;
+}
+
+// The items' native color: white on the product's strong fill, the ink on
+// the momentum card, muted elsewhere.
+QColor itemColorOf(Tier tier, const Palette &palette)
+{
+    switch (tier) {
+    case Tier::Root:
+        return {Qt::white};
+    case Tier::Featured:
+        return palette.ink;
+    case Tier::Section:
+        return palette.inkMuted;
+    }
+    return palette.inkMuted;
+}
+
+QColor nativeFillOf(const QString &role, const Tones &tones)
+{
+    if (tierOf(role) == Tier::Root)
+        return tones.strong;
+    const QHash<QString, QColor> fills{
+        {QStringLiteral("problem"), tones.warm},      {QStringLiteral("emotions"), tones.rose},
+        {QStringLiteral("users"), tones.cool},        {QStringLiteral("value"), tones.sage},
+        {QStringLiteral("capabilities"), tones.cool}, {QStringLiteral("journeys"), tones.sage},
+        {QStringLiteral("unknowns"), tones.rose},
+    };
+    return fills.value(role, tones.sage);
+}
+
+qreal titleLineHeightOf(Tier tier)
+{
+    return tier == Tier::Root ? 15 : 16;
+}
+
 QStringList normalizedItems(const QStringList &values)
 {
     QStringList result;
@@ -109,26 +211,25 @@ QString ProductVisionShape::displayText() const
 
 qreal ProductVisionShape::layoutText()
 {
-    const bool root = isRoot();
-    const bool featured = isFeatured();
+    const Tier tier = tierOf(role);
+    const bool root = tier == Tier::Root;
     const qreal inner = w - padX * 2;
     titleLines_ = text::wrap(root ? rootTitleFont : sectionTitleFont, displayText(), inner);
-    const Font &body = root ? rootBodyFont : featured ? momentumBodyFont : sectionBodyFont;
     const QStringList shown = items.isEmpty() ? QStringList{term(QStringLiteral("empty"))} : items;
     itemLines_.clear();
     for (const QString &item : shown)
-        itemLines_.append(text::wrap(body, item, inner - (root ? 0 : bulletIndent)));
-    itemLineHeight_ = root ? rootLineHeight : featured ? momentumLineHeight : bodyLineHeight;
-    const qreal titleHeight = titleLines_.size() * (root ? 15 : 16);
+        itemLines_.append(text::wrap(bodyFontOf(tier), item, inner - (root ? 0 : bulletIndent)));
+    itemLineHeight_ = itemLineHeightOf(tier);
+    const qreal titleHeight = titleLines_.size() * titleLineHeightOf(tier);
     qreal itemsHeight = 0;
     for (const QStringList &lines : itemLines_)
         itemsHeight += std::max<qsizetype>(1, lines.size()) * itemLineHeight_ + 7;
-    return std::max<qreal>(root ? 138 : featured ? 122 : 120, padY * 2 + titleHeight + 10 + itemsHeight);
+    return std::max<qreal>(minimumHeightOf(tier), padY * 2 + titleHeight + 10 + itemsHeight);
 }
 
 void ProductVisionShape::measure(const Board &)
 {
-    w = isRoot() ? 430 : isFeatured() ? 390 : 280;
+    w = measuredWidthOf(tierOf(role));
     h = layoutText();
 }
 
@@ -162,47 +263,49 @@ void ProductVisionShape::onDoubleClick(Board &board)
 
 void ProductVisionShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
-    const bool root = isRoot();
-    const bool featured = isFeatured();
     const Style &style = board.style();
-    const Tones &tones = style.tones;
-    const QHash<QString, QColor> fills{
-        {QStringLiteral("problem"), tones.warm},      {QStringLiteral("emotions"), tones.rose},
-        {QStringLiteral("users"), tones.cool},        {QStringLiteral("value"), tones.sage},
-        {QStringLiteral("capabilities"), tones.cool}, {QStringLiteral("journeys"), tones.sage},
-        {QStringLiteral("unknowns"), tones.rose},
-    };
-    const QColor nativeFill = root ? tones.strong : fills.value(role, tones.sage);
     const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    shadowFill(painter, path, fillColor(nativeFill), style);
+    shadowFill(painter, path, fillColor(nativeFillOf(role, style.tones)), style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
            state.selected ? 2 : shapeBorderWidth);
     if (state.editing)
         return;
+    const qreal itemsTop = drawTitle(painter, style) + 10;
+    drawItems(painter, style, itemsTop);
+}
 
-    const QColor ink = textColor(root ? QColor(Qt::white) : style.palette.ink);
-    const QColor muted = textColor(root ? QColor(255, 255, 255, qRound(0.78 * 255)) : style.palette.inkMuted);
-    const QColor featuredInk = textColor(style.palette.ink);
-    qreal ty = y + padY;
+qreal ProductVisionShape::drawTitle(QPainter &painter, const Style &style) const
+{
+    const Tier tier = tierOf(role);
+    const bool root = tier == Tier::Root;
+    // The product's title is a translucent white over its strong fill.
+    const QColor color = textColor(root ? QColor(255, 255, 255, qRound(0.78 * 255)) : style.palette.ink);
     const Font &titleFont = root ? rootTitleFont : sectionTitleFont;
+    qreal ty = y + padY;
     for (const QString &line : titleLines_) {
-        text::draw(painter, titleFont, line.toUpper(), QPointF(x + padX, ty), root ? muted : ink, Align::Left,
-                   Baseline::Top);
-        ty += root ? 15 : 16;
+        text::draw(painter, titleFont, line.toUpper(), QPointF(x + padX, ty), color, Align::Left, Baseline::Top);
+        ty += titleLineHeightOf(tier);
     }
-    ty += 10;
-    const Font &body = root ? rootBodyFont : featured ? momentumBodyFont : sectionBodyFont;
-    const QColor bodyColor = root ? ink : featured ? featuredInk : muted;
+    return ty;
+}
+
+void ProductVisionShape::drawItems(QPainter &painter, const Style &style, qreal top) const
+{
+    const Tier tier = tierOf(role);
+    // The product's vision reads as prose; a section's items are bulleted.
+    const bool bulleted = tier != Tier::Root;
+    const Font &body = bodyFontOf(tier);
+    const QColor color = textColor(itemColorOf(tier, style.palette));
+    const qreal textX = x + padX + (bulleted ? bulletIndent : 0);
+    qreal ty = top;
     for (const QStringList &lines : itemLines_) {
-        qreal lineY = ty;
-        if (!root)
-            painter.fillPath(ellipse(QPointF(x + padX + 3, ty + 7), 2.2, 2.2), bodyColor);
+        if (bulleted)
+            painter.fillPath(ellipse(QPointF(x + padX + 3, ty + 7), 2.2, 2.2), color);
         for (const QString &line : lines) {
-            text::draw(painter, body, line, QPointF(x + padX + (root ? 0 : bulletIndent), lineY), bodyColor,
-                       Align::Left, Baseline::Top);
-            lineY += itemLineHeight_;
+            text::draw(painter, body, line, QPointF(textX, ty), color, Align::Left, Baseline::Top);
+            ty += itemLineHeight_;
         }
-        ty = lineY + 7;
+        ty += 7;
     }
 }
 
@@ -236,9 +339,18 @@ void ProductVisionLink::draw(QPainter &painter, const Board &board, bool selecte
     // The arrows stay in the background of the cards, the central one less
     // so; a color chosen by the user is shown as is.
     painter.save();
-    painter.setOpacity(painter.opacity() * (!customColor.isEmpty() ? 1 : selected ? .9 : isCentral(board) ? .72 : .38));
+    painter.setOpacity(painter.opacity() * opacity(board, selected));
     Link::draw(painter, board, selected);
     painter.restore();
+}
+
+qreal ProductVisionLink::opacity(const Board &board, bool selected) const
+{
+    if (!customColor.isEmpty())
+        return 1;
+    if (selected)
+        return .9;
+    return isCentral(board) ? .72 : .38;
 }
 
 } // namespace diagram::productvision

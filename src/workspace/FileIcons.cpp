@@ -6,6 +6,8 @@
 #include <QPainterPath>
 #include <QPalette>
 
+#include <array>
+
 namespace {
 
 struct Badge {
@@ -83,8 +85,8 @@ void drawPage(QPainter &painter, const QString &kind, bool dark)
         // Mountain and sun.
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor("#4caf7d"));
-        const QPointF mountain[] = {{4, 13}, {7, 8.5}, {9, 11}, {10.5, 9.5}, {12, 13}};
-        painter.drawPolygon(mountain, 5);
+        const std::array<QPointF, 5> mountain{{{4, 13}, {7, 8.5}, {9, 11}, {10.5, 9.5}, {12, 13}}};
+        painter.drawPolygon(mountain.data(), int(mountain.size()));
         painter.setBrush(QColor("#e5b73b"));
         painter.drawEllipse(QPointF(6, 6), 1.4, 1.4);
         return;
@@ -221,8 +223,8 @@ QIcon file(const QString &fileName, bool dark)
 
 QIcon folder(bool dark)
 {
-    static QIcon icons[2];
-    QIcon &icon = icons[dark ? 1 : 0];
+    static std::array<QIcon, 2> icons;
+    QIcon &icon = icons.at(dark ? 1 : 0);
     if (icon.isNull())
         icon = render(QString(), dark, drawFolder);
     return icon;

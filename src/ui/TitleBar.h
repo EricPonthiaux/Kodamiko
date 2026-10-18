@@ -3,6 +3,7 @@
 #include "Theme.h"
 
 #include <QAbstractButton>
+#include <QIcon>
 #include <QWidget>
 
 class QHBoxLayout;
@@ -55,10 +56,19 @@ public:
     // Buttons at the right, before the window controls, with one of the
     // UiIcons (drawn in the theme's colors).
     void addActionButton(QAction *action, const QString &iconName);
+
     // The run configuration chip (its menu chooses one), followed by one
     // button: Run while the configuration is stopped, Stop while it runs.
     // Hidden while `name` is empty.
-    void setRunConfiguration(const QIcon &icon, const QString &name, const QString &toolTip, QMenu *menu, bool running);
+    struct RunChip {
+        QIcon icon;
+        QString name;
+        QString toolTip;
+        QMenu *menu = nullptr; // not owned
+        bool running = false;
+    };
+
+    void setRunConfiguration(const RunChip &chip);
     void setRunActions(QAction *run, QAction *stop);
 
     // Window controls (frameless window); otherwise the system draws them.
@@ -69,13 +79,14 @@ public:
 
     WindowButton *windowButton(WindowButton::Kind kind) const;
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     void claudeClicked();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
-    bool eventFilter(QObject *watched, QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
 
 private:

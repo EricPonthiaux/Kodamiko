@@ -12,7 +12,10 @@
 #include <QJsonDocument>
 #include <QRegularExpression>
 
+#include <array>
 #include <cmath>
+#include <functional>
+#include <optional>
 
 namespace diagram::flow {
 
@@ -28,7 +31,7 @@ struct Delimiter {
     const char *variant;
 };
 
-const Delimiter delimiters[] = {
+constexpr auto delimiters = std::to_array<Delimiter>({
     {"(((", ")))", "doublecircle"},
     {"((", "))", "circle"},
     {"([", "])", "stadium"},
@@ -44,7 +47,7 @@ const Delimiter delimiters[] = {
     {"(", ")", "round"},
     {"{", "}", "diamond"},
     {">", "]", "odd"},
-};
+});
 
 std::pair<QString, QString> delimitersOf(const QString &variant, const QString &type)
 {
@@ -241,17 +244,34 @@ struct EdgeKind {
     bool reversed;
 };
 
+QString lineOf(const QString &op)
+{
+    if (op.contains(QLatin1Char('~')))
+        return QStringLiteral("invisible");
+    if (op.contains(QLatin1Char('=')))
+        return QStringLiteral("thick");
+    if (op.contains(QLatin1Char('.')))
+        return QStringLiteral("dotted");
+    return QStringLiteral("solid");
+}
+
+// The head at the operator's right end.
+QString headOf(const QString &op)
+{
+    const QChar last = op.isEmpty() ? QChar() : op.back();
+    if (last == QLatin1Char('>'))
+        return QStringLiteral("arrow");
+    if (last == QLatin1Char('x'))
+        return QStringLiteral("cross");
+    if (last == QLatin1Char('o'))
+        return QStringLiteral("circle");
+    return QStringLiteral("none");
+}
+
 EdgeKind classifyEdge(const QString &op)
 {
-    const QString line = op.contains(QLatin1Char('~'))   ? QStringLiteral("invisible")
-                         : op.contains(QLatin1Char('=')) ? QStringLiteral("thick")
-                         : op.contains(QLatin1Char('.')) ? QStringLiteral("dotted")
-                                                         : QStringLiteral("solid");
-    const QChar last = op.isEmpty() ? QChar() : op.back();
-    const QString head = last == QLatin1Char('>')   ? QStringLiteral("arrow")
-                         : last == QLatin1Char('x') ? QStringLiteral("cross")
-                         : last == QLatin1Char('o') ? QStringLiteral("circle")
-                                                    : QStringLiteral("none");
+    const QString line = lineOf(op);
+    const QString head = headOf(op);
     // A left head without a right one reverses the edge (A <-- B ≡ B --> A).
     const bool reversed = op.startsWith(QLatin1Char('<')) && head == QLatin1String("none");
     return {line, reversed ? QStringLiteral("arrow") : head, reversed};
@@ -269,6 +289,76 @@ struct Nodes {
     QList<Node> list;
 };
 
+// What a reference says of its node's look.
+struct NodeLook {
+    QString variant;
+    std::optional<QString> label;
+    // A shape was written, even without a label.
+    bool delimited = false;
+};
+
+// The delimited label after a node's id; nothing when the rest is not one
+// (trailing garbage: not a node).
+std::optional<NodeLook> parseDelimited(const QString &rest, const QStringList &quoted)
+{
+    if (rest.isEmpty())
+        return NodeLook{};
+    for (const Delimiter &d : delimiters) {
+        const QString open = QString::fromLatin1(d.open);
+        const QString close = QString::fromLatin1(d.close);
+        const bool isEnclosed =
+            rest.startsWith(open) && rest.endsWith(close) && rest.size() > open.size() + close.size() - 1;
+        if (!isEnclosed)
+            continue;
+        const QString inner = rest.mid(open.size(), rest.size() - open.size() - close.size()).trimmed();
+        return NodeLook{QString::fromLatin1(d.variant), mermaidUnquote(unmask(inner, quoted)), true};
+    }
+    return std::nullopt;
+}
+
+// The variant of a v11 `shape:` value, or empty when it names none.
+QString v11Variant(QString value)
+{
+    static const QRegularExpression quotes(QStringLiteral("^[\"']|[\"']$"));
+    value.remove(quotes);
+    return v11Shapes().value(value);
+}
+
+// v11 shape data (`@{ shape: …, label: … }`) overrides the delimiters.
+void applyShapeData(const QString &data, NodeLook &look)
+{
+    static const QRegularExpression pairPattern(QStringLiteral("^([\\w-]+)\\s*:\\s*([\\s\\S]*)$"));
+    for (const QString &entry : splitTop(data, QLatin1Char(','))) {
+        const QRegularExpressionMatch p = pairPattern.match(entry);
+        if (!p.hasMatch())
+            continue;
+        const QString field = p.captured(1);
+        const QString value = p.captured(2).trimmed();
+        const bool isLabel = field == QLatin1String("label") || field == QLatin1String("title");
+        if (field == QLatin1String("shape")) {
+            const QString mapped = v11Variant(value);
+            if (!mapped.isEmpty()) {
+                look.variant = mapped;
+                look.delimited = true;
+            }
+        } else if (isLabel) {
+            look.label = mermaidUnquote(value);
+        }
+    }
+}
+
+// The node keyed `key`, a new process labeled by its key when unknown.
+Node &nodeFor(Nodes &nodes, const QString &key)
+{
+    int at = nodes.index.value(key, -1);
+    if (at < 0) {
+        at = int(nodes.list.size());
+        nodes.index.insert(key, at);
+        nodes.list.append(Node{key, QStringLiteral("process"), key, {}});
+    }
+    return nodes.list[at];
+}
+
 // One node reference: optional id, optional delimited label, optional v11
 // shape data.
 Node *parseNodeRef(const QString &ref, Nodes &nodes, const QStringList &quoted)
@@ -280,64 +370,148 @@ Node *parseNodeRef(const QString &ref, Nodes &nodes, const QStringList &quoted)
     const QRegularExpressionMatch m = nodeRef.match(data.hasMatch() ? ref.left(data.capturedStart()) : ref);
     if (!m.hasMatch())
         return nullptr;
-    QString key = m.captured(1);
-    const QString rest = m.captured(2).trimmed();
-    QString variant;
-    std::optional<QString> label;
-    bool delimited = false;
-    if (!rest.isEmpty()) {
-        for (const Delimiter &d : delimiters) {
-            const QString open = QString::fromLatin1(d.open);
-            const QString close = QString::fromLatin1(d.close);
-            if (rest.startsWith(open) && rest.endsWith(close) && rest.size() > open.size() + close.size() - 1) {
-                variant = QString::fromLatin1(d.variant);
-                label = mermaidUnquote(
-                    unmask(rest.mid(open.size(), rest.size() - open.size() - close.size()).trimmed(), quoted));
-                delimited = true;
-                break;
-            }
-        }
-        if (!delimited)
-            return nullptr; // trailing garbage: not a node
-    }
-    if (data.hasMatch()) {
-        for (const QString &entry : splitTop(unmask(data.captured(1), quoted), QLatin1Char(','))) {
-            static const QRegularExpression pairPattern(QStringLiteral("^([\\w-]+)\\s*:\\s*([\\s\\S]*)$"));
-            const QRegularExpressionMatch p = pairPattern.match(entry);
-            if (!p.hasMatch())
-                continue;
-            QString value = p.captured(2).trimmed();
-            if (p.captured(1) == QLatin1String("shape")) {
-                static const QRegularExpression quotes(QStringLiteral("^[\"']|[\"']$"));
-                value.remove(quotes);
-                const QString mapped = v11Shapes().value(value);
-                if (!mapped.isEmpty()) {
-                    variant = mapped;
-                    delimited = true;
-                }
-            } else if (p.captured(1) == QLatin1String("label") || p.captured(1) == QLatin1String("title")) {
-                label = mermaidUnquote(value);
-            }
-        }
-    }
-    if (key.isEmpty() && !label)
+    std::optional<NodeLook> look = parseDelimited(m.captured(2).trimmed(), quoted);
+    if (!look)
         return nullptr;
-    if (key.isEmpty())
-        key = *label; // a labeled node without id: its label is its identity
-    int at = nodes.index.value(key, -1);
-    if (at < 0) {
-        at = int(nodes.list.size());
-        nodes.index.insert(key, at);
-        nodes.list.append(Node{key, QStringLiteral("process"), key, {}});
-    }
-    Node &node = nodes.list[at];
-    if (label)
-        node.text = *label;
-    if (label || delimited) {
-        node.variant = variant;
-        node.type = typeOf(variant);
+    if (data.hasMatch())
+        applyShapeData(unmask(data.captured(1), quoted), *look);
+    const bool hasId = !m.captured(1).isEmpty();
+    if (!hasId && !look->label)
+        return nullptr;
+    // A labeled node without id: its label is its identity.
+    const QString key = hasId ? m.captured(1) : look->label.value_or(QString());
+    Node &node = nodeFor(nodes, key);
+    if (look->label)
+        node.text = *look->label;
+    if (look->label || look->delimited) {
+        node.variant = look->variant;
+        node.type = typeOf(look->variant);
     }
     return &node;
+}
+
+// Turns the inline label forms (`-- a -->`, `== a ==>`, `-. a .->`) into
+// pipe labels, and drops `:::class` decorations.
+QString pipeInlineLabels(const QString &span)
+{
+    static const QRegularExpression cssClass(QStringLiteral(":::[\\p{L}\\p{N}_-]+"),
+                                             QRegularExpression::UseUnicodePropertiesOption);
+    static const QRegularExpression thick(QStringLiteral("==\\s*([^=|>]+?)\\s*==>"));
+    static const QRegularExpression dotted(QStringLiteral("-\\.\\s*([^.|]+?)\\s*\\.->"));
+    static const QRegularExpression solid(QStringLiteral("--\\s*([^-|>][^->]*?)\\s*-->"));
+    QString result = span;
+    result.remove(cssClass);
+    result.replace(thick, QStringLiteral("==>|\\1|"));
+    result.replace(dotted, QStringLiteral("-.->|\\1|"));
+    result.replace(solid, QStringLiteral("-->|\\1|"));
+    return result;
+}
+
+// The keys of a `A & B` group.
+QList<QString> parseGroup(const QString &group, Nodes &nodes, const QStringList &quoted)
+{
+    QList<QString> keys;
+    for (const QString &ref : splitTop(group, QLatin1Char('&'))) {
+        if (const Node *node = parseNodeRef(ref, nodes, quoted))
+            keys.append(node->key);
+    }
+    return keys;
+}
+
+// Every link from a group to the next, `A & B --> C & D` making four.
+QList<Model::Edge> edgesBetween(const EdgeKind &kind,
+                                const QString &label,
+                                const QList<QString> &sources,
+                                const QList<QString> &targets)
+{
+    const QJsonObject props{
+        {QStringLiteral("label"), label}, {QStringLiteral("line"), kind.line}, {QStringLiteral("head"), kind.head}};
+    QList<Model::Edge> edges;
+    for (const QString &a : sources) {
+        for (const QString &b : targets) {
+            const QString from = kind.reversed ? b : a;
+            const QString to = kind.reversed ? a : b;
+            edges.append({QStringLiteral("flow"), from, to, props});
+        }
+    }
+    return edges;
+}
+
+// A statement of nodes and edges (neither the header nor a skipped one).
+void parseStatement(const QString &statement, Nodes &nodes, Model &model)
+{
+    // Labels go behind placeholders first: an operator written in a label
+    // is only text.
+    QStringList quoted;
+    const QString stmt = outsideBrackets(maskQuotes(statement, quoted), pipeInlineLabels);
+    const QStringList parts = splitEdges(stmt);
+    QList<QString> previous = parseGroup(parts.value(0), nodes, quoted);
+    if (previous.isEmpty() && parts.size() == 1 && !stmt.trimmed().isEmpty())
+        model.warnings.append(QStringLiteral("Not understood: %1").arg(unmask(stmt, quoted)));
+    for (qsizetype i = 1; i + 2 < parts.size() + 1; i += 3) {
+        const QString labelPart = parts.value(i + 1);
+        const QString label = labelPart.isEmpty() ? QString() : mermaidUnquote(unmask(labelPart.trimmed(), quoted));
+        QList<QString> next = parseGroup(parts.value(i + 2), nodes, quoted);
+        model.links.append(edgesBetween(classifyEdge(parts[i]), label, previous, next));
+        previous = std::move(next);
+    }
+}
+
+void appendNodes(const Nodes &nodes, Model &model)
+{
+    for (const Node &node : nodes.list) {
+        QJsonObject props{{QStringLiteral("text"), node.text}};
+        if (!node.variant.isEmpty())
+            props.insert(QStringLiteral("variant"), node.variant);
+        model.nodes.append({node.type, node.key, props});
+    }
+}
+
+// The Mermaid operator of a link's line and head.
+QString edgeOperator(const QString &line, const QString &head)
+{
+    const bool none = head == QLatin1String("none");
+    if (line == QLatin1String("thick"))
+        return none ? QStringLiteral("===") : QStringLiteral("==>");
+    if (line == QLatin1String("dotted"))
+        return none ? QStringLiteral("-.-") : QStringLiteral("-.->");
+    if (line == QLatin1String("invisible"))
+        return QStringLiteral("~~~");
+    if (none)
+        return QStringLiteral("---");
+    if (head == QLatin1String("circle"))
+        return QStringLiteral("--o");
+    if (head == QLatin1String("cross"))
+        return QStringLiteral("--x");
+    return QStringLiteral("-->");
+}
+
+QString mermaidNodeLine(const Shape &shape, const QString &key)
+{
+    if (shape.type == QLatin1String("flowText"))
+        return QStringLiteral("  %1@{ shape: text, label: %2 }").arg(key, mermaidQuote(shape.displayText()));
+    const auto *flowShape = dynamic_cast<const FlowShape *>(&shape);
+    const auto [open, close] = delimitersOf(flowShape ? flowShape->variant : QString(), shape.type);
+    return QStringLiteral("  ") + key + open + mermaidQuote(shape.displayText()) + close;
+}
+
+QString mermaidLinkLine(const Link &link, const QString &from, const QString &to)
+{
+    const auto *flowLink = dynamic_cast<const FlowLink *>(&link);
+    const QString line = flowLink ? flowLink->line : QStringLiteral("solid");
+    const QString head = flowLink ? flowLink->head : QStringLiteral("arrow");
+    const QString label =
+        link.label.isEmpty() ? QString() : QLatin1Char('|') + pipeLabel(link.label) + QLatin1Char('|');
+    return QStringLiteral("  %1 %2%3 %4").arg(from, edgeOperator(line, head), label, to);
+}
+
+// The direction a header gives, `TD` being Graphviz's `TB`.
+QString rankdirOf(const QRegularExpressionMatch &headerMatch)
+{
+    QString written = headerMatch.captured(1).toUpper();
+    if (written.isEmpty() || written == QLatin1String("TD"))
+        return QStringLiteral("TB");
+    return written;
 }
 
 class MermaidFlow : public Codec {
@@ -368,70 +542,16 @@ public:
         QStringList statements;
         for (const QString &line : mermaidLines(source))
             statements += splitTop(line, QLatin1Char(';'));
-        for (QString stmt : statements) {
+        for (const QString &stmt : statements) {
             const QRegularExpressionMatch h = header().match(stmt);
             if (h.hasMatch()) {
-                rankdir = h.captured(1).isEmpty() ? QStringLiteral("TB") : h.captured(1).toUpper();
-                if (rankdir == QLatin1String("TD"))
-                    rankdir = QStringLiteral("TB");
+                rankdir = rankdirOf(h);
                 continue;
             }
-            if (skip().match(stmt).hasMatch())
-                continue;
-            // Labels go behind placeholders first: an operator written in a
-            // label is only text.
-            QStringList quoted;
-            const QString masked = maskQuotes(stmt, quoted);
-            stmt = outsideBrackets(masked, [](const QString &span) {
-                static const QRegularExpression cssClass(QStringLiteral(":::[\\p{L}\\p{N}_-]+"),
-                                                         QRegularExpression::UseUnicodePropertiesOption);
-                static const QRegularExpression thick(QStringLiteral("==\\s*([^=|>]+?)\\s*==>"));
-                static const QRegularExpression dotted(QStringLiteral("-\\.\\s*([^.|]+?)\\s*\\.->"));
-                static const QRegularExpression solid(QStringLiteral("--\\s*([^-|>][^->]*?)\\s*-->"));
-                QString result = span;
-                result.remove(cssClass);
-                result.replace(thick, QStringLiteral("==>|\\1|"));
-                result.replace(dotted, QStringLiteral("-.->|\\1|"));
-                result.replace(solid, QStringLiteral("-->|\\1|"));
-                return result;
-            });
-            const QStringList parts = splitEdges(stmt);
-            const auto refs = [&](const QString &group) {
-                QList<QString> keys;
-                for (const QString &ref : splitTop(group, QLatin1Char('&'))) {
-                    if (const Node *node = parseNodeRef(ref, nodes, quoted))
-                        keys.append(node->key);
-                }
-                return keys;
-            };
-            QList<QString> previous = refs(parts.value(0));
-            if (previous.isEmpty() && parts.size() == 1 && !stmt.trimmed().isEmpty())
-                model.warnings.append(QStringLiteral("Not understood: %1").arg(unmask(stmt, quoted)));
-            for (qsizetype i = 1; i + 2 < parts.size() + 1; i += 3) {
-                const EdgeKind kind = classifyEdge(parts[i]);
-                const QString label = parts.value(i + 1).isEmpty()
-                                          ? QString()
-                                          : mermaidUnquote(unmask(parts.value(i + 1).trimmed(), quoted));
-                const QList<QString> next = refs(parts.value(i + 2));
-                for (const QString &a : previous) {
-                    for (const QString &b : next) {
-                        const QString from = kind.reversed ? b : a;
-                        const QString to = kind.reversed ? a : b;
-                        model.links.append({QStringLiteral("flow"), from, to,
-                                            QJsonObject{{QStringLiteral("label"), label},
-                                                        {QStringLiteral("line"), kind.line},
-                                                        {QStringLiteral("head"), kind.head}}});
-                    }
-                }
-                previous = next;
-            }
+            if (!skip().match(stmt).hasMatch())
+                parseStatement(stmt, nodes, model);
         }
-        for (const Node &node : nodes.list) {
-            QJsonObject props{{QStringLiteral("text"), node.text}};
-            if (!node.variant.isEmpty())
-                props.insert(QStringLiteral("variant"), node.variant);
-            model.nodes.append({node.type, node.key, props});
-        }
+        appendNodes(nodes, model);
         model.meta = QJsonObject{{QStringLiteral("rankdir"), rankdir}};
         return true;
     }
@@ -445,40 +565,151 @@ public:
         for (const auto &s : board.shapes()) {
             const QString key = keyFor(s->key, s->displayText(), used);
             keys.insert(s->id, key);
-            if (s->type == QLatin1String("flowText")) {
-                out.append(QStringLiteral("  %1@{ shape: text, label: %2 }").arg(key, mermaidQuote(s->displayText())));
-                continue;
-            }
-            const auto *flowShape = dynamic_cast<const FlowShape *>(s.get());
-            const auto [open, close] = delimitersOf(flowShape ? flowShape->variant : QString(), s->type);
-            out.append(QStringLiteral("  ") + key + open + mermaidQuote(s->displayText()) + close);
+            out.append(mermaidNodeLine(*s, key));
         }
         for (const auto &l : board.links()) {
             const QString from = keys.value(l->from);
             const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
-            const auto *flowLink = dynamic_cast<const FlowLink *>(l.get());
-            const QString line = flowLink ? flowLink->line : QStringLiteral("solid");
-            const QString head = flowLink ? flowLink->head : QStringLiteral("arrow");
-            const bool none = head == QLatin1String("none");
-            const QString op = line == QLatin1String("thick") ? (none ? QStringLiteral("===") : QStringLiteral("==>"))
-                               : line == QLatin1String("dotted")
-                                   ? (none ? QStringLiteral("-.-") : QStringLiteral("-.->"))
-                               : line == QLatin1String("invisible") ? QStringLiteral("~~~")
-                               : none                               ? QStringLiteral("---")
-                               : head == QLatin1String("circle")    ? QStringLiteral("--o")
-                               : head == QLatin1String("cross")     ? QStringLiteral("--x")
-                                                                    : QStringLiteral("-->");
-            const QString label =
-                l->label.isEmpty() ? QString() : QLatin1Char('|') + pipeLabel(l->label) + QLatin1Char('|');
-            out.append(QStringLiteral("  %1 %2%3 %4").arg(from, op, label, to));
+            out.append(mermaidLinkLine(*l, from, to));
         }
         return out.join(QLatin1Char('\n'));
     }
 
     QString blank() const override { return QStringLiteral("flowchart TB\n  A[First step] --> B[Next step]"); }
 };
+
+// A Flowboard id, written as a number or a string.
+QString flowboardId(const QJsonValue &value)
+{
+    return value.isDouble() ? QString::number(value.toDouble()) : value.toString();
+}
+
+QString knownVariant(const QJsonObject &shape, Model &model)
+{
+    static const QSet<QString> variants{
+        QStringLiteral("square"),       QStringLiteral("round"),    QStringLiteral("stadium"),
+        QStringLiteral("subroutine"),   QStringLiteral("cylinder"), QStringLiteral("circle"),
+        QStringLiteral("doublecircle"), QStringLiteral("ellipse"),  QStringLiteral("hexagon"),
+        QStringLiteral("diamond"),      QStringLiteral("leanr"),    QStringLiteral("leanl"),
+        QStringLiteral("trap"),         QStringLiteral("invtrap"),  QStringLiteral("odd"),
+        QStringLiteral("text")};
+    QString variant = shape.value(QStringLiteral("variant")).toString(QStringLiteral("square"));
+    if (variants.contains(variant))
+        return variant;
+    model.warnings.append(QStringLiteral("Unknown variant \"%1\": drawn as a process").arg(variant));
+    return QStringLiteral("square");
+}
+
+QJsonObject flowboardShapeProps(const QJsonObject &shape, const QString &variant)
+{
+    QJsonObject props{{QStringLiteral("text"), shape.value(QStringLiteral("text")).toString()},
+                      {QStringLiteral("variant"), variant}};
+    // Flowboard writes a size (w, h) only when it was chosen by hand.
+    for (const char *field : {"x", "y", "w", "h"}) {
+        if (shape.value(QLatin1String(field)).isDouble())
+            props.insert(QLatin1String(field), shape.value(QLatin1String(field)));
+    }
+    const QJsonValue fill = shape.value(QStringLiteral("fill"));
+    if (fill.isString() && isHexColor(fill.toString()))
+        props.insert(QStringLiteral("customFill"), fill.toString());
+    else if (fill.isDouble())
+        props.insert(QStringLiteral("customFill"),
+                     QStringLiteral("#%1").arg(qint64(fill.toDouble()), 6, 16, QLatin1Char('0')));
+    return props;
+}
+
+// Reads the shapes into the model; returns their keys by id and by key.
+QHash<QString, QString> readFlowboardShapes(const QJsonArray &shapes, Model &model)
+{
+    QHash<QString, QString> keyOf; // id or key → node key
+    QSet<QString> used;
+    int index = 0;
+    for (const QJsonValue &value : shapes) {
+        const QJsonObject s = value.toObject();
+        ++index;
+        const QString variant = knownVariant(s, model);
+        const QString id = flowboardId(s.value(QStringLiteral("id")));
+        QString key = s.value(QStringLiteral("key")).toString();
+        if (key.isEmpty())
+            key = id.isEmpty() ? QStringLiteral("n%1").arg(index) : QStringLiteral("n") + id;
+        key = keyFor(key, QString(), used);
+        if (!id.isEmpty()) {
+            if (keyOf.contains(id))
+                model.warnings.append(QStringLiteral("Duplicate shape id %1").arg(id));
+            keyOf.insert(id, key);
+        }
+        keyOf.insert(key, key);
+        model.nodes.append({typeOf(variant), key, flowboardShapeProps(s, variant)});
+    }
+    return keyOf;
+}
+
+void readFlowboardLinks(const QJsonArray &links, const QHash<QString, QString> &keyOf, Model &model)
+{
+    for (const QJsonValue &value : links) {
+        const QJsonObject l = value.toObject();
+        const QString from = keyOf.value(flowboardId(l.value(QStringLiteral("from"))));
+        const QString to = keyOf.value(flowboardId(l.value(QStringLiteral("to"))));
+        if (from.isEmpty() || to.isEmpty()) {
+            model.warnings.append(QStringLiteral("A link has a missing end"));
+            continue;
+        }
+        const QJsonObject props{
+            {QStringLiteral("label"), l.value(QStringLiteral("label")).toString()},
+            {QStringLiteral("line"), l.value(QStringLiteral("line")).toString(QStringLiteral("solid"))},
+            {QStringLiteral("head"), l.value(QStringLiteral("head")).toString(QStringLiteral("arrow"))}};
+        model.links.append({QStringLiteral("flow"), from, to, props});
+    }
+}
+
+QString flowboardVariant(const Shape &shape)
+{
+    if (shape.type == QLatin1String("flowText"))
+        return QStringLiteral("text");
+    const auto *flowShape = dynamic_cast<const FlowShape *>(&shape);
+    return flowShape && !flowShape->variant.isEmpty() ? flowShape->variant : QStringLiteral("square");
+}
+
+// A size differing from the minimum the text needs was chosen by hand.
+bool hasManualSize(const Shape &shape)
+{
+    const bool manualWidth = shape.manualWidth && std::abs(*shape.manualWidth - shape.resizeMinWidth) > 0.5;
+    const bool manualHeight = shape.manualHeight && std::abs(*shape.manualHeight - shape.resizeMinHeight) > 0.5;
+    return manualWidth || manualHeight;
+}
+
+QJsonObject flowboardShape(const Shape &shape, int id)
+{
+    QJsonObject json{{QStringLiteral("id"), id},
+                     {QStringLiteral("variant"), flowboardVariant(shape)},
+                     {QStringLiteral("text"), shape.displayText()},
+                     {QStringLiteral("x"), std::round(shape.x * 10) / 10},
+                     {QStringLiteral("y"), std::round(shape.y * 10) / 10}};
+    if (!shape.key.isEmpty())
+        json.insert(QStringLiteral("key"), shape.key);
+    if (hasManualSize(shape)) {
+        json.insert(QStringLiteral("w"), std::round(shape.w * 10) / 10);
+        json.insert(QStringLiteral("h"), std::round(shape.h * 10) / 10);
+    }
+    if (!shape.customFill.isEmpty())
+        json.insert(QStringLiteral("fill"), shape.customFill);
+    return json;
+}
+
+QJsonObject flowboardLink(const Link &link, const QHash<QString, int> &ids)
+{
+    const auto *flowLink = dynamic_cast<const FlowLink *>(&link);
+    QJsonObject json{{QStringLiteral("from"), ids.value(link.from)}, {QStringLiteral("to"), ids.value(link.to)}};
+    if (!link.label.isEmpty())
+        json.insert(QStringLiteral("label"), link.label);
+    if (flowLink && flowLink->line != QLatin1String("solid"))
+        json.insert(QStringLiteral("line"), flowLink->line);
+    if (flowLink && flowLink->head != QLatin1String("arrow"))
+        json.insert(QStringLiteral("head"), flowLink->head);
+    return json;
+}
 
 // Flowboard's .flow files: JSON with the coordinates in it.
 class FlowboardJson : public Codec {
@@ -513,74 +744,9 @@ public:
             return false;
         }
         const QJsonObject root = document.object();
-        static const QSet<QString> variants{
-            QStringLiteral("square"),       QStringLiteral("round"),    QStringLiteral("stadium"),
-            QStringLiteral("subroutine"),   QStringLiteral("cylinder"), QStringLiteral("circle"),
-            QStringLiteral("doublecircle"), QStringLiteral("ellipse"),  QStringLiteral("hexagon"),
-            QStringLiteral("diamond"),      QStringLiteral("leanr"),    QStringLiteral("leanl"),
-            QStringLiteral("trap"),         QStringLiteral("invtrap"),  QStringLiteral("odd"),
-            QStringLiteral("text")};
-        QHash<QString, QString> keyOf; // id or key → node key
-        QSet<QString> used;
-        int index = 0;
-        for (const QJsonValue &value : root.value(QStringLiteral("shapes")).toArray()) {
-            const QJsonObject s = value.toObject();
-            ++index;
-            QString variant = s.value(QStringLiteral("variant")).toString(QStringLiteral("square"));
-            if (!variants.contains(variant)) {
-                model.warnings.append(QStringLiteral("Unknown variant \"%1\": drawn as a process").arg(variant));
-                variant = QStringLiteral("square");
-            }
-            const QString id = s.value(QStringLiteral("id")).isDouble()
-                                   ? QString::number(s.value(QStringLiteral("id")).toDouble())
-                                   : s.value(QStringLiteral("id")).toString();
-            QString key = s.value(QStringLiteral("key")).toString();
-            if (key.isEmpty())
-                key = id.isEmpty() ? QStringLiteral("n%1").arg(index) : QStringLiteral("n") + id;
-            key = keyFor(key, QString(), used);
-            if (!id.isEmpty()) {
-                if (keyOf.contains(id))
-                    model.warnings.append(QStringLiteral("Duplicate shape id %1").arg(id));
-                keyOf.insert(id, key);
-            }
-            keyOf.insert(key, key);
-            QJsonObject props{{QStringLiteral("text"), s.value(QStringLiteral("text")).toString()},
-                              {QStringLiteral("variant"), variant}};
-            for (const char *field : {"x", "y"}) {
-                if (s.value(QLatin1String(field)).isDouble())
-                    props.insert(QLatin1String(field), s.value(QLatin1String(field)));
-            }
-            // Flowboard writes a size only when it was chosen by hand.
-            for (const char *field : {"w", "h"}) {
-                if (s.value(QLatin1String(field)).isDouble())
-                    props.insert(QLatin1String(field), s.value(QLatin1String(field)));
-            }
-            const QJsonValue fill = s.value(QStringLiteral("fill"));
-            if (fill.isString() && isHexColor(fill.toString()))
-                props.insert(QStringLiteral("customFill"), fill.toString());
-            else if (fill.isDouble())
-                props.insert(QStringLiteral("customFill"),
-                             QStringLiteral("#%1").arg(qint64(fill.toDouble()), 6, 16, QLatin1Char('0')));
-            model.nodes.append({typeOf(variant), key, props});
-        }
-        for (const QJsonValue &value : root.value(QStringLiteral("links")).toArray()) {
-            const QJsonObject l = value.toObject();
-            const auto end = [&](const char *name) {
-                const QJsonValue v = l.value(QLatin1String(name));
-                return keyOf.value(v.isDouble() ? QString::number(v.toDouble()) : v.toString());
-            };
-            const QString from = end("from");
-            const QString to = end("to");
-            if (from.isEmpty() || to.isEmpty()) {
-                model.warnings.append(QStringLiteral("A link has a missing end"));
-                continue;
-            }
-            const QJsonObject props{
-                {QStringLiteral("label"), l.value(QStringLiteral("label")).toString()},
-                {QStringLiteral("line"), l.value(QStringLiteral("line")).toString(QStringLiteral("solid"))},
-                {QStringLiteral("head"), l.value(QStringLiteral("head")).toString(QStringLiteral("arrow"))}};
-            model.links.append({QStringLiteral("flow"), from, to, props});
-        }
+        const QHash<QString, QString> keyOf =
+            readFlowboardShapes(root.value(QStringLiteral("shapes")).toArray(), model);
+        readFlowboardLinks(root.value(QStringLiteral("links")).toArray(), keyOf, model);
         model.meta = QJsonObject{
             {QStringLiteral("rankdir"), root.value(QStringLiteral("rankdir")).toString(QStringLiteral("TB"))}};
         return true;
@@ -594,39 +760,10 @@ public:
         int next = 1;
         for (const auto &s : board.shapes()) {
             ids.insert(s->id, next);
-            const auto *flowShape = dynamic_cast<const FlowShape *>(s.get());
-            QJsonObject json{
-                {QStringLiteral("id"), next++},
-                {QStringLiteral("variant"),
-                 s->type == QLatin1String("flowText")
-                     ? QStringLiteral("text")
-                     : (flowShape && !flowShape->variant.isEmpty() ? flowShape->variant : QStringLiteral("square"))},
-                {QStringLiteral("text"), s->displayText()},
-                {QStringLiteral("x"), std::round(s->x * 10) / 10},
-                {QStringLiteral("y"), std::round(s->y * 10) / 10}};
-            if (!s->key.isEmpty())
-                json.insert(QStringLiteral("key"), s->key);
-            const bool manual = (s->manualWidth && std::abs(*s->manualWidth - s->resizeMinWidth) > 0.5) ||
-                                (s->manualHeight && std::abs(*s->manualHeight - s->resizeMinHeight) > 0.5);
-            if (manual) {
-                json.insert(QStringLiteral("w"), std::round(s->w * 10) / 10);
-                json.insert(QStringLiteral("h"), std::round(s->h * 10) / 10);
-            }
-            if (!s->customFill.isEmpty())
-                json.insert(QStringLiteral("fill"), s->customFill);
-            shapes.append(json);
+            shapes.append(flowboardShape(*s, next++));
         }
-        for (const auto &l : board.links()) {
-            const auto *flowLink = dynamic_cast<const FlowLink *>(l.get());
-            QJsonObject json{{QStringLiteral("from"), ids.value(l->from)}, {QStringLiteral("to"), ids.value(l->to)}};
-            if (!l->label.isEmpty())
-                json.insert(QStringLiteral("label"), l->label);
-            if (flowLink && flowLink->line != QLatin1String("solid"))
-                json.insert(QStringLiteral("line"), flowLink->line);
-            if (flowLink && flowLink->head != QLatin1String("arrow"))
-                json.insert(QStringLiteral("head"), flowLink->head);
-            links.append(json);
-        }
+        for (const auto &l : board.links())
+            links.append(flowboardLink(*l, ids));
         const QJsonObject root{
             {QStringLiteral("format"), QStringLiteral("flowboard")},
             {QStringLiteral("version"), 1},

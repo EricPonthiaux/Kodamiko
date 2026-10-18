@@ -20,10 +20,8 @@
 
 namespace {
 
-enum Role {
-    SubtitleRole = Qt::UserRole,
-    IconRole
-};
+constexpr int subtitleRole = Qt::UserRole;
+constexpr int iconRole = Qt::UserRole + 1;
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *snapshotRules = R"(
@@ -68,7 +66,7 @@ public:
         painter->setPen(Qt::NoPen);
         painter->setBrush(tint);
         painter->drawRoundedRect(tile, 8, 8);
-        const QIcon icon = UiIcons::icon(index.data(IconRole).toString(), theme.accent);
+        const QIcon icon = UiIcons::icon(index.data(iconRole).toString(), theme.accent);
         icon.paint(painter, tile.toRect().adjusted(7, 7, -7, -7));
 
         // The text.
@@ -87,7 +85,7 @@ public:
         painter->setPen(theme.mutedText);
         painter->drawText(
             QRectF(text.left(), top + lineHeight + 3, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
-            option.fontMetrics.elidedText(index.data(SubtitleRole).toString(), Qt::ElideRight, int(text.width())));
+            option.fontMetrics.elidedText(index.data(subtitleRole).toString(), Qt::ElideRight, int(text.width())));
         painter->restore();
     }
 };
@@ -299,9 +297,9 @@ void SnapshotsPopup::load(const QString &folder)
     const QDateTime now = QDateTime::currentDateTime();
     for (const Snapshot &snapshot : std::as_const(snapshots_)) {
         auto *item = new QListWidgetItem(snapshot.reason, list_);
-        item->setData(SubtitleRole,
+        item->setData(subtitleRole,
                       QStringLiteral("%1  ·  %2").arg(describeDate(snapshot.date, now), countText(snapshot)));
-        item->setData(IconRole, iconFor(snapshot));
+        item->setData(iconRole, iconFor(snapshot));
         item->setToolTip(snapshot.reason);
     }
 
@@ -356,6 +354,8 @@ void SnapshotsPopup::restoreSelected()
     try {
         repository = RepositoryInfo::read(folder_);
     } catch (const GitError &) {
+        // Unreadable now: there is no repository to restore into, as below.
+        return;
     }
     if (!repository)
         return;

@@ -1,10 +1,10 @@
 #include "Explainer.h"
 
+#include "Presentation.h"
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/families/Families.h"
 
-#include <QCoreApplication>
 #include <QHash>
 #include <QJsonArray>
 #include <QPainter>
@@ -14,96 +14,23 @@
 
 namespace diagram::explainer {
 
+using namespace detail;
+
 namespace {
 
-const Font font(14);
 const Font titleFont(14, 600);
-constexpr qreal lineHeight = 20;
 constexpr qreal pad = 14;
 constexpr qreal maxTextWidth = 280;
-// The size of the heads a free board draws itself (strokes).
-constexpr qreal strokeArrow = 11;
 // Graphviz draws its `triangle` across the full width of a node box but only
 // the top three quarters of its height, whatever the aspect ratio. Reserving a
 // box a third taller makes its polygon exactly the triangle the board draws.
 constexpr qreal graphvizTriangleFill = 0.75;
 
-QString tr(const char *text)
+qreal frameStrokeWidth(const ShapeState &state)
 {
-    return QCoreApplication::translate("ExplainerDiagram", text);
-}
-
-QColor valid(const QColor &color, const QColor &fallback)
-{
-    return color.isValid() ? color : fallback;
-}
-
-QColor toneFill(const Board &board, const QString &tone)
-{
-    const Style &style = board.style();
-    const QColor fallback = style.shape.fill;
-    if (tone == QLatin1String("accent"))
-        return valid(style.tones.group, fallback);
-    if (tone == QLatin1String("info"))
-        return valid(style.tones.cool, fallback);
-    if (tone == QLatin1String("success"))
-        return valid(style.tones.data, valid(style.tones.sage, fallback));
-    if (tone == QLatin1String("warning"))
-        return valid(style.tones.warm, fallback);
-    if (tone == QLatin1String("danger"))
-        return valid(style.tones.rose, fallback);
-    return valid(style.tones.sage, fallback);
-}
-
-QColor toneStroke(const Board &board, const QString &tone)
-{
-    const Style &style = board.style();
-    if (tone == QLatin1String("accent"))
-        return valid(style.tones.strong, style.link.color);
-    return style.link.color;
-}
-
-QString oneOf(const QString &value, const QStringList &allowed, const QString &fallback)
-{
-    return allowed.contains(value) ? value : fallback;
-}
-
-QList<std::pair<QString, QString>> toneChoices()
-{
-    return {{QStringLiteral("neutral"), tr("Neutral")},  {QStringLiteral("accent"), tr("Accent")},
-            {QStringLiteral("info"), tr("Information")}, {QStringLiteral("success"), tr("Success")},
-            {QStringLiteral("warning"), tr("Warning")},  {QStringLiteral("danger"), tr("Danger")}};
-}
-
-QList<std::pair<QString, QString>> arrowChoices()
-{
-    return {{QStringLiteral("none"), tr("None")},
-            {QStringLiteral("start"), tr("At the start")},
-            {QStringLiteral("end"), tr("At the end")},
-            {QStringLiteral("both"), tr("Both ends")}};
-}
-
-Property descriptionProperty()
-{
-    return {QStringLiteral("description"), tr("Description"), Property::Kind::Lines, {}};
-}
-
-// sidecar's withSmallShadow (blur 4, offset 2) for what has no fill to
-// shadow: faint copies a little lower.
-void smallShadow(const Board &board, const std::function<void(const QColor &, QPointF)> &paint)
-{
-    QColor shadow = board.style().palette.shadow;
-    const qreal alpha = shadow.alphaF();
-    for (int i = 0; i < 2; ++i) {
-        shadow.setAlphaF(float(alpha * (0.5 - i * 0.2)));
-        paint(shadow, QPointF(0, 1.5 + i));
-    }
-}
-
-// A filled head whose tip is `tip`, pointing away from `previous`.
-void arrowHead(QPainter &painter, QPointF tip, QPointF previous, const QColor &color, qreal size = strokeArrow)
-{
-    fillArrowHead(painter, tip, std::atan2(tip.y() - previous.y(), tip.x() - previous.x()), size, color);
+    if (state.dropTarget)
+        return 2.5;
+    return state.selected ? 2 : 1.2;
 }
 
 } // namespace
@@ -171,8 +98,8 @@ QRectF FreeNodeShape::textRect() const
         return {cx() - width / 2, cy() - height / 2, width, height};
     }
     if (shape == QLatin1String("ellipse")) {
-        const qreal width = w / std::sqrt(2.0);
-        const qreal height = h / std::sqrt(2.0);
+        const qreal width = w / std::numbers::sqrt2;
+        const qreal height = h / std::numbers::sqrt2;
         return {cx() - width / 2, cy() - height / 2, width, height};
     }
     if (shape == QLatin1String("triangle")) {
@@ -382,20 +309,20 @@ QList<Property> FreeNodeShape::properties() const
     };
 }
 
-QVariant FreeNodeShape::propertyValue(const QString &id) const
+QVariant FreeNodeShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("shape"))
+    if (propertyId == QLatin1String("shape"))
         return shape;
-    if (id == QLatin1String("tone"))
+    if (propertyId == QLatin1String("tone"))
         return tone;
-    if (id == QLatin1String("description"))
+    if (propertyId == QLatin1String("description"))
         return description;
     return {};
 }
 
-void FreeNodeShape::setPropertyValue(const QString &id, const QVariant &value)
+void FreeNodeShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("shape")) {
+    if (propertyId == QLatin1String("shape")) {
         const QString next = oneOf(value.toString(), shapeNames(), shape);
         if (next == shape)
             return;
@@ -406,9 +333,9 @@ void FreeNodeShape::setPropertyValue(const QString &id, const QVariant &value)
         manualHeight.reset();
         if (shape == QLatin1String("circle"))
             w = h = std::min(w, h);
-    } else if (id == QLatin1String("tone")) {
+    } else if (propertyId == QLatin1String("tone")) {
         tone = oneOf(value.toString(), toneNames(), tone);
-    } else if (id == QLatin1String("description")) {
+    } else if (propertyId == QLatin1String("description")) {
         description = value.toString();
     }
 }
@@ -523,10 +450,7 @@ void FreeFrameShape::draw(QPainter &painter, const Board &board, const ShapeStat
     shadowFill(painter, path, fillColor(toneFill(board, tone)), style);
     painter.restore();
     stroke(painter, path, strokeColor(state.selected || dropTarget ? style.shape.selectedStroke : style.shape.stroke),
-           dropTarget       ? 2.5
-           : state.selected ? 2
-                            : 1.2,
-           dropTarget ? QList<qreal>{} : QList<qreal>{7, 5});
+           frameStrokeWidth(state), dropTarget ? QList<qreal>{} : QList<qreal>{7, 5});
     if (state.editing || title.isEmpty())
         return;
     const QColor ink = textColor(style.palette.ink);
@@ -543,20 +467,20 @@ QList<Property> FreeFrameShape::properties() const
     return {{QStringLiteral("tone"), tr("Tone"), Property::Kind::Choice, toneChoices()}, descriptionProperty()};
 }
 
-QVariant FreeFrameShape::propertyValue(const QString &id) const
+QVariant FreeFrameShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("tone"))
+    if (propertyId == QLatin1String("tone"))
         return tone;
-    if (id == QLatin1String("description"))
+    if (propertyId == QLatin1String("description"))
         return description;
     return {};
 }
 
-void FreeFrameShape::setPropertyValue(const QString &id, const QVariant &value)
+void FreeFrameShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("tone"))
+    if (propertyId == QLatin1String("tone"))
         tone = oneOf(value.toString(), toneNames(), tone);
-    else if (id == QLatin1String("description"))
+    else if (propertyId == QLatin1String("description"))
         description = value.toString();
 }
 
@@ -583,301 +507,6 @@ QJsonObject FreeAnchorShape::toJson() const
     return json;
 }
 
-// ---------------------------------------------------------------------------
-// FreeStrokeShape
-
-FreeStrokeShape::FreeStrokeShape()
-    : Shape(QStringLiteral("freeStroke"), 120, 1)
-{
-    syncBounds();
-}
-
-void FreeStrokeShape::load(const QJsonObject &props)
-{
-    Shape::load(props);
-    const QJsonArray array = props.value(QStringLiteral("points")).toArray();
-    if (!array.isEmpty()) {
-        points.clear();
-        for (const QJsonValue &value : array) {
-            const QJsonArray pair = value.toArray();
-            points.emplace_back(pair.at(0).toDouble(), pair.at(1).toDouble());
-        }
-    }
-    label = jsonString(props, QStringLiteral("label"));
-    description = jsonString(props, QStringLiteral("description"));
-    tone = oneOf(jsonString(props, QStringLiteral("tone")), toneNames(), QStringLiteral("neutral"));
-    arrow = oneOf(jsonString(props, QStringLiteral("arrow")), arrowNames(), QStringLiteral("none"));
-    line = oneOf(jsonString(props, QStringLiteral("line")), lineNames(), QStringLiteral("solid"));
-    syncBounds();
-}
-
-QJsonObject FreeStrokeShape::toJson() const
-{
-    QJsonObject json = Shape::toJson();
-    QJsonArray array;
-    for (const QPointF &p : points)
-        array.append(QJsonArray{p.x(), p.y()});
-    json.insert(QStringLiteral("points"), array);
-    json.insert(QStringLiteral("label"), label);
-    json.insert(QStringLiteral("description"), description);
-    json.insert(QStringLiteral("tone"), tone);
-    json.insert(QStringLiteral("arrow"), arrow);
-    json.insert(QStringLiteral("line"), line);
-    return json;
-}
-
-void FreeStrokeShape::syncBounds()
-{
-    if (points.empty())
-        points = {{0, 0}, {120, 0}};
-    qreal minX = points.front().x();
-    qreal maxX = minX;
-    qreal minY = points.front().y();
-    qreal maxY = minY;
-    for (const QPointF &p : points) {
-        minX = std::min(minX, p.x());
-        maxX = std::max(maxX, p.x());
-        minY = std::min(minY, p.y());
-        maxY = std::max(maxY, p.y());
-    }
-    localBounds_ = QRectF(QPointF(minX, minY), QPointF(maxX, maxY));
-    w = std::max<qreal>(1, maxX - minX);
-    h = std::max<qreal>(1, maxY - minY);
-}
-
-void FreeStrokeShape::measure(const Board &)
-{
-    labelWidth_ = text::width(font, label);
-}
-
-QPointF FreeStrokeShape::labelPoint() const
-{
-    const QPointF p = points.empty() ? QPointF() : points[(points.size() - 1) / 2];
-    return {x + p.x(), y + p.y() - 7};
-}
-
-QRectF FreeStrokeShape::strokeBounds() const
-{
-    QRectF result = localBounds_.translated(x, y);
-    if (!label.isEmpty()) {
-        const QPointF at = labelPoint();
-        result = result.united(QRectF(QPointF(at.x() - labelWidth_ / 2 - 4, at.y() - lineHeight),
-                                      QPointF(at.x() + labelWidth_ / 2 + 4, at.y() + 4)));
-    }
-    return result;
-}
-
-std::optional<QRectF> FreeStrokeShape::bounds(const Board &) const
-{
-    return strokeBounds();
-}
-
-bool FreeStrokeShape::hitTest(QPointF point) const
-{
-    for (size_t i = 1; i < points.size(); ++i) {
-        if (distanceToSegment(point, points[i - 1] + QPointF(x, y), points[i] + QPointF(x, y)) <= 7)
-            return true;
-    }
-    if (label.isEmpty())
-        return false;
-    const QPointF at = labelPoint();
-    return point.x() >= at.x() - labelWidth_ / 2 - 4 && point.x() <= at.x() + labelWidth_ / 2 + 4 &&
-           point.y() >= at.y() - lineHeight && point.y() <= at.y() + 4;
-}
-
-void FreeStrokeShape::onDoubleClick(Board &board)
-{
-    TextEditSpec spec;
-    spec.get = [this] { return label; };
-    spec.set = [this](const QString &value) { label = value; };
-    spec.color = board.style().palette.ink;
-    spec.font = font;
-    spec.lineHeight = lineHeight;
-    spec.align = Align::Center;
-    spec.rect = [this] {
-        const QPointF at = labelPoint();
-        const qreal width = std::max<qreal>(80, labelWidth_ + 20);
-        return QRectF(at.x() - width / 2, at.y() - lineHeight, width, lineHeight + 6);
-    };
-    board.beginTextEdit(this, spec);
-}
-
-std::vector<QPointF> FreeStrokeShape::shaft() const
-{
-    std::vector<QPointF> world;
-    world.reserve(points.size());
-    for (const QPointF &p : points)
-        world.push_back(p + QPointF(x, y));
-    // Very short arrows keep their direction and collapse only the shaft:
-    // the line never crosses either tip.
-    const qreal inset = arrowBaseInset(strokeArrow);
-    const bool start = arrow == QLatin1String("start") || arrow == QLatin1String("both");
-    const bool end = arrow == QLatin1String("end") || arrow == QLatin1String("both");
-    return trimPolyline(world, start ? inset : 0, end ? inset : 0);
-}
-
-void FreeStrokeShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
-{
-    if (points.size() < 2)
-        return;
-    const QColor color = state.selected ? board.style().shape.selectedStroke : toneStroke(board, tone);
-    const qreal width = state.selected ? 3 : 2;
-    const QList<qreal> dash = line == QLatin1String("dashed")   ? QList<qreal>{8, 5}
-                              : line == QLatin1String("dotted") ? QList<qreal>{2, 5}
-                                                                : QList<qreal>{};
-    const std::vector<QPointF> body = shaft();
-    QPainterPath path;
-    path.moveTo(body.front());
-    for (size_t i = 1; i < body.size(); ++i)
-        path.lineTo(body[i]);
-    const QPointF first = points[0] + QPointF(x, y);
-    const QPointF second = points[1] + QPointF(x, y);
-    const QPointF last = points.back() + QPointF(x, y);
-    const QPointF beforeLast = points[points.size() - 2] + QPointF(x, y);
-    const bool start = arrow == QLatin1String("start") || arrow == QLatin1String("both");
-    const bool end = arrow == QLatin1String("end") || arrow == QLatin1String("both");
-    const auto paint = [&](const QColor &ink, QPointF offset) {
-        stroke(painter, path.translated(offset), ink, width, dash);
-        if (start)
-            arrowHead(painter, first + offset, second + offset, ink);
-        if (end)
-            arrowHead(painter, last + offset, beforeLast + offset, ink);
-    };
-    smallShadow(board, paint);
-    paint(color, QPointF());
-    if (label.isEmpty() || state.editing)
-        return;
-    text::draw(painter, font, label, labelPoint(), color, Align::Center, Baseline::Bottom);
-}
-
-QList<Property> FreeStrokeShape::properties() const
-{
-    return {
-        {QStringLiteral("arrow"), tr("Arrow"), Property::Kind::Choice, arrowChoices()},
-        {QStringLiteral("line"),
-         tr("Line"),
-         Property::Kind::Choice,
-         {{QStringLiteral("solid"), tr("Solid")},
-          {QStringLiteral("dashed"), tr("Dashed")},
-          {QStringLiteral("dotted"), tr("Dotted")}}},
-        {QStringLiteral("tone"), tr("Tone"), Property::Kind::Choice, toneChoices()},
-        descriptionProperty(),
-    };
-}
-
-QVariant FreeStrokeShape::propertyValue(const QString &id) const
-{
-    if (id == QLatin1String("arrow"))
-        return arrow;
-    if (id == QLatin1String("line"))
-        return line;
-    if (id == QLatin1String("tone"))
-        return tone;
-    if (id == QLatin1String("description"))
-        return description;
-    return {};
-}
-
-void FreeStrokeShape::setPropertyValue(const QString &id, const QVariant &value)
-{
-    if (id == QLatin1String("arrow"))
-        arrow = oneOf(value.toString(), arrowNames(), arrow);
-    else if (id == QLatin1String("line"))
-        line = oneOf(value.toString(), lineNames(), line);
-    else if (id == QLatin1String("tone"))
-        tone = oneOf(value.toString(), toneNames(), tone);
-    else if (id == QLatin1String("description"))
-        description = value.toString();
-}
-
-// ---------------------------------------------------------------------------
-// FreeEdge
-
-FreeEdge::FreeEdge()
-    : Link(QStringLiteral("freeEdge"))
-{
-}
-
-void FreeEdge::load(const QJsonObject &props)
-{
-    Link::load(props);
-    description = jsonString(props, QStringLiteral("description"));
-    tone = oneOf(jsonString(props, QStringLiteral("tone")), toneNames(), QStringLiteral("neutral"));
-    arrow = oneOf(jsonString(props, QStringLiteral("arrow")), arrowNames(), QStringLiteral("end"));
-    const int order = int(jsonNumber(props, QStringLiteral("appearAt"), 0));
-    appearAt = order >= 1 && order <= 1000 ? order : 0;
-}
-
-QJsonObject FreeEdge::toJson() const
-{
-    QJsonObject json = Link::toJson();
-    json.insert(QStringLiteral("description"), description);
-    json.insert(QStringLiteral("tone"), tone);
-    json.insert(QStringLiteral("arrow"), arrow);
-    if (appearAt)
-        json.insert(QStringLiteral("appearAt"), appearAt);
-    return json;
-}
-
-QStringList FreeEdge::graphvizAttributes(const Board &) const
-{
-    // A free board draws its own heads, at its own size, on both ends.
-    // Graphviz must therefore not shorten the spline for a head of its own:
-    // what it reserves is a hole nothing fills, plainly visible on a line
-    // without an arrow, which then stops short of the shape it points at.
-    return {QStringLiteral("dir=none")};
-}
-
-void FreeEdge::draw(QPainter &painter, const Board &board, bool selected) const
-{
-    const std::optional<Route> r = route(board);
-    if (!r)
-        return;
-    LinkStyle style = Link::drawStyle(board, selected);
-    // The tone colors the line unless the user chose a color or it is
-    // selected.
-    if (customColor.isEmpty() && !selected)
-        style.color = toneStroke(board, tone);
-    const bool start = arrow == QLatin1String("start") || arrow == QLatin1String("both");
-    const bool end = arrow == QLatin1String("end") || arrow == QLatin1String("both");
-    const qreal inset = arrowBaseInset(style.arrow);
-    strokeBody(painter, *r, {style.color, style.width, {}, end ? inset : 0, start ? inset : 0});
-    if (start)
-        fillArrowHead(painter, r->a, departureAngle(*r) + M_PI, style.arrow, style.color);
-    if (end)
-        fillArrowHead(painter, r->b, arrivalAngle(*r), style.arrow, style.color);
-}
-
-QList<Property> FreeEdge::properties() const
-{
-    return {
-        {QStringLiteral("arrow"), tr("Arrow"), Property::Kind::Choice, arrowChoices()},
-        {QStringLiteral("tone"), tr("Tone"), Property::Kind::Choice, toneChoices()},
-        descriptionProperty(),
-    };
-}
-
-QVariant FreeEdge::propertyValue(const QString &id) const
-{
-    if (id == QLatin1String("arrow"))
-        return arrow;
-    if (id == QLatin1String("tone"))
-        return tone;
-    if (id == QLatin1String("description"))
-        return description;
-    return {};
-}
-
-void FreeEdge::setPropertyValue(const QString &id, const QVariant &value)
-{
-    if (id == QLatin1String("arrow"))
-        arrow = oneOf(value.toString(), arrowNames(), arrow);
-    else if (id == QLatin1String("tone"))
-        tone = oneOf(value.toString(), toneNames(), tone);
-    else if (id == QLatin1String("description"))
-        description = value.toString();
-}
-
 } // namespace diagram::explainer
 
 // ---------------------------------------------------------------------------
@@ -888,6 +517,7 @@ namespace diagram::families {
 const Family &explainer()
 {
     using namespace explainer;
+    using namespace explainer::detail;
     static const Family family = [] {
         Family f;
         f.id = QStringLiteral("explainer");

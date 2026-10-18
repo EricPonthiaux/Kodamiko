@@ -57,6 +57,39 @@ QString kindName(SymbolKind kind)
     return {};
 }
 
+// "Foo::bar" or "Foo.bar": the container to match, and the name.
+std::pair<QString, QString> splitContainer(const QString &query)
+{
+    static const QRegularExpression separator(QStringLiteral("::|\\.|#"));
+    const qsizetype at = query.lastIndexOf(separator);
+    if (at < 0)
+        return {QString(), query};
+    const QRegularExpressionMatch match = separator.match(query, at);
+    return {query.left(at), query.mid(at + match.capturedLength())};
+}
+
+// How well `symbol` matches `name` and `container` (either may be empty);
+// nullopt if it does not.
+std::optional<int> symbolScore(const SymbolLocation &symbol, const QString &name, const QString &container)
+{
+    int score = name.isEmpty() ? 0 : CommandPalette::matchScore(symbol.name, name);
+    if (score < 0)
+        return std::nullopt;
+    if (!container.isEmpty()) {
+        const int containerScore = CommandPalette::matchScore(symbol.container, container);
+        if (containerScore < 0)
+            return std::nullopt;
+        score += containerScore;
+    }
+    if (symbol.name.compare(name, Qt::CaseInsensitive) == 0)
+        score += 30;
+    else if (symbol.name.startsWith(name, Qt::CaseInsensitive))
+        score += 15;
+    if (!symbol.declarationOnly)
+        score += 2; // the definition before its declaration
+    return score;
+}
+
 } // namespace
 
 GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
@@ -263,21 +296,27 @@ void GoToPopup::filter()
         item->setForeground(1, gray);
     }
     if (shown_.isEmpty()) {
-        QString message = tr("Nothing found");
-        if (tab() == Tab::Files && scanning_ && files_.isEmpty())
-            message = tr("Reading the project's files…");
-        else if (tab() == Tab::Symbols && index_->isIndexing() && symbols_.isEmpty())
-            message = tr("Indexing in progress…");
-        else if (tab() == Tab::Recent && query.isEmpty())
-            message = editedByClaude_->isChecked() ? tr("Claude has not edited any file yet") : tr("No recent files");
-        auto *item = new QTreeWidgetItem(list_, {message});
+        auto *item = new QTreeWidgetItem(list_, {emptyMessage(query)});
         item->setFlags(Qt::NoItemFlags);
-    } else {
-        // Recent Files opens on the previous file, as Ctrl+Tab would.
-        const bool previousFile =
-            tab() == Tab::Recent && query.isEmpty() && !editedByClaude_->isChecked() && list_->topLevelItemCount() > 1;
-        list_->setCurrentItem(list_->topLevelItem(previousFile ? 1 : 0));
+        return;
     }
+    // Recent Files opens on the previous file, as Ctrl+Tab would.
+    const bool previousFile =
+        tab() == Tab::Recent && query.isEmpty() && !editedByClaude_->isChecked() && list_->topLevelItemCount() > 1;
+    list_->setCurrentItem(list_->topLevelItem(previousFile ? 1 : 0));
+}
+
+QString GoToPopup::emptyMessage(const QString &query) const
+{
+    const bool isReadingFiles = scanning_ && files_.isEmpty();
+    const bool isIndexing = index_->isIndexing() && symbols_.isEmpty();
+    if (tab() == Tab::Files && isReadingFiles)
+        return tr("Reading the project's files…");
+    if (tab() == Tab::Symbols && isIndexing)
+        return tr("Indexing in progress…");
+    if (tab() == Tab::Recent && query.isEmpty())
+        return editedByClaude_->isChecked() ? tr("Claude has not edited any file yet") : tr("No recent files");
+    return tr("Nothing found");
 }
 
 QString GoToPopup::relativePath(const QString &path) const
@@ -323,35 +362,13 @@ void GoToPopup::filterFiles(const QString &query, QList<Entry> &entries) const
 void GoToPopup::filterSymbols(const QString &query, QList<Entry> &entries) const
 {
     // "Foo::bar" or "Foo.bar": the container must match too.
-    QString container;
-    QString name = query;
-    static const QRegularExpression separator(QStringLiteral("::|\\.|#"));
-    if (const qsizetype at = query.lastIndexOf(separator); at >= 0) {
-        const QRegularExpressionMatch match = separator.match(query, at);
-        container = query.left(at);
-        name = query.mid(at + match.capturedLength());
-    }
+    const auto [container, name] = splitContainer(query);
     if (name.isEmpty() && container.isEmpty())
         return; // every symbol of the project would be too many to list
     QList<QPair<int, qsizetype>> matches;
     for (qsizetype i = 0; i < symbols_.size(); ++i) {
-        const SymbolLocation &symbol = symbols_[i];
-        int score = name.isEmpty() ? 0 : CommandPalette::matchScore(symbol.name, name);
-        if (score < 0)
-            continue;
-        if (!container.isEmpty()) {
-            const int containerScore = CommandPalette::matchScore(symbol.container, container);
-            if (containerScore < 0)
-                continue;
-            score += containerScore;
-        }
-        if (symbol.name.compare(name, Qt::CaseInsensitive) == 0)
-            score += 30;
-        else if (symbol.name.startsWith(name, Qt::CaseInsensitive))
-            score += 15;
-        if (!symbol.declarationOnly)
-            score += 2; // the definition before its declaration
-        matches.append({score, i});
+        if (const std::optional<int> score = symbolScore(symbols_[i], name, container))
+            matches.append({*score, i});
     }
     std::stable_sort(matches.begin(), matches.end(), [this](const auto &a, const auto &b) {
         if (a.first != b.first)
@@ -360,19 +377,23 @@ void GoToPopup::filterSymbols(const QString &query, QList<Entry> &entries) const
     });
     if (matches.size() > maxShown)
         matches.resize(maxShown);
-    for (const auto &[score, index] : std::as_const(matches)) {
-        const SymbolLocation &symbol = symbols_[index];
-        Entry entry;
-        entry.title = symbol.container.isEmpty() ? symbol.name : symbol.container + QLatin1String("::") + symbol.name;
-        entry.location = QStringLiteral("%1 — %2:%3")
-                             .arg(kindName(symbol.kind), relativePath(symbol.filePath))
-                             .arg(symbol.startLine + 1);
-        if (symbol.declarationOnly)
-            entry.location += tr(" (declaration)");
-        entry.filePath = symbol.filePath;
-        entry.symbol = static_cast<int>(index);
-        entries.append(entry);
-    }
+    for (const auto &[score, index] : std::as_const(matches))
+        entries.append(symbolEntry(index));
+}
+
+GoToPopup::Entry GoToPopup::symbolEntry(qsizetype index) const
+{
+    const SymbolLocation &symbol = symbols_[index];
+    Entry entry;
+    entry.title = symbol.container.isEmpty() ? symbol.name : symbol.container + QLatin1String("::") + symbol.name;
+    entry.location = QStringLiteral("%1 — %2:%3")
+                         .arg(kindName(symbol.kind), relativePath(symbol.filePath))
+                         .arg(symbol.startLine + 1);
+    if (symbol.declarationOnly)
+        entry.location += tr(" (declaration)");
+    entry.filePath = symbol.filePath;
+    entry.symbol = static_cast<int>(index);
+    return entry;
 }
 
 void GoToPopup::filterRecent(const QString &query, QList<Entry> &entries) const
@@ -390,13 +411,19 @@ void GoToPopup::filterRecent(const QString &query, QList<Entry> &entries) const
         entry.title = QFileInfo(path).fileName();
         if (line >= 0)
             entry.title += QStringLiteral(":%1").arg(line + 1);
-        const qsizetype slash = relative.lastIndexOf(QLatin1Char('/'));
-        entry.location = slash >= 0 ? relative.left(slash) : QString();
-        if (!claudeOnly && recent_->isEditedByClaude(path))
-            entry.location += entry.location.isEmpty() ? tr("edited by Claude") : tr(" — edited by Claude");
+        entry.location = recentLocation(path, relative, claudeOnly);
         entry.filePath = path;
         entries.append(entry);
     }
+}
+
+QString GoToPopup::recentLocation(const QString &path, const QString &relative, bool claudeOnly) const
+{
+    const qsizetype slash = relative.lastIndexOf(QLatin1Char('/'));
+    QString location = slash >= 0 ? relative.left(slash) : QString();
+    if (claudeOnly || !recent_->isEditedByClaude(path))
+        return location;
+    return location + (location.isEmpty() ? tr("edited by Claude") : tr(" — edited by Claude"));
 }
 
 void GoToPopup::openCurrent()

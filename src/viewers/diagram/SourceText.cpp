@@ -4,6 +4,82 @@
 
 namespace diagram::source {
 
+namespace {
+
+// Skips the PlantUML blocks that only style the drawing: <style>…</style>
+// and skinparam { … }. Fed the lines in order.
+class StyleBlockSkipper {
+public:
+    bool skips(const QString &line) { return skipsStyle(line) || skipsSkinparam(line); }
+
+private:
+    bool skipsStyle(const QString &line)
+    {
+        static const QRegularExpression styleOpen(QStringLiteral("^<style\\b"),
+                                                  QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression styleClose(QStringLiteral("</style>"),
+                                                   QRegularExpression::CaseInsensitiveOption);
+        if (styleOpen.match(line).hasMatch()) {
+            inStyle_ = true;
+            return true;
+        }
+        if (!inStyle_)
+            return false;
+        if (styleClose.match(line).hasMatch())
+            inStyle_ = false;
+        return true;
+    }
+
+    bool skipsSkinparam(const QString &line)
+    {
+        static const QRegularExpression skinparam(QStringLiteral("^skinparam\\b"),
+                                                  QRegularExpression::CaseInsensitiveOption);
+        if (skinparamDepth_ > 0) {
+            if (line.contains(QLatin1Char('{')))
+                ++skinparamDepth_;
+            if (line.contains(QLatin1Char('}')))
+                --skinparamDepth_;
+            return true;
+        }
+        if (!skinparam.match(line).hasMatch())
+            return false;
+        if (line.contains(QLatin1Char('{')) && !line.contains(QLatin1Char('}')))
+            skinparamDepth_ = 1;
+        return true;
+    }
+
+    bool inStyle_ = false;
+    int skinparamDepth_ = 0;
+};
+
+bool isQuote(QChar c)
+{
+    return c == QLatin1Char('"') || c == QLatin1Char('\'');
+}
+
+bool isOpeningBracket(QChar c)
+{
+    return c == QLatin1Char('[') || c == QLatin1Char('(') || c == QLatin1Char('{');
+}
+
+bool isClosingBracket(QChar c)
+{
+    return c == QLatin1Char(']') || c == QLatin1Char(')') || c == QLatin1Char('}');
+}
+
+QStringList trimmedNonEmpty(const QStringList &parts)
+{
+    QStringList result;
+    for (const QString &part : parts) {
+        const QString trimmed = part.trimmed();
+        if (!trimmed.isEmpty())
+            result.append(trimmed);
+    }
+    return result;
+}
+
+} // namespace
+
 QStringList mermaidLines(const QString &source, bool keepIndent)
 {
     QStringList lines;
@@ -96,41 +172,17 @@ QStringList plantumlLines(const QString &source)
                        "show\\b|remove\\b|restore\\b|scale\\b|autonumber\\b|newpage\\b|mainframe\\b|"
                        "left to right direction|top to bottom direction|allow_mixing\\b|!\\w)"),
         QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression styleOpen(QStringLiteral("^<style\\b"), QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression styleClose(QStringLiteral("</style>"), QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression skinparam(QStringLiteral("^skinparam\\b"),
-                                              QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression newline(QStringLiteral("\\r?\\n"));
     QString text = source;
     text.remove(block);
     QStringList lines;
-    int skipBlock = 0;
-    bool inStyle = false;
+    StyleBlockSkipper styleBlocks;
     for (const QString &raw : text.split(newline)) {
         const QString line = raw.trimmed();
         if (line.isEmpty() || line.startsWith(QLatin1Char('\'')))
             continue;
-        if (styleOpen.match(line).hasMatch()) {
-            inStyle = true;
+        if (styleBlocks.skips(line))
             continue;
-        }
-        if (inStyle) {
-            if (styleClose.match(line).hasMatch())
-                inStyle = false;
-            continue;
-        }
-        if (skipBlock > 0) {
-            if (line.contains(QLatin1Char('{')))
-                ++skipBlock;
-            if (line.contains(QLatin1Char('}')))
-                --skipBlock;
-            continue;
-        }
-        if (skinparam.match(line).hasMatch()) {
-            if (line.contains(QLatin1Char('{')) && !line.contains(QLatin1Char('}')))
-                skipBlock = 1;
-            continue;
-        }
         if (noise.match(line).hasMatch())
             continue;
         lines.append(line);
@@ -224,11 +276,11 @@ QStringList splitTop(const QString &text, QChar separator)
                 quote = QChar();
             continue;
         }
-        if (c == QLatin1Char('"') || c == QLatin1Char('\'')) {
+        if (isQuote(c)) {
             quote = c;
-        } else if (c == QLatin1Char('[') || c == QLatin1Char('(') || c == QLatin1Char('{')) {
+        } else if (isOpeningBracket(c)) {
             ++depth;
-        } else if (c == QLatin1Char(']') || c == QLatin1Char(')') || c == QLatin1Char('}')) {
+        } else if (isClosingBracket(c)) {
             depth = std::max(0, depth - 1);
         } else if (c == separator && depth == 0) {
             parts.append(text.mid(start, i - start));
@@ -236,13 +288,7 @@ QStringList splitTop(const QString &text, QChar separator)
         }
     }
     parts.append(text.mid(start));
-    QStringList result;
-    for (const QString &part : parts) {
-        const QString trimmed = part.trimmed();
-        if (!trimmed.isEmpty())
-            result.append(trimmed);
-    }
-    return result;
+    return trimmedNonEmpty(parts);
 }
 
 } // namespace diagram::source

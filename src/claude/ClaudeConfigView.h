@@ -2,6 +2,7 @@
 
 #include "ClaudeConfig.h"
 
+#include <QHash>
 #include <QSet>
 #include <QTimer>
 #include <QWidget>
@@ -79,6 +80,11 @@ protected:
 
 private:
     void populate();
+    void setRightText(QTreeWidgetItem *item, const QString &text) const;
+    QHash<int, QTreeWidgetItem *> addCategoryItems();
+    QTreeWidgetItem *addEffectiveItem(QTreeWidgetItem *settings);
+    QTreeWidgetItem *addEntryItem(qsizetype index, QTreeWidgetItem *category);
+    void summarizeCategory(QTreeWidgetItem *item);
     void showContextMenu(const QPoint &position);
     void addNewActions(QMenu *menu, ClaudeConfig::Category category);
     void askName(ClaudeConfig::Category category, ClaudeConfig::Scope scope);

@@ -172,7 +172,7 @@ QString hookCommand()
 
 QString findClaudeExecutable()
 {
-    const QString inPath = QStandardPaths::findExecutable(QStringLiteral("claude"));
+    QString inPath = QStandardPaths::findExecutable(QStringLiteral("claude"));
     if (!inPath.isEmpty())
         return inPath;
 
@@ -187,9 +187,9 @@ QString findClaudeExecutable()
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
                                          const QString &hookServerName,
                                          QString *error,
-                                         const QStringList &extraArguments,
-                                         const std::optional<QStringList> &mcpReadOnlyTools)
+                                         const SessionOptions &options)
 {
+    const std::optional<QStringList> &mcpReadOnlyTools = options.mcpReadOnlyTools;
     const QString claude = findClaudeExecutable();
     if (claude.isEmpty()) {
         *error =
@@ -211,7 +211,7 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
         mcpFile = writeSettingsFile(mcpConfig(mcpServer), mcpConfigPath());
 
     const std::optional<QString> settingsFile =
-        writeSettingsFile(sessionSettings(hook, mcpFile ? *mcpReadOnlyTools : QStringList()));
+        writeSettingsFile(sessionSettings(hook, mcpFile ? mcpReadOnlyTools.value_or(QStringList()) : QStringList()));
     if (!settingsFile) {
         *error = QCoreApplication::translate("ClaudeLauncher", "Could not write the hooks configuration.");
         return std::nullopt;
@@ -224,7 +224,7 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
         spec.arguments << QStringLiteral("--plugin-dir") << QDir::toNativeSeparators(plugin);
     if (mcpFile)
         spec.arguments << QStringLiteral("--mcp-config") << *mcpFile;
-    spec.arguments += extraArguments;
+    spec.arguments += options.extraArguments;
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
     spec.environment.insert(QStringLiteral("DUET_SOCKET"), hookServerName);

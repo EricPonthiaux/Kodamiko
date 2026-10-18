@@ -34,6 +34,83 @@ QJsonArray sortedById(const QJsonArray &items)
     return result;
 }
 
+QString defaultShapeOf(const Family *family)
+{
+    return family ? family->defaultShape : QString();
+}
+
+QString defaultLinkOf(const Family *family)
+{
+    return family ? family->defaultLink : QString();
+}
+
+bool linksShape(const Link &link, const QString &shapeId)
+{
+    return link.from == shapeId || link.to == shapeId;
+}
+
+// How children name the shape as their parent: its key, or else its id.
+QString referenceOf(const Shape &shape)
+{
+    return shape.key.isEmpty() ? shape.id : shape.key;
+}
+
+// A key not taken yet, derived from a copied one ("a" -> "a_copy",
+// "a_copy" -> "a_copy_2"); it is taken on return.
+QString freshCopyKey(const QString &key, QSet<QString> &taken)
+{
+    static const QRegularExpression copySuffix(QStringLiteral("_copy(_\\d+)?$"));
+    QString root = key;
+    root.remove(copySuffix);
+    QString candidate = root + QStringLiteral("_copy");
+    for (int index = 2; taken.contains(candidate); ++index)
+        candidate = root + QStringLiteral("_copy_") + QString::number(index);
+    taken.insert(candidate);
+    return candidate;
+}
+
+// A copied shape's properties: shifted, without id nor parent, and with a
+// fresh key so that the copy does not merge with its source on save.
+QJsonObject copiedShapeProps(QJsonObject props, QPointF offset, QSet<QString> &taken)
+{
+    const QString oldKey = props.value(QStringLiteral("key")).toString();
+    props.remove(QStringLiteral("id"));
+    props.insert(QStringLiteral("x"), props.value(QStringLiteral("x")).toDouble() + offset.x());
+    props.insert(QStringLiteral("y"), props.value(QStringLiteral("y")).toDouble() + offset.y());
+    if (!oldKey.isEmpty())
+        props.insert(QStringLiteral("key"), freshCopyKey(oldKey, taken));
+    props.remove(QStringLiteral("parentBoundary"));
+    return props;
+}
+
+bool isLineStyle(const QString &line)
+{
+    return line == QLatin1String("solid") || line == QLatin1String("dashed") || line == QLatin1String("dotted");
+}
+
+// A sparse link style patch; invalid or null values reset to the native
+// style.
+void applyLinkStylePatch(Link &link, const QJsonObject &patch)
+{
+    if (patch.contains(QStringLiteral("customLineStyle"))) {
+        const QString line = patch.value(QStringLiteral("customLineStyle")).toString();
+        link.customLineStyle = isLineStyle(line) ? line : QString();
+    }
+    if (patch.contains(QStringLiteral("customColor"))) {
+        const QString color = patch.value(QStringLiteral("customColor")).toString();
+        link.customColor = isHexColor(color) ? color.toLower() : QString();
+    }
+    if (patch.contains(QStringLiteral("customWidth"))) {
+        const QJsonValue width = patch.value(QStringLiteral("customWidth"));
+        const bool isValidWidth =
+            width.isDouble() && width.toDouble() >= linkWidthMin && width.toDouble() <= linkWidthMax;
+        if (isValidWidth)
+            link.customWidth = width.toDouble();
+        else
+            link.customWidth.reset();
+    }
+}
+
 } // namespace
 
 Board::Board(QObject *parent)
@@ -148,9 +225,8 @@ Shape *Board::addShape(const QString &requestedType, const QJsonObject &props)
 {
     // Saved documents can outlive a family's dictionary: an unknown type
     // falls back to the default shape, so that old boards still open.
-    const QString type = requestedType.isEmpty() || !makeShape(requestedType)
-                             ? (family_ ? family_->defaultShape : QString())
-                             : requestedType;
+    const bool isKnownType = !requestedType.isEmpty() && makeShape(requestedType);
+    const QString type = isKnownType ? requestedType : defaultShapeOf(family_);
     std::unique_ptr<Shape> created = makeShape(type);
     if (!created)
         return nullptr;
@@ -173,7 +249,7 @@ Link *Board::addLink(const QString &requestedType, const QString &from, const QS
         return nullptr;
     bool allowSelf = false;
     bool allowMulti = false;
-    QString type = requestedType.isEmpty() ? (family_ ? family_->defaultLink : QString()) : requestedType;
+    QString type = requestedType.isEmpty() ? defaultLinkOf(family_) : requestedType;
     std::unique_ptr<Link> created = makeLink(type, &allowSelf, &allowMulti);
     if (!created && family_) {
         type = family_->defaultLink;
@@ -184,10 +260,8 @@ Link *Board::addLink(const QString &requestedType, const QString &from, const QS
     if (from == to && !allowSelf)
         return nullptr;
     if (!allowMulti) {
-        for (const auto &l : links_) {
-            if (l->from == from && l->to == to)
-                return l.get();
-        }
+        if (Link *existing = linkBetween(from, to))
+            return existing;
     }
     created->load(props);
     created->type = std::move(type);
@@ -227,21 +301,37 @@ bool Board::removeShape(const QString &id)
         return false;
     QList<const Link *> touching;
     for (const auto &l : links_) {
-        if (l->from == id || l->to == id)
+        if (linksShape(*l, id))
             touching.append(l.get());
     }
     emit removing({removed}, touching);
     // Children outlive the container that held them: they go up to its own
     // parent rather than pointing at a shape that no longer exists.
     const QString inherited = removed->parentBoundary;
-    for (const auto &s : shapes_) {
-        if (s.get() == removed || s->parentBoundary.isEmpty())
-            continue;
-        if (s->parentBoundary == removed->id || (!removed->key.isEmpty() && s->parentBoundary == removed->key))
-            s->parentBoundary = inherited;
+    for (Shape *child : childShapes(removed))
+        child->parentBoundary = inherited;
+    removeLinksOf(id);
+    selection_.remove(id);
+    shapeIndex_.remove(id);
+    shapes_.erase(
+        std::find_if(shapes_.begin(), shapes_.end(), [removed](const auto &s) { return s.get() == removed; }));
+    ++version_;
+    return true;
+}
+
+Link *Board::linkBetween(const QString &from, const QString &to) const
+{
+    for (const auto &l : links_) {
+        if (l->from == from && l->to == to)
+            return l.get();
     }
+    return nullptr;
+}
+
+void Board::removeLinksOf(const QString &shapeId)
+{
     for (auto it = links_.begin(); it != links_.end();) {
-        if ((*it)->from == id || (*it)->to == id) {
+        if (linksShape(**it, shapeId)) {
             linkSelection_.remove((*it)->id);
             linkIndex_.remove((*it)->id);
             it = links_.erase(it);
@@ -249,12 +339,6 @@ bool Board::removeShape(const QString &id)
             ++it;
         }
     }
-    selection_.remove(id);
-    shapeIndex_.remove(id);
-    shapes_.erase(
-        std::find_if(shapes_.begin(), shapes_.end(), [removed](const auto &s) { return s.get() == removed; }));
-    ++version_;
-    return true;
 }
 
 bool Board::removeLink(const QString &id)
@@ -321,8 +405,7 @@ void Board::containShape(Shape &shape, bool growParent)
     Shape *parent = shapeByReference(shape.parentBoundary);
     if (!parent)
         return;
-    std::optional<QRectF> bounds = parent->childBounds(*this);
-    if (!bounds)
+    if (!parent->childBounds(*this))
         return;
     if (growParent && parent->resizable()) {
         const qreal requiredWidth = std::max(parent->w, shape.x + shape.w - parent->x + 12);
@@ -330,9 +413,12 @@ void Board::containShape(Shape &shape, bool growParent)
         if (requiredWidth > parent->w || requiredHeight > parent->h) {
             parent->resizeTo(requiredWidth, requiredHeight, *this);
             containShape(*parent, true);
-            bounds = parent->childBounds(*this);
         }
     }
+    // Read after the growth: the parent's frame may have moved.
+    const std::optional<QRectF> bounds = parent->childBounds(*this);
+    if (!bounds)
+        return;
     shape.x = clamp(shape.x, bounds->left(), std::max(bounds->left(), bounds->right() - shape.w));
     shape.y = clamp(shape.y, bounds->top(), std::max(bounds->top(), bounds->bottom() - shape.h));
 }
@@ -361,7 +447,7 @@ std::optional<Shape *> Board::dropDecision(const Shape &shape, const QSet<QStrin
 {
     Shape *container = containerAt(QPointF(shape.cx(), shape.cy()), &shape);
     const QString current = shape.parentBoundary;
-    const QString reference = container ? (container->key.isEmpty() ? container->id : container->key) : QString();
+    const QString reference = container ? referenceOf(*container) : QString();
     if (reference == current)
         return std::nullopt;
     // Shapes dragged together keep their arrangement: a gesture never
@@ -631,7 +717,25 @@ bool Board::cutSelection()
     return true;
 }
 
+// What pasting shapes produced, for their links and parents.
+struct Board::PastedShapes {
+    QHash<QString, QString> idMap;                 // source id -> copy id
+    QHash<QString, Shape *> byReference;           // source id or key -> copy
+    QList<std::pair<QJsonObject, Shape *>> pasted; // source props, copy
+    QStringList createdIds;
+};
+
 void Board::addClipboardContent(const QJsonArray &shapes, const QJsonArray &links, QPointF offset)
+{
+    selection_.clear();
+    linkSelection_.clear();
+    const PastedShapes pasted = pasteShapes(shapes, offset);
+    reparentPastedShapes(pasted);
+    const QStringList createdLinks = pasteLinks(links, pasted.idMap);
+    emit elementsCreated(pasted.createdIds, createdLinks);
+}
+
+Board::PastedShapes Board::pasteShapes(const QJsonArray &shapes, QPointF offset)
 {
     // A copy is a new element: carrying the source `key` over would merge
     // both into one element on save.
@@ -640,57 +744,46 @@ void Board::addClipboardContent(const QJsonArray &shapes, const QJsonArray &link
         if (!s->key.isEmpty())
             taken.insert(s->key);
     }
-    static const QRegularExpression copySuffix(QStringLiteral("_copy(_\\d+)?$"));
-    const auto freshKey = [&taken](const QString &key) {
-        QString root = key;
-        root.remove(copySuffix);
-        QString candidate = root + QStringLiteral("_copy");
-        for (int index = 2; taken.contains(candidate); ++index)
-            candidate = root + QStringLiteral("_copy_") + QString::number(index);
-        taken.insert(candidate);
-        return candidate;
-    };
-    QHash<QString, QString> idMap;
-    QHash<QString, Shape *> byReference;
-    QList<std::pair<QJsonObject, Shape *>> pasted;
-    QStringList createdShapes;
-    QStringList createdLinks;
-    selection_.clear();
-    linkSelection_.clear();
+    PastedShapes result;
     for (const QJsonValue &value : shapes) {
-        QJsonObject props = value.toObject();
-        const QString oldId = props.value(QStringLiteral("id")).toString();
-        const QString oldKey = props.value(QStringLiteral("key")).toString();
-        props.remove(QStringLiteral("id"));
-        props.insert(QStringLiteral("x"), props.value(QStringLiteral("x")).toDouble() + offset.x());
-        props.insert(QStringLiteral("y"), props.value(QStringLiteral("y")).toDouble() + offset.y());
-        if (!oldKey.isEmpty())
-            props.insert(QStringLiteral("key"), freshKey(oldKey));
-        props.remove(QStringLiteral("parentBoundary"));
+        const QJsonObject original = value.toObject();
+        const QJsonObject props = copiedShapeProps(original, offset, taken);
         Shape *s = addShape(props.value(QStringLiteral("type")).toString(), props);
         if (!s)
             continue;
-        idMap.insert(oldId, s->id);
+        const QString oldId = original.value(QStringLiteral("id")).toString();
+        const QString oldKey = original.value(QStringLiteral("key")).toString();
+        result.idMap.insert(oldId, s->id);
         if (!oldId.isEmpty())
-            byReference.insert(oldId, s);
+            result.byReference.insert(oldId, s);
         if (!oldKey.isEmpty())
-            byReference.insert(oldKey, s);
-        pasted.append({value.toObject(), s});
+            result.byReference.insert(oldKey, s);
+        result.pasted.append({original, s});
         selection_.insert(s->id);
-        createdShapes.append(s->id);
+        result.createdIds.append(s->id);
     }
+    return result;
+}
+
+void Board::reparentPastedShapes(const PastedShapes &pasted)
+{
     // A copied child follows its copied frame; one whose frame stayed behind
     // stays in the original.
-    for (const auto &[original, s] : pasted) {
+    for (const auto &[original, s] : pasted.pasted) {
         const QString parent = original.value(QStringLiteral("parentBoundary")).toString();
         if (parent.isEmpty())
             continue;
-        if (const Shape *copied = byReference.value(parent))
-            s->parentBoundary = copied->key.isEmpty() ? copied->id : copied->key;
+        if (const Shape *copied = pasted.byReference.value(parent))
+            s->parentBoundary = referenceOf(*copied);
         else
             s->parentBoundary = parent;
         containShape(*s);
     }
+}
+
+QStringList Board::pasteLinks(const QJsonArray &links, const QHash<QString, QString> &idMap)
+{
+    QStringList created;
     for (const QJsonValue &value : links) {
         QJsonObject props = value.toObject();
         const QString from = idMap.value(props.value(QStringLiteral("from")).toString());
@@ -701,9 +794,9 @@ void Board::addClipboardContent(const QJsonArray &shapes, const QJsonArray &link
         props.remove(QStringLiteral("spline"));
         props.remove(QStringLiteral("key"));
         if (const Link *l = addLink(props.value(QStringLiteral("type")).toString(), from, to, props))
-            createdLinks.append(l->id);
+            created.append(l->id);
     }
-    emit elementsCreated(createdShapes, createdLinks);
+    return created;
 }
 
 bool Board::pasteClipboard()
@@ -786,27 +879,8 @@ bool Board::styleSelectedLinks(const QJsonObject &patch)
 {
     const QByteArray before = snapshot();
     for (const QString &id : linkSelection_) {
-        Link *l = link(id);
-        if (!l)
-            continue;
-        if (patch.contains(QStringLiteral("customLineStyle"))) {
-            const QString line = patch.value(QStringLiteral("customLineStyle")).toString();
-            l->customLineStyle =
-                line == QLatin1String("solid") || line == QLatin1String("dashed") || line == QLatin1String("dotted")
-                    ? line
-                    : QString();
-        }
-        if (patch.contains(QStringLiteral("customColor"))) {
-            const QString color = patch.value(QStringLiteral("customColor")).toString();
-            l->customColor = isHexColor(color) ? color.toLower() : QString();
-        }
-        if (patch.contains(QStringLiteral("customWidth"))) {
-            const QJsonValue width = patch.value(QStringLiteral("customWidth"));
-            if (width.isDouble() && width.toDouble() >= linkWidthMin && width.toDouble() <= linkWidthMax)
-                l->customWidth = width.toDouble();
-            else
-                l->customWidth.reset();
-        }
+        if (Link *l = link(id))
+            applyLinkStylePatch(*l, patch);
     }
     pushHistory(before);
     emit changed();

@@ -36,27 +36,23 @@ using McpProgress = std::function<void(double, double, const QString &)>;
 struct McpTool {
     using Run = std::function<void(const QJsonObject &arguments, McpReply reply, McpProgress progress)>;
 
+    // What Claude is told about a tool: its name ("get_editor_state"), title
+    // ("Editor state"), description (what it does, when to use it) and
+    // arguments.
+    struct Declaration {
+        QString name;
+        QString title;
+        QString description;
+        QJsonObject inputSchema;
+    };
+
     // A tool that only reads.
-    static McpTool reading(const QString &name,
-                           const QString &title,
-                           const QString &description,
-                           const QJsonObject &inputSchema,
-                           Run run);
+    static McpTool reading(Declaration declaration, Run run);
     // A tool that acts in the editor (opens, lays out…), without asking.
-    static McpTool acting(const QString &name,
-                          const QString &title,
-                          const QString &description,
-                          const QJsonObject &inputSchema,
-                          Run run,
-                          bool idempotent = false);
+    static McpTool acting(Declaration declaration, Run run);
     // A tool that changes the project or runs something: the user is asked
     // first, with `describe`'s text.
-    static McpTool sensitive(const QString &name,
-                             const QString &title,
-                             const QString &description,
-                             const QJsonObject &inputSchema,
-                             std::function<QString(const QJsonObject &)> describe,
-                             Run run);
+    static McpTool sensitive(Declaration declaration, std::function<QString(const QJsonObject &)> describe, Run run);
     // A Run from a function answering at once.
     static Run immediate(std::function<McpResult(const QJsonObject &arguments)> function);
 

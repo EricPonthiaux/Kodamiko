@@ -59,13 +59,6 @@ private:
     ClassSource findClass(const QString &name, const CompletionContext &context) const;
     void addOverrides(const CompletionContext &context, int brace, QList<CompletionItem> &items) const;
     void addImplementations(const CompletionContext &context, QList<CompletionItem> &items) const;
-    static void addAccessors(const QByteArray &blanked,
-                             int brace,
-                             const QString &className,
-                             const QSet<QString> &declared,
-                             const QString &indent,
-                             const QString &unit,
-                             QList<CompletionItem> &items);
     QByteArray readFile(const QString &path) const;
 
     const SymbolIndex *index_;

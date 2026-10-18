@@ -94,12 +94,14 @@ public:
     // `apply` returns true once done (the popup then closes), false to keep
     // the popup open: it may then show an error, or change the message to
     // ask something else.
-    ConfirmPopup(const QString &title,
-                 const QString &location,
-                 const QString &message,
-                 const QString &actionText,
-                 std::function<bool(ConfirmPopup *)> apply,
-                 QWidget *parent);
+    struct Question {
+        QString title;
+        QString location; // under the title: where it applies
+        QString message;
+        QString actionText; // the button that confirms
+    };
+
+    ConfirmPopup(const Question &question, std::function<bool(ConfirmPopup *)> apply, QWidget *parent);
 
     void setMessage(const QString &message, const QString &actionText);
     QString message() const;

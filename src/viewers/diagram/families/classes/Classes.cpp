@@ -9,6 +9,7 @@
 #include <QRegularExpression>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace diagram::classes {
@@ -35,7 +36,7 @@ struct Classifier {
     const char *stereotype; // null: a plain class
 };
 
-const Classifier classifiers[] = {
+const auto classifiers = std::to_array<Classifier>({
     {"class", QT_TRANSLATE_NOOP("ClassDiagram", "Class"), QT_TRANSLATE_NOOP("ClassDiagram", "Class"), nullptr},
     {"abstract", QT_TRANSLATE_NOOP("ClassDiagram", "Abstract class"),
      QT_TRANSLATE_NOOP("ClassDiagram", "Abstract class"), "abstract"},
@@ -61,7 +62,7 @@ const Classifier classifiers[] = {
      "protocol"},
     {"custom", QT_TRANSLATE_NOOP("ClassDiagram", "Custom stereotype"), QT_TRANSLATE_NOOP("ClassDiagram", "UML element"),
      "stereotype"},
-};
+});
 
 // UML_RELATION_PRESETS, with UML_RELATION_DEFAULT_LABELS in English.
 struct Relation {
@@ -71,7 +72,7 @@ struct Relation {
     const char *help;
 };
 
-const Relation relations[] = {
+const auto relations = std::to_array<Relation>({
     {"link", QT_TRANSLATE_NOOP("ClassDiagram", "Association —"), QT_TRANSLATE_NOOP("ClassDiagram", "Association"),
      nullptr},
     {"association", QT_TRANSLATE_NOOP("ClassDiagram", "Directed association →"),
@@ -91,7 +92,7 @@ const Relation relations[] = {
     {"dependency", QT_TRANSLATE_NOOP("ClassDiagram", "Dependency ⇢"), QT_TRANSLATE_NOOP("ClassDiagram", "Dependency"),
      nullptr},
     {"dotted", QT_TRANSLATE_NOOP("ClassDiagram", "Dotted link ⋯"), QT_TRANSLATE_NOOP("ClassDiagram", "Link"), nullptr},
-};
+});
 
 // The kinds as the inspector names them: the menu entries without their
 // text markers.
@@ -120,6 +121,58 @@ QJsonValue stereotypeValue(const QString &stereotype)
     return stereotype.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(stereotype);
 }
 
+// The class name of a saved shape: `name`, else the `text` of an older
+// save, else the default.
+QString loadedName(const QJsonObject &props)
+{
+    const QJsonValue name = props.value(QStringLiteral("name"));
+    if (name.isString())
+        return name.toString();
+    const QJsonValue text = props.value(QStringLiteral("text"));
+    if (text.isString())
+        return text.toString();
+    return tr("Class");
+}
+
+// The outlines of the relation markers, with their tip at `tip`, pointing
+// along `angle`, `size` long.
+
+QPainterPath trianglePath(QPointF tip, qreal angle, qreal size)
+{
+    const qreal bx = tip.x();
+    const qreal by = tip.y();
+    const qreal spread = 0.46;
+    return polygon({{bx, by},
+                    {bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread)},
+                    {bx - size * std::cos(angle + spread), by - size * std::sin(angle + spread)}});
+}
+
+// `size` is half the diamond's length.
+QPainterPath diamondPath(QPointF tip, qreal angle, qreal size)
+{
+    const qreal bx = tip.x();
+    const qreal by = tip.y();
+    const qreal mx = bx - size * std::cos(angle);
+    const qreal my = by - size * std::sin(angle);
+    const qreal side = size * 0.55;
+    return polygon({{bx, by},
+                    {mx + side * std::cos(angle + M_PI / 2), my + side * std::sin(angle + M_PI / 2)},
+                    {bx - 2 * size * std::cos(angle), by - 2 * size * std::sin(angle)},
+                    {mx + side * std::cos(angle - M_PI / 2), my + side * std::sin(angle - M_PI / 2)}});
+}
+
+QPainterPath openArrowPath(QPointF tip, qreal angle, qreal size)
+{
+    const qreal bx = tip.x();
+    const qreal by = tip.y();
+    const qreal spread = 0.5;
+    QPainterPath head;
+    head.moveTo(bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread));
+    head.lineTo(bx, by);
+    head.lineTo(bx - size * std::cos(angle + spread), by - size * std::sin(angle + spread));
+    return head;
+}
+
 } // namespace
 
 QString defaultRelationLabel(const QString &kind)
@@ -143,9 +196,7 @@ ClassShape::ClassShape()
 void ClassShape::load(const QJsonObject &props)
 {
     Shape::load(props);
-    name = props.value(QStringLiteral("name")).isString()   ? props.value(QStringLiteral("name")).toString()
-           : props.value(QStringLiteral("text")).isString() ? props.value(QStringLiteral("text")).toString()
-                                                            : tr("Class");
+    name = loadedName(props);
     stereotype = jsonString(props, QStringLiteral("stereotype"));
     attributes = jsonStrings(props, QStringLiteral("attributes"));
     methods = jsonStrings(props, QStringLiteral("methods"));
@@ -192,7 +243,7 @@ QString ClassShape::editText() const
 
 void ClassShape::setEditText(const QString &value)
 {
-    QStringList sections[3];
+    std::array<QStringList, 3> sections;
     int at = 0;
     for (const QString &raw : value.split(QLatin1Char('\n'))) {
         const QString line = raw.trimmed();
@@ -201,7 +252,7 @@ void ClassShape::setEditText(const QString &value)
             continue;
         }
         if (!line.isEmpty())
-            sections[at].append(line);
+            sections.at(at).append(line);
     }
     static const QRegularExpression stereotypeLine(QStringLiteral("^<<(.+)>>$"));
     stereotype.clear();
@@ -293,16 +344,16 @@ QList<Property> ClassShape::properties() const
     return {{QStringLiteral("stereotype"), tr("Stereotype"), Property::Kind::Choice, choices}};
 }
 
-QVariant ClassShape::propertyValue(const QString &id) const
+QVariant ClassShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("stereotype"))
+    if (propertyId == QLatin1String("stereotype"))
         return stereotype;
     return {};
 }
 
-void ClassShape::setPropertyValue(const QString &id, const QVariant &value)
+void ClassShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("stereotype"))
+    if (propertyId == QLatin1String("stereotype"))
         stereotype = value.toString().trimmed();
 }
 
@@ -374,51 +425,26 @@ void ClassLink::draw(QPainter &painter, const Board &board, bool selected) const
     strokeBody(
         painter, *r,
         {style.color, style.width, dashed ? QList<qreal>{6, 4} : QList<qreal>{}, markerLength * style.markerScale, 0});
-    drawMarker(painter, board, *r, angle, style);
+    drawMarker(painter, board, *r, style);
     drawCards(painter, board, *r, angle);
 }
 
-void ClassLink::drawMarker(QPainter &painter,
-                           const Board &board,
-                           const Route &r,
-                           qreal angle,
-                           const LinkStyle &style) const
+void ClassLink::drawMarker(QPainter &painter, const Board &board, const Route &r, const LinkStyle &style) const
 {
-    const qreal bx = r.b.x();
-    const qreal by = r.b.y();
+    const qreal angle = arrivalAngle(r);
     const QColor background = board.style().background;
     if (kind == QLatin1String("extension") || kind == QLatin1String("realization")) {
-        // A hollow triangle.
-        const qreal size = 14 * style.markerScale;
-        const qreal spread = 0.46;
-        const QPainterPath head =
-            polygon({{bx, by},
-                     {bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread)},
-                     {bx - size * std::cos(angle + spread), by - size * std::sin(angle + spread)}});
+        const QPainterPath head = trianglePath(r.b, angle, 14 * style.markerScale);
         painter.fillPath(head, background);
         stroke(painter, head, style.color, style.width);
     } else if (kind == QLatin1String("composition") || kind == QLatin1String("aggregation")) {
-        // A diamond, filled for a composition, hollow for an aggregation.
-        const qreal size = 9 * style.markerScale;
-        const qreal mx = bx - size * std::cos(angle);
-        const qreal my = by - size * std::sin(angle);
-        const qreal side = size * 0.55;
-        const QPainterPath diamond =
-            polygon({{bx, by},
-                     {mx + side * std::cos(angle + M_PI / 2), my + side * std::sin(angle + M_PI / 2)},
-                     {bx - 2 * size * std::cos(angle), by - 2 * size * std::sin(angle)},
-                     {mx + side * std::cos(angle - M_PI / 2), my + side * std::sin(angle - M_PI / 2)}});
+        // Filled for a composition, hollow for an aggregation.
+        const QPainterPath diamond = diamondPath(r.b, angle, 9 * style.markerScale);
         painter.fillPath(diamond, kind == QLatin1String("composition") ? style.color : background);
         stroke(painter, diamond, style.color, style.width);
     } else if (kind == QLatin1String("association") || kind == QLatin1String("dependency")) {
-        // An open arrow.
         const qreal size = (board.style().link.arrow + 2) * style.markerScale;
-        const qreal spread = 0.5;
-        QPainterPath head;
-        head.moveTo(bx - size * std::cos(angle - spread), by - size * std::sin(angle - spread));
-        head.lineTo(bx, by);
-        head.lineTo(bx - size * std::cos(angle + spread), by - size * std::sin(angle + spread));
-        stroke(painter, head, style.color, style.width);
+        stroke(painter, openArrowPath(r.b, angle, size), style.color, style.width);
     }
 }
 
@@ -453,29 +479,29 @@ QList<Property> ClassLink::properties() const
     };
 }
 
-QVariant ClassLink::propertyValue(const QString &id) const
+QVariant ClassLink::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("kind"))
+    if (propertyId == QLatin1String("kind"))
         return kind;
-    if (id == QLatin1String("fromCard"))
+    if (propertyId == QLatin1String("fromCard"))
         return fromCard;
-    if (id == QLatin1String("toCard"))
+    if (propertyId == QLatin1String("toCard"))
         return toCard;
     return {};
 }
 
-void ClassLink::setPropertyValue(const QString &id, const QVariant &value)
+void ClassLink::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("kind")) {
+    if (propertyId == QLatin1String("kind")) {
         const QString next = value.toString();
         // A label that only named the old kind follows the new one; a
         // label of the user's own stays.
         if (label == defaultRelationLabel(kind))
             label = defaultRelationLabel(next);
         kind = next;
-    } else if (id == QLatin1String("fromCard")) {
+    } else if (propertyId == QLatin1String("fromCard")) {
         fromCard = value.toString().trimmed();
-    } else if (id == QLatin1String("toCard")) {
+    } else if (propertyId == QLatin1String("toCard")) {
         toCard = value.toString().trimmed();
     }
 }

@@ -12,7 +12,7 @@ namespace diagram::states {
 // composite that declares it (the board key is scoped: "Active.Idle").
 class StateElement : public Shape {
 public:
-    StateElement(const QString &type, qreal width, qreal height);
+    StateElement(const QString &typeName, qreal width, qreal height);
 
     void load(const QJsonObject &props) override;
     QJsonObject toJson() const override;
@@ -43,8 +43,8 @@ public:
     QString sourceText() const override { return text; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     QString text;     // the display name
     QStringList desc; // internal description lines ("id : desc")
@@ -106,7 +106,7 @@ private:
 // Small round pseudo-states: the initial dot and the final bullseye.
 class RoundShape : public StateElement {
 public:
-    RoundShape(const QString &type, qreal size);
+    RoundShape(const QString &typeName, qreal size);
 
     bool resizable() const override { return false; }
 
@@ -152,15 +152,15 @@ private:
 // so that the sources do not turn them into one another.
 class ForkJoinShape : public StateElement {
 public:
-    explicit ForkJoinShape(const QString &type);
+    explicit ForkJoinShape(const QString &typeName);
 
     bool resizable() const override { return false; }
 
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
     QString displayText() const override;
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 };
 
 class TransitionLink : public Link {

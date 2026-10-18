@@ -146,47 +146,67 @@ struct Line {
     QString comment;
 };
 
+// Where a node is written: after `indent` and `prefix` (its key), followed
+// by a comma or not, below a line that shows the scope `shown`.
+struct Placement {
+    QString indent;
+    QString prefix;
+    bool comma = false;
+    std::optional<Scope> shown;
+};
+
+// A scalar or an empty container, written on one line.
+bool isLeaf(const Node &node)
+{
+    switch (node.kind) {
+    case Node::Kind::Scalar:
+        return true;
+    case Node::Kind::Object:
+        return node.members.isEmpty();
+    case Node::Kind::Array:
+        return node.items.isEmpty();
+    }
+    return true;
+}
+
 // Lines of `node`; its scope is written only where it differs from the
 // scope of the line above it in the tree (`shown`), or where it replaced
 // something.
-void renderNode(const Node &node,
-                const QString &indent,
-                const QString &prefix,
-                bool comma,
-                std::optional<Scope> shown,
-                QList<Line> *lines)
+QList<Line> renderNode(const Node &node, const Placement &placement)
 {
-    const QString end = comma ? QStringLiteral(",") : QString();
-    const bool annotate = !shown || *shown != node.scope || !node.replaced.isEmpty();
+    const QString &indent = placement.indent;
+    const QString end = placement.comma ? QStringLiteral(",") : QString();
+    const bool annotate = !placement.shown || *placement.shown != node.scope || !node.replaced.isEmpty();
     const QString comment = annotate ? scopeComment(node) : QString();
-    const std::optional<Scope> childShown = annotate ? std::optional(node.scope) : shown;
+    const std::optional<Scope> childShown = annotate ? std::optional(node.scope) : placement.shown;
 
-    if (node.kind == Node::Kind::Scalar || (node.kind == Node::Kind::Object && node.members.isEmpty()) ||
-        (node.kind == Node::Kind::Array && node.items.isEmpty())) {
-        lines->append({indent + prefix + compact(toJson(node)) + end, comment});
-        return;
-    }
+    if (isLeaf(node))
+        return {{indent + placement.prefix + compact(toJson(node)) + end, comment}};
     const QString inner = indent + QStringLiteral("  ");
+    QList<Line> lines;
     if (node.kind == Node::Kind::Object) {
-        lines->append({indent + prefix + QLatin1Char('{'), comment});
+        lines.append({indent + placement.prefix + QLatin1Char('{'), comment});
         for (qsizetype i = 0; i < node.members.size(); ++i) {
             const auto &[key, member] = node.members[i];
-            renderNode(member, inner, compact(key) + QStringLiteral(": "), i + 1 < node.members.size(), childShown,
-                       lines);
+            lines += renderNode(member, {.indent = inner,
+                                         .prefix = compact(key) + QStringLiteral(": "),
+                                         .comma = i + 1 < node.members.size(),
+                                         .shown = childShown});
         }
-        lines->append({indent + QLatin1Char('}') + end, {}});
-    } else {
-        lines->append({indent + prefix + QLatin1Char('['), comment});
-        for (qsizetype i = 0; i < node.items.size(); ++i)
-            renderNode(node.items[i], inner, {}, i + 1 < node.items.size(), childShown, lines);
-        lines->append({indent + QLatin1Char(']') + end, {}});
+        lines.append({indent + QLatin1Char('}') + end, {}});
+        return lines;
     }
+    lines.append({indent + placement.prefix + QLatin1Char('['), comment});
+    for (qsizetype i = 0; i < node.items.size(); ++i)
+        lines += renderNode(node.items[i], {.indent = inner, .comma = i + 1 < node.items.size(), .shown = childShown});
+    lines.append({indent + QLatin1Char(']') + end, {}});
+    return lines;
 }
 
 // "~/.claude/settings.json", ".claude/settings.json" (in the project).
 QString shownPath(const QString &path, const QString &projectDir)
 {
-    const QString inProject = QDir(projectDir).relativeFilePath(path);
+    QString inProject = QDir(projectDir).relativeFilePath(path);
     if (!inProject.startsWith(QLatin1String("..")))
         return inProject;
     const QString home = QDir::homePath() + QLatin1Char('/');
@@ -252,8 +272,9 @@ QString render(const QList<Layer> &layers, const QString &projectDir)
     QList<Line> lines{{QStringLiteral("{"), {}}};
     for (qsizetype i = 0; i < root.members.size(); ++i) {
         const auto &[key, member] = root.members[i];
-        renderNode(member, QStringLiteral("  "), compact(key) + QStringLiteral(": "), i + 1 < root.members.size(),
-                   std::nullopt, &lines);
+        lines += renderNode(member, {.indent = QStringLiteral("  "),
+                                     .prefix = compact(key) + QStringLiteral(": "),
+                                     .comma = i + 1 < root.members.size()});
     }
     lines.append({QStringLiteral("}"), {}});
     // Comments aligned, unless a line is too long for it.

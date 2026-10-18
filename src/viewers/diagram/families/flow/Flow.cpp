@@ -31,11 +31,27 @@ QString tr(const char *text)
 
 bool isOneOf(const QString &value, std::initializer_list<const char *> names)
 {
-    for (const char *name : names) {
-        if (value == QLatin1String(name))
-            return true;
-    }
-    return false;
+    return std::ranges::any_of(names, [&value](const char *name) { return value == QLatin1String(name); });
+}
+
+// The tone of a shape left white: warm for decisions, cool for terminators.
+QColor defaultFillOf(const QString &type, const Tones &tones)
+{
+    if (type == QLatin1String("decision"))
+        return tones.warm;
+    if (type == QLatin1String("terminator"))
+        return tones.cool;
+    return tones.sage;
+}
+
+// The variant a shape without one is drawn as.
+QString defaultVariantOf(const QString &type)
+{
+    if (type == QLatin1String("decision"))
+        return QStringLiteral("diamond");
+    if (type == QLatin1String("terminator"))
+        return QStringLiteral("stadium");
+    return QStringLiteral("square");
 }
 
 const QList<std::pair<QString, QString>> &variantChoices()
@@ -76,13 +92,13 @@ QString typeOf(const QString &variant)
 // ---------------------------------------------------------------------------
 // FlowShape
 
-FlowShape::FlowShape(const QString &type)
-    : Shape(type, 150, 70)
+FlowShape::FlowShape(const QString &typeName)
+    : Shape(typeName, 150, 70)
 {
-    if (type == QLatin1String("decision")) {
+    if (typeName == QLatin1String("decision")) {
         w = 170;
         h = 96;
-    } else if (type == QLatin1String("terminator")) {
+    } else if (typeName == QLatin1String("terminator")) {
         w = 140;
         h = 62;
     }
@@ -298,27 +314,31 @@ QPointF FlowShape::borderPoint(QPointF toward) const
         const qreal dy = toward.y() - cy();
         if (!dx && !dy)
             return center;
-        if (variant == QLatin1String("stadium") && w > h) {
-            const qreal radius = h / 2;
-            const qreal straight = w / 2 - radius;
-            const qreal verticalScale = dy ? radius / std::abs(dy) : std::numeric_limits<qreal>::infinity();
-            if (std::abs(dx * verticalScale) <= straight)
-                return {cx() + dx * verticalScale, cy() + dy * verticalScale};
-            const qreal capX = cx() + (dx >= 0 ? 1 : -1) * straight;
-            const qreal ox = cx() - capX;
-            const qreal a = dx * dx + dy * dy;
-            const qreal b = 2 * ox * dx;
-            const qreal c = ox * ox - radius * radius;
-            const qreal discriminant = std::max<qreal>(0, b * b - 4 * a * c);
-            const qreal t =
-                std::max((-b - std::sqrt(discriminant)) / (2 * a), (-b + std::sqrt(discriminant)) / (2 * a));
-            return {cx() + dx * t, cy() + dy * t};
-        }
+        if (variant == QLatin1String("stadium") && w > h)
+            return stadiumBorderPoint(dx, dy);
         return ellipseBorderPoint(center, toward, w / 2, h / 2);
     }
     if (type == QLatin1String("process") && isOneOf(variant, {"cylinder", "round"}))
         return Shape::borderPoint(toward);
     return polygonBorderPoint(center, toward, points());
+}
+
+QPointF FlowShape::stadiumBorderPoint(qreal dx, qreal dy) const
+{
+    const qreal radius = h / 2;
+    const qreal straight = w / 2 - radius;
+    const qreal verticalScale = dy ? radius / std::abs(dy) : std::numeric_limits<qreal>::infinity();
+    if (std::abs(dx * verticalScale) <= straight)
+        return {cx() + dx * verticalScale, cy() + dy * verticalScale};
+    // Past the straight sides: the ray meets a cap's circle.
+    const qreal capX = cx() + (dx >= 0 ? 1 : -1) * straight;
+    const qreal ox = cx() - capX;
+    const qreal a = dx * dx + dy * dy;
+    const qreal b = 2 * ox * dx;
+    const qreal c = ox * ox - radius * radius;
+    const qreal discriminant = std::max<qreal>(0, b * b - 4 * a * c);
+    const qreal t = std::max((-b - std::sqrt(discriminant)) / (2 * a), (-b + std::sqrt(discriminant)) / (2 * a));
+    return {cx() + dx * t, cy() + dy * t};
 }
 
 QString FlowShape::graphvizGeometry() const
@@ -353,17 +373,15 @@ QStringList FlowShape::graphvizNodeAttributes(const Board &, const QString &, qr
 void FlowShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QColor defaultFill = type == QLatin1String("decision")     ? style.tones.warm
-                               : type == QLatin1String("terminator") ? style.tones.cool
-                                                                     : style.tones.sage;
+    const QColor defaultFill = defaultFillOf(type, style.tones);
     const QColor own = parseColor(fill);
     const QColor nativeFill = !own.isValid() || own == QColor(Qt::white) ? defaultFill : own;
     const QPainterPath path = outline();
     shadowFill(painter, path, fillColor(nativeFill), style);
-    const QColor line = strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border);
+    const QColor border = strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border);
     const qreal width = state.selected ? 2 : shapeBorderWidth;
-    stroke(painter, path, line, width);
-    drawDetails(painter, line, width);
+    stroke(painter, path, border, width);
+    drawDetails(painter, border, width);
     if (state.editing)
         return;
     painter.save();
@@ -382,19 +400,16 @@ QList<Property> FlowShape::properties() const
     return {{QStringLiteral("variant"), tr("Shape"), Property::Kind::Choice, variantChoices()}};
 }
 
-QVariant FlowShape::propertyValue(const QString &id) const
+QVariant FlowShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("variant"))
-        return variant.isEmpty() ? (type == QLatin1String("decision")     ? QStringLiteral("diamond")
-                                    : type == QLatin1String("terminator") ? QStringLiteral("stadium")
-                                                                          : QStringLiteral("square"))
-                                 : variant;
+    if (propertyId == QLatin1String("variant"))
+        return variant.isEmpty() ? defaultVariantOf(type) : variant;
     return {};
 }
 
-void FlowShape::setPropertyValue(const QString &id, const QVariant &value)
+void FlowShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id != QLatin1String("variant"))
+    if (propertyId != QLatin1String("variant"))
         return;
     variant = value.toString();
     // The drawn type follows the variant: one class draws them all.
@@ -591,20 +606,20 @@ QList<Property> FlowLink::properties() const
     };
 }
 
-QVariant FlowLink::propertyValue(const QString &id) const
+QVariant FlowLink::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("line"))
+    if (propertyId == QLatin1String("line"))
         return line;
-    if (id == QLatin1String("head"))
+    if (propertyId == QLatin1String("head"))
         return head;
     return {};
 }
 
-void FlowLink::setPropertyValue(const QString &id, const QVariant &value)
+void FlowLink::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("line"))
+    if (propertyId == QLatin1String("line"))
         line = value.toString();
-    else if (id == QLatin1String("head"))
+    else if (propertyId == QLatin1String("head"))
         head = value.toString();
 }
 

@@ -182,54 +182,102 @@ qreal descent(const Font &font)
     return metrics(font).descent() * font.px / referencePx;
 }
 
+namespace {
+
+QString joined(const QString &line, const QString &token)
+{
+    return line.isEmpty() ? token : line + QLatin1Char(' ') + token;
+}
+
+// The length of the longest prefix of `token` that fits `maxWidth`; at least
+// one character, so that cutting always progresses.
+int fittingPrefixLength(const Font &font, const QString &token, qreal maxWidth)
+{
+    int lo = 1;
+    int hi = int(token.size());
+    int fit = 1;
+    while (lo <= hi) {
+        const int mid = (lo + hi) / 2;
+        if (width(font, token.left(mid)) <= maxWidth) {
+            fit = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    return fit;
+}
+
+// Fills lines word by word, the way wrapText does.
+class LineWrapper {
+public:
+    LineWrapper(const Font &font, qreal maxWidth)
+        : font_(font)
+        , maxWidth_(maxWidth)
+    {
+    }
+
+    void addParagraph(const QString &paragraph)
+    {
+        static const QRegularExpression spaces(QStringLiteral("\\s+"));
+        if (paragraph.isEmpty()) {
+            lines_.append(QString());
+            return;
+        }
+        line_.clear();
+        for (const QString &token : paragraph.trimmed().split(spaces, Qt::SkipEmptyParts))
+            addToken(token);
+        if (!line_.isEmpty())
+            lines_.append(line_);
+    }
+
+    QStringList lines() const { return lines_; }
+
+private:
+    void addToken(const QString &token)
+    {
+        const bool overflows = width(font_, joined(line_, token)) > maxWidth_;
+        if (overflows && !line_.isEmpty()) {
+            lines_.append(line_);
+            line_.clear();
+        }
+        if (width(font_, token) > maxWidth_)
+            cutToken(token);
+        else
+            line_ = joined(line_, token);
+    }
+
+    // An identifier or a URL may hold no space: it is cut at the longest
+    // prefix that really fits instead of overflowing. The last piece stays
+    // open for the next word.
+    void cutToken(const QString &token)
+    {
+        QString rest = token;
+        while (!rest.isEmpty()) {
+            const int fit = fittingPrefixLength(font_, rest, maxWidth_);
+            const QString piece = rest.left(fit);
+            rest = rest.mid(fit);
+            if (!rest.isEmpty())
+                lines_.append(piece);
+            else
+                line_ = piece;
+        }
+    }
+
+    Font font_;
+    qreal maxWidth_;
+    QStringList lines_;
+    QString line_;
+};
+
+} // namespace
+
 QStringList wrap(const Font &font, const QString &value, qreal maxWidth)
 {
-    QStringList lines;
-    static const QRegularExpression spaces(QStringLiteral("\\s+"));
-    for (const QString &paragraph : value.split(QLatin1Char('\n'))) {
-        if (paragraph.isEmpty()) {
-            lines.append(QString());
-            continue;
-        }
-        QString line;
-        for (const QString &token : paragraph.trimmed().split(spaces, Qt::SkipEmptyParts)) {
-            const QString candidate = line.isEmpty() ? token : line + QLatin1Char(' ') + token;
-            if (width(font, candidate) > maxWidth && !line.isEmpty()) {
-                lines.append(line);
-                line.clear();
-            }
-            if (width(font, token) > maxWidth) {
-                // An identifier or a URL may hold no space: it is cut at the
-                // longest prefix that really fits instead of overflowing.
-                QString rest = token;
-                while (!rest.isEmpty()) {
-                    int lo = 1;
-                    int hi = int(rest.size());
-                    int fit = 1;
-                    while (lo <= hi) {
-                        const int mid = (lo + hi) / 2;
-                        if (width(font, rest.left(mid)) <= maxWidth) {
-                            fit = mid;
-                            lo = mid + 1;
-                        } else {
-                            hi = mid - 1;
-                        }
-                    }
-                    const QString piece = rest.left(fit);
-                    rest = rest.mid(fit);
-                    if (!rest.isEmpty())
-                        lines.append(piece);
-                    else
-                        line = piece;
-                }
-            } else {
-                line = line.isEmpty() ? token : line + QLatin1Char(' ') + token;
-            }
-        }
-        if (!line.isEmpty())
-            lines.append(line);
-    }
-    return lines;
+    LineWrapper wrapper(font, maxWidth);
+    for (const QString &paragraph : value.split(QLatin1Char('\n')))
+        wrapper.addParagraph(paragraph);
+    return wrapper.lines();
 }
 
 qreal widest(const Font &font, const QStringList &lines)
@@ -240,6 +288,7 @@ qreal widest(const Font &font, const QStringList &lines)
     return result;
 }
 
+// NOLINTNEXTLINE(readability-function-size): mirrors canvas fillText, called across the families
 void draw(QPainter &painter,
           const Font &font,
           const QString &value,
@@ -293,6 +342,7 @@ QString elided(const Font &font, const QString &value, qreal maxWidth)
 // ---------------------------------------------------------------------------
 // Paths
 
+// NOLINTNEXTLINE(readability-function-size): mirrors canvas roundRect, called across the families
 QPainterPath roundRect(qreal x, qreal y, qreal w, qreal h, qreal r)
 {
     const qreal rr = std::max<qreal>(0, std::min({r, w / 2, h / 2}));
@@ -368,11 +418,13 @@ QPen pen(const QColor &color, qreal width, const QList<qreal> &dash)
 
 } // namespace
 
+// NOLINTNEXTLINE(readability-function-size): mirrors canvas stroke, called across the families
 void stroke(QPainter &painter, const QPainterPath &path, const QColor &color, qreal width, const QList<qreal> &dash)
 {
     painter.strokePath(path, pen(color, width, dash));
 }
 
+// NOLINTNEXTLINE(readability-function-size): mirrors canvas lineTo + stroke, called across the families
 void strokeLine(QPainter &painter, QPointF from, QPointF to, const QColor &color, qreal width, const QList<qreal> &dash)
 {
     painter.save();

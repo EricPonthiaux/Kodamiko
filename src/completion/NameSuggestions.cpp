@@ -7,6 +7,8 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include <optional>
+
 namespace {
 
 bool isJava(const QString &languageId)
@@ -146,6 +148,190 @@ QString splitTemplate(const QString &type, QStringList *arguments)
     return base.trimmed();
 }
 
+bool isDeclaratorSeparator(char c)
+{
+    return c == ' ' || c == '\t' || c == '*' || c == '&';
+}
+
+bool isStatementBoundary(char c)
+{
+    return c == ';' || c == '{' || c == '}' || c == '\n';
+}
+
+// The "<" opening the template arguments that the ">" at text[close]
+// closes; nullopt if a statement boundary comes first, or if nothing
+// precedes the "<".
+std::optional<int> templateOpening(const QByteArray &text, int close)
+{
+    int depth = 0;
+    for (int k = close; k >= 0; --k) {
+        const char c = text[k];
+        if (c == '>')
+            ++depth;
+        else if (c == '<' && --depth == 0)
+            return k > 0 ? std::optional<int>(k) : std::nullopt;
+        else if (isStatementBoundary(c))
+            return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+// The start of the type that ends at `end`, read backwards: names, "::",
+// ".", "<...>", "[]". nullopt if its template arguments are not closed.
+std::optional<int> typeStartBefore(const QByteArray &text, int end, const QString &languageId)
+{
+    int i = end;
+    while (i > 0) {
+        const char c = text[i - 1];
+        const bool isNamePart = CodeScan::isIdentifierByte(c) || (c == '.' && isJava(languageId));
+        const bool isArrayBrackets = c == ']' && i >= 2 && text[i - 2] == '[';
+        const bool isScope = c == ':' && i >= 2 && text[i - 2] == ':';
+        if (isNamePart) {
+            --i;
+        } else if (c == '>') {
+            const std::optional<int> opening = templateOpening(text, i - 1);
+            if (!opening)
+                return std::nullopt;
+            i = *opening;
+        } else if (isArrayBrackets || isScope) {
+            i -= 2;
+        } else {
+            break;
+        }
+    }
+    return i;
+}
+
+// The start of the qualifiers ("const", "static"…) before text[typeStart].
+int qualifiersStart(const QByteArray &text, int typeStart)
+{
+    int before = typeStart;
+    while (true) {
+        while (before > 0 && (text[before - 1] == ' ' || text[before - 1] == '\t'))
+            --before;
+        int wordStart = before;
+        while (wordStart > 0 && CodeScan::isIdentifierByte(text[wordStart - 1]))
+            --wordStart;
+        if (wordStart == before || !qualifierWords().contains(text.mid(wordStart, before - wordStart)))
+            return before;
+        before = wordStart;
+    }
+}
+
+// Whether a declaration can start at text[before]: at the start of a
+// statement or a parameter, or after a label's ":" (not a "::").
+bool isDeclarationStart(const QByteArray &text, int before)
+{
+    if (before == 0)
+        return true;
+    const char previous = text[before - 1];
+    if (QByteArrayView("\n;{}(,").contains(previous))
+        return true;
+    const bool isScope = before >= 2 && text[before - 2] == ':';
+    return previous == ':' && !isScope;
+}
+
+QString cleanedType(const QString &type)
+{
+    QString cleaned = type;
+    cleaned.remove(QRegularExpression(QStringLiteral("\\b(?:const|volatile|struct|enum|union|typename)\\b")));
+    cleaned.remove(QLatin1Char('*'));
+    cleaned.remove(QLatin1Char('&'));
+    cleaned = cleaned.simplified();
+    cleaned.remove(QLatin1Char(' '));
+    return cleaned;
+}
+
+// Drops the empty, repeated and reserved names, keeping the order.
+QStringList usableNames(const QStringList &candidates)
+{
+    QStringList names;
+    for (const QString &name : candidates) {
+        if (!name.isEmpty() && !names.contains(name) && !reservedNames().contains(name))
+            names.append(name);
+    }
+    return names;
+}
+
+QStringList plurals(const QStringList &names)
+{
+    QStringList result;
+    result.reserve(names.size());
+    for (const QString &name : names)
+        result.append(plural(name));
+    return result;
+}
+
+const QSet<QString> &containerTypes()
+{
+    static const QSet<QString> types = {"vector",          "list",        "deque",   "set",     "unordered_set",
+                                        "multiset",        "QList",       "QVector", "QSet",    "QStack",
+                                        "QQueue",          "span",        "array",   "List",    "ArrayList",
+                                        "LinkedList",      "Set",         "HashSet", "TreeSet", "Collection",
+                                        "Iterable",        "Queue",       "Deque",   "Stream",  "initializer_list",
+                                        "QVarLengthArray", "forward_list"};
+    return types;
+}
+
+// Types named after what they hold: a pointer to a Widget is a "widget".
+const QSet<QString> &wrapperTypes()
+{
+    static const QSet<QString> types = {
+        "unique_ptr", "shared_ptr", "weak_ptr",          "optional", "QPointer", "QSharedPointer",   "QScopedPointer",
+        "Optional",   "atomic",     "reference_wrapper", "QFuture",  "Future",   "CompletableFuture"};
+    return types;
+}
+
+const QSet<QString> &stringTypes()
+{
+    static const QSet<QString> types = {"string", "String", "QString", "wstring", "string_view", "QStringView"};
+    return types;
+}
+
+QStringList primitiveNames(const QString &type)
+{
+    static const QHash<QString, QStringList> byType = {{"int", {"i", "n", "count"}},
+                                                       {"long", {"l", "n"}},
+                                                       {"short", {"s"}},
+                                                       {"size_t", {"size", "n", "i"}},
+                                                       {"qsizetype", {"size", "n", "i"}},
+                                                       {"char", {"c"}},
+                                                       {"wchar_t", {"c"}},
+                                                       {"bool", {"b", "enabled"}},
+                                                       {"boolean", {"b", "enabled"}},
+                                                       {"float", {"f", "value"}},
+                                                       {"double", {"d", "value"}},
+                                                       {"qreal", {"value"}},
+                                                       {"byte", {"b"}}};
+    return byType.value(type, {QStringLiteral("value")});
+}
+
+// snake_case: "my_type_t" → "my_type", "type".
+QStringList snakeCaseNames(const QString &type)
+{
+    QStringList words = type.split(QLatin1Char('_'), Qt::SkipEmptyParts);
+    if (words.size() > 1 && words.last() == QLatin1String("t"))
+        words.removeLast();
+    QStringList names;
+    for (qsizetype k = 0; k < words.size(); ++k)
+        names.append(words.mid(k).join(QLatin1Char('_')).toLower());
+    return names;
+}
+
+// "TextEditor" → "textEditor", "editor".
+QStringList camelCaseNames(const QString &type)
+{
+    const QStringList words = camelWords(type);
+    QStringList names;
+    for (qsizetype k = 0; k < words.size(); ++k) {
+        QString name = lowerFirst(words[k]);
+        for (qsizetype j = k + 1; j < words.size(); ++j)
+            name += words[j];
+        names.append(name);
+    }
+    return names;
+}
+
 } // namespace
 
 bool NameSuggestionProvider::handles(const CompletionContext &context) const
@@ -157,148 +343,46 @@ bool NameSuggestionProvider::handles(const CompletionContext &context) const
 
 QString NameSuggestionProvider::declaredTypeAt(const QByteArray &text, int position, const QString &languageId)
 {
-    int i = position;
-    bool separated = false;
-    while (i > 0 && (text[i - 1] == ' ' || text[i - 1] == '\t' || text[i - 1] == '*' || text[i - 1] == '&')) {
-        separated = true;
-        --i;
-    }
-    if (!separated || i == 0)
+    int end = position;
+    while (end > 0 && isDeclaratorSeparator(text[end - 1]))
+        --end;
+    const bool isSeparated = end != position;
+    if (!isSeparated || end == 0)
         return {};
-    const int end = i;
-    // The type, read backwards: names, "::", ".", "<...>", "[]".
-    while (i > 0) {
-        const char c = text[i - 1];
-        if (CodeScan::isIdentifierByte(c)) {
-            --i;
-        } else if (c == '>') {
-            int depth = 0;
-            int k = i - 1;
-            for (; k >= 0; --k) {
-                if (text[k] == '>')
-                    ++depth;
-                else if (text[k] == '<' && --depth == 0)
-                    break;
-                else if (text[k] == ';' || text[k] == '{' || text[k] == '}' || text[k] == '\n')
-                    return {};
-            }
-            if (k <= 0)
-                return {};
-            i = k;
-        } else if (c == ']' && i >= 2 && text[i - 2] == '[') {
-            i -= 2;
-        } else if (c == ':' && i >= 2 && text[i - 2] == ':') {
-            i -= 2;
-        } else if (c == '.' && isJava(languageId)) {
-            --i;
-        } else {
-            break;
-        }
-    }
-    const int typeStart = i;
-    if (typeStart == end || (text[typeStart] >= '0' && text[typeStart] <= '9'))
+    const std::optional<int> typeStart = typeStartBefore(text, end, languageId);
+    if (!typeStart || *typeStart == end)
         return {};
-    // Before it: qualifiers, then the start of a statement or a parameter.
-    int before = typeStart;
-    while (true) {
-        while (before > 0 && (text[before - 1] == ' ' || text[before - 1] == '\t'))
-            --before;
-        int wordStart = before;
-        while (wordStart > 0 && CodeScan::isIdentifierByte(text[wordStart - 1]))
-            --wordStart;
-        if (wordStart == before || !qualifierWords().contains(text.mid(wordStart, before - wordStart)))
-            break;
-        before = wordStart;
-    }
-    if (before > 0 && !QByteArrayView("\n;{}(,").contains(text[before - 1]) &&
-        !(text[before - 1] == ':' && !(before >= 2 && text[before - 2] == ':')))
+    const bool startsWithDigit = text[*typeStart] >= '0' && text[*typeStart] <= '9';
+    if (startsWithDigit)
         return {};
-    const QString type = QString::fromUtf8(text.mid(typeStart, end - typeStart)).trimmed();
+    if (!isDeclarationStart(text, qualifiersStart(text, *typeStart)))
+        return {};
+    const QString type = QString::fromUtf8(text.mid(*typeStart, end - *typeStart)).trimmed();
     return looksLikeType(type, languageId) ? type : QString();
 }
 
 QStringList NameSuggestionProvider::namesFor(const QString &type, const QString &languageId)
 {
-    QString cleaned = type;
-    cleaned.remove(QRegularExpression(QStringLiteral("\\b(?:const|volatile|struct|enum|union|typename)\\b")));
-    cleaned.remove(QLatin1Char('*'));
-    cleaned.remove(QLatin1Char('&'));
-    cleaned = cleaned.simplified();
-    cleaned.remove(QLatin1Char(' '));
-    QStringList names;
-    const auto add = [&names](const QString &name) {
-        if (!name.isEmpty() && !names.contains(name) && !reservedNames().contains(name))
-            names.append(name);
-    };
-    if (cleaned.endsWith(QLatin1String("[]"))) {
-        for (const QString &name : namesFor(cleaned.left(cleaned.size() - 2), languageId))
-            add(plural(name));
-        return names;
-    }
+    const QString cleaned = cleanedType(type);
+    if (cleaned.endsWith(QLatin1String("[]")))
+        return usableNames(plurals(namesFor(cleaned.left(cleaned.size() - 2), languageId)));
     QStringList arguments;
     const QString base = splitTemplate(cleaned, &arguments);
-    static const QSet<QString> containers = {"vector",          "list",        "deque",   "set",     "unordered_set",
-                                             "multiset",        "QList",       "QVector", "QSet",    "QStack",
-                                             "QQueue",          "span",        "array",   "List",    "ArrayList",
-                                             "LinkedList",      "Set",         "HashSet", "TreeSet", "Collection",
-                                             "Iterable",        "Queue",       "Deque",   "Stream",  "initializer_list",
-                                             "QVarLengthArray", "forward_list"};
-    static const QSet<QString> wrappers = {
-        "unique_ptr", "shared_ptr", "weak_ptr",          "optional", "QPointer", "QSharedPointer",   "QScopedPointer",
-        "Optional",   "atomic",     "reference_wrapper", "QFuture",  "Future",   "CompletableFuture"};
-    if (!arguments.isEmpty() && containers.contains(base)) {
-        for (const QString &name : namesFor(arguments.first(), languageId))
-            add(plural(name));
-        add(lowerFirst(base));
-        return names;
-    }
-    if (!arguments.isEmpty() && wrappers.contains(base))
+    const bool hasArguments = !arguments.isEmpty();
+    if (hasArguments && containerTypes().contains(base))
+        return usableNames(plurals(namesFor(arguments.first(), languageId)) << lowerFirst(base));
+    if (hasArguments && wrapperTypes().contains(base))
         return namesFor(arguments.first(), languageId);
-
-    if (primitives().contains(base)) {
-        static const QHash<QString, QStringList> byType = {{"int", {"i", "n", "count"}},
-                                                           {"long", {"l", "n"}},
-                                                           {"short", {"s"}},
-                                                           {"size_t", {"size", "n", "i"}},
-                                                           {"qsizetype", {"size", "n", "i"}},
-                                                           {"char", {"c"}},
-                                                           {"wchar_t", {"c"}},
-                                                           {"bool", {"b", "enabled"}},
-                                                           {"boolean", {"b", "enabled"}},
-                                                           {"float", {"f", "value"}},
-                                                           {"double", {"d", "value"}},
-                                                           {"qreal", {"value"}},
-                                                           {"byte", {"b"}}};
-        for (const QString &name : byType.value(base, {QStringLiteral("value")}))
-            add(name);
+    if (primitives().contains(base))
+        return usableNames(primitiveNames(base));
+    if (stringTypes().contains(base))
+        return usableNames({QStringLiteral("text"), QStringLiteral("name"), QStringLiteral("s")});
+    if (base.contains(QLatin1Char('_')) || base == base.toLower())
+        return usableNames(snakeCaseNames(base));
+    QStringList names = usableNames(camelCaseNames(base));
+    if (!names.isEmpty() || base.isEmpty())
         return names;
-    }
-    static const QSet<QString> strings = {"string", "String", "QString", "wstring", "string_view", "QStringView"};
-    if (strings.contains(base)) {
-        add(QStringLiteral("text"));
-        add(QStringLiteral("name"));
-        add(QStringLiteral("s"));
-        return names;
-    }
-    if (base.contains(QLatin1Char('_')) || base == base.toLower()) {
-        // snake_case: "my_type_t" → "my_type", "type".
-        QStringList words = base.split(QLatin1Char('_'), Qt::SkipEmptyParts);
-        if (words.size() > 1 && words.last() == QLatin1String("t"))
-            words.removeLast();
-        for (qsizetype k = 0; k < words.size(); ++k)
-            add(words.mid(k).join(QLatin1Char('_')).toLower());
-        return names;
-    }
-    const QStringList words = camelWords(base);
-    for (qsizetype k = 0; k < words.size(); ++k) {
-        QString name = lowerFirst(words[k]);
-        for (qsizetype j = k + 1; j < words.size(); ++j)
-            name += words[j];
-        add(name);
-    }
-    if (names.isEmpty() && !base.isEmpty())
-        add(isJava(languageId) ? QStringLiteral("a") + base : lowerFirst(base) + QLatin1Char('_'));
-    return names;
+    return usableNames({isJava(languageId) ? QStringLiteral("a") + base : lowerFirst(base) + QLatin1Char('_')});
 }
 
 void NameSuggestionProvider::complete(const CompletionContext &context, const Callback &done)

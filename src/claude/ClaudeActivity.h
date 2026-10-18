@@ -41,6 +41,8 @@ signals:
 
 private:
     void setState(State state, const QString &detail = {});
+    void waitForInput(const HookEvent &event);
+    void finishResponse(const HookEvent &event);
 
     State state_ = State::Idle;
     QString detail_;

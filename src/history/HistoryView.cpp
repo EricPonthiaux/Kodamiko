@@ -41,19 +41,23 @@ QString formatDate(const QDateTime &date)
     return QLocale().toString(date.toLocalTime(), QLocale::ShortFormat);
 }
 
+struct ClosablePaneParts {
+    QLabel *title = nullptr;
+    QWidget *content = nullptr;
+    QString closeTip;
+    std::function<void()> onClose;
+};
+
 // Closable pane: a bar with its title and a close button, above the content.
-QWidget *closablePane(QLabel *title,
-                      QWidget *content,
-                      const QString &closeTip,
-                      QWidget *parent,
-                      const std::function<void()> &onClose)
+QWidget *closablePane(const ClosablePaneParts &parts, QWidget *parent)
 {
+    QLabel *title = parts.title;
     auto *pane = new QWidget(parent);
     auto *close = new QToolButton(pane);
     close->setText(QStringLiteral("✕"));
-    close->setToolTip(closeTip);
+    close->setToolTip(parts.closeTip);
     close->setAutoRaise(true);
-    QObject::connect(close, &QToolButton::clicked, pane, onClose);
+    QObject::connect(close, &QToolButton::clicked, pane, parts.onClose);
 
     title->setTextInteractionFlags(Qt::TextSelectableByMouse);
     AppFonts::setInterfaceFont(title, 1);
@@ -66,8 +70,20 @@ QWidget *closablePane(QLabel *title,
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addLayout(bar);
-    layout->addWidget(content, 1);
+    layout->addWidget(parts.content, 1);
     return pane;
+}
+
+// "12 commits", "Last 500 commits"…
+QString commitCountText(const CommitLog &log)
+{
+    if (log.info.unborn)
+        return QObject::tr("No commits");
+    if (log.truncated)
+        return QObject::tr("Last %1 commits").arg(log.commits.size());
+    if (log.commits.size() == 1)
+        return QObject::tr("1 commit");
+    return QObject::tr("%1 commits").arg(log.commits.size());
 }
 
 } // namespace
@@ -164,8 +180,16 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     panel_->setSizes({210, 180});
 
     // A pane's close button deselects whatever made it appear, which hides it.
-    commitPane_ = closablePane(commitTitle_, panel_, tr("Close commit"), this, [this] { commits_->clearSelection(); });
-    diffPane_ = closablePane(diffTitle_, diff_, tr("Close diff"), this, [this] { files_->clearSelection(); });
+    commitPane_ = closablePane({.title = commitTitle_,
+                                .content = panel_,
+                                .closeTip = tr("Close commit"),
+                                .onClose = [this] { commits_->clearSelection(); }},
+                               this);
+    diffPane_ = closablePane({.title = diffTitle_,
+                              .content = diff_,
+                              .closeTip = tr("Close diff"),
+                              .onClose = [this] { files_->clearSelection(); }},
+                             this);
 
     leftSplitter_->addWidget(commits_);
     leftSplitter_->addWidget(commitPane_);
@@ -282,10 +306,7 @@ void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
         hidePanes();
         return;
     }
-    QString summary = log_->info.unborn           ? tr("No commits")
-                      : log_->truncated           ? tr("Last %1 commits").arg(log_->commits.size())
-                      : log_->commits.size() == 1 ? tr("1 commit")
-                                                  : tr("%1 commits").arg(log_->commits.size());
+    QString summary = commitCountText(*log_);
     if (!pathFilter_.isEmpty())
         summary += tr(" touching %1").arg(pathFilter_);
     else if (!log_->info.prefix.isEmpty())
@@ -325,6 +346,8 @@ void HistoryView::rebuildList()
 
 void HistoryView::applyFilter()
 {
+    if (!log_)
+        return; // no rows to filter
     const QString text = filter_->text().trimmed();
     for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
         QTreeWidgetItem *item = commits_->topLevelItem(i);

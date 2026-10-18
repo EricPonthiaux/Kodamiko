@@ -7,6 +7,49 @@
 
 namespace diagram {
 
+namespace {
+
+QList<const Codec *> registeredCodecs()
+{
+    QList<const Codec *> all;
+    all += families::explainerCodecs();
+    all += families::productVisionCodecs();
+    all += families::dataModelCodecs();
+    all += families::c4Codecs();
+    all += families::journeyCodecs();
+    all += families::flowchartCodecs();
+    all += families::sequenceCodecs();
+    all += families::classCodecs();
+    all += families::stateCodecs();
+    all += families::mindmapCodecs();
+    return all;
+}
+
+// Mermaid and the JSON scenes first, PlantUML after (class, state,
+// sequence, then the others).
+QList<const Codec *> inDetectionOrder(const QList<const Codec *> &all)
+{
+    QList<const Codec *> ordered;
+    for (const Codec *codec : all) {
+        if (codec->language() != QLatin1String("plantuml"))
+            ordered.append(codec);
+    }
+    for (const QString &id :
+         {QStringLiteral("plantuml-class"), QStringLiteral("plantuml-state"), QStringLiteral("plantuml-sequence")}) {
+        for (const Codec *codec : all) {
+            if (codec->id() == id)
+                ordered.append(codec);
+        }
+    }
+    for (const Codec *codec : all) {
+        if (codec->language() == QLatin1String("plantuml") && !ordered.contains(codec))
+            ordered.append(codec);
+    }
+    return ordered;
+}
+
+} // namespace
+
 const QList<const Family *> &allFamilies()
 {
     // A family without shapes is not ported yet: it is left out.
@@ -39,38 +82,7 @@ const QList<const Codec *> &allCodecs()
 {
     // Detection order matters for PlantUML (no header keyword): class and
     // state have positive markers, sequence is the broadest so it goes last.
-    static const QList<const Codec *> list = [] {
-        QList<const Codec *> all;
-        all += families::explainerCodecs();
-        all += families::productVisionCodecs();
-        all += families::dataModelCodecs();
-        all += families::c4Codecs();
-        all += families::journeyCodecs();
-        all += families::flowchartCodecs();
-        all += families::sequenceCodecs();
-        all += families::classCodecs();
-        all += families::stateCodecs();
-        all += families::mindmapCodecs();
-        QList<const Codec *> ordered;
-        // Mermaid and the JSON scenes first, PlantUML after (class, state,
-        // sequence).
-        for (const Codec *codec : all) {
-            if (codec->language() != QLatin1String("plantuml"))
-                ordered.append(codec);
-        }
-        for (const QString &id : {QStringLiteral("plantuml-class"), QStringLiteral("plantuml-state"),
-                                  QStringLiteral("plantuml-sequence")}) {
-            for (const Codec *codec : all) {
-                if (codec->id() == id)
-                    ordered.append(codec);
-            }
-        }
-        for (const Codec *codec : all) {
-            if (codec->language() == QLatin1String("plantuml") && !ordered.contains(codec))
-                ordered.append(codec);
-        }
-        return ordered;
-    }();
+    static const QList<const Codec *> list = inDetectionOrder(registeredCodecs());
     return list;
 }
 

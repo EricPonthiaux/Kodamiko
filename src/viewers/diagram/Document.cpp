@@ -9,7 +9,9 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 
+#include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace diagram::document {
 
@@ -110,6 +112,67 @@ QString linkKey(const Board &board, const Link &l)
     return (a ? a->key : QString()) + QLatin1Char('>') + (b ? b->key : QString());
 }
 
+void restoreShape(const Board &board, Shape &s, const QJsonObject &saved)
+{
+    s.x = saved.value(QStringLiteral("x")).toDouble();
+    s.y = saved.value(QStringLiteral("y")).toDouble();
+    if (saved.contains(QStringLiteral("w")))
+        s.manualWidth = saved.value(QStringLiteral("w")).toDouble();
+    if (saved.contains(QStringLiteral("h")))
+        s.manualHeight = saved.value(QStringLiteral("h")).toDouble();
+    const QString fill = saved.value(QStringLiteral("fill")).toString();
+    if (isHexColor(fill))
+        s.customFill = fill.toLower();
+    board.measureShape(s);
+}
+
+bool isLineStyle(const QString &line)
+{
+    return line == QLatin1String("solid") || line == QLatin1String("dashed") || line == QLatin1String("dotted");
+}
+
+bool isCubicCurve(const std::vector<QPointF> &curve)
+{
+    return curve.size() >= 4 && (curve.size() - 1) % 3 == 0;
+}
+
+// The saved curve, or else the saved label point, both against the ends'
+// current places.
+void restoreRoute(const Shape &a, const Shape &b, Link &l, const QJsonObject &saved)
+{
+    const std::vector<QPointF> curve = unflat(saved.value(QStringLiteral("c")).toArray());
+    if (isCubicCurve(curve)) {
+        Spline spline;
+        spline.points = curve;
+        spline.start = unpair(saved.value(QStringLiteral("s")));
+        spline.end = unpair(saved.value(QStringLiteral("e")));
+        spline.labelPoint = unpair(saved.value(QStringLiteral("lp")));
+        spline.fromAnchor = QPointF(a.x, a.y);
+        spline.toAnchor = QPointF(b.x, b.y);
+        l.spline = spline;
+        return;
+    }
+    if (const std::optional<QPointF> lp = unpair(saved.value(QStringLiteral("lp"))))
+        l.layoutLabelPoint = Link::ReservedLabel{*lp, QPointF(a.x, a.y), QPointF(b.x, b.y)};
+}
+
+void restoreLink(const Board &board, Link &l, const QJsonObject &saved)
+{
+    const QString line = saved.value(QStringLiteral("style")).toString();
+    if (isLineStyle(line))
+        l.customLineStyle = line;
+    const QString color = saved.value(QStringLiteral("color")).toString();
+    if (isHexColor(color))
+        l.customColor = color.toLower();
+    const qreal width = saved.value(QStringLiteral("width")).toDouble();
+    if (width >= linkWidthMin && width <= linkWidthMax)
+        l.customWidth = width;
+    const Shape *a = board.shape(l.from);
+    const Shape *b = board.shape(l.to);
+    if (a && b)
+        restoreRoute(*a, *b, l, saved);
+}
+
 // Gives the built board's elements their saved place, size, color and
 // curve. Returns the shapes left without a place.
 QStringList restore(const Board &board, const SavedLayout &layout)
@@ -117,20 +180,11 @@ QStringList restore(const Board &board, const SavedLayout &layout)
     QStringList unplaced;
     for (const auto &s : board.shapes()) {
         const QJsonObject saved = layout.shapes.value(s->key);
-        if (s->key.isEmpty() || saved.isEmpty() || !saved.contains(QStringLiteral("x"))) {
+        const bool hasPlace = !s->key.isEmpty() && !saved.isEmpty() && saved.contains(QStringLiteral("x"));
+        if (hasPlace)
+            restoreShape(board, *s, saved);
+        else
             unplaced.append(s->id);
-            continue;
-        }
-        s->x = saved.value(QStringLiteral("x")).toDouble();
-        s->y = saved.value(QStringLiteral("y")).toDouble();
-        if (saved.contains(QStringLiteral("w")))
-            s->manualWidth = saved.value(QStringLiteral("w")).toDouble();
-        if (saved.contains(QStringLiteral("h")))
-            s->manualHeight = saved.value(QStringLiteral("h")).toDouble();
-        const QString fill = saved.value(QStringLiteral("fill")).toString();
-        if (isHexColor(fill))
-            s->customFill = fill.toLower();
-        board.measureShape(*s);
     }
     // Several links can join the same shapes (sequence messages): they get
     // their saved appearance back in order.
@@ -142,181 +196,222 @@ QStringList restore(const Board &board, const SavedLayout &layout)
         if (rank >= candidates.size())
             continue;
         taken.insert(key, rank + 1);
-        const QJsonObject &saved = candidates[rank];
-        const QString line = saved.value(QStringLiteral("style")).toString();
-        if (line == QLatin1String("solid") || line == QLatin1String("dashed") || line == QLatin1String("dotted"))
-            l->customLineStyle = line;
-        const QString color = saved.value(QStringLiteral("color")).toString();
-        if (isHexColor(color))
-            l->customColor = color.toLower();
-        const qreal width = saved.value(QStringLiteral("width")).toDouble();
-        if (width >= linkWidthMin && width <= linkWidthMax)
-            l->customWidth = width;
-        const Shape *a = board.shape(l->from);
-        const Shape *b = board.shape(l->to);
-        const std::vector<QPointF> curve = unflat(saved.value(QStringLiteral("c")).toArray());
-        if (a && b && curve.size() >= 4 && (curve.size() - 1) % 3 == 0) {
-            Spline spline;
-            spline.points = curve;
-            spline.start = unpair(saved.value(QStringLiteral("s")));
-            spline.end = unpair(saved.value(QStringLiteral("e")));
-            spline.labelPoint = unpair(saved.value(QStringLiteral("lp")));
-            spline.fromAnchor = QPointF(a->x, a->y);
-            spline.toAnchor = QPointF(b->x, b->y);
-            l->spline = spline;
-        } else if (a && b) {
-            if (const std::optional<QPointF> lp = unpair(saved.value(QStringLiteral("lp"))))
-                l->layoutLabelPoint = Link::ReservedLabel{*lp, QPointF(a->x, a->y), QPointF(b->x, b->y)};
-        }
+        restoreLink(board, *l, candidates[rank]);
     }
     return unplaced;
+}
+
+bool differsFromMinimum(const std::optional<qreal> &manual, qreal minimum)
+{
+    return manual && std::abs(*manual - minimum) > 0.5;
+}
+
+QJsonObject shapeLayoutEntry(const Shape &s)
+{
+    QJsonObject entry{
+        {QStringLiteral("key"), s.key}, {QStringLiteral("x"), rounded(s.x)}, {QStringLiteral("y"), rounded(s.y)}};
+    // A frame laid out as a cluster takes its size from the layout, not
+    // from its content: measuring could not give it back.
+    const bool laidOutSize = s.isGraphvizCluster();
+    if (laidOutSize || differsFromMinimum(s.manualWidth, s.resizeMinWidth))
+        entry.insert(QStringLiteral("w"), rounded(s.w));
+    if (laidOutSize || differsFromMinimum(s.manualHeight, s.resizeMinHeight))
+        entry.insert(QStringLiteral("h"), rounded(s.h));
+    if (!s.customFill.isEmpty())
+        entry.insert(QStringLiteral("fill"), s.customFill);
+    return entry;
+}
+
+// The link's curve, or else its label point, while they still fit its ends.
+void insertRoute(const Board &board, const Link &l, QJsonObject &entry)
+{
+    const Shape *a = board.shape(l.from);
+    const Shape *b = board.shape(l.to);
+    if (!a || !b)
+        return;
+    if (const Spline *spline = l.validSpline(*a, *b)) {
+        entry.insert(QStringLiteral("c"), flat(spline->points));
+        if (spline->start)
+            entry.insert(QStringLiteral("s"), pair(*spline->start));
+        if (spline->end)
+            entry.insert(QStringLiteral("e"), pair(*spline->end));
+        if (spline->labelPoint)
+            entry.insert(QStringLiteral("lp"), pair(*spline->labelPoint));
+    } else if (const std::optional<QPointF> lp = l.validLayoutLabelPoint(*a, *b)) {
+        entry.insert(QStringLiteral("lp"), pair(*lp));
+    }
+}
+
+QJsonObject linkLayoutEntry(const Board &board, const Link &l, const QString &key, int rank)
+{
+    QJsonObject entry{{QStringLiteral("link"), key}, {QStringLiteral("n"), rank}};
+    if (!l.customLineStyle.isEmpty())
+        entry.insert(QStringLiteral("style"), l.customLineStyle);
+    if (!l.customColor.isEmpty())
+        entry.insert(QStringLiteral("color"), l.customColor);
+    if (l.customWidth)
+        entry.insert(QStringLiteral("width"), *l.customWidth);
+    insertRoute(board, l, entry);
+    return entry;
 }
 
 QStringList layoutLines(const Board &board, const Codec &codec)
 {
     const QString prefix = commentPrefix(codec) + QStringLiteral(" duet ");
+    const auto line = [&prefix](const QJsonObject &entry) {
+        return prefix + QString::fromUtf8(QJsonDocument(entry).toJson(QJsonDocument::Compact));
+    };
     QStringList lines;
     for (const auto &s : board.shapes()) {
-        if (s->key.isEmpty())
-            continue;
-        QJsonObject entry{{QStringLiteral("key"), s->key},
-                          {QStringLiteral("x"), rounded(s->x)},
-                          {QStringLiteral("y"), rounded(s->y)}};
-        // A frame laid out as a cluster takes its size from the layout, not
-        // from its content: measuring could not give it back.
-        const bool laidOutSize = s->isGraphvizCluster();
-        if (laidOutSize || (s->manualWidth && std::abs(*s->manualWidth - s->resizeMinWidth) > 0.5))
-            entry.insert(QStringLiteral("w"), rounded(s->w));
-        if (laidOutSize || (s->manualHeight && std::abs(*s->manualHeight - s->resizeMinHeight) > 0.5))
-            entry.insert(QStringLiteral("h"), rounded(s->h));
-        if (!s->customFill.isEmpty())
-            entry.insert(QStringLiteral("fill"), s->customFill);
-        lines.append(prefix + QString::fromUtf8(QJsonDocument(entry).toJson(QJsonDocument::Compact)));
+        if (!s->key.isEmpty())
+            lines.append(line(shapeLayoutEntry(*s)));
     }
     QHash<QString, int> ranks;
     for (const auto &l : board.links()) {
         const QString key = linkKey(board, *l);
         const int rank = ranks.value(key);
         ranks.insert(key, rank + 1);
-        QJsonObject entry{{QStringLiteral("link"), key}, {QStringLiteral("n"), rank}};
-        if (!l->customLineStyle.isEmpty())
-            entry.insert(QStringLiteral("style"), l->customLineStyle);
-        if (!l->customColor.isEmpty())
-            entry.insert(QStringLiteral("color"), l->customColor);
-        if (l->customWidth)
-            entry.insert(QStringLiteral("width"), *l->customWidth);
-        const Shape *a = board.shape(l->from);
-        const Shape *b = board.shape(l->to);
-        if (a && b) {
-            if (const Spline *spline = l->validSpline(*a, *b)) {
-                entry.insert(QStringLiteral("c"), flat(spline->points));
-                if (spline->start)
-                    entry.insert(QStringLiteral("s"), pair(*spline->start));
-                if (spline->end)
-                    entry.insert(QStringLiteral("e"), pair(*spline->end));
-                if (spline->labelPoint)
-                    entry.insert(QStringLiteral("lp"), pair(*spline->labelPoint));
-            } else if (const std::optional<QPointF> lp = l->validLayoutLabelPoint(*a, *b)) {
-                entry.insert(QStringLiteral("lp"), pair(*lp));
-            }
-        }
+        const QJsonObject entry = linkLayoutEntry(board, *l, key, rank);
+        // Beyond "link" and "n", there is something to keep.
         if (entry.size() > 2)
-            lines.append(prefix + QString::fromUtf8(QJsonDocument(entry).toJson(QJsonDocument::Compact)));
+            lines.append(line(entry));
     }
     if (!lines.isEmpty())
         lines.prepend(commentPrefix(codec) + QStringLiteral(" Layout kept by Duet (positions, sizes, colors, curves)"));
     return lines;
 }
 
-bool build(Board &board,
-           const Codec &codec,
-           const QString &source,
-           const SavedLayout &layout,
-           Loaded &loaded,
-           QString *error,
-           bool keepHistory = false)
+void setError(QString *error, const QString &message)
 {
-    Model model;
-    QString message;
-    if (!codec.parse(source, model, &message)) {
-        if (error)
-            *error = message.isEmpty() ? QStringLiteral("The diagram cannot be read") : message;
-        return false;
-    }
-    QSet<QString> unplacedKeys;
+    if (error)
+        *error = message;
+}
+
+// The keys of the nodes whose source gives no place.
+QSet<QString> unplacedKeys(const Model &model)
+{
+    QSet<QString> keys;
     for (const Model::Node &node : model.nodes) {
         if (!node.props.contains(QStringLiteral("x")) || !node.props.contains(QStringLiteral("y")))
-            unplacedKeys.insert(node.key);
+            keys.insert(node.key);
     }
-    buildBoard(board, codec, model);
-    loaded.codec = &codec;
-    loaded.warnings = model.warnings;
+    return keys;
+}
+
+// The shapes left without a place: by the source when it owns the layout,
+// else by the saved layout.
+QStringList unplacedShapes(const Board &board, const Codec &codec, const Model &model, const SavedLayout &layout)
+{
+    if (!codec.sourceOwnsLayout())
+        return restore(board, layout);
+    const QSet<QString> keys = unplacedKeys(model);
+    QStringList unplaced;
+    for (const auto &s : board.shapes()) {
+        if (keys.contains(s->key))
+            unplaced.append(s->id);
+    }
+    return unplaced;
+}
+
+bool hasUnroutedLinks(const Board &board)
+{
+    return std::ranges::any_of(board.links(), [](const auto &l) { return !l->spline && l->from != l->to; });
+}
+
+enum class History {
+    Clear,
+    Keep
+};
+
+struct BuildRequest {
+    const Codec *codec = nullptr;
+    QString source;
+    const SavedLayout *layout = nullptr;
+    History history = History::Clear;
+};
+
+void decideLayout(const Board &board, const Codec &codec, const QStringList &unplaced, Loaded &loaded)
+{
     loaded.needsArrange = false;
     loaded.unplaced.clear();
     loaded.needsRouting = false;
     const Family &family = codec.family();
-    QStringList unplaced;
-    if (codec.sourceOwnsLayout()) {
-        for (const auto &s : board.shapes()) {
-            if (unplacedKeys.contains(s->key))
-                unplaced.append(s->id);
-        }
-    } else {
-        unplaced = restore(board, layout);
-    }
     if (!board.isEmpty()) {
-        if (unplaced.size() == qsizetype(board.shapes().size()) ||
-            (family.alwaysArrange && codec.arrangeWithGraphviz() && !codec.sourceOwnsLayout()))
+        const bool nothingPlaced = unplaced.size() == qsizetype(board.shapes().size());
+        const bool familyArranges = family.alwaysArrange && codec.arrangeWithGraphviz() && !codec.sourceOwnsLayout();
+        if (nothingPlaced || familyArranges)
             loaded.needsArrange = true;
         else
             loaded.unplaced = unplaced;
     }
-    if (!loaded.needsArrange && family.routeLinksOnMove) {
-        for (const auto &l : board.links()) {
-            if (!l->spline && l->from != l->to)
-                loaded.needsRouting = true;
+    if (!loaded.needsArrange && family.routeLinksOnMove)
+        loaded.needsRouting = hasUnroutedLinks(board);
+}
+
+std::optional<Loaded> build(Board &board, const BuildRequest &request, QString *error)
+{
+    const Codec &codec = *request.codec;
+    Model model;
+    QString message;
+    if (!codec.parse(request.source, model, &message)) {
+        setError(error, message.isEmpty() ? QStringLiteral("The diagram cannot be read") : message);
+        return std::nullopt;
+    }
+    buildBoard(board, codec, model);
+    Loaded loaded;
+    loaded.codec = &codec;
+    loaded.warnings = model.warnings;
+    decideLayout(board, codec, unplacedShapes(board, codec, model, *request.layout), loaded);
+    if (request.history == History::Clear)
+        board.clearHistory();
+    return loaded;
+}
+
+// The codec of a blank file: the first family in menu order written in
+// that language (the flowchart for Mermaid).
+const Codec *blankFileCodec(const QString &language)
+{
+    for (const Family *family : allFamilies()) {
+        for (const Codec *candidate : allCodecs()) {
+            if (&candidate->family() == family && candidate->language() == language)
+                return candidate;
         }
     }
-    if (!keepHistory)
-        board.clearHistory();
-    return true;
+    return nullptr;
+}
+
+QString unsupportedMessage(const QString &language)
+{
+    if (language == QLatin1String("mermaid"))
+        return QStringLiteral("Unsupported Mermaid diagram (the first line names its kind: flowchart, "
+                              "sequenceDiagram, classDiagram…)");
+    return QStringLiteral("Unsupported diagram");
 }
 
 } // namespace
 
-bool load(Board &board, const QString &path, const QByteArray &content, Loaded &loaded, QString *error)
+std::optional<Loaded> load(Board &board, const QString &path, const QByteArray &content, QString *error)
 {
     const QString language = languageOfFile(path);
     if (language.isEmpty()) {
-        if (error)
-            *error = QStringLiteral("Not a diagram file");
-        return false;
+        setError(error, QStringLiteral("Not a diagram file"));
+        return std::nullopt;
     }
     SavedLayout layout;
     QString source = splitLayout(QString::fromUtf8(content), layout);
+    const Codec *codec = codecFor(language, source);
     // A blank file is a new diagram of the first family written in that
     // language.
-    const Codec *codec = codecFor(language, source);
     if (!codec && source.trimmed().isEmpty()) {
-        // The first family in menu order (the flowchart for Mermaid).
-        for (const Family *family : allFamilies()) {
-            for (const Codec *candidate : allCodecs()) {
-                if (!codec && &candidate->family() == family && candidate->language() == language) {
-                    codec = candidate;
-                    source = candidate->blank();
-                }
-            }
-        }
+        codec = blankFileCodec(language);
+        if (codec)
+            source = codec->blank();
     }
     if (!codec) {
-        if (error)
-            *error = language == QLatin1String("mermaid")
-                         ? QStringLiteral("Unsupported Mermaid diagram (the first line names its kind: flowchart, "
-                                          "sequenceDiagram, classDiagram…)")
-                         : QStringLiteral("Unsupported diagram");
-        return false;
+        setError(error, unsupportedMessage(language));
+        return std::nullopt;
     }
-    return build(board, *codec, source, layout, loaded, error);
+    return build(board, {.codec = codec, .source = source, .layout = &layout}, error);
 }
 
 QString source(const Board &board, const Codec &codec)
@@ -345,7 +440,7 @@ QByteArray save(const Board &board, const Codec &codec)
     return text.toUtf8();
 }
 
-bool applySource(Board &board, const Codec &codec, const QString &text, Loaded &loaded, QString *error)
+std::optional<Loaded> applySource(Board &board, const Codec &codec, const QString &text, QString *error)
 {
     // The current arrangement is the layout to keep.
     SavedLayout layout;
@@ -354,18 +449,18 @@ bool applySource(Board &board, const Codec &codec, const QString &text, Loaded &
     const QString cleaned = splitLayout(text, ignored);
     const Codec *target = codecFor(codec.language(), cleaned);
     if (!target) {
-        if (error)
-            *error = QStringLiteral("This is not a diagram Duet reads");
-        return false;
+        setError(error, QStringLiteral("This is not a diagram Duet reads"));
+        return std::nullopt;
     }
     Board scratch;
-    Loaded check;
-    if (!build(scratch, *target, cleaned, layout, check, error))
-        return false;
+    if (!build(scratch, {.codec = target, .source = cleaned, .layout = &layout}, error))
+        return std::nullopt;
     const QByteArray before = board.snapshot();
-    build(board, *target, cleaned, layout, loaded, error, true);
+    // The scratch build above read the same source: this one succeeds.
+    const std::optional<Loaded> applied =
+        build(board, {.codec = target, .source = cleaned, .layout = &layout, .history = History::Keep}, error);
     board.pushHistory(before);
-    return true;
+    return applied.value_or(Loaded{});
 }
 
 QByteArray blank(const QString &familyId)
@@ -398,11 +493,11 @@ QString extension(const QString &familyId)
 QStringList problems(const QString &path, const QByteArray &content)
 {
     Board board;
-    Loaded loaded;
     QString error;
-    if (!load(board, path, content, loaded, &error))
+    const std::optional<Loaded> loaded = load(board, path, content, &error);
+    if (!loaded)
         return {error};
-    return loaded.warnings;
+    return loaded->warnings;
 }
 
 } // namespace diagram::document

@@ -20,11 +20,10 @@ namespace {
 
 constexpr int refreshDelayMs = 200;
 
-enum ItemRole {
-    PathRole = Qt::UserRole,
-    LineRole,
-    ColumnRole
-};
+// Item data roles.
+constexpr int pathRole = Qt::UserRole;
+constexpr int lineRole = Qt::UserRole + 1;
+constexpr int columnRole = Qt::UserRole + 2;
 
 // A red disc with "!" for an error, an amber triangle for a warning.
 QIcon severityIcon(Diagnostic::Severity severity)
@@ -68,6 +67,110 @@ QString countText(int errors, int warnings)
     return parts.join(QStringLiteral(", "));
 }
 
+// A file's problems, errors first, then by position.
+struct FileProblems {
+    QString path;
+    Problems problems;
+    int errors = 0;
+
+    int warnings() const { return int(problems.size()) - errors; }
+};
+
+// The files with problems, those with the most errors first.
+QList<FileProblems> sortedFiles(const ProblemStore &store)
+{
+    QList<FileProblems> files;
+    for (const QString &path : store.files()) {
+        FileProblems file{path, store.problems(path)};
+        if (file.problems.isEmpty())
+            continue;
+        std::stable_sort(file.problems.begin(), file.problems.end(), [](const Problem &a, const Problem &b) {
+            if (a.severity != b.severity)
+                return a.severity == Diagnostic::Severity::Error;
+            return std::pair(a.line, a.column) < std::pair(b.line, b.column);
+        });
+        file.errors = int(std::count_if(file.problems.begin(), file.problems.end(), [](const Problem &problem) {
+            return problem.severity == Diagnostic::Severity::Error;
+        }));
+        files.append(file);
+    }
+    std::stable_sort(files.begin(), files.end(),
+                     [](const FileProblems &a, const FileProblems &b) { return a.errors > b.errors; });
+    return files;
+}
+
+// The selected item, found again after the tree is rebuilt.
+struct Selection {
+    QString path;
+    int line = -1; // -1 when a file is selected
+    QString message;
+
+    bool isFile(const QString &filePath) const { return line < 0 && filePath == path; }
+
+    bool isProblem(const QString &filePath, int problemLine, const QString &toolTip) const
+    {
+        return filePath == path && problemLine == line && toolTip == message;
+    }
+};
+
+Selection selectionOf(const QTreeWidgetItem *current)
+{
+    if (!current)
+        return {};
+    const bool isProblem = current->parent() != nullptr;
+    return {current->data(0, pathRole).toString(), isProblem ? current->data(0, lineRole).toInt() : -1,
+            isProblem ? current->toolTip(0) : QString()};
+}
+
+QString problemToolTip(const Problem &problem)
+{
+    if (problem.source.isEmpty())
+        return problem.message;
+    return problem.message + QStringLiteral("\n— %1").arg(problem.source);
+}
+
+QTreeWidgetItem *addProblemItem(QTreeWidgetItem *fileItem, const QString &path, const Problem &problem)
+{
+    auto *item = new QTreeWidgetItem(fileItem);
+    const QString firstLine = problem.message.section(QLatin1Char('\n'), 0, 0);
+    item->setText(0, QStringLiteral("%1  :%2").arg(firstLine).arg(problem.line + 1));
+    item->setIcon(0, severityIcon(problem.severity));
+    item->setToolTip(0, problemToolTip(problem));
+    item->setData(0, pathRole, path);
+    item->setData(0, lineRole, problem.line);
+    item->setData(0, columnRole, problem.column);
+    return item;
+}
+
+// Adds the file's problems; returns the one that was selected, or null.
+QTreeWidgetItem *addProblemItems(QTreeWidgetItem *fileItem, const FileProblems &file, const Selection &selection)
+{
+    QTreeWidgetItem *selected = nullptr;
+    for (const Problem &problem : file.problems) {
+        QTreeWidgetItem *item = addProblemItem(fileItem, file.path, problem);
+        if (!selected && selection.isProblem(file.path, problem.line, item->toolTip(0)))
+            selected = item;
+    }
+    return selected;
+}
+
+// `projectFolder` empty: folders are shown absolute.
+QTreeWidgetItem *addFileItem(QTreeWidget *tree, const FileProblems &file, const QString &projectFolder, bool darkIcons)
+{
+    const QFileInfo info(file.path);
+    QString folder =
+        projectFolder.isEmpty() ? info.absolutePath() : QDir(projectFolder).relativeFilePath(info.absolutePath());
+    if (folder == QLatin1String("."))
+        folder.clear();
+    auto *fileItem = new QTreeWidgetItem(tree);
+    fileItem->setText(0, QStringLiteral("%1  %2").arg(info.fileName(), countText(file.errors, file.warnings())));
+    fileItem->setIcon(0, FileIcons::file(info.fileName(), darkIcons));
+    fileItem->setToolTip(
+        0, QDir::toNativeSeparators(folder.isEmpty() ? info.fileName() : folder + QLatin1Char('/') + info.fileName()));
+    fileItem->setData(0, pathRole, file.path);
+    return fileItem;
+}
+
 } // namespace
 
 ProblemsView::ProblemsView(ProblemStore *problems, QWidget *parent)
@@ -89,9 +192,9 @@ ProblemsView::ProblemsView(ProblemStore *problems, QWidget *parent)
     connect(tree_, &QTreeWidget::itemClicked, this, &ProblemsView::activate);
     connect(tree_, &QTreeWidget::itemActivated, this, &ProblemsView::activate);
     connect(tree_, &QTreeWidget::itemCollapsed, this,
-            [this](QTreeWidgetItem *item) { collapsedFiles_.insert(item->data(0, PathRole).toString()); });
+            [this](QTreeWidgetItem *item) { collapsedFiles_.insert(item->data(0, pathRole).toString()); });
     connect(tree_, &QTreeWidget::itemExpanded, this,
-            [this](QTreeWidgetItem *item) { collapsedFiles_.remove(item->data(0, PathRole).toString()); });
+            [this](QTreeWidgetItem *item) { collapsedFiles_.remove(item->data(0, pathRole).toString()); });
 
     placeholder_->setAlignment(Qt::AlignCenter);
     placeholder_->setEnabled(false);
@@ -136,76 +239,28 @@ void ProblemsView::refresh()
 {
     refreshTimer_.stop();
 
-    struct File {
-        QString path;
-        Problems problems;
-        int errors = 0;
-    };
-
-    QList<File> files;
+    const QList<FileProblems> files = sortedFiles(*problems_);
     int errors = 0;
     int warnings = 0;
-    for (const QString &path : problems_->files()) {
-        File file{path, problems_->problems(path)};
-        if (file.problems.isEmpty())
-            continue;
-        std::stable_sort(file.problems.begin(), file.problems.end(), [](const Problem &a, const Problem &b) {
-            if (a.severity != b.severity)
-                return a.severity == Diagnostic::Severity::Error;
-            return std::pair(a.line, a.column) < std::pair(b.line, b.column);
-        });
-        for (const Problem &problem : std::as_const(file.problems))
-            file.errors += problem.severity == Diagnostic::Severity::Error;
+    for (const FileProblems &file : files) {
         errors += file.errors;
-        warnings += file.problems.size() - file.errors;
-        files.append(file);
+        warnings += file.warnings();
     }
-    std::stable_sort(files.begin(), files.end(), [](const File &a, const File &b) { return a.errors > b.errors; });
 
     // The selected problem stays selected when it is still there.
-    QString selectedPath;
-    int selectedLine = -1;
-    QString selectedMessage;
-    if (const QTreeWidgetItem *current = tree_->currentItem()) {
-        selectedPath = current->data(0, PathRole).toString();
-        selectedLine = current->parent() ? current->data(0, LineRole).toInt() : -1;
-        selectedMessage = current->parent() ? current->toolTip(0) : QString();
-    }
+    const Selection selection = selectionOf(tree_->currentItem());
     const int scroll = tree_->verticalScrollBar() ? tree_->verticalScrollBar()->value() : 0;
 
     tree_->setUpdatesEnabled(false);
     tree_->clear();
     QTreeWidgetItem *selected = nullptr;
-    const QDir root(folder_);
-    for (const File &file : std::as_const(files)) {
-        const QFileInfo info(file.path);
-        QString folder = folder_.isEmpty() ? info.absolutePath() : root.relativeFilePath(info.absolutePath());
-        if (folder == QLatin1String("."))
-            folder.clear();
-        auto *fileItem = new QTreeWidgetItem(tree_);
-        fileItem->setText(0, QStringLiteral("%1  %2").arg(info.fileName(),
-                                                          countText(file.errors, file.problems.size() - file.errors)));
-        fileItem->setIcon(0, FileIcons::file(info.fileName(), darkIcons_));
-        fileItem->setToolTip(0, QDir::toNativeSeparators(
-                                    folder.isEmpty() ? info.fileName() : folder + QLatin1Char('/') + info.fileName()));
-        fileItem->setData(0, PathRole, file.path);
-        if (selectedLine < 0 && file.path == selectedPath)
+    for (const FileProblems &file : files) {
+        QTreeWidgetItem *fileItem = addFileItem(tree_, file, folder_, darkIcons_);
+        QTreeWidgetItem *selectedProblem = addProblemItems(fileItem, file, selection);
+        if (selection.isFile(file.path))
             selected = fileItem;
-        for (const Problem &problem : file.problems) {
-            auto *item = new QTreeWidgetItem(fileItem);
-            const QString firstLine = problem.message.section(QLatin1Char('\n'), 0, 0);
-            item->setText(0, QStringLiteral("%1  :%2").arg(firstLine).arg(problem.line + 1));
-            item->setIcon(0, severityIcon(problem.severity));
-            QString toolTip = problem.message;
-            if (!problem.source.isEmpty())
-                toolTip += QStringLiteral("\n— %1").arg(problem.source);
-            item->setToolTip(0, toolTip);
-            item->setData(0, PathRole, file.path);
-            item->setData(0, LineRole, problem.line);
-            item->setData(0, ColumnRole, problem.column);
-            if (!selected && file.path == selectedPath && problem.line == selectedLine && toolTip == selectedMessage)
-                selected = item;
-        }
+        else if (!selected)
+            selected = selectedProblem;
         fileItem->setExpanded(!collapsedFiles_.contains(file.path));
     }
     if (selected)
@@ -235,6 +290,6 @@ void ProblemsView::activate(QTreeWidgetItem *item)
             return;
         item = item->child(0);
     }
-    emit problemActivated(item->data(0, PathRole).toString(), item->data(0, LineRole).toInt(),
-                          item->data(0, ColumnRole).toInt());
+    emit problemActivated(item->data(0, pathRole).toString(), item->data(0, lineRole).toInt(),
+                          item->data(0, columnRole).toInt());
 }

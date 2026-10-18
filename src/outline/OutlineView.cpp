@@ -23,11 +23,9 @@ namespace {
 
 constexpr int refreshDelayMs = 300;
 
-enum ItemRole {
-    PositionRole = Qt::UserRole,
-    StartLineRole,
-    EndLineRole
-};
+constexpr int positionRole = Qt::UserRole;
+constexpr int startLineRole = Qt::UserRole + 1;
+constexpr int endLineRole = Qt::UserRole + 2;
 
 struct KindStyle {
     char letter{};
@@ -280,9 +278,9 @@ void OutlineView::populate(const std::vector<OutlineSymbol> &symbols)
                 item->setToolTip(0, QStringLiteral("%1 — %2 (line %3)")
                                         .arg(symbol.name, tr(styleOf(symbol.kind).description))
                                         .arg(symbol.startLine + 1));
-                item->setData(0, PositionRole, symbol.position);
-                item->setData(0, StartLineRole, symbol.startLine);
-                item->setData(0, EndLineRole, symbol.endLine);
+                item->setData(0, positionRole, symbol.position);
+                item->setData(0, startLineRole, symbol.startLine);
+                item->setData(0, endLineRole, symbol.endLine);
                 add(item, symbol.children);
             }
         };
@@ -330,8 +328,8 @@ void OutlineView::selectSymbolAtCursor()
         QTreeWidgetItem *next = nullptr;
         for (int i = 0; i < parent->childCount(); ++i) {
             QTreeWidgetItem *child = parent->child(i);
-            if (!child->isHidden() && child->data(0, StartLineRole).toInt() <= line &&
-                line <= child->data(0, EndLineRole).toInt()) {
+            if (!child->isHidden() && child->data(0, startLineRole).toInt() <= line &&
+                line <= child->data(0, endLineRole).toInt()) {
                 next = child;
                 break;
             }
@@ -356,7 +354,7 @@ void OutlineView::jumpTo(QTreeWidgetItem *item)
 {
     if (!editor_ || !item)
         return;
-    editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, item->data(0, PositionRole).toInt());
+    editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, item->data(0, positionRole).toInt());
     editor_->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
     editor_->setFocus();
 }

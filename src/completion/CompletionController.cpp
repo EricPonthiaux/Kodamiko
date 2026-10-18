@@ -34,10 +34,17 @@ constexpr int fullLineDelayMs = 300;
 constexpr int fullLineBeforeBytes = 6000;
 constexpr int fullLineAfterBytes = 2000;
 // Text of the other open files read by extended completion.
-constexpr qsizetype maxOtherTextBytes = 4 * 1024 * 1024;
+constexpr qsizetype maxOtherTextBytes = qsizetype{4} * 1024 * 1024;
 // Scintilla indicator of the expression to choose (SnippetSession uses
 // 10 and 11).
 constexpr int choiceIndicator = 12;
+
+// Where the inline preview goes: the top left of the text after the
+// cursor, and the height of its line.
+struct PreviewPlace {
+    QPoint topLeft;
+    int lineHeight = 0;
+};
 
 // The gray rest of the selected candidate after the cursor, with the key
 // that inserts it. Drawn over the editor: Scintilla has no inline virtual
@@ -52,23 +59,19 @@ public:
         hide();
     }
 
-    void show(const QString &text,
-              const QString &key,
-              const QFont &font,
-              const QColor &color,
-              QPoint topLeft,
-              int lineHeight)
+    // In the theme's font and muted color.
+    void show(const QString &text, const QString &key, const Theme &theme, PreviewPlace place)
     {
         text_ = text;
         key_ = key;
-        font_ = font;
-        color_ = color;
-        lineHeight_ = lineHeight;
-        QFont keyFont = font;
-        keyFont.setPointSizeF(font.pointSizeF() * 0.75);
+        font_ = theme.font;
+        color_ = theme.mutedText;
+        lineHeight_ = place.lineHeight;
+        QFont keyFont = font_;
+        keyFont.setPointSizeF(font_.pointSizeF() * 0.75);
         keyWidth_ = QFontMetrics(keyFont).horizontalAdvance(key_) + 10;
         const int width = QFontMetrics(font_).horizontalAdvance(text_) + 8 + keyWidth_ + 2;
-        setGeometry(topLeft.x(), topLeft.y(), width, lineHeight);
+        setGeometry(place.topLeft.x(), place.topLeft.y(), width, place.lineHeight);
         QWidget::show();
         raise();
         update();
@@ -113,6 +116,68 @@ bool isIdentifierByte(char c)
 {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$' ||
            static_cast<unsigned char>(c) >= 0x80;
+}
+
+// The preview's place for the text at `position`, on `line`.
+PreviewPlace previewPlaceAt(const EditorWidget &editor, long position, int line)
+{
+    const int x = static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, position));
+    const int y = static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, position));
+    const int lineHeight = static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line));
+    return {QPoint(x, y), lineHeight};
+}
+
+// What a candidate inserts: its snippet expanded, or its text with the
+// cursor after it.
+ExpandedSnippet expansionOf(const CompletionItem &item)
+{
+    if (item.isSnippet)
+        return Snippet::expand(item.textToInsert());
+    ExpandedSnippet expanded;
+    expanded.text = item.textToInsert();
+    expanded.selectionStart = int(expanded.text.size());
+    return expanded;
+}
+
+// A function's call with arguments to type: its parameters can be shown.
+bool insertsCallWithArguments(const CompletionItem &item, const ExpandedSnippet &expanded)
+{
+    const bool callable = item.kind == CompletionItem::Kind::Function || item.kind == CompletionItem::Kind::Method;
+    return callable && expanded.text.contains(QLatin1Char('(')) && !expanded.text.endsWith(QLatin1String("()"));
+}
+
+// Blanks, then a word or a run of punctuation: what Ctrl+Right takes of a
+// Full Line suggestion.
+QString nextWordOf(const QString &text)
+{
+    qsizetype end = 0;
+    while (end < text.size() && text[end].isSpace())
+        ++end;
+    const bool isWord = end < text.size() && isIdentifierCharacter(text[end]);
+    const auto continuesRun = [&text, isWord](QChar c) {
+        return isWord ? isIdentifierCharacter(c) : !c.isSpace() && !isIdentifierCharacter(c);
+    };
+    while (end < text.size() && continuesRun(text[end]))
+        ++end;
+    return text.left(end);
+}
+
+// The keys the open list takes: to close it, move in it, insert.
+bool isListKey(int key)
+{
+    switch (key) {
+    case Qt::Key_Escape:
+    case Qt::Key_Up:
+    case Qt::Key_Down:
+    case Qt::Key_PageUp:
+    case Qt::Key_PageDown:
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+    case Qt::Key_Tab:
+        return true;
+    default:
+        return false;
+    }
 }
 
 } // namespace
@@ -290,105 +355,137 @@ QChar CompletionController::docCommentTrigger(QChar typed, int position) const
     return {};
 }
 
-void CompletionController::onCharacterAdded(int character)
+QChar CompletionController::charAt(int position) const
 {
-    if (active_) {
-        if (choosing_) {
-            close(); // typing gives the choice up
-        } else {
-            refilter();
-            if (active_)
-                return;
-        }
-        // Closed by a character that ends the identifier: it may open the
-        // next completion ("object." after "object").
+    if (position < 0)
+        return {};
+    return {static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, position))};
+}
+
+int CompletionController::currentPosition() const
+{
+    return static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+}
+
+bool CompletionController::followTyping()
+{
+    if (choosing_) {
+        close(); // typing gives the choice up
+        return false;
     }
-    if (editor_->isReadOnly())
-        return;
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const QChar typed(character);
-    followFullLine(typed, position);
-    if ((typed == u'\n' || typed == u'\r') && writeDocComment(position))
-        return;
-    scheduleFullLine(position);
-    const QChar previous =
-        position >= 2 ? QChar(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, position - 2)))
-                      : QChar();
+    refilter();
+    return active_;
+}
+
+void CompletionController::openAutomatically(QChar trigger)
+{
     const AutoCompletion mode = editor_->options().autoCompletion;
-    if (mode == AutoCompletion::Off)
-        return;
-    const auto open = [this, mode](QChar trigger) {
-        if (mode == AutoCompletion::Eager && !trigger.isNull()) {
-            start(false, trigger);
-        } else {
-            pendingTrigger_ = trigger;
-            autoTimer_.start(mode == AutoCompletion::Eager ? eagerDelayMs : calmDelayMs);
-        }
-    };
-    if (insideCommentOrString(position)) {
-        // "from './|'": the modules and files, from the language server.
-        if (inModulePath(position)) {
-            if (typed == u'\'' || typed == u'"' || typed == u'/')
-                open(typed);
-            else if (isIdentifierCharacter(typed))
-                open({});
-            return;
-        }
-        // In a documentation comment: its tags and parameters.
-        if (!insideDocComment(position))
-            return;
-        const QChar trigger = docCommentTrigger(typed, position);
-        if (trigger.isNull())
-            return;
-        // "@pa": the identifier typed after the "@".
-        open(isIdentifierCharacter(typed) ? QChar() : trigger);
+    if (mode == AutoCompletion::Eager && !trigger.isNull()) {
+        start(false, trigger);
         return;
     }
-    if (service_->isTrigger(editor_->languageId(), typed, previous)) {
-        open(typed);
+    pendingTrigger_ = trigger;
+    autoTimer_.start(mode == AutoCompletion::Eager ? eagerDelayMs : calmDelayMs);
+}
+
+void CompletionController::openInCommentOrString(QChar typed, int position)
+{
+    // "from './|'": the modules and files, from the language server.
+    if (inModulePath(position)) {
+        if (typed == u'\'' || typed == u'"' || typed == u'/')
+            openAutomatically(typed);
+        else if (isIdentifierCharacter(typed))
+            openAutomatically({});
         return;
     }
-    if (!isIdentifierCharacter(typed))
+    // In a documentation comment: its tags and parameters.
+    if (!insideDocComment(position))
         return;
+    const QChar trigger = docCommentTrigger(typed, position);
+    if (trigger.isNull())
+        return;
+    // "@pa": the identifier typed after the "@".
+    openAutomatically(isIdentifierCharacter(typed) ? QChar() : trigger);
+}
+
+bool CompletionController::isIdentifierToComplete(int position) const
+{
     // An identifier, not a number.
     const int start = identifierStart(position);
     const char first = static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, start));
     if (first >= '0' && first <= '9')
-        return;
-    if (mode == AutoCompletion::Calm && textBetween(start, position).size() < calmMinimumLetters)
-        return;
-    open({});
+        return false;
+    const bool calm = editor_->options().autoCompletion == AutoCompletion::Calm;
+    return !calm || textBetween(start, position).size() >= calmMinimumLetters;
 }
 
-void CompletionController::start(bool explicitRequest, QChar triggerCharacter, Mode mode)
+void CompletionController::onCharacterAdded(int character)
 {
-    autoTimer_.stop();
-    clearFullLine();
+    // Closed by a character that ends the identifier, the session may open
+    // the next completion ("object." after "object").
+    if (active_ && followTyping())
+        return;
     if (editor_->isReadOnly())
         return;
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    // Typing went on past the identifier since the timer started.
-    if (!explicitRequest && triggerCharacter.isNull() && identifierStart(position) == position)
+    const int position = currentPosition();
+    const QChar typed(character);
+    followFullLine(typed, position);
+    const bool isNewLine = typed == u'\n' || typed == u'\r';
+    if (isNewLine && writeDocComment(position))
         return;
-    // The trigger character was erased or typed past while waiting (Calm).
-    if (!triggerCharacter.isNull() && !explicitRequest &&
-        (position < 1 || QChar(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT,
-                                                                        position - 1))) != triggerCharacter))
+    scheduleFullLine(position);
+    if (editor_->options().autoCompletion == AutoCompletion::Off)
         return;
-
-    // A name typed after "object." (or "->", "::") is a member, whoever
-    // opened the list: only the language server knows those.
-    const int nameStart = identifierStart(position);
-    if (triggerCharacter.isNull() && nameStart > 0) {
-        const auto charAt = [this](int at) {
-            return at >= 0 ? QChar(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, at)))
-                           : QChar();
-        };
-        const QChar before = charAt(nameStart - 1);
-        if (service_->isTrigger(editor_->languageId(), before, charAt(nameStart - 2)))
-            triggerCharacter = before;
+    if (insideCommentOrString(position)) {
+        openInCommentOrString(typed, position);
+        return;
     }
+    if (service_->isTrigger(editor_->languageId(), typed, charAt(position - 2))) {
+        openAutomatically(typed);
+        return;
+    }
+    if (isIdentifierCharacter(typed) && isIdentifierToComplete(position))
+        openAutomatically({});
+}
 
+bool CompletionController::isStillWanted(bool explicitRequest, QChar triggerCharacter, int position) const
+{
+    if (explicitRequest)
+        return true;
+    // Typing went on past the identifier since the timer started.
+    if (triggerCharacter.isNull())
+        return identifierStart(position) != position;
+    // The trigger character was erased or typed past while waiting (Calm).
+    return position >= 1 && charAt(position - 1) == triggerCharacter;
+}
+
+QChar CompletionController::memberTrigger(int position) const
+{
+    const int nameStart = identifierStart(position);
+    if (nameStart <= 0)
+        return {};
+    const QChar before = charAt(nameStart - 1);
+    return service_->isTrigger(editor_->languageId(), before, charAt(nameStart - 2)) ? before : QChar();
+}
+
+QList<QByteArray> CompletionController::otherTexts(const QString &languageId) const
+{
+    QList<QByteArray> texts;
+    qsizetype total = 0;
+    for (const EditorWidget *other : editor_->window()->findChildren<EditorWidget *>()) {
+        if (other == editor_ || other->languageId() != languageId)
+            continue;
+        QByteArray text = other->utf8Bytes().toByteArray();
+        total += text.size();
+        if (total > maxOtherTextBytes)
+            break;
+        texts.append(std::move(text));
+    }
+    return texts;
+}
+
+CompletionContext CompletionController::contextAt(int position, QChar triggerCharacter, bool explicitRequest) const
+{
     CompletionContext context;
     context.filePath = editor_->filePath();
     context.languageId = editor_->languageId();
@@ -401,31 +498,38 @@ void CompletionController::start(bool explicitRequest, QChar triggerCharacter, M
     context.column = int(textBetween(int(lineStart), position).size());
     context.triggerCharacter = triggerCharacter;
     context.explicitRequest = explicitRequest;
-    context.mode = mode;
     const bool inText = insideCommentOrString(position);
     context.inDocComment = inText && DocComments::commentStart(context.text, position, context.languageId) >= 0;
     context.inModulePath = inText && inModulePath(position);
-    if (context.inModulePath && triggerCharacter.isNull() && context.prefixStart > 0) {
-        // Right after the quote or a "/": the server lists what comes next.
-        const char before = context.text[context.prefixStart - 1];
-        if (before == '\'' || before == '"' || before == '/')
-            context.triggerCharacter = QChar(before);
-    }
+    if (!context.inModulePath || !triggerCharacter.isNull() || context.prefixStart <= 0)
+        return context;
+    // Right after the quote or a "/": the server lists what comes next.
+    const char before = context.text[context.prefixStart - 1];
+    if (before == '\'' || before == '"' || before == '/')
+        context.triggerCharacter = QChar(before);
+    return context;
+}
+
+void CompletionController::start(bool explicitRequest, QChar triggerCharacter, Mode mode)
+{
+    autoTimer_.stop();
+    clearFullLine();
+    if (editor_->isReadOnly())
+        return;
+    const int position = currentPosition();
+    if (!isStillWanted(explicitRequest, triggerCharacter, position))
+        return;
+    // A name typed after "object." (or "->", "::") is a member, whoever
+    // opened the list: only the language server knows those.
+    if (triggerCharacter.isNull())
+        triggerCharacter = memberTrigger(position);
+
+    CompletionContext context = contextAt(position, triggerCharacter, explicitRequest);
+    context.mode = mode;
     if (mode == Mode::Smart)
         context.expectedType = ExpectedType::at(context.text, context.prefixStart, context.languageId);
-    if (mode == Mode::Extended) {
-        // The words of the other open files of the language.
-        qsizetype total = 0;
-        for (const EditorWidget *other : editor_->window()->findChildren<EditorWidget *>()) {
-            if (other == editor_ || other->languageId() != context.languageId)
-                continue;
-            QByteArray text = other->utf8Bytes().toByteArray();
-            total += text.size();
-            if (total > maxOtherTextBytes)
-                break;
-            context.otherTexts.append(std::move(text));
-        }
-    }
+    if (mode == Mode::Extended)
+        context.otherTexts = otherTexts(context.languageId); // the words of the other open files
 
     const bool restarting = active_ && prefixStart_ == context.prefixStart; // the same identifier, typed further
     if (choosing_)
@@ -585,15 +689,9 @@ void CompletionController::updatePreview()
             preview->hide();
         return;
     }
-    const int x =
-        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, long(position)));
-    const int y =
-        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, long(position)));
-    const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line_));
-    const Theme &theme = editor_->theme();
     preview->show(item->label.mid(prefix.size()),
-                  editor_->options().completionAcceptsEnter ? QStringLiteral("↵") : QStringLiteral("Tab"), theme.font,
-                  theme.mutedText, QPoint(x, y), lineHeight);
+                  editor_->options().completionAcceptsEnter ? QStringLiteral("↵") : QStringLiteral("Tab"),
+                  editor_->theme(), previewPlaceAt(*editor_, position, line_));
 }
 
 void CompletionController::onModified(int position, int modificationType, int length)
@@ -679,38 +777,78 @@ void CompletionController::close()
     announcedLabel_.clear();
 }
 
+int CompletionController::identifierEnd(int position) const
+{
+    const int length = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
+    int end = position;
+    while (end < length &&
+           isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, end))))
+        ++end;
+    return end;
+}
+
+CompletionItem CompletionController::withChosenExpression(int choiceIndex) const
+{
+    const CompletionItem::Choice choice = choosingItem_.choices.value(choiceIndex);
+    CompletionItem item = choosingItem_;
+    item.insertText = choice.insertText;
+    item.replaceStart = choice.replaceStart;
+    item.choices.clear();
+    return item;
+}
+
+void CompletionController::selectExpansion(const ExpandedSnippet &expanded, int start)
+{
+    // The cursor in the parentheses, the first argument selected:
+    // typing replaces it.
+    const int selectionStart = start + int(expanded.text.left(expanded.selectionStart).toUtf8().size());
+    const int selectionEnd =
+        selectionStart + int(expanded.text.mid(expanded.selectionStart, expanded.selectionLength).toUtf8().size());
+    editor_->SendScintilla(QsciScintillaBase::SCI_SETSEL, static_cast<unsigned long>(selectionStart),
+                           static_cast<long>(selectionEnd));
+}
+
+void CompletionController::watchInserted(const CompletionItem &item, int start, const QByteArray &text)
+{
+    inserted_.reset();
+    if (item.replaceStart >= 0 || !text.startsWith(item.label.toUtf8()))
+        return;
+    inserted_ = Inserted{item.label, start, int(item.label.toUtf8().size()), {}};
+    inserted_->age.start();
+}
+
+void CompletionController::resolveEditsLater(const CompletionItem &item,
+                                             int start,
+                                             int insertedBytes,
+                                             int replacedBytes)
+{
+    if (!item.additionalEdits.isEmpty() || !item.resolveEdits)
+        return;
+    const QPointer<CompletionController> self(this);
+    item.resolveEdits([self, start, insertedBytes, replacedBytes](const QList<TextEdit> &edits) {
+        if (!self || edits.isEmpty())
+            return;
+        self->editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
+        self->applyEdits(edits, start, insertedBytes, replacedBytes);
+        self->editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
+    });
+}
+
 void CompletionController::accept(bool replaceWord)
 {
     if (!isActive() || !popup_->current())
         return;
     CompletionItem item = *popup_->current(); // close() clears the list
     if (choosing_) {
-        // The expression chosen: the item's insertion for it.
-        const CompletionItem::Choice choice = choosingItem_.choices.value(item.order);
-        item = choosingItem_;
-        item.insertText = choice.insertText;
-        item.replaceStart = choice.replaceStart;
-        item.choices.clear();
+        item = withChosenExpression(item.order);
     } else if (item.choices.size() > 1) {
         beginChoice(item);
         return;
     }
-    ExpandedSnippet expanded;
-    if (item.isSnippet) {
-        expanded = Snippet::expand(item.textToInsert());
-    } else {
-        expanded.text = item.textToInsert();
-        expanded.selectionStart = int(expanded.text.size());
-    }
+    const ExpandedSnippet expanded = expansionOf(item);
     const QByteArray text = expanded.text.toUtf8();
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    int end = position;
-    if (replaceWord) {
-        const int length = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
-        while (end < length &&
-               isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, end))))
-            ++end;
-    }
+    const int position = currentPosition();
+    const int end = replaceWord ? identifierEnd(position) : position;
     const int start = item.replaceStart >= 0 ? std::min(item.replaceStart, prefixStart_) : prefixStart_;
     close();
     service_->history()->recordAccepted(editor_->languageId(), item.label);
@@ -719,42 +857,18 @@ void CompletionController::accept(bool replaceWord)
                            static_cast<long>(end));
     editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<unsigned long>(text.size()),
                            text.constData());
-    // The cursor in the parentheses, the first argument selected:
-    // typing replaces it.
-    const int selectionStart = start + int(expanded.text.left(expanded.selectionStart).toUtf8().size());
-    const int selectionEnd =
-        selectionStart + int(expanded.text.mid(expanded.selectionStart, expanded.selectionLength).toUtf8().size());
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETSEL, static_cast<unsigned long>(selectionStart),
-                           static_cast<long>(selectionEnd));
+    selectExpansion(expanded, start);
     // An import that comes with it, in the same undo step.
     // Watched for a few seconds: erased at once, it was the wrong one. From
     // here, so that an import added above moves it along.
-    inserted_.reset();
-    if (item.replaceStart < 0 && text.startsWith(item.label.toUtf8())) {
-        inserted_ = Inserted{item.label, start, int(item.label.toUtf8().size()), {}};
-        inserted_->age.start();
-    }
+    watchInserted(item, start, text);
     // Its placeholders, followed before an import moves them.
     snippet_->start(expanded, start);
     applyEdits(item.additionalEdits, start, int(text.size()), end - start);
     editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
-
-    if (item.additionalEdits.isEmpty() && item.resolveEdits) {
-        // Known once chosen (jdtls): applied when the server answers.
-        const QPointer<CompletionController> self(this);
-        const int inserted = int(text.size());
-        const int replaced = end - start;
-        item.resolveEdits([self, start, inserted, replaced](const QList<TextEdit> &edits) {
-            if (!self || edits.isEmpty())
-                return;
-            self->editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
-            self->applyEdits(edits, start, inserted, replaced);
-            self->editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
-        });
-    }
-    // A call: its parameters.
-    const bool callable = item.kind == CompletionItem::Kind::Function || item.kind == CompletionItem::Kind::Method;
-    if (callable && expanded.text.contains(QLatin1Char('(')) && !expanded.text.endsWith(QLatin1String("()")))
+    // Known once chosen (jdtls): applied when the server answers.
+    resolveEditsLater(item, start, int(text.size()), end - start);
+    if (insertsCallWithArguments(item, expanded))
         emit callInserted();
 }
 
@@ -815,11 +929,7 @@ void CompletionController::insertSnippet(int start, int end, const QString &snip
                            static_cast<long>(end));
     editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<unsigned long>(text.size()),
                            text.constData());
-    const int selectionStart = start + int(expanded.text.left(expanded.selectionStart).toUtf8().size());
-    const int selectionEnd =
-        selectionStart + int(expanded.text.mid(expanded.selectionStart, expanded.selectionLength).toUtf8().size());
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETSEL, static_cast<unsigned long>(selectionStart),
-                           static_cast<long>(selectionEnd));
+    selectExpansion(expanded, start);
     snippet_->start(expanded, start);
     editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
 }
@@ -927,11 +1037,7 @@ void CompletionController::showFullLine()
     auto *preview = static_cast<InlinePreview *>(preview_);
     const long position = fullLinePosition_;
     const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
-    const int x = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, position));
-    const int y = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, position));
-    const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line));
-    const Theme &theme = editor_->theme();
-    preview->show(fullLine_, QStringLiteral("Tab"), theme.font, theme.mutedText, QPoint(x, y), lineHeight);
+    preview->show(fullLine_, QStringLiteral("Tab"), editor_->theme(), previewPlaceAt(*editor_, position, line));
 }
 
 void CompletionController::clearFullLine()
@@ -951,21 +1057,7 @@ void CompletionController::acceptFullLine(bool nextWordOnly)
 {
     if (fullLine_.isEmpty())
         return;
-    QString text = fullLine_;
-    if (nextWordOnly) {
-        // Blanks, then a word or a run of punctuation.
-        qsizetype end = 0;
-        while (end < text.size() && text[end].isSpace())
-            ++end;
-        if (end < text.size() && isIdentifierCharacter(text[end])) {
-            while (end < text.size() && isIdentifierCharacter(text[end]))
-                ++end;
-        } else {
-            while (end < text.size() && !text[end].isSpace() && !isIdentifierCharacter(text[end]))
-                ++end;
-        }
-        text = text.left(end);
-    }
+    const QString text = nextWordOnly ? nextWordOf(fullLine_) : fullLine_;
     const QString rest = fullLine_.mid(text.size());
     const int position = fullLinePosition_;
     const QByteArray bytes = text.toUtf8();
@@ -1035,89 +1127,102 @@ bool CompletionController::eventFilter(QObject *watched, QEvent *event)
     }
     if (event->type() != QEvent::KeyPress && event->type() != QEvent::ShortcutOverride)
         return false;
-    const auto *key = static_cast<QKeyEvent *>(event);
-    if (!isActive() && !fullLine_.isEmpty()) {
-        // The Full Line suggestion: Tab, Ctrl+Right, Escape.
-        const bool plain = key->modifiers() == Qt::NoModifier;
-        const bool tab = key->key() == Qt::Key_Tab && plain;
-        const bool word = key->key() == Qt::Key_Right && key->modifiers() == Qt::ControlModifier;
-        const bool escape = key->key() == Qt::Key_Escape && plain;
-        if (tab || word || escape) {
-            if (event->type() == QEvent::KeyPress) {
-                if (escape)
-                    clearFullLine();
-                else
-                    acceptFullLine(word);
-            }
-            event->accept();
-            return true;
-        }
-    }
-    if (!isActive()) {
-        if (!snippet_->isActive())
-            return false;
-        // The snippet's placeholders: Tab, Shift+Tab, Escape.
-        const bool shift = key->modifiers() == Qt::ShiftModifier;
-        const bool plain = key->modifiers() == Qt::NoModifier;
-        const bool ours = (key->key() == Qt::Key_Tab && plain) || key->key() == Qt::Key_Backtab ||
-                          (key->key() == Qt::Key_Tab && shift) || (key->key() == Qt::Key_Escape && plain);
-        if (!ours)
-            return false;
-        if (event->type() == QEvent::KeyPress) {
-            if (key->key() == Qt::Key_Escape)
-                snippet_->stop();
-            else if (key->key() == Qt::Key_Tab && plain)
-                snippet_->next();
-            else
-                snippet_->previous();
-        }
-        event->accept();
+    auto *key = static_cast<QKeyEvent *>(event);
+    if (isActive())
+        return handlePopupShortcut(key) || handleListKey(key);
+    if (!fullLine_.isEmpty() && handleFullLineKey(key))
         return true;
-    }
+    return snippet_->isActive() && handleSnippetKey(key);
+}
 
+bool CompletionController::handleFullLineKey(QKeyEvent *key)
+{
+    // The Full Line suggestion: Tab, Ctrl+Right, Escape.
+    const bool plain = key->modifiers() == Qt::NoModifier;
+    const bool tab = key->key() == Qt::Key_Tab && plain;
+    const bool word = key->key() == Qt::Key_Right && key->modifiers() == Qt::ControlModifier;
+    const bool escape = key->key() == Qt::Key_Escape && plain;
+    if (!tab && !word && !escape)
+        return false;
+    if (key->type() == QEvent::KeyPress) {
+        if (escape)
+            clearFullLine();
+        else
+            acceptFullLine(word);
+    }
+    key->accept();
+    return true;
+}
+
+bool CompletionController::handleSnippetKey(QKeyEvent *key)
+{
+    // The snippet's placeholders: Tab, Shift+Tab, Escape.
+    const bool shift = key->modifiers() == Qt::ShiftModifier;
+    const bool plain = key->modifiers() == Qt::NoModifier;
+    const bool next = key->key() == Qt::Key_Tab && plain;
+    const bool previous = key->key() == Qt::Key_Backtab || (key->key() == Qt::Key_Tab && shift);
+    const bool escape = key->key() == Qt::Key_Escape && plain;
+    if (!next && !previous && !escape)
+        return false;
+    if (key->type() == QEvent::KeyPress) {
+        if (key->key() == Qt::Key_Escape)
+            snippet_->stop();
+        else if (next)
+            snippet_->next();
+        else
+            snippet_->previous();
+    }
+    key->accept();
+    return true;
+}
+
+bool CompletionController::handlePopupShortcut(QKeyEvent *key)
+{
+    if (key->modifiers() != Qt::ControlModifier)
+        return false;
+    const bool isPress = key->type() == QEvent::KeyPress;
     // Ctrl+Right: the next word of the candidate.
-    if (key->key() == Qt::Key_Right && key->modifiers() == Qt::ControlModifier) {
-        if (event->type() == QEvent::KeyPress && !choosing_)
+    if (key->key() == Qt::Key_Right) {
+        if (isPress && !choosing_)
             acceptNextWord();
-        event->accept();
+        key->accept();
         return true;
     }
     // Ctrl+Q: the documentation beside the list, not the editor's.
-    if (key->key() == Qt::Key_Q && key->modifiers() == Qt::ControlModifier) {
-        if (event->type() == QEvent::KeyPress)
+    if (key->key() == Qt::Key_Q) {
+        if (isPress)
             toggleDocumentation();
-        event->accept();
+        key->accept();
         return true;
     }
+    return false;
+}
+
+bool CompletionController::handleListKey(QKeyEvent *key)
+{
+    const bool isPress = key->type() == QEvent::KeyPress;
     // Enter starts a new line when only Tab inserts.
-    if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && !editor_->options().completionAcceptsEnter) {
-        if (event->type() == QEvent::KeyPress)
+    const bool isEnter = key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter;
+    if (isEnter && !editor_->options().completionAcceptsEnter) {
+        if (isPress)
             close();
         return false;
     }
     const bool plain = !(key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
-    bool handled = plain;
-    switch (key->key()) {
-    case Qt::Key_Escape:
-    case Qt::Key_Up:
-    case Qt::Key_Down:
-    case Qt::Key_PageUp:
-    case Qt::Key_PageDown:
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
-    case Qt::Key_Tab:
-        break;
-    default:
-        handled = false;
-    }
-    if (!handled)
+    if (!plain || !isListKey(key->key()))
         return false;
     // Ours, not a menu shortcut (F-keys apart, these have none).
-    if (event->type() == QEvent::ShortcutOverride) {
-        event->accept();
+    if (!isPress) {
+        key->accept();
         return true;
     }
-    switch (key->key()) {
+    applyListKey(key->key());
+    return true;
+}
+
+void CompletionController::applyListKey(int key)
+{
+    switch (key) {
     case Qt::Key_Escape:
         close();
         break;
@@ -1140,6 +1245,7 @@ bool CompletionController::eventFilter(QObject *watched, QEvent *event)
     case Qt::Key_Tab:
         accept(true);
         break;
+    default:
+        break; // not a key of the list (see isListKey)
     }
-    return true;
 }

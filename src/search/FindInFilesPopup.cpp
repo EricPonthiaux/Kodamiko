@@ -22,6 +22,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <optional>
 #include <utility>
 
 namespace {
@@ -29,11 +30,9 @@ namespace {
 constexpr int searchDelayMs = 300;
 constexpr int matchContext = 80; // characters kept before a match on long lines
 
-enum Role {
-    MatchRole = Qt::UserRole,
-    HighlightStartRole,
-    HighlightLengthRole
-};
+constexpr int matchRole = Qt::UserRole;
+constexpr int highlightStartRole = Qt::UserRole + 1;
+constexpr int highlightLengthRole = Qt::UserRole + 2;
 
 // Line of a result: the occurrence stands out in bold on a colored background.
 class MatchDelegate : public QStyledItemDelegate {
@@ -50,8 +49,8 @@ public:
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
-        const int start = index.data(HighlightStartRole).toInt();
-        const int length = index.data(HighlightLengthRole).toInt();
+        const int start = index.data(highlightStartRole).toInt();
+        const int length = index.data(highlightLengthRole).toInt();
         if (index.column() != 0 || length <= 0) {
             QStyledItemDelegate::paint(painter, option, index);
             return;
@@ -112,6 +111,50 @@ public:
         painter->restore();
     }
 };
+
+// What a result row shows of its line, and where the occurrence starts in it.
+struct Excerpt {
+    QString text;
+    int highlightStart = 0;
+};
+
+Excerpt excerptOf(const FindMatch &match)
+{
+    // Long lines: the text around the occurrence.
+    QString text = match.lineText;
+    int start = match.column;
+    if (start > matchContext) {
+        const int cut = start - matchContext / 2;
+        text = QStringLiteral("…") + text.mid(cut);
+        start = start - cut + 1;
+    }
+    // And no more than a column can show after it (minified files).
+    if (text.size() > start + match.length + matchContext * 4)
+        text = text.left(start + match.length + matchContext * 4) + QStringLiteral("…");
+    // Leading whitespace is dropped, as in IntelliJ.
+    qsizetype leading = 0;
+    while (leading < text.size() && leading < start && text.at(leading).isSpace())
+        ++leading;
+    return {text.mid(leading), start - static_cast<int>(leading)};
+}
+
+// Row a navigation key moves the selection to (-1 when the list is empty),
+// nullopt for any other key.
+std::optional<int> navigationTarget(int key, int row, int count, int page)
+{
+    switch (key) {
+    case Qt::Key_Down:
+        return std::min(row + 1, count - 1);
+    case Qt::Key_Up:
+        return std::max(row - 1, 0);
+    case Qt::Key_PageDown:
+        return std::min(row + page, count - 1);
+    case Qt::Key_PageUp:
+        return std::max(row - page, 0);
+    default:
+        return std::nullopt;
+    }
+}
 
 } // namespace
 
@@ -287,45 +330,22 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
     for (qsizetype i = 0; i < matches_.size(); ++i) {
         const FindMatch &match = matches_[i];
         files.insert(match.filePath);
-        // Long lines: the text around the occurrence.
-        QString text = match.lineText;
-        int start = match.column;
-        if (start > matchContext) {
-            const int cut = start - matchContext / 2;
-            text = QStringLiteral("…") + text.mid(cut);
-            start = start - cut + 1;
-        }
-        // And no more than a column can show after it (minified files).
-        if (text.size() > start + match.length + matchContext * 4)
-            text = text.left(start + match.length + matchContext * 4) + QStringLiteral("…");
-        // Leading whitespace is dropped, as in IntelliJ.
-        qsizetype leading = 0;
-        while (leading < text.size() && leading < start && text.at(leading).isSpace())
-            ++leading;
-        text = text.mid(leading);
-        start -= static_cast<int>(leading);
-
+        const Excerpt excerpt = excerptOf(match);
         const QString location = QStringLiteral("%1 %2")
                                      .arg(QDir::toNativeSeparators(root.relativeFilePath(match.filePath)))
                                      .arg(match.line + 1);
-        auto *item = new QTreeWidgetItem(results_, {text, location});
+        auto *item = new QTreeWidgetItem(results_, {excerpt.text, location});
         item->setFont(0, theme_.font); // code, in the code font (no "->" turned into an arrow)
-        item->setData(0, MatchRole, QVariant::fromValue(i));
-        item->setData(0, HighlightStartRole, start);
-        item->setData(0, HighlightLengthRole, match.length);
+        item->setData(0, matchRole, QVariant::fromValue(i));
+        item->setData(0, highlightStartRole, excerpt.highlightStart);
+        item->setData(0, highlightLengthRole, match.length);
         item->setForeground(1, palette().brush(QPalette::Disabled, QPalette::Text));
         item->setToolTip(1, match.filePath);
     }
     if (search_->text().isEmpty())
         summary_->clear();
-    else if (matches_.isEmpty())
-        summary_->setText(tr("No matches"));
     else
-        summary_->setText(tr("%1 in %2")
-                              .arg(truncated              ? tr("%1+ matches").arg(matches_.size())
-                                   : matches_.size() == 1 ? tr("1 match")
-                                                          : tr("%1 matches").arg(matches_.size()),
-                                   files.size() == 1 ? tr("1 file") : tr("%1 files").arg(files.size())));
+        summary_->setText(summaryText(truncated, files.size()));
     fitLocationColumn();
     if (results_->topLevelItemCount() > 0)
         results_->setCurrentItem(results_->topLevelItem(0));
@@ -335,6 +355,21 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
 
 // The files' column as wide as its paths, at most 40 % of the list: the
 // code keeps the rest.
+QString FindInFilesPopup::summaryText(bool truncated, qsizetype fileCount) const
+{
+    if (matches_.isEmpty())
+        return tr("No matches");
+    QString matchCount;
+    if (truncated)
+        matchCount = tr("%1+ matches").arg(matches_.size());
+    else if (matches_.size() == 1)
+        matchCount = tr("1 match");
+    else
+        matchCount = tr("%1 matches").arg(matches_.size());
+    const QString files = fileCount == 1 ? tr("1 file") : tr("%1 files").arg(fileCount);
+    return tr("%1 in %2").arg(matchCount, files);
+}
+
 void FindInFilesPopup::fitLocationColumn()
 {
     const QFontMetrics metrics(results_->font());
@@ -359,7 +394,7 @@ void FindInFilesPopup::updatePreview()
         preview_->showReadOnlyText(QString(), QStringLiteral("text"));
         return;
     }
-    const FindMatch match = matches_.value(item->data(0, MatchRole).toLongLong());
+    const FindMatch match = matches_.value(item->data(0, matchRole).toLongLong());
     if (match.filePath != previewPath_) {
         previewPath_ = match.filePath;
         QString error;
@@ -393,7 +428,7 @@ void FindInFilesPopup::openCurrent()
     const QTreeWidgetItem *item = results_->currentItem();
     if (!item)
         return;
-    const FindMatch match = matches_.value(item->data(0, MatchRole).toLongLong());
+    const FindMatch match = matches_.value(item->data(0, matchRole).toLongLong());
     dismiss();
     // After the popup has closed and given the focus back.
     QTimer::singleShot(0, this,
@@ -414,52 +449,57 @@ void FindInFilesPopup::applyTheme(const Theme &theme)
 
 bool FindInFilesPopup::eventFilter(QObject *watched, QEvent *event)
 {
-    if ((watched == search_ || watched == mask_) && event->type() == QEvent::KeyPress) {
-        const auto *key = static_cast<QKeyEvent *>(event);
-        const int row = results_->currentIndex().row();
-        const int count = results_->topLevelItemCount();
-        const int page = std::max(results_->viewport()->height() / std::max(results_->sizeHintForRow(0), 1) - 1, 1);
-        int target = -1;
-        switch (key->key()) {
-        case Qt::Key_Down:
-            target = std::min(row + 1, count - 1);
-            break;
-        case Qt::Key_Up:
-            target = std::max(row - 1, 0);
-            break;
-        case Qt::Key_PageDown:
-            target = std::min(row + page, count - 1);
-            break;
-        case Qt::Key_PageUp:
-            target = std::max(row - page, 0);
-            break;
-        case Qt::Key_Return:
-        case Qt::Key_Enter:
-            if (searchTimer_.isActive())
-                searchNow();
-            else
-                openCurrent();
-            return true;
-        case Qt::Key_Escape:
-            dismiss();
-            return true;
-        case Qt::Key_C:
-        case Qt::Key_O:
-        case Qt::Key_X:
-            if (key->modifiers() == Qt::AltModifier) {
-                QToolButton *option = key->key() == Qt::Key_C   ? matchCase_
-                                      : key->key() == Qt::Key_O ? wholeWords_
-                                                                : regularExpression_;
-                option->toggle();
-                return true;
-            }
-            return QFrame::eventFilter(watched, event);
-        default:
-            return QFrame::eventFilter(watched, event);
-        }
-        if (target >= 0)
-            results_->setCurrentItem(results_->topLevelItem(target));
+    const bool isSearchField = watched == search_ || watched == mask_;
+    if (!isSearchField || event->type() != QEvent::KeyPress)
+        return QFrame::eventFilter(watched, event);
+    if (handleSearchFieldKey(*static_cast<QKeyEvent *>(event)))
+        return true;
+    return QFrame::eventFilter(watched, event);
+}
+
+// Keys typed in the search fields that act on the results or the options.
+bool FindInFilesPopup::handleSearchFieldKey(const QKeyEvent &key)
+{
+    const int row = results_->currentIndex().row();
+    const int count = results_->topLevelItemCount();
+    const int page = std::max(results_->viewport()->height() / std::max(results_->sizeHintForRow(0), 1) - 1, 1);
+    if (const std::optional<int> target = navigationTarget(key.key(), row, count, page)) {
+        if (*target >= 0)
+            results_->setCurrentItem(results_->topLevelItem(*target));
         return true;
     }
-    return QFrame::eventFilter(watched, event);
+    switch (key.key()) {
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (searchTimer_.isActive())
+            searchNow();
+        else
+            openCurrent();
+        return true;
+    case Qt::Key_Escape:
+        dismiss();
+        return true;
+    case Qt::Key_C:
+    case Qt::Key_O:
+    case Qt::Key_X:
+        if (key.modifiers() != Qt::AltModifier)
+            return false;
+        optionForShortcut(key.key())->toggle();
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Alt+C, Alt+O, Alt+X: match case, whole words, regular expression.
+QToolButton *FindInFilesPopup::optionForShortcut(int key) const
+{
+    switch (key) {
+    case Qt::Key_C:
+        return matchCase_;
+    case Qt::Key_O:
+        return wholeWords_;
+    default:
+        return regularExpression_;
+    }
 }

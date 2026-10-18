@@ -16,7 +16,7 @@ namespace {
 // where "Go to Definition" makes sense.
 const QStringList codeLanguages = {"c", "cpp", "java", "javascript", "typescript", "tsx"};
 
-constexpr qint64 maxFileSize = 2 * 1024 * 1024;
+constexpr qint64 maxFileSize = qint64(2) * 1024 * 1024;
 constexpr int maxFiles = 50000;
 
 bool isTypeContainer(SymbolKind kind)

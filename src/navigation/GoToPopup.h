@@ -56,13 +56,12 @@ public:
     // Same, with the query's separators already normalized.
     static int fileScore(QStringView relativePath, QStringView normalized, bool hasSlash);
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     // `line` from 0, -1 to keep the file's position.
     void fileChosen(const QString &path, int line);
     void symbolChosen(const SymbolLocation &symbol);
-
-protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     struct Entry {
@@ -77,6 +76,11 @@ private:
     void filterFiles(const QString &query, QList<Entry> &entries) const;
     void filterSymbols(const QString &query, QList<Entry> &entries) const;
     void filterRecent(const QString &query, QList<Entry> &entries) const;
+    // What the list says when nothing is shown.
+    QString emptyMessage(const QString &query) const;
+    Entry symbolEntry(qsizetype index) const;
+    // The folder of a recent file, and whether Claude edited it.
+    QString recentLocation(const QString &path, const QString &relative, bool claudeOnly) const;
     void openCurrent();
     QString relativePath(const QString &path) const;
 

@@ -62,6 +62,141 @@ QString roleText(const QString &label)
     return QLatin1Char('"') + text + QLatin1Char('"');
 }
 
+// Reads an erDiagram line by line: a block of columns stays open across
+// lines until its `}`.
+class ErReader {
+public:
+    explicit ErReader(Model &model)
+        : model_(model)
+    {
+    }
+
+    void read(const QString &line)
+    {
+        if (header().match(line).hasMatch())
+            return;
+        if (!body_.isEmpty()) {
+            readBodyLine(line);
+            return;
+        }
+        if (readBlockOpening(line) || readRelation(line) || readEntityAlone(line))
+            return;
+        model_.warnings.append(QStringLiteral("Not understood: ") + line);
+    }
+
+    // Closes a block the source left open.
+    void finish()
+    {
+        if (!body_.isEmpty())
+            closeBody();
+    }
+
+private:
+    Model::Node &entity(const QString &key)
+    {
+        if (!index_.contains(key)) {
+            index_.insert(key, model_.nodes.size());
+            model_.nodes.append(
+                {QStringLiteral("entity"), key,
+                 QJsonObject{{QStringLiteral("name"), key}, {QStringLiteral("attributes"), QJsonArray()}}});
+        }
+        return model_.nodes[index_.value(key)];
+    }
+
+    static void rename(Model::Node &node, const QString &alias)
+    {
+        if (!alias.trimmed().isEmpty())
+            node.props.insert(QStringLiteral("name"), alias.trimmed());
+    }
+
+    void closeBody()
+    {
+        entity(body_).props.insert(QStringLiteral("attributes"), attributes_);
+        body_.clear();
+        attributes_ = QJsonArray();
+    }
+
+    // A line of an open block: a column, the block's end, or both.
+    void readBodyLine(const QString &line)
+    {
+        const bool closes = line.endsWith(QLatin1Char('}'));
+        const QString field = closes ? line.chopped(1).trimmed() : line;
+        if (!field.isEmpty())
+            attributes_.append(field);
+        if (closes)
+            closeBody();
+    }
+
+    bool readBlockOpening(const QString &line)
+    {
+        const QRegularExpressionMatch open = entityBlock().match(line);
+        if (!open.hasMatch())
+            return false;
+        Model::Node &node = entity(open.captured(1));
+        rename(node, open.captured(2));
+        attributes_ = node.props.value(QStringLiteral("attributes")).toArray();
+        body_ = open.captured(1);
+        // `EMPTY {}` and `ORDER { uuid id PK }` on one line.
+        if (const QString rest = open.captured(3).trimmed(); !rest.isEmpty())
+            readBodyLine(rest);
+        return true;
+    }
+
+    bool readRelation(const QString &line)
+    {
+        const QRegularExpressionMatch rel = relation().match(line);
+        if (!rel.hasMatch())
+            return false;
+        entity(rel.captured(1));
+        entity(rel.captured(5));
+        QJsonObject props{{QStringLiteral("fromCard"), rel.captured(2)},
+                          {QStringLiteral("toCard"), rel.captured(4)},
+                          {QStringLiteral("label"), mermaidUnquote(rel.captured(6))}};
+        if (rel.captured(3) == QLatin1String(".."))
+            props.insert(QStringLiteral("identifying"), false);
+        model_.links.append({QStringLiteral("relationship"), rel.captured(1), rel.captured(5), props});
+        return true;
+    }
+
+    bool readEntityAlone(const QString &line)
+    {
+        const QRegularExpressionMatch alone = entityAlone().match(line);
+        if (!alone.hasMatch())
+            return false;
+        rename(entity(alone.captured(1)), alone.captured(2));
+        return true;
+    }
+
+    Model &model_;
+    QHash<QString, qsizetype> index_;
+    QString body_; // the key of the entity whose block is open
+    QJsonArray attributes_;
+};
+
+// A table renamed after it was read keeps its key (and its place); Mermaid
+// shows the new name as the entity's alias.
+QString aliasText(const QString &name, const QString &key)
+{
+    if (name == key || name.isEmpty())
+        return {};
+    QString text = name;
+    text.replace(QLatin1Char('"'), QLatin1Char('\''));
+    return QStringLiteral("[\"%1\"]").arg(text);
+}
+
+QString relationLine(const Link &link, const QString &from, const QString &to)
+{
+    const auto *relationship = dynamic_cast<const RelationshipLink *>(&link);
+    const QString fromCard =
+        relationship && !relationship->fromCard.isEmpty() ? relationship->fromCard : QStringLiteral("||");
+    const QString toCard =
+        relationship && !relationship->toCard.isEmpty() ? relationship->toCard : QStringLiteral("o{");
+    const QString line = relationship && !relationship->identifying ? QStringLiteral("..") : QStringLiteral("--");
+    return QStringLiteral("  %1 %2%3%4 %5 : %6")
+        .arg(from, fromCard, line, toCard, to,
+             roleText(link.label.isEmpty() ? QStringLiteral("relates to") : link.label));
+}
+
 class MermaidEr : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-er"); }
@@ -82,73 +217,10 @@ public:
 
     bool parse(const QString &source, Model &model, QString *) const override
     {
-        QHash<QString, qsizetype> index;
-        const auto entity = [&](const QString &key) -> Model::Node & {
-            if (!index.contains(key)) {
-                index.insert(key, model.nodes.size());
-                model.nodes.append(
-                    {QStringLiteral("entity"), key,
-                     QJsonObject{{QStringLiteral("name"), key}, {QStringLiteral("attributes"), QJsonArray()}}});
-            }
-            return model.nodes[index.value(key)];
-        };
-        const auto rename = [](Model::Node &node, const QString &alias) {
-            if (!alias.trimmed().isEmpty())
-                node.props.insert(QStringLiteral("name"), alias.trimmed());
-        };
-
-        QString body; // the key of the entity whose block is open
-        QJsonArray attributes;
-        const auto closeBody = [&] {
-            entity(body).props.insert(QStringLiteral("attributes"), attributes);
-            body.clear();
-            attributes = QJsonArray();
-        };
-        // A line of an open block: a column, the block's end, or both.
-        const auto bodyLine = [&](const QString &line) {
-            const bool closes = line.endsWith(QLatin1Char('}'));
-            const QString field = closes ? line.chopped(1).trimmed() : line;
-            if (!field.isEmpty())
-                attributes.append(field);
-            if (closes)
-                closeBody();
-        };
-        for (const QString &line : mermaidLines(source)) {
-            if (header().match(line).hasMatch())
-                continue;
-            if (!body.isEmpty()) {
-                bodyLine(line);
-                continue;
-            }
-            if (const QRegularExpressionMatch open = entityBlock().match(line); open.hasMatch()) {
-                Model::Node &node = entity(open.captured(1));
-                rename(node, open.captured(2));
-                attributes = node.props.value(QStringLiteral("attributes")).toArray();
-                body = open.captured(1);
-                // `EMPTY {}` and `ORDER { uuid id PK }` on one line.
-                if (const QString rest = open.captured(3).trimmed(); !rest.isEmpty())
-                    bodyLine(rest);
-                continue;
-            }
-            if (const QRegularExpressionMatch rel = relation().match(line); rel.hasMatch()) {
-                entity(rel.captured(1));
-                entity(rel.captured(5));
-                QJsonObject props{{QStringLiteral("fromCard"), rel.captured(2)},
-                                  {QStringLiteral("toCard"), rel.captured(4)},
-                                  {QStringLiteral("label"), mermaidUnquote(rel.captured(6))}};
-                if (rel.captured(3) == QLatin1String(".."))
-                    props.insert(QStringLiteral("identifying"), false);
-                model.links.append({QStringLiteral("relationship"), rel.captured(1), rel.captured(5), props});
-                continue;
-            }
-            if (const QRegularExpressionMatch alone = entityAlone().match(line); alone.hasMatch()) {
-                rename(entity(alone.captured(1)), alone.captured(2));
-                continue;
-            }
-            model.warnings.append(QStringLiteral("Not understood: ") + line);
-        }
-        if (!body.isEmpty())
-            closeBody();
+        ErReader reader(model);
+        for (const QString &line : mermaidLines(source))
+            reader.read(line);
+        reader.finish();
         model.meta = QJsonObject{{QStringLiteral("rankdir"), QStringLiteral("LR")}};
         return true;
     }
@@ -163,15 +235,7 @@ public:
             const QString name = table ? table->name : s->displayText();
             const QString key = keyFor(s->key, name, used);
             keys.insert(s->id, key);
-            // A table renamed after it was read keeps its key (and its
-            // place); Mermaid shows the new name as the entity's alias.
-            QString alias;
-            if (name != key && !name.isEmpty()) {
-                QString text = name;
-                text.replace(QLatin1Char('"'), QLatin1Char('\''));
-                alias = QStringLiteral("[\"%1\"]").arg(text);
-            }
-            out.append(QStringLiteral("  %1%2 {").arg(key, alias));
+            out.append(QStringLiteral("  %1%2 {").arg(key, aliasText(name, key)));
             if (table) {
                 for (const QString &field : table->attributes)
                     out.append(QStringLiteral("    ") + field);
@@ -181,18 +245,8 @@ public:
         for (const auto &l : board.links()) {
             const QString from = keys.value(l->from);
             const QString to = keys.value(l->to);
-            if (from.isEmpty() || to.isEmpty())
-                continue;
-            const auto *relationship = dynamic_cast<const RelationshipLink *>(l.get());
-            const QString fromCard =
-                relationship && !relationship->fromCard.isEmpty() ? relationship->fromCard : QStringLiteral("||");
-            const QString toCard =
-                relationship && !relationship->toCard.isEmpty() ? relationship->toCard : QStringLiteral("o{");
-            const QString line =
-                relationship && !relationship->identifying ? QStringLiteral("..") : QStringLiteral("--");
-            out.append(QStringLiteral("  %1 %2%3%4 %5 : %6")
-                           .arg(from, fromCard, line, toCard, to,
-                                roleText(l->label.isEmpty() ? QStringLiteral("relates to") : l->label)));
+            if (!from.isEmpty() && !to.isEmpty())
+                out.append(relationLine(*l, from, to));
         }
         return out.join(QLatin1Char('\n'));
     }

@@ -55,7 +55,7 @@ void CodeNavigator::goToDefinition()
     // "Foo::bar", "x.bar", "x->bar": what precedes the word on the line.
     const int lineStart =
         static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, request.line));
-    const QString before = editor->text(lineStart, start);
+    const QString before = editor->text(lineStart, request.position);
     static const QRegularExpression qualified(QStringLiteral("(\\w+)\\s*::\\s*$"));
     static const QRegularExpression member(QStringLiteral("(\\.|->)\\s*$"));
     if (const QRegularExpressionMatch match = qualified.match(before); match.hasMatch())

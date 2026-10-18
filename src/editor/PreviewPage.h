@@ -6,6 +6,7 @@
 #include <QWebEngineView>
 #include <QWidget>
 
+#include <array>
 #include <memory>
 
 class CodeColorizer;
@@ -161,7 +162,8 @@ private:
     MarkdownPreview *markdown_ = nullptr;
     HtmlPreview *html_ = nullptr;
     QSplitter *splitter_;
-    QToolButton *buttons_[3]{};
+    static constexpr std::size_t modeCount = 3;
+    std::array<QToolButton *, modeCount> buttons_{}; // indexed by Mode
     Mode mode_ = Mode::Preview;
     QTimer updateTimer_;
 };

@@ -206,122 +206,179 @@ QString cppStandardFromCMake(const QByteArray &cmake)
     return {};
 }
 
+} // namespace ProjectDetector
+
+namespace {
+
+// A project folder and what walking it found.
+class ProjectScan {
+public:
+    explicit ProjectScan(const QString &folder)
+        : folder_(folder)
+    {
+        int entries = 0;
+        walk(folder, 0, scan_, entries);
+    }
+
+    // The shallowest file with this name, or an empty string.
+    QString marker(const QString &name) const { return scan_.markers.value(name); }
+
+    QString relative(const QString &path) const { return QDir(folder_).relativeFilePath(path); }
+
+    int count(const QStringList &suffixes) const { return ::count(scan_, suffixes); }
+
+    const QString &folder() const { return folder_; }
+
+private:
+    QString folder_;
+    Scan scan_;
+};
+
+// The Java version a .java-version or .sdkmanrc file names.
+QString javaVersionFromVersionFile(const QString &name, const QString &path)
+{
+    if (name != QLatin1String(".sdkmanrc"))
+        return ProjectDetector::javaMajor(firstLine(path));
+    static const QRegularExpression entry(QStringLiteral(R"(^\s*java\s*=\s*(\S+))"),
+                                          QRegularExpression::MultilineOption);
+    return ProjectDetector::javaMajor(entry.match(QString::fromUtf8(readFile(path))).captured(1));
+}
+
+void detectJavaVersionFiles(const ProjectScan &project, DetectedLanguage &java)
+{
+    for (const QString &name : {QStringLiteral(".java-version"), QStringLiteral(".sdkmanrc")}) {
+        const QString path = project.marker(name);
+        if (path.isEmpty() || !java.runtimeVersion.isEmpty())
+            continue;
+        java.runtimeVersion = javaVersionFromVersionFile(name, path);
+        if (!java.runtimeVersion.isEmpty())
+            java.evidence = project.relative(path);
+    }
+}
+
+void detectJavaBuildFiles(const ProjectScan &project, DetectedLanguage &java)
+{
+    for (const QString &name :
+         {QStringLiteral("pom.xml"), QStringLiteral("build.gradle.kts"), QStringLiteral("build.gradle")}) {
+        const QString path = project.marker(name);
+        if (path.isEmpty())
+            continue;
+        if (java.evidence.isEmpty())
+            java.evidence = project.relative(path);
+        if (!java.runtimeVersion.isEmpty())
+            continue;
+        const QByteArray text = readFile(path);
+        java.runtimeVersion = name == QLatin1String("pom.xml") ? ProjectDetector::javaVersionFromPom(text)
+                                                               : ProjectDetector::javaVersionFromGradle(text);
+    }
+}
+
+DetectedLanguage detectJava(const ProjectScan &project)
+{
+    DetectedLanguage java{QStringLiteral("java"), {}, {}, {}};
+    detectJavaVersionFiles(project, java);
+    detectJavaBuildFiles(project, java);
+    const int files = project.count({QStringLiteral("java")});
+    if (java.evidence.isEmpty() && files >= minimumSources)
+        java.evidence = filesEvidence(files, QStringLiteral("java"));
+    return java;
+}
+
+void detectJavaScriptManifests(const ProjectScan &project, DetectedLanguage &javascript)
+{
+    for (const QString &name : {QStringLiteral(".nvmrc"), QStringLiteral(".node-version")}) {
+        const QString path = project.marker(name);
+        if (path.isEmpty() || !javascript.runtimeVersion.isEmpty())
+            continue;
+        javascript.runtimeVersion = ProjectDetector::nodeMajor(firstLine(path));
+        javascript.evidence = project.relative(path);
+    }
+    if (const QString package = project.marker(QStringLiteral("package.json")); !package.isEmpty()) {
+        if (javascript.runtimeVersion.isEmpty())
+            javascript.runtimeVersion = ProjectDetector::nodeVersionFromPackageJson(readFile(package));
+        javascript.evidence = project.relative(package);
+    }
+    const QString tsconfig = project.marker(QStringLiteral("tsconfig.json"));
+    if (javascript.evidence.isEmpty() && !tsconfig.isEmpty())
+        javascript.evidence = project.relative(tsconfig);
+}
+
+DetectedLanguage detectJavaScript(const ProjectScan &project)
+{
+    DetectedLanguage javascript{QStringLiteral("javascript"), {}, {}, {}};
+    detectJavaScriptManifests(project, javascript);
+    if (!javascript.evidence.isEmpty())
+        return javascript;
+    const int ts = project.count({QStringLiteral("ts"), QStringLiteral("tsx"), QStringLiteral("mts")});
+    const int js = project.count({QStringLiteral("js"), QStringLiteral("jsx"), QStringLiteral("mjs")});
+    if (ts + js < minimumSources)
+        return javascript;
+    javascript.evidence = ts >= js ? filesEvidence(ts, QStringLiteral("ts")) : filesEvidence(js, QStringLiteral("js"));
+    return javascript;
+}
+
+DetectedLanguage detectCpp(const ProjectScan &project)
+{
+    DetectedLanguage cpp{QStringLiteral("cpp"), {}, {}, {}};
+    if (const QString cmake = project.marker(QStringLiteral("CMakeLists.txt")); !cmake.isEmpty()) {
+        cpp.runtimeVersion = ProjectDetector::cppStandardFromCMake(readFile(cmake));
+        cpp.evidence = project.relative(cmake);
+    }
+    for (const QString &name : {QStringLiteral("compile_commands.json"), QStringLiteral("meson.build")}) {
+        if (cpp.evidence.isEmpty() && !project.marker(name).isEmpty())
+            cpp.evidence = project.relative(project.marker(name));
+    }
+    const int sources = project.count({QStringLiteral("cpp"), QStringLiteral("cc"), QStringLiteral("cxx"),
+                                       QStringLiteral("c"), QStringLiteral("hpp"), QStringLiteral("h")});
+    if (cpp.evidence.isEmpty() && sources >= minimumSources)
+        cpp.evidence = QStringLiteral("%1 C/C++ files").arg(sources);
+    return cpp;
+}
+
+void detectPythonManifests(const ProjectScan &project, DetectedLanguage &python)
+{
+    if (const QString version = project.marker(QStringLiteral(".python-version")); !version.isEmpty()) {
+        if (python.runtimeVersion.isEmpty())
+            python.runtimeVersion = ProjectDetector::pythonMinor(firstLine(version));
+        python.evidence = project.relative(version);
+    }
+    if (const QString pyproject = project.marker(QStringLiteral("pyproject.toml")); !pyproject.isEmpty()) {
+        if (python.runtimeVersion.isEmpty())
+            python.runtimeVersion = ProjectDetector::pythonVersionFromPyproject(readFile(pyproject));
+        python.evidence = project.relative(pyproject);
+    }
+    for (const QString &name : {QStringLiteral("setup.py"), QStringLiteral("requirements.txt")}) {
+        if (python.evidence.isEmpty() && !project.marker(name).isEmpty())
+            python.evidence = project.relative(project.marker(name));
+    }
+}
+
+DetectedLanguage detectPython(const ProjectScan &project)
+{
+    DetectedLanguage python{QStringLiteral("python"), {}, {}, {}};
+    detectVirtualEnvironment(project.folder(), python);
+    if (!python.runtimePath.isEmpty())
+        python.evidence =
+            project.relative(QDir::cleanPath(QFileInfo(python.runtimePath).absolutePath() + QStringLiteral("/..")));
+    detectPythonManifests(project, python);
+    const int files = project.count({QStringLiteral("py")});
+    if (python.evidence.isEmpty() && files >= minimumSources)
+        python.evidence = filesEvidence(files, QStringLiteral("py"));
+    return python;
+}
+
+} // namespace
+
+namespace ProjectDetector {
+
 QList<DetectedLanguage> detect(const QString &folder)
 {
-    Scan scan;
-    int entries = 0;
-    walk(folder, 0, scan, entries);
-    const auto marker = [&scan](const QString &name) { return scan.markers.value(name); };
-    const auto relative = [&folder](const QString &path) { return QDir(folder).relativeFilePath(path); };
-
+    const ProjectScan project(folder);
     QList<DetectedLanguage> found;
-
-    // Java
-    {
-        DetectedLanguage java{QStringLiteral("java"), {}, {}, {}};
-        for (const QString &name : {QStringLiteral(".java-version"), QStringLiteral(".sdkmanrc")}) {
-            if (!marker(name).isEmpty() && java.runtimeVersion.isEmpty()) {
-                QString line = firstLine(marker(name));
-                if (name == QLatin1String(".sdkmanrc")) {
-                    static const QRegularExpression entry(QStringLiteral(R"(^\s*java\s*=\s*(\S+))"),
-                                                          QRegularExpression::MultilineOption);
-                    line = entry.match(QString::fromUtf8(readFile(marker(name)))).captured(1);
-                }
-                java.runtimeVersion = javaMajor(line);
-                if (!java.runtimeVersion.isEmpty())
-                    java.evidence = relative(marker(name));
-            }
-        }
-        for (const QString &name :
-             {QStringLiteral("pom.xml"), QStringLiteral("build.gradle.kts"), QStringLiteral("build.gradle")}) {
-            const QString path = marker(name);
-            if (path.isEmpty())
-                continue;
-            if (java.evidence.isEmpty())
-                java.evidence = relative(path);
-            if (java.runtimeVersion.isEmpty()) {
-                const QByteArray text = readFile(path);
-                java.runtimeVersion =
-                    name == QLatin1String("pom.xml") ? javaVersionFromPom(text) : javaVersionFromGradle(text);
-            }
-        }
-        const int files = count(scan, {QStringLiteral("java")});
-        if (java.evidence.isEmpty() && files >= minimumSources)
-            java.evidence = filesEvidence(files, QStringLiteral("java"));
-        if (!java.evidence.isEmpty())
-            found.append(java);
-    }
-
-    // JavaScript / TypeScript
-    {
-        DetectedLanguage javascript{QStringLiteral("javascript"), {}, {}, {}};
-        for (const QString &name : {QStringLiteral(".nvmrc"), QStringLiteral(".node-version")}) {
-            if (!marker(name).isEmpty() && javascript.runtimeVersion.isEmpty()) {
-                javascript.runtimeVersion = nodeMajor(firstLine(marker(name)));
-                javascript.evidence = relative(marker(name));
-            }
-        }
-        if (const QString package = marker(QStringLiteral("package.json")); !package.isEmpty()) {
-            if (javascript.runtimeVersion.isEmpty())
-                javascript.runtimeVersion = nodeVersionFromPackageJson(readFile(package));
-            javascript.evidence = relative(package);
-        }
-        if (javascript.evidence.isEmpty() && !marker(QStringLiteral("tsconfig.json")).isEmpty())
-            javascript.evidence = relative(marker(QStringLiteral("tsconfig.json")));
-        const int ts = count(scan, {QStringLiteral("ts"), QStringLiteral("tsx"), QStringLiteral("mts")});
-        const int js = count(scan, {QStringLiteral("js"), QStringLiteral("jsx"), QStringLiteral("mjs")});
-        if (javascript.evidence.isEmpty() && ts + js >= minimumSources)
-            javascript.evidence =
-                ts >= js ? filesEvidence(ts, QStringLiteral("ts")) : filesEvidence(js, QStringLiteral("js"));
-        if (!javascript.evidence.isEmpty())
-            found.append(javascript);
-    }
-
-    // C / C++
-    {
-        DetectedLanguage cpp{QStringLiteral("cpp"), {}, {}, {}};
-        if (const QString cmake = marker(QStringLiteral("CMakeLists.txt")); !cmake.isEmpty()) {
-            cpp.runtimeVersion = cppStandardFromCMake(readFile(cmake));
-            cpp.evidence = relative(cmake);
-        }
-        for (const QString &name : {QStringLiteral("compile_commands.json"), QStringLiteral("meson.build")}) {
-            if (cpp.evidence.isEmpty() && !marker(name).isEmpty())
-                cpp.evidence = relative(marker(name));
-        }
-        const int sources = count(scan, {QStringLiteral("cpp"), QStringLiteral("cc"), QStringLiteral("cxx"),
-                                         QStringLiteral("c"), QStringLiteral("hpp"), QStringLiteral("h")});
-        if (cpp.evidence.isEmpty() && sources >= minimumSources)
-            cpp.evidence = QStringLiteral("%1 C/C++ files").arg(sources);
-        if (!cpp.evidence.isEmpty())
-            found.append(cpp);
-    }
-
-    // Python
-    {
-        DetectedLanguage python{QStringLiteral("python"), {}, {}, {}};
-        detectVirtualEnvironment(folder, python);
-        if (!python.runtimePath.isEmpty())
-            python.evidence =
-                relative(QDir::cleanPath(QFileInfo(python.runtimePath).absolutePath() + QStringLiteral("/..")));
-        if (const QString version = marker(QStringLiteral(".python-version")); !version.isEmpty()) {
-            if (python.runtimeVersion.isEmpty())
-                python.runtimeVersion = pythonMinor(firstLine(version));
-            python.evidence = relative(version);
-        }
-        if (const QString pyproject = marker(QStringLiteral("pyproject.toml")); !pyproject.isEmpty()) {
-            if (python.runtimeVersion.isEmpty())
-                python.runtimeVersion = pythonVersionFromPyproject(readFile(pyproject));
-            python.evidence = relative(pyproject);
-        }
-        for (const QString &name : {QStringLiteral("setup.py"), QStringLiteral("requirements.txt")}) {
-            if (python.evidence.isEmpty() && !marker(name).isEmpty())
-                python.evidence = relative(marker(name));
-        }
-        const int files = count(scan, {QStringLiteral("py")});
-        if (python.evidence.isEmpty() && files >= minimumSources)
-            python.evidence = filesEvidence(files, QStringLiteral("py"));
-        if (!python.evidence.isEmpty())
-            found.append(python);
+    for (const DetectedLanguage &language :
+         {detectJava(project), detectJavaScript(project), detectCpp(project), detectPython(project)}) {
+        if (!language.evidence.isEmpty())
+            found.append(language);
     }
 
     // In the order of the families.

@@ -8,6 +8,7 @@
 #include <QPainter>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace diagram::journey {
@@ -23,7 +24,7 @@ constexpr qreal headerLineH = 15;
 constexpr qreal titleLineH = 20;
 constexpr qreal actorLineH = 17;
 // The scores' fills when the board is not colorful.
-const char *const legacyScore[] = {"#eef2f7", "#e9eef5", "#e5edf5", "#e0ebf4", "#d9e8f4"};
+constexpr std::array<const char *, 5> legacyScore{"#eef2f7", "#e9eef5", "#e5edf5", "#e0ebf4", "#d9e8f4"};
 
 QString tr(const char *text)
 {
@@ -127,8 +128,8 @@ void JourneyTaskShape::draw(QPainter &painter, const Board &board, const ShapeSt
 {
     const Style &style = board.style();
     // The mood of the step: rose for a pain point, cool for a delight.
-    const QColor scoreTones[] = {style.tones.rose, style.tones.warm, style.tones.warm, style.tones.sage,
-                                 style.tones.cool};
+    const std::array<QColor, 5> scoreTones{style.tones.rose, style.tones.warm, style.tones.warm, style.tones.sage,
+                                           style.tones.cool};
     const QColor nativeFill = style.tones.colorful ? scoreTones[score - 1] : QColor(legacyScore[score - 1]);
     const QColor ink = textColor(style.palette.ink);
     const QColor muted = textColor(style.palette.inkMuted);
@@ -174,24 +175,24 @@ QList<Property> JourneyTaskShape::properties() const
     };
 }
 
-QVariant JourneyTaskShape::propertyValue(const QString &id) const
+QVariant JourneyTaskShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("section"))
+    if (propertyId == QLatin1String("section"))
         return section;
-    if (id == QLatin1String("score"))
+    if (propertyId == QLatin1String("score"))
         return QString::number(score);
-    if (id == QLatin1String("actors"))
+    if (propertyId == QLatin1String("actors"))
         return actors.join(QStringLiteral(", "));
     return {};
 }
 
-void JourneyTaskShape::setPropertyValue(const QString &id, const QVariant &value)
+void JourneyTaskShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("section"))
+    if (propertyId == QLatin1String("section"))
         section = value.toString().trimmed();
-    else if (id == QLatin1String("score"))
+    else if (propertyId == QLatin1String("score"))
         score = clampScore(value.toString().toDouble());
-    else if (id == QLatin1String("actors"))
+    else if (propertyId == QLatin1String("actors"))
         actors = splitActors(value.toString());
 }
 

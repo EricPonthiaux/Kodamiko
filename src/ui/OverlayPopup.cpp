@@ -22,7 +22,6 @@ public:
     {
     }
 
-protected:
     bool eventFilter(QObject *watched, QEvent *event) override
     {
         popup_->onWatchedEvent(watched, event);

@@ -90,8 +90,8 @@ QJsonArray toJsonArray(const QStringList &values)
 // ---------------------------------------------------------------------------
 // Shape
 
-Shape::Shape(QString type, qreal width, qreal height)
-    : type(std::move(type))
+Shape::Shape(QString typeName, qreal width, qreal height)
+    : type(std::move(typeName))
     , w(width)
     , h(height)
 {
@@ -292,14 +292,14 @@ void measureShape(const Board &board, Shape &shape, const QJsonObject *props)
 // ---------------------------------------------------------------------------
 // Geometry helpers
 
-QPointF bezierPoint(QPointF p0, QPointF p1, QPointF p2, QPointF p3, qreal t)
+QPointF bezierPoint(const std::array<QPointF, 4> &controls, qreal t)
 {
     const qreal u = 1 - t;
     const qreal a = u * u * u;
     const qreal b = 3 * u * u * t;
     const qreal c = 3 * u * t * t;
     const qreal d = t * t * t;
-    return {a * p0.x() + b * p1.x() + c * p2.x() + d * p3.x(), a * p0.y() + b * p1.y() + c * p2.y() + d * p3.y()};
+    return a * controls[0] + b * controls[1] + c * controls[2] + d * controls[3];
 }
 
 qreal distanceToSegment(QPointF p, QPointF a, QPointF b)
@@ -412,6 +412,7 @@ QPointF ellipseBorderPoint(QPointF center, QPointF toward, qreal rx, qreal ry)
     return {center.x() + dx * t, center.y() + dy * t};
 }
 
+// NOLINTNEXTLINE(readability-function-size): mirrors the canvas arrowhead the families call (9 sites)
 void fillArrowHead(QPainter &painter, QPointF tip, qreal angle, qreal size, const QColor &color, qreal spread)
 {
     QPainterPath path;
@@ -482,8 +483,8 @@ std::optional<Spline> Spline::fromJson(const QJsonValue &value)
 // ---------------------------------------------------------------------------
 // Link
 
-Link::Link(QString type)
-    : type(std::move(type))
+Link::Link(QString typeName)
+    : type(std::move(typeName))
 {
 }
 
@@ -541,7 +542,7 @@ const Spline *Link::validSpline(const Shape &a, const Shape &b) const
         std::abs(b.x - s.toAnchor.x()) > 0.5 || std::abs(b.y - s.toAnchor.y()) > 0.5) {
         // The curve lies as soon as an end moves: the link falls back to a
         // straight line until the next routing.
-        const_cast<Link *>(this)->spline.reset();
+        spline.reset();
         flatFor_.clear();
         flat_.clear();
         return nullptr;
@@ -557,7 +558,7 @@ std::optional<QPointF> Link::validLayoutLabelPoint(const Shape &a, const Shape &
     if (std::abs(a.x - reserved.fromAnchor.x()) <= 0.5 && std::abs(a.y - reserved.fromAnchor.y()) <= 0.5 &&
         std::abs(b.x - reserved.toAnchor.x()) <= 0.5 && std::abs(b.y - reserved.toAnchor.y()) <= 0.5)
         return reserved.point;
-    const_cast<Link *>(this)->layoutLabelPoint.reset();
+    layoutLabelPoint.reset();
     return std::nullopt;
 }
 
@@ -608,7 +609,7 @@ const std::vector<QPointF> &Link::flatCurve(const std::vector<QPointF> &curve) c
     for (size_t i = 1; i + 2 < curve.size(); i += 3) {
         const QPointF p0 = flat_.back();
         for (int t = 1; t <= 8; ++t)
-            flat_.push_back(bezierPoint(p0, curve[i], curve[i + 1], curve[i + 2], t / 8.0));
+            flat_.push_back(bezierPoint({p0, curve[i], curve[i + 1], curve[i + 2]}, t / 8.0));
     }
     flatFor_ = curve;
     return flat_;
@@ -732,14 +733,14 @@ void Link::strokeBody(QPainter &painter, const Route &r, const BodyOptions &o) c
 
 qreal Link::arrivalAngle(const Route &r) const
 {
-    QPointF from = r.a;
+    QPointF previous = r.a;
     if (!r.curve.empty()) {
         const QPointF last = r.curve.back();
-        from = std::hypot(r.b.x() - last.x(), r.b.y() - last.y()) > 0.5 ? last : r.curve[r.curve.size() - 2];
+        previous = std::hypot(r.b.x() - last.x(), r.b.y() - last.y()) > 0.5 ? last : r.curve[r.curve.size() - 2];
     } else if (r.points.size() > 1) {
-        from = r.points[r.points.size() - 2];
+        previous = r.points[r.points.size() - 2];
     }
-    return std::atan2(r.b.y() - from.y(), r.b.x() - from.x());
+    return std::atan2(r.b.y() - previous.y(), r.b.x() - previous.x());
 }
 
 qreal Link::departureAngle(const Route &r) const
@@ -791,7 +792,8 @@ LinkStyle Link::drawStyle(const Board &board, bool selected, qreal nativeWidth) 
     const qreal markerScale = width / nativeWidth;
     LinkStyle result;
     const QColor custom = parseColor(customColor);
-    result.color = custom.isValid() ? custom : (selected ? style.shape.selectedStroke : style.link.color);
+    const QColor native = selected ? style.shape.selectedStroke : style.link.color;
+    result.color = custom.isValid() ? custom : native;
     result.width = width + (selected ? 1 : 0);
     result.arrow = style.link.arrow * markerScale;
     result.markerScale = markerScale;

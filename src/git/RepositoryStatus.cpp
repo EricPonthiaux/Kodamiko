@@ -198,11 +198,11 @@ std::optional<RepositoryStatus> RepositoryStatus::read(const QString &folder)
     const Ptr<git_index> indexGuard(index);
 
     QByteArray prefixBytes = status.info.prefix.toUtf8();
-    char *pathspec[] = {prefixBytes.data()};
+    char *pathspec = prefixBytes.data();
     git_diff_options options;
     git_diff_options_init(&options, GIT_DIFF_OPTIONS_VERSION);
     if (!status.info.prefix.isEmpty()) {
-        options.pathspec.strings = pathspec;
+        options.pathspec.strings = &pathspec;
         options.pathspec.count = 1;
     }
 

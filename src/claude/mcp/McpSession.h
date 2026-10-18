@@ -1,11 +1,12 @@
 #pragma once
 
+#include "McpRegistry.h"
+
 #include <QJsonObject>
 #include <QObject>
 #include <QPointer>
 #include <QSet>
 
-class McpRegistry;
 class QLocalSocket;
 
 // One MCP connection: the duet-mcp relay Claude Code started, connected to
@@ -35,9 +36,23 @@ private:
     void send(const QJsonObject &message);
     void result(const QJsonValue &id, const QJsonObject &value);
     void error(const QJsonValue &id, int code, const QString &message);
+    // One JSON-RPC method: answers the request `id`.
+    using RequestHandler = void (McpSession::*)(const QJsonValue &id, const QJsonObject &params);
+    void handleRequest(const QString &method, const QJsonValue &id, const QJsonObject &params);
+    void initialize(const QJsonValue &id, const QJsonObject &params);
+    // Answers with an empty result (ping, logging level).
+    void acknowledge(const QJsonValue &id, const QJsonObject &params);
+    void listTools(const QJsonValue &id, const QJsonObject &params);
     void callTool(const QJsonValue &id, const QJsonObject &params);
+    void listResources(const QJsonValue &id, const QJsonObject &params);
+    void listResourceTemplates(const QJsonValue &id, const QJsonObject &params);
     void readResource(const QJsonValue &id, const QJsonObject &params);
+    void subscribe(const QJsonValue &id, const QJsonObject &params);
+    void unsubscribe(const QJsonValue &id, const QJsonObject &params);
+    void listPrompts(const QJsonValue &id, const QJsonObject &params);
     void getPrompt(const QJsonValue &id, const QJsonObject &params);
+    // Reports a long tool's progress to the client when it gave a token.
+    McpProgress progressFor(const QJsonValue &token);
 
     QPointer<QLocalSocket> socket_;
     McpRegistry *registry_;

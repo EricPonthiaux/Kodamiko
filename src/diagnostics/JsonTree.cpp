@@ -15,6 +15,17 @@ QString tr(const char *text)
     return QCoreApplication::translate("JsonTree", text);
 }
 
+std::optional<int> hexDigit(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    return std::nullopt;
+}
+
 class Parser {
 public:
     explicit Parser(QByteArrayView text)
@@ -69,43 +80,44 @@ private:
             return fail(tr("Nested too deeply"));
         JsonNode node;
         node.start = int(pos_);
+        if (!valueInto(node, depth))
+            return std::nullopt;
+        node.end = int(pos_);
+        return node;
+    }
+
+    bool valueInto(JsonNode &node, int depth)
+    {
         switch (peek()) {
         case '{':
-            if (!object(node, depth))
-                return std::nullopt;
-            break;
+            return object(node, depth);
         case '[':
-            if (!array(node, depth))
-                return std::nullopt;
-            break;
-        case '"': {
-            std::optional<QString> text = string();
-            if (!text)
-                return std::nullopt;
-            node.type = QJsonValue::String;
-            node.scalar = *text;
-            break;
-        }
+            return array(node, depth);
+        case '"':
+            return stringValue(node);
         case 't':
         case 'f':
         case 'n':
-            if (!literal(node))
-                return std::nullopt;
-            break;
-        case '\0':
-            if (atEnd())
-                return fail(tr("Unexpected end of the document"));
-            [[fallthrough]];
+            return literal(node);
         default:
-            if (peek() == '-' || (peek() >= '0' && peek() <= '9')) {
-                if (!number(node))
-                    return std::nullopt;
-                break;
-            }
-            return fail(tr("Expected a value"));
+            break;
         }
-        node.end = int(pos_);
-        return node;
+        if (atEnd())
+            return fail(tr("Unexpected end of the document")), false;
+        const bool startsNumber = peek() == '-' || (peek() >= '0' && peek() <= '9');
+        if (startsNumber)
+            return number(node);
+        return fail(tr("Expected a value")), false;
+    }
+
+    bool stringValue(JsonNode &node)
+    {
+        std::optional<QString> text = string();
+        if (!text)
+            return false;
+        node.type = QJsonValue::String;
+        node.scalar = *text;
+        return true;
     }
 
     bool object(JsonNode &node, int depth)
@@ -119,25 +131,8 @@ private:
         }
         while (true) {
             skipSpace();
-            if (peek() != '"')
-                return fail(peek() == '}' ? tr("Trailing comma") : tr("Expected a key in quotes")), false;
-            JsonMember member;
-            member.keyStart = int(pos_);
-            std::optional<QString> key = string();
-            if (!key)
+            if (!member(node, depth))
                 return false;
-            member.key = *key;
-            member.keyEnd = int(pos_);
-            skipSpace();
-            if (peek() != ':')
-                return fail(tr("Expected “:” after the key")), false;
-            ++pos_;
-            skipSpace();
-            std::optional<JsonNode> child = value(depth + 1);
-            if (!child)
-                return false;
-            member.value = std::move(*child);
-            node.members.append(std::move(member));
             skipSpace();
             if (peek() == ',') {
                 ++pos_;
@@ -149,6 +144,31 @@ private:
             }
             return fail(atEnd() ? tr("Unclosed object: “}” expected") : tr("Expected “,” or “}”")), false;
         }
+    }
+
+    // A `"key": value` pair, appended to the object `node`.
+    bool member(JsonNode &node, int depth)
+    {
+        if (peek() != '"')
+            return fail(peek() == '}' ? tr("Trailing comma") : tr("Expected a key in quotes")), false;
+        JsonMember member;
+        member.keyStart = int(pos_);
+        std::optional<QString> key = string();
+        if (!key)
+            return false;
+        member.key = *key;
+        member.keyEnd = int(pos_);
+        skipSpace();
+        if (peek() != ':')
+            return fail(tr("Expected “:” after the key")), false;
+        ++pos_;
+        skipSpace();
+        std::optional<JsonNode> child = value(depth + 1);
+        if (!child)
+            return false;
+        member.value = std::move(*child);
+        node.members.append(std::move(member));
+        return true;
     }
 
     bool array(JsonNode &node, int depth)
@@ -187,14 +207,10 @@ private:
             return fail(tr("Invalid \\u escape"));
         int code = 0;
         for (int i = 0; i < 4; ++i) {
-            const char c = text_[pos_ + i];
-            const int digit = c >= '0' && c <= '9'   ? c - '0'
-                              : c >= 'a' && c <= 'f' ? c - 'a' + 10
-                              : c >= 'A' && c <= 'F' ? c - 'A' + 10
-                                                     : -1;
-            if (digit < 0)
+            const std::optional<int> digit = hexDigit(text_[pos_ + i]);
+            if (!digit)
                 return fail(tr("Invalid \\u escape"));
-            code = code * 16 + digit;
+            code = code * 16 + *digit;
         }
         pos_ += 4;
         return code;
@@ -223,45 +239,45 @@ private:
             }
             result += QString::fromUtf8(utf8);
             utf8.clear();
-            ++pos_;
-            const char escape = peek();
-            ++pos_;
-            switch (escape) {
-            case '"':
-                result += QLatin1Char('"');
-                break;
-            case '\\':
-                result += QLatin1Char('\\');
-                break;
-            case '/':
-                result += QLatin1Char('/');
-                break;
-            case 'b':
-                result += QLatin1Char('\b');
-                break;
-            case 'f':
-                result += QLatin1Char('\f');
-                break;
-            case 'n':
-                result += QLatin1Char('\n');
-                break;
-            case 'r':
-                result += QLatin1Char('\r');
-                break;
-            case 't':
-                result += QLatin1Char('\t');
-                break;
-            case 'u': {
-                std::optional<int> code = hex4();
-                if (!code)
-                    return std::nullopt;
-                result += QChar(char16_t(*code)); // surrogates pair up in QString
-                break;
-            }
-            default:
-                pos_ -= 2;
-                return fail(tr("Invalid escape in a string"));
-            }
+            const std::optional<QChar> escaped = escape();
+            if (!escaped)
+                return std::nullopt;
+            result += *escaped; // surrogates pair up in QString
+        }
+    }
+
+    // The character an escape sequence stands for, past its backslash.
+    std::optional<QChar> escape()
+    {
+        ++pos_; // backslash
+        const char escape = peek();
+        ++pos_;
+        switch (escape) {
+        case '"':
+            return QLatin1Char('"');
+        case '\\':
+            return QLatin1Char('\\');
+        case '/':
+            return QLatin1Char('/');
+        case 'b':
+            return QLatin1Char('\b');
+        case 'f':
+            return QLatin1Char('\f');
+        case 'n':
+            return QLatin1Char('\n');
+        case 'r':
+            return QLatin1Char('\r');
+        case 't':
+            return QLatin1Char('\t');
+        case 'u': {
+            const std::optional<int> code = hex4();
+            if (!code)
+                return std::nullopt;
+            return QChar(char16_t(*code));
+        }
+        default:
+            pos_ -= 2;
+            return fail(tr("Invalid escape in a string"));
         }
     }
 
@@ -280,33 +296,45 @@ private:
         return fail(tr("Expected a value")), false;
     }
 
+    bool digits()
+    {
+        const qsizetype from = pos_;
+        while (peek() >= '0' && peek() <= '9')
+            ++pos_;
+        return pos_ > from;
+    }
+
+    // An optional `.digits`; false if the dot has no digits.
+    bool fraction()
+    {
+        if (peek() != '.')
+            return true;
+        ++pos_;
+        return digits();
+    }
+
+    // An optional `e[+-]digits`; false if the exponent has no digits.
+    bool exponent()
+    {
+        if (peek() != 'e' && peek() != 'E')
+            return true;
+        ++pos_;
+        if (peek() == '+' || peek() == '-')
+            ++pos_;
+        return digits();
+    }
+
     bool number(JsonNode &node)
     {
         const qsizetype start = pos_;
-        const auto digits = [this] {
-            const qsizetype from = pos_;
-            while (peek() >= '0' && peek() <= '9')
-                ++pos_;
-            return pos_ > from;
-        };
         if (peek() == '-')
             ++pos_;
         if (peek() == '0')
             ++pos_;
         else if (!digits())
             return fail(tr("Invalid number")), false;
-        if (peek() == '.') {
-            ++pos_;
-            if (!digits())
-                return fail(tr("Invalid number")), false;
-        }
-        if (peek() == 'e' || peek() == 'E') {
-            ++pos_;
-            if (peek() == '+' || peek() == '-')
-                ++pos_;
-            if (!digits())
-                return fail(tr("Invalid number")), false;
-        }
+        if (!fraction() || !exponent())
+            return fail(tr("Invalid number")), false;
         bool ok = false;
         const double number = QByteArray(text_.sliced(start, pos_ - start)).toDouble(&ok);
         if (!ok || !std::isfinite(number))

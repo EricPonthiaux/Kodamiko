@@ -4,8 +4,10 @@
 
 #include <QDialog>
 
-class QVBoxLayout;
+class QFrame;
+class QHBoxLayout;
 class QLabel;
+class QVBoxLayout;
 
 // Help ▸ Check Prerequisites, also shown at startup when git or Claude Code
 // is missing: the state of each program, and how to install it. The
@@ -31,6 +33,10 @@ signals:
 
 private:
     void rebuild();
+    // A program's state and, unless it is fine, how to install it.
+    QFrame *createCard(const Prerequisite &prerequisite);
+    // The install command, with buttons to copy and run it.
+    QHBoxLayout *createInstallRow(const Prerequisite &prerequisite, QWidget *card);
 
     QList<Prerequisite> prerequisites_;
     QLabel *summary_;

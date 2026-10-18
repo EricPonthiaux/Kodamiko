@@ -7,6 +7,8 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include <optional>
+
 namespace {
 
 enum class Style {
@@ -165,26 +167,23 @@ QString templateParameterName(const QString &declaration)
     return text.mid(start);
 }
 
-Documented documentedAt(const QByteArray &text, int position, Style style)
+// The names of template parameters: "typename T, int N" gives T, N.
+QStringList templateParameterNames(const QString &parameters)
 {
-    Documented result;
-    const QString header = CodeScan::nextDeclaration(text, position);
-    if (header.isEmpty())
-        return result;
-    const bool typed = style != Style::JsDoc;
-    static const QRegularExpression templateHead(
-        QStringLiteral("^\\s*template\\s*<(.*?)>\\s*(?:class|struct|union|using)\\b"));
-    if (const QRegularExpressionMatch match = templateHead.match(header); match.hasMatch()) {
-        // A class template: its parameters only.
-        for (const QString &part : CodeScan::splitTopLevel(match.captured(1)))
-            if (const QString name = templateParameterName(part); !name.isEmpty())
-                result.templateParameters.append(name);
-        result.found = true;
-        return result;
+    QStringList names;
+    for (const QString &part : CodeScan::splitTopLevel(parameters)) {
+        if (const QString name = templateParameterName(part); !name.isEmpty())
+            names.append(name);
     }
+    return names;
+}
+
+// The function declared by `header`; in JavaScript also "const f = (a, b)
+// =>", "f = async function (a)". Nullopt when it declares none.
+std::optional<CodeScan::Function> documentedFunction(const QString &header, Style style)
+{
     CodeScan::Function function = CodeScan::parseFunction(header);
     if (function.name.isEmpty() && style == Style::JsDoc) {
-        // "const f = (a, b) =>", "f = async function (a)".
         static const QRegularExpression arrow(
             QStringLiteral("=\\s*(?:async\\s+)?(?:function\\s*\\w*\\s*)?\\(([^()]*)\\)"));
         if (const QRegularExpressionMatch match = arrow.match(header); match.hasMatch()) {
@@ -193,29 +192,58 @@ Documented documentedAt(const QByteArray &text, int position, Style style)
         }
     }
     if (function.name.isEmpty())
+        return std::nullopt;
+    return function;
+}
+
+bool returnsValue(const CodeScan::Function &function, Style style)
+{
+    // TypeScript: "f(): Type".
+    if (style == Style::JsDoc)
+        return function.trailing.startsWith(QLatin1Char(':')) && !function.trailing.contains(QLatin1String("void"));
+    // Not a constructor (no type) nor a destructor.
+    return function.returnsValue() && !function.name.startsWith(QLatin1Char('~'));
+}
+
+// Java's "throws IOException, Foo": the exceptions.
+QStringList thrownExceptions(const CodeScan::Function &function)
+{
+    static const QRegularExpression throwsClause(QStringLiteral("\\bthrows\\s+([\\w.,\\s<>]+)"));
+    const QRegularExpressionMatch match = throwsClause.match(function.trailing);
+    if (!match.hasMatch())
+        return {};
+    QStringList exceptions;
+    for (const QString &exception : match.captured(1).split(QLatin1Char(','), Qt::SkipEmptyParts))
+        exceptions.append(exception.trimmed());
+    return exceptions;
+}
+
+Documented documentedAt(const QByteArray &text, int position, Style style)
+{
+    Documented result;
+    const QString header = CodeScan::nextDeclaration(text, position);
+    if (header.isEmpty())
+        return result;
+    static const QRegularExpression templateHead(
+        QStringLiteral("^\\s*template\\s*<(.*?)>\\s*(?:class|struct|union|using)\\b"));
+    if (const QRegularExpressionMatch match = templateHead.match(header); match.hasMatch()) {
+        // A class template: its parameters only.
+        result.templateParameters = templateParameterNames(match.captured(1));
+        result.found = true;
+        return result;
+    }
+    const std::optional<CodeScan::Function> function = documentedFunction(header, style);
+    if (!function)
         return result;
     result.found = true;
-    for (const CodeScan::Parameter &parameter : function.parameterList(typed)) {
+    const bool typed = style != Style::JsDoc;
+    for (const CodeScan::Parameter &parameter : function->parameterList(typed)) {
         if (!parameter.name.isEmpty())
             result.parameters.append(parameter.name);
     }
-    for (const QString &part : CodeScan::splitTopLevel(function.templateParameters)) {
-        if (const QString name = templateParameterName(part); !name.isEmpty())
-            result.templateParameters.append(name);
-    }
-    if (style == Style::JsDoc) {
-        // TypeScript: "f(): Type".
-        result.returnsValue =
-            function.trailing.startsWith(QLatin1Char(':')) && !function.trailing.contains(QLatin1String("void"));
-    } else {
-        // Not a constructor (no type) nor a destructor.
-        result.returnsValue = function.returnsValue() && !function.name.startsWith(QLatin1Char('~'));
-    }
-    static const QRegularExpression throwsClause(QStringLiteral("\\bthrows\\s+([\\w.,\\s<>]+)"));
-    if (const QRegularExpressionMatch match = throwsClause.match(function.trailing); match.hasMatch()) {
-        for (const QString &exception : match.captured(1).split(QLatin1Char(','), Qt::SkipEmptyParts))
-            result.exceptions.append(exception.trimmed());
-    }
+    result.templateParameters = templateParameterNames(function->templateParameters);
+    result.returnsValue = returnsValue(*function, style);
+    result.exceptions = thrownExceptions(*function);
     return result;
 }
 
@@ -229,6 +257,119 @@ QString parameterTypeOf(const QByteArray &text, int position, const QString &nam
     return {};
 }
 
+// The start of the "///" or "//!" comment on the line of `position`, -1
+// if none.
+int lineCommentStart(const QByteArray &text, int position)
+{
+    int lineStart = position;
+    while (lineStart > 0 && text[lineStart - 1] != '\n')
+        --lineStart;
+    int first = lineStart;
+    while (first < position && (text[first] == ' ' || text[first] == '\t'))
+        ++first;
+    const bool isDocLine = text.mid(first, 3) == "///" || text.mid(first, 3) == "//!";
+    const bool isDocComment = position >= first + 3 && isDocLine && text.mid(first, 4) != "////";
+    return isDocComment ? first : -1;
+}
+
+// Whether the "/*" at `open` opens a documentation comment: "/**" or
+// "/*!", not "/**/" nor in a line comment ("// see /*").
+bool opensDocComment(const QByteArray &text, int open)
+{
+    const char marker = text[open + 2];
+    if ((marker != '*' && marker != '!') || text.mid(open, 4) == "/**/")
+        return false;
+    const int openLine = int(text.lastIndexOf('\n', open)) + 1;
+    return !text.mid(openLine, open - openLine).contains("//");
+}
+
+QString tagKindName(Style style)
+{
+    switch (style) {
+    case Style::Doxygen:
+        return QObject::tr("Doxygen command");
+    case Style::Javadoc:
+        return QObject::tr("Javadoc tag");
+    case Style::JsDoc:
+    case Style::None:
+        break;
+    }
+    return QObject::tr("JSDoc tag");
+}
+
+// The tags of the comment's style, the usual ones first.
+QList<CompletionItem> tagItems(Style style)
+{
+    const QString kind = tagKindName(style);
+    const QList<Tag> &tags = tagsOf(style);
+    QList<CompletionItem> items;
+    for (int i = 0; i < tags.size(); ++i) {
+        CompletionItem item;
+        item.label = QString::fromLatin1(tags[i].name);
+        item.detail = QString::fromLatin1(tags[i].detail);
+        item.kind = CompletionItem::Kind::Keyword;
+        item.documentation = kind;
+        item.order = i;
+        item.priority = 2;
+        items.append(item);
+    }
+    return items;
+}
+
+// The names `comment` documents already with a "@param" tag, the one
+// being typed at `prefixInComment` left out.
+QSet<QString> documentedNamesIn(const QString &comment, int prefixInComment)
+{
+    static const QRegularExpression documentedTag(QStringLiteral(
+        "[@\\\\](?:param|arg|argument|tparam|template)(?:\\[[^\\]]*\\])?\\s+(?:\\{[^}]*\\}\\s*)?([\\w$]+)"));
+    QSet<QString> names;
+    for (QRegularExpressionMatchIterator it = documentedTag.globalMatch(comment); it.hasNext();) {
+        const QRegularExpressionMatch match = it.next();
+        if (match.capturedStart(1) != prefixInComment)
+            names.insert(match.captured(1));
+    }
+    return names;
+}
+
+// After "@param" ("@param[in]", "@param {Type}") in the comment starting
+// at `commentStart`: the parameters still undocumented, in the order of
+// the declaration.
+QList<CompletionItem> parameterItems(const CompletionContext &context, int commentStart, Style style)
+{
+    const QByteArray &text = context.text;
+    int lineStart = context.prefixStart;
+    while (lineStart > 0 && text[lineStart - 1] != '\n')
+        --lineStart;
+    const QString line = QString::fromUtf8(text.mid(lineStart, context.prefixStart - lineStart));
+    static const QRegularExpression paramTag(
+        QStringLiteral("[@\\\\](param|arg|argument|tparam|template)(?:\\[[^\\]]*\\])?\\s+(?:\\{[^}]*\\}\\s*)?$"));
+    const QRegularExpressionMatch tag = paramTag.match(line);
+    const int after = afterComment(text, commentStart);
+    if (!tag.hasMatch() || after < 0)
+        return {};
+    const bool templates = tag.captured(1) == QLatin1String("tparam") || tag.captured(1) == QLatin1String("template");
+    const Documented documented = documentedAt(text, after, style);
+    const QString comment = QString::fromUtf8(text.mid(commentStart, after - commentStart));
+    const int prefixInComment =
+        int(QString::fromUtf8(text.mid(commentStart, context.prefixStart - commentStart)).size());
+    const QSet<QString> documentedNames = documentedNamesIn(comment, prefixInComment);
+    const QStringList names = templates ? documented.templateParameters : documented.parameters;
+    QList<CompletionItem> items;
+    for (int i = 0; i < names.size(); ++i) {
+        if (documentedNames.contains(names[i]))
+            continue;
+        CompletionItem item;
+        item.label = names[i];
+        item.kind = templates ? CompletionItem::Kind::Type : CompletionItem::Kind::Variable;
+        if (!templates)
+            item.detail = parameterTypeOf(text, after, names[i], style != Style::JsDoc);
+        item.order = i;
+        item.priority = 10;
+        items.append(item);
+    }
+    return items;
+}
+
 } // namespace
 
 namespace DocComments {
@@ -237,28 +378,13 @@ int commentStart(const QByteArray &text, int position, const QString &languageId
 {
     if (styleOf(languageId) == Style::None || position <= 0 || position > text.size())
         return -1;
-    // "///" or "//!" on the line.
-    int lineStart = position;
-    while (lineStart > 0 && text[lineStart - 1] != '\n')
-        --lineStart;
-    int first = lineStart;
-    while (first < position && (text[first] == ' ' || text[first] == '\t'))
-        ++first;
-    if (position >= first + 3 && (text.mid(first, 3) == "///" || text.mid(first, 3) == "//!") &&
-        text.mid(first, 4) != "////")
-        return first;
+    if (const int lineComment = lineCommentStart(text, position); lineComment >= 0)
+        return lineComment;
     const int open = int(text.lastIndexOf("/*", position - 2));
     if (open < 0 || open + 2 >= text.size())
         return -1;
     const int close = int(text.lastIndexOf("*/", position - 2));
-    if (close > open)
-        return -1;
-    const char marker = text[open + 2];
-    if ((marker != '*' && marker != '!') || text.mid(open, 4) == "/**/")
-        return -1;
-    // The "/*" of a line comment ("// see /*") is no comment.
-    const int openLine = int(text.lastIndexOf('\n', open)) + 1;
-    if (text.mid(openLine, open - openLine).contains("//"))
+    if (close > open || !opensDocComment(text, open))
         return -1;
     return open;
 }
@@ -301,72 +427,14 @@ bool DocCommentProvider::handles(const CompletionContext &context) const
 
 void DocCommentProvider::complete(const CompletionContext &context, const Callback &done)
 {
-    QList<CompletionItem> items;
     const QByteArray &text = context.text;
     const int start = DocComments::commentStart(text, context.position, context.languageId);
     if (start < 0 || context.prefixStart <= 0) {
-        done(items, false);
+        done({}, false);
         return;
     }
     const Style style = styleOf(context.languageId);
     const char before = text[context.prefixStart - 1];
-    if (before == '@' || (before == '\\' && style == Style::Doxygen)) {
-        const QString kind = style == Style::Doxygen   ? QObject::tr("Doxygen command")
-                             : style == Style::Javadoc ? QObject::tr("Javadoc tag")
-                                                       : QObject::tr("JSDoc tag");
-        const QList<Tag> &tags = tagsOf(style);
-        for (int i = 0; i < tags.size(); ++i) {
-            CompletionItem item;
-            item.label = QString::fromLatin1(tags[i].name);
-            item.detail = QString::fromLatin1(tags[i].detail);
-            item.kind = CompletionItem::Kind::Keyword;
-            item.documentation = kind;
-            item.order = i; // the usual ones first
-            item.priority = 2;
-            items.append(item);
-        }
-        done(items, false);
-        return;
-    }
-
-    // The parameters, after "@param" ("@param[in]", "@param {Type}").
-    int lineStart = context.prefixStart;
-    while (lineStart > 0 && text[lineStart - 1] != '\n')
-        --lineStart;
-    const QString line = QString::fromUtf8(text.mid(lineStart, context.prefixStart - lineStart));
-    static const QRegularExpression paramTag(
-        QStringLiteral("[@\\\\](param|arg|argument|tparam|template)(?:\\[[^\\]]*\\])?\\s+(?:\\{[^}]*\\}\\s*)?$"));
-    const QRegularExpressionMatch tag = paramTag.match(line);
-    const int after = afterComment(text, start);
-    if (!tag.hasMatch() || after < 0) {
-        done(items, false);
-        return;
-    }
-    const bool templates = tag.captured(1) == QLatin1String("tparam") || tag.captured(1) == QLatin1String("template");
-    const Documented documented = documentedAt(text, after, style);
-    // Those documented already, elsewhere in the comment.
-    const QString comment = QString::fromUtf8(text.mid(start, after - start));
-    const int prefixInComment = int(QString::fromUtf8(text.mid(start, context.prefixStart - start)).size());
-    static const QRegularExpression documentedTag(QStringLiteral(
-        "[@\\\\](?:param|arg|argument|tparam|template)(?:\\[[^\\]]*\\])?\\s+(?:\\{[^}]*\\}\\s*)?([\\w$]+)"));
-    QSet<QString> documentedNames;
-    for (QRegularExpressionMatchIterator it = documentedTag.globalMatch(comment); it.hasNext();) {
-        const QRegularExpressionMatch match = it.next();
-        if (match.capturedStart(1) != prefixInComment)
-            documentedNames.insert(match.captured(1));
-    }
-    const QStringList names = templates ? documented.templateParameters : documented.parameters;
-    for (int i = 0; i < names.size(); ++i) {
-        if (documentedNames.contains(names[i]))
-            continue;
-        CompletionItem item;
-        item.label = names[i];
-        item.kind = templates ? CompletionItem::Kind::Type : CompletionItem::Kind::Variable;
-        if (!templates)
-            item.detail = parameterTypeOf(text, after, names[i], style != Style::JsDoc);
-        item.order = i; // in the order of the declaration
-        item.priority = 10;
-        items.append(item);
-    }
-    done(items, false);
+    const bool afterTagMarker = before == '@' || (before == '\\' && style == Style::Doxygen);
+    done(afterTagMarker ? tagItems(style) : parameterItems(context, start, style), false);
 }

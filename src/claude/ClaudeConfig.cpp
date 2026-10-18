@@ -42,7 +42,7 @@ QByteArray readHead(const QString &path)
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return {};
-    return file.read(16 * 1024); // the front matter is at the top
+    return file.read(qint64(16) * 1024); // the front matter is at the top
 }
 
 // Markdown files under `dir`, sorted, as paths relative to it.
@@ -62,16 +62,25 @@ public:
     QList<Entry> entries;
 
     // A file that is listed only when it exists.
-    void add(Category category, Scope scope, const QString &name, const QString &path, bool readOnly = false)
+    void add(Category category, Scope scope, const QString &name, const QString &path)
     {
         if (QFileInfo(path).isFile())
-            entries.append(makeEntry(category, scope, name, path, true, readOnly));
+            entries.append(describe({.category = category, .scope = scope, .name = name, .path = path}));
+    }
+
+    // Like add(), for a file Duet must show but never edit.
+    void addReadOnly(Category category, Scope scope, const QString &name, const QString &path)
+    {
+        if (QFileInfo(path).isFile())
+            entries.append(
+                describe({.category = category, .scope = scope, .name = name, .path = path, .readOnly = true}));
     }
 
     // A usual file, listed even before it is created.
     void addUsual(Category category, Scope scope, const QString &name, const QString &path)
     {
-        entries.append(makeEntry(category, scope, name, path, QFileInfo(path).isFile(), false));
+        entries.append(describe(
+            {.category = category, .scope = scope, .name = name, .path = path, .exists = QFileInfo(path).isFile()}));
     }
 
     // Skills: one folder each, with its SKILL.md.
@@ -96,31 +105,118 @@ public:
     }
 
 private:
-    static Entry makeEntry(Category category,
-                           Scope scope,
-                           const QString &name,
-                           const QString &path,
-                           bool exists,
-                           bool readOnly)
+    // Completes `entry`: clean path, read-only scopes, and what its front
+    // matter declares.
+    static Entry describe(Entry entry)
     {
-        Entry entry;
-        entry.category = category;
-        entry.scope = scope;
-        entry.name = name;
+        const QString path = entry.path;
         entry.path = QDir::cleanPath(path);
-        entry.exists = exists;
-        entry.readOnly = readOnly || scope == Scope::Managed || scope == Scope::Session;
-        if (exists && path.endsWith(QLatin1String(".md"))) {
-            const QMap<QString, QString> fields = frontMatter(readHead(path));
-            entry.description = fields.value(QStringLiteral("description"));
-            if (category == Category::Skills || category == Category::Agents) {
-                if (const QString declared = fields.value(QStringLiteral("name")); !declared.isEmpty())
-                    entry.name = declared;
-            }
-        }
+        entry.readOnly = entry.readOnly || entry.scope == Scope::Managed || entry.scope == Scope::Session;
+        if (!entry.exists || !path.endsWith(QLatin1String(".md")))
+            return entry;
+        const QMap<QString, QString> fields = frontMatter(readHead(path));
+        entry.description = fields.value(QStringLiteral("description"));
+        const bool canDeclareName = entry.category == Category::Skills || entry.category == Category::Agents;
+        if (const QString declared = fields.value(QStringLiteral("name")); canDeclareName && !declared.isEmpty())
+            entry.name = declared;
         return entry;
     }
 };
+
+// CLAUDE.md and CLAUDE.local.md of the folders above the project.
+void collectParentMemory(Collector &c, const QDir &project)
+{
+    QStringList parents;
+    for (QDir dir(project.absolutePath()); dir.cdUp();)
+        parents.prepend(dir.absolutePath());
+    for (const QString &parent : std::as_const(parents)) {
+        for (const QString &fileName : {QStringLiteral("CLAUDE.md"), QStringLiteral("CLAUDE.local.md")}) {
+            const QString path = QDir(parent).filePath(fileName);
+            c.add(Category::Memory, Scope::Parent, QDir::toNativeSeparators(QDir::cleanPath(path)), path);
+        }
+    }
+}
+
+// Claude's own memory of the project, its MEMORY.md index first.
+void collectAutoMemory(Collector &c, const QString &projectDir)
+{
+    const QString autoMemory = autoMemoryDir(projectDir);
+    const QStringList memories = markdownFiles(autoMemory, false);
+    if (memories.contains(QStringLiteral("MEMORY.md")))
+        c.add(Category::Memory, Scope::Auto, QStringLiteral("MEMORY.md"),
+              QDir(autoMemory).filePath(QStringLiteral("MEMORY.md")));
+    for (const QString &memory : memories) {
+        if (memory != QLatin1String("MEMORY.md"))
+            c.add(Category::Memory, Scope::Auto, memory, QDir(autoMemory).filePath(memory));
+    }
+}
+
+// The project's CLAUDE.md, at its root or in .claude/.
+void collectProjectMemory(Collector &c, const QDir &project)
+{
+    const QDir projectClaude(project.filePath(QStringLiteral(".claude")));
+    const bool isInClaudeFolder =
+        projectClaude.exists(QStringLiteral("CLAUDE.md")) && !project.exists(QStringLiteral("CLAUDE.md"));
+    if (isInClaudeFolder)
+        c.add(Category::Memory, Scope::Project, QStringLiteral(".claude/CLAUDE.md"),
+              projectClaude.filePath(QStringLiteral("CLAUDE.md")));
+    else
+        c.addUsual(Category::Memory, Scope::Project, QStringLiteral("CLAUDE.md"),
+                   project.filePath(QStringLiteral("CLAUDE.md")));
+}
+
+// CLAUDE.md and CLAUDE.local.md of the project's subfolders.
+void collectSubfolderMemory(Collector &c, const QString &projectDir)
+{
+    const QDir project(projectDir);
+    ProjectFiles::Options options;
+    options.accept = [](const QFileInfo &info) {
+        return info.fileName() == QLatin1String("CLAUDE.md") || info.fileName() == QLatin1String("CLAUDE.local.md");
+    };
+    for (const QFileInfo &info : ProjectFiles::list(projectDir, options)) {
+        if (info.absolutePath() != project.absolutePath())
+            c.add(Category::Memory, Scope::Subfolder, project.relativeFilePath(info.absoluteFilePath()),
+                  info.absoluteFilePath());
+    }
+}
+
+void collectMemory(Collector &c, const QString &projectDir)
+{
+    const QDir project(projectDir);
+    const QDir user(configDir());
+    c.add(Category::Memory, Scope::Managed, QStringLiteral("CLAUDE.md"),
+          QDir(managedDir()).filePath(QStringLiteral("CLAUDE.md")));
+    c.addUsual(Category::Memory, Scope::User, QStringLiteral("CLAUDE.md"), user.filePath(QStringLiteral("CLAUDE.md")));
+    collectParentMemory(c, project);
+    collectAutoMemory(c, projectDir);
+    collectProjectMemory(c, project);
+    collectSubfolderMemory(c, projectDir);
+    c.addUsual(Category::Memory, Scope::Local, QStringLiteral("CLAUDE.local.md"),
+               project.filePath(QStringLiteral("CLAUDE.local.md")));
+}
+
+void collectSettings(Collector &c, const QString &projectDir, const QString &sessionSettings)
+{
+    const QDir project(projectDir);
+    for (const SettingsFile &file : settingsFiles(projectDir, sessionSettings)) {
+        switch (file.scope) {
+        case Scope::Managed:
+            c.add(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
+            break;
+        case Scope::Session:
+            c.add(Category::Settings, file.scope, tr("Duet session hooks"), file.path);
+            break;
+        case Scope::User:
+            c.addUsual(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
+            break;
+        default:
+            c.addUsual(Category::Settings, file.scope, project.relativeFilePath(file.path), file.path);
+            break;
+        }
+    }
+    c.add(Category::Settings, Scope::User, QStringLiteral("keybindings.json"),
+          QDir(configDir()).filePath(QStringLiteral("keybindings.json")));
+}
 
 } // namespace
 
@@ -148,44 +244,7 @@ QList<Entry> entries(const QString &projectDir, const QString &sessionSettings)
     const QDir managed(managedDir());
     Collector c;
 
-    // Memory.
-    c.add(Category::Memory, Scope::Managed, QStringLiteral("CLAUDE.md"), managed.filePath(QStringLiteral("CLAUDE.md")));
-    c.addUsual(Category::Memory, Scope::User, QStringLiteral("CLAUDE.md"), user.filePath(QStringLiteral("CLAUDE.md")));
-    QStringList parents;
-    for (QDir dir(project.absolutePath()); dir.cdUp();)
-        parents.prepend(dir.absolutePath());
-    for (const QString &parent : std::as_const(parents)) {
-        for (const QString &fileName : {QStringLiteral("CLAUDE.md"), QStringLiteral("CLAUDE.local.md")}) {
-            const QString path = QDir(parent).filePath(fileName);
-            c.add(Category::Memory, Scope::Parent, QDir::toNativeSeparators(QDir::cleanPath(path)), path);
-        }
-    }
-    const QString autoMemory = autoMemoryDir(projectDir);
-    const QStringList memories = markdownFiles(autoMemory, false);
-    if (memories.contains(QStringLiteral("MEMORY.md")))
-        c.add(Category::Memory, Scope::Auto, QStringLiteral("MEMORY.md"),
-              QDir(autoMemory).filePath(QStringLiteral("MEMORY.md")));
-    for (const QString &memory : memories) {
-        if (memory != QLatin1String("MEMORY.md"))
-            c.add(Category::Memory, Scope::Auto, memory, QDir(autoMemory).filePath(memory));
-    }
-    if (projectClaude.exists(QStringLiteral("CLAUDE.md")) && !project.exists(QStringLiteral("CLAUDE.md")))
-        c.add(Category::Memory, Scope::Project, QStringLiteral(".claude/CLAUDE.md"),
-              projectClaude.filePath(QStringLiteral("CLAUDE.md")));
-    else
-        c.addUsual(Category::Memory, Scope::Project, QStringLiteral("CLAUDE.md"),
-                   project.filePath(QStringLiteral("CLAUDE.md")));
-    ProjectFiles::Options options;
-    options.accept = [](const QFileInfo &info) {
-        return info.fileName() == QLatin1String("CLAUDE.md") || info.fileName() == QLatin1String("CLAUDE.local.md");
-    };
-    for (const QFileInfo &info : ProjectFiles::list(projectDir, options)) {
-        if (info.absolutePath() != project.absolutePath())
-            c.add(Category::Memory, Scope::Subfolder, project.relativeFilePath(info.absoluteFilePath()),
-                  info.absoluteFilePath());
-    }
-    c.addUsual(Category::Memory, Scope::Local, QStringLiteral("CLAUDE.local.md"),
-               project.filePath(QStringLiteral("CLAUDE.local.md")));
+    collectMemory(c, projectDir);
 
     for (const auto &[scope, base] : {std::pair{Scope::User, user}, std::pair{Scope::Project, projectClaude}}) {
         c.addMarkdown(Category::Rules, scope, base.filePath(QStringLiteral("rules")), true);
@@ -195,31 +254,13 @@ QList<Entry> entries(const QString &projectDir, const QString &sessionSettings)
         c.addMarkdown(Category::OutputStyles, scope, base.filePath(QStringLiteral("output-styles")), false);
     }
 
-    // Settings.
-    for (const SettingsFile &file : settingsFiles(projectDir, sessionSettings)) {
-        switch (file.scope) {
-        case Scope::Managed:
-            c.add(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
-            break;
-        case Scope::Session:
-            c.add(Category::Settings, file.scope, tr("Duet session hooks"), file.path);
-            break;
-        case Scope::User:
-            c.addUsual(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
-            break;
-        default:
-            c.addUsual(Category::Settings, file.scope, project.relativeFilePath(file.path), file.path);
-            break;
-        }
-    }
-    c.add(Category::Settings, Scope::User, QStringLiteral("keybindings.json"),
-          user.filePath(QStringLiteral("keybindings.json")));
+    collectSettings(c, projectDir, sessionSettings);
 
     // MCP servers. Claude Code rewrites its state file all the time: it
     // is shown, never edited (`claude mcp` changes it).
     c.add(Category::Mcp, Scope::Managed, QStringLiteral("managed-mcp.json"),
           managed.filePath(QStringLiteral("managed-mcp.json")));
-    c.add(Category::Mcp, Scope::User, QFileInfo(stateFile()).fileName(), stateFile(), true);
+    c.addReadOnly(Category::Mcp, Scope::User, QFileInfo(stateFile()).fileName(), stateFile());
     c.addUsual(Category::Mcp, Scope::Project, QStringLiteral(".mcp.json"),
                project.filePath(QStringLiteral(".mcp.json")));
 

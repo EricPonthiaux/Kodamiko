@@ -2,6 +2,7 @@
 
 #include "LibGit2.h"
 
+#include <QDebug>
 #include <QDir>
 #include <QFileInfo>
 
@@ -47,6 +48,19 @@ int severity(FileStatus status)
     return 0;
 }
 
+// Path of the entry relative to the repository, without the "/" git puts
+// after an ignored folder; nothing if git gives none.
+std::optional<QString> entryPath(const git_status_entry &entry)
+{
+    const git_diff_delta *delta = entry.index_to_workdir ? entry.index_to_workdir : entry.head_to_index;
+    if (!delta || !delta->new_file.path)
+        return std::nullopt;
+    QString path = QString::fromUtf8(delta->new_file.path);
+    if (path.endsWith(QLatin1Char('/')))
+        path.chop(1);
+    return path;
+}
+
 } // namespace
 
 namespace FileStatuses {
@@ -74,11 +88,11 @@ FileStatusMap read(const QString &folder)
                     GIT_STATUS_OPT_INCLUDE_IGNORED | GIT_STATUS_OPT_RENAMES_HEAD_TO_INDEX |
                     GIT_STATUS_OPT_EXCLUDE_SUBMODULES;
     QByteArray pathspec;
-    char *pathspecs[1];
+    char *pathspecData = nullptr;
     if (prefix != QLatin1String(".") && !prefix.startsWith(QLatin1String(".."))) {
         pathspec = prefix.toUtf8() + '/';
-        pathspecs[0] = pathspec.data();
-        options.pathspec = {pathspecs, 1};
+        pathspecData = pathspec.data();
+        options.pathspec = {&pathspecData, 1};
         options.flags |= GIT_STATUS_OPT_DISABLE_PATHSPEC_MATCH;
     }
 
@@ -91,16 +105,13 @@ FileStatusMap read(const QString &folder)
         const std::optional<FileStatus> status = statusOf(entry->status);
         if (!status)
             continue;
-        const git_diff_delta *delta = entry->index_to_workdir ? entry->index_to_workdir : entry->head_to_index;
-        if (!delta || !delta->new_file.path)
+        std::optional<QString> path = entryPath(*entry);
+        if (!path)
             continue;
-        QString path = QString::fromUtf8(delta->new_file.path);
-        if (path.endsWith(QLatin1Char('/')))
-            path.chop(1); // ignored folder
         // Relative to the open folder, then absolute as the tree shows it.
         if (!pathspec.isEmpty())
-            path = path.mid(pathspec.size());
-        result.insert(folderPath + QLatin1Char('/') + path, *status);
+            path = path->mid(pathspec.size());
+        result.insert(folderPath + QLatin1Char('/') + *path, *status);
     }
     return result;
 }
@@ -159,8 +170,9 @@ void FileStatusReader::refresh()
         FileStatusMap statuses;
         try {
             statuses = FileStatuses::read(folder);
-        } catch (const GitError &) {
+        } catch (const GitError &error) {
             // Unreadable repository: no colors.
+            qDebug() << "File states of" << folder << "unreadable:" << error.what();
         }
         QMetaObject::invokeMethod(
             this,

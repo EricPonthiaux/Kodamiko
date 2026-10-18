@@ -71,8 +71,11 @@ struct RunConfiguration;
 
 // Main window with four full-screen modes, chosen with the tabs at the
 // bottom right: Terminal, Edit (Files / Outline / Claude panel | editor
-// tabs), Diff (pending changes, commits) and History. Wires up the modules and relays their
-// signals.
+// tabs), Diff (pending changes, commits) and History. Wires up the modules
+// and relays their signals. Its implementation is split by area:
+// MainWindow.cpp (layout and modes), MainWindowMenus.cpp, MainWindowRun.cpp,
+// MainWindowGit.cpp, MainWindowClaude.cpp, MainWindowProject.cpp,
+// MainWindowEditing.cpp and MainWindowSettings.cpp.
 class MainWindow : public QMainWindow {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(MainWindow)
@@ -88,6 +91,8 @@ public:
     explicit MainWindow(const QString &folder, QWidget *parent = nullptr);
     ~MainWindow() override;
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     // File ▸ Close Project: the window closes, the welcome window should
     // show. Emitted before it closes.
@@ -96,17 +101,52 @@ signals:
 protected:
     void closeEvent(QCloseEvent *event) override;
     void changeEvent(QEvent *event) override;
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    // How long a status bar message stays.
+    static constexpr int statusMessageMs = 5000;
+    // `message` in the status bar, for statusMessageMs.
+    void showStatus(const QString &message);
+
     void createWidgets();
+    void createCodeServices();
+    void createGitViews();
+    void createCentralWidget();
+    // The answer to the sensitive tool request shown, then the next one.
+    void answerToolRequest(bool accepted);
     void createGitServices();
     void createPopups();
     QWidget *createEditPage();
+    void createFilesPanel();
+    // The Files tree's options, as the user last set them.
+    void restoreTreeOptions();
+    void createClaudeConfigView();
+    void createProblemsAndOutline();
+    // The editor tabs with the find bar and the notices above them.
+    QWidget *createEditorArea();
+    // Files deleted from the tree or the Claude panel: their tabs close.
+    void forgetDeletedFiles(const QString &path);
+    // Files were created, renamed or deleted: the views that list them follow.
+    void afterFilesChanged();
+    // `path` relative to the project; empty for the project itself.
+    QString projectRelativePath(const QString &path) const;
     QWidget *createTerminalPage();
     void createModeTabs();
     void createStatusBar();
     void createMenus();
+    void createFileMenu();
+    void createClaudeMenu();
+    void createViewMenu();
+
+    // A checkable menu entry for a setting on by default, kept in QSettings
+    // under `key`.
+    struct SettingToggle {
+        QString text;
+        QString key;
+        QString toolTip;
+    };
+
+    QAction *addSettingToggle(QMenu *menu, const SettingToggle &toggle);
     void createGitMenu();
     void createEditMenu();
     void createFoldingMenu(QMenu *edit);

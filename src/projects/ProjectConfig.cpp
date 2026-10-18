@@ -37,7 +37,11 @@ const LanguageSetup *ProjectConfig::language(const QString &family) const
 
 LanguageSetup *ProjectConfig::language(const QString &family)
 {
-    return const_cast<LanguageSetup *>(std::as_const(*this).language(family));
+    for (LanguageSetup &setup : languages) {
+        if (setup.language == family)
+            return &setup;
+    }
+    return nullptr;
 }
 
 QVariantMap ProjectConfig::toVariant() const

@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <climits>
 #include <cstdlib>
+#include <memory>
+#include <span>
 
 namespace {
 
@@ -80,6 +82,7 @@ void TreeSitterHighlighter::applyTheme(const Theme &theme)
     editor_->recolor();
 }
 
+// NOLINTNEXTLINE(readability-function-size): the ten parameters of QsciScintillaBase::SCN_MODIFIED
 void TreeSitterHighlighter::onModified(int position,
                                        int modificationType,
                                        const char *,
@@ -139,11 +142,12 @@ int TreeSitterHighlighter::reparseIfNeeded()
     int firstChange = 0;
     if (tree_) {
         uint32_t rangeCount = 0;
-        TSRange *ranges = ts_tree_get_changed_ranges(tree_, newTree, &rangeCount);
+        // tree-sitter allocates the ranges with malloc() and leaves them to the caller.
+        const std::unique_ptr<TSRange, decltype(&std::free)> ranges(
+            ts_tree_get_changed_ranges(tree_, newTree, &rangeCount), &std::free);
         firstChange = INT_MAX;
-        for (uint32_t i = 0; i < rangeCount; ++i)
-            firstChange = std::min(firstChange, static_cast<int>(ranges[i].start_byte));
-        std::free(ranges);
+        for (const TSRange &range : std::span(ranges.get(), rangeCount))
+            firstChange = std::min(firstChange, static_cast<int>(range.start_byte));
         ts_tree_delete(tree_);
     }
     const bool firstParse = !tree_;

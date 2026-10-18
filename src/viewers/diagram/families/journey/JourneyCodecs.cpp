@@ -29,6 +29,17 @@ const QRegularExpression &header()
     return pattern;
 }
 
+// The comma-separated actors of a task, blanks dropped.
+QJsonArray parseActors(const QString &list)
+{
+    QJsonArray actors;
+    for (const QString &actor : list.split(QLatin1Char(','))) {
+        if (!actor.trimmed().isEmpty())
+            actors.append(actor.trimmed());
+    }
+    return actors;
+}
+
 class MermaidJourney : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-journey"); }
@@ -75,15 +86,10 @@ public:
                 continue;
             }
             const QString key = QStringLiteral("step%1").arg(++position);
-            QJsonArray actors;
-            for (const QString &actor : m.captured(3).split(QLatin1Char(','))) {
-                if (!actor.trimmed().isEmpty())
-                    actors.append(actor.trimmed());
-            }
             model.nodes.append({QStringLiteral("journey"), key,
                                 QJsonObject{{QStringLiteral("text"), m.captured(1).trimmed()},
                                             {QStringLiteral("score"), m.captured(2).toInt()},
-                                            {QStringLiteral("actors"), actors},
+                                            {QStringLiteral("actors"), parseActors(m.captured(3))},
                                             {QStringLiteral("section"), section}}});
             if (!previous.isEmpty())
                 model.links.append({QStringLiteral("journeyLink"), previous, key, QJsonObject{}});

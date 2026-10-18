@@ -11,6 +11,9 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <array>
+#include <utility>
+
 FilesPanel::FilesPanel(QWidget *parent)
     : QWidget(parent)
     , tree_(new FileTreeView(this))
@@ -132,11 +135,14 @@ FilesPanel::FilesPanel(QWidget *parent)
 
 void FilesPanel::setTreeOptions(const ProjectTreeModel::Options &options)
 {
-    for (QAction *action : {compactFolders_, nestFiles_, showIgnored_}) {
+    const std::array<std::pair<QAction *, bool>, 3> checks{{
+        {compactFolders_, options.compactFolders},
+        {nestFiles_, options.nestFiles},
+        {showIgnored_, options.showIgnored},
+    }};
+    for (const auto &[action, checked] : checks) {
         const QSignalBlocker blocker(action);
-        action->setChecked(action == compactFolders_ ? options.compactFolders
-                           : action == nestFiles_    ? options.nestFiles
-                                                     : options.showIgnored);
+        action->setChecked(checked);
     }
     tree_->setTreeOptions(options);
 }

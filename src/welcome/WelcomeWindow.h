@@ -36,16 +36,19 @@ public:
 
     QListWidget *projectList() const { return list_; }
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     void projectChosen(const ProjectConfig &project);
 
 protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
     void importProject();
     void filter(const QString &text);
+    // The languages `project` uses, as shown under its name; none until set up.
+    static QStringList shownLanguages(const ProjectConfig &project);
     void showContextMenu(const QPoint &position);
     void remove(QListWidgetItem *item);
 

@@ -64,6 +64,23 @@ QJsonObject clientCapabilities()
     };
 }
 
+// The Content-Length of a message's header lines, if they have one.
+std::optional<qsizetype> contentLength(QByteArrayView headers)
+{
+    static constexpr QByteArrayView name = "content-length:";
+    std::optional<qsizetype> length;
+    for (qsizetype lineStart = 0; lineStart < headers.size();) {
+        qsizetype lineEnd = headers.indexOf('\n', lineStart);
+        if (lineEnd < 0)
+            lineEnd = headers.size();
+        const QByteArrayView header = headers.sliced(lineStart, lineEnd - lineStart).trimmed();
+        if (header.size() >= name.size() && header.first(name.size()).compare(name, Qt::CaseInsensitive) == 0)
+            length = header.sliced(name.size()).trimmed().toLongLong();
+        lineStart = lineEnd + 1;
+    }
+    return length;
+}
+
 } // namespace
 
 LspClient::LspClient(QString program, QStringList arguments, const QString &rootFolder, QObject *parent)
@@ -236,25 +253,18 @@ QList<QJsonObject> LspClient::takeMessages(QByteArray &buffer)
         const qsizetype headerEnd = buffer.indexOf("\r\n\r\n", offset);
         if (headerEnd < 0)
             break;
-        qsizetype length = -1;
-        for (qsizetype lineStart = offset; lineStart < headerEnd;) {
-            qsizetype lineEnd = buffer.indexOf('\n', lineStart);
-            if (lineEnd < 0 || lineEnd > headerEnd)
-                lineEnd = headerEnd;
-            const QByteArrayView header = QByteArrayView(buffer.constData() + lineStart, lineEnd - lineStart).trimmed();
-            if (header.size() >= 15 && header.first(15).compare("content-length:", Qt::CaseInsensitive) == 0)
-                length = header.sliced(15).trimmed().toLongLong();
-            lineStart = lineEnd + 1;
-        }
-        if (length < 0) { // not a header: drop it
+        const std::optional<qsizetype> length =
+            contentLength(QByteArrayView(buffer.constData() + offset, headerEnd - offset));
+        const bool isHeader = length && *length >= 0;
+        if (!isHeader) { // not a header: drop it
             offset = headerEnd + 4;
             continue;
         }
-        if (buffer.size() < headerEnd + 4 + length)
+        if (buffer.size() < headerEnd + 4 + *length)
             break; // the rest is still coming
         const QJsonDocument document =
-            QJsonDocument::fromJson(QByteArray::fromRawData(buffer.constData() + headerEnd + 4, length));
-        offset = headerEnd + 4 + length;
+            QJsonDocument::fromJson(QByteArray::fromRawData(buffer.constData() + headerEnd + 4, *length));
+        offset = headerEnd + 4 + *length;
         if (document.isObject())
             messages.append(document.object());
     }

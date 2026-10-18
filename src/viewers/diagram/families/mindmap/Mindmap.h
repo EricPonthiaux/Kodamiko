@@ -39,6 +39,10 @@ public:
     int depth = 1;
 
 private:
+    // The bubble (or a leaf's underline) and its selection outline.
+    void drawBody(QPainter &painter, const Style &style, bool selected) const;
+    void drawLeafBody(QPainter &painter, const Style &style, bool selected) const;
+
     QStringList lines_;
 };
 

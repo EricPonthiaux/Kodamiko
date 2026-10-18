@@ -17,15 +17,14 @@ namespace {
 // Above the local providers (2 to 6): the server knows the types.
 constexpr int basePriority = 10;
 
+bool isIdentifierChar(QChar c)
+{
+    return c.isLetterOrNumber() || c == u'_' || c == u'$';
+}
+
 bool isIdentifier(const QString &text)
 {
-    if (text.isEmpty())
-        return false;
-    for (const QChar c : text) {
-        if (!c.isLetterOrNumber() && c != u'_' && c != u'$')
-            return false;
-    }
-    return true;
+    return !text.isEmpty() && std::ranges::all_of(text, isIdentifierChar);
 }
 
 // A string, or MarkupContent ({"kind", "value"}).
@@ -69,8 +68,9 @@ CompletionItem::Kind kindOf(int lspKind)
         return Kind::Struct;
     case 25:
         return Kind::Type; // type parameter
+    default:
+        return Kind::Text;
     }
-    return Kind::Text;
 }
 
 // Where a candidate's edit starts, in bytes of the context's text, when on
@@ -90,6 +90,122 @@ int editStart(const QJsonObject &edit, const CompletionContext &context)
         lineStart +
         int(QString::fromUtf8(context.text.mid(lineStart, context.position - lineStart)).left(column).toUtf8().size());
     return at < context.prefixStart ? at : -1;
+}
+
+// The indexes of the server's candidates in its order: by sortText, else
+// as sent.
+std::vector<int> serverOrder(const QJsonArray &list)
+{
+    std::vector<int> order(list.size());
+    for (int i = 0; i < int(list.size()); ++i)
+        order[i] = i;
+    const auto sortText = [&list](int index) { return list[index].toObject().value("sortText").toString(); };
+    std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return sortText(a) < sortText(b); });
+    return order;
+}
+
+// clangd prefixes its labels with a space or a "•" (header to insert).
+QString labelOf(const QJsonObject &lsp)
+{
+    const QString label = lsp.value("label").toString().trimmed();
+    return label.startsWith(QChar(0x2022)) ? label.mid(1).trimmed() : label;
+}
+
+// The name to match and show: the first of what is inserted, the filter
+// text and the label that is a plain identifier (jdtls filters on
+// "equals(Object obj) : boolean"); else the label's leading identifier.
+QString nameOf(const QString &insert, const QString &filterText, const QString &label)
+{
+    for (const QString &candidate : {insert, filterText, label}) {
+        if (isIdentifier(candidate))
+            return candidate;
+    }
+    const qsizetype length = std::ranges::find_if_not(label, isIdentifierChar) - label.begin();
+    return length > 0 ? label.left(length) : label;
+}
+
+// Signature and type, at the right: "(int value)  void".
+QString detailOf(const QJsonObject &lsp, const QString &label, const QString &name)
+{
+    QStringList details;
+    const QJsonObject labelDetails = lsp.value("labelDetails").toObject();
+    QString signature = labelDetails.value("detail").toString();
+    if (signature.isEmpty() && label.startsWith(name) && label.size() > name.size())
+        signature = label.mid(name.size()); // clangd: "printValue(int value)"
+    if (!signature.trimmed().isEmpty())
+        details.append(signature.trimmed());
+    // The short form first: jdtls's detail is "Main.count : int".
+    QString type = labelDetails.value("description").toString().trimmed();
+    if (type.isEmpty())
+        type = lsp.value("detail").toString().trimmed();
+    if (!type.isEmpty() && type != signature.trimmed())
+        details.append(type);
+    return details.join(QStringLiteral("  "));
+}
+
+QString typeOf(const QJsonObject &lsp, const QString &label)
+{
+    const QString description = lsp.value("labelDetails").toObject().value("description").toString();
+    QString type =
+        ExpectedType::ofDetail(!description.trimmed().isEmpty() ? description : lsp.value("detail").toString());
+    if (type.isEmpty() && label.contains(QLatin1String(" : ")))
+        return ExpectedType::ofDetail(label); // jdtls: "size() : int"
+    return type;
+}
+
+// The candidate `lsp`, at `rank` of the server's `count`.
+CompletionItem itemOf(const QJsonObject &lsp, int rank, int count)
+{
+    const QString label = labelOf(lsp);
+    const QString edit = lsp.value("textEdit").toObject().value("newText").toString();
+    const QString insert = !edit.isEmpty() ? edit : lsp.value("insertText").toString();
+    const QString name = nameOf(insert, lsp.value("filterText").toString(), label);
+
+    CompletionItem item;
+    item.label = name;
+    item.insertText = insert.isEmpty() || insert == name ? QString() : insert;
+    item.isSnippet = lsp.value("insertTextFormat").toInt() == 2 && !item.insertText.isEmpty();
+    item.order = rank;
+    item.additionalEdits = LspCompletionProvider::parseEdits(lsp.value("additionalTextEdits").toArray());
+    item.detail = detailOf(lsp, label, name);
+    item.type = typeOf(lsp, label);
+    item.kind = kindOf(lsp.value("kind").toInt());
+    // The server ranks by the expected type and the scope: its order
+    // weighs in, from +8 for its first candidate down to +0, on top of
+    // how well the typed letters match.
+    item.priority = basePriority + 8 - (rank * 8) / std::max(count, 1);
+    item.documentation = documentationOf(lsp.value("documentation"));
+    return item;
+}
+
+// What the item lacks (edits, documentation), asked from `server` once
+// the item is chosen.
+void resolveLater(CompletionItem &item, const QPointer<LspClient> &server, const QJsonObject &lsp)
+{
+    if (item.additionalEdits.isEmpty()) {
+        item.resolveEdits = [server, lsp](const CompletionItem::EditsCallback &done) {
+            if (!server) {
+                done({});
+                return;
+            }
+            server->request(
+                QStringLiteral("completionItem/resolve"), lsp, [done](const QJsonValue &resolved, const QString &) {
+                    done(LspCompletionProvider::parseEdits(resolved.toObject().value("additionalTextEdits").toArray()));
+                });
+        };
+    }
+    if (item.documentation.isEmpty()) {
+        item.resolveDocumentation = [server, lsp](const CompletionItem::TextCallback &done) {
+            if (!server) {
+                done({});
+                return;
+            }
+            server->request(QStringLiteral("completionItem/resolve"), lsp,
+                            [done](const QJsonValue &resolved, const QString &) {
+                                done(documentationOf(resolved.toObject().value("documentation")));
+                            });
+        };
+    }
 }
 
 } // namespace
@@ -143,108 +259,18 @@ QList<CompletionItem> LspCompletionProvider::parse(const QJsonValue &result,
         *incomplete = object.value("isIncomplete").toBool();
     }
 
-    // The server's order (sortText, else as sent) becomes a priority.
-    struct Ranked {
-        QString sortText;
-        int index;
-    };
-
-    std::vector<Ranked> order;
-    order.reserve(list.size());
-    for (int i = 0; i < list.size(); ++i)
-        order.push_back({list[i].toObject().value("sortText").toString(), i});
-    std::stable_sort(order.begin(), order.end(),
-                     [](const Ranked &a, const Ranked &b) { return a.sortText < b.sortText; });
-
+    // The server's order becomes a priority.
+    const std::vector<int> order = serverOrder(list);
+    const int count = int(order.size());
     QList<CompletionItem> items;
     items.reserve(list.size());
-    for (int rank = 0; rank < int(order.size()); ++rank) {
-        const QJsonObject lsp = list[order[rank].index].toObject();
-        // clangd prefixes its labels with a space or a "•" (header to insert).
-        QString label = lsp.value("label").toString().trimmed();
-        if (label.startsWith(QChar(0x2022)))
-            label = label.mid(1).trimmed();
-        const QString edit = lsp.value("textEdit").toObject().value("newText").toString();
-        const QString insert = !edit.isEmpty() ? edit : lsp.value("insertText").toString();
-        // The name to match and show: the first of what is inserted, the
-        // filter text and the label that is a plain identifier (jdtls
-        // filters on "equals(Object obj) : boolean"); else the label's
-        // leading identifier.
-        QString name;
-        for (const QString &candidate : {insert, lsp.value("filterText").toString(), label}) {
-            if (isIdentifier(candidate)) {
-                name = candidate;
-                break;
-            }
-        }
-        if (name.isEmpty()) {
-            qsizetype end = 0;
-            while (end < label.size() && (label[end].isLetterOrNumber() || label[end] == u'_' || label[end] == u'$'))
-                ++end;
-            name = end > 0 ? label.left(end) : label;
-        }
-
-        // Signature and type, at the right: "(int value)  void".
-        QStringList details;
-        const QJsonObject labelDetails = lsp.value("labelDetails").toObject();
-        QString signature = labelDetails.value("detail").toString();
-        if (signature.isEmpty() && label.startsWith(name) && label.size() > name.size())
-            signature = label.mid(name.size()); // clangd: "printValue(int value)"
-        if (!signature.trimmed().isEmpty())
-            details.append(signature.trimmed());
-        // The short form first: jdtls's detail is "Main.count : int".
-        QString type = labelDetails.value("description").toString().trimmed();
-        if (type.isEmpty())
-            type = lsp.value("detail").toString().trimmed();
-        if (!type.isEmpty() && type != signature.trimmed())
-            details.append(type);
-
-        CompletionItem item;
-        item.label = name;
-        item.insertText = insert.isEmpty() || insert == name ? QString() : insert;
-        item.isSnippet = lsp.value("insertTextFormat").toInt() == 2 && !item.insertText.isEmpty();
-        item.order = rank;
+    for (int rank = 0; rank < count; ++rank) {
+        const QJsonObject lsp = list[order[rank]].toObject();
+        CompletionItem item = itemOf(lsp, rank, count);
         if (context)
             item.replaceStart = editStart(lsp.value("textEdit").toObject(), *context);
-        item.additionalEdits = parseEdits(lsp.value("additionalTextEdits").toArray());
-        if (resolves && item.additionalEdits.isEmpty()) {
-            item.resolveEdits = [server, lsp](const CompletionItem::EditsCallback &done) {
-                if (!server) {
-                    done({});
-                    return;
-                }
-                server->request(QStringLiteral("completionItem/resolve"), lsp,
-                                [done](const QJsonValue &resolved, const QString &) {
-                                    done(parseEdits(resolved.toObject().value("additionalTextEdits").toArray()));
-                                });
-            };
-        }
-        item.detail = details.join(QStringLiteral("  "));
-        item.type = ExpectedType::ofDetail(!labelDetails.value("description").toString().trimmed().isEmpty()
-                                               ? labelDetails.value("description").toString()
-                                               : lsp.value("detail").toString());
-        if (item.type.isEmpty() && label.contains(QLatin1String(" : ")))
-            item.type = ExpectedType::ofDetail(label); // jdtls: "size() : int"
-        item.kind = kindOf(lsp.value("kind").toInt());
-        // The head of the server's list ranks higher.
-        const int count = int(order.size());
-        // The server ranks by the expected type and the scope: its order
-        // weighs in, from +8 for its first candidate down to +0, on top of
-        // how well the typed letters match.
-        item.priority = basePriority + 8 - (rank * 8) / std::max(count, 1);
-        item.documentation = documentationOf(lsp.value("documentation"));
-        if (resolves && item.documentation.isEmpty()) {
-            item.resolveDocumentation = [server, lsp](const CompletionItem::TextCallback &done) {
-                if (!server) {
-                    done({});
-                    return;
-                }
-                server->request(QStringLiteral("completionItem/resolve"), lsp,
-                                [done](const QJsonValue &resolved, const QString &) {
-                                    done(documentationOf(resolved.toObject().value("documentation")));
-                                });
-            };
-        }
+        if (resolves)
+            resolveLater(item, server, lsp);
         items.append(item);
     }
     return items;

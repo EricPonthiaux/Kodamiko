@@ -84,64 +84,99 @@ private:
         }
     }
 
+    bool isAt(QChar c) const { return i_ < s_.size() && s_[i_] == c; }
+
+    bool isAtDigit() const { return i_ < s_.size() && s_[i_].isDigit(); }
+
+    bool isAtNameCharacter() const { return i_ < s_.size() && (s_[i_].isLetterOrNumber() || s_[i_] == u'_'); }
+
+    bool isAtNameStart() const { return i_ < s_.size() && (s_[i_].isLetter() || s_[i_] == u'_'); }
+
+    void skipName()
+    {
+        while (isAtNameCharacter())
+            ++i_;
+    }
+
     void dollar()
     {
-        ++i_;                                     // "$"
-        if (i_ < s_.size() && s_[i_].isDigit()) { // $1
-            const int index = number();
-            const int start = int(out_.size());
-            out_ += placeholders_.value(index);
-            stop(index, start);
+        ++i_; // "$"
+        if (isAtDigit()) {
+            plainTabStop();
             return;
         }
-        if (i_ < s_.size() && s_[i_] == u'{') {
+        if (isAt(u'{')) {
             ++i_;
-            if (i_ < s_.size() && s_[i_].isDigit()) {
-                const int index = number();
-                const int start = int(out_.size());
-                if (i_ < s_.size() && s_[i_] == u':') { // ${1:text}
-                    ++i_;
-                    parse(true);
-                } else if (i_ < s_.size() && s_[i_] == u'|') { // ${1|one,two|}
-                    ++i_;
-                    QString choice;
-                    bool first = true;
-                    while (i_ < s_.size() && s_[i_] != u'|') {
-                        if (s_[i_] == u',')
-                            first = false;
-                        else if (first)
-                            choice += s_[i_];
-                        ++i_;
-                    }
-                    i_ += 2; // "|}"
-                    out_ += choice;
-                } else if (i_ < s_.size() && s_[i_] == u'}') { // ${1}
-                    ++i_;
-                    out_ += placeholders_.value(index);
-                }
-                stop(index, start);
-                return;
-            }
-            // ${NAME} or ${NAME:default}: the default only.
-            while (i_ < s_.size() && (s_[i_].isLetterOrNumber() || s_[i_] == u'_'))
-                ++i_;
-            if (i_ < s_.size() && s_[i_] == u':') {
-                ++i_;
-                parse(true);
-            } else {
-                while (i_ < s_.size() && s_[i_] != u'}')
-                    ++i_;
-                ++i_;
-            }
+            braced();
             return;
         }
         // $NAME: a variable, nothing; a lone "$": itself.
-        if (i_ < s_.size() && (s_[i_].isLetter() || s_[i_] == u'_')) {
-            while (i_ < s_.size() && (s_[i_].isLetterOrNumber() || s_[i_] == u'_'))
-                ++i_;
+        if (isAtNameStart()) {
+            skipName();
             return;
         }
         out_ += u'$';
+    }
+
+    // $1
+    void plainTabStop()
+    {
+        const int index = number();
+        const int start = int(out_.size());
+        out_ += placeholders_.value(index);
+        stop(index, start);
+    }
+
+    // After "${".
+    void braced()
+    {
+        if (isAtDigit()) {
+            bracedTabStop();
+            return;
+        }
+        // ${NAME} or ${NAME:default}: the default only.
+        skipName();
+        if (isAt(u':')) {
+            ++i_;
+            parse(true);
+            return;
+        }
+        while (i_ < s_.size() && s_[i_] != u'}')
+            ++i_;
+        ++i_;
+    }
+
+    void bracedTabStop()
+    {
+        const int index = number();
+        const int start = int(out_.size());
+        if (isAt(u':')) { // ${1:text}
+            ++i_;
+            parse(true);
+        } else if (isAt(u'|')) { // ${1|one,two|}
+            ++i_;
+            out_ += firstChoice();
+        } else if (isAt(u'}')) { // ${1}
+            ++i_;
+            out_ += placeholders_.value(index);
+        }
+        stop(index, start);
+    }
+
+    // After "${1|": reads up to the closing "|}", returns the first choice.
+    QString firstChoice()
+    {
+        QString choice;
+        bool first = true;
+        while (i_ < s_.size() && s_[i_] != u'|') {
+            if (s_[i_] == u',')
+                first = false;
+            else if (first)
+                choice += s_[i_];
+            ++i_;
+        }
+        i_ += 2; // "|}"
+        return choice;
     }
 
     const QString &s_;

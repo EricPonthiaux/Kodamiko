@@ -23,18 +23,21 @@ QString translate(const char *text)
     return QCoreApplication::translate("EntryPopups", text);
 }
 
+bool isValidCharacter(QChar character)
+{
+#ifdef Q_OS_WIN
+    if (QStringLiteral("<>:\"|?*\\").contains(character))
+        return false;
+#endif
+    return character.category() != QChar::Other_Control && character != QLatin1Char('/');
+}
+
 bool isValidComponent(const QString &component)
 {
     if (component.isEmpty() || component == QLatin1String(".") || component == QLatin1String(".."))
         return false;
-    for (const QChar character : component) {
-        if (character.category() == QChar::Other_Control || character == QLatin1Char('/'))
-            return false;
-#ifdef Q_OS_WIN
-        if (QStringLiteral("<>:\"|?*\\").contains(character))
-            return false;
-#endif
-    }
+    if (!std::ranges::all_of(component, isValidCharacter))
+        return false;
 #ifdef Q_OS_WIN
     if (component.endsWith(QLatin1Char('.')) || component.endsWith(QLatin1Char(' ')))
         return false;
@@ -219,17 +222,12 @@ void NamePopup::errorChanged(bool shown)
                               : QString());
 }
 
-ConfirmPopup::ConfirmPopup(const QString &title,
-                           const QString &location,
-                           const QString &message,
-                           const QString &actionText,
-                           std::function<bool(ConfirmPopup *)> apply,
-                           QWidget *parent)
-    : EntryPopup(title, location, parent)
+ConfirmPopup::ConfirmPopup(const Question &question, std::function<bool(ConfirmPopup *)> apply, QWidget *parent)
+    : EntryPopup(question.title, question.location, parent)
     , apply_(std::move(apply))
-    , message_(new QLabel(message, this))
+    , message_(new QLabel(question.message, this))
     , cancel_(new QPushButton(tr("Cancel"), this))
-    , action_(new QPushButton(actionText, this))
+    , action_(new QPushButton(question.actionText, this))
 {
     message_->setWordWrap(true);
     message_->setTextFormat(Qt::PlainText);

@@ -120,11 +120,11 @@ struct Font {
 
     Font() = default;
 
-    constexpr Font(qreal px, int weight = 400, bool italic = false, bool mono = false)
-        : px(px)
-        , weight(weight)
-        , italic(italic)
-        , mono(mono)
+    constexpr explicit Font(qreal sizePx, int cssWeight = 400, bool isItalic = false, bool isMono = false)
+        : px(sizePx)
+        , weight(cssWeight)
+        , italic(isItalic)
+        , mono(isMono)
     {
     }
 };

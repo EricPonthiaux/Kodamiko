@@ -24,6 +24,16 @@ QListWidget#stashList::item:selected { background: @selection; color: @accentTex
 QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )";
 
+// "added", "deleted" or "modified", from the header of a file's patch.
+QString fileStatus(const QByteArray &chunk)
+{
+    if (chunk.contains("\nnew file mode"))
+        return StashesPopup::tr("added");
+    if (chunk.contains("\ndeleted file mode"))
+        return StashesPopup::tr("deleted");
+    return StashesPopup::tr("modified");
+}
+
 } // namespace
 
 StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *parent)
@@ -192,9 +202,7 @@ QList<DiffFile> StashesPopup::splitPatch(const QByteArray &patch)
         const qsizetype newPath = firstLine.lastIndexOf(" b/");
         DiffFile file;
         file.path = QString::fromUtf8(newPath < 0 ? firstLine.mid(11) : firstLine.mid(newPath + 3));
-        file.status = chunk.contains("\nnew file mode")       ? tr("added")
-                      : chunk.contains("\ndeleted file mode") ? tr("deleted")
-                                                              : tr("modified");
+        file.status = fileStatus(chunk);
         file.patch = FilePatch::parse(chunk);
         files.append(file);
     }

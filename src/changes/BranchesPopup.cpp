@@ -19,13 +19,11 @@
 
 namespace {
 
-enum Role {
-    IndexRole = Qt::UserRole,
-    SubtitleRole,
-    TrackingRole,
-    HeadingRole,
-    CurrentRole
-};
+constexpr int indexRole = Qt::UserRole;
+constexpr int subtitleRole = Qt::UserRole + 1;
+constexpr int trackingRole = Qt::UserRole + 2;
+constexpr int headingRole = Qt::UserRole + 3;
+constexpr int currentRole = Qt::UserRole + 4;
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *branchesRules = R"(
@@ -45,7 +43,7 @@ public:
 
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
-        if (index.data(HeadingRole).toBool())
+        if (index.data(headingRole).toBool())
             return {0, option.fontMetrics.height() + 14};
         return {0, option.fontMetrics.height() * 2 + 22};
     }
@@ -55,7 +53,7 @@ public:
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
         const QRectF row = QRectF(option.rect).adjusted(4, 1, -4, -1);
-        if (index.data(HeadingRole).toBool()) {
+        if (index.data(headingRole).toBool()) {
             QFont heading = option.font;
             heading.setPointSizeF(heading.pointSizeF() * 0.85);
             heading.setWeight(QFont::DemiBold);
@@ -83,7 +81,7 @@ public:
         UiIcons::icon(QStringLiteral("branch"), theme.accent).paint(painter, tile.toRect().adjusted(7, 7, -7, -7));
 
         // Tracking, at the right.
-        const QString tracking = index.data(TrackingRole).toString();
+        const QString tracking = index.data(trackingRole).toString();
         const qreal trackingWidth = tracking.isEmpty() ? 0 : option.fontMetrics.horizontalAdvance(tracking) + 16;
         if (!tracking.isEmpty()) {
             painter->setPen(theme.mutedText);
@@ -103,7 +101,7 @@ public:
         painter->setFont(title);
         painter->setPen(selected ? theme.accentText : theme.foreground);
         painter->drawText(QRectF(text.left(), top, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter, name);
-        if (index.data(CurrentRole).toBool()) {
+        if (index.data(currentRole).toBool()) {
             const QString badge = BranchesPopup::tr("current");
             QFont small = option.font;
             small.setPointSizeF(small.pointSizeF() * 0.85);
@@ -121,7 +119,7 @@ public:
         painter->setPen(theme.mutedText);
         painter->drawText(
             QRectF(text.left(), top + lineHeight + 3, text.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
-            option.fontMetrics.elidedText(index.data(SubtitleRole).toString(), Qt::ElideRight, int(text.width())));
+            option.fontMetrics.elidedText(index.data(subtitleRole).toString(), Qt::ElideRight, int(text.width())));
         painter->restore();
     }
 };
@@ -145,6 +143,55 @@ QString subtitleOf(const BranchInfo &branch)
     if (!branch.upstream.isEmpty())
         parts.prepend(QStringLiteral("→ ") + branch.upstream);
     return parts.join(QStringLiteral("  ·  "));
+}
+
+// "On main, tracking origin/main (2 ahead, 1 behind).", for a branch.
+QString branchSummary(const RepositoryInfo &repository)
+{
+    QString text = BranchesPopup::tr("On %1").arg(repository.branch);
+    if (!repository.upstream.isEmpty()) {
+        text += BranchesPopup::tr(", tracking %1").arg(repository.upstream);
+        const bool isLevel = repository.ahead == 0 && repository.behind == 0;
+        if (isLevel)
+            text += BranchesPopup::tr(" (up to date as of the last fetch)");
+        else
+            text += BranchesPopup::tr(" (%1 ahead, %2 behind)").arg(repository.ahead).arg(repository.behind);
+    }
+    return text + QLatin1Char('.');
+}
+
+void addHeading(QListWidget *list, bool remote)
+{
+    auto *heading = new QListWidgetItem(remote ? BranchesPopup::tr("Remote") : BranchesPopup::tr("Local"), list);
+    heading->setData(headingRole, true);
+    heading->setFlags(Qt::NoItemFlags);
+}
+
+void addBranch(QListWidget *list, const BranchInfo &branch, int index)
+{
+    auto *item = new QListWidgetItem(branch.name, list);
+    item->setData(indexRole, index);
+    item->setData(subtitleRole, subtitleOf(branch));
+    item->setData(trackingRole, trackingText(branch));
+    item->setData(currentRole, branch.current);
+    item->setToolTip(branch.subject);
+}
+
+bool isNavigationKey(int key)
+{
+    return key == Qt::Key_Up || key == Qt::Key_Down || key == Qt::Key_PageUp || key == Qt::Key_PageDown;
+}
+
+// Moves the current row by `step`, skipping the headings; stays put at the
+// ends of the list.
+void moveToBranchRow(QListWidget *list, int step)
+{
+    int row = list->currentRow();
+    do {
+        row += step;
+    } while (row >= 0 && row < list->count() && list->item(row)->data(headingRole).toBool());
+    if (row >= 0 && row < list->count())
+        list->setCurrentRow(row);
 }
 
 } // namespace
@@ -219,10 +266,8 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     auto *hint = new QLabel(tr("Right-click a branch for more."), footer);
     hint->setObjectName(QStringLiteral("footerHint"));
     switch_->setDefault(true);
-    connect(merge_, &QPushButton::clicked, this,
-            [this] { act([this](const BranchInfo &branch) { actions_->merge(branch.name); }); });
-    connect(rebase_, &QPushButton::clicked, this,
-            [this] { act([this](const BranchInfo &branch) { actions_->rebase(branch.name); }); });
+    connect(merge_, &QPushButton::clicked, this, &BranchesPopup::mergeSelected);
+    connect(rebase_, &QPushButton::clicked, this, &BranchesPopup::rebaseSelected);
     connect(switch_, &QPushButton::clicked, this, &BranchesPopup::switchToSelected);
     auto *footerLayout = new QHBoxLayout(footer);
     footerLayout->setContentsMargins(28, 12, 18, 14);
@@ -281,15 +326,7 @@ void BranchesPopup::load(const QString &folder)
         subtitle_->setText(tr("HEAD is detached at %1.").arg(repository->headId));
     } else {
         current_ = repository->branch;
-        QString text = tr("On %1").arg(repository->branch);
-        if (!repository->upstream.isEmpty()) {
-            text += tr(", tracking %1").arg(repository->upstream);
-            if (repository->ahead == 0 && repository->behind == 0)
-                text += tr(" (up to date as of the last fetch)");
-            else
-                text += tr(" (%1 ahead, %2 behind)").arg(repository->ahead).arg(repository->behind);
-        }
-        subtitle_->setText(text + QLatin1Char('.'));
+        subtitle_->setText(branchSummary(*repository));
     }
     empty_->setText(error.isEmpty() ? tr("No branches yet: make a first commit.") : error);
 
@@ -313,16 +350,9 @@ void BranchesPopup::rebuildList()
         bool &headingShown = branch.remote ? remoteHeading : localHeading;
         if (!headingShown) {
             headingShown = true;
-            auto *heading = new QListWidgetItem(branch.remote ? tr("Remote") : tr("Local"), list_);
-            heading->setData(HeadingRole, true);
-            heading->setFlags(Qt::NoItemFlags);
+            addHeading(list_, branch.remote);
         }
-        auto *item = new QListWidgetItem(branch.name, list_);
-        item->setData(IndexRole, i);
-        item->setData(SubtitleRole, subtitleOf(branch));
-        item->setData(TrackingRole, trackingText(branch));
-        item->setData(CurrentRole, branch.current);
-        item->setToolTip(branch.subject);
+        addBranch(list_, branch, i);
         // The first branch one would switch to: not the current one.
         if (firstSelectable < 0 && !branch.current)
             firstSelectable = list_->count() - 1;
@@ -341,9 +371,9 @@ void BranchesPopup::rebuildList()
 const BranchInfo *BranchesPopup::selected() const
 {
     const QListWidgetItem *item = list_->currentItem();
-    if (!item || item->data(HeadingRole).toBool())
+    if (!item || item->data(headingRole).toBool())
         return nullptr;
-    const int index = item->data(IndexRole).toInt();
+    const int index = item->data(indexRole).toInt();
     return index >= 0 && index < branches_.size() ? &branches_.at(index) : nullptr;
 }
 
@@ -379,6 +409,31 @@ void BranchesPopup::switchToSelected()
     act([this](const BranchInfo &chosen) { actions_->switchBranch(chosen.name, chosen.remote); });
 }
 
+void BranchesPopup::mergeSelected()
+{
+    act([this](const BranchInfo &chosen) { actions_->merge(chosen.name); });
+}
+
+void BranchesPopup::rebaseSelected()
+{
+    act([this](const BranchInfo &chosen) { actions_->rebase(chosen.name); });
+}
+
+void BranchesPopup::trackSelected()
+{
+    act([this](const BranchInfo &chosen) { actions_->trackBranch(chosen.name); });
+}
+
+void BranchesPopup::renameSelected()
+{
+    act([this](const BranchInfo &chosen) { actions_->renameBranch(chosen.name); });
+}
+
+void BranchesPopup::deleteSelected()
+{
+    act([this](const BranchInfo &chosen) { actions_->deleteBranch(chosen.name, chosen.remote); });
+}
+
 void BranchesPopup::showMenu(const QPoint &position)
 {
     if (QListWidgetItem *item = list_->itemAt(position))
@@ -389,27 +444,20 @@ void BranchesPopup::showMenu(const QPoint &position)
     const bool onBranch = !current_.isEmpty();
     QMenu menu(this);
     if (!branch->current) {
-        menu.addAction(tr("Switch to %1").arg(branch->remote ? Branches::nameOnRemote(branch->name) : branch->name),
-                       this, &BranchesPopup::switchToSelected);
+        const QString shortName = branch->remote ? Branches::nameOnRemote(branch->name) : branch->name;
+        menu.addAction(tr("Switch to %1").arg(shortName), this, &BranchesPopup::switchToSelected);
         if (onBranch) {
-            menu.addAction(tr("Merge into %1").arg(current_), this,
-                           [this] { act([this](const BranchInfo &chosen) { actions_->merge(chosen.name); }); });
-            menu.addAction(tr("Rebase %1 onto It").arg(current_), this,
-                           [this] { act([this](const BranchInfo &chosen) { actions_->rebase(chosen.name); }); });
+            menu.addAction(tr("Merge into %1").arg(current_), this, &BranchesPopup::mergeSelected);
+            menu.addAction(tr("Rebase %1 onto It").arg(current_), this, &BranchesPopup::rebaseSelected);
         }
     }
-    if (branch->remote && onBranch) {
-        menu.addAction(tr("Track It from %1").arg(current_), this,
-                       [this] { act([this](const BranchInfo &chosen) { actions_->trackBranch(chosen.name); }); });
-    }
+    if (branch->remote && onBranch)
+        menu.addAction(tr("Track It from %1").arg(current_), this, &BranchesPopup::trackSelected);
     menu.addSeparator();
-    if (!branch->remote) {
-        menu.addAction(tr("Rename…"), this,
-                       [this] { act([this](const BranchInfo &chosen) { actions_->renameBranch(chosen.name); }); });
-    }
-    QAction *remove = menu.addAction(branch->remote ? tr("Delete on the Remote…") : tr("Delete"), this, [this] {
-        act([this](const BranchInfo &chosen) { actions_->deleteBranch(chosen.name, chosen.remote); });
-    });
+    if (!branch->remote)
+        menu.addAction(tr("Rename…"), this, &BranchesPopup::renameSelected);
+    QAction *remove = menu.addAction(branch->remote ? tr("Delete on the Remote…") : tr("Delete"), this,
+                                     &BranchesPopup::deleteSelected);
     remove->setEnabled(!branch->current);
     menu.exec(list_->viewport()->mapToGlobal(position));
 }
@@ -417,21 +465,15 @@ void BranchesPopup::showMenu(const QPoint &position)
 bool BranchesPopup::eventFilter(QObject *watched, QEvent *event)
 {
     // Up and Down in the filter move through the list.
-    if (watched == filter_ && event->type() == QEvent::KeyPress) {
-        const auto *key = static_cast<QKeyEvent *>(event);
-        if (key->key() == Qt::Key_Up || key->key() == Qt::Key_Down || key->key() == Qt::Key_PageUp ||
-            key->key() == Qt::Key_PageDown) {
-            int row = list_->currentRow();
-            const int step = key->key() == Qt::Key_Up || key->key() == Qt::Key_PageUp ? -1 : 1;
-            do {
-                row += step;
-            } while (row >= 0 && row < list_->count() && list_->item(row)->data(HeadingRole).toBool());
-            if (row >= 0 && row < list_->count())
-                list_->setCurrentRow(row);
-            return true;
-        }
-    }
-    return OverlayPopup::eventFilter(watched, event);
+    const bool isFilterKey = watched == filter_ && event->type() == QEvent::KeyPress;
+    if (!isFilterKey)
+        return OverlayPopup::eventFilter(watched, event);
+    const int key = static_cast<QKeyEvent *>(event)->key();
+    if (!isNavigationKey(key))
+        return OverlayPopup::eventFilter(watched, event);
+    const bool isUpward = key == Qt::Key_Up || key == Qt::Key_PageUp;
+    moveToBranchRow(list_, isUpward ? -1 : 1);
+    return true;
 }
 
 void BranchesPopup::keyPressEvent(QKeyEvent *event)

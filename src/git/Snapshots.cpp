@@ -12,6 +12,7 @@
 #include <QTemporaryDir>
 
 #include <algorithm>
+#include <array>
 
 using libgit2::check;
 using libgit2::Ptr;
@@ -91,16 +92,72 @@ void parseMessage(const QString &message, Snapshot &snapshot)
     }
 }
 
-// Snapshot of `paths`; with `wholeWorkingTree`, the other files are recorded
-// too (`paths` must then list every changed file). With `skipIfUnchanged`,
-// nothing is recorded (and an empty string returned) if the most recent
-// snapshot has the same paths, the same scope and the same content.
-QString createSnapshot(const RepositoryInfo &repository,
-                       const QString &reason,
-                       const QStringList &paths,
-                       bool wholeWorkingTree,
-                       bool skipIfUnchanged)
+// Adds `paths` to the index named by `environment`. "git add" rejects a path
+// that is neither tracked nor present on disk: such paths are left out.
+void addExisting(const RepositoryInfo &repository, const QStringList &paths, const QHash<QString, QString> &environment)
 {
+    if (paths.isEmpty())
+        return;
+    const QStringList trackedList = Git::splitNul(Git::run(
+        repository.workDir, QStringList{QStringLiteral("ls-files"), QStringLiteral("-z"), QStringLiteral("--")} + paths,
+        {}, environment));
+    const QSet<QString> tracked(trackedList.begin(), trackedList.end());
+    QStringList existing;
+    for (const QString &path : paths) {
+        if (tracked.contains(path) || QFileInfo::exists(QDir(repository.workDir).filePath(path)))
+            existing.append(path);
+    }
+    if (existing.isEmpty())
+        return;
+    Git::run(repository.workDir,
+             QStringList{QStringLiteral("add"), QStringLiteral("-A"), QStringLiteral("--")} + existing, {},
+             environment);
+}
+
+// Whether the most recent snapshot has the same tree, paths and scope.
+bool matchesLastSnapshot(const RepositoryInfo &repository,
+                         const QString &tree,
+                         const QStringList &paths,
+                         bool wholeWorkingTree)
+{
+    const QStringList refs = refsNewestFirst(repository);
+    if (refs.isEmpty())
+        return false;
+    const QString previous =
+        QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("log"), QStringLiteral("-1"),
+                                                        QStringLiteral("--format=%T%n%B"), refs.first()}));
+    const QString previousTree = previous.section(QLatin1Char('\n'), 0, 0);
+    Snapshot last;
+    parseMessage(previous.section(QLatin1Char('\n'), 1), last);
+    return previousTree == tree && last.paths == paths && last.wholeWorkingTree == wholeWorkingTree;
+}
+
+// A reference name not used yet, sortable by date; the number prevents two
+// snapshots with the same name.
+QString unusedRefName(const RepositoryInfo &repository)
+{
+    const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss-zzz"));
+    QString ref = refPrefix + stamp;
+    for (int i = 1; !Git::run(repository.workDir, {QStringLiteral("for-each-ref"), ref}).isEmpty(); ++i)
+        ref = refPrefix + stamp + QLatin1Char('-') + QString::number(i);
+    return ref;
+}
+
+struct SnapshotRequest {
+    QString reason;
+    QStringList paths;
+    // The other files are recorded too: `paths` must then list every changed file.
+    bool wholeWorkingTree = false;
+    // Nothing is recorded if the most recent snapshot has the same paths, the
+    // same scope and the same content.
+    bool skipIfUnchanged = false;
+};
+
+// Snapshot described by `request`; its reference name, or an empty string
+// when skipped as unchanged.
+QString createSnapshot(const RepositoryInfo &repository, const SnapshotRequest &request)
+{
+    const QStringList &paths = request.paths;
     // A temporary index, copied from the real one, receives the files' state:
     // the real index is not touched.
     const QTemporaryDir temporary;
@@ -113,55 +170,21 @@ QString createSnapshot(const RepositoryInfo &repository,
     QHash<QString, QString> environment = snapshotIdentity();
     environment.insert(QStringLiteral("GIT_INDEX_FILE"), index);
 
-    // "git add" rejects a path that is neither tracked nor present on disk.
-    if (!paths.isEmpty()) {
-        const QSet<QString> tracked = [&] {
-            const QStringList list = Git::splitNul(
-                Git::run(repository.workDir,
-                         QStringList{QStringLiteral("ls-files"), QStringLiteral("-z"), QStringLiteral("--")} + paths,
-                         {}, environment));
-            return QSet<QString>(list.begin(), list.end());
-        }();
-        QStringList existing;
-        for (const QString &path : paths) {
-            if (tracked.contains(path) || QFileInfo::exists(QDir(repository.workDir).filePath(path)))
-                existing.append(path);
-        }
-        if (!existing.isEmpty())
-            Git::run(repository.workDir,
-                     QStringList{QStringLiteral("add"), QStringLiteral("-A"), QStringLiteral("--")} + existing, {},
-                     environment);
-    }
+    addExisting(repository, paths, environment);
     const QString tree =
         QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("write-tree")}, {}, environment)).trimmed();
-
-    if (skipIfUnchanged) {
-        const QStringList refs = refsNewestFirst(repository);
-        if (!refs.isEmpty()) {
-            const QString previous =
-                QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("log"), QStringLiteral("-1"),
-                                                                QStringLiteral("--format=%T%n%B"), refs.first()}));
-            const QString previousTree = previous.section(QLatin1Char('\n'), 0, 0);
-            Snapshot last;
-            parseMessage(previous.section(QLatin1Char('\n'), 1), last);
-            if (previousTree == tree && last.paths == paths && last.wholeWorkingTree == wholeWorkingTree)
-                return {};
-        }
-    }
+    if (request.skipIfUnchanged && matchesLastSnapshot(repository, tree, paths, request.wholeWorkingTree))
+        return {};
 
     QStringList commitArguments{QStringLiteral("commit-tree"), QStringLiteral("--no-gpg-sign"), tree};
     if (!repository.unborn)
         commitArguments << QStringLiteral("-p") << QStringLiteral("HEAD");
     commitArguments << QStringLiteral("-F") << QStringLiteral("-");
-    const QString message = messageFor(reason, paths, wholeWorkingTree);
+    const QString message = messageFor(request.reason, paths, request.wholeWorkingTree);
     const QString commit =
         QString::fromUtf8(Git::run(repository.workDir, commitArguments, message.toUtf8(), environment)).trimmed();
 
-    // Name sortable by date; the number prevents two snapshots with the same name.
-    const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss-zzz"));
-    QString ref = refPrefix + stamp;
-    for (int i = 1; !Git::run(repository.workDir, {QStringLiteral("for-each-ref"), ref}).isEmpty(); ++i)
-        ref = refPrefix + stamp + QLatin1Char('-') + QString::number(i);
+    const QString ref = unusedRefName(repository);
     Git::run(repository.workDir, {QStringLiteral("update-ref"), ref, commit});
     prune(repository);
     return ref;
@@ -221,18 +244,23 @@ namespace Snapshots {
 
 QString create(const RepositoryInfo &repository, const QString &reason, const QStringList &paths)
 {
-    return createSnapshot(repository, reason, paths, false, false);
+    return createSnapshot(repository, {.reason = reason, .paths = paths});
 }
 
 QString createOfWorkingTree(const RepositoryInfo &repository, const QString &reason)
 {
-    return createSnapshot(repository, reason, changedPaths(repository), true, true);
+    return createSnapshot(
+        repository,
+        {.reason = reason, .paths = changedPaths(repository), .wholeWorkingTree = true, .skipIfUnchanged = true});
 }
 
 QString createIfChanged(const RepositoryInfo &repository, const QString &reason)
 {
     const QStringList paths = changedPaths(repository);
-    return paths.isEmpty() ? QString() : createSnapshot(repository, reason, paths, true, true);
+    return paths.isEmpty()
+               ? QString()
+               : createSnapshot(repository,
+                                {.reason = reason, .paths = paths, .wholeWorkingTree = true, .skipIfUnchanged = true});
 }
 
 QList<Snapshot> list(const QString &folder)
@@ -264,9 +292,9 @@ QList<Snapshot> list(const QString &folder)
 
         Snapshot snapshot;
         snapshot.ref = QString::fromUtf8(git_reference_name(reference));
-        char id[GIT_OID_MAX_HEXSIZE + 1] = {};
-        git_oid_tostr(id, sizeof id, git_commit_id(commit));
-        snapshot.commitId = QString::fromLatin1(id);
+        std::array<char, GIT_OID_MAX_HEXSIZE + 1> id{};
+        git_oid_tostr(id.data(), id.size(), git_commit_id(commit));
+        snapshot.commitId = QString::fromLatin1(id.data());
         snapshot.date = QDateTime::fromSecsSinceEpoch(git_commit_time(commit));
         parseMessage(QString::fromUtf8(git_commit_message(commit)), snapshot);
         snapshots.append(snapshot);
@@ -289,7 +317,8 @@ int restore(const RepositoryInfo &repository, const Snapshot &snapshot)
 
     // The current state, recorded whole so that the restore can be undone,
     // gives the files to put back: those that differ from the snapshot.
-    const QString current = createSnapshot(repository, reason, changedPaths(repository), true, false);
+    const QString current =
+        createSnapshot(repository, {.reason = reason, .paths = changedPaths(repository), .wholeWorkingTree = true});
     const QStringList paths =
         Git::splitNul(Git::run(repository.workDir, {QStringLiteral("diff-tree"), QStringLiteral("-r"),
                                                     QStringLiteral("-z"), QStringLiteral("--name-only"),

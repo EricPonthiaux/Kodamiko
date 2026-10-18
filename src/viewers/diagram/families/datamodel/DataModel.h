@@ -46,8 +46,8 @@ public:
     QString displayText() const override { return name; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // The columns, parsed from `attributes` (kept in sync lazily).
     const QList<Field> &databaseFields() const;
@@ -78,6 +78,12 @@ public:
     QStringList attributes;
 
 private:
+    void drawTitleBar(QPainter &painter, const Palette &palette) const;
+    void drawColumnHeadings(QPainter &painter, const Style &style) const;
+    // One column's row; `relatedSides` are the edges where relations join it.
+    void drawRow(QPainter &painter, const Style &style, qsizetype index, const QSet<bool> &relatedSides) const;
+    void drawKeyBadges(QPainter &painter, const Palette &palette, const Field &field, QPointF rowTopLeft) const;
+
     mutable QList<Field> fields_;
     mutable QStringList parsedFrom_;
     qreal nameW_ = 130;
@@ -104,8 +110,8 @@ public:
         const Board &board,
         const QString &rankdir) const override;
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // The tables and columns the relation joins: the FK side is always the
     // source (it may be the link's `to`), the referenced column the target.
@@ -140,6 +146,14 @@ public:
     QString toColumn;
     // Mermaid's `--` (identifying) or `..` (non-identifying, dashed).
     bool identifying = true;
+
+private:
+    // The endpoints when no column chosen by hand is a FK: the tables' own
+    // FKs decide, else their primary columns are joined.
+    Endpoints foreignKeyEndpoints(const EntityShape &fromShape,
+                                  const EntityShape &toShape,
+                                  const Field *selectedFrom,
+                                  const Field *selectedTo) const;
 };
 
 } // namespace diagram::datamodel

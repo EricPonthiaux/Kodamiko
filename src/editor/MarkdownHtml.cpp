@@ -11,7 +11,7 @@
 #include <cmark-gfm-core-extensions.h>
 #include <cmark-gfm.h>
 
-#include <cstdlib>
+#include <array>
 #include <ranges>
 #include <vector>
 
@@ -41,9 +41,12 @@ QString octicon(const QString &name, const QString &classes)
 
 QString render(cmark_node *node, cmark_llist *extensions)
 {
-    char *html = cmark_render_html(node, options, extensions);
+    // The parser allocates the tree with cmark's default allocator; the HTML
+    // must be freed by the same one.
+    cmark_mem *allocator = cmark_get_default_mem_allocator();
+    char *html = cmark_render_html_with_mem(node, options, extensions, allocator);
     const QString result = QString::fromUtf8(html);
-    std::free(html);
+    allocator->free(html);
     return result;
 }
 
@@ -130,13 +133,13 @@ struct Alert {
     const char *icon;
 };
 
-const Alert alerts[] = {
+constexpr std::array<Alert, 5> alerts = {{
     {"[!NOTE]", "note", "Note", "info"},
     {"[!TIP]", "tip", "Tip", "light-bulb"},
     {"[!IMPORTANT]", "important", "Important", "report"},
     {"[!WARNING]", "warning", "Warning", "alert"},
     {"[!CAUTION]", "caution", "Caution", "stop"},
-};
+}};
 
 // "> [!NOTE]" quotes: GitHub's alert boxes. Empty if `node` is not one.
 QString alertHtml(cmark_node *node, cmark_llist *extensions)
@@ -259,11 +262,12 @@ QString body(const QString &markdown, CodeColorizer *colorizer)
     // Nodes to rewrite, collected first: the tree must not change while walked.
     std::vector<cmark_node *> nodes;
     cmark_iter *iter = cmark_iter_new(document);
-    for (cmark_event_type event; (event = cmark_iter_next(iter)) != CMARK_EVENT_DONE;) {
+    for (cmark_event_type event = cmark_iter_next(iter); event != CMARK_EVENT_DONE; event = cmark_iter_next(iter)) {
         cmark_node *node = cmark_iter_get_node(iter);
         const cmark_node_type type = cmark_node_get_type(node);
-        if (event == CMARK_EVENT_ENTER &&
-            (type == CMARK_NODE_CODE_BLOCK || type == CMARK_NODE_HEADING || type == CMARK_NODE_BLOCK_QUOTE))
+        const bool isRewritten =
+            type == CMARK_NODE_CODE_BLOCK || type == CMARK_NODE_HEADING || type == CMARK_NODE_BLOCK_QUOTE;
+        if (event == CMARK_EVENT_ENTER && isRewritten)
             nodes.push_back(node);
     }
     cmark_iter_free(iter);

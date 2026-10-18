@@ -14,6 +14,7 @@
 #include <optional>
 
 class Toolchains;
+struct RuntimeInstall;
 
 // A language server Duet knows how to run.
 struct LanguageServerSpec {
@@ -143,6 +144,25 @@ private:
     // version, else the PATH's. Empty when there is none.
     QString programFor(const LanguageServerSpec &spec) const;
     std::optional<LanguageServerSpec> findSpec(const QString &languageId) const;
+
+    struct ServerCommand;
+    // Records why the server of `spec` cannot run, and says it.
+    void fail(const LanguageServerSpec &spec, const QString &error);
+    // Duet's npm installs are scripts: `command` then runs them with a
+    // Node recent enough. False, failed, if there is none.
+    bool runScriptWithNode(const LanguageServerSpec &spec, ServerCommand &command);
+    // The Java jdtls itself runs on, if any.
+    std::optional<JavaRuntime> jdtlsJava() const;
+    // Turns `command` into jdtls's Java command; `runtime` is the
+    // project's JDK, null if none. False, failed, if impossible.
+    bool launchJdtls(const LanguageServerSpec &spec, const RuntimeInstall *runtime, ServerCommand &command);
+    LspClient *startClient(const LanguageServerSpec &spec,
+                           const ServerCommand &command,
+                           const LanguageSetup *setup,
+                           const RuntimeInstall *runtime);
+    void receiveNotification(const QString &method, const QJsonValue &params);
+    // Forgets the documents opened in `server`.
+    void forgetDocuments(const QString &server);
 
     QString folder_;
     ProjectConfig project_;

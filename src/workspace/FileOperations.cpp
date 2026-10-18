@@ -6,6 +6,8 @@
 #include <QFile>
 #include <QFileInfo>
 
+#include <algorithm>
+
 namespace {
 
 QString translate(const char *text)
@@ -46,11 +48,9 @@ bool copyTree(const QString &source, const QString &destination, QString *error)
     }
     const QFileInfoList entries =
         QDir(source).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
-    for (const QFileInfo &entry : entries) {
-        if (!copyTree(entry.absoluteFilePath(), destination + QLatin1Char('/') + entry.fileName(), error))
-            return false;
-    }
-    return true;
+    return std::ranges::all_of(entries, [&](const QFileInfo &entry) {
+        return copyTree(entry.absoluteFilePath(), destination + QLatin1Char('/') + entry.fileName(), error);
+    });
 }
 
 } // namespace

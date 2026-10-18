@@ -59,8 +59,8 @@ struct Preferences {
     // Font of code (editor, terminal, diffs) for these preferences,
     // without ligatures.
     QFont codeFont() const;
-    // The code font, line height and ligatures given to `theme`.
-    void applyTypography(Theme &theme) const;
+    // The code font, line height and ligatures given to `target`.
+    void applyTypography(Theme &target) const;
     // Font of the interface (menus, tabs, panels, dialogs).
     QFont interfaceFont() const;
     // Font of the side trees.

@@ -29,8 +29,8 @@ public:
     QString displayText() const override { return name; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     QString name;
     QString kind = QStringLiteral("system"); // person | system | container | component
@@ -60,6 +60,21 @@ private:
     qreal layoutText();
     QPainterPath boxPath() const;
     void drawPerson(QPainter &painter, const QColor &ink) const;
+    // The database cap or the queue's end lines, over the box.
+    void drawVariantMarks(QPainter &painter, const QColor &color) const;
+
+    // Where the texts line up: centered under a person or a database, flush
+    // left otherwise.
+    struct TextColumn {
+        qreal x = 0;
+        Align align = Align::Left;
+    };
+
+    TextColumn textColumn() const;
+    void drawTexts(QPainter &painter, const Style &style, const BodyStyle &body) const;
+    // Fills the pill behind the technology lines starting at `top`; returns
+    // its height.
+    qreal drawTechnologyPill(QPainter &painter, const Style &style, const TextColumn &column, qreal top) const;
 
     QStringList titleLines_;
     QStringList typeLines_;
@@ -95,8 +110,8 @@ public:
     QString displayText() const override { return name; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     QString name;
     // Enterprise_Boundary | System_Boundary | Container_Boundary |
@@ -122,8 +137,8 @@ public:
     QString layoutLabel(const Board &board) const override;
     QString graphvizHtmlLabel(const Board &board) const override;
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // The label and its [technology], wrapped in the font the panel is
     // painted with.

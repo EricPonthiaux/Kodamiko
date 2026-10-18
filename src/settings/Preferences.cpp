@@ -109,11 +109,11 @@ QFont Preferences::codeFont() const
     return AppFonts::withLigatures(font, false);
 }
 
-void Preferences::applyTypography(Theme &theme) const
+void Preferences::applyTypography(Theme &target) const
 {
-    theme.font = codeFont();
-    theme.lineHeight = codeLineHeight;
-    theme.editorLigatures = ligatures;
+    target.font = codeFont();
+    target.lineHeight = codeLineHeight;
+    target.editorLigatures = ligatures;
 }
 
 QFont Preferences::interfaceFont() const

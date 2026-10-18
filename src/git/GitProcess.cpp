@@ -42,14 +42,8 @@ QString withoutProgress(const QByteArray &errorOutput)
     return kept.join(QLatin1Char('\n')).trimmed();
 }
 
-} // namespace
-
-QByteArray run(const QString &workDir, const QStringList &arguments, const RunOptions &options)
+QProcessEnvironment gitEnvironment(const RunOptions &options)
 {
-    const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
-    if (git.isEmpty())
-        throw GitError(QObject::tr("The git command was not found: install git and make sure it is in the PATH."));
-
     QProcessEnvironment processEnvironment = QProcessEnvironment::systemEnvironment();
     processEnvironment.insert(QStringLiteral("GIT_TERMINAL_PROMPT"), QStringLiteral("0"));
     processEnvironment.insert(QStringLiteral("GIT_LITERAL_PATHSPECS"), QStringLiteral("1"));
@@ -59,10 +53,70 @@ QByteArray run(const QString &workDir, const QStringList &arguments, const RunOp
         for (auto it = environment->begin(); it != environment->end(); ++it)
             processEnvironment.insert(it.key(), it.value());
     }
+    return processEnvironment;
+}
+
+bool isCancelled(const Feedback &feedback)
+{
+    return feedback.cancel && feedback.cancel->load();
+}
+
+// Waits for git to finish, reporting its progress lines, and returns its
+// error output. Kills git and throws a Cancelled GitError if the feedback
+// asks for it.
+// No timeout: the repository's hooks (pre-commit…) can take a while, and a
+// fetch over a slow network too. Only the user stops git.
+QByteArray waitForGit(QProcess &process, const Feedback &feedback)
+{
+    QByteArray errorOutput;
+    QByteArray progressBuffer;
+    const auto readErrors = [&] {
+        const QByteArray chunk = process.readAllStandardError();
+        errorOutput += chunk;
+        if (!feedback.progress)
+            return;
+        progressBuffer += chunk;
+        for (const QString &line : takeLines(progressBuffer))
+            feedback.progress(line);
+    };
+    while (!process.waitForFinished(pollMs) && process.state() != QProcess::NotRunning) {
+        readErrors();
+        if (isCancelled(feedback)) {
+            process.kill();
+            process.waitForFinished();
+            throw GitError(QObject::tr("Cancelled"), GitError::Kind::Cancelled);
+        }
+    }
+    readErrors();
+    return errorOutput;
+}
+
+// What to tell the user about a failed git: its error output (`errors`),
+// else its standard output, else its exit code.
+QString failureMessage(const QProcess &process,
+                       const QStringList &arguments,
+                       const QString &errors,
+                       const QByteArray &output)
+{
+    if (!errors.isEmpty())
+        return errors;
+    QString outputText = QString::fromUtf8(output).trimmed();
+    if (!outputText.isEmpty())
+        return outputText;
+    return QObject::tr("git %1 failed (code %2)").arg(arguments.value(0)).arg(process.exitCode());
+}
+
+} // namespace
+
+QByteArray run(const QString &workDir, const QStringList &arguments, const RunOptions &options)
+{
+    const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
+    if (git.isEmpty())
+        throw GitError(QObject::tr("The git command was not found: install git and make sure it is in the PATH."));
 
     QProcess process;
     process.setWorkingDirectory(workDir);
-    process.setProcessEnvironment(processEnvironment);
+    process.setProcessEnvironment(gitEnvironment(options));
     process.start(git, arguments);
     if (!process.waitForStarted())
         throw GitError(QObject::tr("Cannot start git: %1").arg(process.errorString()));
@@ -70,40 +124,14 @@ QByteArray run(const QString &workDir, const QStringList &arguments, const RunOp
         process.write(options.input);
     process.closeWriteChannel();
 
-    // No timeout: the repository's hooks (pre-commit…) can take a while, and
-    // a fetch over a slow network too. Only the user stops git.
-    QByteArray errorOutput;
-    QByteArray progressBuffer;
-    const auto readErrors = [&] {
-        const QByteArray chunk = process.readAllStandardError();
-        errorOutput += chunk;
-        if (options.feedback.progress) {
-            progressBuffer += chunk;
-            for (const QString &line : takeLines(progressBuffer))
-                options.feedback.progress(line);
-        }
-    };
-    while (!process.waitForFinished(pollMs) && process.state() != QProcess::NotRunning) {
-        readErrors();
-        if (options.feedback.cancel && options.feedback.cancel->load()) {
-            process.kill();
-            process.waitForFinished();
-            throw GitError(QObject::tr("Cancelled"), GitError::Kind::Cancelled);
-        }
-    }
-    readErrors();
-
+    const QByteArray errorOutput = waitForGit(process, options.feedback);
     const QByteArray output = process.readAllStandardOutput();
-    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        QString message =
-            options.feedback.progress ? withoutProgress(errorOutput) : QString::fromUtf8(errorOutput).trimmed();
-        if (message.isEmpty())
-            message = QString::fromUtf8(output).trimmed();
-        if (message.isEmpty())
-            message = QObject::tr("git %1 failed (code %2)").arg(arguments.value(0)).arg(process.exitCode());
-        throw GitError(message);
-    }
-    return output;
+    const bool failed = process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0;
+    if (!failed)
+        return output;
+    const QString errors =
+        options.feedback.progress ? withoutProgress(errorOutput) : QString::fromUtf8(errorOutput).trimmed();
+    throw GitError(failureMessage(process, arguments, errors, output));
 }
 
 QByteArray run(const QString &workDir,

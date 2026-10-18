@@ -38,14 +38,17 @@ int nextMessageOrder(const Board &board);
 // Writes the fragment statements that lead from the stack `active` to the
 // stack `next` (closing, opening, switching branch), and returns `next`.
 // Mermaid and PlantUML differ only by indentation and Mermaid's implicit
-// `and` branch of parallel fragments; `encode` escapes the labels for the
-// notation.
+// `and` branch of parallel fragments.
+struct FragmentSyntax {
+    QString indent;
+    bool parallelBranches = false;
+    std::function<QString(const QString &)> encode; // escapes the labels for the notation
+};
+
 QList<Fragment> syncFragments(QStringList &out,
                               const QList<Fragment> &active,
                               const QList<Fragment> &next,
-                              const QString &indent = {},
-                              bool parallelBranches = false,
-                              const std::function<QString(const QString &)> &encode = {});
+                              const FragmentSyntax &syntax = {});
 
 // Header + dashed lifeline. `kind` keeps the Mermaid/PlantUML participant
 // kind for faithful round trips; actors are drawn as their UML silhouette.
@@ -70,8 +73,8 @@ public:
     QString displayText() const override { return text; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     bool isActor() const { return kind == QLatin1String("actor"); }
 
@@ -83,6 +86,9 @@ public:
 private:
     qreal lifelineEnd(const Board &board) const;
     void drawActivations(QPainter &painter, const Board &board) const;
+    // The UML silhouette with its text below, or the header box.
+    void drawActor(QPainter &painter, const Style &style, const ShapeState &state) const;
+    void drawHeader(QPainter &painter, const Style &style, const ShapeState &state) const;
 
     QStringList lines_;
 };
@@ -106,8 +112,8 @@ public:
     bool routesItself() const override { return true; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // Rank in the conversation (0-based); assigned on first routing when
     // missing.
@@ -119,12 +125,15 @@ public:
     QList<Fragment> fragments;
 
 private:
-    void drawHead(QPainter &painter,
-                  const Board &board,
-                  QPointF tip,
-                  qreal angle,
-                  const LinkStyle &style,
-                  const QString &kind) const;
+    // A head to draw: its kind (arrow | open | cross | none), where its tip
+    // lies and the direction it points to.
+    struct HeadPlacement {
+        QString kind;
+        QPointF tip;
+        qreal angle = 0;
+    };
+
+    void drawHead(QPainter &painter, const Board &board, const LinkStyle &style, const HeadPlacement &placement) const;
 };
 
 // The family's own layout (arrangeSequence): participants on one row, in

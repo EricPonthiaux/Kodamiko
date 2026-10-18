@@ -45,6 +45,16 @@ QString runtimeDescription(const QString &family)
     return QObject::tr("For the files compile_commands.json does not cover.");
 }
 
+// The first item of `combo` for `version`, whatever its path; -1 if none.
+int indexOfVersion(const QComboBox *combo, const QString &version)
+{
+    for (int i = 0; i < combo->count(); ++i) {
+        if (combo->itemData(i).toMap().value(versionKey) == version)
+            return i;
+    }
+    return -1;
+}
+
 QString serverTitle(const QString &id)
 {
     if (id.isEmpty())
@@ -103,12 +113,12 @@ void ProjectSetupForm::build(Card &card)
     });
     connect(card.runtime, &QComboBox::currentIndexChanged, this, &ProjectSetupForm::changed);
     connect(card.server, &QComboBox::currentIndexChanged, this, [this, cardOf] {
-        Card &card = cardOf();
-        LanguageSetup setup = setupOf(card);
+        Card &current = cardOf();
+        LanguageSetup setup = setupOf(current);
         setup.serverVersion.clear();
         toolchains_->complete(setup);
-        fillServerVersions(card, setup.server, setup.serverVersion);
-        updateRows(card);
+        fillServerVersions(current, setup.server, setup.serverVersion);
+        updateRows(current);
         emit changed();
     });
     connect(card.serverVersion, &QComboBox::currentIndexChanged, this, &ProjectSetupForm::changed);
@@ -188,59 +198,76 @@ void ProjectSetupForm::fillRuntimes(Card &card, const LanguageSetup &setup)
     const QSignalBlocker blocker(card.runtime);
     card.runtime->clear();
     int selected = -1;
-    if (card.family == QLatin1String("cpp")) {
-        for (const QString &standard : ToolCatalog::runtimeVersions(card.family))
-            card.runtime->addItem(QString(standard).replace(QLatin1String("c++"), QLatin1String("C++")),
-                                  item(standard));
-        selected = card.runtime->findData(item(setup.runtimeVersion));
-    } else if (card.family == QLatin1String("python")) {
-        QList<RuntimeInstall> pythons = toolchains_->runtimes(QStringLiteral("python"));
-        const bool listed = std::any_of(pythons.cbegin(), pythons.cend(), [&](const RuntimeInstall &python) {
-            return python.executable == setup.runtimePath;
-        });
-        if (!setup.runtimePath.isEmpty() && !listed)
-            pythons.prepend({QStringLiteral("python"), setup.runtimeVersion,
-                             QFileInfo(setup.runtimePath).absolutePath(), setup.runtimePath, false});
-        for (const RuntimeInstall &python : std::as_const(pythons)) {
-            QString where = QDir::toNativeSeparators(python.executable);
-            if (!project_.path.isEmpty() && python.executable.startsWith(project_.path + QLatin1Char('/')))
-                where = tr("the project's %1").arg(QDir(project_.path).relativeFilePath(python.executable));
-            card.runtime->addItem(tr("Python %1 — %2").arg(python.version.isEmpty() ? tr("?") : python.version, where),
-                                  item(python.version, python.executable));
-        }
-        if (pythons.isEmpty())
-            card.runtime->addItem(tr("No Python found on this machine"), item(setup.runtimeVersion));
-        selected = card.runtime->findData(item(setup.runtimeVersion, setup.runtimePath));
-        if (selected < 0) {
-            for (int i = 0; i < card.runtime->count(); ++i) {
-                if (card.runtime->itemData(i).toMap().value(versionKey) == setup.runtimeVersion) {
-                    selected = i;
-                    break;
-                }
-            }
-        }
-    } else {
-        const QString tool = ToolCatalog::runtimeOf(card.family);
-        const ToolSpec *spec = ToolCatalog::find(tool);
-        QStringList versions = ToolCatalog::runtimeVersions(card.family);
-        for (const RuntimeInstall &runtime : toolchains_->runtimes(tool)) {
-            if (!versions.contains(runtime.version))
-                versions.append(runtime.version);
-        }
-        if (!setup.runtimeVersion.isEmpty() && !versions.contains(setup.runtimeVersion))
-            versions.append(setup.runtimeVersion);
-        std::sort(versions.begin(), versions.end(),
-                  [](const QString &a, const QString &b) { return a.toInt() > b.toInt(); });
-        for (const QString &version : std::as_const(versions)) {
-            const std::optional<RuntimeInstall> found = toolchains_->runtime(tool, version);
-            const QString state = !found           ? tr("will download")
-                                  : found->managed ? tr("downloaded")
-                                                   : tr("on this machine");
-            card.runtime->addItem(tr("%1 %2 — %3").arg(spec ? spec->title : tool, version, state), item(version));
-        }
-        selected = card.runtime->findData(item(setup.runtimeVersion));
-    }
+    if (card.family == QLatin1String("cpp"))
+        selected = fillCppStandards(card.runtime, setup);
+    else if (card.family == QLatin1String("python"))
+        selected = fillPythons(card.runtime, setup);
+    else
+        selected = fillToolRuntimes(card.runtime, card.family, setup);
     card.runtime->setCurrentIndex(std::max(0, selected));
+}
+
+int ProjectSetupForm::fillCppStandards(QComboBox *combo, const LanguageSetup &setup)
+{
+    for (const QString &standard : ToolCatalog::runtimeVersions(QStringLiteral("cpp")))
+        combo->addItem(QString(standard).replace(QLatin1String("c++"), QLatin1String("C++")), item(standard));
+    return combo->findData(item(setup.runtimeVersion));
+}
+
+int ProjectSetupForm::fillPythons(QComboBox *combo, const LanguageSetup &setup) const
+{
+    QList<RuntimeInstall> pythons = toolchains_->runtimes(QStringLiteral("python"));
+    const bool listed = std::any_of(pythons.cbegin(), pythons.cend(), [&](const RuntimeInstall &python) {
+        return python.executable == setup.runtimePath;
+    });
+    if (!setup.runtimePath.isEmpty() && !listed)
+        pythons.prepend({QStringLiteral("python"), setup.runtimeVersion, QFileInfo(setup.runtimePath).absolutePath(),
+                         setup.runtimePath, false});
+    for (const RuntimeInstall &python : std::as_const(pythons)) {
+        const QString version = python.version.isEmpty() ? tr("?") : python.version;
+        combo->addItem(tr("Python %1 — %2").arg(version, pythonLocation(python.executable)),
+                       item(python.version, python.executable));
+    }
+    if (pythons.isEmpty())
+        combo->addItem(tr("No Python found on this machine"), item(setup.runtimeVersion));
+    const int selected = combo->findData(item(setup.runtimeVersion, setup.runtimePath));
+    return selected >= 0 ? selected : indexOfVersion(combo, setup.runtimeVersion);
+}
+
+QString ProjectSetupForm::pythonLocation(const QString &executable) const
+{
+    const bool isInProject = !project_.path.isEmpty() && executable.startsWith(project_.path + QLatin1Char('/'));
+    if (isInProject)
+        return tr("the project's %1").arg(QDir(project_.path).relativeFilePath(executable));
+    return QDir::toNativeSeparators(executable);
+}
+
+int ProjectSetupForm::fillToolRuntimes(QComboBox *combo, const QString &family, const LanguageSetup &setup) const
+{
+    const QString tool = ToolCatalog::runtimeOf(family);
+    const ToolSpec *spec = ToolCatalog::find(tool);
+    QStringList versions = ToolCatalog::runtimeVersions(family);
+    for (const RuntimeInstall &runtime : toolchains_->runtimes(tool)) {
+        if (!versions.contains(runtime.version))
+            versions.append(runtime.version);
+    }
+    if (!setup.runtimeVersion.isEmpty() && !versions.contains(setup.runtimeVersion))
+        versions.append(setup.runtimeVersion);
+    std::sort(versions.begin(), versions.end(),
+              [](const QString &a, const QString &b) { return a.toInt() > b.toInt(); });
+    const QString title = spec ? spec->title : tool;
+    for (const QString &version : std::as_const(versions)) {
+        const QString state = runtimeState(toolchains_->runtime(tool, version));
+        combo->addItem(tr("%1 %2 — %3").arg(title, version, state), item(version));
+    }
+    return combo->findData(item(setup.runtimeVersion));
+}
+
+QString ProjectSetupForm::runtimeState(const std::optional<RuntimeInstall> &found)
+{
+    if (!found)
+        return tr("will download");
+    return found->managed ? tr("downloaded") : tr("on this machine");
 }
 
 void ProjectSetupForm::fillServerVersions(Card &card, const QString &server, const QString &selected)

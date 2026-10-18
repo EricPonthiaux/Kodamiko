@@ -40,6 +40,9 @@ private:
 
     // Lays the text out for the current width; returns the height it needs.
     qreal layoutText();
+    // Draws the title lines from the top padding; returns where they end.
+    qreal drawTitle(QPainter &painter, const Style &style) const;
+    void drawItems(QPainter &painter, const Style &style, qreal top) const;
 
     QStringList titleLines_;
     QList<QStringList> itemLines_;
@@ -56,6 +59,7 @@ public:
 private:
     // The arrow from the product to its momentum, the spine of the vision.
     bool isCentral(const Board &board) const;
+    qreal opacity(const Board &board, bool selected) const;
 };
 
 } // namespace diagram::productvision

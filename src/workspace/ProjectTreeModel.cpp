@@ -17,6 +17,8 @@ namespace {
 constexpr int maxCompactedFolders = 200;
 constexpr int maxChainLength = 50;
 constexpr int reloadDelayMs = 150;
+// Guards against cycles while walking down toward a path.
+constexpr int maxTreeDepth = 512;
 
 // Main file suffix ← companion file suffix, for names that differ only by
 // these suffixes ("Foo.cpp" ← "Foo.h"). Without a leading dot, whole names.
@@ -25,7 +27,7 @@ struct NestingRule {
     const char *child;
 };
 
-const NestingRule nestingRules[] = {
+constexpr auto nestingRules = std::to_array<NestingRule>({
     {".cpp", ".h"},
     {".cpp", ".hpp"},
     {".cc", ".h"},
@@ -53,14 +55,14 @@ const NestingRule nestingRules[] = {
     {"go.mod", "go.sum"},
     {"Gemfile", "Gemfile.lock"},
     {"composer.json", "composer.lock"},
-};
+});
 
 // Direct main file of `name` among `siblings`; empty if none. The longest
 // companion suffix is tried first: "x.d.ts" is a declaration, not a ".ts".
 QString directParent(const QString &name, const QStringList &siblings)
 {
     static const std::vector<NestingRule> rules = [] {
-        std::vector<NestingRule> sorted(std::begin(nestingRules), std::end(nestingRules));
+        std::vector<NestingRule> sorted(nestingRules.begin(), nestingRules.end());
         std::stable_sort(sorted.begin(), sorted.end(), [](const NestingRule &a, const NestingRule &b) {
             return qstrlen(a.child) > qstrlen(b.child);
         });
@@ -91,6 +93,22 @@ bool lessThan(const QFileInfo &a, const QFileInfo &b)
         return a.isDir();
     const int order = a.fileName().compare(b.fileName(), Qt::CaseInsensitive);
     return order != 0 ? order < 0 : a.fileName() < b.fileName();
+}
+
+QStringList fileNamesOf(const QFileInfoList &entries)
+{
+    QStringList names;
+    for (const QFileInfo &entry : entries) {
+        if (!entry.isDir())
+            names.append(entry.fileName());
+    }
+    return names;
+}
+
+// Identity of a row across rereadings of its folder.
+QString rowKey(const QString &path, bool isDir, const QStringList &chain)
+{
+    return path + (isDir ? QStringLiteral("\nd\n") : QStringLiteral("\nf\n")) + chain.join(QLatin1Char('\n'));
 }
 
 } // namespace
@@ -198,36 +216,18 @@ std::vector<ProjectTreeModel::Entry> ProjectTreeModel::list(const QString &folde
     const QFileInfoList entries = visibleEntries(folder);
     const auto folders = std::count_if(entries.begin(), entries.end(), [](const QFileInfo &e) { return e.isDir(); });
     const bool compact = options_.compactFolders && folders <= maxCompactedFolders;
-
-    QStringList fileNames;
-    for (const QFileInfo &entry : entries) {
-        if (!entry.isDir())
-            fileNames.append(entry.fileName());
-    }
+    const QStringList fileNames = fileNamesOf(entries);
 
     std::vector<Entry> result;
     QHash<QString, size_t> fileRows;     // file name → index in result
     QList<QPair<QString, Entry>> nested; // main file name, companion
     for (const QFileInfo &info : entries) {
-        Entry entry;
-        entry.path = QDir::cleanPath(info.absoluteFilePath());
-        entry.name = info.fileName();
-        entry.isDir = info.isDir();
-        if (entry.isDir && compact && !info.isSymLink()) {
-            for (int depth = 0; depth < maxChainLength; ++depth) {
-                const QFileInfoList inside = visibleEntries(entry.path);
-                if (inside.size() != 1 || !inside.first().isDir() || inside.first().isSymLink())
-                    break;
-                entry.chain.append(entry.path);
-                entry.path = QDir::cleanPath(inside.first().absoluteFilePath());
-                entry.name += QLatin1Char('/') + inside.first().fileName();
-            }
-        }
-        if (!entry.isDir && options_.nestFiles) {
-            if (const QString parent = nestingParent(entry.name, fileNames); !parent.isEmpty()) {
-                nested.append({parent, std::move(entry)});
-                continue;
-            }
+        Entry entry = makeEntry(info, compact);
+        const bool mayNest = !entry.isDir && options_.nestFiles;
+        const QString parent = mayNest ? nestingParent(entry.name, fileNames) : QString();
+        if (!parent.isEmpty()) {
+            nested.append({parent, std::move(entry)});
+            continue;
         }
         if (!entry.isDir)
             fileRows.insert(entry.name, result.size());
@@ -238,6 +238,29 @@ std::vector<ProjectTreeModel::Entry> ProjectTreeModel::list(const QString &folde
             result[*row].nested.push_back(std::move(entry));
     }
     return result;
+}
+
+ProjectTreeModel::Entry ProjectTreeModel::makeEntry(const QFileInfo &info, bool compact) const
+{
+    Entry entry;
+    entry.path = QDir::cleanPath(info.absoluteFilePath());
+    entry.name = info.fileName();
+    entry.isDir = info.isDir();
+    if (entry.isDir && compact && !info.isSymLink())
+        followChain(entry);
+    return entry;
+}
+
+void ProjectTreeModel::followChain(Entry &entry) const
+{
+    for (int depth = 0; depth < maxChainLength; ++depth) {
+        const QFileInfoList inside = visibleEntries(entry.path);
+        if (inside.size() != 1 || !inside.first().isDir() || inside.first().isSymLink())
+            return;
+        entry.chain.append(entry.path);
+        entry.path = QDir::cleanPath(inside.first().absoluteFilePath());
+        entry.name += QLatin1Char('/') + inside.first().fileName();
+    }
 }
 
 QString ProjectTreeModel::nestingParent(const QString &fileName, const QStringList &siblings)
@@ -311,43 +334,56 @@ void ProjectTreeModel::watch(Node *node)
 // folder of generated files changes thousands of rows at once.
 void ProjectTreeModel::update(Node *node, std::vector<Entry> entries)
 {
-    const QModelIndex parent = indexOf(node);
-    const auto sameRow = [](const Node &existing, const Entry &entry) {
-        return existing.path == entry.path && existing.isDir == entry.isDir && existing.chain == entry.chain;
-    };
-    const auto keyOf = [](const QString &path, bool isDir, const QStringList &chain) {
-        return path + (isDir ? QStringLiteral("\nd\n") : QStringLiteral("\nf\n")) + chain.join(QLatin1Char('\n'));
-    };
+    removeGoneRows(node, entries);
+    insertNewRows(node, std::move(entries));
+}
+
+// Rows that are gone, from the end, a run at a time.
+void ProjectTreeModel::removeGoneRows(Node *node, const std::vector<Entry> &entries)
+{
     QSet<QString> present;
     present.reserve(static_cast<qsizetype>(entries.size()));
     for (const Entry &entry : entries)
-        present.insert(keyOf(entry.path, entry.isDir, entry.chain));
+        present.insert(rowKey(entry.path, entry.isDir, entry.chain));
 
-    // Rows that are gone, from the end, a run at a time.
+    const QModelIndex parent = indexOf(node);
     auto &children = node->children;
-    for (int row = static_cast<int>(children.size()) - 1; row >= 0;) {
+    const auto isPresent = [&](int row) {
         const Node &child = *children[static_cast<size_t>(row)];
-        if (present.contains(keyOf(child.path, child.isDir, child.chain))) {
+        return present.contains(rowKey(child.path, child.isDir, child.chain));
+    };
+    for (int row = static_cast<int>(children.size()) - 1; row >= 0;) {
+        if (isPresent(row)) {
             --row;
             continue;
         }
         int first = row;
-        while (first > 0) {
-            const Node &previous = *children[static_cast<size_t>(first - 1)];
-            if (present.contains(keyOf(previous.path, previous.isDir, previous.chain)))
-                break;
+        while (first > 0 && !isPresent(first - 1))
             --first;
-        }
         beginRemoveRows(parent, first, row);
         children.erase(children.begin() + first, children.begin() + row + 1);
         node->renumber();
         endRemoveRows();
         row = first - 1;
     }
-    // New rows, at their place, a run at a time; the remaining ones are in
-    // the same order.
+}
+
+// New rows, at their place, a run at a time; the remaining ones are in the
+// same order.
+void ProjectTreeModel::insertNewRows(Node *node, std::vector<Entry> entries)
+{
+    const QModelIndex parent = indexOf(node);
+    auto &children = node->children;
+    // Whether the existing row `childRow` is the entry `entryRow`.
+    const auto isSameRow = [&](size_t childRow, size_t entryRow) {
+        if (childRow >= children.size())
+            return false;
+        const Node &existing = *children[childRow];
+        const Entry &entry = entries[entryRow];
+        return existing.path == entry.path && existing.isDir == entry.isDir && existing.chain == entry.chain;
+    };
     for (size_t i = 0; i < entries.size();) {
-        if (i < children.size() && sameRow(*children[i], entries[i])) {
+        if (isSameRow(i, i)) {
             Node *child = children[i].get();
             if (!child->isDir)
                 update(child, std::move(entries[i].nested)); // nested files
@@ -355,7 +391,7 @@ void ProjectTreeModel::update(Node *node, std::vector<Entry> entries)
             continue;
         }
         size_t end = i + 1;
-        while (end < entries.size() && !(i < children.size() && sameRow(*children[i], entries[end])))
+        while (end < entries.size() && !isSameRow(i, end))
             ++end;
         beginInsertRows(parent, static_cast<int>(i), static_cast<int>(end - 1));
         std::vector<std::unique_ptr<Node>> added;
@@ -395,44 +431,9 @@ void ProjectTreeModel::refresh()
 void ProjectTreeModel::reloadPending()
 {
     reloadTimer_.stop();
-    const QStringList folders = std::exchange(changedFolders_, {});
-    // A change in a folder alters its own rows, and may alter its row in its
-    // parent (a compact chain that splits or grows).
-    QList<Node *> toUpdate;
-    for (const QString &folder : folders) {
-        std::function<Node *(Node *)> find = [&](Node *node) -> Node * {
-            for (const auto &child : node->children) {
-                if (child->path == folder || child->chain.contains(folder))
-                    return child.get();
-                if (child->isDir && child->loaded && folder.startsWith(child->path + QLatin1Char('/')))
-                    return find(child.get());
-            }
-            return nullptr;
-        };
-        Node *row = find(invisibleRoot_.get());
-        if (!row)
-            continue;
-        if (row->isDir && row->loaded && row->path == folder && !toUpdate.contains(row))
-            toUpdate.append(row);
-        if (row->parent && row->parent != invisibleRoot_.get() && !toUpdate.contains(row->parent))
-            toUpdate.append(row->parent);
-    }
-    // Outer folders first: updating them may replace the inner ones.
-    std::sort(toUpdate.begin(), toUpdate.end(), [](Node *a, Node *b) { return a->path.size() < b->path.size(); });
-    QStringList updatedPaths;
-    for (const Node *node : std::as_const(toUpdate))
-        updatedPaths.append(node->path);
-    for (const QString &path : std::as_const(updatedPaths)) {
-        std::function<Node *(Node *)> find = [&](Node *node) -> Node * {
-            for (const auto &child : node->children) {
-                if (child->path == path)
-                    return child.get();
-                if (child->isDir && child->loaded && path.startsWith(child->path + QLatin1Char('/')))
-                    return find(child.get());
-            }
-            return nullptr;
-        };
-        Node *node = find(invisibleRoot_.get());
+    const QStringList changed = std::exchange(changedFolders_, {});
+    for (const QString &path : foldersToUpdate(changed)) {
+        Node *node = findRow(path, [&path](const Node &row) { return row.path == path; });
         if (!node || !node->loaded)
             continue;
         if (!QFileInfo(node->path).isDir())
@@ -440,6 +441,55 @@ void ProjectTreeModel::reloadPending()
         update(node, list(node->path));
         watch(node);
     }
+}
+
+// A change in a folder alters its own rows, and may alter its row in its
+// parent (a compact chain that splits or grows). Outer folders come first:
+// updating them may replace the inner ones.
+QStringList ProjectTreeModel::foldersToUpdate(const QStringList &changed) const
+{
+    QList<Node *> toUpdate;
+    const auto add = [&toUpdate](Node *node) {
+        if (!toUpdate.contains(node))
+            toUpdate.append(node);
+    };
+    for (const QString &folder : changed) {
+        Node *row =
+            findRow(folder, [&folder](const Node &node) { return node.path == folder || node.chain.contains(folder); });
+        if (!row)
+            continue;
+        const bool isChangedFolder = row->isDir && row->loaded && row->path == folder;
+        if (isChangedFolder)
+            add(row);
+        const bool hasParentRow = row->parent && row->parent != invisibleRoot_.get();
+        if (hasParentRow)
+            add(row->parent);
+    }
+    std::sort(toUpdate.begin(), toUpdate.end(), [](Node *a, Node *b) { return a->path.size() < b->path.size(); });
+    QStringList paths;
+    for (const Node *node : std::as_const(toUpdate))
+        paths.append(node->path);
+    return paths;
+}
+
+ProjectTreeModel::Node *ProjectTreeModel::findRow(const QString &path,
+                                                  const std::function<bool(const Node &)> &isTarget) const
+{
+    const Node *node = invisibleRoot_.get();
+    while (node) {
+        const Node *next = nullptr;
+        for (const auto &child : node->children) {
+            if (isTarget(*child))
+                return child.get();
+            const bool leadsToPath = child->isDir && child->loaded && path.startsWith(child->path + QLatin1Char('/'));
+            if (leadsToPath) {
+                next = child.get();
+                break;
+            }
+        }
+        node = next;
+    }
+    return nullptr;
 }
 
 QModelIndex ProjectTreeModel::index(const QString &path)
@@ -450,31 +500,39 @@ QModelIndex ProjectTreeModel::index(const QString &path)
     Node *node = invisibleRoot_->children.front().get();
     if (target == node->path)
         return indexOf(node);
-    if (!target.startsWith(node->path + QLatin1Char('/')) && node->path != QLatin1String("/"))
+    const bool isUnderRoot = target.startsWith(node->path + QLatin1Char('/')) || node->path == QLatin1String("/");
+    if (!isUnderRoot)
         return {};
-    for (int depth = 0; depth < 512; ++depth) {
+    for (int depth = 0; depth < maxTreeDepth && node; ++depth) {
         load(node);
-        Node *next = nullptr;
-        for (const auto &child : node->children) {
-            if (child->path == target || child->chain.contains(target))
-                return indexOf(child.get());
-            if (!child->isDir) {
-                for (const auto &companion : child->children) {
-                    if (companion->path == target)
-                        return indexOf(companion.get());
-                }
-                continue;
-            }
-            if (target.startsWith(child->path + QLatin1Char('/'))) {
-                next = child.get();
-                break;
-            }
-        }
-        if (!next)
-            return {};
-        node = next;
+        const PathStep step = stepToward(*node, target);
+        if (step.found)
+            return indexOf(step.found);
+        node = step.next;
     }
     return {};
+}
+
+ProjectTreeModel::PathStep ProjectTreeModel::stepToward(const Node &node, const QString &target)
+{
+    for (const auto &child : node.children) {
+        if (Node *row = rowShowing(child.get(), target))
+            return {.found = row, .next = nullptr};
+        if (child->isDir && target.startsWith(child->path + QLatin1Char('/')))
+            return {.found = nullptr, .next = child.get()};
+    }
+    return {};
+}
+
+ProjectTreeModel::Node *ProjectTreeModel::rowShowing(Node *row, const QString &target)
+{
+    if (row->path == target || row->chain.contains(target))
+        return row;
+    if (row->isDir)
+        return nullptr;
+    const auto companion =
+        std::ranges::find_if(row->children, [&target](const auto &file) { return file->path == target; });
+    return companion != row->children.end() ? companion->get() : nullptr;
 }
 
 QString ProjectTreeModel::filePath(const QModelIndex &index) const

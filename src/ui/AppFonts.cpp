@@ -1,8 +1,12 @@
 #include "AppFonts.h"
 
+#include <QEvent>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QWidget>
+
+#include <functional>
+#include <utility>
 
 namespace AppFonts {
 namespace {
@@ -25,6 +29,30 @@ QString addFont(const QString &path)
     const int id = QFontDatabase::addApplicationFont(path);
     return id >= 0 ? QFontDatabase::applicationFontFamilies(id).value(0) : QString();
 }
+
+// Calls `apply` each time the application font changes, as long as its
+// parent lives. QGuiApplication sends itself ApplicationFontChange, so the
+// filter watches the application object.
+class ApplicationFontFollower : public QObject {
+public:
+    ApplicationFontFollower(QObject *parent, std::function<void()> apply)
+        : QObject(parent)
+        , apply_(std::move(apply))
+    {
+        qGuiApp->installEventFilter(this);
+    }
+
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        const bool isApplicationFontChange = event->type() == QEvent::ApplicationFontChange && watched == qGuiApp;
+        if (isApplicationFontChange)
+            apply_();
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    std::function<void()> apply_;
+};
 
 } // namespace
 
@@ -68,7 +96,7 @@ void setInterfaceFont(QWidget *widget, qreal scale, QFont::Weight weight, qreal 
         widget->setFont(font);
     };
     apply();
-    QObject::connect(qGuiApp, &QGuiApplication::fontChanged, widget, apply);
+    new ApplicationFontFollower(widget, apply); // owned by `widget`
 }
 
 QFont codeFont(qreal pointSize)

@@ -1,5 +1,6 @@
 #include "Sequence.h"
 
+#include "Lanes.h"
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/families/Families.h"
@@ -14,21 +15,18 @@
 
 namespace diagram::sequence {
 
+using namespace detail;
+
 namespace {
 
 const Font font(14);
-const Font fragmentFont(11);
 constexpr qreal lineHeight = 20;
 constexpr qreal pad = 14;
 constexpr qreal maxWidth = 320;
 
-constexpr qreal messageStep = 44;    // vertical distance between consecutive messages
 constexpr qreal lifelineTail = 28;   // lifeline overshoot below the last message
-constexpr qreal selfLoopWidth = 56;  // horizontal reach of a self-message loop
 constexpr qreal selfLoopHeight = 18; // vertical drop of a self-message loop
 constexpr qreal portAnchorGap = 14;  // the link handle right under the header
-constexpr qreal fragmentHeader = 24; // room a fragment's header reserves
-constexpr qreal branchHeader = 22;   // room a branch separator reserves
 
 QString tr(const char *text)
 {
@@ -46,216 +44,7 @@ const QList<std::pair<QString, QString>> &kindChoices()
     return list;
 }
 
-QList<const MessageLink *> messages(const Board &board)
-{
-    QList<const MessageLink *> result;
-    for (const auto &l : board.links()) {
-        if (const auto *m = dynamic_cast<const MessageLink *>(l.get()))
-            result.append(m);
-    }
-    return result;
-}
-
-// Messages in conversation order (a message without a rank counts as 0, as
-// sidecar's `order ?? 0`).
-QList<const MessageLink *> orderedMessages(const Board &board)
-{
-    QList<const MessageLink *> result = messages(board);
-    std::stable_sort(result.begin(), result.end(), [](const MessageLink *a, const MessageLink *b) {
-        return a->order.value_or(0) < b->order.value_or(0);
-    });
-    return result;
-}
-
-// Participants left to right.
-QList<ParticipantShape *> participants(const Board &board)
-{
-    QList<ParticipantShape *> result;
-    for (const auto &s : board.shapes()) {
-        if (auto *p = dynamic_cast<ParticipantShape *>(s.get()))
-            result.append(p);
-    }
-    std::stable_sort(result.begin(), result.end(),
-                     [](const ParticipantShape *a, const ParticipantShape *b) { return a->x < b->x; });
-    return result;
-}
-
-// Lowest header bottom among participants: where the message lanes start.
-qreal laneTop(const Board &board)
-{
-    qreal top = -std::numeric_limits<qreal>::infinity();
-    for (const auto &s : board.shapes()) {
-        if (dynamic_cast<const ParticipantShape *>(s.get()))
-            top = std::max(top, s->y + s->h);
-    }
-    return std::isinf(top) ? 0 : top;
-}
-
-int maxOrder(const Board &board)
-{
-    int result = -1;
-    for (const MessageLink *m : messages(board)) {
-        if (m->order)
-            result = std::max(result, *m->order);
-    }
-    return result;
-}
-
-bool sameBranch(const Fragment &a, const Fragment &b)
-{
-    return a.branchKeyword == b.branchKeyword && a.branchLabel == b.branchLabel;
-}
-
-// The room the fragments reserve above the message of rank `order`: a header
-// for each fragment opened on the way, a separator for each branch switched.
-qreal structureOffset(const Board &board, int order)
-{
-    QList<const MessageLink *> list;
-    for (const MessageLink *m : orderedMessages(board)) {
-        if (m->order.value_or(0) <= order)
-            list.append(m);
-    }
-    QList<Fragment> active;
-    qreal offset = 0;
-    for (const MessageLink *m : list) {
-        const QList<Fragment> &next = m->fragments;
-        qsizetype common = 0;
-        while (common < active.size() && common < next.size() && active[common].id == next[common].id)
-            ++common;
-        offset += std::max<qsizetype>(0, next.size() - common) * fragmentHeader;
-        for (qsizetype i = 0; i < common; ++i) {
-            if (!sameBranch(active[i], next[i]))
-                offset += branchHeader;
-        }
-        active = next;
-    }
-    return offset;
-}
-
-// A fragment as drawn: its extent in ranks and its branches.
-struct FragmentSpan {
-    Fragment fragment;
-    int startOrder = 0;
-    int endOrder = 0;
-
-    struct Branch {
-        QString signature;
-        int order = 0;
-        QString keyword;
-        QString label;
-    };
-
-    QList<Branch> branches;
-};
-
-QList<FragmentSpan> fragmentSpans(const Board &board)
-{
-    QList<FragmentSpan> found;
-    QHash<QString, qsizetype> index;
-    for (const MessageLink *m : messages(board)) {
-        const int order = m->order.value_or(0);
-        for (const Fragment &fragment : m->fragments) {
-            qsizetype at = index.value(fragment.id, -1);
-            if (at < 0) {
-                at = found.size();
-                index.insert(fragment.id, at);
-                found.append({fragment, order, order, {}});
-            }
-            FragmentSpan &span = found[at];
-            span.startOrder = std::min(span.startOrder, order);
-            span.endOrder = std::max(span.endOrder, order);
-            const QString signature = fragment.branchKeyword + QLatin1Char('\n') + fragment.branchLabel;
-            const bool known = std::any_of(span.branches.cbegin(), span.branches.cend(),
-                                           [&](const FragmentSpan::Branch &b) { return b.signature == signature; });
-            if (!signature.trimmed().isEmpty() && !known)
-                span.branches.append({signature, order, fragment.branchKeyword, fragment.branchLabel});
-        }
-    }
-    std::stable_sort(found.begin(), found.end(), [](const FragmentSpan &a, const FragmentSpan &b) {
-        if (a.fragment.depth != b.fragment.depth)
-            return a.fragment.depth < b.fragment.depth;
-        return a.startOrder < b.startOrder;
-    });
-    return found;
-}
-
-QString joined(const QString &a, const QString &b)
-{
-    QStringList parts;
-    if (!a.isEmpty())
-        parts.append(a);
-    if (!b.isEmpty())
-        parts.append(b);
-    return parts.join(QLatin1Char(' '));
-}
-
 } // namespace
-
-// ---------------------------------------------------------------------------
-// Fragments
-
-QJsonObject Fragment::toJson() const
-{
-    return {{QStringLiteral("id"), id},
-            {QStringLiteral("kind"), kind},
-            {QStringLiteral("label"), label},
-            {QStringLiteral("depth"), depth},
-            {QStringLiteral("branchKeyword"), branchKeyword},
-            {QStringLiteral("branchLabel"), branchLabel}};
-}
-
-Fragment Fragment::fromJson(const QJsonObject &json)
-{
-    Fragment f;
-    f.id = jsonString(json, QStringLiteral("id"));
-    f.kind = jsonString(json, QStringLiteral("kind"));
-    f.label = jsonString(json, QStringLiteral("label"));
-    f.depth = int(jsonNumber(json, QStringLiteral("depth"), 0));
-    f.branchKeyword = jsonString(json, QStringLiteral("branchKeyword"));
-    f.branchLabel = jsonString(json, QStringLiteral("branchLabel"));
-    return f;
-}
-
-qreal messageY(const Board &board, int order)
-{
-    return laneTop(board) + messageStep * (order + 1) + structureOffset(board, order);
-}
-
-int nextMessageOrder(const Board &board)
-{
-    return maxOrder(board) + 1;
-}
-
-QList<Fragment> syncFragments(QStringList &out,
-                              const QList<Fragment> &active,
-                              const QList<Fragment> &next,
-                              const QString &indent,
-                              bool parallelBranches,
-                              const std::function<QString(const QString &)> &encode)
-{
-    const auto text = [&](const QString &value) { return encode ? encode(value) : value; };
-    qsizetype common = 0;
-    while (common < active.size() && common < next.size() && active[common].id == next[common].id)
-        ++common;
-    for (qsizetype i = active.size() - 1; i >= common; --i)
-        out.append(indent + QStringLiteral("end"));
-    for (qsizetype i = common; i < next.size(); ++i) {
-        const Fragment &f = next[i];
-        out.append(indent + f.kind + (f.label.isEmpty() ? QString() : QLatin1Char(' ') + text(f.label)));
-    }
-    for (qsizetype i = 0; i < common; ++i) {
-        const Fragment &before = active[i];
-        const Fragment &after = next[i];
-        if (sameBranch(before, after))
-            continue;
-        const QString keyword = !after.branchKeyword.isEmpty()                           ? after.branchKeyword
-                                : parallelBranches && after.kind == QLatin1String("par") ? QStringLiteral("and")
-                                                                                         : QStringLiteral("else");
-        out.append(indent + keyword +
-                   (after.branchLabel.isEmpty() ? QString() : QLatin1Char(' ') + text(after.branchLabel)));
-    }
-    return next;
-}
 
 // ---------------------------------------------------------------------------
 // ParticipantShape
@@ -391,35 +180,44 @@ void ParticipantShape::draw(QPainter &painter, const Board &board, const ShapeSt
     strokeLine(painter, QPointF(cx(), y + h), QPointF(cx(), std::max(end, y + h + lifelineTail)),
                style.palette.lifeline, 1.5, {5, 5});
     drawActivations(painter, board);
+    if (isActor())
+        drawActor(painter, style, state);
+    else
+        drawHeader(painter, style, state);
+}
 
-    if (isActor()) {
-        const QColor custom = parseColor(customFill);
-        const QColor color = state.selected     ? style.shape.selectedStroke
-                             : custom.isValid() ? custom
-                                                : style.palette.border;
-        QPainterPath figure = ellipse(QPointF(cx(), y + 11), 7, 7);
-        figure.moveTo(cx(), y + 18);
-        figure.lineTo(cx(), y + 38);
-        figure.moveTo(cx() - 13, y + 26);
-        figure.lineTo(cx() + 13, y + 26);
-        figure.moveTo(cx(), y + 38);
-        figure.lineTo(cx() - 11, y + 50);
-        figure.moveTo(cx(), y + 38);
-        figure.lineTo(cx() + 11, y + 50);
-        const qreal width = state.selected ? 2 : shapeBorderWidth;
-        // sidecar's small shadow under the silhouette.
-        stroke(painter, figure.translated(0, 2), style.palette.shadow, width + 1);
-        stroke(painter, figure, strokeColor(color), width);
-        if (state.editing)
-            return;
-        qreal ty = y + 56;
-        for (const QString &line : lines_) {
-            text::draw(painter, font, line, QPointF(cx(), ty), color, Align::Center, Baseline::Top);
-            ty += lineHeight;
-        }
+void ParticipantShape::drawActor(QPainter &painter, const Style &style, const ShapeState &state) const
+{
+    // The silhouette and its text share one color: the selection's, else
+    // the user's fill, else the border's.
+    const QColor custom = parseColor(customFill);
+    QColor color = custom.isValid() ? custom : style.palette.border;
+    if (state.selected)
+        color = style.shape.selectedStroke;
+    QPainterPath figure = ellipse(QPointF(cx(), y + 11), 7, 7);
+    figure.moveTo(cx(), y + 18);
+    figure.lineTo(cx(), y + 38);
+    figure.moveTo(cx() - 13, y + 26);
+    figure.lineTo(cx() + 13, y + 26);
+    figure.moveTo(cx(), y + 38);
+    figure.lineTo(cx() - 11, y + 50);
+    figure.moveTo(cx(), y + 38);
+    figure.lineTo(cx() + 11, y + 50);
+    const qreal width = state.selected ? 2 : shapeBorderWidth;
+    // sidecar's small shadow under the silhouette.
+    stroke(painter, figure.translated(0, 2), style.palette.shadow, width + 1);
+    stroke(painter, figure, strokeColor(color), width);
+    if (state.editing)
         return;
+    qreal ty = y + 56;
+    for (const QString &line : lines_) {
+        text::draw(painter, font, line, QPointF(cx(), ty), color, Align::Center, Baseline::Top);
+        ty += lineHeight;
     }
+}
 
+void ParticipantShape::drawHeader(QPainter &painter, const Style &style, const ShapeState &state) const
+{
     const QColor own = parseColor(fill);
     const QColor nativeFill = !own.isValid() || own == QColor(Qt::white) ? style.tones.cool : own;
     const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
@@ -449,16 +247,16 @@ QList<Property> ParticipantShape::properties() const
     return {{QStringLiteral("kind"), tr("Kind"), Property::Kind::Choice, kindChoices()}};
 }
 
-QVariant ParticipantShape::propertyValue(const QString &id) const
+QVariant ParticipantShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("kind"))
+    if (propertyId == QLatin1String("kind"))
         return kind;
     return {};
 }
 
-void ParticipantShape::setPropertyValue(const QString &id, const QVariant &value)
+void ParticipantShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id != QLatin1String("kind"))
+    if (propertyId != QLatin1String("kind"))
         return;
     kind = value.toString().isEmpty() ? QStringLiteral("participant") : value.toString();
     // An actor's silhouette is taller than a header box.
@@ -569,18 +367,19 @@ void MessageLink::draw(QPainter &painter, const Board &board, bool selected) con
     body.trim = head == QLatin1String("arrow") ? arrowBaseInset(style.arrow) : 0;
     body.trimStart = startHead == QLatin1String("arrow") ? arrowBaseInset(style.arrow) : 0;
     strokeBody(painter, *r, body);
-    drawHead(painter, board, r->b, arrivalAngle(*r), style, head);
+    drawHead(painter, board, style, {head, r->b, arrivalAngle(*r)});
     if (startHead != QLatin1String("none"))
-        drawHead(painter, board, r->a, departureAngle(*r) + M_PI, style, startHead);
+        drawHead(painter, board, style, {startHead, r->a, departureAngle(*r) + M_PI});
 }
 
 void MessageLink::drawHead(QPainter &painter,
                            const Board &board,
-                           QPointF tip,
-                           qreal angle,
                            const LinkStyle &style,
-                           const QString &kind) const
+                           const HeadPlacement &placement) const
 {
+    const QString &kind = placement.kind;
+    const QPointF tip = placement.tip;
+    const qreal angle = placement.angle;
     if (kind == QLatin1String("arrow")) {
         fillArrowHead(painter, tip, angle, style.arrow, style.color);
     } else if (kind == QLatin1String("open")) {
@@ -626,138 +425,29 @@ QList<Property> MessageLink::properties() const
     };
 }
 
-QVariant MessageLink::propertyValue(const QString &id) const
+QVariant MessageLink::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("line"))
+    if (propertyId == QLatin1String("line"))
         return line;
-    if (id == QLatin1String("head"))
+    if (propertyId == QLatin1String("head"))
         return head;
-    if (id == QLatin1String("startHead"))
+    if (propertyId == QLatin1String("startHead"))
         return startHead;
-    if (id == QLatin1String("activation"))
+    if (propertyId == QLatin1String("activation"))
         return activation;
     return {};
 }
 
-void MessageLink::setPropertyValue(const QString &id, const QVariant &value)
+void MessageLink::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("line"))
+    if (propertyId == QLatin1String("line"))
         line = value.toString();
-    else if (id == QLatin1String("head"))
+    else if (propertyId == QLatin1String("head"))
         head = value.toString();
-    else if (id == QLatin1String("startHead"))
+    else if (propertyId == QLatin1String("startHead"))
         startHead = value.toString().isEmpty() ? QStringLiteral("none") : value.toString();
-    else if (id == QLatin1String("activation"))
+    else if (propertyId == QLatin1String("activation"))
         activation = value.toString();
-}
-
-// ---------------------------------------------------------------------------
-// Layout and underlay
-
-// A dedicated layout: a sequence is not a layered graph, Graphviz would
-// scatter it. The participants line up on one row in their current
-// left-to-right order, lifelines spaced so that every message label fits
-// between its two ends, and the lanes are compacted (the gaps left by
-// deletions disappear).
-void arrange(const Board &board)
-{
-    const QList<ParticipantShape *> parts = participants(board);
-    if (parts.isEmpty())
-        return;
-    QHash<QString, int> index;
-    for (int i = 0; i < parts.size(); ++i)
-        index.insert(parts[i]->id, i);
-
-    // Compacted lanes: the relative order is kept, the holes disappear.
-    QList<const MessageLink *> list = messages(board);
-    std::stable_sort(list.begin(), list.end(), [](const MessageLink *a, const MessageLink *b) {
-        constexpr int last = std::numeric_limits<int>::max();
-        return a->order.value_or(last) < b->order.value_or(last);
-    });
-    for (int i = 0; i < list.size(); ++i)
-        list[i]->order = i;
-
-    // Spacing: at least minGap everywhere; each message claims its label's
-    // width between its lifelines (spread over the intervals it crosses),
-    // and a self-message the room of its loop on the right.
-    const Font labelFont(board.style().linkLabel.fontPx);
-    constexpr qreal minGap = 70;
-    QList<qreal> gaps(std::max<qsizetype>(parts.size() - 1, 0), minGap);
-    const auto spanOf = [&](const MessageLink *l) { return std::abs(index.value(l->from, 0) - index.value(l->to, 0)); };
-    QList<const MessageLink *> bySpan = list;
-    std::stable_sort(bySpan.begin(), bySpan.end(),
-                     [&](const MessageLink *a, const MessageLink *b) { return spanOf(a) < spanOf(b); });
-    for (const MessageLink *l : bySpan) {
-        if (!index.contains(l->from) || !index.contains(l->to))
-            continue;
-        const int i = index.value(l->from);
-        const int j = index.value(l->to);
-        const qreal labelWidth =
-            l->label.isEmpty() ? 0 : text::width(labelFont, l->label.section(QLatin1Char('\n'), 0, 0)) + 30;
-        if (i == j) {
-            const qreal need = selfLoopWidth + labelWidth + 20;
-            if (i < gaps.size())
-                gaps[i] = std::max(gaps[i], need);
-            continue;
-        }
-        const int lo = std::min(i, j);
-        const int hi = std::max(i, j);
-        qreal centerDistance = 0;
-        for (int k = lo; k < hi; ++k)
-            centerDistance += parts[k]->w / 2 + gaps[k] + parts[k + 1]->w / 2;
-        if (labelWidth > centerDistance) {
-            const qreal extra = (labelWidth - centerDistance) / (hi - lo);
-            for (int k = lo; k < hi; ++k)
-                gaps[k] += extra;
-        }
-    }
-
-    // One row of headers, aligned at the top.
-    qreal x = 0;
-    for (int i = 0; i < parts.size(); ++i) {
-        parts[i]->x = x;
-        parts[i]->y = 20;
-        x += parts[i]->w + (i < gaps.size() ? gaps[i] : 0);
-    }
-}
-
-void drawFragments(QPainter &painter, const Board &board)
-{
-    const QList<ParticipantShape *> parts = participants(board);
-    if (parts.isEmpty())
-        return;
-    const Style &style = board.style();
-    const qreal left = parts.front()->cx() - 34;
-    const qreal right = parts.back()->cx() + 34;
-    for (const FragmentSpan &span : fragmentSpans(board)) {
-        const qreal inset = span.fragment.depth * 8;
-        const qreal x = left + inset;
-        const qreal width = std::max<qreal>(80, right - left - inset * 2);
-        const qreal top = messageY(board, span.startOrder) - 44;
-        const qreal bottom = messageY(board, span.endOrder) + 22;
-        stroke(painter, roundRect(x, top, width, bottom - top, shapeRadiusSm), style.palette.separator, 1.25);
-
-        const QString heading = joined(span.fragment.kind, span.fragment.label);
-        if (!heading.isEmpty()) {
-            const qreal headingWidth = text::width(fragmentFont, heading) + 16;
-            painter.fillRect(QRectF(x + 1, top + 1, headingWidth, 19), style.palette.labelBg);
-            text::draw(painter, fragmentFont, heading, QPointF(x + 8, top + 10), style.palette.labelInk, Align::Left,
-                       Baseline::Middle);
-        }
-        for (const FragmentSpan::Branch &branch : span.branches) {
-            if (branch.order <= span.startOrder)
-                continue;
-            const qreal y = messageY(board, branch.order) - 31;
-            strokeLine(painter, QPointF(x, y), QPointF(x + width, y), style.palette.separator, 1.25, {5, 4});
-            const QString label = joined(branch.keyword, branch.label);
-            if (!label.isEmpty()) {
-                const qreal labelWidth = text::width(fragmentFont, label) + 12;
-                painter.fillRect(QRectF(x + 8, y - 8, labelWidth, 16), style.palette.labelBg);
-                text::draw(painter, fragmentFont, label, QPointF(x + 14, y), style.palette.labelInk, Align::Left,
-                           Baseline::Middle);
-            }
-        }
-    }
 }
 
 } // namespace diagram::sequence

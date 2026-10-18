@@ -41,8 +41,8 @@ void RecentFiles::markEditedByClaude(const QStringList &paths)
 
 void RecentFiles::remove(const QString &path)
 {
-    const QString cleanPath = QDir::cleanPath(path);
-    const auto under = [&cleanPath](const QString &recent) { return isUnder(recent, cleanPath); };
+    const QString removed = QDir::cleanPath(path);
+    const auto under = [&removed](const QString &recent) { return isUnder(recent, removed); };
     opened_.removeIf(under);
     editedByClaude_.removeIf(under);
 }

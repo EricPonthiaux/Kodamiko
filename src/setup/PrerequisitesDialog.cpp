@@ -108,60 +108,66 @@ void PrerequisitesDialog::rebuild()
                                    "click <b>Check Again</b>. Installations run in a terminal tab, where you can "
                                    "follow them and answer their questions."));
 
-    const QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    for (const Prerequisite &prerequisite : std::as_const(prerequisites_)) {
-        auto *card = new QFrame(rows_);
-        card->setFrameShape(QFrame::StyledPanel);
-        auto *cardLayout = new QVBoxLayout(card);
-        cardLayout->setContentsMargins(12, 10, 12, 10);
-        cardLayout->setSpacing(6);
-
-        auto *icon = new QLabel(card);
-        icon->setPixmap(statusIcon(style(), prerequisite.status).pixmap(statusIconSize, statusIconSize));
-        auto *name = new QLabel(QStringLiteral("<b>%1</b>").arg(prerequisite.name.toHtmlEscaped()), card);
-        auto *status = new QLabel(statusText(prerequisite), card);
-        status->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        status->setEnabled(prerequisite.status != Prerequisite::Status::Ok); // path: secondary text
-        auto *title = new QHBoxLayout;
-        title->setSpacing(8);
-        title->addWidget(icon);
-        title->addWidget(name);
-        title->addWidget(status, 1);
-        cardLayout->addLayout(title);
-
-        auto *purpose = new QLabel(prerequisite.purpose, card);
-        purpose->setWordWrap(true);
-        purpose->setEnabled(false); // secondary text
-        cardLayout->addWidget(purpose);
-
-        if (prerequisite.status != Prerequisite::Status::Ok) {
-            if (!prerequisite.installCommand.isEmpty()) {
-                auto *command = new QLineEdit(prerequisite.installCommand, card);
-                command->setReadOnly(true);
-                command->setFont(mono);
-                command->setCursorPosition(0);
-                auto *copy = new QPushButton(tr("Copy"), card);
-                connect(copy, &QPushButton::clicked, this,
-                        [text = prerequisite.installCommand] { QApplication::clipboard()->setText(text); });
-                auto *install = new QPushButton(
-                    prerequisite.status == Prerequisite::Status::Outdated ? tr("Update") : tr("Install"), card);
-                install->setDefault(true);
-                connect(install, &QPushButton::clicked, this, [this, prerequisite] {
-                    emit installRequested(tr("Install %1").arg(prerequisite.name),
-                                          Prerequisites::installProcess(prerequisite, QDir::homePath()));
-                });
-                auto *commandRow = new QHBoxLayout;
-                commandRow->addWidget(command, 1);
-                commandRow->addWidget(copy);
-                commandRow->addWidget(install);
-                cardLayout->addLayout(commandRow);
-            }
-            auto *guide =
-                new QLabel(tr("<a href=\"%1\">Installation guide</a>").arg(prerequisite.helpUrl.toString()), card);
-            guide->setOpenExternalLinks(true);
-            cardLayout->addWidget(guide);
-        }
-        rowsLayout_->addWidget(card);
-    }
+    for (const Prerequisite &prerequisite : std::as_const(prerequisites_))
+        rowsLayout_->addWidget(createCard(prerequisite));
     adjustSize();
+}
+
+QFrame *PrerequisitesDialog::createCard(const Prerequisite &prerequisite)
+{
+    auto *card = new QFrame(rows_);
+    card->setFrameShape(QFrame::StyledPanel);
+    auto *cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(12, 10, 12, 10);
+    cardLayout->setSpacing(6);
+
+    auto *icon = new QLabel(card);
+    icon->setPixmap(statusIcon(style(), prerequisite.status).pixmap(statusIconSize, statusIconSize));
+    auto *name = new QLabel(QStringLiteral("<b>%1</b>").arg(prerequisite.name.toHtmlEscaped()), card);
+    auto *status = new QLabel(statusText(prerequisite), card);
+    status->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    status->setEnabled(prerequisite.status != Prerequisite::Status::Ok); // path: secondary text
+    auto *title = new QHBoxLayout;
+    title->setSpacing(8);
+    title->addWidget(icon);
+    title->addWidget(name);
+    title->addWidget(status, 1);
+    cardLayout->addLayout(title);
+
+    auto *purpose = new QLabel(prerequisite.purpose, card);
+    purpose->setWordWrap(true);
+    purpose->setEnabled(false); // secondary text
+    cardLayout->addWidget(purpose);
+
+    if (prerequisite.status == Prerequisite::Status::Ok)
+        return card;
+    if (!prerequisite.installCommand.isEmpty())
+        cardLayout->addLayout(createInstallRow(prerequisite, card));
+    auto *guide = new QLabel(tr("<a href=\"%1\">Installation guide</a>").arg(prerequisite.helpUrl.toString()), card);
+    guide->setOpenExternalLinks(true);
+    cardLayout->addWidget(guide);
+    return card;
+}
+
+QHBoxLayout *PrerequisitesDialog::createInstallRow(const Prerequisite &prerequisite, QWidget *card)
+{
+    auto *command = new QLineEdit(prerequisite.installCommand, card);
+    command->setReadOnly(true);
+    command->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    command->setCursorPosition(0);
+    auto *copy = new QPushButton(tr("Copy"), card);
+    connect(copy, &QPushButton::clicked, this,
+            [text = prerequisite.installCommand] { QApplication::clipboard()->setText(text); });
+    auto *install =
+        new QPushButton(prerequisite.status == Prerequisite::Status::Outdated ? tr("Update") : tr("Install"), card);
+    install->setDefault(true);
+    connect(install, &QPushButton::clicked, this, [this, prerequisite] {
+        emit installRequested(tr("Install %1").arg(prerequisite.name),
+                              Prerequisites::installProcess(prerequisite, QDir::homePath()));
+    });
+    auto *commandRow = new QHBoxLayout;
+    commandRow->addWidget(command, 1);
+    commandRow->addWidget(copy);
+    commandRow->addWidget(install);
+    return commandRow;
 }

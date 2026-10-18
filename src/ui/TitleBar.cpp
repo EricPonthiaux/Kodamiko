@@ -235,22 +235,19 @@ void TitleBar::addActionButton(QAction *action, const QString &iconName)
     actions_->addWidget(actionButton(action, iconName));
 }
 
-void TitleBar::setRunConfiguration(const QIcon &icon,
-                                   const QString &name,
-                                   const QString &toolTip,
-                                   QMenu *menu,
-                                   bool running)
+void TitleBar::setRunConfiguration(const RunChip &chip)
 {
-    run_->setVisible(!name.isEmpty());
-    run_->setIcon(icon);
-    run_->setText(name + QStringLiteral("  ▾"));
-    run_->setToolTip(toolTip);
-    run_->setMenu(menu);
-    running_ = running;
+    const bool shown = !chip.name.isEmpty();
+    run_->setVisible(shown);
+    run_->setIcon(chip.icon);
+    run_->setText(chip.name + QStringLiteral("  ▾"));
+    run_->setToolTip(chip.toolTip);
+    run_->setMenu(chip.menu);
+    running_ = chip.running;
     if (runButton_)
-        runButton_->setVisible(!name.isEmpty() && !running);
+        runButton_->setVisible(shown && !chip.running);
     if (stopButton_)
-        stopButton_->setVisible(!name.isEmpty() && running);
+        stopButton_->setVisible(shown && chip.running);
 }
 
 void TitleBar::setRunActions(QAction *run, QAction *stop)

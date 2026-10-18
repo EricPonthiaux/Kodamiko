@@ -4,6 +4,7 @@
 #include "JsonTree.h"
 
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QRegularExpression>
 
@@ -30,7 +31,21 @@ private:
     struct Result;
 
     Result check(const JsonNode &node, const QJsonValue &schema, int depth) const;
+    // False, with the problem added to `result`, when the node is not of a
+    // type, const or enum value the schema allows.
+    static bool checkKind(const JsonNode &node, const QJsonObject &schema, Result &result);
+    void checkContent(const JsonNode &node, const QJsonObject &schema, int depth, Result &result) const;
+    void checkString(const JsonNode &node, const QJsonObject &schema, Result &result) const;
+    static void checkNumber(const JsonNode &node, const QJsonObject &schema, Result &result);
+    void checkArray(const JsonNode &node, const QJsonObject &schema, int depth, Result &result) const;
+    void checkAnyOf(const JsonNode &node, const QJsonArray &branches, int depth, Result &result) const;
     void checkObject(const JsonNode &node, const QJsonObject &schema, int depth, Result &result) const;
+    // Checks a member against properties and patternProperties; false if
+    // neither names it.
+    bool checkKnownMember(const JsonMember &member, const QJsonObject &schema, int depth, Result &result) const;
+    void checkUnknownMember(const JsonMember &member, const QJsonObject &schema, int depth, Result &result) const;
+    // The schema of the child `key`, looked for in `schema` and its branches.
+    QJsonValue childSchema(const QJsonValue &schema, const QString &key, int depth) const;
     QJsonObject resolve(const QJsonValue &schema) const;
     const QRegularExpression &regex(const QString &pattern) const;
 

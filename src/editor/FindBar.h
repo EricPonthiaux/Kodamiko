@@ -6,7 +6,10 @@
 #include <QTimer>
 #include <QWidget>
 
+#include <optional>
+
 class EditorWidget;
+class QKeyEvent;
 class QLabel;
 class QLineEdit;
 class QToolButton;
@@ -29,7 +32,9 @@ public:
     // on one line) and selected.
     void showFind();
     void showReplace();
-    void close();
+    // Hides the bar, its highlights included, and gives the focus back to the
+    // editor.
+    void dismiss();
 
     void findNext();
     void findPrevious();
@@ -55,11 +60,16 @@ public:
         long end;
     };
 
-    // Matches of `query` in the editor, up to `limit`. `flags`: SCFIND_*.
-    // `valid` is set to false for an invalid regular expression.
-    static QList<Match> findAll(EditorWidget *editor, const QString &query, int flags, bool *valid, int limit);
+    struct Query {
+        QString text;
+        int flags = 0; // SCFIND_*
+        int limit = 0; // most matches returned
+    };
 
-protected:
+    // Matches of `query` in the editor; nullopt for an invalid regular
+    // expression.
+    static std::optional<QList<Match>> findAll(EditorWidget *editor, const Query &query);
+
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
@@ -74,6 +84,9 @@ private:
     void updateCount();
     void clearHighlights(EditorWidget *editor);
     QToolButton *addOption(const QString &text, const QString &toolTip);
+    // Keys of the search and replace fields; true if handled.
+    bool handleFieldKey(const QObject *field, const QKeyEvent &key);
+    QToolButton *optionForKey(int key) const;
 
     QPointer<EditorWidget> editor_;
     Theme theme_;

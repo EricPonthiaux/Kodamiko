@@ -1,5 +1,6 @@
 #include "DataModel.h"
 
+#include "References.h"
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/families/Families.h"
@@ -12,6 +13,8 @@
 #include <cmath>
 
 namespace diagram::datamodel {
+
+using namespace detail;
 
 namespace {
 
@@ -67,22 +70,31 @@ QSet<QString> tableIdentifiers(const EntityShape &table)
     return result;
 }
 
-struct Reference {
-    QString table;
-    QString column;
-};
-
-// A comment naming the referenced column: `references customer.id`,
-// `ref customer.id`, `-> customer.id` or just `customer.id`.
-std::optional<Reference> referencedColumn(const QString &comment)
+// How surely a FK column references a table known by `candidates`: its
+// comment names the table, else its name is (or ends with) the table's
+// name followed by `id`.
+int foreignKeyScore(const Field &field, const QSet<QString> &candidates)
 {
-    static const QRegularExpression pattern(
-        QStringLiteral("^(?:(?:references?|ref(?:erences)?)\\s+|->\\s*)?([\\w.-]+)\\.([\\w.-]+)$"),
-        QRegularExpression::CaseInsensitiveOption);
-    const QRegularExpressionMatch m = pattern.match(comment.trimmed());
-    if (!m.hasMatch())
-        return std::nullopt;
-    return Reference{m.captured(1), m.captured(2)};
+    const std::optional<Reference> reference = referencedColumn(field.comment);
+    int score = reference && candidates.contains(normalizedIdentifier(reference->table)) ? 1000 : 0;
+    const QString fieldName = normalizedIdentifier(field.name);
+    for (const QString &candidate : candidates) {
+        if (fieldName == candidate + QLatin1String("id"))
+            score = std::max(score, 500);
+        else if (fieldName.endsWith(candidate + QLatin1String("id")))
+            score = std::max(score, 300);
+    }
+    return score;
+}
+
+// The end of a relation lying on `table`, null if the relation does not touch it.
+const RelationshipLink::End *endOn(const RelationshipLink::ColumnEndpoints &ends, const EntityShape *table)
+{
+    if (ends.fromShape == table)
+        return &ends.from;
+    if (ends.toShape == table)
+        return &ends.to;
+    return nullptr;
 }
 
 // A table, not the server hosting it: outline, header row, then columns;
@@ -102,40 +114,22 @@ void drawTableIcon(QPainter &painter, qreal cx, qreal cy, const QColor &color)
     stroke(painter, grid, color, 1.4);
 }
 
-// Cardinalities as Mermaid writes them on each side of `--`.
-const QList<std::pair<QString, QString>> &fromCardChoices()
-{
-    static const QList<std::pair<QString, QString>> list{
-        {QStringLiteral("||"), tr("Exactly one")},
-        {QStringLiteral("|o"), tr("Zero or one")},
-        {QStringLiteral("}|"), tr("One or more")},
-        {QStringLiteral("}o"), tr("Zero or more")},
-    };
-    return list;
-}
-
-const QList<std::pair<QString, QString>> &toCardChoices()
-{
-    static const QList<std::pair<QString, QString>> list{
-        {QStringLiteral("||"), tr("Exactly one")},
-        {QStringLiteral("o|"), tr("Zero or one")},
-        {QStringLiteral("|{"), tr("One or more")},
-        {QStringLiteral("o{"), tr("Zero or more")},
-    };
-    return list;
-}
-
-// The choices, with the current value kept when the source wrote another
-// spelling.
-QList<std::pair<QString, QString>> withValue(QList<std::pair<QString, QString>> choices, const QString &value)
-{
-    const bool known = std::any_of(choices.begin(), choices.end(), [&](const auto &c) { return c.first == value; });
-    if (!known && !value.isEmpty())
-        choices.prepend({value, value});
-    return choices;
-}
-
 } // namespace
+
+namespace detail {
+
+std::optional<Reference> referencedColumn(const QString &comment)
+{
+    static const QRegularExpression pattern(
+        QStringLiteral("^(?:(?:references?|ref(?:erences)?)\\s+|->\\s*)?([\\w.-]+)\\.([\\w.-]+)$"),
+        QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpressionMatch m = pattern.match(comment.trimmed());
+    if (!m.hasMatch())
+        return std::nullopt;
+    return Reference{m.captured(1), m.captured(2)};
+}
+
+} // namespace detail
 
 // ---------------------------------------------------------------------------
 // Fields
@@ -154,7 +148,10 @@ Field parseDatabaseField(const QString &value)
     static const QRegularExpression spaces(QStringLiteral("\\s+"));
     QStringList tokens = statement.split(spaces, Qt::SkipEmptyParts);
     field.type = tokens.isEmpty() ? QString() : tokens.takeFirst();
-    field.name = !tokens.isEmpty() ? tokens.takeFirst() : !field.type.isEmpty() ? field.type : QStringLiteral("column");
+    if (!tokens.isEmpty())
+        field.name = tokens.takeFirst();
+    else
+        field.name = field.type.isEmpty() ? QStringLiteral("column") : field.type;
     for (const QString &token : tokens) {
         for (const QString &part : token.split(QLatin1Char(','))) {
             const QString key = part.trimmed().toUpper();
@@ -261,15 +258,7 @@ std::optional<EntityShape::ForeignKey> EntityShape::foreignKeyTo(const EntitySha
         if (!field.has("FK"))
             continue;
         ++foreignKeys;
-        const std::optional<Reference> reference = referencedColumn(field.comment);
-        int score = reference && candidates.contains(normalizedIdentifier(reference->table)) ? 1000 : 0;
-        const QString fieldName = normalizedIdentifier(field.name);
-        for (const QString &candidate : candidates) {
-            if (fieldName == candidate + QLatin1String("id"))
-                score = std::max(score, 500);
-            else if (fieldName.endsWith(candidate + QLatin1String("id")))
-                score = std::max(score, 300);
-        }
+        const int score = foreignKeyScore(field, candidates);
         if (!best || score > best->score)
             best = ForeignKey{&field, score};
     }
@@ -319,9 +308,12 @@ QList<Port> EntityShape::connectionPorts(const Board &board) const
         return Shape::connectionPorts(board);
     QList<Port> result;
     for (const Field &field : fields) {
-        const qreal py = columnAnchor(field.name, true)->y();
-        result.append({x, py, field.name});
-        result.append({x + w, py, field.name});
+        // A name without letters or digits cannot be looked up again.
+        const std::optional<QPointF> anchor = columnAnchor(field.name, true);
+        if (!anchor)
+            continue;
+        result.append({x, anchor->y(), field.name});
+        result.append({x + w, anchor->y(), field.name});
     }
     return result;
 }
@@ -335,8 +327,10 @@ std::optional<Port> EntityShape::connectionPortAt(const Board &, QPointF point) 
     const qsizetype index =
         std::clamp<qsizetype>(qsizetype(std::floor((point.y() - top) / rowH)), 0, fields.size() - 1);
     const Field &field = fields[index];
-    const QPointF anchor = *columnAnchor(field.name, point.x() < cx());
-    return Port{anchor.x(), anchor.y(), field.name};
+    const std::optional<QPointF> anchor = columnAnchor(field.name, point.x() < cx());
+    if (!anchor)
+        return std::nullopt;
+    return Port{anchor->x(), anchor->y(), field.name};
 }
 
 QPointF EntityShape::connectionPoint(const Board &board, QPointF from, QPointF pointer) const
@@ -385,9 +379,7 @@ QHash<QString, QSet<bool>> EntityShape::relatedColumns(const Board &board) const
         const std::optional<RelationshipLink::ColumnEndpoints> ends = relation->columnEndpoints(board);
         if (!ends)
             continue;
-        const RelationshipLink::End *end = ends->fromShape == this ? &ends->from
-                                           : ends->toShape == this ? &ends->to
-                                                                   : nullptr;
+        const RelationshipLink::End *end = endOn(*ends, this);
         if (end && !end->column.isEmpty())
             result[end->column].insert(end->left);
     }
@@ -423,8 +415,6 @@ void EntityShape::draw(QPainter &painter, const Board &board, const ShapeState &
 {
     const Style &style = board.style();
     const Palette &palette = style.palette;
-    const QColor bodyInk = textColor(palette.ink);
-    const QColor mutedInk = textColor(palette.inkMuted);
     const QPainterPath outline = roundRect(x, y, w, h, shapeRadiusSm);
     shadowFill(painter, outline, fillColor(palette.fill), style);
     stroke(painter, outline, strokeColor(state.selected ? style.shape.selectedStroke : palette.border),
@@ -434,14 +424,30 @@ void EntityShape::draw(QPainter &painter, const Board &board, const ShapeState &
 
     painter.save();
     painter.setClipPath(outline, Qt::IntersectClip);
+    drawTitleBar(painter, palette);
+    drawColumnHeadings(painter, style);
+    const QList<Field> &fields = databaseFields();
+    if (fields.isEmpty())
+        text::draw(painter, noneFont, tr("No columns"), QPointF(x + pad, y + headerH + columnsH + rowH / 2),
+                   textColor(palette.inkMuted), Align::Left, Baseline::Middle);
+    const QHash<QString, QSet<bool>> related = relatedColumns(board);
+    for (qsizetype index = 0; index < fields.size(); ++index)
+        drawRow(painter, style, index, related.value(fields[index].name));
+    painter.restore();
+}
 
+void EntityShape::drawTitleBar(QPainter &painter, const Palette &palette) const
+{
     painter.fillRect(QRectF(x, y, w, headerH), fillColor(palette.solid));
     const QColor headerInk = textColor(Qt::white);
     drawTableIcon(painter, x + 23, y + headerH / 2, headerInk);
     text::draw(painter, titleFont, text::elided(titleFont, name, w - 58), QPointF(x + 43, y + headerH / 2), headerInk,
                Align::Left, Baseline::Middle);
+}
 
-    const QList<Field> &fields = databaseFields();
+void EntityShape::drawColumnHeadings(QPainter &painter, const Style &style) const
+{
+    const QColor mutedInk = textColor(style.palette.inkMuted);
     const qreal nameX = x + pad;
     const qreal typeX = nameX + nameW_;
     const qreal keysX = typeX + typeW_;
@@ -452,44 +458,49 @@ void EntityShape::draw(QPainter &painter, const Board &board, const ShapeState &
     text::draw(painter, headerFont, tr("TYPE"), QPointF(typeX, headerMiddle), mutedInk, Align::Left, Baseline::Middle);
     text::draw(painter, headerFont, tr("KEYS"), QPointF(keysX, headerMiddle), mutedInk, Align::Left, Baseline::Middle);
     for (const qreal sx : {typeX - 8, keysX - 8})
-        strokeLine(painter, QPointF(sx, y + headerH), QPointF(sx, y + h), palette.separator, 1);
+        strokeLine(painter, QPointF(sx, y + headerH), QPointF(sx, y + h), style.palette.separator, 1);
+}
 
-    if (fields.isEmpty())
-        text::draw(painter, noneFont, tr("No columns"), QPointF(nameX, y + headerH + columnsH + rowH / 2), mutedInk,
-                   Align::Left, Baseline::Middle);
-    const QHash<QString, QSet<bool>> related = relatedColumns(board);
-    for (qsizetype index = 0; index < fields.size(); ++index) {
-        const Field &field = fields[index];
-        const qreal ry = y + headerH + columnsH + index * rowH;
-        const qreal middle = ry + rowH / 2;
-        if (index % 2)
-            painter.fillRect(QRectF(x, ry, w, rowH), withAlpha(style.tones.sage, customFill.isEmpty() ? 0.45 : 0.16));
-        if (related.contains(field.name))
-            painter.fillRect(QRectF(x, ry, w, rowH), withAlpha(palette.selection, 0.08));
-        strokeLine(painter, QPointF(x, ry), QPointF(x + w, ry), palette.separator, 1);
+void EntityShape::drawRow(QPainter &painter, const Style &style, qsizetype index, const QSet<bool> &relatedSides) const
+{
+    const Palette &palette = style.palette;
+    const QColor mutedInk = textColor(palette.inkMuted);
+    const Field &field = databaseFields()[index];
+    const qreal nameX = x + pad;
+    const qreal typeX = nameX + nameW_;
+    const qreal ry = y + headerH + columnsH + index * rowH;
+    const qreal middle = ry + rowH / 2;
+    if (index % 2)
+        painter.fillRect(QRectF(x, ry, w, rowH), withAlpha(style.tones.sage, customFill.isEmpty() ? 0.45 : 0.16));
+    if (!relatedSides.isEmpty())
+        painter.fillRect(QRectF(x, ry, w, rowH), withAlpha(palette.selection, 0.08));
+    strokeLine(painter, QPointF(x, ry), QPointF(x + w, ry), palette.separator, 1);
 
-        text::draw(painter, columnFont, text::elided(columnFont, field.name, nameW_ - 24), QPointF(nameX, middle),
-                   field.has("PK") ? bodyInk : mutedInk, Align::Left, Baseline::Middle);
-        text::draw(painter, typeFont, text::elided(typeFont, field.type, typeW_ - 22), QPointF(typeX, middle), mutedInk,
-                   Align::Left, Baseline::Middle);
-
-        qreal badgeX = keysX;
-        for (const QString &constraint : field.constraints) {
-            const bool foreign = constraint == QLatin1String("FK");
-            const QColor tone = foreign ? palette.line : palette.selection;
-            const QPainterPath badge = roundRect(badgeX, ry + 8, badgeW, 15, 4);
-            painter.fillPath(badge, withAlpha(tone, constraint == QLatin1String("PK") ? 0.18 : 0.1));
-            stroke(painter, badge, tone, 1);
-            text::draw(painter, badgeFont, constraint, QPointF(badgeX + badgeW / 2, middle),
-                       customFill.isEmpty() ? tone : bodyInk, Align::Center, Baseline::Middle);
-            badgeX += badgeW + 4;
-        }
-        for (const bool left : related.value(field.name)) {
-            const QPainterPath dot = ellipse(QPointF(left ? x + 3 : x + w - 3, middle), 3, 3);
-            painter.fillPath(dot, style.link.color);
-        }
+    text::draw(painter, columnFont, text::elided(columnFont, field.name, nameW_ - 24), QPointF(nameX, middle),
+               field.has("PK") ? textColor(palette.ink) : mutedInk, Align::Left, Baseline::Middle);
+    text::draw(painter, typeFont, text::elided(typeFont, field.type, typeW_ - 22), QPointF(typeX, middle), mutedInk,
+               Align::Left, Baseline::Middle);
+    drawKeyBadges(painter, palette, field, QPointF(typeX + typeW_, ry));
+    for (const bool left : relatedSides) {
+        const QPainterPath dot = ellipse(QPointF(left ? x + 3 : x + w - 3, middle), 3, 3);
+        painter.fillPath(dot, style.link.color);
     }
-    painter.restore();
+}
+
+void EntityShape::drawKeyBadges(QPainter &painter, const Palette &palette, const Field &field, QPointF rowTopLeft) const
+{
+    const qreal middle = rowTopLeft.y() + rowH / 2;
+    qreal badgeX = rowTopLeft.x();
+    for (const QString &constraint : field.constraints) {
+        const bool foreign = constraint == QLatin1String("FK");
+        const QColor tone = foreign ? palette.line : palette.selection;
+        const QPainterPath badge = roundRect(badgeX, rowTopLeft.y() + 8, badgeW, 15, 4);
+        painter.fillPath(badge, withAlpha(tone, constraint == QLatin1String("PK") ? 0.18 : 0.1));
+        stroke(painter, badge, tone, 1);
+        text::draw(painter, badgeFont, constraint, QPointF(badgeX + badgeW / 2, middle),
+                   customFill.isEmpty() ? tone : textColor(palette.ink), Align::Center, Baseline::Middle);
+        badgeX += badgeW + 4;
+    }
 }
 
 QList<Property> EntityShape::properties() const
@@ -498,21 +509,21 @@ QList<Property> EntityShape::properties() const
             {QStringLiteral("attributes"), tr("Columns (type name keys \"comment\")"), Property::Kind::Lines, {}}};
 }
 
-QVariant EntityShape::propertyValue(const QString &id) const
+QVariant EntityShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("name"))
+    if (propertyId == QLatin1String("name"))
         return name;
-    if (id == QLatin1String("attributes"))
+    if (propertyId == QLatin1String("attributes"))
         return attributes.join(QLatin1Char('\n'));
     return {};
 }
 
-void EntityShape::setPropertyValue(const QString &id, const QVariant &value)
+void EntityShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("name")) {
+    if (propertyId == QLatin1String("name")) {
         const QString text = value.toString().trimmed();
         name = text.isEmpty() ? QStringLiteral("TABLE") : text;
-    } else if (id == QLatin1String("attributes")) {
+    } else if (propertyId == QLatin1String("attributes")) {
         // Each keystroke sends the whole text again: normalizing it as it
         // comes loses nothing of what is being typed.
         attributes.clear();
@@ -521,201 +532,6 @@ void EntityShape::setPropertyValue(const QString &id, const QVariant &value)
                 attributes.append(databaseFieldText(line));
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// RelationshipLink
-
-RelationshipLink::RelationshipLink()
-    : Link(QStringLiteral("relationship"))
-{
-}
-
-void RelationshipLink::load(const QJsonObject &props)
-{
-    Link::load(props);
-    fromCard = jsonString(props, QStringLiteral("fromCard"), QStringLiteral("||"));
-    toCard = jsonString(props, QStringLiteral("toCard"), QStringLiteral("o{"));
-    fromColumn = jsonString(props, QStringLiteral("fromColumn"), jsonString(props, QStringLiteral("fromPort")));
-    toColumn = jsonString(props, QStringLiteral("toColumn"), jsonString(props, QStringLiteral("toPort")));
-    identifying = jsonBool(props, QStringLiteral("identifying"), true);
-}
-
-QJsonObject RelationshipLink::toJson() const
-{
-    QJsonObject json = Link::toJson();
-    json.insert(QStringLiteral("fromCard"), fromCard);
-    json.insert(QStringLiteral("toCard"), toCard);
-    if (!fromColumn.isEmpty())
-        json.insert(QStringLiteral("fromColumn"), fromColumn);
-    if (!toColumn.isEmpty())
-        json.insert(QStringLiteral("toColumn"), toColumn);
-    if (!identifying)
-        json.insert(QStringLiteral("identifying"), false);
-    return json;
-}
-
-RelationshipLink::Endpoints RelationshipLink::relationshipEndpoints(const EntityShape &fromShape,
-                                                                    const EntityShape &toShape) const
-{
-    const Field *selectedFrom = fromShape.column(fromColumn);
-    const Field *selectedTo = toShape.column(toColumn);
-    const std::optional<EntityShape::ForeignKey> fromForeignKey = fromShape.foreignKeyTo(toShape);
-    const std::optional<EntityShape::ForeignKey> toForeignKey = toShape.foreignKeyTo(fromShape);
-
-    const auto endpoint = [](const EntityShape &owner, const EntityShape &referenced, const Field &foreignKey,
-                             const Field *target) {
-        if (!target) {
-            if (const std::optional<Reference> reference = referencedColumn(foreignKey.comment))
-                target = referenced.column(reference->column);
-        }
-        if (!target)
-            target = referenced.primaryColumn();
-        return Endpoints{&owner, &referenced, foreignKey.name, target ? target->name : QString()};
-    };
-
-    // Columns chosen by hand: their FK decides the direction, the FK being
-    // always the source of the arrow.
-    if (selectedFrom && selectedFrom->has("FK"))
-        return endpoint(fromShape, toShape, *selectedFrom, selectedTo);
-    if (selectedTo && selectedTo->has("FK"))
-        return endpoint(toShape, fromShape, *selectedTo, selectedFrom);
-
-    // An explicit target column goes with the FK found in the other table
-    // (a natural key or a UK, not only `id`).
-    if (selectedFrom && toForeignKey)
-        return endpoint(toShape, fromShape, *toForeignKey->field, selectedFrom);
-    if (selectedTo && fromForeignKey)
-        return endpoint(fromShape, toShape, *fromForeignKey->field, selectedTo);
-
-    const bool useFromForeignKey = fromForeignKey && (!toForeignKey || fromForeignKey->score > toForeignKey->score ||
-                                                      fromCard.contains(QLatin1Char('}')));
-    if (useFromForeignKey)
-        return endpoint(fromShape, toShape, *fromForeignKey->field, nullptr);
-    if (toForeignKey)
-        return endpoint(toShape, fromShape, *toForeignKey->field, nullptr);
-
-    const Field *fromPrimary = selectedFrom ? selectedFrom : fromShape.primaryColumn();
-    const Field *toPrimary = selectedTo ? selectedTo : toShape.primaryColumn();
-    return {&fromShape, &toShape, fromPrimary ? fromPrimary->name : QString(), toPrimary ? toPrimary->name : QString()};
-}
-
-std::optional<RelationshipLink::ColumnEndpoints> RelationshipLink::columnEndpoints(const Board &board) const
-{
-    const auto *fromShape = dynamic_cast<const EntityShape *>(board.shape(from));
-    const auto *toShape = dynamic_cast<const EntityShape *>(board.shape(to));
-    if (!fromShape || !toShape)
-        return std::nullopt;
-    const Endpoints relationship = relationshipEndpoints(*fromShape, *toShape);
-    if (relationship.fromColumn.isEmpty() || relationship.toColumn.isEmpty())
-        return std::nullopt;
-    const bool leftToRight = relationship.toShape->cx() >= relationship.fromShape->cx();
-    const std::optional<QPointF> a = relationship.fromShape->columnAnchor(relationship.fromColumn, !leftToRight);
-    const std::optional<QPointF> b = relationship.toShape->columnAnchor(relationship.toColumn, leftToRight);
-    if (!a || !b)
-        return std::nullopt;
-    return ColumnEndpoints{relationship.fromShape,
-                           relationship.toShape,
-                           {relationship.fromColumn, !leftToRight, *a},
-                           {relationship.toColumn, leftToRight, *b}};
-}
-
-std::optional<std::pair<GraphvizEndpoint, GraphvizEndpoint>> RelationshipLink::graphvizEndpoints(
-    const Board &board,
-    const QString &rankdir) const
-{
-    const auto *fromShape = dynamic_cast<const EntityShape *>(board.shape(from));
-    const auto *toShape = dynamic_cast<const EntityShape *>(board.shape(to));
-    if (!fromShape || !toShape)
-        return std::nullopt;
-    const Endpoints relationship = relationshipEndpoints(*fromShape, *toShape);
-    const QString fromPort = relationship.fromShape->graphvizPortForColumn(relationship.fromColumn);
-    const QString toPort = relationship.toShape->graphvizPortForColumn(relationship.toColumn);
-    if (fromPort.isEmpty() || toPort.isEmpty())
-        return std::nullopt;
-    const bool reverse = rankdir == QLatin1String("RL");
-    return std::pair{
-        GraphvizEndpoint{relationship.fromShape->id, fromPort, reverse ? QStringLiteral("w") : QStringLiteral("e")},
-        GraphvizEndpoint{relationship.toShape->id, toPort, reverse ? QStringLiteral("e") : QStringLiteral("w")}};
-}
-
-std::optional<Route> RelationshipLink::route(const Board &board) const
-{
-    const std::optional<ColumnEndpoints> ends = columnEndpoints(board);
-    if (!ends)
-        return Link::route(board);
-    // Without a stored spline the standard route brings nothing: the data
-    // model draws its own path between the columns. After a Graphviz layout,
-    // its curve is reused as is while it still joins the two columns.
-    if (spline) {
-        const std::optional<Route> layout = Link::route(board);
-        const auto closeTo = [](QPointF p, QPointF q) { return std::hypot(p.x() - q.x(), p.y() - q.y()) <= 2; };
-        if (layout && !layout->curve.empty() && closeTo(layout->a, ends->from.point) &&
-            closeTo(layout->b, ends->to.point))
-            return layout;
-    }
-    const QPointF a = ends->from.point;
-    const QPointF b = ends->to.point;
-    const qreal middleX = (a.x() + b.x()) / 2;
-    Route r;
-    r.a = a;
-    r.b = b;
-    // Orthogonal: two rows at different heights stay readable.
-    if (std::abs(a.y() - b.y()) < 0.5)
-        r.points = {a, b};
-    else
-        r.points = {a, QPointF(middleX, a.y()), QPointF(middleX, b.y()), b};
-    r.labelPoint = polylineMidpoint(r.points);
-    return r;
-}
-
-void RelationshipLink::draw(QPainter &painter, const Board &board, bool selected) const
-{
-    // A standard triangular head on the referenced column, as sidecar draws
-    // it (the crow's feet were dropped there: the PK/FK badges and the
-    // joined rows carry the meaning). Non-identifying relations are dashed,
-    // as Mermaid draws them.
-    const std::optional<Route> r = route(board);
-    if (!r)
-        return;
-    const LinkStyle style = drawStyle(board, selected);
-    QList<qreal> dash;
-    if (!identifying)
-        dash = {6, 4};
-    strokeBody(painter, *r, {style.color, style.width, dash, arrowBaseInset(style.arrow), 0});
-    fillArrowHead(painter, r->b, arrivalAngle(*r), style.arrow, style.color);
-}
-
-QList<Property> RelationshipLink::properties() const
-{
-    return {
-        {QStringLiteral("fromCard"), tr("Cardinality at the start"), Property::Kind::Choice,
-         withValue(fromCardChoices(), fromCard)},
-        {QStringLiteral("toCard"), tr("Cardinality at the end"), Property::Kind::Choice,
-         withValue(toCardChoices(), toCard)},
-        {QStringLiteral("identifying"), tr("Identifying"), Property::Kind::Bool, {}},
-    };
-}
-
-QVariant RelationshipLink::propertyValue(const QString &id) const
-{
-    if (id == QLatin1String("fromCard"))
-        return fromCard;
-    if (id == QLatin1String("toCard"))
-        return toCard;
-    if (id == QLatin1String("identifying"))
-        return identifying;
-    return {};
-}
-
-void RelationshipLink::setPropertyValue(const QString &id, const QVariant &value)
-{
-    if (id == QLatin1String("fromCard"))
-        fromCard = value.toString();
-    else if (id == QLatin1String("toCard"))
-        toCard = value.toString();
-    else if (id == QLatin1String("identifying"))
-        identifying = value.toBool();
 }
 
 } // namespace diagram::datamodel

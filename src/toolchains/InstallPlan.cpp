@@ -24,7 +24,7 @@ QString runtimeVersionFor(const QString &tool, int minimum)
     const ToolSpec *spec = ToolCatalog::find(tool);
     if (!spec)
         return {};
-    const QString preferred = ToolCatalog::defaultRuntimeVersion(spec->family);
+    QString preferred = ToolCatalog::defaultRuntimeVersion(spec->family);
     if (preferred.toInt() >= minimum)
         return preferred;
     for (const auto &version : std::views::reverse(spec->versions)) {
@@ -39,54 +39,85 @@ bool isSystem(const QString &version)
     return version.isEmpty() || version == QLatin1String(ProjectLanguages::systemVersion);
 }
 
+// The steps of a plan, each tool and version once.
+class PlannedSteps {
+public:
+    void add(const QString &tool, const QString &version, const QString &reason)
+    {
+        const bool isPlanned = std::ranges::any_of(
+            steps_, [&](const InstallStep &step) { return step.tool == tool && step.version == version; });
+        if (!isPlanned)
+            steps_.append({tool, version, titleOf(tool, version), reason});
+    }
+
+    bool hasAtLeast(const QString &tool, int minimum) const
+    {
+        return std::ranges::any_of(
+            steps_, [&](const InstallStep &step) { return step.tool == tool && step.version.toInt() >= minimum; });
+    }
+
+    // The runtimes first: the servers need them to install and run.
+    QList<InstallStep> runtimesFirst() const
+    {
+        QList<InstallStep> steps = steps_;
+        std::stable_partition(steps.begin(), steps.end(), [](const InstallStep &step) {
+            const ToolSpec *spec = ToolCatalog::find(step.tool);
+            return spec && spec->isRuntime;
+        });
+        return steps;
+    }
+
+private:
+    QList<InstallStep> steps_;
+};
+
+// What the server runs on: always for jdtls (Duet starts it with Java), for
+// Duet's own npm installs otherwise.
+void planServerRuntime(const ToolSpec &server,
+                       const LanguageSetup &setup,
+                       const Toolchains &toolchains,
+                       PlannedSteps &steps)
+{
+    if (server.runtime.isEmpty())
+        return;
+    const bool needsRuntime = !isSystem(setup.serverVersion) || server.runtime == QLatin1String("jdk");
+    if (!needsRuntime)
+        return;
+    const bool hasRuntime = toolchains.runtimeAtLeast(server.runtime, server.minimumRuntime) ||
+                            steps.hasAtLeast(server.runtime, server.minimumRuntime);
+    if (!hasRuntime)
+        steps.add(server.runtime, runtimeVersionFor(server.runtime, server.minimumRuntime),
+                  QObject::tr("runs %1").arg(server.id));
+}
+
+void planLanguage(const LanguageSetup &setup, const Toolchains &toolchains, PlannedSteps &steps)
+{
+    const QString family = ProjectLanguages::title(setup.language);
+    const QString runtime = ToolCatalog::runtimeOf(setup.language);
+    if (!runtime.isEmpty() && !setup.runtimeVersion.isEmpty() && !toolchains.runtimeFor(setup))
+        steps.add(runtime, setup.runtimeVersion, QObject::tr("%1 runtime").arg(family));
+
+    const ToolSpec *server = ToolCatalog::find(setup.server);
+    if (!server)
+        return;
+    const bool system = isSystem(setup.serverVersion);
+    planServerRuntime(*server, setup, toolchains, steps);
+    if (!system && !toolchains.isInstalled(server->id, setup.serverVersion))
+        steps.add(server->id, setup.serverVersion, QObject::tr("%1 language server").arg(family));
+}
+
 } // namespace
 
 namespace InstallPlan {
 
 QList<InstallStep> plan(const ProjectConfig &config, const Toolchains &toolchains)
 {
-    QList<InstallStep> steps;
-    const auto add = [&steps](const QString &tool, const QString &version, const QString &reason) {
-        for (const InstallStep &step : std::as_const(steps)) {
-            if (step.tool == tool && step.version == version)
-                return;
-        }
-        steps.append({tool, version, titleOf(tool, version), reason});
-    };
-    const auto planned = [&steps](const QString &tool, int minimum) {
-        return std::any_of(steps.cbegin(), steps.cend(), [&](const InstallStep &step) {
-            return step.tool == tool && step.version.toInt() >= minimum;
-        });
-    };
-
+    PlannedSteps steps;
     for (const LanguageSetup &setup : config.languages) {
-        if (!setup.enabled)
-            continue;
-        const QString family = ProjectLanguages::title(setup.language);
-        const QString runtime = ToolCatalog::runtimeOf(setup.language);
-        if (!runtime.isEmpty() && !setup.runtimeVersion.isEmpty() && !toolchains.runtimeFor(setup))
-            add(runtime, setup.runtimeVersion, QObject::tr("%1 runtime").arg(family));
-
-        const ToolSpec *server = ToolCatalog::find(setup.server);
-        if (!server)
-            continue;
-        const bool system = isSystem(setup.serverVersion);
-        // What it runs on: always for jdtls (Duet starts it with Java),
-        // for Duet's own npm installs otherwise.
-        if (!server->runtime.isEmpty() && (!system || server->runtime == QLatin1String("jdk")) &&
-            !toolchains.runtimeAtLeast(server->runtime, server->minimumRuntime) &&
-            !planned(server->runtime, server->minimumRuntime))
-            add(server->runtime, runtimeVersionFor(server->runtime, server->minimumRuntime),
-                QObject::tr("runs %1").arg(server->id));
-        if (!system && !toolchains.isInstalled(server->id, setup.serverVersion))
-            add(server->id, setup.serverVersion, QObject::tr("%1 language server").arg(family));
+        if (setup.enabled)
+            planLanguage(setup, toolchains, steps);
     }
-    // The runtimes first: the servers need them to install and run.
-    std::stable_partition(steps.begin(), steps.end(), [](const InstallStep &step) {
-        const ToolSpec *spec = ToolCatalog::find(step.tool);
-        return spec && spec->isRuntime;
-    });
-    return steps;
+    return steps.runtimesFirst();
 }
 
 QStringList unavailable(const ProjectConfig &config, const Toolchains &toolchains)

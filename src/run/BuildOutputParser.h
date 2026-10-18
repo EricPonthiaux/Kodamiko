@@ -28,12 +28,32 @@ public:
     static QString cleanLine(const QString &line);
 
 private:
+    // A problem as the output names it: 1-based, its path not resolved yet.
+    struct Found {
+        QString path;
+        int line = 0;
+        int column = 0;
+        Diagnostic::Severity severity = Diagnostic::Severity::Error;
+        QString message;
+    };
+
     void parseLine(const QString &line);
+    // Each reads a line in its tool's format; false when it is not.
+    bool parseMaven(const QString &line);
+    bool parseKotlin(const QString &line);
+    bool startRust(const QString &line);
+    bool startCMake(const QString &line);
+    bool startPython(const QString &line);
+    bool parseEslint(const QString &line);
+    void parseCompiler(const QString &line);
     // Problems that span lines: Rust's header waits for its location,
     // CMake's location for its message, Python's frames for the exception.
     bool continuePending(const QString &line);
+    bool continueRust(const QString &line);
+    bool continueCMake(const QString &line);
+    bool continuePython(const QString &line);
     void flushPending();
-    void add(const QString &path, int line, int column, Diagnostic::Severity severity, const QString &message);
+    void add(const Found &found);
     QString resolve(QString path) const;
 
     QString workingDirectory_;

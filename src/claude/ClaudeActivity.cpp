@@ -1,5 +1,18 @@
 #include "ClaudeActivity.h"
 
+namespace {
+
+QString failureDetail(const HookEvent &event)
+{
+    if (!event.failed)
+        return {};
+    if (event.message.isEmpty())
+        return ClaudeActivity::tr("Claude stopped on an error");
+    return ClaudeActivity::tr("Claude stopped on an error: %1").arg(event.message);
+}
+
+} // namespace
+
 ClaudeActivity::ClaudeActivity(QObject *parent)
     : QObject(parent)
 {
@@ -34,33 +47,39 @@ void ClaudeActivity::handle(const HookEvent &event)
             setState(State::Working);
         break;
     case HookEvent::Kind::PermissionRequested:
-    case HookEvent::Kind::NeedsAttention: {
-        const QString detail = event.kind == HookEvent::Kind::PermissionRequested
-                                   ? tr("Waiting for permission: %1").arg(event.message)
-                                   : event.message;
-        const bool alreadyWaiting = state_ == State::NeedsInput;
-        setState(State::NeedsInput, detail);
-        // The Notification that follows a PermissionRequest says the same thing.
-        if (!watched_ && !alreadyWaiting)
-            emit attentionRequested(tr("Claude needs your input"), detail);
+    case HookEvent::Kind::NeedsAttention:
+        waitForInput(event);
         break;
-    }
-    case HookEvent::Kind::ResponseFinished: {
-        const QString detail = !event.failed             ? QString()
-                               : event.message.isEmpty() ? tr("Claude stopped on an error")
-                                                         : tr("Claude stopped on an error: %1").arg(event.message);
-        if (watched_) {
-            setState(State::Idle);
-            break;
-        }
-        setState(State::Done, detail);
-        emit attentionRequested(event.failed ? tr("Claude stopped") : tr("Claude has finished"),
-                                detail.isEmpty() ? tr("The response is ready.") : detail);
+    case HookEvent::Kind::ResponseFinished:
+        finishResponse(event);
         break;
-    }
     case HookEvent::Kind::StatusUpdated:
         break;
     }
+}
+
+void ClaudeActivity::waitForInput(const HookEvent &event)
+{
+    const QString detail = event.kind == HookEvent::Kind::PermissionRequested
+                               ? tr("Waiting for permission: %1").arg(event.message)
+                               : event.message;
+    const bool alreadyWaiting = state_ == State::NeedsInput;
+    setState(State::NeedsInput, detail);
+    // The Notification that follows a PermissionRequest says the same thing.
+    if (!watched_ && !alreadyWaiting)
+        emit attentionRequested(tr("Claude needs your input"), detail);
+}
+
+void ClaudeActivity::finishResponse(const HookEvent &event)
+{
+    if (watched_) {
+        setState(State::Idle);
+        return;
+    }
+    const QString detail = failureDetail(event);
+    setState(State::Done, detail);
+    emit attentionRequested(event.failed ? tr("Claude stopped") : tr("Claude has finished"),
+                            detail.isEmpty() ? tr("The response is ready.") : detail);
 }
 
 void ClaudeActivity::interrupt()

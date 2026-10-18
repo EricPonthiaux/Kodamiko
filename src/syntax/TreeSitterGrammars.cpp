@@ -84,7 +84,7 @@ const TreeSitterGrammar *forLanguage(const QString &languageId)
 {
     static std::map<QString, LoadedGrammar> loaded;
 
-    if (auto it = loaded.find(languageId); it != loaded.end())
+    if (const auto it = loaded.find(languageId); it != loaded.end())
         return it->second.grammar.get();
 
     const auto definition = definitions().find(languageId);

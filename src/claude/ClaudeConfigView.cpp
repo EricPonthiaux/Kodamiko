@@ -23,6 +23,8 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <array>
+
 using ClaudeConfig::Category;
 using ClaudeConfig::Entry;
 using ClaudeConfig::Scope;
@@ -31,14 +33,21 @@ namespace {
 
 constexpr int refreshDelayMs = 400;
 
-enum ItemRole {
-    EntryRole = Qt::UserRole,
-    CategoryRole,
-    EffectiveRole
-};
+// Item data roles of the tree.
+constexpr int entryRole = Qt::UserRole;
+constexpr int categoryRole = Qt::UserRole + 1;
+constexpr int effectiveRole = Qt::UserRole + 2;
 
-constexpr Category allCategories[] = {Category::Memory,   Category::Rules,        Category::Skills,   Category::Agents,
-                                      Category::Commands, Category::OutputStyles, Category::Settings, Category::Mcp};
+// The key populate() keeps the "Effective Settings" item current with.
+const QString effectiveKey = QStringLiteral("#effective");
+
+constexpr std::array allCategories{Category::Memory,   Category::Rules,        Category::Skills,   Category::Agents,
+                                   Category::Commands, Category::OutputStyles, Category::Settings, Category::Mcp};
+
+bool isEffectiveItem(const QTreeWidgetItem *item)
+{
+    return item && item->data(0, effectiveRole).toBool();
+}
 
 // "skill", "agent"... for the New menus and popups.
 QString itemNoun(Category category)
@@ -55,6 +64,14 @@ QString itemNoun(Category category)
     default:
         return {};
     }
+}
+
+// A folder is removed with its content; a link, never followed.
+bool removePermanently(const QFileInfo &info)
+{
+    if (info.isDir() && !info.isSymLink())
+        return QDir(info.filePath()).removeRecursively();
+    return QFile::remove(info.filePath());
 }
 
 bool createFile(const QString &path, const QByteArray &content, QString *error)
@@ -145,9 +162,9 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     connect(deleteAction, &QAction::triggered, this, [this] { confirmDelete(tree_->currentItem()); });
     tree_->addAction(deleteAction);
     connect(tree_, &QTreeWidget::itemCollapsed, this,
-            [this](QTreeWidgetItem *item) { collapsed_.insert(item->data(0, CategoryRole).toInt()); });
+            [this](QTreeWidgetItem *item) { collapsed_.insert(item->data(0, categoryRole).toInt()); });
     connect(tree_, &QTreeWidget::itemExpanded, this,
-            [this](QTreeWidgetItem *item) { collapsed_.remove(item->data(0, CategoryRole).toInt()); });
+            [this](QTreeWidgetItem *item) { collapsed_.remove(item->data(0, categoryRole).toInt()); });
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -217,101 +234,123 @@ const Entry *ClaudeConfigView::entryOf(const QTreeWidgetItem *item) const
 {
     if (!item)
         return nullptr;
-    const QVariant index = item->data(0, EntryRole);
+    const QVariant index = item->data(0, entryRole);
     return index.isValid() && index.toInt() < entries_.size() ? &entries_[index.toInt()] : nullptr;
 }
 
 void ClaudeConfigView::populate()
 {
-    QString current = entryOf(tree_->currentItem()) ? entryOf(tree_->currentItem())->path : QString();
-    if (tree_->currentItem() && tree_->currentItem()->data(0, EffectiveRole).toBool())
-        current = QStringLiteral("#effective");
+    const QTreeWidgetItem *previous = tree_->currentItem();
+    QString current = entryOf(previous) ? entryOf(previous)->path : QString();
+    if (isEffectiveItem(previous))
+        current = effectiveKey;
     const int scroll = tree_->verticalScrollBar()->value();
     const QSignalBlocker blocker(tree_);
     tree_->clear();
 
-    const QPalette palette = tree_->palette();
+    const QHash<int, QTreeWidgetItem *> categories = addCategoryItems();
+    QTreeWidgetItem *currentItem = nullptr;
+    if (!folder_.isEmpty()) {
+        QTreeWidgetItem *effective = addEffectiveItem(categories.value(static_cast<int>(Category::Settings)));
+        if (current == effectiveKey)
+            currentItem = effective;
+    }
+    for (qsizetype i = 0; i < entries_.size(); ++i) {
+        QTreeWidgetItem *item = addEntryItem(i, categories.value(static_cast<int>(entries_[i].category)));
+        if (entries_[i].path == current)
+            currentItem = item;
+    }
+    for (QTreeWidgetItem *item : categories)
+        summarizeCategory(item);
+    if (currentItem)
+        tree_->setCurrentItem(currentItem);
+    tree_->verticalScrollBar()->setValue(scroll);
+}
+
+void ClaudeConfigView::setRightText(QTreeWidgetItem *item, const QString &text) const
+{
     // Room after the scope and the counts, away from the edge.
-    const auto setRightText = [this](QTreeWidgetItem *item, const QString &text) {
-        item->setText(1, text);
-        item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
-        item->setSizeHint(1, QSize(tree_->fontMetrics().horizontalAdvance(text) + 18, 0));
-    };
-    const QColor muted = palette.color(QPalette::PlaceholderText);
-    const QColor missing = palette.color(QPalette::Disabled, QPalette::Text);
+    item->setText(1, text);
+    item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+    item->setSizeHint(1, QSize(tree_->fontMetrics().horizontalAdvance(text) + 18, 0));
+}
+
+QHash<int, QTreeWidgetItem *> ClaudeConfigView::addCategoryItems()
+{
+    const QColor muted = tree_->palette().color(QPalette::PlaceholderText);
     QHash<int, QTreeWidgetItem *> categories;
     for (Category category : allCategories) {
         auto *item = new QTreeWidgetItem(tree_);
         item->setText(0, ClaudeConfig::categoryTitle(category));
-        item->setData(0, CategoryRole, static_cast<int>(category));
+        item->setData(0, categoryRole, static_cast<int>(category));
         QFont font = item->font(0);
         font.setBold(true);
         item->setFont(0, font);
         item->setForeground(1, muted);
         categories.insert(static_cast<int>(category), item);
     }
+    return categories;
+}
 
-    QTreeWidgetItem *currentItem = nullptr;
-    if (!folder_.isEmpty()) {
-        auto *effective = new QTreeWidgetItem(categories.value(static_cast<int>(Category::Settings)));
-        effective->setData(0, EffectiveRole, true);
-        effective->setText(0, tr("Effective Settings"));
-        effective->setIcon(0, FileIcons::file(QStringLiteral("settings.json"), darkIcons_));
-        setRightText(effective, tr("Merged"));
-        effective->setForeground(1, muted);
-        effective->setToolTip(0, tr("The settings Claude applies, merged from every file, each value with its origin"));
-        if (current == QLatin1String("#effective"))
-            currentItem = effective;
-    }
-    for (qsizetype i = 0; i < entries_.size(); ++i) {
-        const Entry &entry = entries_[i];
-        auto *item = new QTreeWidgetItem(categories.value(static_cast<int>(entry.category)));
-        item->setData(0, EntryRole, int(i));
-        item->setText(0, entry.name);
-        setRightText(item, ClaudeConfig::scopeTitle(entry.scope));
-        item->setForeground(1, muted);
-        const QIcon icon = FileIcons::file(QFileInfo(entry.path).fileName(), darkIcons_);
-        item->setIcon(0, touched_.contains(entry.path) ? FileIcons::withClaudeDot(icon) : icon);
+QTreeWidgetItem *ClaudeConfigView::addEffectiveItem(QTreeWidgetItem *settings)
+{
+    auto *effective = new QTreeWidgetItem(settings);
+    effective->setData(0, effectiveRole, true);
+    effective->setText(0, tr("Effective Settings"));
+    effective->setIcon(0, FileIcons::file(QStringLiteral("settings.json"), darkIcons_));
+    setRightText(effective, tr("Merged"));
+    effective->setForeground(1, tree_->palette().color(QPalette::PlaceholderText));
+    effective->setToolTip(0, tr("The settings Claude applies, merged from every file, each value with its origin"));
+    return effective;
+}
 
-        QStringList tip{QDir::toNativeSeparators(entry.path), ClaudeConfig::scopeDescription(entry.scope)};
-        if (!entry.description.isEmpty())
-            tip.append(entry.description);
-        if (!entry.exists) {
-            QFont font = item->font(0);
-            font.setItalic(true);
-            item->setFont(0, font);
-            item->setForeground(0, missing);
-            tip.append(tr("Not created yet: double-click to create it"));
-        } else if (entry.readOnly) {
-            tip.append(tr("Read-only"));
-        }
-        item->setToolTip(0, tip.join(QLatin1Char('\n')));
-        item->setToolTip(1, ClaudeConfig::scopeDescription(entry.scope));
-        if (entry.path == current)
-            currentItem = item;
-    }
+QTreeWidgetItem *ClaudeConfigView::addEntryItem(qsizetype index, QTreeWidgetItem *category)
+{
+    const Entry &entry = entries_[index];
+    const QPalette palette = tree_->palette();
+    auto *item = new QTreeWidgetItem(category);
+    item->setData(0, entryRole, int(index));
+    item->setText(0, entry.name);
+    setRightText(item, ClaudeConfig::scopeTitle(entry.scope));
+    item->setForeground(1, palette.color(QPalette::PlaceholderText));
+    const QIcon icon = FileIcons::file(QFileInfo(entry.path).fileName(), darkIcons_);
+    item->setIcon(0, touched_.contains(entry.path) ? FileIcons::withClaudeDot(icon) : icon);
 
-    for (QTreeWidgetItem *item : std::as_const(categories)) {
-        const int count = item->childCount();
-        int created = 0;
-        for (int i = 0; i < count; ++i) {
-            const Entry *entry = entryOf(item->child(i));
-            created += entry && entry->exists ? 1 : 0;
-        }
-        if (created > 0)
-            setRightText(item, QString::number(created));
-        if (count == 0)
-            item->setForeground(0, missing);
-        item->setExpanded(!collapsed_.contains(item->data(0, CategoryRole).toInt()));
+    QStringList tip{QDir::toNativeSeparators(entry.path), ClaudeConfig::scopeDescription(entry.scope)};
+    if (!entry.description.isEmpty())
+        tip.append(entry.description);
+    if (!entry.exists) {
+        QFont font = item->font(0);
+        font.setItalic(true);
+        item->setFont(0, font);
+        item->setForeground(0, palette.color(QPalette::Disabled, QPalette::Text));
+        tip.append(tr("Not created yet: double-click to create it"));
+    } else if (entry.readOnly) {
+        tip.append(tr("Read-only"));
     }
-    if (currentItem)
-        tree_->setCurrentItem(currentItem);
-    tree_->verticalScrollBar()->setValue(scroll);
+    item->setToolTip(0, tip.join(QLatin1Char('\n')));
+    item->setToolTip(1, ClaudeConfig::scopeDescription(entry.scope));
+    return item;
+}
+
+void ClaudeConfigView::summarizeCategory(QTreeWidgetItem *item)
+{
+    const int count = item->childCount();
+    int created = 0;
+    for (int i = 0; i < count; ++i) {
+        const Entry *entry = entryOf(item->child(i));
+        created += entry && entry->exists ? 1 : 0;
+    }
+    if (created > 0)
+        setRightText(item, QString::number(created));
+    if (count == 0)
+        item->setForeground(0, tree_->palette().color(QPalette::Disabled, QPalette::Text));
+    item->setExpanded(!collapsed_.contains(item->data(0, categoryRole).toInt()));
 }
 
 void ClaudeConfigView::activate(QTreeWidgetItem *item)
 {
-    if (item && item->data(0, EffectiveRole).toBool()) {
+    if (isEffectiveItem(item)) {
         emit effectiveSettingsRequested();
         return;
     }
@@ -363,9 +402,7 @@ QString ClaudeConfigView::removeTarget(const QString &target, bool permanently)
     const QFileInfo info(target);
     if (!info.exists() && !info.isSymLink())
         return tr("“%1” no longer exists").arg(info.fileName());
-    const bool removed = !permanently                        ? QFile::moveToTrash(target)
-                         : info.isDir() && !info.isSymLink() ? QDir(target).removeRecursively()
-                                                             : QFile::remove(target);
+    const bool removed = permanently ? removePermanently(info) : QFile::moveToTrash(target);
     if (!removed)
         return permanently ? tr("Cannot delete “%1”").arg(info.fileName())
                            : tr("“%1” cannot be moved to the trash").arg(info.fileName());
@@ -387,20 +424,20 @@ void ClaudeConfigView::confirmDelete(QTreeWidgetItem *item)
     if (hasUnsavedChanges_ && hasUnsavedChanges_(target))
         message += QLatin1Char(' ') + tr("Unsaved changes in the editor will be lost.");
     auto *popup = new ConfirmPopup(
-        isFolder ? tr("Delete Skill") : tr("Delete File"),
-        QDir::toNativeSeparators(QFileInfo(target).absolutePath() + QLatin1Char('/')), message, tr("Delete"),
-        [this, target, permanently = false](ConfirmPopup *popup) mutable {
+        {isFolder ? tr("Delete Skill") : tr("Delete File"),
+         QDir::toNativeSeparators(QFileInfo(target).absolutePath() + QLatin1Char('/')), message, tr("Delete")},
+        [this, target, permanently = false](ConfirmPopup *confirm) mutable {
             const QString error = removeTarget(target, permanently);
             if (error.isEmpty())
                 return true;
             if (permanently) {
-                popup->showError(error);
+                confirm->showError(error);
                 return false;
             }
             permanently = true;
-            popup->setMessage(tr("“%1” cannot be moved to the trash. Delete it permanently? This cannot be undone.")
-                                  .arg(QFileInfo(target).fileName()),
-                              tr("Delete Permanently"));
+            confirm->setMessage(tr("“%1” cannot be moved to the trash. Delete it permanently? This cannot be undone.")
+                                    .arg(QFileInfo(target).fileName()),
+                                tr("Delete Permanently"));
             return false;
         },
         this);
@@ -434,13 +471,13 @@ void ClaudeConfigView::showContextMenu(const QPoint &position)
         return;
     QMenu menu;
     const Entry *entry = entryOf(item);
-    if (item->data(0, EffectiveRole).toBool()) {
+    if (item->data(0, effectiveRole).toBool()) {
         menu.addAction(tr("&Open"), this, &ClaudeConfigView::effectiveSettingsRequested);
         menu.exec(tree_->viewport()->mapToGlobal(position));
         return;
     }
     if (!entry) {
-        const auto category = static_cast<Category>(item->data(0, CategoryRole).toInt());
+        const auto category = static_cast<Category>(item->data(0, categoryRole).toInt());
         if (!ClaudeConfig::canCreate(category))
             return;
         addNewActions(menu.addMenu(tr("New %1").arg(itemNoun(category))), category);

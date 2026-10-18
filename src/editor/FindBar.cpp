@@ -64,7 +64,7 @@ FindBar::FindBar(QWidget *parent)
     QToolButton *next = addButton(QStringLiteral("↓"), tr("Next Occurrence (F3)"));
     connect(next, &QToolButton::clicked, this, &FindBar::findNext);
     QToolButton *closeButton = addButton(QStringLiteral("✕"), tr("Close (Escape)"));
-    connect(closeButton, &QToolButton::clicked, this, &FindBar::close);
+    connect(closeButton, &QToolButton::clicked, this, &FindBar::dismiss);
 
     auto *findRow = new QHBoxLayout;
     findRow->setSpacing(4);
@@ -169,7 +169,7 @@ void FindBar::open(bool withReplace)
     refresh();
 }
 
-void FindBar::close()
+void FindBar::dismiss()
 {
     refreshTimer_.stop();
     hide();
@@ -203,18 +203,17 @@ int FindBar::searchFlags() const
     return flags;
 }
 
-QList<FindBar::Match> FindBar::findAll(EditorWidget *editor, const QString &query, int flags, bool *valid, int limit)
+std::optional<QList<FindBar::Match>> FindBar::findAll(EditorWidget *editor, const Query &query)
 {
-    *valid = true;
     QList<Match> matches;
-    if (!editor || query.isEmpty())
+    if (!editor || query.text.isEmpty())
         return matches;
-    const QByteArray pattern = query.toUtf8();
+    const QByteArray pattern = query.text.toUtf8();
     const long length = editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
-    editor->SendScintilla(QsciScintillaBase::SCI_SETSEARCHFLAGS, flags);
+    editor->SendScintilla(QsciScintillaBase::SCI_SETSEARCHFLAGS, query.flags);
     editor->SendScintilla(QsciScintillaBase::SCI_SETSTATUS, 0);
     long position = 0;
-    while (position <= length && matches.size() < limit) {
+    while (position <= length && matches.size() < query.limit) {
         editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(position), length);
         const long found = editor->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET,
                                                  static_cast<unsigned long>(pattern.size()), pattern.constData());
@@ -229,9 +228,8 @@ QList<FindBar::Match> FindBar::findAll(EditorWidget *editor, const QString &quer
             break;
     }
     if (editor->SendScintilla(QsciScintillaBase::SCI_GETSTATUS) == QsciScintillaBase::SC_STATUS_WARNREGEX) {
-        *valid = false;
         editor->SendScintilla(QsciScintillaBase::SCI_SETSTATUS, 0);
-        matches.clear();
+        return std::nullopt;
     }
     return matches;
 }
@@ -251,7 +249,10 @@ void FindBar::refresh()
         updateCount();
         return;
     }
-    matches_ = findAll(editor_, search_->text(), searchFlags(), &valid_, matchLimit);
+    const std::optional<QList<Match>> found =
+        findAll(editor_, {.text = search_->text(), .flags = searchFlags(), .limit = matchLimit});
+    valid_ = found.has_value();
+    matches_ = found.value_or(QList<Match>());
 
     clearHighlights(editor_);
     const bool dark = theme_.isDark;
@@ -331,9 +332,9 @@ void FindBar::selectFrom(long position, bool forward)
         }
         select(matches_.first()); // wraps around
     } else {
-        for (auto matche : std::views::reverse(matches_)) {
-            if (matche.end <= position) {
-                select(matche);
+        for (const Match &match : std::views::reverse(matches_)) {
+            if (match.end <= position) {
+                select(match);
                 return;
             }
         }
@@ -413,9 +414,9 @@ void FindBar::replaceAll()
     editor_->SendScintilla(QsciScintillaBase::SCI_SETSEARCHFLAGS, searchFlags());
     editor_->beginUndoAction();
     // From the end: the positions of the remaining matches do not move.
-    for (auto matche : std::views::reverse(matches_)) {
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(matche.start),
-                               matche.end);
+    for (const Match &match : std::views::reverse(matches_)) {
+        editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(match.start),
+                               match.end);
         if (editor_->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET, static_cast<unsigned long>(pattern.size()),
                                    pattern.constData()) >= 0)
             editor_->SendScintilla(message, static_cast<unsigned long>(replacement.size()), replacement.constData());
@@ -434,36 +435,45 @@ void FindBar::applyTheme(const Theme &theme)
 
 bool FindBar::eventFilter(QObject *watched, QEvent *event)
 {
-    if ((watched == search_ || watched == replace_) && event->type() == QEvent::KeyPress) {
-        const auto *key = static_cast<QKeyEvent *>(event);
-        const bool shift = key->modifiers() & Qt::ShiftModifier;
-        switch (key->key()) {
-        case Qt::Key_Escape:
-            close();
-            return true;
-        case Qt::Key_Return:
-        case Qt::Key_Enter:
-            if (watched == replace_)
-                replaceCurrent();
-            else if (shift)
-                findPrevious();
-            else
-                findNext();
-            return true;
-        case Qt::Key_C:
-        case Qt::Key_O:
-        case Qt::Key_X:
-            if (key->modifiers() == Qt::AltModifier) {
-                QToolButton *option = key->key() == Qt::Key_C   ? matchCase_
-                                      : key->key() == Qt::Key_O ? wholeWords_
-                                                                : regularExpression_;
-                option->toggle();
-                return true;
-            }
-            break;
-        default:
-            break;
-        }
-    }
+    const bool isField = watched == search_ || watched == replace_;
+    if (isField && event->type() == QEvent::KeyPress && handleFieldKey(watched, *static_cast<QKeyEvent *>(event)))
+        return true;
     return QWidget::eventFilter(watched, event);
+}
+
+bool FindBar::handleFieldKey(const QObject *field, const QKeyEvent &key)
+{
+    switch (key.key()) {
+    case Qt::Key_Escape:
+        dismiss();
+        return true;
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (field == replace_)
+            replaceCurrent();
+        else if (key.modifiers() & Qt::ShiftModifier)
+            findPrevious();
+        else
+            findNext();
+        return true;
+    case Qt::Key_C:
+    case Qt::Key_O:
+    case Qt::Key_X:
+        if (key.modifiers() != Qt::AltModifier)
+            return false;
+        optionForKey(key.key())->toggle();
+        return true;
+    default:
+        return false;
+    }
+}
+
+// The option that Alt+`key` toggles, as its tooltip says.
+QToolButton *FindBar::optionForKey(int key) const
+{
+    if (key == Qt::Key_C)
+        return matchCase_;
+    if (key == Qt::Key_O)
+        return wholeWords_;
+    return regularExpression_;
 }

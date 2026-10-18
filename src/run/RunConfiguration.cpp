@@ -145,6 +145,38 @@ void detectJava(const QString &folder, QList<RunConfiguration> &found)
     }
 }
 
+// The first makefile make reads, with its test and run targets.
+QString makefileOf(const QString &folder)
+{
+    for (const QString &name :
+         {QStringLiteral("GNUmakefile"), QStringLiteral("makefile"), QStringLiteral("Makefile")}) {
+        if (exists(folder, name))
+            return name;
+    }
+    return {};
+}
+
+void detectMake(const QString &folder, QList<RunConfiguration> &found)
+{
+    using Kind = RunConfiguration::Kind;
+    const QString name = makefileOf(folder);
+    if (name.isEmpty())
+        return;
+    found.append(make(QStringLiteral("make"), Kind::Build, QStringLiteral("make")));
+    static const QRegularExpression target(QStringLiteral("^([A-Za-z0-9_.-]+)\\s*:(?!=)"),
+                                           QRegularExpression::MultilineOption);
+    QSet<QString> targets;
+    for (const QRegularExpressionMatch &match :
+         target.globalMatch(QString::fromUtf8(readFile(folder + QLatin1Char('/') + name))))
+        targets.insert(match.captured(1));
+    for (const QString &test : {QStringLiteral("test"), QStringLiteral("check")}) {
+        if (targets.contains(test))
+            found.append(make(QStringLiteral("make %1").arg(test), Kind::Test, QStringLiteral("make %1").arg(test)));
+    }
+    if (targets.contains(QStringLiteral("run")))
+        found.append(make(QStringLiteral("make run"), Kind::Run, QStringLiteral("make run")));
+}
+
 void detectOthers(const QString &folder, QList<RunConfiguration> &found)
 {
     using Kind = RunConfiguration::Kind;
@@ -161,26 +193,7 @@ void detectOthers(const QString &folder, QList<RunConfiguration> &found)
         readFile(folder + QStringLiteral("/pyproject.toml")).contains("[tool.pytest")) {
         found.append(make(QStringLiteral("pytest"), Kind::Test, QStringLiteral("python -m pytest")));
     }
-    for (const QString &name :
-         {QStringLiteral("GNUmakefile"), QStringLiteral("makefile"), QStringLiteral("Makefile")}) {
-        if (!exists(folder, name))
-            continue;
-        found.append(make(QStringLiteral("make"), Kind::Build, QStringLiteral("make")));
-        static const QRegularExpression target(QStringLiteral("^([A-Za-z0-9_.-]+)\\s*:(?!=)"),
-                                               QRegularExpression::MultilineOption);
-        QSet<QString> targets;
-        for (const QRegularExpressionMatch &match :
-             target.globalMatch(QString::fromUtf8(readFile(folder + QLatin1Char('/') + name))))
-            targets.insert(match.captured(1));
-        for (const QString &test : {QStringLiteral("test"), QStringLiteral("check")}) {
-            if (targets.contains(test))
-                found.append(
-                    make(QStringLiteral("make %1").arg(test), Kind::Test, QStringLiteral("make %1").arg(test)));
-        }
-        if (targets.contains(QStringLiteral("run")))
-            found.append(make(QStringLiteral("make run"), Kind::Run, QStringLiteral("make run")));
-        break;
-    }
+    detectMake(folder, found);
 }
 
 } // namespace

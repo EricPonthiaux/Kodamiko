@@ -8,6 +8,8 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 
+#include <algorithm>
+
 namespace Prerequisites {
 namespace {
 
@@ -130,12 +132,8 @@ QVersionNumber parseVersion(const QString &output)
 QString linuxInstallCommand(const QString &osId, const QString &osIdLike, const QString &package)
 {
     const QStringList ids = (osId + QLatin1Char(' ') + osIdLike).split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    const auto is = [&](std::initializer_list<const char *> names) {
-        for (const char *name : names) {
-            if (ids.contains(QLatin1String(name)))
-                return true;
-        }
-        return false;
+    const auto is = [&ids](std::initializer_list<const char *> names) {
+        return std::ranges::any_of(names, [&ids](const char *name) { return ids.contains(QLatin1String(name)); });
     };
     // Debian-like before Fedora-like: some distributions list both.
     if (is({"debian", "ubuntu"}))

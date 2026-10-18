@@ -30,10 +30,7 @@ protected:
             QStyleOptionTab option;
             initStyleOption(&option, i);
             painter.drawControl(QStyle::CE_TabBarTabShape, option);
-            const QColor color = i == currentIndex() ? theme_.accentText
-                                 : i == hovered      ? theme_.foreground
-                                                     : theme_.mutedText;
-            drawLabel(painter, option.rect, tabIcon(i), tabText(i), color);
+            drawLabel(painter, option.rect, i, labelColor(i, hovered));
         }
     }
 
@@ -45,32 +42,48 @@ protected:
     }
 
 private:
-    void drawLabel(QPainter &painter, const QRect &rect, const QIcon &icon, const QString &text, const QColor &color)
+    QColor labelColor(int index, int hovered) const
     {
-        const QSize level(rect.height(), rect.width());
+        if (index == currentIndex())
+            return theme_.accentText;
+        if (index == hovered)
+            return theme_.foreground;
+        return theme_.mutedText;
+    }
+
+    void drawLabel(QPainter &painter, const QRect &rect, int index, const QColor &color)
+    {
         const qreal ratio = devicePixelRatioF();
-        QImage image(level * ratio, QImage::Format_ARGB32_Premultiplied);
-        image.setDevicePixelRatio(ratio);
-        image.fill(Qt::transparent);
-        {
-            QPainter imagePainter(&image);
-            imagePainter.setFont(font());
-            imagePainter.setPen(color);
-            const QSize icons = icon.isNull() ? QSize() : iconSize();
-            const int spacing = icon.isNull() ? 0 : 4;
-            const int textWidth = fontMetrics().horizontalAdvance(text);
-            int x = (level.width() - icons.width() - spacing - textWidth) / 2;
-            if (!icon.isNull()) {
-                icon.paint(&imagePainter, QRect(QPoint(x, (level.height() - icons.height()) / 2), icons));
-                x += icons.width() + spacing;
-            }
-            imagePainter.drawText(QRect(x, 0, textWidth, level.height()), Qt::AlignVCenter | Qt::TextShowMnemonic,
-                                  text);
-        }
+        const QImage image = levelLabel(QSize(rect.height(), rect.width()), index, color);
         // Read from bottom to top.
         QImage turned = image.transformed(QTransform().rotate(270));
         turned.setDevicePixelRatio(ratio);
         painter.drawImage(rect.topLeft(), turned);
+    }
+
+    // The tab's icon and text, centered in an image of size `level`.
+    QImage levelLabel(const QSize &level, int index, const QColor &color) const
+    {
+        const QIcon icon = tabIcon(index);
+        const QString text = tabText(index);
+        const qreal ratio = devicePixelRatioF();
+        QImage image(level * ratio, QImage::Format_ARGB32_Premultiplied);
+        image.setDevicePixelRatio(ratio);
+        image.fill(Qt::transparent);
+        QPainter imagePainter(&image);
+        imagePainter.setFont(font());
+        imagePainter.setPen(color);
+        const QSize icons = icon.isNull() ? QSize() : iconSize();
+        const int spacing = icon.isNull() ? 0 : 4;
+        const int textWidth = fontMetrics().horizontalAdvance(text);
+        int x = (level.width() - icons.width() - spacing - textWidth) / 2;
+        if (!icon.isNull()) {
+            icon.paint(&imagePainter, QRect(QPoint(x, (level.height() - icons.height()) / 2), icons));
+            x += icons.width() + spacing;
+        }
+        imagePainter.drawText(QRect(x, 0, textWidth, level.height()), Qt::AlignVCenter | Qt::TextShowMnemonic, text);
+        imagePainter.end();
+        return image;
     }
 
     Theme theme_;

@@ -7,6 +7,13 @@ namespace {
 
 constexpr size_t maxScrollbackLines = 10000;
 
+// VTermModifier is a set of bit flags: combinations such as Shift+Ctrl are
+// valid values even though the C enum does not name them.
+VTermModifier modifierFromBits(int bits)
+{
+    return static_cast<VTermModifier>(bits); // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange): bit flags
+}
+
 VTermModifier toVTermModifier(Qt::KeyboardModifiers modifiers)
 {
     int result = VTERM_MOD_NONE;
@@ -23,7 +30,7 @@ VTermModifier toVTermModifier(Qt::KeyboardModifiers modifiers)
     if (modifiers & Qt::ControlModifier)
         result |= VTERM_MOD_CTRL;
 #endif
-    return static_cast<VTermModifier>(result);
+    return modifierFromBits(result);
 }
 
 VTermKey toVTermKey(int key)
@@ -63,9 +70,11 @@ VTermKey toVTermKey(int key)
     default:
         break;
     }
-    if (key >= Qt::Key_F1 && key <= Qt::Key_F35)
-        return static_cast<VTermKey>(VTERM_KEY_FUNCTION(key - Qt::Key_F1 + 1));
-    return VTERM_KEY_NONE;
+    // libvterm numbers F1…F255 from VTERM_KEY_FUNCTION_0 without naming them.
+    if (key < Qt::Key_F1 || key > Qt::Key_F35)
+        return VTERM_KEY_NONE;
+    const int functionKey = VTERM_KEY_FUNCTION(key - Qt::Key_F1 + 1);
+    return static_cast<VTermKey>(functionKey); // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange): unnamed keys
 }
 
 VTermColor rgbColor(const QColor &color)
@@ -184,7 +193,7 @@ TerminalCell VtScreen::cell(int row, int column) const
     }
     TerminalCell result = toTerminalCell(line[static_cast<size_t>(column)]);
     // Widths are not stored in the history: we infer them.
-    if (column + 1 < static_cast<int>(line.size()) && line[static_cast<size_t>(column + 1)].chars[0] == uint32_t(-1))
+    if (column + 1 < static_cast<int>(line.size()) && line[static_cast<size_t>(column) + 1].chars[0] == uint32_t(-1))
         result.width = 2;
     return result;
 }
@@ -254,7 +263,7 @@ bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &
     const VTermModifier modifier = toVTermModifier(modifiers);
 
     if (key == Qt::Key_Backtab) {
-        vterm_keyboard_key(terminal_, VTERM_KEY_TAB, static_cast<VTermModifier>(modifier | VTERM_MOD_SHIFT));
+        vterm_keyboard_key(terminal_, VTERM_KEY_TAB, modifierFromBits(modifier | VTERM_MOD_SHIFT));
         return true;
     }
     if (const VTermKey special = toVTermKey(key); special != VTERM_KEY_NONE) {
@@ -264,15 +273,15 @@ bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &
 
     // Ctrl+letter: libvterm computes the control code itself (Ctrl+C → 0x03).
     if ((modifier & VTERM_MOD_CTRL) && key >= Qt::Key_A && key <= Qt::Key_Z) {
-        const uint32_t letter = static_cast<uint32_t>('a' + (key - Qt::Key_A));
-        vterm_keyboard_unichar(terminal_, letter, static_cast<VTermModifier>(modifier & ~VTERM_MOD_SHIFT));
+        const auto letter = static_cast<uint32_t>('a' + (key - Qt::Key_A));
+        vterm_keyboard_unichar(terminal_, letter, modifierFromBits(modifier & ~VTERM_MOD_SHIFT));
         return true;
     }
 
     if (text.isEmpty())
         return false;
     // Uppercase letters and symbols already carry the effect of Shift: don't send it again.
-    const auto withoutShift = static_cast<VTermModifier>(modifier & ~VTERM_MOD_SHIFT);
+    const VTermModifier withoutShift = modifierFromBits(modifier & ~VTERM_MOD_SHIFT);
     for (const char32_t codePoint : text.toUcs4()) {
         if (codePoint < 0x20 && !(modifier & VTERM_MOD_CTRL))
             continue; // control character produced by the platform, already handled
@@ -319,7 +328,7 @@ TerminalCell VtScreen::toTerminalCell(const VTermScreenCell &cell) const
     result.italic = cell.attrs.italic;
     result.underline = cell.attrs.underline != VTERM_UNDERLINE_OFF;
     result.strike = cell.attrs.strike;
-    result.width = cell.width;
+    result.width = static_cast<unsigned char>(cell.width);
     return result;
 }
 

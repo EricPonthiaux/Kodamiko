@@ -12,6 +12,7 @@
 #include <QRegularExpression>
 
 #include <algorithm>
+#include <array>
 
 namespace diagram::sequence {
 
@@ -65,6 +66,42 @@ QJsonArray fragmentsJson(const QList<Fragment> &stack)
     return array;
 }
 
+// The fragments a source has opened and not closed yet, innermost last.
+class FragmentStack {
+public:
+    bool isEmpty() const { return stack_.isEmpty(); }
+
+    void open(const QString &kind, const QString &label)
+    {
+        Fragment f;
+        f.id = QStringLiteral("fragment-%1").arg(++opened_);
+        f.kind = kind;
+        f.label = label;
+        f.depth = int(stack_.size());
+        stack_.append(f);
+    }
+
+    // Precondition: a fragment is open.
+    void switchBranch(const QString &keyword, const QString &label)
+    {
+        stack_.back().branchKeyword = keyword;
+        stack_.back().branchLabel = label;
+    }
+
+    // An `end` with nothing open is ignored.
+    void close()
+    {
+        if (!stack_.isEmpty())
+            stack_.removeLast();
+    }
+
+    QJsonArray toJson() const { return fragmentsJson(stack_); }
+
+private:
+    QList<Fragment> stack_;
+    int opened_ = 0;
+};
+
 // The board's participants left to right, and its messages in conversation
 // order: what both serializers walk.
 QList<const ParticipantShape *> participantsOf(const Board &board)
@@ -108,12 +145,18 @@ struct Arrow {
 };
 
 // Longest first, so that `-->>` never reads as `-->` + `>`.
-const Arrow arrows[] = {
-    {"<<-->>", "dashed", "arrow", "arrow"}, {"<<->>", "solid", "arrow", "arrow"}, {"-->>", "dashed", "arrow", "none"},
-    {"->>", "solid", "arrow", "none"},      {"--x", "dashed", "cross", "none"},   {"-x", "solid", "cross", "none"},
-    {"--)", "dashed", "open", "none"},      {"-)", "solid", "open", "none"},      {"-->", "dashed", "none", "none"},
+const auto arrows = std::to_array<Arrow>({
+    {"<<-->>", "dashed", "arrow", "arrow"},
+    {"<<->>", "solid", "arrow", "arrow"},
+    {"-->>", "dashed", "arrow", "none"},
+    {"->>", "solid", "arrow", "none"},
+    {"--x", "dashed", "cross", "none"},
+    {"-x", "solid", "cross", "none"},
+    {"--)", "dashed", "open", "none"},
+    {"-)", "solid", "open", "none"},
+    {"-->", "dashed", "none", "none"},
     {"->", "solid", "none", "none"},
-};
+});
 
 const QRegularExpression &mermaidMessage()
 {
@@ -175,6 +218,126 @@ QString mermaidText(const QString &text)
     return result;
 }
 
+// `;` separates Mermaid statements, but it also ends the entities (&amp;
+// #quot;): they are hidden before splitting.
+QStringList mermaidStatements(const QString &source)
+{
+    static const QRegularExpression entity(QStringLiteral("([&#]#?\\w{1,8});"));
+    QStringList statements;
+    for (const QString &line : mermaidLines(source)) {
+        QString masked = line;
+        masked.replace(entity, QStringLiteral("\\1\x01"));
+        for (QString part : masked.split(QLatin1Char(';'))) {
+            part.replace(QLatin1Char('\x01'), QLatin1Char(';'));
+            part = part.trimmed();
+            if (!part.isEmpty())
+                statements.append(part);
+        }
+    }
+    return statements;
+}
+
+// Reads a Mermaid sequence into a model, one statement at a time.
+class MermaidReader {
+public:
+    explicit MermaidReader(Model &model)
+        : model_(model)
+    {
+    }
+
+    void read(const QString &stmt)
+    {
+        if (mermaidHeader().match(stmt).hasMatch())
+            return;
+        if (readDeclaration(stmt) || readFragment(stmt))
+            return;
+        if (mermaidPresentation().match(stmt).hasMatch())
+            return;
+        readMessage(stmt);
+    }
+
+    void finish()
+    {
+        nodes_.toModel(model_);
+        model_.meta = QJsonObject{};
+    }
+
+private:
+    bool readDeclaration(const QString &stmt)
+    {
+        static const QRegularExpression declaration(
+            QStringLiteral("^(?:create\\s+)?(participant|actor)\\s+(.+?)(?:\\s+as\\s+(.+))?$"),
+            QRegularExpression::CaseInsensitiveOption);
+        const QRegularExpressionMatch m = declaration.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        const QString key = decodeLabel(m.captured(2)).trimmed();
+        const QString kind = m.captured(1).toLower();
+        Node &node = nodes_.get(key, kind);
+        if (m.hasCaptured(3) && !m.captured(3).isEmpty())
+            node.text = decodeLabel(m.captured(3).trimmed());
+        if (kind == QLatin1String("actor"))
+            node.kind = kind;
+        return true;
+    }
+
+    // A fragment opened, a branch of the innermost one, or an end.
+    bool readFragment(const QString &stmt)
+    {
+        static const QRegularExpression open(QStringLiteral("^(loop|alt|opt|par|critical|break|rect)\\b\\s*(.*)$"),
+                                             QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression branch(QStringLiteral("^(else|and|option)\\b\\s*(.*)$"),
+                                               QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression end(QStringLiteral("^end\\b"), QRegularExpression::CaseInsensitiveOption);
+        if (const QRegularExpressionMatch m = open.match(stmt); m.hasMatch()) {
+            fragments_.open(m.captured(1).toLower(), decodeLabel(m.captured(2).trimmed()));
+            return true;
+        }
+        if (const QRegularExpressionMatch m = branch.match(stmt); m.hasMatch() && !fragments_.isEmpty()) {
+            fragments_.switchBranch(m.captured(1).toLower(), decodeLabel(m.captured(2).trimmed()));
+            return true;
+        }
+        if (!end.match(stmt).hasMatch())
+            return false;
+        fragments_.close();
+        return true;
+    }
+
+    void readMessage(const QString &stmt)
+    {
+        static const QRegularExpression wrap(QStringLiteral("^(?:wrap|nowrap):\\s*"),
+                                             QRegularExpression::CaseInsensitiveOption);
+        // A dropped statement is reported even when it reads as a message.
+        const bool isDropped = mermaidDropped().match(stmt).hasMatch();
+        const QRegularExpressionMatch msg = isDropped ? QRegularExpressionMatch() : mermaidMessage().match(stmt);
+        if (!msg.hasMatch()) {
+            model_.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
+            return;
+        }
+        const QString token = msg.captured(2);
+        // The message pattern only matches the tokens of `arrows`.
+        const Arrow &arrow =
+            *std::ranges::find_if(arrows, [&](const Arrow &a) { return token == QLatin1String(a.token); });
+        const QString from = nodes_.get(msg.captured(1).trimmed(), QStringLiteral("participant")).key;
+        const QString to = nodes_.get(msg.captured(4).trimmed(), QStringLiteral("participant")).key;
+        QString text = msg.captured(5);
+        text.remove(wrap);
+        model_.links.append({QStringLiteral("message"), from, to,
+                             QJsonObject{{QStringLiteral("label"), decodeLabel(text.trimmed())},
+                                         {QStringLiteral("line"), QLatin1String(arrow.line)},
+                                         {QStringLiteral("head"), QLatin1String(arrow.head)},
+                                         {QStringLiteral("startHead"), QLatin1String(arrow.startHead)},
+                                         {QStringLiteral("activation"), msg.captured(3)},
+                                         {QStringLiteral("fragments"), fragments_.toJson()},
+                                         {QStringLiteral("order"), order_++}}});
+    }
+
+    Model &model_;
+    Nodes nodes_;
+    FragmentStack fragments_;
+    int order_ = 0;
+};
+
 class MermaidSequence : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-sequence"); }
@@ -198,95 +361,10 @@ public:
 
     bool parse(const QString &source, Model &model, QString *) const override
     {
-        Nodes nodes;
-        int order = 0;
-        int fragmentSeq = 0;
-        QList<Fragment> stack;
-
-        // `;` separates Mermaid statements, but it also ends the entities
-        // (&amp; #quot;): they are hidden before splitting.
-        static const QRegularExpression entity(QStringLiteral("([&#]#?\\w{1,8});"));
-        QStringList statements;
-        for (const QString &line : mermaidLines(source)) {
-            QString masked = line;
-            masked.replace(entity, QStringLiteral("\\1\x01"));
-            for (QString part : masked.split(QLatin1Char(';'))) {
-                part.replace(QLatin1Char('\x01'), QLatin1Char(';'));
-                part = part.trimmed();
-                if (!part.isEmpty())
-                    statements.append(part);
-            }
-        }
-
-        static const QRegularExpression declaration(
-            QStringLiteral("^(?:create\\s+)?(participant|actor)\\s+(.+?)(?:\\s+as\\s+(.+))?$"),
-            QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression open(QStringLiteral("^(loop|alt|opt|par|critical|break|rect)\\b\\s*(.*)$"),
-                                             QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression branch(QStringLiteral("^(else|and|option)\\b\\s*(.*)$"),
-                                               QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression end(QStringLiteral("^end\\b"), QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression wrap(QStringLiteral("^(?:wrap|nowrap):\\s*"),
-                                             QRegularExpression::CaseInsensitiveOption);
-
-        for (const QString &stmt : statements) {
-            if (mermaidHeader().match(stmt).hasMatch())
-                continue;
-            if (const QRegularExpressionMatch m = declaration.match(stmt); m.hasMatch()) {
-                const QString key = decodeLabel(m.captured(2)).trimmed();
-                const QString kind = m.captured(1).toLower();
-                Node &node = nodes.get(key, kind);
-                if (m.hasCaptured(3) && !m.captured(3).isEmpty())
-                    node.text = decodeLabel(m.captured(3).trimmed());
-                if (kind == QLatin1String("actor"))
-                    node.kind = kind;
-                continue;
-            }
-            if (const QRegularExpressionMatch m = open.match(stmt); m.hasMatch()) {
-                Fragment f;
-                f.id = QStringLiteral("fragment-%1").arg(++fragmentSeq);
-                f.kind = m.captured(1).toLower();
-                f.label = decodeLabel(m.captured(2).trimmed());
-                f.depth = int(stack.size());
-                stack.append(f);
-                continue;
-            }
-            if (const QRegularExpressionMatch m = branch.match(stmt); m.hasMatch() && !stack.isEmpty()) {
-                stack.back().branchKeyword = m.captured(1).toLower();
-                stack.back().branchLabel = decodeLabel(m.captured(2).trimmed());
-                continue;
-            }
-            if (end.match(stmt).hasMatch()) {
-                if (!stack.isEmpty())
-                    stack.removeLast();
-                continue;
-            }
-            if (mermaidPresentation().match(stmt).hasMatch())
-                continue;
-            const QRegularExpressionMatch msg =
-                mermaidDropped().match(stmt).hasMatch() ? QRegularExpressionMatch() : mermaidMessage().match(stmt);
-            if (!msg.hasMatch()) {
-                model.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
-                continue;
-            }
-            const QString token = msg.captured(2);
-            const Arrow *arrow = std::find_if(std::begin(arrows), std::end(arrows),
-                                              [&](const Arrow &a) { return token == QLatin1String(a.token); });
-            const QString from = nodes.get(msg.captured(1).trimmed(), QStringLiteral("participant")).key;
-            const QString to = nodes.get(msg.captured(4).trimmed(), QStringLiteral("participant")).key;
-            QString text = msg.captured(5);
-            text.remove(wrap);
-            model.links.append({QStringLiteral("message"), from, to,
-                                QJsonObject{{QStringLiteral("label"), decodeLabel(text.trimmed())},
-                                            {QStringLiteral("line"), QLatin1String(arrow->line)},
-                                            {QStringLiteral("head"), QLatin1String(arrow->head)},
-                                            {QStringLiteral("startHead"), QLatin1String(arrow->startHead)},
-                                            {QStringLiteral("activation"), msg.captured(3)},
-                                            {QStringLiteral("fragments"), fragmentsJson(stack)},
-                                            {QStringLiteral("order"), order++}}});
-        }
-        nodes.toModel(model);
-        model.meta = QJsonObject{};
+        MermaidReader reader(model);
+        for (const QString &stmt : mermaidStatements(source))
+            reader.read(stmt);
+        reader.finish();
         return true;
     }
 
@@ -312,7 +390,7 @@ public:
             const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
-            active = syncFragments(out, active, l->fragments, QStringLiteral("  "), true, mermaidText);
+            active = syncFragments(out, active, l->fragments, {QStringLiteral("  "), true, mermaidText});
             out.append(QStringLiteral("  ") + from + mermaidArrow(*l) + l->activation + to + QStringLiteral(": ") +
                        mermaidText(l->label));
         }
@@ -394,6 +472,19 @@ struct ArrowKind {
     bool reversed = false;
 };
 
+// The tip a PlantUML head token draws: `x` a cross, the plain `arrow`
+// character an arrow, any other one an open head.
+QString headOf(const QString &token, const char *arrow)
+{
+    if (token == QLatin1String("x"))
+        return QStringLiteral("cross");
+    if (token == QLatin1String(arrow))
+        return QStringLiteral("arrow");
+    if (!token.isEmpty())
+        return QStringLiteral("open");
+    return QStringLiteral("none");
+}
+
 // A PlantUML arrow: a double dash is dotted (drawn dashed), the head
 // characters decide the tip, a left head without a right one reverses it.
 ArrowKind classifyArrow(const QString &op)
@@ -407,12 +498,6 @@ ArrowKind classifyArrow(const QString &op)
     kind.line = clean.contains(QStringLiteral("--")) ? QStringLiteral("dashed") : QStringLiteral("solid");
     const QString right = rightHead.match(clean).captured(1);
     const QString left = leftHead.match(clean).captured(1);
-    const auto headOf = [](const QString &token, const char *arrow) {
-        return token == QLatin1String("x")     ? QStringLiteral("cross")
-               : token == QLatin1String(arrow) ? QStringLiteral("arrow")
-               : !token.isEmpty()              ? QStringLiteral("open")
-                                               : QStringLiteral("none");
-    };
     if (right.isEmpty() && !left.isEmpty()) {
         kind.head = headOf(left, "<");
         kind.reversed = true;
@@ -430,6 +515,180 @@ QString plantumlEscape(const QString &text)
     QString result = text;
     return result.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
 }
+
+// The activation a PlantUML lifeline shortcut (`++`, `--`…) gives a message.
+QString activationOf(const QString &shortcut)
+{
+    if (shortcut.startsWith(QLatin1Char('+')))
+        return QStringLiteral("+");
+    if (shortcut.startsWith(QLatin1Char('-')))
+        return QStringLiteral("-");
+    return {};
+}
+
+// The arrow written for a message: start decoration, dashes, head.
+QString plantumlArrow(const MessageLink &l)
+{
+    QString start;
+    if (l.startHead == QLatin1String("arrow"))
+        start = QStringLiteral("<");
+    else if (l.startHead == QLatin1String("cross"))
+        start = QStringLiteral("x");
+    const QString dash = l.line == QLatin1String("dashed") ? QStringLiteral("--") : QStringLiteral("-");
+    QString head = QStringLiteral(">");
+    if (l.head == QLatin1String("cross"))
+        head = QStringLiteral(">x");
+    else if (l.head == QLatin1String("open"))
+        head = QStringLiteral(">>");
+    return start + dash + head;
+}
+
+// PlantUML's lifeline shortcuts are doubled: `++` activates the receiver,
+// `--` deactivates the sender.
+QString plantumlShortcut(const QString &activation)
+{
+    if (activation == QLatin1String("+"))
+        return QStringLiteral(" ++");
+    if (activation == QLatin1String("-"))
+        return QStringLiteral(" --");
+    return {};
+}
+
+// Reads a PlantUML sequence into a model, one statement at a time.
+class PlantumlReader {
+public:
+    explicit PlantumlReader(Model &model)
+        : model_(model)
+    {
+    }
+
+    void read(const QString &stmt)
+    {
+        if (skipBlock(stmt))
+            return;
+        if (readDeclaration(stmt) || readFragment(stmt))
+            return;
+        if (plantumlPresentation().match(stmt).hasMatch())
+            return;
+        if (readDropped(stmt))
+            return;
+        readMessage(stmt);
+    }
+
+    void finish()
+    {
+        nodes_.toModel(model_);
+        model_.meta = QJsonObject{};
+    }
+
+private:
+    // Inside a multi-line note or ref, everything up to its end is skipped.
+    bool skipBlock(const QString &stmt)
+    {
+        if (block_.isEmpty())
+            return false;
+        static const QRegularExpression blockEnd(QStringLiteral(R"(^end\s*(note|hnote|rnote|ref)\b)"),
+                                                 QRegularExpression::CaseInsensitiveOption);
+        if (blockEnd.match(stmt).hasMatch())
+            block_.clear();
+        return true;
+    }
+
+    void declare(const QString &key, const QString &kind, const QString &alias = {})
+    {
+        Node &node = nodes_.get(key, kind);
+        if (!alias.isEmpty())
+            node.text = alias;
+    }
+
+    bool readDeclaration(const QString &stmt)
+    {
+        const QRegularExpressionMatch m = plantumlDeclaration().match(stmt);
+        if (!m.hasMatch())
+            return false;
+        const QString kind = m.captured(1).toLower();
+        if (!m.captured(3).isEmpty())
+            declare(m.captured(3), kind, plantumlText(m.captured(2))); // "Long" as A
+        else if (!m.captured(4).isEmpty())
+            declare(m.captured(4), kind, plantumlText(m.captured(5))); // A as "Long"
+        else if (!m.captured(6).isEmpty())
+            declare(m.captured(7), kind, plantumlText(m.captured(6))); // Long as A
+        else
+            declare(unquote(!m.captured(8).isEmpty() ? m.captured(8) : m.captured(9)), kind);
+        return true;
+    }
+
+    // A group opened, a branch of the innermost one, or an end.
+    bool readFragment(const QString &stmt)
+    {
+        static const QRegularExpression open(
+            QStringLiteral("^(loop|alt|opt|par|critical|break|group|rect)\\b\\s*(.*)$"),
+            QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression branch(QStringLiteral("^(else|and)\\b\\s*(.*)$"),
+                                               QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression end(QStringLiteral("^end\\b"), QRegularExpression::CaseInsensitiveOption);
+        // `end note`, `end ref`, `end box` close those, not a group.
+        static const QRegularExpression endOther(QStringLiteral(R"(^end\s*(?:note|hnote|rnote|ref|box)\b)"),
+                                                 QRegularExpression::CaseInsensitiveOption);
+        if (const QRegularExpressionMatch m = open.match(stmt); m.hasMatch()) {
+            fragments_.open(m.captured(1).toLower(), plantumlText(m.captured(2).trimmed()));
+            return true;
+        }
+        if (const QRegularExpressionMatch m = branch.match(stmt); m.hasMatch() && !fragments_.isEmpty()) {
+            fragments_.switchBranch(m.captured(1).toLower(), plantumlText(m.captured(2).trimmed()));
+            return true;
+        }
+        if (endOther.match(stmt).hasMatch())
+            return true;
+        if (!end.match(stmt).hasMatch())
+            return false;
+        fragments_.close();
+        return true;
+    }
+
+    // Read but not kept: reported. A note or a ref without `:` spans lines
+    // up to its end.
+    bool readDropped(const QString &stmt)
+    {
+        static const QRegularExpression blockStart(QStringLiteral(R"(^(note|hnote|rnote|ref)\b[^:]*$)"),
+                                                   QRegularExpression::CaseInsensitiveOption);
+        if (!plantumlDropped().match(stmt).hasMatch())
+            return false;
+        if (const QRegularExpressionMatch m = blockStart.match(stmt); m.hasMatch())
+            block_ = m.captured(1);
+        model_.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
+        return true;
+    }
+
+    void readMessage(const QString &stmt)
+    {
+        const QRegularExpressionMatch msg = plantumlMessage().match(stmt);
+        if (!msg.hasMatch()) {
+            model_.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
+            return;
+        }
+        const ArrowKind arrow = classifyArrow(msg.captured(2));
+        const QString a = unquote(msg.captured(1));
+        const QString b = unquote(msg.captured(3));
+        declare(a, QStringLiteral("participant"));
+        declare(b, QStringLiteral("participant"));
+        model_.links.append({QStringLiteral("message"), arrow.reversed ? b : a, arrow.reversed ? a : b,
+                             QJsonObject{{QStringLiteral("label"), plantumlText(msg.captured(5).trimmed())},
+                                         {QStringLiteral("line"), arrow.line},
+                                         {QStringLiteral("head"), arrow.head},
+                                         {QStringLiteral("startHead"), arrow.startHead},
+                                         {QStringLiteral("activation"), activationOf(msg.captured(4))},
+                                         {QStringLiteral("fragments"), fragments_.toJson()},
+                                         {QStringLiteral("order"), order_++}}});
+    }
+
+    Model &model_;
+    Nodes nodes_;
+    FragmentStack fragments_;
+    int order_ = 0;
+    // The kind of the multi-line note or ref being skipped, or empty.
+    QString block_;
+};
 
 class PlantumlSequence : public Codec {
 public:
@@ -460,104 +719,10 @@ public:
 
     bool parse(const QString &source, Model &model, QString *) const override
     {
-        Nodes nodes;
-        int order = 0;
-        int fragmentSeq = 0;
-        QList<Fragment> stack;
-        const auto participant = [&](const QString &key, const QString &kind, const QString &alias = {}) {
-            Node &node = nodes.get(key, kind);
-            if (!alias.isEmpty())
-                node.text = alias;
-        };
-
-        static const QRegularExpression open(
-            QStringLiteral("^(loop|alt|opt|par|critical|break|group|rect)\\b\\s*(.*)$"),
-            QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression branch(QStringLiteral("^(else|and)\\b\\s*(.*)$"),
-                                               QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression end(QStringLiteral("^end\\b"), QRegularExpression::CaseInsensitiveOption);
-        // `end note`, `end ref`, `end box` close those, not a group.
-        static const QRegularExpression endOther(QStringLiteral(R"(^end\s*(?:note|hnote|rnote|ref|box)\b)"),
-                                                 QRegularExpression::CaseInsensitiveOption);
-        // A note or a ref without `:` spans lines up to its end.
-        static const QRegularExpression blockStart(QStringLiteral(R"(^(note|hnote|rnote|ref)\b[^:]*$)"),
-                                                   QRegularExpression::CaseInsensitiveOption);
-        QString block;
-
-        for (const QString &stmt : plantumlLines(source)) {
-            if (!block.isEmpty()) {
-                static const QRegularExpression blockEnd(QStringLiteral(R"(^end\s*(note|hnote|rnote|ref)\b)"),
-                                                         QRegularExpression::CaseInsensitiveOption);
-                if (blockEnd.match(stmt).hasMatch())
-                    block.clear();
-                continue;
-            }
-            if (const QRegularExpressionMatch m = plantumlDeclaration().match(stmt); m.hasMatch()) {
-                const QString kind = m.captured(1).toLower();
-                if (!m.captured(3).isEmpty())
-                    participant(m.captured(3), kind, plantumlText(m.captured(2))); // "Long" as A
-                else if (!m.captured(4).isEmpty())
-                    participant(m.captured(4), kind, plantumlText(m.captured(5))); // A as "Long"
-                else if (!m.captured(6).isEmpty())
-                    participant(m.captured(7), kind, plantumlText(m.captured(6))); // Long as A
-                else
-                    participant(unquote(!m.captured(8).isEmpty() ? m.captured(8) : m.captured(9)), kind);
-                continue;
-            }
-            if (const QRegularExpressionMatch m = open.match(stmt); m.hasMatch()) {
-                Fragment f;
-                f.id = QStringLiteral("fragment-%1").arg(++fragmentSeq);
-                f.kind = m.captured(1).toLower();
-                f.label = plantumlText(m.captured(2).trimmed());
-                f.depth = int(stack.size());
-                stack.append(f);
-                continue;
-            }
-            if (const QRegularExpressionMatch m = branch.match(stmt); m.hasMatch() && !stack.isEmpty()) {
-                stack.back().branchKeyword = m.captured(1).toLower();
-                stack.back().branchLabel = plantumlText(m.captured(2).trimmed());
-                continue;
-            }
-            if (endOther.match(stmt).hasMatch())
-                continue;
-            if (end.match(stmt).hasMatch()) {
-                if (!stack.isEmpty())
-                    stack.removeLast();
-                continue;
-            }
-            if (plantumlPresentation().match(stmt).hasMatch())
-                continue;
-            if (plantumlDropped().match(stmt).hasMatch()) {
-                if (const QRegularExpressionMatch m = blockStart.match(stmt); m.hasMatch())
-                    block = m.captured(1);
-                model.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
-                continue;
-            }
-            const QRegularExpressionMatch msg = plantumlMessage().match(stmt);
-            if (!msg.hasMatch()) {
-                model.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
-                continue;
-            }
-            const ArrowKind arrow = classifyArrow(msg.captured(2));
-            const QString a = unquote(msg.captured(1));
-            const QString b = unquote(msg.captured(3));
-            participant(a, QStringLiteral("participant"));
-            participant(b, QStringLiteral("participant"));
-            const QString shortcut = msg.captured(4);
-            model.links.append({QStringLiteral("message"), arrow.reversed ? b : a, arrow.reversed ? a : b,
-                                QJsonObject{{QStringLiteral("label"), plantumlText(msg.captured(5).trimmed())},
-                                            {QStringLiteral("line"), arrow.line},
-                                            {QStringLiteral("head"), arrow.head},
-                                            {QStringLiteral("startHead"), arrow.startHead},
-                                            {QStringLiteral("activation"),
-                                             shortcut.startsWith(QLatin1Char('+'))   ? QStringLiteral("+")
-                                             : shortcut.startsWith(QLatin1Char('-')) ? QStringLiteral("-")
-                                                                                     : QString()},
-                                            {QStringLiteral("fragments"), fragmentsJson(stack)},
-                                            {QStringLiteral("order"), order++}}});
-        }
-        nodes.toModel(model);
-        model.meta = QJsonObject{};
+        PlantumlReader reader(model);
+        for (const QString &stmt : plantumlLines(source))
+            reader.read(stmt);
+        reader.finish();
         return true;
     }
 
@@ -582,20 +747,8 @@ public:
             const QString to = keys.value(l->to);
             if (from.isEmpty() || to.isEmpty())
                 continue;
-            active = syncFragments(out, active, l->fragments, {}, false, plantumlEscape);
-            const QString dash = l->line == QLatin1String("dashed") ? QStringLiteral("--") : QStringLiteral("-");
-            const QString head = l->head == QLatin1String("cross")  ? QStringLiteral(">x")
-                                 : l->head == QLatin1String("open") ? QStringLiteral(">>")
-                                                                    : QStringLiteral(">");
-            const QString start = l->startHead == QLatin1String("arrow")   ? QStringLiteral("<")
-                                  : l->startHead == QLatin1String("cross") ? QStringLiteral("x")
-                                                                           : QString();
-            // PlantUML's lifeline shortcuts are doubled: `++` activates the
-            // receiver, `--` deactivates the sender.
-            const QString shortcut = l->activation == QLatin1String("+")   ? QStringLiteral(" ++")
-                                     : l->activation == QLatin1String("-") ? QStringLiteral(" --")
-                                                                           : QString();
-            out.append(QStringLiteral("%1 %2%3%4 %5%6").arg(from, start, dash, head, to, shortcut) +
+            active = syncFragments(out, active, l->fragments, {.encode = plantumlEscape});
+            out.append(QStringLiteral("%1 %2 %3%4").arg(from, plantumlArrow(*l), to, plantumlShortcut(l->activation)) +
                        (l->label.isEmpty() ? QString() : QStringLiteral(" : ") + plantumlEscape(l->label)));
         }
         for (qsizetype i = active.size() - 1; i >= 0; --i)

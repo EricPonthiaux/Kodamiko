@@ -170,7 +170,8 @@ void UnixPty::readAvailable()
         if (count < 0 && errno == EINTR)
             continue;
         // 0 or EIO: the slave side is closed, the program has exited.
-        exited = !(count < 0 && errno == EAGAIN);
+        const bool wouldBlock = count < 0 && errno == EAGAIN;
+        exited = !wouldBlock;
         break;
     }
     if (!batch.isEmpty())

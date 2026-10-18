@@ -16,6 +16,7 @@ public:
     virtual void applyTheme(const Theme &theme) = 0;
 
     // Brings work deferred after an edit (fold levels) up to date, before
-    // a command that relies on it.
-    virtual void flush() { }
+    // a command that relies on it. Pure, like the rest, so that a class can
+    // implement this interface next to QObject.
+    virtual void flush() = 0;
 };

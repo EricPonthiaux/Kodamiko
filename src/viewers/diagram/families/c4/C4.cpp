@@ -1,14 +1,13 @@
 #include "C4.h"
 
 #include "viewers/diagram/Board.h"
-#include "viewers/diagram/Family.h"
 #include "viewers/diagram/Graphviz.h"
-#include "viewers/diagram/families/Families.h"
 
 #include <QCoreApplication>
 #include <QPainter>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace diagram::c4 {
@@ -127,9 +126,11 @@ C4ElementShape::BodyStyle C4ElementShape::bodyStyle(const Style &style) const
 
 QString C4ElementShape::typeText() const
 {
-    const QString suffix = variant == QLatin1String("database") ? QStringLiteral(" · ") + tr("Database")
-                           : variant == QLatin1String("queue")  ? QStringLiteral(" · ") + tr("Queue")
-                                                                : QString();
+    QString suffix;
+    if (variant == QLatin1String("database"))
+        suffix = QStringLiteral(" · ") + tr("Database");
+    else if (variant == QLatin1String("queue"))
+        suffix = QStringLiteral(" · ") + tr("Queue");
     return QLatin1Char('[') + kindTerm(kind) + suffix + QLatin1Char(']');
 }
 
@@ -243,13 +244,7 @@ void C4ElementShape::draw(QPainter &painter, const Board &board, const ShapeStat
     shadowFill(painter, path, body.fill, style);
     stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : body.stroke),
            state.selected ? 2 : shapeBorderWidth, external ? QList<qreal>{7, 4} : QList<qreal>{});
-
-    if (variant == QLatin1String("database")) {
-        stroke(painter, ellipse(QPointF(cx(), y + 13), w / 2, 13), body.stroke, 1.25);
-    } else if (variant == QLatin1String("queue")) {
-        for (const qreal offset : {qreal(13), w - 13})
-            strokeLine(painter, QPointF(x + offset, y + 12), QPointF(x + offset, y + h - 12), body.stroke, 1);
-    }
+    drawVariantMarks(painter, body.stroke);
     if (state.editing)
         return;
 
@@ -257,41 +252,68 @@ void C4ElementShape::draw(QPainter &painter, const Board &board, const ShapeStat
     // measure, no glyph can physically leave the silhouette.
     painter.save();
     painter.setClipPath(path, Qt::IntersectClip);
-    const bool centered = kind == QLatin1String("person") || variant == QLatin1String("database");
-    const qreal textX = centered ? cx() : x + 20;
-    const Align align = centered ? Align::Center : Align::Left;
-    qreal ty = y + contentTop();
     if (kind == QLatin1String("person"))
         drawPerson(painter, body.ink);
-    for (const QString &line : titleLines_) {
-        text::draw(painter, title, line, QPointF(textX, ty), body.ink, align, Baseline::Top);
-        ty += 22;
+    drawTexts(painter, style, body);
+    painter.restore();
+}
+
+void C4ElementShape::drawVariantMarks(QPainter &painter, const QColor &color) const
+{
+    if (variant == QLatin1String("database")) {
+        stroke(painter, ellipse(QPointF(cx(), y + 13), w / 2, 13), color, 1.25);
+        return;
     }
-    ty += 4;
-    for (const QString &line : typeLines_) {
-        text::draw(painter, small, line, QPointF(textX, ty), body.muted, align, Baseline::Top);
-        ty += 16;
-    }
-    ty += 8;
+    if (variant != QLatin1String("queue"))
+        return;
+    for (const qreal offset : {qreal(13), w - 13})
+        strokeLine(painter, QPointF(x + offset, y + 12), QPointF(x + offset, y + h - 12), color, 1);
+}
+
+C4ElementShape::TextColumn C4ElementShape::textColumn() const
+{
+    const bool centered = kind == QLatin1String("person") || variant == QLatin1String("database");
+    if (centered)
+        return {cx(), Align::Center};
+    return {x + 20, Align::Left};
+}
+
+void C4ElementShape::drawTexts(QPainter &painter, const Style &style, const BodyStyle &body) const
+{
+    const TextColumn column = textColumn();
+    const auto drawLines = [&](const Font &lineFont, const QStringList &lines, const QColor &color, qreal top,
+                               qreal step) {
+        for (const QString &line : lines) {
+            text::draw(painter, lineFont, line, QPointF(column.x, top), color, column.align, Baseline::Top);
+            top += step;
+        }
+    };
+    qreal ty = y + contentTop();
+    drawLines(title, titleLines_, body.ink, ty, 22);
+    ty += titleLines_.size() * 22 + 4;
+    drawLines(small, typeLines_, body.muted, ty, 16);
+    ty += typeLines_.size() * 16 + 8;
     if (!technologyLines_.isEmpty()) {
         // The technology sits in a translucent pill.
-        const qreal pillH = technologyLines_.size() * 15 + 7;
-        const qreal tw = std::min(w - 24, text::widest(small, technologyLines_) + 18);
-        const bool strong = kind == QLatin1String("system") && !external;
-        const QPainterPath pill = roundRect(centered ? cx() - tw / 2 : textX - 6, ty - 2, tw, pillH, 3);
-        painter.fillPath(pill, withAlpha(strong ? style.palette.labelBg : style.palette.fill, strong ? 0.18 : 0.45));
-        qreal py = ty + 1;
-        for (const QString &line : technologyLines_) {
-            text::draw(painter, small, line, QPointF(textX, py), body.muted, align, Baseline::Top);
-            py += 15;
-        }
+        const qreal pillH = drawTechnologyPill(painter, style, column, ty);
+        drawLines(small, technologyLines_, body.muted, ty + 1, 15);
         ty += pillH + 4;
     }
-    for (const QString &line : descriptionLines_) {
-        text::draw(painter, font, line, QPointF(textX, ty), body.ink, align, Baseline::Top);
-        ty += lineHeight;
-    }
-    painter.restore();
+    drawLines(font, descriptionLines_, body.ink, ty, lineHeight);
+}
+
+qreal C4ElementShape::drawTechnologyPill(QPainter &painter,
+                                         const Style &style,
+                                         const TextColumn &column,
+                                         qreal top) const
+{
+    const qreal pillH = technologyLines_.size() * 15 + 7;
+    const qreal tw = std::min(w - 24, text::widest(small, technologyLines_) + 18);
+    const bool strong = kind == QLatin1String("system") && !external;
+    const qreal left = column.align == Align::Center ? cx() - tw / 2 : column.x - 6;
+    const QPainterPath pill = roundRect(left, top - 2, tw, pillH, 3);
+    painter.fillPath(pill, withAlpha(strong ? style.palette.labelBg : style.palette.fill, strong ? 0.18 : 0.45));
+    return pillH;
 }
 
 QList<Property> C4ElementShape::properties() const
@@ -310,32 +332,32 @@ QList<Property> C4ElementShape::properties() const
     };
 }
 
-QVariant C4ElementShape::propertyValue(const QString &id) const
+QVariant C4ElementShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("kind"))
+    if (propertyId == QLatin1String("kind"))
         return kind;
-    if (id == QLatin1String("variant"))
+    if (propertyId == QLatin1String("variant"))
         return variant;
-    if (id == QLatin1String("external"))
+    if (propertyId == QLatin1String("external"))
         return external;
-    if (id == QLatin1String("technology"))
+    if (propertyId == QLatin1String("technology"))
         return technology;
-    if (id == QLatin1String("description"))
+    if (propertyId == QLatin1String("description"))
         return description;
     return {};
 }
 
-void C4ElementShape::setPropertyValue(const QString &id, const QVariant &value)
+void C4ElementShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("kind"))
+    if (propertyId == QLatin1String("kind"))
         kind = value.toString();
-    else if (id == QLatin1String("variant"))
+    else if (propertyId == QLatin1String("variant"))
         variant = value.toString();
-    else if (id == QLatin1String("external"))
+    else if (propertyId == QLatin1String("external"))
         external = value.toBool();
-    else if (id == QLatin1String("technology"))
+    else if (propertyId == QLatin1String("technology"))
         technology = value.toString();
-    else if (id == QLatin1String("description"))
+    else if (propertyId == QLatin1String("description"))
         description = value.toString();
 }
 
@@ -470,16 +492,16 @@ QList<Property> C4BoundaryShape::properties() const
               {QStringLiteral("Boundary"), tr("Boundary")}}}};
 }
 
-QVariant C4BoundaryShape::propertyValue(const QString &id) const
+QVariant C4BoundaryShape::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("boundaryKind"))
+    if (propertyId == QLatin1String("boundaryKind"))
         return boundaryKind;
     return {};
 }
 
-void C4BoundaryShape::setPropertyValue(const QString &id, const QVariant &value)
+void C4BoundaryShape::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("boundaryKind"))
+    if (propertyId == QLatin1String("boundaryKind"))
         boundaryKind = value.toString();
 }
 
@@ -594,137 +616,25 @@ QList<Property> C4RelationLink::properties() const
     };
 }
 
-QVariant C4RelationLink::propertyValue(const QString &id) const
+QVariant C4RelationLink::propertyValue(const QString &propertyId) const
 {
-    if (id == QLatin1String("technology"))
+    if (propertyId == QLatin1String("technology"))
         return technology;
-    if (id == QLatin1String("description"))
+    if (propertyId == QLatin1String("description"))
         return description;
-    if (id == QLatin1String("bidirectional"))
+    if (propertyId == QLatin1String("bidirectional"))
         return bidirectional;
     return {};
 }
 
-void C4RelationLink::setPropertyValue(const QString &id, const QVariant &value)
+void C4RelationLink::setPropertyValue(const QString &propertyId, const QVariant &value)
 {
-    if (id == QLatin1String("technology"))
+    if (propertyId == QLatin1String("technology"))
         technology = value.toString().trimmed();
-    else if (id == QLatin1String("description"))
+    else if (propertyId == QLatin1String("description"))
         description = value.toString();
-    else if (id == QLatin1String("bidirectional"))
+    else if (propertyId == QLatin1String("bidirectional"))
         bidirectional = value.toBool();
 }
 
 } // namespace diagram::c4
-
-// ---------------------------------------------------------------------------
-// The family
-
-namespace diagram::families {
-
-const Family &c4()
-{
-    using namespace diagram::c4;
-    static const Family family = [] {
-        Family f;
-        f.id = QStringLiteral("c4");
-        f.title = tr("C4 architecture");
-        f.shapes = {{QStringLiteral("c4boundary"), [] { return std::unique_ptr<Shape>(new C4BoundaryShape); }},
-                    {QStringLiteral("c4"), [] { return std::unique_ptr<Shape>(new C4ElementShape); }}};
-        f.links = {
-            {QStringLiteral("c4relation"), [] { return std::unique_ptr<Link>(new C4RelationLink); }, false, true}};
-        f.defaultShape = QStringLiteral("c4");
-        f.defaultLink = QStringLiteral("c4relation");
-        f.graphvizClusters = true;
-        f.graphvizSplines = QStringLiteral("spline");
-        f.graphvizAdaptiveDirection = true;
-        f.nestedCreation = true;
-
-        // Elements: people, then each structural kind as a box, a database
-        // and a queue, internal and external; then the boundaries.
-        const auto element = [](const QString &kind, const QString &variant, bool external, const QString &label,
-                                const QString &name, const QString &help) {
-            QStringList id{kind};
-            if (variant != QLatin1String("box"))
-                id.append(variant);
-            if (external)
-                id.append(QStringLiteral("external"));
-            return ElementPreset{id.join(QLatin1Char('-')), label, help, QStringLiteral("c4"),
-                                 QJsonObject{{QStringLiteral("name"), name},
-                                             {QStringLiteral("kind"), kind},
-                                             {QStringLiteral("description"), QString()},
-                                             {QStringLiteral("technology"), QString()},
-                                             {QStringLiteral("external"), external},
-                                             {QStringLiteral("variant"), variant}}};
-        };
-        f.elements = {
-            element(QStringLiteral("person"), QStringLiteral("box"), false, tr("Person"), tr("Person"), tr("Person")),
-            element(QStringLiteral("person"), QStringLiteral("box"), true, tr("External person"), tr("External person"),
-                    tr("Person")),
-        };
-        struct Structural {
-            const char *kind;
-            QString noun;
-            QString abbreviation;
-        };
-        const Structural structurals[] = {{"system", tr("System"), QStringLiteral("SYS")},
-                                          {"container", tr("Container"), QStringLiteral("CTR")},
-                                          {"component", tr("Component"), QStringLiteral("CMP")}};
-        for (const Structural &s : structurals) {
-            for (const char *variant : {"box", "database", "queue"}) {
-                for (const bool external : {false, true}) {
-                    const QString v = QString::fromLatin1(variant);
-                    const QString base = v == QLatin1String("database") ? tr("Database")
-                                         : v == QLatin1String("queue")  ? tr("Message queue")
-                                                                        : s.noun;
-                    const QString name = external ? tr("External %1").arg(base.toLower()) : base;
-                    // The menu tells the kinds apart ("Container database");
-                    // the element is named by what it is ("Database").
-                    QString label = v == QLatin1String("box") ? s.noun : s.noun + QLatin1Char(' ') + base.toLower();
-                    if (external)
-                        label = tr("External %1").arg(label.toLower());
-                    const QString help = s.abbreviation + (v == QLatin1String("database") ? QStringLiteral(" · DB")
-                                                           : v == QLatin1String("queue")  ? QStringLiteral(" · QUEUE")
-                                                                                          : QString());
-                    f.elements.append(element(QString::fromLatin1(s.kind), v, external, label, name, help));
-                }
-            }
-        }
-        const auto boundary = [](const char *id, const QString &label, const char *kind) {
-            return ElementPreset{QString::fromLatin1(id),
-                                 label,
-                                 {},
-                                 QStringLiteral("c4boundary"),
-                                 QJsonObject{{QStringLiteral("name"), label},
-                                             {QStringLiteral("boundaryKind"), QString::fromLatin1(kind)}}};
-        };
-        f.elements += {boundary("enterprise-boundary", tr("Enterprise boundary"), "Enterprise_Boundary"),
-                       boundary("system-boundary", tr("System boundary"), "System_Boundary"),
-                       boundary("container-boundary", tr("Container boundary"), "Container_Boundary"),
-                       boundary("deployment-boundary", tr("Deployment node"), "Deployment_Node")};
-
-        const auto relation = [](const char *id, const QString &label, const QString &edgeLabel, bool both) {
-            QJsonObject props{{QStringLiteral("label"), edgeLabel}};
-            props.insert(both ? QStringLiteral("bidirectional") : QStringLiteral("directed"), true);
-            return RelationPreset{QString::fromLatin1(id), label, {}, props};
-        };
-        f.relations = {relation("uses", tr("Uses"), tr("Uses"), false),
-                       relation("calls", tr("Calls"), tr("Calls"), false),
-                       relation("sends", tr("Sends"), tr("Sends"), false),
-                       relation("reads", tr("Reads"), tr("Reads"), false),
-                       relation("writes", tr("Writes"), tr("Writes"), false),
-                       relation("publishes", tr("Publishes"), tr("Publishes"), false),
-                       relation("consumes", tr("Consumes"), tr("Consumes"), false),
-                       relation("hosts", tr("Hosts"), tr("Hosts"), false),
-                       relation("depends", tr("Depends on"), tr("Depends on"), false),
-                       relation("exchanges", tr("Bidirectional exchange"), tr("Exchanges with"), true)};
-        f.technologies = {QStringLiteral("HTTP/HTTPS"), QStringLiteral("REST/JSON"),
-                          QStringLiteral("WebSocket"),  QStringLiteral("gRPC"),
-                          QStringLiteral("SQL"),        QStringLiteral("AMQP"),
-                          QStringLiteral("Kafka"),      tr("Event")};
-        return f;
-    }();
-    return family;
-}
-
-} // namespace diagram::families

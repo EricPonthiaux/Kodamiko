@@ -48,6 +48,16 @@ QListWidget#welcomeProjects { background: transparent; border: none; outline: no
 
 // A project of the list: its name, its folder below, the languages it is
 // set up for on the right.
+// The chips of a project in the list: its languages, or why there are none.
+QStringList chipTexts(const QStringList &languages, bool missing)
+{
+    if (missing)
+        return {QObject::tr("Folder not found")};
+    if (languages.isEmpty())
+        return {QObject::tr("Not set up")};
+    return languages;
+}
+
 class ProjectDelegate : public QStyledItemDelegate {
 public:
     ProjectDelegate(Theme theme, QObject *parent)
@@ -86,9 +96,7 @@ public:
         const QFontMetrics smallMetrics(small);
         painter->setFont(small);
         int right = text.right();
-        const QStringList chips = missing               ? QStringList{QObject::tr("Folder not found")}
-                                  : languages.isEmpty() ? QStringList{QObject::tr("Not set up")}
-                                                        : languages;
+        const QStringList chips = chipTexts(languages, missing);
         for (const auto &it : std::views::reverse(chips)) {
             const int width = smallMetrics.horizontalAdvance(it) + 14;
             const QRectF chip(right - width, text.top() + (text.height() - smallMetrics.height() - 6) / 2.0, width,
@@ -250,14 +258,7 @@ void WelcomeWindow::reload()
     for (const ProjectConfig &project : ProjectStore::all()) {
         auto *item = new QListWidgetItem(project.name.isEmpty() ? project.path : project.name, list_);
         item->setData(pathRole, project.path);
-        QStringList languages;
-        for (const LanguageSetup &setup : project.languages) {
-            if (setup.enabled)
-                languages.append(ProjectLanguages::title(setup.language));
-        }
-        if (project.configured && languages.isEmpty())
-            languages.append(tr("No language server"));
-        item->setData(languagesRole, project.configured ? languages : QStringList());
+        item->setData(languagesRole, shownLanguages(project));
         item->setData(missingRole, !QFileInfo(project.path).isDir());
         item->setToolTip(QDir::toNativeSeparators(project.path));
         if (project.path == current)
@@ -266,6 +267,20 @@ void WelcomeWindow::reload()
     if (!list_->currentItem() && list_->count() > 0)
         list_->setCurrentRow(0);
     filter(search_->text());
+}
+
+QStringList WelcomeWindow::shownLanguages(const ProjectConfig &project)
+{
+    if (!project.configured)
+        return {};
+    QStringList languages;
+    for (const LanguageSetup &setup : project.languages) {
+        if (setup.enabled)
+            languages.append(ProjectLanguages::title(setup.language));
+    }
+    if (languages.isEmpty())
+        languages.append(tr("No language server"));
+    return languages;
 }
 
 void WelcomeWindow::filter(const QString &text)

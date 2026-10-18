@@ -9,7 +9,7 @@ namespace Keymap {
 namespace {
 
 // Property of a command's action holding its default shortcuts.
-constexpr char defaultProperty[] = "keymapDefault";
+constexpr const char *defaultProperty = "keymapDefault";
 
 QString plainText(const QAction *action)
 {

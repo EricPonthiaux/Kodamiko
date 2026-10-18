@@ -21,7 +21,7 @@ struct HookEvent {
         StatusUpdated,       // status line refresh: model, context, usage limits
     };
 
-    Kind kind;
+    Kind kind{};
     QString sessionId;
     QStringList filePaths; // EditRequested, FilesEdited: absolute paths
     QString prompt;        // PromptSubmitted

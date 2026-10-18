@@ -12,7 +12,9 @@
 class CompletionPopup;
 class CompletionService;
 class EditorWidget;
+class QKeyEvent;
 class SnippetSession;
+struct ExpandedSnippet;
 
 // Completion in one editor: opens the popup on Ctrl+Space, and while typing
 // an identifier or after a trigger character (".") as
@@ -88,19 +90,43 @@ public:
     // The placeholders of the snippet last inserted.
     SnippetSession *snippet() const { return snippet_; }
 
+    // The editor's keys while the popup, a Full Line suggestion or a
+    // snippet's placeholders are shown.
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     // A function's call was inserted, the cursor in its parentheses: its
     // parameters can be shown.
     void callInserted();
 
-protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
-
 private:
     using Mode = CompletionContext::Mode;
 
     void start(bool explicitRequest, QChar triggerCharacter, Mode mode = Mode::Basic);
+    // Whether a request started by a timer still applies at `position`:
+    // the trigger character still before the cursor, the identifier not
+    // typed past.
+    bool isStillWanted(bool explicitRequest, QChar triggerCharacter, int position) const;
+    // The trigger character ("." of "object.na|") before the name typed at
+    // `position`, null when none.
+    QChar memberTrigger(int position) const;
+    CompletionContext contextAt(int position, QChar triggerCharacter, bool explicitRequest) const;
+    // The text of the other open editors of the language, for extended
+    // completion.
+    QList<QByteArray> otherTexts(const QString &languageId) const;
     void onCharacterAdded(int character);
+    // A character typed in an open session: filters the list. Returns
+    // whether the session goes on.
+    bool followTyping();
+    // Opens completion as EditorOptions::autoCompletion says: at once or
+    // after a pause.
+    void openAutomatically(QChar trigger);
+    // A character typed in a comment or a string: a module path or a
+    // documentation tag may follow.
+    void openInCommentOrString(QChar typed, int position);
+    // Whether the identifier typed up to `position` is worth completing:
+    // not a number, long enough in Calm mode.
+    bool isIdentifierToComplete(int position) const;
     void refilter();
     void showPopup();
     // Ranks the candidates by the user's past choices.
@@ -110,6 +136,11 @@ private:
     void onModified(int position, int modificationType, int length);
     // Start of the identifier ending at `position`, in bytes.
     int identifierStart(int position) const;
+    // End of the identifier starting at `position`, in bytes.
+    int identifierEnd(int position) const;
+    // The character at `position`, null before the text.
+    QChar charAt(int position) const;
+    int currentPosition() const;
     bool insideCommentOrString(int position) const;
     bool insideDocComment(int position) const;
     // In the module name of a JavaScript import: "from './|'".
@@ -125,6 +156,23 @@ private:
     void insertSnippet(int start, int end, const QString &snippet);
     // Lists the item's choices instead of the candidates.
     void beginChoice(const CompletionItem &item);
+    // The item being chosen for, inserting the expression of choice
+    // `choiceIndex`.
+    CompletionItem withChosenExpression(int choiceIndex) const;
+    // Selects the first stop of `expanded`, inserted at `start`.
+    void selectExpansion(const ExpandedSnippet &expanded, int start);
+    // Follows the candidate just inserted, to count its erasure as a
+    // rejection.
+    void watchInserted(const CompletionItem &item, int start, const QByteArray &text);
+    // The item's edits known only once chosen (jdtls): applied when they
+    // come.
+    void resolveEditsLater(const CompletionItem &item, int start, int insertedBytes, int replacedBytes);
+    // Keys: each returns whether it took the key.
+    bool handleFullLineKey(QKeyEvent *key);
+    bool handleSnippetKey(QKeyEvent *key);
+    bool handlePopupShortcut(QKeyEvent *key);
+    bool handleListKey(QKeyEvent *key);
+    void applyListKey(int key);
     void highlightChoice();
     void updateKeyHint();
     // Full Line completion.

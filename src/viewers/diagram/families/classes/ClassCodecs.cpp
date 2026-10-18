@@ -14,6 +14,8 @@
 #include <QJsonArray>
 #include <QRegularExpression>
 
+#include <algorithm>
+
 namespace diagram::classes {
 
 namespace {
@@ -46,33 +48,40 @@ struct ClassNodes {
     }
 };
 
-void addRelation(Model &model,
-                 const ClassNode &a,
-                 const ClassNode &b,
-                 const QString &token,
-                 const QString &leftCard,
-                 const QString &rightCard,
-                 const QString &label)
+// A relation as written: `left [leftCard] token [rightCard] right [: label]`.
+struct WrittenRelation {
+    QString leftKey;
+    QString rightKey;
+    QString token;
+    QString leftCard;
+    QString rightCard;
+    QString label;
+};
+
+const UmlRelation *findUmlRelation(const QString &token)
 {
-    const UmlRelation *relation = nullptr;
-    for (const UmlRelation &candidate : umlRelations()) {
-        if (candidate.token == token) {
-            relation = &candidate;
-            break;
-        }
-    }
+    const QList<UmlRelation> &relations = umlRelations();
+    const auto found =
+        std::ranges::find_if(relations, [&](const UmlRelation &candidate) { return candidate.token == token; });
+    return found == relations.end() ? nullptr : &*found;
+}
+
+void addRelation(Model &model, const WrittenRelation &written)
+{
+    const UmlRelation *relation = findUmlRelation(written.token);
     if (!relation)
         return;
     // A marker written on the left makes the left class the target.
     const bool left = relation->targetOnLeft;
-    model.links.append({QStringLiteral("relation"), left ? b.key : a.key, left ? a.key : b.key,
+    model.links.append({QStringLiteral("relation"), left ? written.rightKey : written.leftKey,
+                        left ? written.leftKey : written.rightKey,
                         QJsonObject{{QStringLiteral("kind"), relation->kind},
-                                    {QStringLiteral("label"), label},
-                                    {QStringLiteral("fromCard"), left ? rightCard : leftCard},
-                                    {QStringLiteral("toCard"), left ? leftCard : rightCard}}});
+                                    {QStringLiteral("label"), written.label},
+                                    {QStringLiteral("fromCard"), left ? written.rightCard : written.leftCard},
+                                    {QStringLiteral("toCard"), left ? written.leftCard : written.rightCard}}});
 }
 
-void finish(Model &model, const ClassNodes &nodes, const QJsonObject &meta)
+void finishModel(Model &model, const ClassNodes &nodes, const QJsonObject &meta)
 {
     for (const ClassNode &node : nodes.list) {
         model.nodes.append(
@@ -143,6 +152,160 @@ const QRegularExpression &mermaidHeader()
     return pattern;
 }
 
+// `~T~` generics display as <T>; `` `name` `` backticks are dropped.
+QString mermaidDisplayName(QString raw)
+{
+    static const QRegularExpression generics(QStringLiteral("~([^~]*)~"));
+    raw.replace(generics, QStringLiteral("<\\1>"));
+    raw.remove(QLatin1Char('`'));
+    return raw;
+}
+
+// Reads a Mermaid class diagram one statement at a time.
+class MermaidReader {
+public:
+    explicit MermaidReader(Model &model)
+        : model_(model)
+    {
+    }
+
+    void read(const QString &stmt)
+    {
+        if (mermaidHeader().match(stmt).hasMatch())
+            return;
+        const bool understood = readDirection(stmt) || readBodyLine(stmt) || readDeclaration(stmt) ||
+                                readAnnotation(stmt) || readRelation(stmt) || isSkipped(stmt) ||
+                                readExternalMember(stmt);
+        if (!understood)
+            model_.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
+    }
+
+    void finish() { finishModel(model_, nodes_, QJsonObject{{QStringLiteral("rankdir"), rankdir_}}); }
+
+private:
+    ClassNode &classNamed(const QString &rawName)
+    {
+        static const QRegularExpression genericsOut(QStringLiteral("~[^~]*~"));
+        QString key = rawName;
+        key.remove(QLatin1Char('`'));
+        key.remove(genericsOut);
+        return nodes_.get(key.trimmed(), mermaidDisplayName(rawName));
+    }
+
+    static void addMember(ClassNode &node, const QString &raw)
+    {
+        static const QRegularExpression stereotypeLine(QStringLiteral("^<<(.+)>>$"));
+        const QString line = mermaidDisplayName(raw.trimmed());
+        if (line.isEmpty())
+            return;
+        const QRegularExpressionMatch st = stereotypeLine.match(line);
+        if (st.hasMatch()) {
+            node.stereotype = st.captured(1);
+            return;
+        }
+        (line.contains(QLatin1Char('(')) ? node.methods : node.attributes).append(line);
+    }
+
+    bool readDirection(const QString &stmt)
+    {
+        static const QRegularExpression direction(QStringLiteral("^direction\\s+(TB|BT|RL|LR)"));
+        const QRegularExpressionMatch m = direction.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        rankdir_ = m.captured(1);
+        return true;
+    }
+
+    bool readBodyLine(const QString &stmt)
+    {
+        static const QRegularExpression closing(QStringLiteral("\\}$"));
+        if (body_ < 0)
+            return false;
+        if (stmt == QLatin1String("}")) {
+            body_ = -1;
+            return true;
+        }
+        QString line = stmt;
+        line.remove(closing);
+        addMember(nodes_.list[body_], line);
+        if (stmt.endsWith(QLatin1Char('}')))
+            body_ = -1;
+        return true;
+    }
+
+    // class Name / class Name["Label"] / class Name {
+    bool readDeclaration(const QString &stmt)
+    {
+        static const QRegularExpression declaration(QStringLiteral("^class\\s+(") + mermaidName +
+                                                        QStringLiteral(")\\s*(?:\\[\"([^\"]*)\"\\])?\\s*(\\{)?\\s*$"),
+                                                    QRegularExpression::UseUnicodePropertiesOption);
+        const QRegularExpressionMatch m = declaration.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        ClassNode &node = classNamed(m.captured(1));
+        if (!m.captured(2).isEmpty())
+            node.name = m.captured(2);
+        if (!m.captured(3).isEmpty())
+            body_ = nodes_.index.value(node.key);
+        return true;
+    }
+
+    // <<interface>> Name, a standalone annotation.
+    bool readAnnotation(const QString &stmt)
+    {
+        static const QRegularExpression annotation(QStringLiteral("^<<(.+)>>\\s+(") + mermaidName +
+                                                       QStringLiteral(")$"),
+                                                   QRegularExpression::UseUnicodePropertiesOption);
+        const QRegularExpressionMatch m = annotation.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        classNamed(m.captured(2)).stereotype = m.captured(1);
+        return true;
+    }
+
+    // [left, "card"], operator, ["card"] right, [: label]
+    bool readRelation(const QString &stmt)
+    {
+        static const QRegularExpression relationPattern(
+            QStringLiteral("^(") + mermaidName + QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(") + umlRelationPattern() +
+                QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(") + mermaidName + QStringLiteral(")\\s*(?::\\s*(.*))?$"),
+            QRegularExpression::UseUnicodePropertiesOption);
+        const QRegularExpressionMatch m = relationPattern.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        const QString leftKey = classNamed(m.captured(1)).key;
+        const QString rightKey = classNamed(m.captured(5)).key;
+        addRelation(model_, {leftKey, rightKey, m.captured(3), m.captured(2), m.captured(4), m.captured(6).trimmed()});
+        return true;
+    }
+
+    static bool isSkipped(const QString &stmt)
+    {
+        static const QRegularExpression skip(
+            QStringLiteral("^(?:direction\\b|note\\b|namespace\\b|style\\b|classDef\\b|cssClass\\b|callback\\b|link\\b|"
+                           "click\\b|href\\b|accTitle|accDescr|\\})"));
+        return skip.match(stmt).hasMatch();
+    }
+
+    // Name : +member()
+    bool readExternalMember(const QString &stmt)
+    {
+        static const QRegularExpression memberLine(QStringLiteral("^(") + mermaidName +
+                                                       QStringLiteral(")\\s*:\\s*(.+)$"),
+                                                   QRegularExpression::UseUnicodePropertiesOption);
+        const QRegularExpressionMatch m = memberLine.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        addMember(classNamed(m.captured(1)), m.captured(2));
+        return true;
+    }
+
+    Model &model_;
+    ClassNodes nodes_;
+    QString rankdir_ = QStringLiteral("TB");
+    int body_ = -1; // the class whose { } body we are inside
+};
+
 class MermaidClass : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-class"); }
@@ -163,105 +326,10 @@ public:
 
     bool parse(const QString &source, Model &model, QString *) const override
     {
-        constexpr auto unicode = QRegularExpression::UseUnicodePropertiesOption;
-        // [left, "card"], operator, ["card"] right, [: label]
-        static const QRegularExpression relationPattern(
-            QStringLiteral("^(") + mermaidName + QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(") + umlRelationPattern() +
-                QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?(") + mermaidName + QStringLiteral(")\\s*(?::\\s*(.*))?$"),
-            unicode);
-        // class Name / class Name["Label"] / class Name {
-        static const QRegularExpression declaration(QStringLiteral("^class\\s+(") + mermaidName +
-                                                        QStringLiteral(")\\s*(?:\\[\"([^\"]*)\"\\])?\\s*(\\{)?\\s*$"),
-                                                    unicode);
-        static const QRegularExpression annotation(
-            QStringLiteral("^<<(.+)>>\\s+(") + mermaidName + QStringLiteral(")$"), unicode);
-        static const QRegularExpression memberLine(
-            QStringLiteral("^(") + mermaidName + QStringLiteral(")\\s*:\\s*(.+)$"), unicode);
-        static const QRegularExpression skip(
-            QStringLiteral("^(?:direction\\b|note\\b|namespace\\b|style\\b|classDef\\b|cssClass\\b|callback\\b|link\\b|"
-                           "click\\b|href\\b|accTitle|accDescr|\\})"));
-        static const QRegularExpression direction(QStringLiteral("^direction\\s+(TB|BT|RL|LR)"));
-        static const QRegularExpression generics(QStringLiteral("~([^~]*)~"));
-        static const QRegularExpression genericsOut(QStringLiteral("~[^~]*~"));
-        static const QRegularExpression stereotypeLine(QStringLiteral("^<<(.+)>>$"));
-        static const QRegularExpression closing(QStringLiteral("\\}$"));
-
-        // `~T~` generics display as <T>; `` `name` `` backticks are dropped.
-        const auto displayName = [](QString raw) {
-            raw.replace(generics, QStringLiteral("<\\1>"));
-            raw.remove(QLatin1Char('`'));
-            return raw;
-        };
-        ClassNodes nodes;
-        const auto cls = [&](const QString &rawName) -> ClassNode & {
-            QString key = rawName;
-            key.remove(QLatin1Char('`'));
-            key.remove(genericsOut);
-            return nodes.get(key.trimmed(), displayName(rawName));
-        };
-        const auto member = [&](ClassNode &node, const QString &raw) {
-            const QString line = displayName(raw.trimmed());
-            if (line.isEmpty())
-                return;
-            const QRegularExpressionMatch st = stereotypeLine.match(line);
-            if (st.hasMatch()) {
-                node.stereotype = st.captured(1);
-                return;
-            }
-            (line.contains(QLatin1Char('(')) ? node.methods : node.attributes).append(line);
-        };
-
-        QString rankdir = QStringLiteral("TB");
-        int body = -1; // the class whose { } body we are inside
-        for (const QString &stmt : mermaidLines(source)) {
-            if (mermaidHeader().match(stmt).hasMatch())
-                continue;
-            if (const QRegularExpressionMatch m = direction.match(stmt); m.hasMatch()) {
-                rankdir = m.captured(1);
-                continue;
-            }
-            if (body >= 0) {
-                if (stmt == QLatin1String("}")) {
-                    body = -1;
-                    continue;
-                }
-                QString line = stmt;
-                line.remove(closing);
-                member(nodes.list[body], line);
-                if (stmt.endsWith(QLatin1Char('}')))
-                    body = -1;
-                continue;
-            }
-            if (const QRegularExpressionMatch m = declaration.match(stmt); m.hasMatch()) {
-                ClassNode &node = cls(m.captured(1));
-                if (!m.captured(2).isEmpty())
-                    node.name = m.captured(2);
-                if (!m.captured(3).isEmpty())
-                    body = nodes.index.value(node.key);
-                continue;
-            }
-            // <<interface>> Name, a standalone annotation.
-            if (const QRegularExpressionMatch m = annotation.match(stmt); m.hasMatch()) {
-                cls(m.captured(2)).stereotype = m.captured(1);
-                continue;
-            }
-            if (const QRegularExpressionMatch m = relationPattern.match(stmt); m.hasMatch()) {
-                const QString a = cls(m.captured(1)).key;
-                const QString b = cls(m.captured(5)).key;
-                addRelation(model, nodes.list[nodes.index.value(a)], nodes.list[nodes.index.value(b)], m.captured(3),
-                            m.captured(2), m.captured(4), m.captured(6).trimmed());
-                continue;
-            }
-            if (skip.match(stmt).hasMatch())
-                continue;
-            // Name : +member()
-            if (const QRegularExpressionMatch m = memberLine.match(stmt); m.hasMatch()) {
-                member(cls(m.captured(1)), m.captured(2));
-                continue;
-            }
-            model.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
-        }
-        finish(model, nodes, QJsonObject{{QStringLiteral("rankdir"), rankdir}});
+        MermaidReader reader(model);
+        for (const QString &stmt : mermaidLines(source))
+            reader.read(stmt);
+        reader.finish();
         return true;
     }
 
@@ -330,6 +398,166 @@ QString canonicalArrows(QString stmt)
     return stmt;
 }
 
+// The stereotype a PlantUML declaration keyword implies: none for a plain
+// class, "abstract" for both abstract forms, the keyword itself otherwise.
+QString keywordStereotype(const QString &kind)
+{
+    if (kind.startsWith(QLatin1String("abstract")))
+        return QStringLiteral("abstract");
+    if (kind == QLatin1String("class"))
+        return {};
+    return kind;
+}
+
+// Reads a PlantUML class diagram one statement at a time.
+class PlantumlReader {
+public:
+    explicit PlantumlReader(Model &model)
+        : model_(model)
+    {
+    }
+
+    void read(const QString &stmt)
+    {
+        const bool understood = readBodyLine(stmt) || readDeclaration(stmt) || isSkipped(stmt) || readRelation(stmt) ||
+                                readExternalMember(stmt);
+        if (!understood)
+            model_.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
+    }
+
+    void finish() { finishModel(model_, nodes_, QJsonObject{}); }
+
+private:
+    ClassNode &classNamed(const QString &rawName, const QString &alias = QString())
+    {
+        static const QRegularExpression generics(QStringLiteral("<[^>]*>"));
+        QString key = rawName;
+        key.remove(generics);
+        ClassNode &node = nodes_.get(key.trimmed(), alias.isEmpty() ? rawName : alias);
+        if (!alias.isEmpty())
+            node.name = alias;
+        return node;
+    }
+
+    static void addMember(ClassNode &node, const QString &raw)
+    {
+        static const QRegularExpression modifiers(QStringLiteral("\\{(?:static|abstract|field|method)\\}\\s*"),
+                                                  QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression decoration(QStringLiteral("^[-.=_]{2,}"));
+        QString line = raw;
+        line.remove(modifiers);
+        line = line.trimmed();
+        if (line.isEmpty() || decoration.match(line).hasMatch())
+            return; // a separator's decoration
+        (line.contains(QLatin1Char('(')) ? node.methods : node.attributes).append(line);
+    }
+
+    bool readBodyLine(const QString &stmt)
+    {
+        static const QRegularExpression closing(QStringLiteral("\\}$"));
+        if (body_ < 0)
+            return false;
+        if (stmt == QLatin1String("}")) {
+            body_ = -1;
+            return true;
+        }
+        QString line = stmt;
+        line.remove(closing);
+        addMember(nodes_.list[body_], line);
+        if (stmt.endsWith(QLatin1Char('}')))
+            body_ = -1;
+        return true;
+    }
+
+    // `"Display" as Key`, `Key`, or `Key as "Display"`.
+    ClassNode &declaredClass(const QRegularExpressionMatch &m)
+    {
+        const bool isQuoted = !m.captured(1).isEmpty();
+        if (!isQuoted)
+            return classNamed(m.captured(3), m.captured(4).isEmpty() ? QString() : plantumlText(m.captured(4)));
+        if (m.captured(2).isEmpty())
+            return classNamed(plantumlText(m.captured(1)));
+        return classNamed(m.captured(2), plantumlText(m.captured(1)));
+    }
+
+    bool readDeclaration(const QString &stmt)
+    {
+        // Names are not ASCII-only (unlike sidecar's \w): `class Société`.
+        constexpr auto options =
+            QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption;
+        static const QRegularExpression declaration(
+            QStringLiteral("^(?:") + plantumlKinds +
+                QStringLiteral(
+                    ")\\s+(?:\"([^\"]+)\"(?:\\s+as\\s+([\\w.]+))?|([\\w.]+(?:<[^>]*>)?)(?:\\s+as\\s+\"([^\"]+)\")?)"
+                    "\\s*(?:<<[^>]*>>\\s*)?(\\{)?\\s*$"),
+            options);
+        static const QRegularExpression declarationKind(QStringLiteral("^(") + plantumlKinds + QStringLiteral(")"),
+                                                        QRegularExpression::CaseInsensitiveOption);
+        static const QRegularExpression stereotypePattern(QStringLiteral("<<\\s*([^>]*?)\\s*>>"));
+        const QRegularExpressionMatch m = declaration.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        ClassNode &node = declaredClass(m);
+        const QString kindStereotype = keywordStereotype(declarationKind.match(stmt).captured(1).toLower());
+        if (!kindStereotype.isEmpty())
+            node.stereotype = kindStereotype;
+        const QRegularExpressionMatch st = stereotypePattern.match(stmt);
+        if (st.hasMatch() && !st.captured(1).isEmpty())
+            node.stereotype = st.captured(1);
+        if (!m.captured(5).isEmpty())
+            body_ = nodes_.index.value(node.key);
+        return true;
+    }
+
+    static bool isSkipped(const QString &stmt)
+    {
+        static const QRegularExpression skip(
+            QStringLiteral("^(?:package\\b|namespace\\b|together\\b|note\\b|end\\s+note|"
+                           "\\.\\.|__|==|--$|\\})"),
+            QRegularExpression::CaseInsensitiveOption);
+        return skip.match(stmt).hasMatch();
+    }
+
+    // After infix stripping, the arrows are Mermaid's.
+    bool readRelation(const QString &stmt)
+    {
+        static const QRegularExpression relationPattern(
+            QStringLiteral("^([\\w.\"<>]+)\\s*(?:\"([^\"]*)\"\\s*)?(") + umlRelationPattern() +
+                QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?([\\w.\"<>]+)\\s*(?::\\s*(.*))?$"),
+            QRegularExpression::UseUnicodePropertiesOption);
+        static const QRegularExpression labelArrow(QStringLiteral("\\s*[<>]$"));
+        const QRegularExpressionMatch m = relationPattern.match(canonicalArrows(stmt));
+        if (!m.hasMatch())
+            return false;
+        QString left = m.captured(1);
+        QString right = m.captured(5);
+        left.remove(QLatin1Char('"'));
+        right.remove(QLatin1Char('"'));
+        const QString leftKey = classNamed(left).key;
+        const QString rightKey = classNamed(right).key;
+        QString label = m.captured(6);
+        label.remove(labelArrow);
+        addRelation(model_, {leftKey, rightKey, m.captured(3), m.captured(2), m.captured(4), label.trimmed()});
+        return true;
+    }
+
+    // An external member: X : +method()
+    bool readExternalMember(const QString &stmt)
+    {
+        static const QRegularExpression memberLine(QStringLiteral("^([\\w.]+)\\s*:\\s*(.+)$"),
+                                                   QRegularExpression::UseUnicodePropertiesOption);
+        const QRegularExpressionMatch m = memberLine.match(stmt);
+        if (!m.hasMatch())
+            return false;
+        addMember(classNamed(m.captured(1)), m.captured(2));
+        return true;
+    }
+
+    Model &model_;
+    ClassNodes nodes_;
+    int body_ = -1; // the class whose { } body we are inside
+};
+
 class PlantumlClass : public Codec {
 public:
     QString id() const override { return QStringLiteral("plantuml-class"); }
@@ -345,118 +573,16 @@ public:
         static const QRegularExpression keyword(
             QStringLiteral("^(?:abstract\\s+class|abstract|class|interface|enum|annotation)\\b"),
             QRegularExpression::CaseInsensitiveOption);
-        for (const QString &line : plantumlLines(source)) {
-            if (keyword.match(line).hasMatch())
-                return true;
-        }
-        return false;
+        const QStringList lines = plantumlLines(source);
+        return std::ranges::any_of(lines, [](const QString &line) { return keyword.match(line).hasMatch(); });
     }
 
     bool parse(const QString &source, Model &model, QString *) const override
     {
-        // Names are not ASCII-only (unlike sidecar's \w): `class Société`.
-        constexpr auto options =
-            QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption;
-        static const QRegularExpression declaration(
-            QStringLiteral("^(?:") + plantumlKinds +
-                QStringLiteral(
-                    ")\\s+(?:\"([^\"]+)\"(?:\\s+as\\s+([\\w.]+))?|([\\w.]+(?:<[^>]*>)?)(?:\\s+as\\s+\"([^\"]+)\")?)"
-                    "\\s*(?:<<[^>]*>>\\s*)?(\\{)?\\s*$"),
-            options);
-        static const QRegularExpression declarationKind(QStringLiteral("^(") + plantumlKinds + QStringLiteral(")"),
-                                                        QRegularExpression::CaseInsensitiveOption);
-        // After infix stripping, the arrows are Mermaid's.
-        static const QRegularExpression relationPattern(
-            QStringLiteral("^([\\w.\"<>]+)\\s*(?:\"([^\"]*)\"\\s*)?(") + umlRelationPattern() +
-                QStringLiteral(")\\s*(?:\"([^\"]*)\"\\s*)?([\\w.\"<>]+)\\s*(?::\\s*(.*))?$"),
-            QRegularExpression::UseUnicodePropertiesOption);
-        static const QRegularExpression skip(
-            QStringLiteral("^(?:package\\b|namespace\\b|together\\b|note\\b|end\\s+note|"
-                           "\\.\\.|__|==|--$|\\})"),
-            QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression stereotypePattern(QStringLiteral("<<\\s*([^>]*?)\\s*>>"));
-        static const QRegularExpression memberLine(QStringLiteral("^([\\w.]+)\\s*:\\s*(.+)$"),
-                                                   QRegularExpression::UseUnicodePropertiesOption);
-        static const QRegularExpression modifiers(QStringLiteral("\\{(?:static|abstract|field|method)\\}\\s*"),
-                                                  QRegularExpression::CaseInsensitiveOption);
-        static const QRegularExpression decoration(QStringLiteral("^[-.=_]{2,}"));
-        static const QRegularExpression generics(QStringLiteral("<[^>]*>"));
-        static const QRegularExpression closing(QStringLiteral("\\}$"));
-        static const QRegularExpression labelArrow(QStringLiteral("\\s*[<>]$"));
-
-        ClassNodes nodes;
-        const auto cls = [&](const QString &rawName, const QString &alias = QString()) -> ClassNode & {
-            QString key = rawName;
-            key.remove(generics);
-            ClassNode &node = nodes.get(key.trimmed(), alias.isEmpty() ? rawName : alias);
-            if (!alias.isEmpty())
-                node.name = alias;
-            return node;
-        };
-        const auto member = [&](ClassNode &node, const QString &raw) {
-            QString line = raw;
-            line.remove(modifiers);
-            line = line.trimmed();
-            if (line.isEmpty() || decoration.match(line).hasMatch())
-                return; // a separator's decoration
-            (line.contains(QLatin1Char('(')) ? node.methods : node.attributes).append(line);
-        };
-
-        int body = -1;
-        for (const QString &stmt : plantumlLines(source)) {
-            if (body >= 0) {
-                if (stmt == QLatin1String("}")) {
-                    body = -1;
-                    continue;
-                }
-                QString line = stmt;
-                line.remove(closing);
-                member(nodes.list[body], line);
-                if (stmt.endsWith(QLatin1Char('}')))
-                    body = -1;
-                continue;
-            }
-            if (const QRegularExpressionMatch m = declaration.match(stmt); m.hasMatch()) {
-                const QString kind = declarationKind.match(stmt).captured(1).toLower();
-                ClassNode &node =
-                    !m.captured(1).isEmpty()
-                        ? (!m.captured(2).isEmpty() ? cls(m.captured(2), plantumlText(m.captured(1)))
-                                                    : cls(plantumlText(m.captured(1))))
-                        : cls(m.captured(3), m.captured(4).isEmpty() ? QString() : plantumlText(m.captured(4)));
-                if (kind != QLatin1String("class") && !kind.startsWith(QLatin1String("abstract")))
-                    node.stereotype = kind;
-                else if (kind.startsWith(QLatin1String("abstract")))
-                    node.stereotype = QStringLiteral("abstract");
-                const QRegularExpressionMatch st = stereotypePattern.match(stmt);
-                if (st.hasMatch() && !st.captured(1).isEmpty())
-                    node.stereotype = st.captured(1);
-                if (!m.captured(5).isEmpty())
-                    body = nodes.index.value(node.key);
-                continue;
-            }
-            if (skip.match(stmt).hasMatch())
-                continue;
-            if (const QRegularExpressionMatch m = relationPattern.match(canonicalArrows(stmt)); m.hasMatch()) {
-                QString left = m.captured(1);
-                QString right = m.captured(5);
-                left.remove(QLatin1Char('"'));
-                right.remove(QLatin1Char('"'));
-                const QString a = cls(left).key;
-                const QString b = cls(right).key;
-                QString label = m.captured(6);
-                label.remove(labelArrow);
-                addRelation(model, nodes.list[nodes.index.value(a)], nodes.list[nodes.index.value(b)], m.captured(3),
-                            m.captured(2), m.captured(4), label.trimmed());
-                continue;
-            }
-            // An external member: X : +method()
-            if (const QRegularExpressionMatch m = memberLine.match(stmt); m.hasMatch()) {
-                member(cls(m.captured(1)), m.captured(2));
-                continue;
-            }
-            model.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
-        }
-        finish(model, nodes, QJsonObject{});
+        PlantumlReader reader(model);
+        for (const QString &stmt : plantumlLines(source))
+            reader.read(stmt);
+        reader.finish();
         return true;
     }
 

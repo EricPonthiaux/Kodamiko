@@ -51,19 +51,23 @@ QStringList switchArguments(const RepositoryInfo &repository, const QString &nam
     return {QStringLiteral("--track"), name};
 }
 
-} // namespace
-
-QString nameError(const QString &name)
+// Why `name` holds a character git refuses, or empty.
+QString characterError(const QString &name)
 {
-    if (name.isEmpty())
-        return QObject::tr("Enter a name.");
     for (const QChar c : name) {
         if (c == QLatin1Char(' '))
             return QObject::tr("A branch name cannot contain spaces.");
-        if (isForbidden(c))
-            return QObject::tr("A branch name cannot contain \"%1\".")
-                .arg(c.unicode() < 0x20 ? QStringLiteral("\\t") : QString(c));
+        if (!isForbidden(c))
+            continue;
+        const QString shown = c.unicode() < 0x20 ? QStringLiteral("\\t") : QString(c);
+        return QObject::tr("A branch name cannot contain \"%1\".").arg(shown);
     }
+    return {};
+}
+
+// Why git refuses the name as a whole, or empty.
+QString wholeNameError(const QString &name)
+{
     if (name.startsWith(QLatin1Char('-')))
         return QObject::tr("A branch name cannot start with \"-\".");
     if (name == QLatin1String("@"))
@@ -74,13 +78,34 @@ QString nameError(const QString &name)
         return QObject::tr("A branch name cannot contain \"@{\".");
     if (name.endsWith(QLatin1Char('.')) || name.endsWith(QLatin1Char('/')))
         return QObject::tr("A branch name cannot end with \"%1\".").arg(name.right(1));
+    return {};
+}
+
+// Why git refuses one "/"-separated part of a name, or empty.
+QString partError(const QString &part)
+{
+    if (part.isEmpty())
+        return QObject::tr("A branch name cannot contain \"//\" or start with \"/\".");
+    if (part.startsWith(QLatin1Char('.')))
+        return QObject::tr("A part of a branch name cannot start with \".\".");
+    if (part.endsWith(QLatin1String(".lock")))
+        return QObject::tr("A part of a branch name cannot end with \".lock\".");
+    return {};
+}
+
+} // namespace
+
+QString nameError(const QString &name)
+{
+    if (name.isEmpty())
+        return QObject::tr("Enter a name.");
+    if (const QString error = characterError(name); !error.isEmpty())
+        return error;
+    if (const QString error = wholeNameError(name); !error.isEmpty())
+        return error;
     for (const QString &part : name.split(QLatin1Char('/'))) {
-        if (part.isEmpty())
-            return QObject::tr("A branch name cannot contain \"//\" or start with \"/\".");
-        if (part.startsWith(QLatin1Char('.')))
-            return QObject::tr("A part of a branch name cannot start with \".\".");
-        if (part.endsWith(QLatin1String(".lock")))
-            return QObject::tr("A part of a branch name cannot end with \".lock\".");
+        if (const QString error = partError(part); !error.isEmpty())
+            return error;
     }
     return {};
 }

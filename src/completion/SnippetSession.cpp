@@ -13,6 +13,16 @@ namespace {
 constexpr int stopIndicator = 10;
 constexpr int currentIndicator = 11;
 
+// Where a position goes when [position, position + length) is deleted.
+int positionAfterDeletion(int at, int position, int length)
+{
+    if (at <= position)
+        return at;
+    if (at >= position + length)
+        return at - length;
+    return position;
+}
+
 } // namespace
 
 SnippetSession::SnippetSession(EditorWidget *editor)
@@ -147,26 +157,43 @@ void SnippetSession::onModified(int position, int modificationType, int length)
     const bool deleted = modificationType & QsciScintillaBase::SC_MOD_DELETETEXT;
     if (!inserted && !deleted)
         return;
-    for (int s = 0; s < stops_.size(); ++s) {
-        for (Range &range : stops_[s].ranges) {
-            if (deleted) {
-                const auto map = [position, length](int at) {
-                    return at <= position ? at : (at >= position + length ? at - length : position);
-                };
-                range = {map(range.start), map(range.end)};
-            } else if (position < range.start || (position == range.start && s != current_)) {
-                // Before it; text at the edge of another stop is not its own.
-                range.start += length;
-                range.end += length;
-            } else if (position < range.end || (position == range.end && s == current_)) {
-                range.end += length; // typed in it
-            }
-        }
-    }
+    if (deleted)
+        moveForDeletion(position, length);
+    else
+        moveForInsertion(position, length);
     if (!synchronizing_ && !synchronizePending_) {
         synchronizePending_ = true;
         // The document cannot change during its own notification.
         QTimer::singleShot(0, this, &SnippetSession::synchronize);
+    }
+}
+
+void SnippetSession::moveForDeletion(int position, int length)
+{
+    for (Stop &stop : stops_) {
+        for (Range &range : stop.ranges)
+            range = {positionAfterDeletion(range.start, position, length),
+                     positionAfterDeletion(range.end, position, length)};
+    }
+}
+
+void SnippetSession::moveForInsertion(int position, int length)
+{
+    for (int s = 0; s < stops_.size(); ++s) {
+        const bool isCurrent = s == current_;
+        for (Range &range : stops_[s].ranges) {
+            // Text at the edge of another stop is not its own.
+            const bool isAtStartOfOther = position == range.start && !isCurrent;
+            const bool isAtEndOfCurrent = position == range.end && isCurrent;
+            const bool isBefore = position < range.start || isAtStartOfOther;
+            const bool isInside = position < range.end || isAtEndOfCurrent;
+            if (isBefore) {
+                range.start += length;
+                range.end += length;
+            } else if (isInside) {
+                range.end += length; // typed in it
+            }
+        }
     }
 }
 

@@ -4,6 +4,7 @@
 
 #include <QObject>
 
+class QMouseEvent;
 class QWidget;
 
 // Frame Duet draws itself around its window when the system's is
@@ -33,13 +34,16 @@ public:
     // Resize cursor for `edges`; the arrow for none.
     static Qt::CursorShape cursorFor(Qt::Edges edges);
 
-protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void updateMargins();
     void paint();
     bool drawsShadow() const;
+    // The resize cursor over the shadow, while no button is held.
+    void updateCursor(const QMouseEvent *mouse);
+    // A left press on the shadow resizes the window; returns whether it did.
+    bool startResize(const QMouseEvent *mouse);
 
     QWidget *window_;
     Theme theme_;

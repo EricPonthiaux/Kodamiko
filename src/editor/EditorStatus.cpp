@@ -207,7 +207,8 @@ void EditorStatus::showLineEndingMenu()
     if (!editor_)
         return;
     QMenu menu(this);
-    auto *group = new QActionGroup(&menu);
+    // Declared after the menu, so destroyed before it.
+    QActionGroup group(&menu);
     const std::array<std::pair<LineEnding, QString>, 3> choices{{{LineEnding::Lf, tr("LF - Unix and macOS (\\n)")},
                                                                  {LineEnding::CrLf, tr("CRLF - Windows (\\r\\n)")},
                                                                  {LineEnding::Cr, tr("CR - Classic Mac OS (\\r)")}}};
@@ -215,7 +216,7 @@ void EditorStatus::showLineEndingMenu()
         QAction *action = menu.addAction(name);
         action->setCheckable(true);
         action->setChecked(editor_->format().lineEnding == lineEnding);
-        group->addAction(action);
+        group.addAction(action);
         connect(action, &QAction::triggered, this, [this, lineEnding] {
             if (editor_)
                 editor_->setLineEnding(lineEnding);
@@ -229,12 +230,14 @@ void EditorStatus::showIndentationMenu()
     if (!editor_)
         return;
     QMenu menu(this);
-    auto *group = new QActionGroup(&menu);
+    // Declared after the menu, so destroyed before it.
+    QActionGroup group(&menu);
     const auto addChoice = [&](const QString &name, bool useTabs, int width) {
         QAction *action = menu.addAction(name);
         action->setCheckable(true);
-        action->setChecked(editor_->indentationsUseTabs() == useTabs && (useTabs || editor_->tabWidth() == width));
-        group->addAction(action);
+        const bool isSameWidth = useTabs || editor_->tabWidth() == width;
+        action->setChecked(editor_->indentationsUseTabs() == useTabs && isSameWidth);
+        group.addAction(action);
         connect(action, &QAction::triggered, this, [this, useTabs, width] {
             if (editor_)
                 editor_->setIndentationStyle(useTabs, useTabs ? editor_->tabWidth() : width);

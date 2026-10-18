@@ -13,6 +13,8 @@
 #include <QVBoxLayout>
 #include <QVariantAnimation>
 
+#include <array>
+
 namespace {
 
 QColor mix(const QColor &a, const QColor &b, qreal share)
@@ -35,7 +37,6 @@ public:
     {
     }
 
-protected:
     bool eventFilter(QObject *, QEvent *event) override
     {
         if (event->type() == QEvent::MouseButtonRelease &&
@@ -49,6 +50,97 @@ protected:
 private:
     QAbstractButton *button_;
 };
+
+void drawWindowDots(QPainter &painter, const QRectF &bar)
+{
+    const std::array<QColor, 3> dots = {QColor("#ff5f57"), QColor("#febc2e"), QColor("#28c840")};
+    for (std::size_t i = 0; i < dots.size(); ++i) {
+        painter.setBrush(dots[i]);
+        painter.drawEllipse(QPointF(bar.left() + 10 + qreal(i) * 9, bar.center().y()), 2.6, 2.6);
+    }
+}
+
+QColor syntaxColor(const Theme &theme, const char *category)
+{
+    const int index = theme.syntaxStyleIndex(QString::fromLatin1(category));
+    return index >= 0 ? theme.syntaxStyles[index].second.foreground : theme.foreground;
+}
+
+// A run of code of one category in a theme's miniature.
+struct CodeRun {
+    const char *category;
+    qreal width;
+};
+
+// Lines of code as bars of the theme's syntax colors, right of `gutter`.
+void drawCodeLines(QPainter &painter, const Theme &theme, const QRectF &preview, const QRectF &gutter)
+{
+    // Each line: indentation, then (category, width) runs.
+    const QList<std::pair<int, QList<CodeRun>>> lines = {
+        {0, {{"comment", 70}}},
+        {0, {{"keyword", 26}, {"type", 22}, {"function", 34}, {"punctuation", 8}}},
+        {1, {{"keyword", 18}, {"variable", 20}, {"operator", 6}, {"string", 44}}},
+        {1, {{"function", 30}, {"punctuation", 6}, {"number", 14}, {"punctuation", 6}}},
+        {1, {{"keyword", 30}, {"variable", 24}}},
+        {0, {{"punctuation", 8}}},
+    };
+    qreal y = gutter.top() + 9;
+    for (const auto &[indent, runs] : lines) {
+        // The current line, as in the editor.
+        if (&runs == &lines[2].second)
+            painter.fillRect(QRectF(gutter.right(), y - 3.5, preview.width() - gutter.width(), 10), theme.caretLine);
+        painter.setBrush(theme.marginForeground);
+        painter.drawRoundedRect(QRectF(gutter.left() + 6, y, 6, 3), 1.5, 1.5);
+        qreal x = gutter.right() + 8 + indent * 12;
+        for (const CodeRun &run : runs) {
+            const qreal width = std::min(run.width, preview.right() - 8 - x);
+            if (width <= 0)
+                break;
+            painter.setBrush(syntaxColor(theme, run.category));
+            painter.drawRoundedRect(QRectF(x, y, width, 3), 1.5, 1.5);
+            x += width + 5;
+        }
+        y += 12;
+    }
+}
+
+void drawCheckMark(QPainter &painter, const QPointF &center, const QColor &accent)
+{
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(accent);
+    painter.drawEllipse(center, 8, 8);
+    painter.setPen(QPen(Qt::white, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawPolyline(
+        QPolygonF({center + QPointF(-3.5, 0), center + QPointF(-1, 2.6), center + QPointF(3.6, -2.4)}));
+}
+
+struct KeycapColors {
+    QColor fill;
+    QColor border;
+    QColor text;
+    QColor muted;
+};
+
+// Light keycaps on a selected row, the palette's otherwise.
+KeycapColors keycapColors(const QPalette &palette, bool selected)
+{
+    if (selected)
+        return {QColor(255, 255, 255, 40), QColor(255, 255, 255, 90), QColor(Qt::white), QColor(255, 255, 255, 170)};
+    return {palette.color(QPalette::Button), palette.color(QPalette::Mid), palette.color(QPalette::Text),
+            palette.color(QPalette::PlaceholderText)};
+}
+
+void drawKeycap(QPainter &painter, const QRectF &cap, const QString &key, const KeycapColors &colors)
+{
+    painter.setPen(QPen(colors.border, 1));
+    painter.setBrush(colors.fill);
+    painter.drawRoundedRect(cap.adjusted(0.5, 0.5, -0.5, -0.5), 4, 4);
+    // The key's lower edge, slightly thicker.
+    painter.setPen(QPen(colors.border, 1.5));
+    painter.drawLine(QPointF(cap.left() + 3, cap.bottom() - 0.5), QPointF(cap.right() - 3, cap.bottom() - 0.5));
+    painter.setPen(colors.text);
+    painter.drawText(cap, Qt::AlignCenter, key);
+}
 
 } // namespace
 
@@ -211,51 +303,10 @@ void ThemeCard::paintEvent(QPaintEvent *)
     const QRectF bar(preview.left(), preview.top(), preview.width(), 16);
     painter.fillRect(bar, theme_.window);
     painter.setPen(Qt::NoPen);
-    const QColor dots[] = {QColor("#ff5f57"), QColor("#febc2e"), QColor("#28c840")};
-    for (int i = 0; i < 3; ++i) {
-        painter.setBrush(dots[i]);
-        painter.drawEllipse(QPointF(bar.left() + 10 + i * 9, bar.center().y()), 2.6, 2.6);
-    }
+    drawWindowDots(painter, bar);
     const QRectF gutter(preview.left(), bar.bottom(), 18, preview.height() - bar.height());
     painter.fillRect(gutter, theme_.marginBackground);
-
-    const auto color = [this](const char *category) {
-        const int index = theme_.syntaxStyleIndex(QString::fromLatin1(category));
-        return index >= 0 ? theme_.syntaxStyles[index].second.foreground : theme_.foreground;
-    };
-
-    // Each line: indentation, then (category, width) runs.
-    struct Run {
-        const char *category;
-        qreal width;
-    };
-
-    const QList<std::pair<int, QList<Run>>> lines = {
-        {0, {{"comment", 70}}},
-        {0, {{"keyword", 26}, {"type", 22}, {"function", 34}, {"punctuation", 8}}},
-        {1, {{"keyword", 18}, {"variable", 20}, {"operator", 6}, {"string", 44}}},
-        {1, {{"function", 30}, {"punctuation", 6}, {"number", 14}, {"punctuation", 6}}},
-        {1, {{"keyword", 30}, {"variable", 24}}},
-        {0, {{"punctuation", 8}}},
-    };
-    qreal y = bar.bottom() + 9;
-    for (const auto &[indent, runs] : lines) {
-        // The current line, as in the editor.
-        if (&runs == &lines[2].second)
-            painter.fillRect(QRectF(gutter.right(), y - 3.5, preview.width() - gutter.width(), 10), theme_.caretLine);
-        painter.setBrush(theme_.marginForeground);
-        painter.drawRoundedRect(QRectF(gutter.left() + 6, y, 6, 3), 1.5, 1.5);
-        qreal x = gutter.right() + 8 + indent * 12;
-        for (const Run &run : runs) {
-            const qreal width = std::min(run.width, preview.right() - 8 - x);
-            if (width <= 0)
-                break;
-            painter.setBrush(color(run.category));
-            painter.drawRoundedRect(QRectF(x, y, width, 3), 1.5, 1.5);
-            x += width + 5;
-        }
-        y += 12;
-    }
+    drawCodeLines(painter, theme_, preview, gutter);
     painter.restore();
 
     // The name, and a check mark when chosen.
@@ -266,15 +317,8 @@ void ThemeCard::paintEvent(QPaintEvent *)
     painter.setFont(font);
     painter.setPen(colors.color(QPalette::WindowText));
     painter.drawText(label, Qt::AlignVCenter | Qt::AlignLeft, theme_.title);
-    if (isChecked()) {
-        const QPointF center(label.right() - 7, label.center().y());
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(accent);
-        painter.drawEllipse(center, 8, 8);
-        painter.setPen(QPen(Qt::white, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawPolyline(
-            QPolygonF({center + QPointF(-3.5, 0), center + QPointF(-1, 2.6), center + QPointF(3.6, -2.4)}));
-    }
+    if (isChecked())
+        drawCheckMark(painter, QPointF(label.right() - 7, label.center().y()), accent);
 
     // The border: the accent when chosen or under the mouse.
     QColor border = colors.color(QPalette::Mid);
@@ -437,11 +481,7 @@ void KeycapDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     font.setPointSizeF(font.pointSizeF() * 0.86);
     const QFontMetricsF metrics(font);
     const bool selected = option.state & QStyle::State_Selected;
-    const QPalette &colors = option.palette;
-    const QColor capFill = selected ? QColor(255, 255, 255, 40) : colors.color(QPalette::Button);
-    const QColor capBorder = selected ? QColor(255, 255, 255, 90) : colors.color(QPalette::Mid);
-    const QColor text = selected ? QColor(Qt::white) : colors.color(QPalette::Text);
-    const QColor muted = selected ? QColor(255, 255, 255, 170) : colors.color(QPalette::PlaceholderText);
+    const KeycapColors colors = keycapColors(option.palette, selected);
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
@@ -461,24 +501,15 @@ void KeycapDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
         if (shortcut.isEmpty())
             continue;
         if (!first)
-            drawWord(QStringLiteral("or"), muted);
+            drawWord(QStringLiteral("or"), colors.muted);
         first = false;
         const QList<QStringList> chords = keysOf(shortcut);
         for (int c = 0; c < chords.size(); ++c) {
             if (c > 0)
-                drawWord(QStringLiteral("then"), muted);
+                drawWord(QStringLiteral("then"), colors.muted);
             for (const QString &key : chords[c]) {
                 const qreal width = std::max(metrics.horizontalAdvance(key) + 12, height);
-                const QRectF cap(x, top, width, height);
-                painter->setPen(QPen(capBorder, 1));
-                painter->setBrush(capFill);
-                painter->drawRoundedRect(cap.adjusted(0.5, 0.5, -0.5, -0.5), 4, 4);
-                // The key's lower edge, slightly thicker.
-                painter->setPen(QPen(capBorder, 1.5));
-                painter->drawLine(QPointF(cap.left() + 3, cap.bottom() - 0.5),
-                                  QPointF(cap.right() - 3, cap.bottom() - 0.5));
-                painter->setPen(text);
-                painter->drawText(cap, Qt::AlignCenter, key);
+                drawKeycap(*painter, QRectF(x, top, width, height), key, colors);
                 x += width + 3;
             }
             x += 3;

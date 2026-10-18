@@ -26,6 +26,102 @@ DownloadSource failure(const QString &error)
     return source;
 }
 
+bool isWindows(const Platform &platform)
+{
+    return platform.os == QLatin1String("windows");
+}
+
+ArchiveFormat archiveFormatOf(const Platform &platform)
+{
+    return isWindows(platform) ? ArchiveFormat::Zip : ArchiveFormat::TarGz;
+}
+
+QString archiveSuffixOf(const Platform &platform)
+{
+    return isWindows(platform) ? QStringLiteral(".zip") : QStringLiteral(".tar.gz");
+}
+
+DownloadSource jdkSource(const QString &version, const Platform &platform, const QByteArray &metadata)
+{
+    // OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
+    const QString prefix = QStringLiteral("OpenJDK%1U-jdk_%2_%3_hotspot_").arg(version, platform.arch, platform.os);
+    const QString suffix = archiveSuffixOf(platform);
+    for (const QJsonValue &asset : QJsonDocument::fromJson(metadata).object().value("assets").toArray()) {
+        const QString name = asset.toObject().value("name").toString();
+        if (!name.startsWith(prefix) || !name.endsWith(suffix))
+            continue;
+        DownloadSource source;
+        source.fileName = name;
+        source.url = QUrl(asset.toObject().value("browser_download_url").toString());
+        source.checksumUrl = QUrl(source.url.toString() + QStringLiteral(".sha256.txt"));
+        source.format = archiveFormatOf(platform);
+        return source;
+    }
+    return failure(QObject::tr("No JDK %1 build for %2 %3").arg(version, platform.os, platform.arch));
+}
+
+// The newest release of a major version: index.json lists the newest first.
+QString nodeRelease(const QString &version, const QByteArray &metadata)
+{
+    for (const QJsonValue &entry : QJsonDocument::fromJson(metadata).array()) {
+        const QString candidate = entry.toObject().value("version").toString();
+        if (candidate.startsWith(QStringLiteral("v%1.").arg(version)))
+            return candidate;
+    }
+    return {};
+}
+
+QString nodeOsName(const Platform &platform)
+{
+    if (isWindows(platform))
+        return QStringLiteral("win");
+    if (platform.os == QLatin1String("mac"))
+        return QStringLiteral("darwin");
+    return QStringLiteral("linux");
+}
+
+DownloadSource nodeSource(const QString &version, const Platform &platform, const QByteArray &metadata)
+{
+    const QString release = nodeRelease(version, metadata);
+    if (release.isEmpty())
+        return failure(QObject::tr("No Node.js %1 release found").arg(version));
+    const QString arch = platform.arch == QLatin1String("aarch64") ? QStringLiteral("arm64") : QStringLiteral("x64");
+    DownloadSource source;
+    source.fileName =
+        QStringLiteral("node-%1-%2-%3%4").arg(release, nodeOsName(platform), arch, archiveSuffixOf(platform));
+    source.url = QUrl(QStringLiteral("https://nodejs.org/dist/%1/%2").arg(release, source.fileName));
+    source.checksumUrl = QUrl(QStringLiteral("https://nodejs.org/dist/%1/SHASUMS256.txt").arg(release));
+    source.format = archiveFormatOf(platform);
+    return source;
+}
+
+DownloadSource clangdSource(const QString &version, const Platform &platform)
+{
+    // Built for x64 only, on Linux and Windows; universal on macOS.
+    if (platform.arch != QLatin1String("x64") && platform.os != QLatin1String("mac"))
+        return failure(QObject::tr("clangd publishes no build for %1 %2: install it with your package manager")
+                           .arg(platform.os, platform.arch));
+    DownloadSource source;
+    source.fileName = QStringLiteral("clangd-%1-%2.zip").arg(platform.os, version);
+    source.url =
+        QUrl(QStringLiteral("https://github.com/clangd/clangd/releases/download/%1/%2").arg(version, source.fileName));
+    source.format = ArchiveFormat::Zip;
+    return source;
+}
+
+DownloadSource jdtlsSource(const QString &version, const QByteArray &metadata)
+{
+    const QString name = QString::fromUtf8(metadata).trimmed();
+    if (!name.startsWith(QLatin1String("jdt-language-server-")) || !name.endsWith(QLatin1String(".tar.gz")))
+        return failure(QObject::tr("No jdtls %1 milestone found").arg(version));
+    DownloadSource source;
+    source.fileName = name;
+    source.url = QUrl(QStringLiteral("https://download.eclipse.org/jdtls/milestones/%1/%2").arg(version, name));
+    source.checksumUrl = QUrl(source.url.toString() + QStringLiteral(".sha256"));
+    source.format = ArchiveFormat::TarGz;
+    return source;
+}
+
 } // namespace
 
 namespace ToolCatalog {
@@ -190,74 +286,16 @@ QUrl metadataUrl(const QString &id, const QString &version)
 
 DownloadSource source(const QString &id, const QString &version, const Platform &platform, const QByteArray &metadata)
 {
-    const bool windows = platform.os == QLatin1String("windows");
-    DownloadSource source;
-
-    if (id == jdkId) {
-        // OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
-        const QString prefix = QStringLiteral("OpenJDK%1U-jdk_%2_%3_hotspot_").arg(version, platform.arch, platform.os);
-        const QString suffix = windows ? QStringLiteral(".zip") : QStringLiteral(".tar.gz");
-        for (const QJsonValue &asset : QJsonDocument::fromJson(metadata).object().value("assets").toArray()) {
-            const QString name = asset.toObject().value("name").toString();
-            if (!name.startsWith(prefix) || !name.endsWith(suffix))
-                continue;
-            source.fileName = name;
-            source.url = QUrl(asset.toObject().value("browser_download_url").toString());
-            source.checksumUrl = QUrl(source.url.toString() + QStringLiteral(".sha256.txt"));
-            source.format = windows ? ArchiveFormat::Zip : ArchiveFormat::TarGz;
-            return source;
-        }
-        return failure(QObject::tr("No JDK %1 build for %2 %3").arg(version, platform.os, platform.arch));
-    }
-
-    if (id == nodeId) {
-        QString release;
-        for (const QJsonValue &entry : QJsonDocument::fromJson(metadata).array()) {
-            const QString candidate = entry.toObject().value("version").toString();
-            if (candidate.startsWith(QStringLiteral("v%1.").arg(version))) {
-                release = candidate; // newest first
-                break;
-            }
-        }
-        if (release.isEmpty())
-            return failure(QObject::tr("No Node.js %1 release found").arg(version));
-        const QString os = windows                               ? QStringLiteral("win")
-                           : platform.os == QLatin1String("mac") ? QStringLiteral("darwin")
-                                                                 : QStringLiteral("linux");
-        const QString arch =
-            platform.arch == QLatin1String("aarch64") ? QStringLiteral("arm64") : QStringLiteral("x64");
-        source.fileName = QStringLiteral("node-%1-%2-%3%4")
-                              .arg(release, os, arch, windows ? QStringLiteral(".zip") : QStringLiteral(".tar.gz"));
-        source.url = QUrl(QStringLiteral("https://nodejs.org/dist/%1/%2").arg(release, source.fileName));
-        source.checksumUrl = QUrl(QStringLiteral("https://nodejs.org/dist/%1/SHASUMS256.txt").arg(release));
-        source.format = windows ? ArchiveFormat::Zip : ArchiveFormat::TarGz;
-        return source;
-    }
-
-    if (id == QLatin1String("clangd")) {
-        // Built for x64 only, on Linux and Windows; universal on macOS.
-        if (platform.arch != QLatin1String("x64") && platform.os != QLatin1String("mac"))
-            return failure(QObject::tr("clangd publishes no build for %1 %2: install it with your package manager")
-                               .arg(platform.os, platform.arch));
-        source.fileName = QStringLiteral("clangd-%1-%2.zip").arg(platform.os, version);
-        source.url = QUrl(
-            QStringLiteral("https://github.com/clangd/clangd/releases/download/%1/%2").arg(version, source.fileName));
-        source.format = ArchiveFormat::Zip;
-        return source;
-    }
-
-    if (id == QLatin1String("jdtls")) {
-        const QString name = QString::fromUtf8(metadata).trimmed();
-        if (!name.startsWith(QLatin1String("jdt-language-server-")) || !name.endsWith(QLatin1String(".tar.gz")))
-            return failure(QObject::tr("No jdtls %1 milestone found").arg(version));
-        source.fileName = name;
-        source.url = QUrl(QStringLiteral("https://download.eclipse.org/jdtls/milestones/%1/%2").arg(version, name));
-        source.checksumUrl = QUrl(source.url.toString() + QStringLiteral(".sha256"));
-        source.format = ArchiveFormat::TarGz;
-        return source;
-    }
-
+    if (id == jdkId)
+        return jdkSource(version, platform, metadata);
+    if (id == nodeId)
+        return nodeSource(version, platform, metadata);
+    if (id == QLatin1String("clangd"))
+        return clangdSource(version, platform);
+    if (id == QLatin1String("jdtls"))
+        return jdtlsSource(version, metadata);
     if (const ToolSpec *tool = find(id); tool && !tool->npmPackages.isEmpty()) {
+        DownloadSource source;
         source.format = ArchiveFormat::Npm;
         return source;
     }

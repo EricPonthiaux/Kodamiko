@@ -111,7 +111,7 @@ void Installer::cancel()
         process_->kill();
         process_->waitForFinished(2000);
     }
-    file_.reset();
+    file_ = nullptr;
     QDir(stagingFolder()).removeRecursively();
     if (index_ >= 0 && index_ < steps_.size())
         emit stepFinished(index_, tr("Cancelled"));
@@ -232,23 +232,30 @@ void Installer::fetchArchive(const DownloadSource &source, const QString &expect
     });
     connect(reply, &QNetworkReply::finished, this, [this, reply, generation, source, archive, expectedChecksum] {
         reply->deleteLater();
-        if (generation != generation_)
-            return;
-        if (file_) {
-            file_->write(reply->readAll());
-            file_->close();
-            file_.reset();
-        }
-        if (const QString error = replyError(reply); !error.isEmpty()) {
-            fail(error);
-            return;
-        }
-        if (!expectedChecksum.isEmpty() && sha256Of(archive) != expectedChecksum) {
-            fail(tr("%1 is damaged: its checksum does not match").arg(QFileInfo(archive).fileName()));
-            return;
-        }
-        extract(source, archive);
+        if (generation == generation_)
+            finishArchive(reply, source, archive, expectedChecksum);
     });
+}
+
+void Installer::finishArchive(QNetworkReply *reply,
+                              const DownloadSource &source,
+                              const QString &archive,
+                              const QString &expectedChecksum)
+{
+    if (file_) {
+        file_->write(reply->readAll());
+        file_->close();
+        file_ = nullptr;
+    }
+    if (const QString error = replyError(reply); !error.isEmpty()) {
+        fail(error);
+        return;
+    }
+    if (!expectedChecksum.isEmpty() && sha256Of(archive) != expectedChecksum) {
+        fail(tr("%1 is damaged: its checksum does not match").arg(QFileInfo(archive).fileName()));
+        return;
+    }
+    extract(source, archive);
 }
 
 void Installer::extract(const DownloadSource &source, const QString &archive)
@@ -294,11 +301,11 @@ void Installer::installNpm()
 {
     const InstallStep step = steps_.at(index_);
     const ToolSpec *spec = ToolCatalog::find(step.tool);
-    const std::optional<RuntimeInstall> node =
-        toolchains_->runtimeAtLeast(QStringLiteral("node"), spec ? spec->minimumRuntime : 0);
+    const int minimumNode = spec ? spec->minimumRuntime : 0;
+    const std::optional<RuntimeInstall> node = toolchains_->runtimeAtLeast(QStringLiteral("node"), minimumNode);
     const QString npm = node ? Toolchains::npmScript(*node) : QString();
-    if (!spec || npm.isEmpty()) {
-        fail(tr("%1 needs Node.js %2 or newer with npm").arg(step.tool).arg(spec ? spec->minimumRuntime : 0));
+    if (!spec || !node || npm.isEmpty()) {
+        fail(tr("%1 needs Node.js %2 or newer with npm").arg(step.tool).arg(minimumNode));
         return;
     }
     const QString content = stagingFolder() + QStringLiteral("/content");
@@ -384,7 +391,7 @@ void Installer::complete(const QString &content)
 void Installer::fail(const QString &error)
 {
     ok_ = false;
-    file_.reset();
+    file_ = nullptr;
     QDir(stagingFolder()).removeRecursively();
     emit stepFinished(index_, error);
     nextStep();

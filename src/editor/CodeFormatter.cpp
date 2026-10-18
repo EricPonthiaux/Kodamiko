@@ -52,6 +52,18 @@ QString localPrettier(const QString &filePath)
     return {};
 }
 
+// Kills the process if it still runs, and deletes it once it has exited.
+void disposeOf(QProcess *process)
+{
+    if (process->state() == QProcess::NotRunning) {
+        process->deleteLater();
+        return;
+    }
+    process->kill();
+    // Reaped by QProcess once it exits; deleting it now would block.
+    QObject::connect(process, &QProcess::finished, process, &QObject::deleteLater);
+}
+
 } // namespace
 
 QList<Command> candidates(const QString &languageId, const QString &filePath)
@@ -160,9 +172,10 @@ std::optional<QString> run(const Command &command, const QString &workDir, const
     return resultOf(process, name, text, error);
 }
 
-void start(const Command &command, const QString &workDir, const QString &text, QObject *context, const Done &done)
+void start(const Job &job, QObject *context, const Done &done)
 {
-    const QString name = QFileInfo(command.program).completeBaseName();
+    const QString name = QFileInfo(job.command.program).completeBaseName();
+    const QString &text = job.text;
     auto *process = new QProcess(context);
     auto *timer = new QTimer(process);
     timer->setSingleShot(true);
@@ -171,13 +184,7 @@ void start(const Command &command, const QString &workDir, const QString &text, 
     const auto finish = [process, timer, done](const std::optional<QString> &formatted, const QString &error) {
         timer->stop();
         QObject::disconnect(process, nullptr, nullptr, nullptr);
-        if (process->state() != QProcess::NotRunning) {
-            process->kill();
-            // Reaped by QProcess once it exits; deleting it now would block.
-            QObject::connect(process, &QProcess::finished, process, &QObject::deleteLater);
-        } else {
-            process->deleteLater();
-        }
+        disposeOf(process);
         done(formatted, error);
     };
     QObject::connect(process, &QProcess::errorOccurred, context, [process, name, finish](QProcess::ProcessError code) {
@@ -191,8 +198,8 @@ void start(const Command &command, const QString &workDir, const QString &text, 
     });
     QObject::connect(timer, &QTimer::timeout, context, [name, finish] { finish(std::nullopt, timeoutMessage(name)); });
 
-    process->setWorkingDirectory(workDir);
-    process->start(command.program, command.arguments);
+    process->setWorkingDirectory(job.workDir);
+    process->start(job.command.program, job.command.arguments);
     process->write(text.toUtf8());
     process->closeWriteChannel();
     timer->start(timeoutMs);

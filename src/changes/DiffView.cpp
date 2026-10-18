@@ -8,6 +8,7 @@
 #include <QFontMetrics>
 
 #include <algorithm>
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -15,46 +16,40 @@ namespace {
 
 // Styles of the text (no lexer: they are set by hand) and of the margin;
 // from firstSyntaxStyle, the colors of the code (see syntaxStyle()).
-enum Style {
-    PlainStyle = 0,
-    FileHeaderStyle = 40,
-    FileNameStyle = 41,
-    HunkHeaderStyle = 42,
-    NoteStyle = 43,
-    NumberStyle = 44,
-    AddedNumberStyle = 45,
-    RemovedNumberStyle = 46,
-    AddedStatsStyle = 47,
-    RemovedStatsStyle = 48,
-    FileMarginStyle = 49,
-    HunkMarginStyle = 50
-};
+constexpr int plainStyle = 0;
+constexpr int fileHeaderStyle = 40;
+constexpr int fileNameStyle = 41;
+constexpr int hunkHeaderStyle = 42;
+constexpr int noteStyle = 43;
+constexpr int numberStyle = 44;
+constexpr int addedNumberStyle = 45;
+constexpr int removedNumberStyle = 46;
+constexpr int addedStatsStyle = 47;
+constexpr int removedStatsStyle = 48;
+constexpr int fileMarginStyle = 49;
+constexpr int hunkMarginStyle = 50;
 
 constexpr int firstSyntaxStyle = 64;
 constexpr int lastSyntaxStyle = 255;
 
 // Markers: full-line backgrounds, and a stronger strip in the side margin.
-enum Marker {
-    AddedBackground = 0,
-    RemovedBackground,
-    FileHeaderBackground,
-    HunkHeaderBackground,
-    AddedStrip,
-    RemovedStrip,
-    FileHeaderStrip,
-    HunkHeaderStrip
-};
+constexpr int addedBackground = 0;
+constexpr int removedBackground = 1;
+constexpr int fileHeaderBackground = 2;
+constexpr int hunkHeaderBackground = 3;
+constexpr int addedStrip = 4;
+constexpr int removedStrip = 5;
+constexpr int fileHeaderStrip = 6;
+constexpr int hunkHeaderStrip = 7;
 
 // Indicators: the words that changed within a line.
-enum Indicator {
-    AddedWords = 8,
-    RemovedWords
-};
+constexpr int addedWords = 8;
+constexpr int removedWords = 9;
 
 constexpr int numberMargin = 0;
 constexpr int stripMargin = 1;
 // Beyond this, a file's code is not colored: the diff appears at once.
-constexpr qsizetype maxHighlightedBytes = 512 * 1024;
+constexpr qsizetype maxHighlightedBytes = qsizetype(512) * 1024;
 
 QColor mix(const QColor &a, const QColor &b, double share)
 {
@@ -149,6 +144,227 @@ QList<DiffView::Range> changedRanges(const QString &text, const QList<DiffView::
     return ranges;
 }
 
+using Line = DiffView::Line;
+using LineKind = DiffView::LineKind;
+using Range = DiffView::Range;
+
+QStringView tokenText(const QString &text, Range token)
+{
+    return QStringView(text).mid(token.start, token.length);
+}
+
+// Longest common subsequence of the tokens of `removed` and `added`: the
+// length of the one from each pair of positions (i, j), in a table of
+// (before.size() + 1) × (after.size() + 1), filled from the end.
+std::vector<int> commonLengths(const QString &removed,
+                               const QList<Range> &before,
+                               const QString &added,
+                               const QList<Range> &after)
+{
+    const size_t n = before.size();
+    const size_t m = after.size();
+    std::vector<int> common((n + 1) * (m + 1), 0);
+    const auto at = [m](size_t i, size_t j) { return i * (m + 1) + j; };
+    for (size_t i = n; i-- > 0;) {
+        for (size_t j = m; j-- > 0;) {
+            const bool isSame = tokenText(removed, before[int(i)]) == tokenText(added, after[int(j)]);
+            common[at(i, j)] =
+                isSame ? common[at(i + 1, j + 1)] + 1 : std::max(common[at(i + 1, j)], common[at(i, j + 1)]);
+        }
+    }
+    return common;
+}
+
+// "Name.cpp   src/folder · modified   +12 −3", the name brighter.
+Line fileTitle(const DiffFile &file, int fileIndex)
+{
+    const qsizetype slash = file.path.lastIndexOf(QLatin1Char('/'));
+    const QString name = file.path.mid(slash + 1);
+    QStringList details;
+    if (slash >= 0)
+        details.append(file.path.left(slash));
+    if (!file.status.isEmpty())
+        details.append(file.status);
+    Line title;
+    title.kind = LineKind::FileHeader;
+    title.text = details.isEmpty() ? name : name + QStringLiteral("   ") + details.join(QStringLiteral("  ·  "));
+    title.emphasis = static_cast<int>(name.size());
+    QStringList stats;
+    if (const int added = file.patch.addedLines(); added > 0)
+        stats.append(QStringLiteral("+%1").arg(added));
+    if (const int removed = file.patch.removedLines(); removed > 0)
+        stats.append(QStringLiteral("−%1").arg(removed));
+    if (!stats.isEmpty()) {
+        title.text += QStringLiteral("   ");
+        title.statsStart = static_cast<int>(title.text.size());
+        title.text += stats.join(QLatin1Char(' '));
+    }
+    title.location = {fileIndex, -1, -1};
+    return title;
+}
+
+// What stands in place of the blocks of a patch that has none.
+Line noTextNote(const FilePatch &patch, int fileIndex)
+{
+    const bool binary = std::any_of(patch.header.begin(), patch.header.end(), [](const QByteArray &line) {
+        return line.startsWith("Binary files") || line.startsWith("GIT binary patch");
+    });
+    Line note;
+    note.kind = LineKind::Note;
+    note.text = binary ? DiffView::tr("Binary file") : DiffView::tr("No changes to the text");
+    note.location = {fileIndex, -1, -1};
+    return note;
+}
+
+// "⋯ lines 40–48 · function": the numbers of the new version, unless the
+// block only removes.
+Line hunkSeparator(const DiffHunk &hunk, DiffView::Location location, bool withHeading)
+{
+    Line separator;
+    separator.kind = LineKind::HunkHeader;
+    const QString lines =
+        hunk.newCount > 0 ? linesLabel(hunk.newStart, hunk.newCount) : linesLabel(hunk.oldStart, hunk.oldCount);
+    separator.text = QStringLiteral("⋯ ") + lines;
+    if (const QString heading = QString::fromUtf8(hunk.heading).trimmed(); withHeading && !heading.isEmpty())
+        separator.text += QStringLiteral("  ·  ") + heading;
+    separator.location = location;
+    return separator;
+}
+
+// The next line numbers on each side of a block.
+struct LineNumbers {
+    int oldNumber = 0;
+    int newNumber = 0;
+};
+
+// A line of a block, without git's "+", "-" or " "; advances `numbers`
+// past it.
+Line patchLine(const QByteArray &raw, DiffView::Location location, LineNumbers &numbers)
+{
+    Line line;
+    line.location = location;
+    line.text = QString::fromUtf8(raw.mid(1));
+    if (line.text.endsWith(QLatin1Char('\r')))
+        line.text.chop(1);
+    if (raw.startsWith('+')) {
+        line.kind = LineKind::Added;
+        line.newNumber = numbers.newNumber++;
+    } else if (raw.startsWith('-')) {
+        line.kind = LineKind::Removed;
+        line.oldNumber = numbers.oldNumber++;
+    } else if (raw.startsWith('\\')) {
+        line.kind = LineKind::Note;
+        line.text = DiffView::tr("No line break at the end of the file");
+    } else {
+        line.kind = LineKind::Context;
+        line.oldNumber = numbers.oldNumber++;
+        line.newNumber = numbers.newNumber++;
+    }
+    return line;
+}
+
+qsizetype endOfRun(const QList<Line> &lines, qsizetype from, LineKind kind)
+{
+    qsizetype end = from;
+    while (end < lines.size() && lines[end].kind == kind)
+        ++end;
+    return end;
+}
+
+// Removed lines followed by added ones, from `first`: each faces the one in
+// its place, and shows which words changed.
+void markChangedWords(QList<Line> &lines, qsizetype first)
+{
+    for (qsizetype i = first; i < lines.size();) {
+        const qsizetype removedEnd = endOfRun(lines, i, LineKind::Removed);
+        const qsizetype addedEnd = endOfRun(lines, removedEnd, LineKind::Added);
+        const qsizetype pairs = std::min(removedEnd - i, addedEnd - removedEnd);
+        for (qsizetype k = 0; k < pairs; ++k) {
+            auto [before, after] = DiffView::wordChanges(lines[i + k].text, lines[removedEnd + k].text);
+            lines[i + k].changes = std::move(before);
+            lines[removedEnd + k].changes = std::move(after);
+        }
+        i = std::max(addedEnd, i + 1);
+    }
+}
+
+void appendHunk(QList<Line> &lines, const DiffHunk &hunk, DiffView::Location location, bool withHeading)
+{
+    lines.append(hunkSeparator(hunk, location, withHeading));
+    const qsizetype first = lines.size();
+    LineNumbers numbers{hunk.oldStart, hunk.newStart};
+    for (int l = 0; l < hunk.lines.size(); ++l)
+        lines.append(patchLine(hunk.lines[l], {location.file, location.hunk, l}, numbers));
+    markChangedWords(lines, first);
+}
+
+// Bytes of the first `characters` of `text`, as Scintilla counts.
+long utf8Length(const QString &text, int characters)
+{
+    return static_cast<long>(text.left(characters).toUtf8().size());
+}
+
+// Both versions of a file's blocks, one after the other and a blank line
+// between them: removed lines are colored in the old one, the others in
+// the new one, each where it stands in its own code.
+constexpr int oldSide = 0;
+constexpr int newSide = 1;
+
+struct SidePlace {
+    int line;
+    int side;
+    qsizetype offset; // in the side's code
+};
+
+struct BothSides {
+    std::array<QByteArray, 2> code;
+    QList<SidePlace> places;
+};
+
+bool isCodeLine(const Line &line)
+{
+    return line.kind == LineKind::Context || line.kind == LineKind::Added || line.kind == LineKind::Removed;
+}
+
+BothSides collectSides(const QList<Line> &lines, int fileStart, int file)
+{
+    BothSides sides;
+    int hunk = -1;
+    for (int i = fileStart; i < lines.size() && lines[i].location.file == file; ++i) {
+        const Line &line = lines[i];
+        if (!isCodeLine(line))
+            continue;
+        if (line.location.hunk != hunk) {
+            hunk = line.location.hunk;
+            sides.code[oldSide] += '\n';
+            sides.code[newSide] += '\n';
+        }
+        const QByteArray text = line.text.toUtf8() + '\n';
+        const int side = line.kind == LineKind::Removed ? oldSide : newSide;
+        sides.places.append({i, side, sides.code[side].size()});
+        if (line.kind == LineKind::Context)
+            sides.code[oldSide] += text;
+        sides.code[side] += text;
+    }
+    return sides;
+}
+
+// The style of each byte of each side, as `scratch` colors it.
+std::array<QByteArray, 2> scratchStyles(const QsciScintilla &scratch, const std::array<QByteArray, 2> &code)
+{
+    std::array<QByteArray, 2> styles;
+    for (size_t side = 0; side < code.size(); ++side) {
+        scratch.SendScintilla(QsciScintillaBase::SCI_SETTEXT, 0UL, code[side].constData());
+        scratch.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0UL, -1L);
+        styles[side].resize(code[side].size());
+        for (qsizetype p = 0; p < code[side].size(); ++p) {
+            styles[side][p] = static_cast<char>(
+                scratch.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, static_cast<unsigned long>(p)));
+        }
+    }
+    return styles;
+}
+
 } // namespace
 
 DiffView::DiffView(const Theme &theme, QWidget *parent)
@@ -165,7 +381,7 @@ DiffView::DiffView(const Theme &theme, QWidget *parent)
     setMarginType(stripMargin, QsciScintilla::SymbolMargin);
     setMarginMarkerMask(numberMargin, 0);
     setMarginMarkerMask(stripMargin,
-                        (1 << AddedStrip) | (1 << RemovedStrip) | (1 << FileHeaderStrip) | (1 << HunkHeaderStrip));
+                        (1 << addedStrip) | (1 << removedStrip) | (1 << fileHeaderStrip) | (1 << hunkHeaderStrip));
     setMarginWidth(stripMargin, 3);
     for (int margin = 2; margin < 5; ++margin)
         setMarginWidth(margin, 0);
@@ -181,27 +397,16 @@ std::pair<QList<DiffView::Range>, QList<DiffView::Range>> DiffView::wordChanges(
     const size_t m = after.size();
     if (n == 0 || m == 0 || n * m > 40000)
         return {};
-    const auto token = [](const QString &text, Range range) {
-        return QStringView(text).mid(range.start, range.length);
-    };
 
-    // Longest common subsequence of the tokens, from the end.
-    std::vector<int> common((n + 1) * (m + 1), 0);
+    const std::vector<int> common = commonLengths(removed, before, added, after);
     const auto at = [m](size_t i, size_t j) { return i * (m + 1) + j; };
-    for (size_t i = n; i-- > 0;) {
-        for (size_t j = m; j-- > 0;) {
-            common[at(i, j)] = token(removed, before[int(i)]) == token(added, after[int(j)])
-                                   ? common[at(i + 1, j + 1)] + 1
-                                   : std::max(common[at(i + 1, j)], common[at(i, j + 1)]);
-        }
-    }
     std::vector<bool> keptBefore(n, false);
     std::vector<bool> keptAfter(m, false);
     int shared = 0;
     for (size_t i = 0, j = 0; i < n && j < m;) {
-        if (token(removed, before[int(i)]) == token(added, after[int(j)])) {
+        if (tokenText(removed, before[int(i)]) == tokenText(added, after[int(j)])) {
             keptBefore[i] = keptAfter[j] = true;
-            shared += visibleLength(token(removed, before[int(i)]));
+            shared += visibleLength(tokenText(removed, before[int(i)]));
             ++i;
             ++j;
         } else if (common[at(i + 1, j)] >= common[at(i, j + 1)]) {
@@ -226,105 +431,19 @@ QList<DiffView::Line> DiffView::layout(const QList<DiffFile> &files)
         Line spacer;
         spacer.kind = LineKind::Spacer;
         lines.append(spacer);
-        // "Name.cpp   src/folder · modified   +12 −3", the name brighter.
-        const qsizetype slash = file.path.lastIndexOf(QLatin1Char('/'));
-        const QString name = file.path.mid(slash + 1);
-        QStringList details;
-        if (slash >= 0)
-            details.append(file.path.left(slash));
-        if (!file.status.isEmpty())
-            details.append(file.status);
-        Line title;
-        title.kind = LineKind::FileHeader;
-        title.text = details.isEmpty() ? name : name + QStringLiteral("   ") + details.join(QStringLiteral("  ·  "));
-        title.emphasis = static_cast<int>(name.size());
-        QStringList stats;
-        if (const int added = file.patch.addedLines(); added > 0)
-            stats.append(QStringLiteral("+%1").arg(added));
-        if (const int removed = file.patch.removedLines(); removed > 0)
-            stats.append(QStringLiteral("−%1").arg(removed));
-        if (!stats.isEmpty()) {
-            title.text += QStringLiteral("   ");
-            title.statsStart = static_cast<int>(title.text.size());
-            title.text += stats.join(QLatin1Char(' '));
-        }
-        title.location = {f, -1, -1};
-        lines.append(title);
+        lines.append(fileTitle(file, f));
 
         const FilePatch &patch = file.patch;
         if (patch.hunks.isEmpty()) {
-            const bool binary = std::any_of(patch.header.begin(), patch.header.end(), [](const QByteArray &line) {
-                return line.startsWith("Binary files") || line.startsWith("GIT binary patch");
-            });
-            Line note;
-            note.kind = LineKind::Note;
-            note.text = binary ? tr("Binary file") : tr("No changes to the text");
-            note.location = {f, -1, -1};
-            lines.append(note);
+            lines.append(noTextNote(patch, f));
             continue;
         }
         // Git takes the heading of a block from the last line starting with
         // a letter: in prose, a sentence cut short.
         const QString language = LanguageRegistry::languageForFile(file.path);
         const bool headings = language != LanguageRegistry::plainText && language != QLatin1String("markdown");
-        for (int h = 0; h < patch.hunks.size(); ++h) {
-            const DiffHunk &hunk = patch.hunks[h];
-            Line separator;
-            separator.kind = LineKind::HunkHeader;
-            // Numbers of the new version, unless the block only removes.
-            separator.text = QStringLiteral("⋯ ") + (hunk.newCount > 0 ? linesLabel(hunk.newStart, hunk.newCount)
-                                                                       : linesLabel(hunk.oldStart, hunk.oldCount));
-            if (const QString heading = QString::fromUtf8(hunk.heading).trimmed(); headings && !heading.isEmpty())
-                separator.text += QStringLiteral("  ·  ") + heading;
-            separator.location = {f, h, -1};
-            lines.append(separator);
-
-            const qsizetype first = lines.size();
-            int oldNumber = hunk.oldStart;
-            int newNumber = hunk.newStart;
-            for (int l = 0; l < hunk.lines.size(); ++l) {
-                const QByteArray &raw = hunk.lines[l];
-                Line line;
-                line.location = {f, h, l};
-                QString text = QString::fromUtf8(raw.mid(1));
-                if (text.endsWith(QLatin1Char('\r')))
-                    text.chop(1);
-                line.text = text;
-                if (raw.startsWith('+')) {
-                    line.kind = LineKind::Added;
-                    line.newNumber = newNumber++;
-                } else if (raw.startsWith('-')) {
-                    line.kind = LineKind::Removed;
-                    line.oldNumber = oldNumber++;
-                } else if (raw.startsWith('\\')) {
-                    line.kind = LineKind::Note;
-                    line.text = tr("No line break at the end of the file");
-                } else {
-                    line.kind = LineKind::Context;
-                    line.oldNumber = oldNumber++;
-                    line.newNumber = newNumber++;
-                }
-                lines.append(line);
-            }
-
-            // Removed lines followed by added ones: each faces the one in
-            // its place, and shows which words changed.
-            for (qsizetype i = first; i < lines.size();) {
-                qsizetype removedEnd = i;
-                while (removedEnd < lines.size() && lines[removedEnd].kind == LineKind::Removed)
-                    ++removedEnd;
-                qsizetype addedEnd = removedEnd;
-                while (addedEnd < lines.size() && lines[addedEnd].kind == LineKind::Added)
-                    ++addedEnd;
-                const qsizetype pairs = std::min(removedEnd - i, addedEnd - removedEnd);
-                for (qsizetype k = 0; k < pairs; ++k) {
-                    auto [before, after] = wordChanges(lines[i + k].text, lines[removedEnd + k].text);
-                    lines[i + k].changes = std::move(before);
-                    lines[removedEnd + k].changes = std::move(after);
-                }
-                i = std::max(addedEnd, i + 1);
-            }
-        }
+        for (int h = 0; h < patch.hunks.size(); ++h)
+            appendHunk(lines, patch.hunks[h], {f, h, -1}, headings);
     }
     return lines;
 }
@@ -383,79 +502,8 @@ void DiffView::render()
 
     markerDeleteAll();
     clearMarginText();
-    // Margin: "old new" numbers, and a sign the colors repeat.
-    const QString blank(numberWidth_, QLatin1Char(' '));
-    const auto number = [this, &blank](int value) {
-        return value > 0 ? QString::number(value).rightJustified(numberWidth_) : blank;
-    };
-    const auto bytes = [](const QString &text, int characters) {
-        return static_cast<long>(text.left(characters).toUtf8().size());
-    };
-    for (int i = 0; i < lines_.size(); ++i) {
-        const Line &line = lines_[i];
-        const long start = SendScintilla(SCI_POSITIONFROMLINE, i);
-        const long length = SendScintilla(SCI_LINELENGTH, i);
-        int style = PlainStyle;
-        switch (line.kind) {
-        case LineKind::Spacer:
-            break;
-        case LineKind::FileHeader:
-            style = FileHeaderStyle;
-            markerAdd(i, FileHeaderBackground);
-            markerAdd(i, FileHeaderStrip);
-            setMarginText(i, QStringLiteral(" "), FileMarginStyle);
-            break;
-        case LineKind::HunkHeader:
-            style = HunkHeaderStyle;
-            markerAdd(i, HunkHeaderBackground);
-            markerAdd(i, HunkHeaderStrip);
-            setMarginText(i, QStringLiteral(" "), HunkMarginStyle);
-            break;
-        case LineKind::Note:
-            style = NoteStyle;
-            break;
-        case LineKind::Added:
-            markerAdd(i, AddedBackground);
-            markerAdd(i, AddedStrip);
-            setMarginText(i, QStringLiteral("%1 %2 +").arg(blank, number(line.newNumber)), AddedNumberStyle);
-            break;
-        case LineKind::Removed:
-            markerAdd(i, RemovedBackground);
-            markerAdd(i, RemovedStrip);
-            setMarginText(i, QStringLiteral("%1 %2 −").arg(number(line.oldNumber), blank), RemovedNumberStyle);
-            break;
-        case LineKind::Context:
-            setMarginText(i, QStringLiteral("%1 %2  ").arg(number(line.oldNumber), number(line.newNumber)),
-                          NumberStyle);
-            break;
-        }
-        SendScintilla(SCI_STARTSTYLING, start);
-        SendScintilla(SCI_SETSTYLING, length, style);
-        if (line.emphasis > 0) {
-            SendScintilla(SCI_STARTSTYLING, start);
-            SendScintilla(SCI_SETSTYLING, bytes(line.text, line.emphasis), FileNameStyle);
-        }
-        if (line.statsStart >= 0) {
-            // "+12" in green, "−3" in red.
-            const int minus = static_cast<int>(line.text.indexOf(QChar(0x2212), line.statsStart));
-            const long statsStart = start + bytes(line.text, line.statsStart);
-            const long minusStart = minus >= 0 ? start + bytes(line.text, minus) : start + length;
-            SendScintilla(SCI_STARTSTYLING, statsStart);
-            SendScintilla(SCI_SETSTYLING, minusStart - statsStart, AddedStatsStyle);
-            if (minus >= 0) {
-                SendScintilla(SCI_STARTSTYLING, minusStart);
-                SendScintilla(SCI_SETSTYLING, start + length - minusStart, RemovedStatsStyle);
-            }
-        }
-        if (!line.changes.isEmpty()) {
-            SendScintilla(SCI_SETINDICATORCURRENT, line.kind == LineKind::Added ? AddedWords : RemovedWords);
-            for (const Range &range : line.changes) {
-                const long from = start + bytes(line.text, range.start);
-                SendScintilla(SCI_INDICATORFILLRANGE, from,
-                              start + bytes(line.text, range.start + range.length) - from);
-            }
-        }
-    }
+    for (int i = 0; i < lines_.size(); ++i)
+        styleLine(i, decorateLine(i));
     for (int file = 0; file < fileStarts_.size(); ++file)
         highlightSyntax(file);
 
@@ -467,42 +515,96 @@ void DiffView::render()
                    numbered ? metrics.horizontalAdvance(QString(2 * numberWidth_ + 5, QLatin1Char('9'))) : 8);
 }
 
+QString DiffView::marginNumber(int value) const
+{
+    if (value <= 0)
+        return {numberWidth_, QLatin1Char(' ')};
+    return QString::number(value).rightJustified(numberWidth_);
+}
+
+int DiffView::decorateLine(int line)
+{
+    // Margin: "old new" numbers, and a sign the colors repeat.
+    const Line &shown = lines_[line];
+    const QString blank = marginNumber(0);
+    switch (shown.kind) {
+    case LineKind::Spacer:
+        return plainStyle;
+    case LineKind::FileHeader:
+        markerAdd(line, fileHeaderBackground);
+        markerAdd(line, fileHeaderStrip);
+        setMarginText(line, QStringLiteral(" "), fileMarginStyle);
+        return fileHeaderStyle;
+    case LineKind::HunkHeader:
+        markerAdd(line, hunkHeaderBackground);
+        markerAdd(line, hunkHeaderStrip);
+        setMarginText(line, QStringLiteral(" "), hunkMarginStyle);
+        return hunkHeaderStyle;
+    case LineKind::Note:
+        return noteStyle;
+    case LineKind::Added:
+        markerAdd(line, addedBackground);
+        markerAdd(line, addedStrip);
+        setMarginText(line, QStringLiteral("%1 %2 +").arg(blank, marginNumber(shown.newNumber)), addedNumberStyle);
+        return plainStyle;
+    case LineKind::Removed:
+        markerAdd(line, removedBackground);
+        markerAdd(line, removedStrip);
+        setMarginText(line, QStringLiteral("%1 %2 −").arg(marginNumber(shown.oldNumber), blank), removedNumberStyle);
+        return plainStyle;
+    case LineKind::Context:
+        setMarginText(line, QStringLiteral("%1 %2  ").arg(marginNumber(shown.oldNumber), marginNumber(shown.newNumber)),
+                      numberStyle);
+        return plainStyle;
+    }
+    return plainStyle;
+}
+
+void DiffView::styleLine(int line, int style)
+{
+    const Line &shown = lines_[line];
+    const long start = SendScintilla(SCI_POSITIONFROMLINE, line);
+    const long length = SendScintilla(SCI_LINELENGTH, line);
+    SendScintilla(SCI_STARTSTYLING, start);
+    SendScintilla(SCI_SETSTYLING, length, style);
+    if (shown.emphasis > 0) {
+        SendScintilla(SCI_STARTSTYLING, start);
+        SendScintilla(SCI_SETSTYLING, utf8Length(shown.text, shown.emphasis), fileNameStyle);
+    }
+    if (shown.statsStart >= 0)
+        styleStats(shown, start, length);
+    if (shown.changes.isEmpty())
+        return;
+    SendScintilla(SCI_SETINDICATORCURRENT, shown.kind == LineKind::Added ? addedWords : removedWords);
+    for (const Range &range : shown.changes) {
+        const long from = start + utf8Length(shown.text, range.start);
+        SendScintilla(SCI_INDICATORFILLRANGE, from, start + utf8Length(shown.text, range.start + range.length) - from);
+    }
+}
+
+void DiffView::styleStats(const Line &title, long start, long length)
+{
+    // "+12" in green, "−3" in red.
+    const int minus = static_cast<int>(title.text.indexOf(QChar(0x2212), title.statsStart));
+    const long statsStart = start + utf8Length(title.text, title.statsStart);
+    const long minusStart = minus >= 0 ? start + utf8Length(title.text, minus) : start + length;
+    SendScintilla(SCI_STARTSTYLING, statsStart);
+    SendScintilla(SCI_SETSTYLING, minusStart - statsStart, addedStatsStyle);
+    if (minus < 0)
+        return;
+    SendScintilla(SCI_STARTSTYLING, minusStart);
+    SendScintilla(SCI_SETSTYLING, start + length - minusStart, removedStatsStyle);
+}
+
 void DiffView::highlightSyntax(int file)
 {
     const QString language = LanguageRegistry::languageForFile(paths_.value(file));
     if (language == LanguageRegistry::plainText)
         return;
 
-    // Both versions of the blocks, one after the other and a blank line
-    // between them: removed lines are colored in the old one, the others in
-    // the new one, each where it stands in its own code.
-    QByteArray sides[2];
-
-    struct Place {
-        int line;
-        int side;
-        qsizetype offset;
-    };
-
-    QList<Place> places;
-    int hunk = -1;
-    for (int i = fileStarts_[file]; i < lines_.size() && lines_[i].location.file == file; ++i) {
-        const Line &line = lines_[i];
-        if (line.kind != LineKind::Context && line.kind != LineKind::Added && line.kind != LineKind::Removed)
-            continue;
-        if (line.location.hunk != hunk) {
-            hunk = line.location.hunk;
-            sides[0] += '\n';
-            sides[1] += '\n';
-        }
-        const QByteArray text = line.text.toUtf8() + '\n';
-        const int side = line.kind == LineKind::Removed ? 0 : 1;
-        places.append({i, side, sides[side].size()});
-        if (line.kind == LineKind::Context)
-            sides[0] += text;
-        sides[side] += text;
-    }
-    if (places.isEmpty() || sides[0].size() + sides[1].size() > maxHighlightedBytes)
+    const BothSides sides = collectSides(lines_, fileStarts_[file], file);
+    const bool isTooLong = sides.code[oldSide].size() + sides.code[newSide].size() > maxHighlightedBytes;
+    if (sides.places.isEmpty() || isTooLong)
         return;
 
     QsciScintilla scratch;
@@ -511,44 +613,40 @@ void DiffView::highlightSyntax(int file)
         return;
     highlighter->attach(&scratch);
     highlighter->applyTheme(theme_);
+    const std::array<QByteArray, 2> styles = scratchStyles(scratch, sides.code);
 
     // The scratch editor's styles become the diff's, by their look.
     const long plain = scintillaColor(theme_.foreground);
     std::vector<int> styleOf(256, -1);
     const auto diffStyle = [&](int scratchStyle) {
         int &style = styleOf[scratchStyle & 0xff];
-        if (style < 0) {
-            const long foreground = scratch.SendScintilla(SCI_STYLEGETFORE, scratchStyle);
-            const bool bold = scratch.SendScintilla(SCI_STYLEGETBOLD, scratchStyle);
-            const bool italic = scratch.SendScintilla(SCI_STYLEGETITALIC, scratchStyle);
-            style = foreground == plain && !bold && !italic ? PlainStyle : syntaxStyle(foreground, bold, italic);
-        }
+        if (style >= 0)
+            return style;
+        const long foreground = scratch.SendScintilla(SCI_STYLEGETFORE, scratchStyle);
+        const bool bold = scratch.SendScintilla(SCI_STYLEGETBOLD, scratchStyle);
+        const bool italic = scratch.SendScintilla(SCI_STYLEGETITALIC, scratchStyle);
+        const bool isPlain = foreground == plain && !bold && !italic;
+        style = isPlain ? plainStyle : syntaxStyle(foreground, bold, italic);
         return style;
     };
-    QByteArray styles[2];
-    for (int side = 0; side < 2; ++side) {
-        scratch.SendScintilla(SCI_SETTEXT, 0UL, sides[side].constData());
-        scratch.SendScintilla(SCI_COLOURISE, 0UL, -1L);
-        styles[side].resize(sides[side].size());
-        for (qsizetype p = 0; p < sides[side].size(); ++p)
-            styles[side][p] = static_cast<char>(scratch.SendScintilla(SCI_GETSTYLEAT, static_cast<unsigned long>(p)));
-    }
+    for (const SidePlace &place : sides.places)
+        styleRuns(place.line, QByteArrayView(styles[place.side]).sliced(place.offset), diffStyle);
+}
 
-    for (const Place &place : std::as_const(places)) {
-        const long start = SendScintilla(SCI_POSITIONFROMLINE, place.line);
-        const long length = static_cast<long>(lines_[place.line].text.toUtf8().size());
-        const QByteArray &lineStyles = styles[place.side];
-        for (long run = 0; run < length;) {
-            const char scratchStyle = lineStyles[place.offset + run];
-            long end = run + 1;
-            while (end < length && lineStyles[place.offset + end] == scratchStyle)
-                ++end;
-            if (const int style = diffStyle(static_cast<unsigned char>(scratchStyle)); style != PlainStyle) {
-                SendScintilla(SCI_STARTSTYLING, start + run);
-                SendScintilla(SCI_SETSTYLING, end - run, style);
-            }
-            run = end;
+void DiffView::styleRuns(int line, QByteArrayView scratchStyles, const std::function<int(int)> &diffStyle)
+{
+    const long start = SendScintilla(SCI_POSITIONFROMLINE, line);
+    const long length = static_cast<long>(lines_[line].text.toUtf8().size());
+    for (long run = 0; run < length;) {
+        const char scratchStyle = scratchStyles[run];
+        long end = run + 1;
+        while (end < length && scratchStyles[end] == scratchStyle)
+            ++end;
+        if (const int style = diffStyle(static_cast<unsigned char>(scratchStyle)); style != plainStyle) {
+            SendScintilla(SCI_STARTSTYLING, start + run);
+            SendScintilla(SCI_SETSTYLING, end - run, style);
         }
+        run = end;
     }
 }
 
@@ -559,7 +657,7 @@ int DiffView::syntaxStyle(long foreground, bool bold, bool italic)
         return it.value();
     const int style = firstSyntaxStyle + static_cast<int>(syntaxStyles_.size());
     if (style > lastSyntaxStyle)
-        return PlainStyle;
+        return plainStyle;
     const QByteArray family = theme_.font.family().toUtf8();
     SendScintilla(SCI_STYLESETFORE, style, foreground);
     SendScintilla(SCI_STYLESETBACK, style, theme_.background);
@@ -597,36 +695,36 @@ void DiffView::defineStyles()
     define(STYLE_DEFAULT, theme_.foreground, theme_.background, theme_.font);
     SendScintilla(SCI_STYLECLEARALL);
     syntaxStyles_.clear();
-    define(PlainStyle, theme_.foreground, theme_.background, theme_.font);
-    define(FileHeaderStyle, colors.muted, colors.fileHeader, label);
-    define(FileNameStyle, theme_.foreground, colors.fileHeader, name);
-    define(HunkHeaderStyle, colors.muted, colors.hunkHeader, small);
-    define(NoteStyle, colors.muted, theme_.background, italic);
-    define(NumberStyle, theme_.marginForeground, theme_.marginBackground, theme_.font);
-    define(AddedNumberStyle, colors.addedStrong, colors.added, theme_.font);
-    define(RemovedNumberStyle, colors.removedStrong, colors.removed, theme_.font);
-    define(AddedStatsStyle, colors.addedStrong, colors.fileHeader, stats);
-    define(RemovedStatsStyle, colors.removedStrong, colors.fileHeader, stats);
-    define(FileMarginStyle, colors.muted, colors.fileHeader, theme_.font);
-    define(HunkMarginStyle, colors.muted, colors.hunkHeader, theme_.font);
+    define(plainStyle, theme_.foreground, theme_.background, theme_.font);
+    define(fileHeaderStyle, colors.muted, colors.fileHeader, label);
+    define(fileNameStyle, theme_.foreground, colors.fileHeader, name);
+    define(hunkHeaderStyle, colors.muted, colors.hunkHeader, small);
+    define(noteStyle, colors.muted, theme_.background, italic);
+    define(numberStyle, theme_.marginForeground, theme_.marginBackground, theme_.font);
+    define(addedNumberStyle, colors.addedStrong, colors.added, theme_.font);
+    define(removedNumberStyle, colors.removedStrong, colors.removed, theme_.font);
+    define(addedStatsStyle, colors.addedStrong, colors.fileHeader, stats);
+    define(removedStatsStyle, colors.removedStrong, colors.fileHeader, stats);
+    define(fileMarginStyle, colors.muted, colors.fileHeader, theme_.font);
+    define(hunkMarginStyle, colors.muted, colors.hunkHeader, theme_.font);
     define(STYLE_LINENUMBER, theme_.marginForeground, theme_.marginBackground, theme_.font);
 
     const auto background = [this](int marker, const QColor &color) {
         markerDefine(QsciScintilla::Background, marker);
         setMarkerBackgroundColor(color, marker);
     };
-    background(AddedBackground, colors.added);
-    background(RemovedBackground, colors.removed);
-    background(FileHeaderBackground, colors.fileHeader);
-    background(HunkHeaderBackground, colors.hunkHeader);
+    background(addedBackground, colors.added);
+    background(removedBackground, colors.removed);
+    background(fileHeaderBackground, colors.fileHeader);
+    background(hunkHeaderBackground, colors.hunkHeader);
     const auto strip = [this](int marker, const QColor &color) {
         markerDefine(QsciScintilla::FullRectangle, marker);
         setMarkerBackgroundColor(color, marker);
     };
-    strip(AddedStrip, colors.addedStrong);
-    strip(RemovedStrip, colors.removedStrong);
-    strip(FileHeaderStrip, colors.fileHeader);
-    strip(HunkHeaderStrip, colors.hunkHeader);
+    strip(addedStrip, colors.addedStrong);
+    strip(removedStrip, colors.removedStrong);
+    strip(fileHeaderStrip, colors.fileHeader);
+    strip(hunkHeaderStrip, colors.hunkHeader);
 
     const auto words = [this](int indicator, const QColor &color) {
         SendScintilla(SCI_INDICSETSTYLE, indicator, long(INDIC_FULLBOX));
@@ -635,8 +733,8 @@ void DiffView::defineStyles()
         SendScintilla(SCI_INDICSETOUTLINEALPHA, indicator, 0L);
         SendScintilla(SCI_INDICSETUNDER, indicator, 1L);
     };
-    words(AddedWords, colors.addedWords);
-    words(RemovedWords, colors.removedWords);
+    words(addedWords, colors.addedWords);
+    words(removedWords, colors.removedWords);
 }
 
 void DiffView::applyTheme(const Theme &theme)

@@ -14,7 +14,7 @@ QString writeIcon(const QString &name, const QString &svg)
     const QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/theme");
     if (!QDir().mkpath(folder))
         return {};
-    const QString path = folder + QLatin1Char('/') + name;
+    QString path = folder + QLatin1Char('/') + name;
     QFile file(path);
     if (file.open(QIODevice::ReadOnly) && file.readAll() == svg.toUtf8())
         return path;

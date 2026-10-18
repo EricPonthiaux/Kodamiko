@@ -3,13 +3,15 @@
 #include <QRegularExpression>
 
 #include <algorithm>
+#include <optional>
 
 namespace {
 
-QByteArray hunkHeader(int oldStart, int oldCount, int newStart, int newCount, const QByteArray &heading)
+// The "@@" line of `hunk`.
+QByteArray hunkHeader(const DiffHunk &hunk)
 {
-    return "@@ -" + QByteArray::number(oldStart) + ',' + QByteArray::number(oldCount) + " +" +
-           QByteArray::number(newStart) + ',' + QByteArray::number(newCount) + " @@" + heading;
+    return "@@ -" + QByteArray::number(hunk.oldStart) + ',' + QByteArray::number(hunk.oldCount) + " +" +
+           QByteArray::number(hunk.newStart) + ',' + QByteArray::number(hunk.newCount) + " @@" + hunk.heading;
 }
 
 // First line number of one side of a hunk: git writes the preceding line
@@ -24,11 +26,24 @@ int startFromFirstLine(int first, int count)
     return count > 0 ? first : first - 1;
 }
 
+// "a/path" ↔ "b/path", quotes included if git added them.
+QByteArray otherSide(QByteArray name, char from, char to)
+{
+    const int letter = name.startsWith('"') ? 1 : 0;
+    if (name.size() > letter && name[letter] == from)
+        name[letter] = to;
+    return name;
+}
+
+bool isFileModeOrIndexLine(const QByteArray &line)
+{
+    return line.startsWith("deleted file mode") || line.startsWith("new file mode") || line.startsWith("index ");
+}
+
 // Partial patch of a deleted file (forward) or created file (reverse): the
 // file must stay, so the patch becomes a plain modification.
 QList<QByteArray> keepFileHeader(const QList<QByteArray> &header)
 {
-    QList<QByteArray> result;
     QByteArray oldName;
     QByteArray newName;
     for (const QByteArray &line : header) {
@@ -37,15 +52,9 @@ QList<QByteArray> keepFileHeader(const QList<QByteArray> &header)
         else if (line.startsWith("+++ "))
             newName = line.mid(4);
     }
-    // "a/path" ↔ "b/path", quotes included if git added them.
-    const auto otherSide = [](QByteArray name, char from, char to) {
-        const int letter = name.startsWith('"') ? 1 : 0;
-        if (name.size() > letter && name[letter] == from)
-            name[letter] = to;
-        return name;
-    };
+    QList<QByteArray> result;
     for (const QByteArray &line : header) {
-        if (line.startsWith("deleted file mode") || line.startsWith("new file mode") || line.startsWith("index "))
+        if (isFileModeOrIndexLine(line))
             continue;
         if (line == "--- /dev/null")
             result.append("--- " + otherSide(newName, 'b', 'a'));
@@ -53,6 +62,101 @@ QList<QByteArray> keepFileHeader(const QList<QByteArray> &header)
             result.append("+++ " + otherSide(oldName, 'a', 'b'));
         else
             result.append(line);
+    }
+    return result;
+}
+
+// The hunk whose "@@" line is `line`, without its lines; nothing if `line`
+// is not a hunk header.
+std::optional<DiffHunk> parseHunkHeader(const QByteArray &line)
+{
+    static const QRegularExpression hunkPattern(QStringLiteral(R"(^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@)"));
+    if (!line.startsWith("@@ "))
+        return std::nullopt;
+    const QRegularExpressionMatch match = hunkPattern.match(QString::fromLatin1(line));
+    if (!match.hasMatch())
+        return std::nullopt;
+    // A count git omits is 1.
+    const auto count = [&match](int group) {
+        return match.captured(group).isEmpty() ? 1 : match.captured(group).toInt();
+    };
+    DiffHunk hunk;
+    hunk.oldStart = match.captured(1).toInt();
+    hunk.oldCount = count(2);
+    hunk.newStart = match.captured(3).toInt();
+    hunk.newCount = count(4);
+    hunk.heading = line.mid(match.capturedLength(0));
+    return hunk;
+}
+
+struct SelectionCoverage {
+    bool anySelected = false;
+    bool complete = true; // every "+" and "-" line is selected
+};
+
+SelectionCoverage coverageOf(const QList<DiffHunk> &hunks, const PatchSelection &selection)
+{
+    SelectionCoverage coverage;
+    for (int i = 0; i < hunks.size(); ++i) {
+        const QSet<int> chosen = selection.value(i);
+        for (int j = 0; j < hunks[i].lines.size(); ++j) {
+            if (!hunks[i].isChange(j))
+                continue;
+            if (chosen.contains(j))
+                coverage.anySelected = true;
+            else
+                coverage.complete = false;
+        }
+    }
+    return coverage;
+}
+
+bool hasHeaderLine(const QList<QByteArray> &header, const char *start)
+{
+    return std::any_of(header.begin(), header.end(),
+                       [start](const QByteArray &line) { return line.startsWith(start); });
+}
+
+bool hasChosenChange(const DiffHunk &hunk, const QSet<int> &chosen)
+{
+    return std::any_of(chosen.begin(), chosen.end(),
+                       [&hunk](int line) { return line < hunk.lines.size() && hunk.isChange(line); });
+}
+
+// The first character of a diff line: ' ', '+', '-' or '\\'.
+char kindOf(const QByteArray &line)
+{
+    return line.isEmpty() ? ' ' : line[0];
+}
+
+// `hunk` keeping only the chosen changes, with both sides counted again.
+// The starts are copied as they are.
+DiffHunk partialHunk(const DiffHunk &hunk, const QSet<int> &chosen, PatchDirection direction)
+{
+    // An unselected change stays as on the side the patch applies to.
+    const char keptKind = direction == PatchDirection::Forward ? '-' : '+';
+    DiffHunk result;
+    result.oldStart = hunk.oldStart;
+    result.newStart = hunk.newStart;
+    result.heading = hunk.heading;
+    bool previousKept = false;
+    for (int j = 0; j < hunk.lines.size(); ++j) {
+        QByteArray line = hunk.lines[j];
+        const char kind = kindOf(line);
+        if (kind == '\\') {
+            if (previousKept)
+                result.lines.append(line);
+            continue;
+        }
+        const bool isUnselectedChange = hunk.isChange(j) && !chosen.contains(j);
+        previousKept = !isUnselectedChange || kind == keptKind;
+        if (!previousKept)
+            continue;
+        if (isUnselectedChange)
+            line[0] = ' ';
+        result.lines.append(line);
+        result.oldCount += int(kindOf(line) != '+');
+        result.newCount += int(kindOf(line) != '-');
     }
     return result;
 }
@@ -67,25 +171,14 @@ bool DiffHunk::isChange(int line) const
 
 FilePatch FilePatch::parse(const QByteArray &patch)
 {
-    static const QRegularExpression hunkPattern(QStringLiteral(R"(^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@)"));
-
     FilePatch result;
     QList<QByteArray> lines = patch.split('\n');
     if (!lines.isEmpty() && lines.last().isEmpty())
         lines.removeLast();
     for (const QByteArray &line : std::as_const(lines)) {
-        if (line.startsWith("@@ ")) {
-            const QRegularExpressionMatch match = hunkPattern.match(QString::fromLatin1(line));
-            if (match.hasMatch()) {
-                DiffHunk hunk;
-                hunk.oldStart = match.captured(1).toInt();
-                hunk.oldCount = match.captured(2).isEmpty() ? 1 : match.captured(2).toInt();
-                hunk.newStart = match.captured(3).toInt();
-                hunk.newCount = match.captured(4).isEmpty() ? 1 : match.captured(4).toInt();
-                hunk.heading = line.mid(match.capturedLength(0));
-                result.hunks.append(hunk);
-                continue;
-            }
+        if (std::optional<DiffHunk> hunk = parseHunkHeader(line)) {
+            result.hunks.append(std::move(*hunk));
+            continue;
         }
         if (result.hunks.isEmpty())
             result.header.append(line);
@@ -148,83 +241,34 @@ PatchSelection FilePatch::selectHunk(int hunk) const
 
 QByteArray FilePatch::partial(const PatchSelection &selection, PatchDirection direction) const
 {
-    const bool forward = direction == PatchDirection::Forward;
-    bool anySelected = false;
-    bool complete = true;
-    for (int i = 0; i < hunks.size(); ++i) {
-        for (int j = 0; j < hunks[i].lines.size(); ++j) {
-            if (!hunks[i].isChange(j))
-                continue;
-            if (selection.value(i).contains(j))
-                anySelected = true;
-            else
-                complete = false;
-        }
-    }
-    if (!anySelected)
+    const SelectionCoverage coverage = coverageOf(hunks, selection);
+    if (!coverage.anySelected)
         return {};
 
     // The side the patch applies to (the old one forward, the new one in
     // reverse) is kept as is; only the other side changes.
-    const auto hasLine = [this](const char *start) {
-        return std::any_of(header.begin(), header.end(),
-                           [start](const QByteArray &line) { return line.startsWith(start); });
-    };
-    const bool fileMustStay = !complete && (forward ? hasLine("deleted file mode") : hasLine("new file mode"));
+    const bool forward = direction == PatchDirection::Forward;
+    const char *const removedFileMode = forward ? "deleted file mode" : "new file mode";
+    const bool fileMustStay = !coverage.complete && hasHeaderLine(header, removedFileMode);
     QList<QByteArray> out = fileMustStay ? keepFileHeader(header) : header;
 
     int delta = 0; // accumulated offset on the modified side
     for (int i = 0; i < hunks.size(); ++i) {
-        const DiffHunk &hunk = hunks[i];
         const QSet<int> chosen = selection.value(i);
-        const bool hasChange = std::any_of(chosen.begin(), chosen.end(), [&hunk](int line) {
-            return line < hunk.lines.size() && hunk.isChange(line);
-        });
-        if (!hasChange)
+        if (!hasChosenChange(hunks[i], chosen))
             continue;
-
-        QList<QByteArray> body;
-        int oldCount = 0;
-        int newCount = 0;
-        bool previousKept = false;
-        for (int j = 0; j < hunk.lines.size(); ++j) {
-            QByteArray line = hunk.lines[j];
-            const char kind = line.isEmpty() ? ' ' : line[0];
-            if (kind == '\\') {
-                if (previousKept)
-                    body.append(line);
-                continue;
-            }
-            if ((kind == '+' || kind == '-') && !chosen.contains(j)) {
-                // Unselected change: the line stays as on the side the
-                // patch applies to.
-                const char kept = forward ? '-' : '+';
-                previousKept = kind == kept;
-                if (!previousKept)
-                    continue;
-                line[0] = ' ';
-            } else {
-                previousKept = true;
-            }
-            body.append(line);
-            const char marker = line.isEmpty() ? ' ' : line[0];
-            oldCount += marker != '+';
-            newCount += marker != '-';
-        }
-
+        DiffHunk part = partialHunk(hunks[i], chosen, direction);
         // Only the start of the modified side is recomputed: the previous
         // hunks may not be fully applied to it.
-        int oldStart = hunk.oldStart;
-        int newStart = hunk.newStart;
         if (forward) {
-            newStart = startFromFirstLine(firstLine(oldStart, oldCount) + delta, newCount);
-            delta += newCount - oldCount;
+            part.newStart = startFromFirstLine(firstLine(part.oldStart, part.oldCount) + delta, part.newCount);
+            delta += part.newCount - part.oldCount;
         } else {
-            oldStart = startFromFirstLine(firstLine(newStart, newCount) + delta, oldCount);
-            delta += oldCount - newCount;
+            part.oldStart = startFromFirstLine(firstLine(part.newStart, part.newCount) + delta, part.oldCount);
+            delta += part.oldCount - part.newCount;
         }
-        out.append(hunkHeader(oldStart, oldCount, newStart, newCount, hunk.heading));
-        out.append(body);
+        out.append(hunkHeader(part));
+        out.append(part.lines);
     }
     return out.join('\n') + '\n';
 }

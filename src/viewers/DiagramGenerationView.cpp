@@ -70,18 +70,27 @@ QString errorColor(const QPalette &palette)
     return palette.color(QPalette::Window).lightness() < 128 ? QStringLiteral("#e06c75") : QStringLiteral("#e45649");
 }
 
+// Why the diagram is missing: Claude's failure, its last answer, or its
+// error output, the most telling first.
+QString failureMessage(const QString &answer, bool answerFailed, const QString &errorOutput)
+{
+    if (answerFailed && !answer.isEmpty())
+        return answer;
+    if (!answer.isEmpty())
+        return DiagramGenerationView::tr("Claude did not write the diagram: %1").arg(answer);
+    if (!errorOutput.isEmpty())
+        return errorOutput;
+    return DiagramGenerationView::tr("Claude did not write the diagram.");
+}
+
 } // namespace
 
-DiagramGenerationView::DiagramGenerationView(QString workDir,
-                                             QString path,
-                                             QString kindTitle,
-                                             QString description,
-                                             QWidget *parent)
+DiagramGenerationView::DiagramGenerationView(Request drawing, QWidget *parent)
     : QWidget(parent)
-    , workDir_(std::move(workDir))
-    , path_(std::move(path))
-    , kindTitle_(std::move(kindTitle))
-    , description_(std::move(description))
+    , workDir_(std::move(drawing.workDir))
+    , path_(std::move(drawing.path))
+    , kindTitle_(std::move(drawing.kindTitle))
+    , description_(std::move(drawing.description))
     , clock_(new QTimer(this))
     , spinner_(new Spinner(this))
     , title_(new QLabel(this))
@@ -254,12 +263,7 @@ void DiagramGenerationView::onProcessFinished()
         emit finished(path_, answer_);
         return;
     }
-    QString error = answerFailed_ ? answer_ : QString();
-    if (error.isEmpty())
-        error = !answer_.isEmpty()       ? tr("Claude did not write the diagram: %1").arg(answer_)
-                : !errorOutput.isEmpty() ? errorOutput
-                                         : tr("Claude did not write the diagram.");
-    fail(error);
+    fail(failureMessage(answer_, answerFailed_, errorOutput));
 }
 
 void DiagramGenerationView::onHookReceived(const HookEvent &event)

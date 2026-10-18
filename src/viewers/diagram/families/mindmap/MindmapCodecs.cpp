@@ -13,6 +13,10 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include <array>
+#include <functional>
+#include <utility>
+
 namespace diagram::mindmap {
 
 namespace {
@@ -20,9 +24,15 @@ namespace {
 using namespace diagram::source;
 
 // Mindmap delimiters, longest first.
-const std::pair<const char *, const char *> delimiters[] = {
-    {"((", "))"}, {"))", "(("}, {"{{", "}}"}, {")", "("}, {"([", "])"}, {"[", "]"}, {"(", ")"},
-};
+constexpr std::array<std::pair<const char *, const char *>, 7> delimiters{{
+    {"((", "))"},
+    {"))", "(("},
+    {"{{", "}}"},
+    {")", "("},
+    {"([", "])"},
+    {"[", "]"},
+    {"(", ")"},
+}};
 
 struct NodeText {
     QString key; // empty: a bare text
@@ -66,15 +76,23 @@ QString header(const QString &source)
     return lines.isEmpty() ? QString() : lines.first();
 }
 
-} // namespace
+struct Entry {
+    int indent;
+    NodeText node;
+};
 
-void parseTree(const QString &source, Model &model)
+// The leading-space count of a statement: its place in the hierarchy.
+int indentOf(const QString &stmt)
 {
-    struct Entry {
-        int indent;
-        NodeText node;
-    };
+    int indent = 0;
+    while (indent < stmt.size() && stmt.at(indent).isSpace())
+        ++indent;
+    return indent;
+}
 
+// The source's nodes with their indent, decorations and blank lines left out.
+QList<Entry> readEntries(const QString &source)
+{
     static const QRegularExpression icon(QStringLiteral("::icon\\([^)]*\\)"));
     static const QRegularExpression cssClass(QStringLiteral(":::.*$"));
     static const QRegularExpression headerLine(QStringLiteral("^\\s*mindmap\\s*$"));
@@ -86,24 +104,85 @@ void parseTree(const QString &source, Model &model)
             stmt.chop(1);
         if (stmt.trimmed().isEmpty() || headerLine.match(stmt).hasMatch())
             continue;
-        int indent = 0;
-        while (indent < stmt.size() && stmt.at(indent).isSpace())
-            ++indent;
         const NodeText node = parseText(stmt);
         if (node.text.isEmpty())
             continue;
-        entries.append({indent, node});
+        entries.append({indentOf(stmt), node});
     }
+    return entries;
+}
 
+QSet<QString> sourceIds(const QList<Entry> &entries)
+{
+    QSet<QString> ids;
+    for (const Entry &entry : entries) {
+        if (!entry.node.key.isEmpty())
+            ids.insert(entry.node.key);
+    }
+    return ids;
+}
+
+// The shapes in writing order with their depth. A mind map has one root: the
+// others are written as top-level branches so that no content is lost, then
+// whatever only a cycle reaches.
+QList<std::pair<QString, int>> writingOrder(const Board &board)
+{
+    QHash<QString, QList<QString>> children; // shape id → child ids
+    QSet<QString> hasParent;
+    for (const auto &l : board.links()) {
+        children[l->from].append(l->to);
+        hasParent.insert(l->to);
+    }
+    QList<std::pair<QString, int>> order; // shape id, depth
+    QSet<QString> visited;
+    const std::function<void(const QString &, int)> visit = [&](const QString &id, int depth) {
+        if (visited.contains(id) || !board.shape(id))
+            return; // a cycle cannot be expressed
+        visited.insert(id);
+        order.append({id, depth});
+        for (const QString &child : children.value(id))
+            visit(child, depth + 1);
+    };
+    bool first = true;
+    for (const auto &s : board.shapes()) {
+        if (!hasParent.contains(s->id)) {
+            visit(s->id, first ? 0 : 1);
+            first = false;
+        }
+    }
+    for (const auto &s : board.shapes())
+        visit(s->id, 1);
+    return order;
+}
+
+// A node's line: the root as a circle, a node keyed by its text's slug as a
+// bare text (Mermaid's usual form), any other one with its id.
+QString nodeLine(const QString &key, const QString &text, int depth)
+{
+    static const QRegularExpression special(QStringLiteral("[()\\[\\]{}\"\\n]"));
+    // Also quoted: what a bare line would read differently (spaces around
+    // it, the header's word).
+    const bool needsQuotes = text.contains(special) || text != text.trimmed() ||
+                             text.compare(QStringLiteral("mindmap"), Qt::CaseInsensitive) == 0;
+    const QString inner = needsQuotes ? mermaidQuote(text) : text;
+    const QString indent(qsizetype(depth + 1) * 2, QLatin1Char(' '));
+    if (depth == 0)
+        return indent + key + QStringLiteral("((") + inner + QStringLiteral("))");
+    if (!needsQuotes && key == slugOf(text))
+        return indent + text;
+    return indent + key + QLatin1Char('[') + inner + QLatin1Char(']');
+}
+
+} // namespace
+
+void parseTree(const QString &source, Model &model)
+{
+    const QList<Entry> entries = readEntries(source);
     // Keys: the source id when there is one, else a slug of the text (sidecar
     // numbers them m1, m2… in order; a slug keeps a node's place when a
     // branch is inserted before it). Source ids are reserved first so that a
     // slug never takes one.
-    QSet<QString> used;
-    for (const Entry &entry : entries) {
-        if (!entry.node.key.isEmpty())
-            used.insert(entry.node.key);
-    }
+    QSet<QString> used = sourceIds(entries);
     QSet<QString> assigned;
 
     struct Open {
@@ -162,57 +241,13 @@ public:
     QString serialize(const Board &board, const QJsonObject &) const override
     {
         QStringList out{QStringLiteral("mindmap")};
-        QHash<QString, QList<QString>> children; // shape id → child ids
-        QSet<QString> hasParent;
-        for (const auto &l : board.links()) {
-            children[l->from].append(l->to);
-            hasParent.insert(l->to);
-        }
-
-        // Roots: shapes nobody points to. A mind map has one root: the others
-        // are written as top-level branches so that no content is lost, then
-        // whatever only a cycle reaches.
-        QList<std::pair<QString, int>> order; // shape id, depth
-        QSet<QString> visited;
-        const std::function<void(const QString &, int)> visit = [&](const QString &id, int depth) {
-            if (visited.contains(id) || !board.shape(id))
-                return; // a cycle cannot be expressed
-            visited.insert(id);
-            order.append({id, depth});
-            for (const QString &child : children.value(id))
-                visit(child, depth + 1);
-        };
-        bool first = true;
-        for (const auto &s : board.shapes()) {
-            if (!hasParent.contains(s->id)) {
-                visit(s->id, first ? 0 : 1);
-                first = false;
-            }
-        }
-        for (const auto &s : board.shapes())
-            visit(s->id, 1);
-
         // Keys first, in the order written, so that the reading gives them
-        // back: a node whose key is its text's slug is written as a bare text
-        // (Mermaid's usual form), any other one with its id.
+        // back.
         QSet<QString> used;
-        for (const auto &[id, depth] : order) {
+        for (const auto &[id, depth] : writingOrder(board)) {
             const Shape *s = board.shape(id);
             const QString text = s->displayText().trimmed().isEmpty() ? QStringLiteral("Idea") : s->displayText();
-            const QString key = keyFor(s->key, text, used);
-            static const QRegularExpression special(QStringLiteral("[()\\[\\]{}\"\\n]"));
-            // Also quoted: what a bare line would read differently (spaces
-            // around it, the header's word).
-            const bool needsQuotes = text.contains(special) || text != text.trimmed() ||
-                                     text.compare(QStringLiteral("mindmap"), Qt::CaseInsensitive) == 0;
-            const QString inner = needsQuotes ? mermaidQuote(text) : text;
-            const QString indent(2 * (depth + 1), QLatin1Char(' '));
-            if (depth == 0)
-                out.append(indent + key + QStringLiteral("((") + inner + QStringLiteral("))"));
-            else if (!needsQuotes && key == slugOf(text))
-                out.append(indent + text);
-            else
-                out.append(indent + key + QLatin1Char('[') + inner + QLatin1Char(']'));
+            out.append(nodeLine(keyFor(s->key, text, used), text, depth));
         }
         return out.join(QLatin1Char('\n'));
     }

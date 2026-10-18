@@ -12,7 +12,7 @@
 namespace {
 
 // The hook's output, kept on the socket until the reply.
-constexpr char outputProperty[] = "duetHookOutput";
+constexpr const char *outputProperty = "duetHookOutput";
 
 } // namespace
 

@@ -13,11 +13,12 @@ namespace RunConfigurationMenu {
 // A configuration on two lines: its kind's icon, its name, its command
 // below in muted text; on the right a green dot while it runs, a check
 // mark when it is the selected one. Triggering the action chooses it.
-QWidgetAction *addConfiguration(QMenu *menu,
-                                const RunConfiguration &configuration,
-                                bool selected,
-                                bool running,
-                                const Theme &theme);
+struct RowState {
+    bool selected = false;
+    bool running = false;
+};
+
+QWidgetAction *addConfiguration(QMenu *menu, const RunConfiguration &configuration, RowState state, const Theme &theme);
 
 // Small uppercase heading over a group of configurations.
 void addHeading(QMenu *menu, const QString &text, const Theme &theme);

@@ -37,9 +37,10 @@ public:
 
     QTreeWidget *tree() const { return tree_; }
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 protected:
     void showEvent(QShowEvent *event) override;
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void updateProvider();

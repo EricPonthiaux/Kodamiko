@@ -14,7 +14,6 @@ class TrailingTabButton : public QObject {
 public:
     TrailingTabButton(QTabWidget *tabs, QAbstractButton *button);
 
-protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:

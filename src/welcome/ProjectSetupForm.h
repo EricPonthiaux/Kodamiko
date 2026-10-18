@@ -5,9 +5,12 @@
 
 #include <QWidget>
 
+#include <optional>
+
 class QComboBox;
 class QLabel;
 class QVBoxLayout;
+struct RuntimeInstall;
 class SettingsCard;
 class Toolchains;
 class ToggleSwitch;
@@ -52,6 +55,14 @@ private:
     void build(Card &card);
     void fill(Card &card, const LanguageSetup &setup, const QString &evidence);
     void fillRuntimes(Card &card, const LanguageSetup &setup);
+    // Each fills `combo` and returns the index of `setup`'s runtime, -1 if
+    // not listed.
+    static int fillCppStandards(QComboBox *combo, const LanguageSetup &setup);
+    int fillPythons(QComboBox *combo, const LanguageSetup &setup) const;
+    int fillToolRuntimes(QComboBox *combo, const QString &family, const LanguageSetup &setup) const;
+    // `executable`, relative to the project when inside it.
+    QString pythonLocation(const QString &executable) const;
+    static QString runtimeState(const std::optional<RuntimeInstall> &found);
     void fillServerVersions(Card &card, const QString &server, const QString &selected);
     void updateRows(Card &card);
     LanguageSetup setupOf(const Card &card) const;

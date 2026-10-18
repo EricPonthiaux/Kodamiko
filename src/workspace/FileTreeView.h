@@ -7,7 +7,9 @@
 #include <QTreeView>
 
 #include <functional>
+#include <optional>
 
+class ConfirmPopup;
 class QLabel;
 class TreeDecorations;
 
@@ -164,6 +166,9 @@ private:
     int stickyRowHeight() const;
     // A fine line under each folder holding `index`, in its branches' `rect`.
     void drawIndentGuides(QPainter *painter, const QRect &rect, const QModelIndex &index) const;
+    // Folder whose guide is brighter: the current item when it is an
+    // expanded folder, else its parent.
+    QModelIndex currentFolder() const;
 
     void collectExpanded(const QModelIndex &parent, QStringList *paths) const;
     void expandPending();
@@ -181,6 +186,10 @@ private:
     void renameEntry(const QString &path);
     QString renameEntryTo(const QString &path, const QString &name);
     void deleteEntry(const QString &path);
+    // Both emit entryDeleted once done; false otherwise (an error shown in
+    // `confirm` for the permanent deletion).
+    bool moveToTrash(const QString &path);
+    bool deletePermanently(ConfirmPopup *confirm, const QString &path, bool isFolder);
     void confirmRollback(const QString &path);
     void expandRoot();
     // Folder a drop at `position` goes to; empty if none.
@@ -192,16 +201,31 @@ private:
     void transfer(const QStringList &sources, const QString &folder, bool move);
     // Returns an error message, empty once done.
     QString transferOne(const QString &source, const QString &destination, bool move);
+    void transferSingle(const QString &source, const QString &folder, bool move);
+    void askTransferName(const QString &source, const QString &folder, bool move);
     void copyPath(const QString &path, bool relative);
     void reveal(const QString &path);
     void selectPending();
     // Files shown by the current scope.
     void updateScopeFiles();
+    // Paths the current scope would show, before checking the tree.
+    QStringList scopeCandidates() const;
+    // Row of `path` in the model, invalid outside the working folder.
+    QModelIndex rowInTree(const QString &path) const;
     void expandScope(const QModelIndex &parent);
 
     // Speed search: the letters typed select the next visible item whose name
     // matches them; Up and Down go to the previous or next one.
     bool handleSpeedSearchKey(QKeyEvent *event);
+    // Keys acting on a search in progress: whether the key is consumed;
+    // nullopt for the keys that do not act on it.
+    std::optional<bool> handleActiveSearchKey(QKeyEvent *event);
+    // Up or Down during a search: the previous or next match.
+    void stepSpeedSearch(bool forward);
+    // Tree shortcuts that copy a path or send it to Claude.
+    bool handlePathKey(QKeyEvent *event);
+    // Shortcuts acting on the current entry: clipboard, duplicate, delete, rename.
+    bool handleEntryKey(QKeyEvent *event);
     void setSpeedSearch(const QString &text);
     bool speedSearchMatches(const QModelIndex &index) const;
     // From `from` (included), in the given direction, without wrapping.

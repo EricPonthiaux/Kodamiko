@@ -17,6 +17,32 @@ constexpr int notStartedExitCode = 127;
 
 const QString selectedKey = QStringLiteral("run/selected");
 
+void prependPath(QProcessEnvironment &environment, const QString &folder)
+{
+    environment.insert(QStringLiteral("PATH"), QDir::toNativeSeparators(folder) + QDir::listSeparator() +
+                                                   environment.value(QStringLiteral("PATH")));
+}
+
+// Puts a runtime first in the PATH, with the variables its tools read.
+void addRuntime(QProcessEnvironment &environment, const RuntimeInstall &runtime)
+{
+    if (runtime.tool == QLatin1String("jdk")) {
+        environment.insert(QStringLiteral("JAVA_HOME"), QDir::toNativeSeparators(runtime.home));
+        prependPath(environment, runtime.home + QStringLiteral("/bin"));
+        return;
+    }
+    if (runtime.executable.isEmpty())
+        return;
+    const QString bin = QFileInfo(runtime.executable).absolutePath();
+    prependPath(environment, bin);
+    // A virtual environment, as its activate script sets it.
+    const bool isVirtualEnvironment =
+        runtime.tool == QLatin1String("python") && QFileInfo::exists(bin + QStringLiteral("/../pyvenv.cfg"));
+    if (isVirtualEnvironment)
+        environment.insert(QStringLiteral("VIRTUAL_ENV"),
+                           QDir::toNativeSeparators(QDir::cleanPath(bin + QStringLiteral("/.."))));
+}
+
 } // namespace
 
 Runner::Runner(ProblemStore *problems, QObject *parent)
@@ -80,30 +106,13 @@ ProcessSpec Runner::processSpec(const RunConfiguration &configuration) const
     ProcessSpec spec;
     spec.workingDirectory = QDir::cleanPath(QDir(project_.path).filePath(configuration.folder));
     spec.environment = terminalEnvironment();
-    const auto prependPath = [&spec](const QString &folder) {
-        spec.environment.insert(QStringLiteral("PATH"), QDir::toNativeSeparators(folder) + QDir::listSeparator() +
-                                                            spec.environment.value(QStringLiteral("PATH")));
-    };
     // The runtimes the project was set up with come first.
     if (toolchains_) {
         for (const LanguageSetup &setup : project_.languages) {
             if (!setup.enabled)
                 continue;
-            const std::optional<RuntimeInstall> runtime = toolchains_->runtimeFor(setup);
-            if (!runtime)
-                continue;
-            if (runtime->tool == QLatin1String("jdk")) {
-                spec.environment.insert(QStringLiteral("JAVA_HOME"), QDir::toNativeSeparators(runtime->home));
-                prependPath(runtime->home + QStringLiteral("/bin"));
-            } else if (!runtime->executable.isEmpty()) {
-                const QString bin = QFileInfo(runtime->executable).absolutePath();
-                prependPath(bin);
-                // A virtual environment, as its activate script sets it.
-                if (runtime->tool == QLatin1String("python") &&
-                    QFileInfo::exists(bin + QStringLiteral("/../pyvenv.cfg")))
-                    spec.environment.insert(QStringLiteral("VIRTUAL_ENV"),
-                                            QDir::toNativeSeparators(QDir::cleanPath(bin + QStringLiteral("/.."))));
-            }
+            if (const std::optional<RuntimeInstall> runtime = toolchains_->runtimeFor(setup))
+                addRuntime(spec.environment, *runtime);
         }
     }
     for (auto it = configuration.environment.cbegin(); it != configuration.environment.cend(); ++it)
@@ -141,17 +150,17 @@ void Runner::start(const RunConfiguration &configuration, TerminalWidget *termin
 
     const std::weak_ptr<Run> weak = run;
     connect(run->publishTimer, &QTimer::timeout, this, [this, weak] {
-        if (const std::shared_ptr<Run> run = weak.lock())
-            publish(*run);
+        if (const std::shared_ptr<Run> current = weak.lock())
+            publish(*current);
     });
     connect(terminal, &TerminalWidget::outputReceived, this, [weak](const QByteArray &data) {
-        const std::shared_ptr<Run> run = weak.lock();
-        if (!run)
+        const std::shared_ptr<Run> current = weak.lock();
+        if (!current)
             return;
-        run->parser->feed(data);
+        current->parser->feed(data);
         // Problems shown while the build goes on.
-        if (run->parser->problems().size() > run->published && !run->publishTimer->isActive())
-            run->publishTimer->start();
+        if (current->parser->problems().size() > current->published && !current->publishTimer->isActive())
+            current->publishTimer->start();
     });
     connect(terminal, &TerminalWidget::finished, this,
             [this, name, terminal](int exitCode) { onFinished(name, terminal, exitCode); });

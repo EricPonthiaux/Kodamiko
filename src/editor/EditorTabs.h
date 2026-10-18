@@ -123,8 +123,12 @@ private:
     // diagram (the file then opens as text).
     QWidget *openDiagram(const QString &absolutePath, QString *error);
     bool saveDiagram(DiagramView *view);
+    void syncDiagramWithDisk(DiagramView *diagram, const QString &path);
     void updateDiagramTabTitle(DiagramView *view);
     QList<DiagramView *> diagramViews() const;
+    void syncEditorWithDisk(EditorWidget *editor, const QString &path);
+    // Asks whether to reload a file modified both in its tab and on disk.
+    bool confirmReload(const QString &filePath, const QString &question);
     bool closeTab(int index, bool askToSave = true);
     // Path of the file shown in `page`, empty for a diff.
     QString filePathOf(QWidget *page) const;

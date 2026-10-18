@@ -15,7 +15,10 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include <algorithm>
+#include <array>
 #include <functional>
+#include <utility>
 
 namespace diagram::productvision {
 
@@ -64,6 +67,43 @@ QStringList descendants(const QString &key, const Model &tree)
     return result;
 }
 
+// The product's node: the one keyed `product`, else the first root of the tree.
+const Model::Node *findProduct(const Model &tree, const QHash<QString, const Model::Node *> &byKey)
+{
+    if (const Model::Node *product = byKey.value(QStringLiteral("product")))
+        return product;
+    QSet<QString> incoming;
+    for (const Model::Edge &link : tree.links)
+        incoming.insert(link.to);
+    const auto isRoot = [&incoming](const Model::Node &node) { return !incoming.contains(node.key); };
+    const auto root = std::ranges::find_if(tree.nodes, isRoot);
+    return root == tree.nodes.end() ? nullptr : &*root;
+}
+
+// One hierarchy, both shown and laid out by Graphviz: every arrow joins
+// adjacent levels, so no long edge runs behind another card.
+void appendArrows(Model &model)
+{
+    QSet<QString> visible;
+    for (const Model::Node &node : model.nodes)
+        visible.insert(node.key);
+    static constexpr std::array<std::pair<const char *, const char *>, 7> arrows{{
+        {"product", "emotions"},
+        {"emotions", "problem"},
+        {"emotions", "users"},
+        {"emotions", "value"},
+        {"problem", "capabilities"},
+        {"users", "journeys"},
+        {"value", "unknowns"},
+    }};
+    for (const auto &[fromText, toText] : arrows) {
+        const QString from = QString::fromLatin1(fromText);
+        const QString to = QString::fromLatin1(toText);
+        if (visible.contains(from) && visible.contains(to))
+            model.links.append({QStringLiteral("productVisionLink"), from, to, QJsonObject{}});
+    }
+}
+
 class MermaidProductVision : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-product-vision"); }
@@ -81,16 +121,9 @@ public:
         Model tree;
         mindmap::parseTree(source, tree);
         QHash<QString, const Model::Node *> byKey;
-        QSet<QString> incoming;
         for (const Model::Node &node : tree.nodes)
             byKey.insert(node.key, &node);
-        for (const Model::Edge &link : tree.links)
-            incoming.insert(link.to);
-        const Model::Node *product = byKey.value(QStringLiteral("product"));
-        for (int i = 0; !product && i < tree.nodes.size(); ++i) {
-            if (!incoming.contains(tree.nodes.at(i).key))
-                product = &tree.nodes.at(i);
-        }
+        const Model::Node *product = findProduct(tree, byKey);
         const QString productTitle = product ? product->props.value(QStringLiteral("text")).toString() : QString();
         const QStringList vision =
             byKey.contains(QStringLiteral("vision")) ? descendants(QStringLiteral("vision"), tree) : QStringList();
@@ -111,21 +144,7 @@ public:
                                             {QStringLiteral("title"), term(role)},
                                             {QStringLiteral("items"), toJsonArray(items)}}});
         }
-        // One hierarchy, both shown and laid out by Graphviz: every arrow
-        // joins adjacent levels, so no long edge runs behind another card.
-        QSet<QString> visible;
-        for (const Model::Node &node : model.nodes)
-            visible.insert(node.key);
-        static const std::pair<const char *, const char *> arrows[] = {
-            {"product", "emotions"},     {"emotions", "problem"}, {"emotions", "users"}, {"emotions", "value"},
-            {"problem", "capabilities"}, {"users", "journeys"},   {"value", "unknowns"},
-        };
-        for (const auto &[fromText, toText] : arrows) {
-            const QString from = QString::fromLatin1(fromText);
-            const QString to = QString::fromLatin1(toText);
-            if (visible.contains(from) && visible.contains(to))
-                model.links.append({QStringLiteral("productVisionLink"), from, to, QJsonObject{}});
-        }
+        appendArrows(model);
         model.meta = QJsonObject{{QStringLiteral("purpose"), QStringLiteral("product-vision")},
                                  {QStringLiteral("rankdir"), QStringLiteral("TB")},
                                  {QStringLiteral("engine"), QStringLiteral("dot")}};

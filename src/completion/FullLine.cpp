@@ -23,6 +23,8 @@ FullLineModel::FullLineModel(QObject *parent)
 
 FullLineModel::~FullLineModel() = default;
 
+// The virtual signature takes the callback by value, for the overrides that store it.
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 void FullLineModel::suggest(const QString &, const QString &, const QString &, Callback done)
 {
     done({});

@@ -255,6 +255,43 @@ private:
     const Theme *theme_;
 };
 
+// A candidate scored by its index; only the kept ones are copied (an
+// item carries strings, edits and callbacks).
+struct ScoredItem {
+    int index;
+    int score;
+    FuzzyMatch::Match match;
+};
+
+// The candidates matching `prefix`, unsorted.
+std::vector<ScoredItem> scoredItems(const QList<CompletionItem> &items, const QString &prefix, bool anywhere)
+{
+    std::vector<ScoredItem> scored;
+    for (int i = 0; i < items.size(); ++i) {
+        const CompletionItem &item = items[i];
+        // The word already typed in full is no suggestion.
+        if (item.kind == CompletionItem::Kind::Text && item.label == prefix)
+            continue;
+        if (std::optional<FuzzyMatch::Match> match = FuzzyMatch::match(prefix, item.label, anywhere))
+            scored.push_back({i, match->score + item.priority, std::move(*match)});
+    }
+    return scored;
+}
+
+// Higher scores first, then the source's order, then shorter labels.
+bool ranksBefore(const QList<CompletionItem> &items, const ScoredItem &a, const ScoredItem &b)
+{
+    if (a.score != b.score)
+        return a.score > b.score;
+    const CompletionItem &first = items[a.index];
+    const CompletionItem &second = items[b.index];
+    if (first.order != second.order)
+        return first.order < second.order;
+    if (first.label.size() != second.label.size())
+        return first.label.size() < second.label.size();
+    return a.index < b.index; // stable
+}
+
 } // namespace
 
 CompletionPopup::CompletionPopup(QWidget *parent)
@@ -343,34 +380,8 @@ void CompletionPopup::applyTheme(const Theme &theme)
 
 int CompletionPopup::setItems(const QList<CompletionItem> &items, const QString &prefix, bool anywhere)
 {
-    // Candidates are scored by index; only the kept ones are copied (an
-    // item carries strings, edits and callbacks).
-    struct Scored {
-        int index;
-        int score;
-        FuzzyMatch::Match match;
-    };
-
-    std::vector<Scored> scored;
-    for (int i = 0; i < items.size(); ++i) {
-        const CompletionItem &item = items[i];
-        // The word already typed in full is no suggestion.
-        if (item.kind == CompletionItem::Kind::Text && item.label == prefix)
-            continue;
-        if (std::optional<FuzzyMatch::Match> match = FuzzyMatch::match(prefix, item.label, anywhere))
-            scored.push_back({i, match->score + item.priority, std::move(*match)});
-    }
-    const auto before = [&items](const Scored &a, const Scored &b) {
-        if (a.score != b.score)
-            return a.score > b.score;
-        const CompletionItem &first = items[a.index];
-        const CompletionItem &second = items[b.index];
-        if (first.order != second.order)
-            return first.order < second.order;
-        if (first.label.size() != second.label.size())
-            return first.label.size() < second.label.size();
-        return a.index < b.index; // stable
-    };
+    std::vector<ScoredItem> scored = scoredItems(items, prefix, anywhere);
+    const auto before = [&items](const ScoredItem &a, const ScoredItem &b) { return ranksBefore(items, a, b); };
     const size_t maxKept = anywhere ? 500 : 200; // nobody scrolls further
     const size_t kept = std::min(scored.size(), maxKept);
     std::partial_sort(scored.begin(), scored.begin() + static_cast<std::ptrdiff_t>(kept), scored.end(), before);

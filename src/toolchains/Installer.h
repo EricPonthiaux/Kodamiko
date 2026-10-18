@@ -56,6 +56,11 @@ private:
     void startStep();
     void download(const DownloadSource &source);
     void fetchArchive(const DownloadSource &source, const QString &expectedChecksum);
+    // The download ended: checks the archive, then unpacks it.
+    void finishArchive(QNetworkReply *reply,
+                       const DownloadSource &source,
+                       const QString &archive,
+                       const QString &expectedChecksum);
     void extract(const DownloadSource &source, const QString &archive);
     void installNpm();
     void complete(const QString &content);

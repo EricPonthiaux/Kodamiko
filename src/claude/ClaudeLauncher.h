@@ -45,16 +45,21 @@ QByteArray mcpConfig(const QString &mcpServer);
 // Where the --mcp-config file is written.
 QString mcpConfigPath();
 
+// What a session is started with, besides its folder and hooks.
+struct SessionOptions {
+    // After --settings ("--continue" to resume the last conversation).
+    QStringList extraArguments;
+    // With them, the session gets the editor's MCP server (duet-mcp), these
+    // of its tools allowed without asking.
+    std::optional<QStringList> mcpReadOnlyTools;
+};
+
 // Process to launch, or nullopt (with `error` set) if `claude` or
-// `duet-hook` cannot be found. `extraArguments` follow --settings
-// ("--continue" to resume the last conversation). With `mcpReadOnlyTools`,
-// the session gets the editor's MCP server (duet-mcp), those of its tools
-// allowed without asking.
+// `duet-hook` cannot be found.
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
                                          const QString &hookServerName,
                                          QString *error,
-                                         const QStringList &extraArguments = {},
-                                         const std::optional<QStringList> &mcpReadOnlyTools = std::nullopt);
+                                         const SessionOptions &options = {});
 
 // One-off `claude --print` run, outside the editor's session and without its
 // hooks: `arguments` follow --print. The user's own login and settings apply,

@@ -31,7 +31,6 @@ public:
         return matchScore(QStringView(text), QStringView(query));
     }
 
-protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:

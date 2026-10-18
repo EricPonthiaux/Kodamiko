@@ -20,8 +20,8 @@ public:
     QString displayText() const override { return text; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     struct TextLayout {
         QStringList header; // the section and the score, as dots

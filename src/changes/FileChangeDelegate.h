@@ -16,14 +16,14 @@ class FileChangeDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
 public:
-    enum Role {
-        PathRole = Qt::UserRole + 50, // path shown (relative), "/" separators
-        KindRole,                     // ChangeKind
-        OldPathRole,                  // renamed from
-        SectionCountRole,             // on a section title: its number of files
-        AddedRole,                    // lines added, when known
-        RemovedRole,                  // lines removed
-    };
+    // Item data roles; tests/tst_changes.cpp reads them too.
+    // Item data roles of the file rows.
+    static constexpr int pathRole = Qt::UserRole + 50;    // path shown (relative), "/" separators
+    static constexpr int kindRole = pathRole + 1;         // ChangeKind
+    static constexpr int oldPathRole = pathRole + 2;      // renamed from
+    static constexpr int sectionCountRole = pathRole + 3; // on a section title: its number of files
+    static constexpr int addedRole = pathRole + 4;        // lines added, when known
+    static constexpr int removedRole = pathRole + 5;      // lines removed
 
     explicit FileChangeDelegate(QObject *parent = nullptr);
 

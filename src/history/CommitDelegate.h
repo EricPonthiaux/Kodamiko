@@ -15,13 +15,6 @@ class CommitDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
 public:
-    enum Role {
-        AuthorRole = Qt::UserRole + 60,
-        DateRole,
-        ShortIdRole,
-        RefsRole
-    };
-
     explicit CommitDelegate(QObject *parent = nullptr);
 
     static void setCommit(QTreeWidgetItem *item, const CommitSummary &commit);

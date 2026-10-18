@@ -39,8 +39,8 @@ public:
     QString displayText() const override { return label; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // Where the text lives inside the outline, in world coordinates.
     QRectF textRect() const;
@@ -110,8 +110,8 @@ public:
     QString displayText() const override { return title; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     const QStringList &titleLines() const { return titleLines_; }
 
@@ -170,8 +170,8 @@ public:
     QString displayText() const override { return label; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // The stroke's extent with its label, world coordinates.
     QRectF strokeBounds() const;
@@ -202,8 +202,8 @@ public:
     QStringList graphvizAttributes(const Board &board) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     QString description;
     QString tone = QStringLiteral("neutral");

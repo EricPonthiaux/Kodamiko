@@ -58,18 +58,89 @@ QPoint belowCaret(const EditorWidget *editor)
     return editor->viewport()->mapToGlobal(point);
 }
 
+// Where the problem is underlined in `editor`, in bytes.
+std::pair<int, int> problemRange(EditorWidget *editor, const Problem &problem)
+{
+    const auto send = [editor](int message, long argument, long more = 0) {
+        return int(editor->SendScintilla(message, argument, more));
+    };
+    if (problem.column < 0) {
+        // A line, without its indentation.
+        return {send(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, problem.line),
+                send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line)};
+    }
+    const int start = CodeIntelligence::positionOf(editor, {problem.line, problem.column});
+    if (problem.endLine >= 0)
+        return {start, std::max(start, CodeIntelligence::positionOf(editor, {problem.endLine, problem.endColumn}))};
+    // The word at the column, or its character.
+    const int wordEnd = send(QsciScintillaBase::SCI_WORDENDPOSITION, start, 1);
+    if (wordEnd > start)
+        return {start, wordEnd};
+    return {start, std::min(send(QsciScintillaBase::SCI_POSITIONAFTER, start),
+                            send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line))};
+}
+
+// The characters of the active parameter in the signature's label: offsets
+// given by the server, or its text found after the "(".
+std::optional<std::pair<int, int>> parameterRange(const QJsonObject &signature, int parameter)
+{
+    const QJsonArray parameters = signature.value("parameters").toArray();
+    if (parameter < 0 || parameter >= parameters.size())
+        return std::nullopt;
+    const QJsonValue name = parameters.at(parameter).toObject().value("label");
+    if (name.isArray()) {
+        const int start = name.toArray().at(0).toInt();
+        if (start < 0)
+            return std::nullopt;
+        return std::pair{start, name.toArray().at(1).toInt()};
+    }
+    const QString text = name.toString();
+    if (text.isEmpty())
+        return std::nullopt;
+    const QString label = signature.value("label").toString();
+    const int start = int(label.indexOf(text, std::max<qsizetype>(label.indexOf(QLatin1Char('(')), 0)));
+    if (start < 0)
+        return std::nullopt;
+    return std::pair{start, start + int(text.size())};
+}
+
+// Shows `text` as the call tip of `editor`, its characters `highlight`
+// highlighted.
+void showCallTip(const EditorWidget *editor, const QString &text, std::optional<std::pair<int, int>> highlight)
+{
+    const Theme &theme = editor->theme();
+    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETBACK, theme.alternateBase);
+    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETFORE, theme.foreground);
+    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETFOREHLT, theme.accent);
+    const QByteArray bytes = text.toUtf8();
+    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSHOW,
+                          uintptr_t(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)), bytes.constData());
+    if (!highlight || highlight->second <= highlight->first)
+        return;
+    const auto byteOffset = [&text](int characters) { return long(text.left(characters).toUtf8().size()); };
+    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETHLT,
+                          static_cast<unsigned long>(byteOffset(highlight->first)), byteOffset(highlight->second));
+}
+
+// A Command, or a CodeAction carrying one; empty if there is none.
+QJsonObject commandOf(const QJsonObject &action)
+{
+    const QJsonValue command = action.value("command");
+    if (command.isObject())
+        return command.toObject();
+    if (command.isString())
+        return action;
+    return {};
+}
+
 } // namespace
 
-CodeIntelligence::CodeIntelligence(EditorTabs *tabs,
-                                   LanguageServers *servers,
-                                   CodeNavigator *navigator,
-                                   ProblemStore *problems,
-                                   QObject *parent)
+CodeIntelligence::CodeIntelligence(const Services &services, QObject *parent)
     : QObject(parent)
-    , tabs_(tabs)
-    , servers_(servers)
-    , navigator_(navigator)
-    , problems_(problems)
+    , tabs_(services.tabs)
+    , servers_(services.servers)
+    , navigator_(services.navigator)
+    , problems_(services.problems)
 {
     // A quick fix or a refactoring carried out by the server comes back as
     // an edit to apply.
@@ -86,31 +157,11 @@ void CodeIntelligence::showProblems(const QString &path)
     // Claude's configuration files have their own checker.
     if (!editor || ClaudeLint::kindOf(path) != ClaudeLint::Kind::None)
         return;
-    const auto send = [editor](int message, long argument, long more = 0) {
-        return int(editor->SendScintilla(message, argument, more));
-    };
     Diagnostics shown;
     for (const Problem &problem : problems_->problems(path)) {
         if (problem.line >= editor->lines())
             continue; // a build's, for a text that has changed since
-        int start = 0;
-        int end = 0;
-        if (problem.column < 0) {
-            // A line, without its indentation.
-            start = send(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, problem.line);
-            end = send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line);
-        } else {
-            start = positionOf(editor, {problem.line, problem.column});
-            if (problem.endLine >= 0) {
-                end = std::max(start, positionOf(editor, {problem.endLine, problem.endColumn}));
-            } else {
-                // The word at the column, or its character.
-                end = send(QsciScintillaBase::SCI_WORDENDPOSITION, start, 1);
-                if (end <= start)
-                    end = std::min(send(QsciScintillaBase::SCI_POSITIONAFTER, start),
-                                   send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line));
-            }
-        }
+        const auto [start, end] = problemRange(editor, problem);
         shown.append({problem.severity, start, end, problem.message});
     }
     editor->setDiagnostics(shown);
@@ -305,66 +356,40 @@ void CodeIntelligence::requestSignatureHelp(EditorWidget *editor, bool explicitR
                   QJsonObject{{"triggerKind", explicitRequest ? 1 : 2},
                               {"isRetrigger", editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPACTIVE) != 0}});
     const int generation = ++signatureGeneration_;
-    client->request(
-        QStringLiteral("textDocument/signatureHelp"), params,
-        [this, generation, guard = QPointer<EditorWidget>(editor), explicitRequest](const QJsonValue &result,
-                                                                                    const QString &) {
-            if (generation != signatureGeneration_ || !guard)
-                return;
-            const EditorWidget *editor = guard;
-            const QJsonObject help = result.toObject();
-            const QJsonArray signatures = help.value("signatures").toArray();
-            if (signatures.isEmpty()) {
-                editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPCANCEL);
-                if (explicitRequest)
-                    emit statusMessage(tr("No call here"));
-                return;
-            }
-            const int active = std::clamp(help.value("activeSignature").toInt(), 0, int(signatures.size()) - 1);
-            const QJsonObject signature = signatures.at(active).toObject();
-            const QString label = signature.value("label").toString();
-            const int parameter = signature.contains("activeParameter") ? signature.value("activeParameter").toInt()
-                                                                        : help.value("activeParameter").toInt();
+    client->request(QStringLiteral("textDocument/signatureHelp"), params,
+                    [this, generation, guard = QPointer<EditorWidget>(editor),
+                     explicitRequest](const QJsonValue &result, const QString &) {
+                        if (generation != signatureGeneration_ || !guard)
+                            return;
+                        showSignatureHelp(guard, result.toObject(), explicitRequest);
+                    });
+}
 
-            // The current parameter: offsets in the label, or its text.
-            int highlightStart = -1;
-            int highlightEnd = -1;
-            const QJsonArray parameters = signature.value("parameters").toArray();
-            if (parameter >= 0 && parameter < parameters.size()) {
-                const QJsonValue name = parameters.at(parameter).toObject().value("label");
-                if (name.isArray()) {
-                    highlightStart = name.toArray().at(0).toInt();
-                    highlightEnd = name.toArray().at(1).toInt();
-                } else if (const QString text = name.toString(); !text.isEmpty()) {
-                    highlightStart = int(label.indexOf(text, std::max<qsizetype>(label.indexOf(QLatin1Char('(')), 0)));
-                    highlightEnd = highlightStart < 0 ? -1 : highlightStart + int(text.size());
-                }
-            }
-            QString shown = label;
-            int offset = 0;
-            if (signatures.size() > 1) {
-                const QString counter = QStringLiteral("%1/%2  ").arg(active + 1).arg(signatures.size());
-                shown.prepend(counter);
-                offset = int(counter.size());
-            }
+void CodeIntelligence::showSignatureHelp(const EditorWidget *editor, const QJsonObject &help, bool explicitRequest)
+{
+    const QJsonArray signatures = help.value("signatures").toArray();
+    if (signatures.isEmpty()) {
+        editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPCANCEL);
+        if (explicitRequest)
+            emit statusMessage(tr("No call here"));
+        return;
+    }
+    const int active = std::clamp(help.value("activeSignature").toInt(), 0, int(signatures.size()) - 1);
+    const QJsonObject signature = signatures.at(active).toObject();
+    const int parameter = signature.contains("activeParameter") ? signature.value("activeParameter").toInt()
+                                                                : help.value("activeParameter").toInt();
+    std::optional<std::pair<int, int>> highlight = parameterRange(signature, parameter);
 
-            const Theme &theme = editor->theme();
-            editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETBACK, theme.alternateBase);
-            editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETFORE, theme.foreground);
-            editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETFOREHLT, theme.accent);
-            const QByteArray bytes = shown.toUtf8();
-            editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSHOW,
-                                  uintptr_t(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)),
-                                  bytes.constData());
-            if (highlightStart >= 0 && highlightEnd > highlightStart) {
-                const auto byteOffset = [&shown](int characters) {
-                    return long(shown.left(characters).toUtf8().size());
-                };
-                editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETHLT,
-                                      static_cast<unsigned long>(byteOffset(offset + highlightStart)),
-                                      byteOffset(offset + highlightEnd));
-            }
-        });
+    QString shown = signature.value("label").toString();
+    if (signatures.size() > 1) {
+        const QString counter = QStringLiteral("%1/%2  ").arg(active + 1).arg(signatures.size());
+        shown.prepend(counter);
+        if (highlight) {
+            highlight->first += int(counter.size());
+            highlight->second += int(counter.size());
+        }
+    }
+    showCallTip(editor, shown, highlight);
 }
 
 // Definitions and usages
@@ -424,25 +449,29 @@ void CodeIntelligence::findUsages()
                 emit statusMessage(tr("Find Usages failed: %1").arg(error));
                 return;
             }
-            QList<Location> locations = parseLocations(result);
-            std::sort(locations.begin(), locations.end(), [](const Location &a, const Location &b) {
-                return a.filePath != b.filePath ? a.filePath < b.filePath : a.range.start < b.range.start;
-            });
-            if (locations.isEmpty()) {
-                emit statusMessage(tr("No usages of “%1”").arg(word));
-                return;
-            }
-            emit statusMessage(locations.size() == 1 ? tr("1 usage of “%1”").arg(word)
-                                                     : tr("%1 usages of “%2”").arg(locations.size()).arg(word));
-            if (locations.size() > maxUsagesShown)
-                locations.resize(maxUsagesShown);
-            QHash<QString, QStringList> lines;
-            QStringList entries;
-            for (const Location &location : std::as_const(locations))
-                entries.append(describe(location, lines));
-            if (const int chosen = chooseFrom(guard, entries); chosen >= 0)
-                jumpTo(locations.at(chosen));
+            showUsages(guard, word, parseLocations(result));
         });
+}
+
+void CodeIntelligence::showUsages(EditorWidget *editor, const QString &word, QList<Location> locations)
+{
+    std::sort(locations.begin(), locations.end(), [](const Location &a, const Location &b) {
+        return a.filePath != b.filePath ? a.filePath < b.filePath : a.range.start < b.range.start;
+    });
+    if (locations.isEmpty()) {
+        emit statusMessage(tr("No usages of “%1”").arg(word));
+        return;
+    }
+    emit statusMessage(locations.size() == 1 ? tr("1 usage of “%1”").arg(word)
+                                             : tr("%1 usages of “%2”").arg(locations.size()).arg(word));
+    if (locations.size() > maxUsagesShown)
+        locations.resize(maxUsagesShown);
+    QHash<QString, QStringList> lines;
+    QStringList entries;
+    for (const Location &location : std::as_const(locations))
+        entries.append(describe(location, lines));
+    if (const int chosen = chooseFrom(editor, entries); chosen >= 0)
+        jumpTo(locations.at(chosen));
 }
 
 void CodeIntelligence::jumpTo(const Location &location)
@@ -551,41 +580,43 @@ void CodeIntelligence::showQuickFixes()
                             emit statusMessage(tr("Quick fixes failed: %1").arg(error));
                             return;
                         }
-                        QList<QJsonObject> actions;
-                        QStringList titles;
-                        for (const QJsonValue &item : result.toArray()) {
-                            const QJsonObject action = item.toObject();
-                            if (action.contains("disabled") || action.value("title").toString().isEmpty())
-                                continue;
-                            actions.append(action);
-                            titles.append(action.value("title").toString());
-                        }
-                        if (actions.isEmpty()) {
-                            emit statusMessage(tr("No quick fixes here"));
-                            return;
-                        }
-                        const int chosen = chooseFrom(guard, titles);
-                        if (chosen < 0)
-                            return;
-                        const QJsonObject action = actions.at(chosen);
-                        if (action.contains("edit"))
-                            applyWorkspaceEdit(parseWorkspaceEdit(action.value("edit").toObject()));
-                        // A Command, or a CodeAction carrying one: the server carries
-                        // it out and sends back the edit ("workspace/applyEdit").
-                        const QJsonObject command = action.value("command").isObject()
-                                                        ? action.value("command").toObject()
-                                                    : action.value("command").isString() ? action
-                                                                                         : QJsonObject();
-                        if (!command.isEmpty() && server) {
-                            server->request(QStringLiteral("workspace/executeCommand"),
-                                            QJsonObject{{"command", command.value("command")},
-                                                        {"arguments", command.value("arguments").toArray()}},
-                                            [this](const QJsonValue &, const QString &error) {
-                                                if (!error.isEmpty())
-                                                    emit statusMessage(tr("The quick fix failed: %1").arg(error));
-                                            });
-                        }
+                        chooseQuickFix(guard, server, result.toArray());
                     });
+}
+
+void CodeIntelligence::chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions)
+{
+    QList<QJsonObject> actions;
+    QStringList titles;
+    for (const QJsonValue &item : codeActions) {
+        const QJsonObject action = item.toObject();
+        if (action.contains("disabled") || action.value("title").toString().isEmpty())
+            continue;
+        actions.append(action);
+        titles.append(action.value("title").toString());
+    }
+    if (actions.isEmpty()) {
+        emit statusMessage(tr("No quick fixes here"));
+        return;
+    }
+    const int chosen = chooseFrom(editor, titles);
+    if (chosen < 0)
+        return;
+    const QJsonObject action = actions.at(chosen);
+    if (action.contains("edit"))
+        applyWorkspaceEdit(parseWorkspaceEdit(action.value("edit").toObject()));
+    // The server carries the command out and sends back the edit
+    // ("workspace/applyEdit").
+    const QJsonObject command = commandOf(action);
+    if (command.isEmpty() || !server)
+        return;
+    server->request(
+        QStringLiteral("workspace/executeCommand"),
+        QJsonObject{{"command", command.value("command")}, {"arguments", command.value("arguments").toArray()}},
+        [this](const QJsonValue &, const QString &error) {
+            if (!error.isEmpty())
+                emit statusMessage(tr("The quick fix failed: %1").arg(error));
+        });
 }
 
 int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit)
@@ -673,8 +704,12 @@ QString CodeIntelligence::counterpartOf(const QString &filePath)
                                         QStringLiteral("mm")};
     const QFileInfo info(filePath);
     const QString suffix = info.suffix().toLower();
-    const QStringList *wanted = headers.contains(suffix) ? &sources : sources.contains(suffix) ? &headers : nullptr;
-    if (!wanted)
+    const QStringList *wanted = nullptr;
+    if (headers.contains(suffix))
+        wanted = &sources;
+    else if (sources.contains(suffix))
+        wanted = &headers;
+    else
         return {};
     const QDir folder = info.dir();
     const QStringList folders = {folder.path(), folder.filePath(QStringLiteral("../include")),

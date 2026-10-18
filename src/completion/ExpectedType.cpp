@@ -5,6 +5,8 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include <optional>
+
 namespace ExpectedType {
 namespace {
 
@@ -67,11 +69,20 @@ QString typeOf(const QString &declaration)
         if (notTypes().contains(word))
             return {};
     }
-    const QString type = words.join(QLatin1Char(' '));
+    QString type = words.join(QLatin1Char(' '));
     static const QSet<QString> inferred = {"auto", "var", "let", "def", "auto *", "auto &", "const auto &"};
     if (inferred.contains(type) || type == QLatin1String("auto*") || type == QLatin1String("auto&"))
         return {};
     return type;
+}
+
+// Whether the ":" at blanked[i - 1] stands alone (a label, a base
+// clause), not in a "::".
+bool isSingleColon(const QByteArray &blanked, int i)
+{
+    const bool followsColon = i >= 2 && blanked[i - 2] == ':';
+    const bool precedesColon = i < blanked.size() && blanked[i] == ':';
+    return !followsColon && !precedesColon;
 }
 
 // The text of the declaration before `end` back to the start of its
@@ -83,14 +94,16 @@ QString declarationBefore(const QByteArray &blanked, int end)
     int i = end;
     while (i > 0) {
         const char c = blanked[i - 1];
+        const bool isTopLevelComma = c == ',' && angle == 0;
+        const bool isLabelColon = c == ':' && isSingleColon(blanked, i);
+        const bool endsDeclaration = QByteArrayView(";{}()\n").contains(c) || isTopLevelComma || isLabelColon;
         if (c == '>') {
             ++angle;
         } else if (c == '<') {
             if (angle == 0)
                 break;
             --angle;
-        } else if (c == ';' || c == '{' || c == '}' || c == '(' || c == ')' || c == '\n' || (c == ',' && angle == 0) ||
-                   (c == ':' && !(i >= 2 && blanked[i - 2] == ':') && !(i < blanked.size() && blanked[i] == ':'))) {
+        } else if (endsDeclaration) {
             break;
         }
         --i;
@@ -111,6 +124,47 @@ bool looksLikeType(const QString &declaration)
     return !operators.match(declaration).hasMatch();
 }
 
+bool isWholeWordAt(const QByteArray &text, int start, int end)
+{
+    const bool continuesBefore = start > 0 && CodeScan::isIdentifierByte(text[start - 1]);
+    const bool continuesAfter = end < text.size() && CodeScan::isIdentifierByte(text[end]);
+    return !continuesBefore && !continuesAfter;
+}
+
+// The TypeScript annotation after the ":" at blanked[colon]: "name: Type".
+QString annotationAfter(const QByteArray &blanked, int colon)
+{
+    int typeEnd = colon + 1;
+    while (typeEnd < blanked.size() && !QByteArrayView("=;,){\n").contains(blanked[typeEnd]))
+        ++typeEnd;
+    return QString::fromUtf8(blanked.mid(colon + 1, typeEnd - colon - 1)).trimmed();
+}
+
+// The type that the name at blanked[at, end) is declared with there;
+// nullopt if that occurrence declares nothing.
+std::optional<QString> typeDeclaredAt(const QByteArray &blanked, int at, int end, const QString &languageId)
+{
+    if (!isWholeWordAt(blanked, at, end))
+        return std::nullopt;
+    int after = end;
+    while (after < blanked.size() && (blanked[after] == ' ' || blanked[after] == '\t'))
+        ++after;
+    if (after >= blanked.size())
+        return std::nullopt;
+    const char next = blanked[after];
+    if (isTypeScript(languageId) && next == ':')
+        return annotationAfter(blanked, after);
+    if (!QByteArrayView("=;,)[{(:").contains(next))
+        return std::nullopt;
+    const QString declaration = declarationBefore(blanked, at);
+    if (!looksLikeType(declaration))
+        return std::nullopt;
+    QString type = typeOf(declaration);
+    if (type.isEmpty())
+        return std::nullopt;
+    return type;
+}
+
 // The declared type of `name`, from its last declaration before `before`.
 QString declaredType(const QByteArray &blanked, const QByteArray &name, int before, const QString &languageId)
 {
@@ -118,30 +172,8 @@ QString declaredType(const QByteArray &blanked, const QByteArray &name, int befo
         return {};
     for (int at = int(blanked.lastIndexOf(name, before - int(name.size()))); at >= 0;
          at = at > 0 ? int(blanked.lastIndexOf(name, at - 1)) : -1) {
-        const int end = at + int(name.size());
-        if ((at > 0 && CodeScan::isIdentifierByte(blanked[at - 1])) ||
-            (end < blanked.size() && CodeScan::isIdentifierByte(blanked[end])))
-            continue;
-        int after = end;
-        while (after < blanked.size() && (blanked[after] == ' ' || blanked[after] == '\t'))
-            ++after;
-        if (after >= blanked.size())
-            continue;
-        const char next = blanked[after];
-        if (isTypeScript(languageId) && next == ':') { // "name: Type"
-            int typeEnd = after + 1;
-            while (typeEnd < blanked.size() && !QByteArrayView("=;,){\n").contains(blanked[typeEnd]))
-                ++typeEnd;
-            return QString::fromUtf8(blanked.mid(after + 1, typeEnd - after - 1)).trimmed();
-        }
-        if (!QByteArrayView("=;,)[{(:").contains(next))
-            continue;
-        const QString declaration = declarationBefore(blanked, at);
-        if (!looksLikeType(declaration))
-            continue;
-        const QString type = typeOf(declaration);
-        if (!type.isEmpty())
-            return type;
+        if (const std::optional<QString> type = typeDeclaredAt(blanked, at, at + int(name.size()), languageId))
+            return *type;
     }
     return {};
 }
@@ -240,6 +272,89 @@ QString withoutArguments(const QString &type)
     return open < 0 ? type : type.left(open);
 }
 
+// Whether the code before blanked[i] expects a bool: a condition, a
+// negation, an operand of "&&" or "||".
+bool expectsBoolean(const QByteArray &blanked, int i)
+{
+    const char c = blanked[i - 1];
+    if (c == '(') {
+        const QByteArray keyword = wordBefore(blanked, skipBlanksBack(blanked, i - 1));
+        if (keyword == "if" || keyword == "while")
+            return true;
+    }
+    const bool isInequality = i < blanked.size() && blanked[i] == '=';
+    if (c == '!' && !isInequality)
+        return true;
+    if (i < 2)
+        return false;
+    const char before = blanked[i - 2];
+    const bool isLogicalAnd = c == '&' && before == '&';
+    const bool isLogicalOr = c == '|' && before == '|';
+    return isLogicalAnd || isLogicalOr;
+}
+
+// The start of the operator ending with the "=" at blanked[i - 1]:
+// "a = |", "a == |", "a != |", "a += |". nullopt for "a <= |": a number,
+// but which.
+std::optional<int> operatorStartBefore(const QByteArray &blanked, int i)
+{
+    const char before = i >= 2 ? blanked[i - 2] : '\0';
+    if (before == '<' || before == '>')
+        return std::nullopt;
+    const bool isComparison = before == '=' || before == '!';
+    const bool isCompoundAssignment = QByteArrayView("+-*/%&|^").contains(before);
+    return isComparison || isCompoundAssignment ? i - 2 : i - 1;
+}
+
+// "let x: Foo = |": the annotated type, else the name's declaration.
+QString typeScriptAssignedType(const QByteArray &blanked, int lhsEnd, const QString &languageId)
+{
+    int statement = lhsEnd;
+    while (statement > 0 && !QByteArrayView(";{}(\n").contains(blanked[statement - 1]))
+        --statement;
+    static const QRegularExpression annotated(QStringLiteral("[\\w$]\\s*\\??:\\s*(.+)$"));
+    const QRegularExpressionMatch match =
+        annotated.match(QString::fromUtf8(blanked.mid(statement, lhsEnd - statement)));
+    if (match.hasMatch())
+        return match.captured(1).trimmed();
+    return declaredType(blanked, wordBefore(blanked, lhsEnd), lhsEnd, languageId);
+}
+
+// "Type name" before "= |": the declared type, empty for "auto x";
+// nullopt when `lhs` declares nothing.
+std::optional<QString> declarationType(const QString &lhs)
+{
+    static const QRegularExpression declaration(
+        QStringLiteral("^(.*?[\\w>\\]*&])\\s*\\b([A-Za-z_$][\\w$]*)\\s*(?:\\[[^\\]]*\\])?$"));
+    const QRegularExpressionMatch match = declaration.match(lhs);
+    if (!match.hasMatch() || !looksLikeType(match.captured(1)))
+        return std::nullopt;
+    QString type = typeOf(match.captured(1));
+    if (!type.isEmpty())
+        return type;
+    if (!match.captured(1).simplified().isEmpty())
+        return QString(); // "auto x = |"
+    return std::nullopt;
+}
+
+// Whether an item of type `type` fits where `wanted` is expected.
+bool typesMatch(const QString &type, const QString &wanted)
+{
+    if (type == wanted)
+        return true;
+    const bool bothNumbers = isNumber(type) && isNumber(wanted);
+    const bool bothStrings = isString(type) && isString(wanted);
+    const bool bothBooleans = isBoolean(type) && isBoolean(wanted);
+    if (bothNumbers || bothStrings || bothBooleans)
+        return true;
+    // "QList" and "QList<int>": one of them without its arguments.
+    const bool bothHaveArguments = type.contains(QLatin1Char('<')) && wanted.contains(QLatin1Char('<'));
+    if (bothHaveArguments)
+        return false;
+    return withoutArguments(type) == withoutArguments(wanted) &&
+           type.endsWith(QLatin1Char('*')) == wanted.endsWith(QLatin1Char('*'));
+}
+
 } // namespace
 
 QString at(const QByteArray &text, int position, const QString &languageId)
@@ -250,60 +365,28 @@ QString at(const QByteArray &text, int position, const QString &languageId)
     const int i = skipBlanksBack(blanked, position);
     if (i <= 0)
         return {};
-    const char c = blanked[i - 1];
     const QByteArray word = wordBefore(blanked, i);
-
     if (word == "return" || word == "co_return")
         return isUntyped(languageId) ? QString() : returnType(blanked, i, languageId);
-
-    // A condition.
-    if (c == '(') {
-        const QByteArray keyword = wordBefore(blanked, skipBlanksBack(blanked, i - 1));
-        if (keyword == "if" || keyword == "while")
-            return QStringLiteral("bool");
-    }
-    if ((c == '!' && !(i < blanked.size() && blanked[i] == '=')) ||
-        (i >= 2 && ((c == '&' && blanked[i - 2] == '&') || (c == '|' && blanked[i - 2] == '|'))))
+    if (expectsBoolean(blanked, i))
         return QStringLiteral("bool");
 
-    if (c != '=' || isUntyped(languageId))
+    if (blanked[i - 1] != '=' || isUntyped(languageId))
         return {};
-    // "a == |", "a != |": the type of a.
-    const char before = i >= 2 ? blanked[i - 2] : '\0';
-    int operatorStart = i - 1;
-    if (before == '=' || before == '!') {
-        operatorStart = i - 2;
-    } else if (before == '<' || before == '>') {
-        return {}; // "a <= |": a number, but which
-    } else if (QByteArrayView("+-*/%&|^").contains(before)) {
-        operatorStart = i - 2; // "a += |"
-    }
-    const int lhsEnd = skipBlanksBack(blanked, operatorStart);
-    if (isTypeScript(languageId)) {
-        // "let x: Foo = |".
-        int statement = lhsEnd;
-        while (statement > 0 && !QByteArrayView(";{}(\n").contains(blanked[statement - 1]))
-            --statement;
-        static const QRegularExpression annotated(QStringLiteral("[\\w$]\\s*\\??:\\s*(.+)$"));
-        const QRegularExpressionMatch match =
-            annotated.match(QString::fromUtf8(blanked.mid(statement, lhsEnd - statement)));
-        if (match.hasMatch())
-            return match.captured(1).trimmed();
-        return declaredType(blanked, wordBefore(blanked, lhsEnd), lhsEnd, languageId);
-    }
+    const std::optional<int> operatorStart = operatorStartBefore(blanked, i);
+    if (!operatorStart)
+        return {};
+    const int lhsEnd = skipBlanksBack(blanked, *operatorStart);
+    if (isTypeScript(languageId))
+        return typeScriptAssignedType(blanked, lhsEnd, languageId);
     const QString lhs = declarationBefore(blanked, lhsEnd);
     if (lhs.isEmpty())
         return {};
     // "Type name = |": a declaration.
-    static const QRegularExpression declaration(
-        QStringLiteral("^(.*?[\\w>\\]*&])\\s*\\b([A-Za-z_$][\\w$]*)\\s*(?:\\[[^\\]]*\\])?$"));
-    if (const QRegularExpressionMatch match = declaration.match(lhs);
-        match.hasMatch() && operatorStart == i - 1 && looksLikeType(match.captured(1))) {
-        QString type = typeOf(match.captured(1));
-        if (!type.isEmpty())
-            return type;
-        if (!match.captured(1).simplified().isEmpty())
-            return {}; // "auto x = |"
+    const bool isPlainAssignment = *operatorStart == i - 1;
+    if (isPlainAssignment) {
+        if (const std::optional<QString> type = declarationType(lhs))
+            return *type;
     }
     // "name = |", "this->name = |", "a.b = |": the name's declaration.
     return declaredType(blanked, wordBefore(blanked, lhsEnd), lhsEnd, languageId);
@@ -325,7 +408,7 @@ QString ofParameter(const QString &label, const QString &languageId)
 
 QString ofDetail(const QString &detail)
 {
-    const QString text = detail.trimmed();
+    QString text = detail.trimmed();
     if (const int colon = int(text.lastIndexOf(QLatin1String(" : "))); colon >= 0)
         return text.mid(colon + 3).trimmed(); // jdtls: "Main.count : int"
     if (const int arrow = int(text.lastIndexOf(QLatin1String("->"))); arrow >= 0)
@@ -380,16 +463,7 @@ bool accepts(const QString &expected, const CompletionItem &item, bool afterNew)
     const QString type = normalized(item.type);
     if (type.isEmpty())
         return false;
-    if (type == wanted)
-        return true;
-    if ((isNumber(type) && isNumber(wanted)) || (isString(type) && isString(wanted)) ||
-        (isBoolean(type) && isBoolean(wanted)))
-        return true;
-    // "QList" and "QList<int>": one of them without its arguments.
-    if (!type.contains(QLatin1Char('<')) || !wanted.contains(QLatin1Char('<')))
-        return withoutArguments(type) == withoutArguments(wanted) &&
-               type.endsWith(QLatin1Char('*')) == wanted.endsWith(QLatin1Char('*'));
-    return false;
+    return typesMatch(type, wanted);
 }
 
 } // namespace ExpectedType

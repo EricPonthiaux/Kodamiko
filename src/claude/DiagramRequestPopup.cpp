@@ -8,19 +8,15 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 
-DiagramRequestPopup::DiagramRequestPopup(const QString &location,
-                                         const QList<DiagramKind> &kinds,
-                                         const QString &initialName,
-                                         Apply apply,
-                                         QWidget *parent)
-    : EntryPopup(tr("Diagram Drawn by Claude"), location, parent)
+DiagramRequestPopup::DiagramRequestPopup(const Form &form, Apply apply, QWidget *parent)
+    : EntryPopup(tr("Diagram Drawn by Claude"), form.location, parent)
     , apply_(std::move(apply))
     , kind_(new QComboBox(this))
     , description_(new QPlainTextEdit(this))
     , name_(new QLineEdit(this))
     , draw_(new QPushButton(tr("Draw"), this))
 {
-    for (const DiagramKind &kind : kinds)
+    for (const DiagramKind &kind : form.kinds)
         kind_->addItem(kind.title, kind.id);
 
     description_->setPlaceholderText(tr("What should it show? “How an order is returned”, "
@@ -31,7 +27,7 @@ DiagramRequestPopup::DiagramRequestPopup(const QString &location,
     description_->setFixedHeight(description_->fontMetrics().lineSpacing() * 5 + 12);
 
     name_->setPlaceholderText(tr("File name, with “/” to create subfolders"));
-    name_->setText(initialName);
+    name_->setText(form.initialName);
 
     auto *cancel = new QPushButton(tr("Cancel"), this);
     draw_->setDefault(true);

@@ -3,6 +3,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#include <utility>
+
 namespace {
 
 // Notification types that mean Claude cannot go on without the user. The
@@ -29,6 +31,31 @@ QStringList editedFiles(const QJsonObject &event)
             paths.append(path);
     }
     return paths;
+}
+
+// PostToolUse: a command ran, or files were edited.
+std::optional<HookEvent> afterToolUse(HookEvent event, const QJsonObject &object)
+{
+    if (object.value(QLatin1String("tool_name")).toString() == QLatin1String("Bash")) {
+        event.kind = HookEvent::Kind::CommandFinished;
+        return event;
+    }
+    event.filePaths = editedFiles(object);
+    if (event.filePaths.isEmpty())
+        return std::nullopt;
+    event.kind = HookEvent::Kind::FilesEdited;
+    return event;
+}
+
+// PreToolUse: Claude is about to edit files; other tools do not concern us.
+std::optional<HookEvent> beforeToolUse(HookEvent event, const QJsonObject &object)
+{
+    event.filePaths = editedFiles(object);
+    if (event.filePaths.isEmpty())
+        return std::nullopt;
+    event.kind = HookEvent::Kind::EditRequested;
+    event.message = object.value(QLatin1String("tool_name")).toString();
+    return event;
 }
 
 } // namespace
@@ -70,24 +97,9 @@ std::optional<HookEvent> HookEvent::fromJson(const QByteArray &json)
         event.status = object.value(QLatin1String("status")).toObject();
         return event;
     }
-    if (eventName == QLatin1String("PostToolUse")) {
-        if (object.value(QLatin1String("tool_name")).toString() == QLatin1String("Bash")) {
-            event.kind = Kind::CommandFinished;
-            return event;
-        }
-        event.filePaths = editedFiles(object);
-        if (event.filePaths.isEmpty())
-            return std::nullopt;
-        event.kind = Kind::FilesEdited;
-        return event;
-    }
-    if (eventName == QLatin1String("PreToolUse")) {
-        event.filePaths = editedFiles(object);
-        if (event.filePaths.isEmpty())
-            return std::nullopt;
-        event.kind = Kind::EditRequested;
-        event.message = object.value(QLatin1String("tool_name")).toString();
-        return event;
-    }
+    if (eventName == QLatin1String("PostToolUse"))
+        return afterToolUse(std::move(event), object);
+    if (eventName == QLatin1String("PreToolUse"))
+        return beforeToolUse(std::move(event), object);
     return std::nullopt;
 }

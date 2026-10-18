@@ -38,11 +38,18 @@ QString describeCandidates(const QString &languageId, const QString &filePath);
 // formatted text, or nullopt with the formatter's error message.
 std::optional<QString> run(const Command &command, const QString &workDir, const QString &text, QString *error);
 
-// Same as run(), without blocking: `done` is called later, on `context`'s
+// Same as run(), without blocking, for `job.command` run in `job.workDir`
+// on `job.text`: `done` is called later, on `context`'s
 // thread, with the formatted text, or nullopt and the error message. It is
 // not called if `context` is destroyed first.
+struct Job {
+    Command command;
+    QString workDir;
+    QString text;
+};
+
 using Done = std::function<void(const std::optional<QString> &formatted, const QString &error)>;
-void start(const Command &command, const QString &workDir, const QString &text, QObject *context, const Done &done);
+void start(const Job &job, QObject *context, const Done &done);
 
 // Where `position` (an offset in `before`) ends up in `after`: at the same
 // number of non-blank characters from the start. Formatters mostly move

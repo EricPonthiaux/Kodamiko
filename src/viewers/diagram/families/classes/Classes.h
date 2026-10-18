@@ -25,8 +25,8 @@ public:
     QString displayText() const override { return name; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // The text edited in place: «stereotype» and name, then `--` before the
     // attributes and before the methods.
@@ -48,8 +48,8 @@ public:
     QStringList graphvizAttributes(const Board &board) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     // link | association | extension | realization | composition |
     // aggregation | dependency | dotted
@@ -58,11 +58,7 @@ public:
     QString toCard;   // near the marker end
 
 private:
-    void drawMarker(QPainter &painter,
-                    const Board &board,
-                    const Route &route,
-                    qreal angle,
-                    const LinkStyle &style) const;
+    void drawMarker(QPainter &painter, const Board &board, const Route &route, const LinkStyle &style) const;
     void drawCards(QPainter &painter, const Board &board, const Route &route, qreal angle) const;
 };
 

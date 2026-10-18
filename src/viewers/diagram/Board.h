@@ -196,7 +196,15 @@ private:
     void reindex();
     std::unique_ptr<Shape> makeShape(const QString &type) const;
     std::unique_ptr<Link> makeLink(const QString &type, bool *allowSelf, bool *allowMulti) const;
+    // The first link from `from` to `to`, or null.
+    Link *linkBetween(const QString &from, const QString &to) const;
+    // Removes every link touching the shape, and their selection.
+    void removeLinksOf(const QString &shapeId);
+    struct PastedShapes;
     void addClipboardContent(const QJsonArray &shapes, const QJsonArray &links, QPointF offset);
+    PastedShapes pasteShapes(const QJsonArray &shapes, QPointF offset);
+    void reparentPastedShapes(const PastedShapes &pasted);
+    QStringList pasteLinks(const QJsonArray &links, const QHash<QString, QString> &idMap);
 
     const Family *family_ = nullptr;
     Style style_;

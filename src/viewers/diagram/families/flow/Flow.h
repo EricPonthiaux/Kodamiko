@@ -13,7 +13,7 @@ QString typeOf(const QString &variant);
 
 class FlowShape : public Shape {
 public:
-    explicit FlowShape(const QString &type);
+    explicit FlowShape(const QString &typeName);
 
     void load(const QJsonObject &props) override;
     QJsonObject toJson() const override;
@@ -31,8 +31,8 @@ public:
     QString displayText() const override { return text; }
 
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     QString text;
     QString fill = QStringLiteral("#ffffff");
@@ -47,6 +47,10 @@ private:
     qreal textEditPaddingX() const;
     qreal labelCenterY() const;
     QList<QPointF> points() const;
+    // The point where a stadium's border meets the ray from its center along
+    // (dx, dy), a non-zero direction.
+    QPointF stadiumBorderPoint(qreal dx, qreal dy) const;
+
     QPainterPath outline() const;
     void drawDetails(QPainter &painter, const QColor &color, qreal width) const;
     QString graphvizGeometry() const;
@@ -89,8 +93,8 @@ public:
     LinkStyle drawStyle(const Board &board, bool selected) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
     QList<Property> properties() const override;
-    QVariant propertyValue(const QString &id) const override;
-    void setPropertyValue(const QString &id, const QVariant &value) override;
+    QVariant propertyValue(const QString &propertyId) const override;
+    void setPropertyValue(const QString &propertyId, const QVariant &value) override;
 
     QString line = QStringLiteral("solid"); // solid | thick | dotted | invisible
     QString head = QStringLiteral("arrow"); // arrow | none | circle | cross

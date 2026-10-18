@@ -27,6 +27,7 @@
 #include <QWebEngineScript>
 #include <QWebEngineSettings>
 
+#include <array>
 #include <utility>
 
 namespace {
@@ -301,16 +302,24 @@ PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QWidget *parent)
     toolbar->setContentsMargins(4, 2, 6, 2);
     toolbar->setSpacing(2);
     toolbar->addStretch();
-    const QString names[] = {tr("Editor"), tr("Split"), tr("Preview")};
-    const QString tips[] = {tr("Editor only"), tr("Editor and preview side by side"), tr("Preview only")};
-    for (int i = 0; i < 3; ++i) {
+
+    struct ModeChoice {
+        QString name;
+        QString toolTip;
+    };
+
+    // In the order of Mode, whose values are the buttons' ids.
+    const std::array<ModeChoice, modeCount> choices = {{{tr("Editor"), tr("Editor only")},
+                                                        {tr("Split"), tr("Editor and preview side by side")},
+                                                        {tr("Preview"), tr("Preview only")}}};
+    for (std::size_t i = 0; i < choices.size(); ++i) {
         auto *button = new QToolButton(this);
-        button->setText(names[i]);
-        button->setToolTip(tips[i]);
+        button->setText(choices[i].name);
+        button->setToolTip(choices[i].toolTip);
         button->setCheckable(true);
         button->setAutoRaise(true);
         button->setFocusPolicy(Qt::NoFocus);
-        group->addButton(button, i);
+        group->addButton(button, int(i));
         toolbar->addWidget(button);
         buttons_[i] = button;
     }
@@ -354,7 +363,7 @@ QWidget *PreviewPage::preview() const
 void PreviewPage::setMode(Mode mode)
 {
     mode_ = mode;
-    buttons_[static_cast<int>(mode)]->setChecked(true);
+    buttons_[static_cast<std::size_t>(mode)]->setChecked(true);
     if (mode != Mode::Editor && isVisible())
         ensurePreview();
     QWidget *shown = preview();

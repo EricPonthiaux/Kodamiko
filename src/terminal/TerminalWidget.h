@@ -92,7 +92,9 @@ private:
     void scrollToBottom();
 
     void paintRow(QPainter &painter, int row);
-    void paintCell(QPainter &painter, const TerminalCell &cell, int x, int y, bool selected) const;
+    void computeRowColors(int contentRow);
+    void paintRowBackgrounds(QPainter &painter, int y) const;
+    void paintCell(QPainter &painter, const TerminalCell &cell, const QPoint &topLeft) const;
     void paintCursor(QPainter &painter) const;
     const QFont &fontFor(bool bold, bool italic, bool underline, bool strike) const;
 

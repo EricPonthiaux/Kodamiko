@@ -25,44 +25,30 @@ McpResult McpResult::error(const QString &text)
     return result;
 }
 
-McpTool McpTool::reading(const QString &name,
-                         const QString &title,
-                         const QString &description,
-                         const QJsonObject &inputSchema,
-                         Run run)
+McpTool McpTool::reading(Declaration declaration, Run run)
 {
     McpTool tool;
-    tool.name = name;
-    tool.title = title;
-    tool.description = description;
-    tool.inputSchema = inputSchema;
+    tool.name = std::move(declaration.name);
+    tool.title = std::move(declaration.title);
+    tool.description = std::move(declaration.description);
+    tool.inputSchema = std::move(declaration.inputSchema);
     tool.readOnly = true;
     tool.idempotent = true;
     tool.run = std::move(run);
     return tool;
 }
 
-McpTool McpTool::acting(const QString &name,
-                        const QString &title,
-                        const QString &description,
-                        const QJsonObject &inputSchema,
-                        Run run,
-                        bool idempotent)
+McpTool McpTool::acting(Declaration declaration, Run run)
 {
-    McpTool tool = reading(name, title, description, inputSchema, std::move(run));
+    McpTool tool = reading(std::move(declaration), std::move(run));
     tool.readOnly = false;
-    tool.idempotent = idempotent;
+    tool.idempotent = false;
     return tool;
 }
 
-McpTool McpTool::sensitive(const QString &name,
-                           const QString &title,
-                           const QString &description,
-                           const QJsonObject &inputSchema,
-                           std::function<QString(const QJsonObject &)> describe,
-                           Run run)
+McpTool McpTool::sensitive(Declaration declaration, std::function<QString(const QJsonObject &)> describe, Run run)
 {
-    McpTool tool = acting(name, title, description, inputSchema, std::move(run));
+    McpTool tool = acting(std::move(declaration), std::move(run));
     tool.destructive = true;
     tool.confirm = true;
     tool.describe = std::move(describe);

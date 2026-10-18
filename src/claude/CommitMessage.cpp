@@ -41,7 +41,7 @@ QString wrapBody(const QString &message)
 {
     constexpr int width = 72;
     static const QRegularExpression item(QStringLiteral("^([-*]|\\d+[.)]) "));
-    QStringList lines = message.split(QLatin1Char('\n'));
+    const QStringList lines = message.split(QLatin1Char('\n'));
     QStringList wrapped;
     for (qsizetype i = 0; i < lines.size(); ++i) {
         const QString &line = lines.at(i);

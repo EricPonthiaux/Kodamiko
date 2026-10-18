@@ -172,6 +172,40 @@ QString patternMessage(const QString &text, const QString &pattern, const QJsonO
     return message;
 }
 
+// A key written twice: Claude reads only the last one.
+void reportDuplicateKeys(const JsonNode &node, Diagnostics &diagnostics)
+{
+    for (qsizetype i = 0; i < node.members.size(); ++i) {
+        const JsonMember &member = node.members[i];
+        const auto isSameKey = [&](const JsonMember &other) { return other.key == member.key; };
+        if (std::any_of(node.members.begin() + i + 1, node.members.end(), isSameKey))
+            diagnostics.append({Diagnostic::Severity::Warning, member.keyStart, member.keyEnd,
+                                tr("Duplicate key: only the last “%1” counts").arg(member.key)});
+        reportDuplicateKeys(member.value, diagnostics);
+    }
+    for (const JsonNode &item : node.items)
+        reportDuplicateKeys(item, diagnostics);
+}
+
+void appendMissing(QStringList &list, const QStringList &items)
+{
+    for (const QString &item : items) {
+        if (!list.contains(item))
+            list.append(item);
+    }
+}
+
+// A key as a string node, for propertyNames to check.
+JsonNode keyNode(const JsonMember &member)
+{
+    JsonNode key;
+    key.type = QJsonValue::String;
+    key.scalar = member.key;
+    key.start = member.keyStart;
+    key.end = member.keyEnd;
+    return key;
+}
+
 } // namespace
 
 struct JsonSchema::Result {
@@ -204,25 +238,7 @@ JsonSchema::JsonSchema(QJsonObject schema)
 Diagnostics JsonSchema::validate(const JsonNode &root) const
 {
     Diagnostics diagnostics = check(root, root_, 0).diagnostics;
-
-    // A key written twice: Claude reads only the last one.
-    const std::function<void(const JsonNode &)> findDuplicates = [&](const JsonNode &node) {
-        for (qsizetype i = 0; i < node.members.size(); ++i) {
-            const JsonMember &member = node.members[i];
-            for (qsizetype j = i + 1; j < node.members.size(); ++j) {
-                if (node.members[j].key == member.key) {
-                    diagnostics.append({Diagnostic::Severity::Warning, member.keyStart, member.keyEnd,
-                                        tr("Duplicate key: only the last “%1” counts").arg(member.key)});
-                    break;
-                }
-            }
-            findDuplicates(member.value);
-        }
-        for (const JsonNode &item : node.items)
-            findDuplicates(item);
-    };
-    findDuplicates(root);
-
+    reportDuplicateKeys(root, diagnostics);
     std::stable_sort(diagnostics.begin(), diagnostics.end(),
                      [](const Diagnostic &a, const Diagnostic &b) { return a.start < b.start; });
     return diagnostics;
@@ -267,144 +283,15 @@ JsonSchema::Result JsonSchema::check(const JsonNode &node, const QJsonValue &sch
         return result;
     }
     const QJsonObject schema = resolve(schemaValue);
-
-    const QStringList types = typesOf(schema);
-    if (!types.isEmpty() &&
-        std::none_of(types.begin(), types.end(), [&](const QString &type) { return hasType(node, type); })) {
-        QStringList names;
-        for (const QString &type : types)
-            names.append(typeName(type));
-        result.typeMatched = false;
-        result.expected = names;
-        result.add(node, tr("Expected %1, not %2").arg(names.join(tr(" or ")), actualName(node)));
+    if (!checkKind(node, schema, result))
         return result;
-    }
-    const QJsonValue value = node.toJson();
-    if (schema.contains(QLatin1String("const")) && value != schema.value(QLatin1String("const"))) {
-        result.typeMatched = false;
-        result.expected = {compact(schema.value(QLatin1String("const")))};
-        result.add(node, tr("Expected %1").arg(result.expected.first()));
-        return result;
-    }
-    if (schema.contains(QLatin1String("enum"))) {
-        const QJsonArray values = schema.value(QLatin1String("enum")).toArray();
-        if (!values.contains(value)) {
-            QStringList names;
-            for (const QJsonValue &item : values)
-                names.append(compact(item));
-            result.typeMatched = false;
-            result.expected = names;
-            result.add(node, tr("Expected one of: %1").arg(names.join(QStringLiteral(", "))));
-            return result;
-        }
-    }
-
-    switch (node.type) {
-    case QJsonValue::String: {
-        const QString text = node.scalar.toString();
-        const qsizetype length = text.toUcs4().size();
-        if (schema.contains(QLatin1String("minLength")) && length < schema.value(QLatin1String("minLength")).toInt())
-            result.add(node, length == 0
-                                 ? tr("Must not be empty")
-                                 : tr("At least %1 characters").arg(schema.value(QLatin1String("minLength")).toInt()));
-        if (schema.contains(QLatin1String("maxLength")) && length > schema.value(QLatin1String("maxLength")).toInt())
-            result.add(node, tr("At most %1 characters").arg(schema.value(QLatin1String("maxLength")).toInt()));
-        if (schema.contains(QLatin1String("pattern"))) {
-            const QString pattern = schema.value(QLatin1String("pattern")).toString();
-            const QRegularExpression &expression = regex(pattern);
-            if (expression.isValid() && !expression.match(text).hasMatch())
-                result.add(node, patternMessage(text, pattern, schema));
-        }
-        break;
-    }
-    case QJsonValue::Double: {
-        const double number = node.scalar.toDouble();
-        const auto bound = [&](const char *keyword, auto violates, const char *message) {
-            const QJsonValue limit = schema.value(QLatin1String(keyword));
-            if (limit.isDouble() && violates(number, limit.toDouble()))
-                result.add(node, tr(message).arg(limit.toDouble()));
-        };
-        bound("minimum", std::less<double>(), QT_TRANSLATE_NOOP("JsonSchema", "At least %1"));
-        bound("maximum", std::greater<double>(), QT_TRANSLATE_NOOP("JsonSchema", "At most %1"));
-        bound("exclusiveMinimum", std::less_equal<double>(), QT_TRANSLATE_NOOP("JsonSchema", "Greater than %1"));
-        bound("exclusiveMaximum", std::greater_equal<double>(), QT_TRANSLATE_NOOP("JsonSchema", "Less than %1"));
-        break;
-    }
-    case QJsonValue::Array: {
-        const QJsonValue items = schema.value(QLatin1String("items"));
-        for (qsizetype i = 0; i < node.items.size(); ++i) {
-            const QJsonValue itemSchema = items.isArray() ? items.toArray().at(i) : items;
-            if (!itemSchema.isUndefined())
-                result.diagnostics += check(node.items[i], itemSchema, depth + 1).diagnostics;
-        }
-        if (schema.contains(QLatin1String("minItems")) &&
-            node.items.size() < schema.value(QLatin1String("minItems")).toInt())
-            result.add(node, QCoreApplication::translate("JsonSchema", "At least %n item(s)", nullptr,
-                                                         schema.value(QLatin1String("minItems")).toInt()));
-        if (schema.contains(QLatin1String("maxItems")) &&
-            node.items.size() > schema.value(QLatin1String("maxItems")).toInt())
-            result.add(node, QCoreApplication::translate("JsonSchema", "At most %n item(s)", nullptr,
-                                                         schema.value(QLatin1String("maxItems")).toInt()));
-        if (schema.value(QLatin1String("uniqueItems")).toBool()) {
-            for (qsizetype i = 1; i < node.items.size(); ++i) {
-                const QJsonValue item = node.items[i].toJson();
-                for (qsizetype j = 0; j < i; ++j) {
-                    if (node.items[j].toJson() == item) {
-                        result.add(node.items[i], tr("Already in the list"));
-                        break;
-                    }
-                }
-            }
-        }
-        break;
-    }
-    case QJsonValue::Object:
-        checkObject(node, schema, depth, result);
-        break;
-    default:
-        break;
-    }
+    checkContent(node, schema, depth, result);
 
     for (const QJsonValue &part : schema.value(QLatin1String("allOf")).toArray())
         result.diagnostics += check(node, part, depth + 1).diagnostics;
-
     // oneOf is checked as anyOf: schemas often have branches that overlap.
-    for (const char *keyword : {"anyOf", "oneOf"}) {
-        const QJsonArray branches = schema.value(QLatin1String(keyword)).toArray();
-        if (branches.isEmpty())
-            continue;
-        QList<Result> results;
-        bool matched = false;
-        for (const QJsonValue &branch : branches) {
-            results.append(check(node, branch, depth + 1));
-            if (results.last().diagnostics.isEmpty()) {
-                matched = true;
-                break;
-            }
-        }
-        if (matched)
-            continue;
-        const Result *best = nullptr;
-        for (const Result &branch : std::as_const(results)) {
-            if (branch.typeMatched && (!best || branch.diagnostics.size() < best->diagnostics.size()))
-                best = &branch;
-        }
-        if (best) {
-            result.diagnostics += best->diagnostics;
-            continue;
-        }
-        // Of no kind the branches accept: what each expected.
-        QStringList expected;
-        for (const Result &branch : std::as_const(results)) {
-            for (const QString &item : branch.expected) {
-                if (!expected.contains(item))
-                    expected.append(item);
-            }
-        }
-        result.typeMatched = false;
-        result.expected = expected;
-        result.add(node, tr("Expected %1, not %2").arg(expected.join(tr(" or ")), actualName(node)));
-    }
+    for (const char *keyword : {"anyOf", "oneOf"})
+        checkAnyOf(node, schema.value(QLatin1String(keyword)).toArray(), depth, result);
 
     if (schema.contains(QLatin1String("not")) &&
         check(node, schema.value(QLatin1String("not")), depth + 1).diagnostics.isEmpty())
@@ -412,47 +299,153 @@ JsonSchema::Result JsonSchema::check(const JsonNode &node, const QJsonValue &sch
     return result;
 }
 
+bool JsonSchema::checkKind(const JsonNode &node, const QJsonObject &schema, Result &result)
+{
+    const QStringList types = typesOf(schema);
+    const bool isOfType =
+        std::any_of(types.begin(), types.end(), [&](const QString &type) { return hasType(node, type); });
+    if (!types.isEmpty() && !isOfType) {
+        QStringList names;
+        for (const QString &type : types)
+            names.append(typeName(type));
+        result.typeMatched = false;
+        result.expected = names;
+        result.add(node, tr("Expected %1, not %2").arg(names.join(tr(" or ")), actualName(node)));
+        return false;
+    }
+    const QJsonValue value = node.toJson();
+    if (schema.contains(QLatin1String("const")) && value != schema.value(QLatin1String("const"))) {
+        result.typeMatched = false;
+        result.expected = {compact(schema.value(QLatin1String("const")))};
+        result.add(node, tr("Expected %1").arg(result.expected.first()));
+        return false;
+    }
+    const QJsonArray values = schema.value(QLatin1String("enum")).toArray();
+    if (schema.contains(QLatin1String("enum")) && !values.contains(value)) {
+        QStringList names;
+        for (const QJsonValue &item : values)
+            names.append(compact(item));
+        result.typeMatched = false;
+        result.expected = names;
+        result.add(node, tr("Expected one of: %1").arg(names.join(QStringLiteral(", "))));
+        return false;
+    }
+    return true;
+}
+
+void JsonSchema::checkContent(const JsonNode &node, const QJsonObject &schema, int depth, Result &result) const
+{
+    switch (node.type) {
+    case QJsonValue::String:
+        checkString(node, schema, result);
+        break;
+    case QJsonValue::Double:
+        checkNumber(node, schema, result);
+        break;
+    case QJsonValue::Array:
+        checkArray(node, schema, depth, result);
+        break;
+    case QJsonValue::Object:
+        checkObject(node, schema, depth, result);
+        break;
+    default:
+        break;
+    }
+}
+
+void JsonSchema::checkString(const JsonNode &node, const QJsonObject &schema, Result &result) const
+{
+    const QString text = node.scalar.toString();
+    const qsizetype length = text.toUcs4().size();
+    const int minLength = schema.value(QLatin1String("minLength")).toInt();
+    const int maxLength = schema.value(QLatin1String("maxLength")).toInt();
+    if (schema.contains(QLatin1String("minLength")) && length < minLength)
+        result.add(node, length == 0 ? tr("Must not be empty") : tr("At least %1 characters").arg(minLength));
+    if (schema.contains(QLatin1String("maxLength")) && length > maxLength)
+        result.add(node, tr("At most %1 characters").arg(maxLength));
+    if (!schema.contains(QLatin1String("pattern")))
+        return;
+    const QString pattern = schema.value(QLatin1String("pattern")).toString();
+    const QRegularExpression &expression = regex(pattern);
+    if (expression.isValid() && !expression.match(text).hasMatch())
+        result.add(node, patternMessage(text, pattern, schema));
+}
+
+void JsonSchema::checkNumber(const JsonNode &node, const QJsonObject &schema, Result &result)
+{
+    const double number = node.scalar.toDouble();
+    const auto bound = [&](const char *keyword, auto violates, const char *message) {
+        const QJsonValue limit = schema.value(QLatin1String(keyword));
+        if (limit.isDouble() && violates(number, limit.toDouble()))
+            result.add(node, tr(message).arg(limit.toDouble()));
+    };
+    bound("minimum", std::less<>(), QT_TRANSLATE_NOOP("JsonSchema", "At least %1"));
+    bound("maximum", std::greater<>(), QT_TRANSLATE_NOOP("JsonSchema", "At most %1"));
+    bound("exclusiveMinimum", std::less_equal<>(), QT_TRANSLATE_NOOP("JsonSchema", "Greater than %1"));
+    bound("exclusiveMaximum", std::greater_equal<>(), QT_TRANSLATE_NOOP("JsonSchema", "Less than %1"));
+}
+
+void JsonSchema::checkArray(const JsonNode &node, const QJsonObject &schema, int depth, Result &result) const
+{
+    const QJsonValue items = schema.value(QLatin1String("items"));
+    for (qsizetype i = 0; i < node.items.size(); ++i) {
+        const QJsonValue itemSchema = items.isArray() ? items.toArray().at(i) : items;
+        if (!itemSchema.isUndefined())
+            result.diagnostics += check(node.items[i], itemSchema, depth + 1).diagnostics;
+    }
+    const int minItems = schema.value(QLatin1String("minItems")).toInt();
+    const int maxItems = schema.value(QLatin1String("maxItems")).toInt();
+    if (schema.contains(QLatin1String("minItems")) && node.items.size() < minItems)
+        result.add(node, QCoreApplication::translate("JsonSchema", "At least %n item(s)", nullptr, minItems));
+    if (schema.contains(QLatin1String("maxItems")) && node.items.size() > maxItems)
+        result.add(node, QCoreApplication::translate("JsonSchema", "At most %n item(s)", nullptr, maxItems));
+    if (!schema.value(QLatin1String("uniqueItems")).toBool())
+        return;
+    for (qsizetype i = 1; i < node.items.size(); ++i) {
+        const QJsonValue item = node.items[i].toJson();
+        const auto isSameItem = [&](const JsonNode &earlier) { return earlier.toJson() == item; };
+        if (std::any_of(node.items.begin(), node.items.begin() + i, isSameItem))
+            result.add(node.items[i], tr("Already in the list"));
+    }
+}
+
+void JsonSchema::checkAnyOf(const JsonNode &node, const QJsonArray &branches, int depth, Result &result) const
+{
+    if (branches.isEmpty())
+        return;
+    QList<Result> results;
+    for (const QJsonValue &branch : branches) {
+        results.append(check(node, branch, depth + 1));
+        if (results.last().diagnostics.isEmpty())
+            return;
+    }
+    const Result *best = nullptr;
+    for (const Result &branch : std::as_const(results)) {
+        const bool isFewer = !best || branch.diagnostics.size() < best->diagnostics.size();
+        if (branch.typeMatched && isFewer)
+            best = &branch;
+    }
+    if (best) {
+        result.diagnostics += best->diagnostics;
+        return;
+    }
+    // Of no kind the branches accept: what each expected.
+    QStringList expected;
+    for (const Result &branch : std::as_const(results))
+        appendMissing(expected, branch.expected);
+    result.typeMatched = false;
+    result.expected = expected;
+    result.add(node, tr("Expected %1, not %2").arg(expected.join(tr(" or ")), actualName(node)));
+}
+
 void JsonSchema::checkObject(const JsonNode &node, const QJsonObject &schema, int depth, Result &result) const
 {
-    const QJsonObject properties = schema.value(QLatin1String("properties")).toObject();
-    const QJsonObject patterns = schema.value(QLatin1String("patternProperties")).toObject();
-    const QJsonValue additional = schema.value(QLatin1String("additionalProperties"));
     const QJsonValue propertyNames = schema.value(QLatin1String("propertyNames"));
-
     for (const JsonMember &member : node.members) {
-        bool known = false;
-        if (properties.contains(member.key)) {
-            known = true;
-            result.diagnostics += check(member.value, properties.value(member.key), depth + 1).diagnostics;
-        }
-        for (auto it = patterns.begin(); it != patterns.end(); ++it) {
-            if (regex(it.key()).match(member.key).hasMatch()) {
-                known = true;
-                result.diagnostics += check(member.value, it.value(), depth + 1).diagnostics;
-            }
-        }
-        if (!known) {
-            const QString suggestion = closestName(member.key, properties.keys());
-            if (additional.isBool() && !additional.toBool()) {
-                result.add(member.keyStart, member.keyEnd,
-                           suggestion.isEmpty()
-                               ? tr("Unknown key “%1”").arg(member.key)
-                               : tr("Unknown key “%1”: did you mean “%2”?").arg(member.key, suggestion));
-            } else if (additional.isObject()) {
-                result.diagnostics += check(member.value, additional, depth + 1).diagnostics;
-            } else if (!suggestion.isEmpty()) {
-                result.add(member.keyStart, member.keyEnd,
-                           tr("Unknown key “%1”: did you mean “%2”?").arg(member.key, suggestion));
-            }
-        }
-        if (!propertyNames.isUndefined()) {
-            JsonNode key;
-            key.type = QJsonValue::String;
-            key.scalar = member.key;
-            key.start = member.keyStart;
-            key.end = member.keyEnd;
-            result.diagnostics += check(key, propertyNames, depth + 1).diagnostics;
-        }
+        if (!checkKnownMember(member, schema, depth, result))
+            checkUnknownMember(member, schema, depth, result);
+        if (!propertyNames.isUndefined())
+            result.diagnostics += check(keyNode(member), propertyNames, depth + 1).diagnostics;
     }
 
     for (const QJsonValue &required : schema.value(QLatin1String("required")).toArray()) {
@@ -462,40 +455,77 @@ void JsonSchema::checkObject(const JsonNode &node, const QJsonObject &schema, in
     }
 }
 
+bool JsonSchema::checkKnownMember(const JsonMember &member, const QJsonObject &schema, int depth, Result &result) const
+{
+    bool known = false;
+    const QJsonObject properties = schema.value(QLatin1String("properties")).toObject();
+    if (properties.contains(member.key)) {
+        known = true;
+        result.diagnostics += check(member.value, properties.value(member.key), depth + 1).diagnostics;
+    }
+    const QJsonObject patterns = schema.value(QLatin1String("patternProperties")).toObject();
+    for (auto it = patterns.begin(); it != patterns.end(); ++it) {
+        if (regex(it.key()).match(member.key).hasMatch()) {
+            known = true;
+            result.diagnostics += check(member.value, it.value(), depth + 1).diagnostics;
+        }
+    }
+    return known;
+}
+
+void JsonSchema::checkUnknownMember(const JsonMember &member,
+                                    const QJsonObject &schema,
+                                    int depth,
+                                    Result &result) const
+{
+    const QJsonValue additional = schema.value(QLatin1String("additionalProperties"));
+    const QString suggestion = closestName(member.key, schema.value(QLatin1String("properties")).toObject().keys());
+    const bool isClosed = additional.isBool() && !additional.toBool();
+    if (isClosed) {
+        result.add(member.keyStart, member.keyEnd,
+                   suggestion.isEmpty() ? tr("Unknown key “%1”").arg(member.key)
+                                        : tr("Unknown key “%1”: did you mean “%2”?").arg(member.key, suggestion));
+    } else if (additional.isObject()) {
+        result.diagnostics += check(member.value, additional, depth + 1).diagnostics;
+    } else if (!suggestion.isEmpty()) {
+        result.add(member.keyStart, member.keyEnd,
+                   tr("Unknown key “%1”: did you mean “%2”?").arg(member.key, suggestion));
+    }
+}
+
+QJsonValue JsonSchema::childSchema(const QJsonValue &schemaValue, const QString &key, int depth) const
+{
+    if (depth > 8)
+        return {QJsonValue::Undefined};
+    const QJsonObject schema = resolve(schemaValue);
+    const QJsonObject properties = schema.value(QLatin1String("properties")).toObject();
+    if (properties.contains(key))
+        return properties.value(key);
+    const QJsonObject patterns = schema.value(QLatin1String("patternProperties")).toObject();
+    for (auto it = patterns.begin(); it != patterns.end(); ++it) {
+        if (regex(it.key()).match(key).hasMatch())
+            return it.value();
+    }
+    if (schema.value(QLatin1String("additionalProperties")).isObject())
+        return schema.value(QLatin1String("additionalProperties"));
+    bool isIndex = false;
+    key.toInt(&isIndex);
+    if (isIndex && schema.value(QLatin1String("items")).isObject())
+        return schema.value(QLatin1String("items"));
+    for (const char *keyword : {"anyOf", "oneOf", "allOf"}) {
+        for (const QJsonValue &branch : schema.value(QLatin1String(keyword)).toArray()) {
+            if (const QJsonValue found = childSchema(branch, key, depth + 1); !found.isUndefined())
+                return found;
+        }
+    }
+    return {QJsonValue::Undefined};
+}
+
 QString JsonSchema::description(const QStringList &path) const
 {
-    // The schema of a child, looked for in `schema` and its branches.
-    const std::function<QJsonValue(const QJsonValue &, const QString &, int)> child =
-        [&](const QJsonValue &schemaValue, const QString &key, int depth) -> QJsonValue {
-        if (depth > 8)
-            return {QJsonValue::Undefined};
-        const QJsonObject schema = resolve(schemaValue);
-        const QJsonObject properties = schema.value(QLatin1String("properties")).toObject();
-        if (properties.contains(key))
-            return properties.value(key);
-        const QJsonObject patterns = schema.value(QLatin1String("patternProperties")).toObject();
-        for (auto it = patterns.begin(); it != patterns.end(); ++it) {
-            if (regex(it.key()).match(key).hasMatch())
-                return it.value();
-        }
-        if (schema.value(QLatin1String("additionalProperties")).isObject())
-            return schema.value(QLatin1String("additionalProperties"));
-        bool isIndex = false;
-        key.toInt(&isIndex);
-        if (isIndex && schema.value(QLatin1String("items")).isObject())
-            return schema.value(QLatin1String("items"));
-        for (const char *keyword : {"anyOf", "oneOf", "allOf"}) {
-            for (const QJsonValue &branch : schema.value(QLatin1String(keyword)).toArray()) {
-                if (const QJsonValue found = child(branch, key, depth + 1); !found.isUndefined())
-                    return found;
-            }
-        }
-        return {QJsonValue::Undefined};
-    };
-
     QJsonValue schema = root_;
     for (const QString &key : path) {
-        schema = child(schema, key, 0);
+        schema = childSchema(schema, key, 0);
         if (schema.isUndefined())
             return {};
     }

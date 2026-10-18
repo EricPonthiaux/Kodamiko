@@ -11,6 +11,7 @@
 
 class EditorWidget;
 class QFrame;
+class QHBoxLayout;
 
 // Marks, in a margin of the editor, the lines that differ from the file's
 // version in the git index, as IntelliJ does: a green bar for added lines,
@@ -64,6 +65,8 @@ private:
     void defineMarkers();
     bool goTo(bool forward);
     int cursorLine() const;
+    QHBoxLayout *createPopupToolbar(QFrame *popup, const LineChange &change);
+    QPoint popupOrigin(const LineChange &change) const;
 
     EditorWidget *editor_;
     Theme theme_;

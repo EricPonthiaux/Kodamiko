@@ -13,17 +13,17 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <array>
 #include <ranges>
 
 namespace {
 
-enum Marker {
-    AddedMarker = 20,
-    ModifiedMarker,
-    DeletedMarker
-};
+// Scintilla marker numbers.
+constexpr int addedMarker = 20;
+constexpr int modifiedMarker = 21;
+constexpr int deletedMarker = 22;
 
-constexpr int markerMask = (1 << AddedMarker) | (1 << ModifiedMarker) | (1 << DeletedMarker);
+constexpr int markerMask = (1 << addedMarker) | (1 << modifiedMarker) | (1 << deletedMarker);
 constexpr int marginWidth = 8;
 constexpr int updateDelayMs = 250;
 constexpr int popupMaxLines = 15;
@@ -52,9 +52,114 @@ QImage deletedMark(const QColor &color, int lineHeight)
     painter.scale(ratio, ratio);
     painter.setPen(Qt::NoPen);
     painter.setBrush(color);
-    const QPointF points[] = {{0, 0}, {6, 0}, {0, 6}};
-    painter.drawPolygon(points, 3);
+    const std::array<QPointF, 3> points = {QPointF(0, 0), QPointF(6, 0), QPointF(0, 6)};
+    painter.drawPolygon(points.data(), int(points.size()));
     return image;
+}
+
+// The file's version in the index, or none when the repository is unreadable:
+// no marks rather than an error at every keystroke.
+std::optional<QByteArray> readIndexVersion(const QString &filePath)
+{
+    try {
+        return LineChanges::indexVersion(filePath);
+    } catch (const GitError &) {
+        return std::nullopt;
+    }
+}
+
+QList<LineChange> computeChanges(const QByteArray &base, const QByteArray &text)
+{
+    try {
+        return LineChanges::compute(base, text);
+    } catch (const GitError &) {
+        return {};
+    }
+}
+
+// The line that carries a change's mark: a deletion at the end of the file is
+// marked on the last line.
+int markerLine(const LineChange &change, int lineCount)
+{
+    return std::min(change.start, lineCount - 1);
+}
+
+// The first change after `line`, wrapping around to the first one.
+const LineChange &nextChange(const QList<LineChange> &all, int line, int lineCount)
+{
+    const auto isAfter = [line, lineCount](const LineChange &change) {
+        return markerLine(change, lineCount) > line && !change.covers(line, lineCount);
+    };
+    const auto found = std::ranges::find_if(all, isAfter);
+    return found != all.end() ? *found : all.first();
+}
+
+// The last change before `line`, wrapping around to the last one.
+const LineChange &previousChange(const QList<LineChange> &all, int line, int lineCount)
+{
+    const auto isBefore = [line, lineCount](const LineChange &change) {
+        return markerLine(change, lineCount) < line && !change.covers(line, lineCount);
+    };
+    const auto reversed = std::views::reverse(all);
+    const auto found = std::ranges::find_if(reversed, isBefore);
+    return found != reversed.end() ? *found : all.last();
+}
+
+QString changeSummary(const LineChange &change)
+{
+    const int lines = change.kind() == LineChange::Kind::Deleted ? change.baseCount : change.count;
+    switch (change.kind()) {
+    case LineChange::Kind::Added:
+        return lines == 1 ? ChangeGutter::tr("1 added line") : ChangeGutter::tr("%1 added lines").arg(lines);
+    case LineChange::Kind::Deleted:
+        return lines == 1 ? ChangeGutter::tr("1 deleted line") : ChangeGutter::tr("%1 deleted lines").arg(lines);
+    case LineChange::Kind::Modified:
+        return lines == 1 ? ChangeGutter::tr("1 modified line") : ChangeGutter::tr("%1 modified lines").arg(lines);
+    }
+    return {};
+}
+
+QToolButton *addToolButton(QWidget *parent, QHBoxLayout *layout, const QString &text, const QString &toolTip)
+{
+    auto *button = new QToolButton(parent);
+    button->setText(text);
+    button->setToolTip(toolTip);
+    button->setAutoRaise(true);
+    layout->addWidget(button);
+    return button;
+}
+
+// What a popup needs to show the lines of a change as they are in the index.
+struct BaseLinesStyle {
+    const Theme &theme;
+    int maxWidth = 0;
+};
+
+// The lines as they are in the index, on the background of deleted lines.
+QPlainTextEdit *createBaseLinesView(const QString &baseText,
+                                    int lineCount,
+                                    const BaseLinesStyle &style,
+                                    QWidget *parent)
+{
+    auto *view = new QPlainTextEdit(parent);
+    view->setReadOnly(true);
+    view->setLineWrapMode(QPlainTextEdit::NoWrap);
+    view->setFont(style.theme.font);
+    view->setPlainText(baseText);
+    QPalette palette = view->palette();
+    const QColor deleted = colorsFor(style.theme).deleted;
+    palette.setColor(QPalette::Base, style.theme.isDark ? deleted.darker(300) : deleted.lighter(160));
+    palette.setColor(QPalette::Text, style.theme.foreground);
+    view->setPalette(palette);
+    const QFontMetrics metrics(style.theme.font);
+    const int shown = std::min(lineCount, popupMaxLines);
+    view->setFixedHeight(metrics.lineSpacing() * shown + 2 * view->frameWidth() +
+                         static_cast<int>(2 * view->document()->documentMargin()) + 2);
+    int widest = 0;
+    for (const QString &text : baseText.split(QLatin1Char('\n')))
+        widest = std::max(widest, metrics.horizontalAdvance(text));
+    view->setMinimumWidth(std::min(widest + 30, style.maxWidth));
+    return view;
 }
 
 } // namespace
@@ -80,16 +185,11 @@ ChangeGutter::ChangeGutter(EditorWidget *editor)
 
 void ChangeGutter::reloadBase()
 {
-    std::optional<QByteArray> base;
-    if (!editor_->filePath().isEmpty()) {
-        try {
-            base = LineChanges::indexVersion(editor_->filePath());
-        } catch (const GitError &) {
-            // Unreadable repository: no marks rather than an error at every
-            // keystroke.
-        }
+    if (editor_->filePath().isEmpty()) {
+        setBase(std::nullopt);
+        return;
     }
-    setBase(base);
+    setBase(readIndexVersion(editor_->filePath()));
 }
 
 void ChangeGutter::setBase(const std::optional<QByteArray> &base)
@@ -115,17 +215,14 @@ void ChangeGutter::update()
     upToDate_ = true;
     changes_.clear();
     if (base_) {
-        try {
-            // No copy: the diff is computed before the document can change.
-            const QByteArrayView text = editor_->utf8Bytes();
-            changes_ = LineChanges::compute(*base_, QByteArray::fromRawData(text.data(), text.size()));
-        } catch (const GitError &) {
-        }
+        // No copy: the diff is computed before the document can change.
+        const QByteArrayView text = editor_->utf8Bytes();
+        changes_ = computeChanges(*base_, QByteArray::fromRawData(text.data(), text.size()));
     }
 
-    editor_->markerDeleteAll(AddedMarker);
-    editor_->markerDeleteAll(ModifiedMarker);
-    editor_->markerDeleteAll(DeletedMarker);
+    editor_->markerDeleteAll(addedMarker);
+    editor_->markerDeleteAll(modifiedMarker);
+    editor_->markerDeleteAll(deletedMarker);
     if (changes_.isEmpty())
         return;
     defineMarkers();
@@ -135,10 +232,10 @@ void ChangeGutter::update()
         case LineChange::Kind::Added:
         case LineChange::Kind::Modified:
             for (int line = change.start; line < change.start + change.count; ++line)
-                editor_->markerAdd(line, change.kind() == LineChange::Kind::Added ? AddedMarker : ModifiedMarker);
+                editor_->markerAdd(line, change.kind() == LineChange::Kind::Added ? addedMarker : modifiedMarker);
             break;
         case LineChange::Kind::Deleted:
-            editor_->markerAdd(std::min(change.start, lineCount - 1), DeletedMarker);
+            editor_->markerAdd(markerLine(change, lineCount), deletedMarker);
             break;
         }
     }
@@ -147,12 +244,12 @@ void ChangeGutter::update()
 void ChangeGutter::defineMarkers()
 {
     const ChangeColors colors = colorsFor(theme_);
-    editor_->markerDefine(QsciScintilla::LeftRectangle, AddedMarker);
-    editor_->setMarkerBackgroundColor(colors.added, AddedMarker);
-    editor_->markerDefine(QsciScintilla::LeftRectangle, ModifiedMarker);
-    editor_->setMarkerBackgroundColor(colors.modified, ModifiedMarker);
+    editor_->markerDefine(QsciScintilla::LeftRectangle, addedMarker);
+    editor_->setMarkerBackgroundColor(colors.added, addedMarker);
+    editor_->markerDefine(QsciScintilla::LeftRectangle, modifiedMarker);
+    editor_->setMarkerBackgroundColor(colors.modified, modifiedMarker);
     const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0));
-    editor_->markerDefine(deletedMark(colors.deleted, lineHeight), DeletedMarker);
+    editor_->markerDefine(deletedMark(colors.deleted, lineHeight), deletedMarker);
 }
 
 QList<LineChange> ChangeGutter::changes()
@@ -219,29 +316,10 @@ bool ChangeGutter::goTo(bool forward)
         return false;
     const int line = cursorLine();
     const int lineCount = editor_->lines();
-    const auto markerLine = [lineCount](const LineChange &change) { return std::min(change.start, lineCount - 1); };
-    const LineChange *target = nullptr;
-    if (forward) {
-        for (const LineChange &change : all) {
-            if (markerLine(change) > line && !change.covers(line, lineCount)) {
-                target = &change;
-                break;
-            }
-        }
-        if (!target)
-            target = &all.first();
-    } else {
-        for (const auto &it : std::views::reverse(all)) {
-            if (markerLine(it) < line && !it.covers(line, lineCount)) {
-                target = &it;
-                break;
-            }
-        }
-        if (!target)
-            target = &all.last();
-    }
-    editor_->setCursorPosition(markerLine(*target), 0);
-    editor_->ensureLineVisible(markerLine(*target));
+    const LineChange &target = forward ? nextChange(all, line, lineCount) : previousChange(all, line, lineCount);
+    const int targetLine = markerLine(target, lineCount);
+    editor_->setCursorPosition(targetLine, 0);
+    editor_->ensureLineVisible(targetLine);
     editor_->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
     return true;
 }
@@ -286,6 +364,7 @@ void ChangeGutter::showChangeAt(int line)
     if (!found || !base_)
         return;
     const LineChange change = *found;
+    const QByteArray base = *base_; // implicitly shared, no copy of the text
     if (popup_)
         popup_->close();
 
@@ -294,71 +373,40 @@ void ChangeGutter::showChangeAt(int line)
     popup->setFrameShape(QFrame::StyledPanel);
     popup_ = popup;
 
-    const auto addButton = [popup](QHBoxLayout *layout, const QString &text, const QString &toolTip) {
-        auto *button = new QToolButton(popup);
-        button->setText(text);
-        button->setToolTip(toolTip);
-        button->setAutoRaise(true);
-        layout->addWidget(button);
-        return button;
-    };
-    auto *toolbar = new QHBoxLayout;
-    toolbar->setContentsMargins(0, 0, 0, 0);
-    toolbar->setSpacing(2);
-    const QToolButton *previous = addButton(toolbar, QStringLiteral("↑"), tr("Previous Change (Ctrl+Alt+Shift+Up)"));
-    const QToolButton *next = addButton(toolbar, QStringLiteral("↓"), tr("Next Change (Ctrl+Alt+Shift+Down)"));
-    QToolButton *rollbackButton = addButton(toolbar, tr("Rollback"), tr("Rollback Lines (Ctrl+Alt+Z)"));
-    rollbackButton->setEnabled(!editor_->isReadOnly());
-    const QToolButton *showDiff = addButton(toolbar, tr("Show Diff"), tr("Show this change in a diff tab"));
-    toolbar->addStretch();
-    const int lines = change.kind() == LineChange::Kind::Deleted ? change.baseCount : change.count;
-    QString summary;
-    switch (change.kind()) {
-    case LineChange::Kind::Added:
-        summary = lines == 1 ? tr("1 added line") : tr("%1 added lines").arg(lines);
-        break;
-    case LineChange::Kind::Deleted:
-        summary = lines == 1 ? tr("1 deleted line") : tr("%1 deleted lines").arg(lines);
-        break;
-    case LineChange::Kind::Modified:
-        summary = lines == 1 ? tr("1 modified line") : tr("%1 modified lines").arg(lines);
-        break;
-    }
-    auto *label = new QLabel(summary, popup);
-    label->setEnabled(false);
-    toolbar->addWidget(label);
-
     auto *layout = new QVBoxLayout(popup);
     layout->setContentsMargins(6, 4, 6, 6);
     layout->setSpacing(4);
-    layout->addLayout(toolbar);
-
+    layout->addLayout(createPopupToolbar(popup, change));
     if (change.baseCount > 0) {
-        // The lines as they are in the index.
-        auto *previousText = new QPlainTextEdit(popup);
-        previousText->setReadOnly(true);
-        previousText->setLineWrapMode(QPlainTextEdit::NoWrap);
-        previousText->setFont(theme_.font);
-        QString lines = QString::fromUtf8(LineChanges::lines(*base_, change.baseStart, change.baseCount));
-        lines.remove(QLatin1Char('\r'));
-        if (lines.endsWith(QLatin1Char('\n')))
-            lines.chop(1);
-        previousText->setPlainText(lines);
-        QPalette palette = previousText->palette();
-        const QColor deleted = colorsFor(theme_).deleted;
-        palette.setColor(QPalette::Base, theme_.isDark ? deleted.darker(300) : deleted.lighter(160));
-        palette.setColor(QPalette::Text, theme_.foreground);
-        previousText->setPalette(palette);
-        const QFontMetrics metrics(theme_.font);
-        const int shown = std::min(change.baseCount, popupMaxLines);
-        previousText->setFixedHeight(metrics.lineSpacing() * shown + 2 * previousText->frameWidth() +
-                                     static_cast<int>(2 * previousText->document()->documentMargin()) + 2);
-        int widest = 0;
-        for (const QString &text : lines.split(QLatin1Char('\n')))
-            widest = std::max(widest, metrics.horizontalAdvance(text));
-        previousText->setMinimumWidth(std::min(widest + 30, editor_->viewport()->width() - 40));
-        layout->addWidget(previousText);
+        QString baseText = QString::fromUtf8(LineChanges::lines(base, change.baseStart, change.baseCount));
+        baseText.remove(QLatin1Char('\r'));
+        if (baseText.endsWith(QLatin1Char('\n')))
+            baseText.chop(1);
+        const BaseLinesStyle style{.theme = theme_, .maxWidth = editor_->viewport()->width() - 40};
+        layout->addWidget(createBaseLinesView(baseText, change.baseCount, style, popup));
     }
+
+    popup->adjustSize();
+    popup->move(popupOrigin(change));
+    popup->show();
+}
+
+QHBoxLayout *ChangeGutter::createPopupToolbar(QFrame *popup, const LineChange &change)
+{
+    auto *toolbar = new QHBoxLayout;
+    toolbar->setContentsMargins(0, 0, 0, 0);
+    toolbar->setSpacing(2);
+    const QToolButton *previous =
+        addToolButton(popup, toolbar, QStringLiteral("↑"), tr("Previous Change (Ctrl+Alt+Shift+Up)"));
+    const QToolButton *next =
+        addToolButton(popup, toolbar, QStringLiteral("↓"), tr("Next Change (Ctrl+Alt+Shift+Down)"));
+    QToolButton *rollbackButton = addToolButton(popup, toolbar, tr("Rollback"), tr("Rollback Lines (Ctrl+Alt+Z)"));
+    rollbackButton->setEnabled(!editor_->isReadOnly());
+    const QToolButton *showDiff = addToolButton(popup, toolbar, tr("Show Diff"), tr("Show this change in a diff tab"));
+    toolbar->addStretch();
+    auto *label = new QLabel(changeSummary(change), popup);
+    label->setEnabled(false);
+    toolbar->addWidget(label);
 
     connect(previous, &QToolButton::clicked, this, [this] {
         if (goToPrevious())
@@ -374,18 +422,17 @@ void ChangeGutter::showChangeAt(int line)
         popup->close();
         emit diffRequested(tr("Change in %1").arg(QFileInfo(editor_->filePath()).fileName()), diff);
     });
+    return toolbar;
+}
 
+QPoint ChangeGutter::popupOrigin(const LineChange &change) const
+{
     // Under the change's last line, aligned with the text.
-    const int lineCount = editor_->lines();
-    const int markerLine = std::min(change.start, lineCount - 1);
-    const int belowLine = change.count > 0 ? change.start + change.count - 1 : markerLine;
+    const int belowLine = change.count > 0 ? change.start + change.count - 1 : markerLine(change, editor_->lines());
     const long position = editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, belowLine);
     const int y = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, position)) +
                   static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, belowLine));
-    const QPoint origin = editor_->viewport()->mapToGlobal(QPoint(0, y));
-    popup->adjustSize();
-    popup->move(origin);
-    popup->show();
+    return editor_->viewport()->mapToGlobal(QPoint(0, y));
 }
 
 void ChangeGutter::applyTheme(const Theme &theme)

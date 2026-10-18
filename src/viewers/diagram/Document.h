@@ -4,6 +4,8 @@
 #include <QString>
 #include <QStringList>
 
+#include <optional>
+
 // A diagram file: its source in a notation (Mermaid, PlantUML, a JSON
 // scene) and, for the notations that know nothing of coordinates, the
 // layout kept by Duet in comments at the end of the file:
@@ -34,16 +36,18 @@ struct Loaded {
     QStringList warnings;
 };
 
-// Reads a file's content into `board`. False, with `error`, if the file is
-// not a diagram Duet reads.
-bool load(Board &board, const QString &path, const QByteArray &content, Loaded &loaded, QString *error);
+// Reads a file's content into `board` and tells how to lay it out. Nullopt,
+// with `error` (may be null), if the file is not a diagram Duet reads.
+std::optional<Loaded> load(Board &board, const QString &path, const QByteArray &content, QString *error);
 // The file's content for the board, in the notation of `codec`.
 QByteArray save(const Board &board, const Codec &codec);
 // The source alone, without the layout comments.
 QString source(const Board &board, const Codec &codec);
 // Replaces the board's content with `source` in the same notation, keeping
-// the layout by key; `laidOut` tells whether new elements need a layout.
-bool applySource(Board &board, const Codec &codec, const QString &text, Loaded &loaded, QString *error);
+// the layout by key, and tells whether new elements need a layout. Nullopt,
+// with `error` (may be null), if `text` cannot be read: the board is then
+// left untouched.
+std::optional<Loaded> applySource(Board &board, const Codec &codec, const QString &text, QString *error);
 // A new file of a family, in its default notation (empty if unknown).
 QByteArray blank(const QString &familyId);
 // The file extension of a family's files ("mmd").

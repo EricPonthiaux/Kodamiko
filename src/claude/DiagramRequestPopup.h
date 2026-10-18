@@ -21,14 +21,18 @@ public:
     // started: the popup then closes.
     using Apply = std::function<QString(const QString &kindId, const QString &name, const QString &description)>;
 
-    DiagramRequestPopup(const QString &location,
-                        const QList<DiagramKind> &kinds,
-                        const QString &initialName,
-                        Apply apply,
-                        QWidget *parent);
+    // What the popup offers.
+    struct Form {
+        QString location;         // the folder, under the title
+        QList<DiagramKind> kinds; // to choose from
+        QString initialName;      // in the name field
+    };
+
+    DiagramRequestPopup(const Form &form, Apply apply, QWidget *parent);
+
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void accept() override;
     void focusContent() override;

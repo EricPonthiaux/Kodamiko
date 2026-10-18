@@ -135,25 +135,11 @@ bool WindowFrame::eventFilter(QObject *watched, QEvent *event)
         if (frameless_)
             QMetaObject::invokeMethod(this, &WindowFrame::updateMargins, Qt::QueuedConnection);
         break;
-    case QEvent::MouseMove: {
-        if (!drawsShadow())
-            break;
-        const auto *mouse = static_cast<QMouseEvent *>(event);
-        if (mouse->buttons() == Qt::NoButton)
-            window_->setCursor(cursorFor(edgesAt(mouse->position().toPoint(), window_->size(), shadowWidth)));
+    case QEvent::MouseMove:
+        updateCursor(static_cast<QMouseEvent *>(event));
         break;
-    }
-    case QEvent::MouseButtonPress: {
-        if (!drawsShadow())
-            break;
-        const auto *mouse = static_cast<QMouseEvent *>(event);
-        const Qt::Edges edges = edgesAt(mouse->position().toPoint(), window_->size(), shadowWidth);
-        if (mouse->button() == Qt::LeftButton && edges && window_->windowHandle()) {
-            window_->windowHandle()->startSystemResize(edges);
-            return true;
-        }
-        break;
-    }
+    case QEvent::MouseButtonPress:
+        return startResize(static_cast<QMouseEvent *>(event));
     case QEvent::Leave:
         if (frameless_)
             window_->unsetCursor();
@@ -162,4 +148,22 @@ bool WindowFrame::eventFilter(QObject *watched, QEvent *event)
         break;
     }
     return false;
+}
+
+void WindowFrame::updateCursor(const QMouseEvent *mouse)
+{
+    if (!drawsShadow() || mouse->buttons() != Qt::NoButton)
+        return;
+    window_->setCursor(cursorFor(edgesAt(mouse->position().toPoint(), window_->size(), shadowWidth)));
+}
+
+bool WindowFrame::startResize(const QMouseEvent *mouse)
+{
+    if (!drawsShadow() || mouse->button() != Qt::LeftButton || !window_->windowHandle())
+        return false;
+    const Qt::Edges edges = edgesAt(mouse->position().toPoint(), window_->size(), shadowWidth);
+    if (!edges)
+        return false;
+    window_->windowHandle()->startSystemResize(edges);
+    return true;
 }

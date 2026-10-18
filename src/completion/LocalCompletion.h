@@ -54,6 +54,9 @@ private:
         QString filePath;
     };
 
+    // Rebuilds candidates_ for the language family `languages` if the index changed.
+    void refreshCandidates(const QString &languages);
+
     const SymbolIndex *index_;
     // The project's symbols of one language family, deduplicated: rebuilt
     // only when the index changes, not at every keystroke.

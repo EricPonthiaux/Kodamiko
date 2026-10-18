@@ -49,6 +49,37 @@ bool newerFirst(const QString &a, const QString &b)
     return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
 }
 
+// The runtime at `path` (its home or its executable), among those found
+// or as it is.
+std::optional<RuntimeInstall> runtimeAt(const QString &path,
+                                        const QString &tool,
+                                        const QString &version,
+                                        const QList<RuntimeInstall> &found)
+{
+    for (const RuntimeInstall &runtime : found) {
+        if (runtime.home == path || runtime.executable == path)
+            return runtime;
+    }
+    // Not among those found (a project's .venv): taken as it is.
+    if (QFileInfo(path).isExecutable() && tool == QLatin1String("python"))
+        return RuntimeInstall{tool, version, QFileInfo(path).absolutePath(), path, false};
+    if (tool != QLatin1String("jdk"))
+        return std::nullopt;
+    const std::optional<JavaRuntime> java = JavaRuntimes::inspect(path);
+    if (!java)
+        return std::nullopt;
+    return RuntimeInstall{tool, QString::number(java->majorVersion), java->home, java->executable, false};
+}
+
+std::optional<RuntimeInstall> newest(const QList<RuntimeInstall> &runtimes)
+{
+    if (runtimes.isEmpty())
+        return std::nullopt;
+    return *std::max_element(runtimes.begin(), runtimes.end(), [](const RuntimeInstall &a, const RuntimeInstall &b) {
+        return newerFirst(b.version, a.version);
+    });
+}
+
 #ifdef Q_OS_WIN
 const QStringList pythonNames{QStringLiteral("python"), QStringLiteral("python3")};
 #else
@@ -58,13 +89,11 @@ const QStringList pythonNames{QStringLiteral("python3"),    QStringLiteral("pyth
                               QStringLiteral("python3.8")};
 #endif
 
-QList<RuntimeInstall> machineNodes()
+// Version managers keep one folder per version.
+QStringList versionManagerNodes()
 {
-    QStringList executables;
-    if (const QString onPath = QStandardPaths::findExecutable(QStringLiteral("node")); !onPath.isEmpty())
-        executables.append(onPath);
-    // Version managers keep one folder per version.
     const QString home = QDir::homePath();
+    QStringList executables;
     for (const QString &parent :
          {home + QStringLiteral("/.nvm/versions/node"), home + QStringLiteral("/.local/share/fnm/node-versions"),
           home + QStringLiteral("/.volta/tools/image/node")}) {
@@ -77,6 +106,15 @@ QList<RuntimeInstall> machineNodes()
             }
         }
     }
+    return executables;
+}
+
+QList<RuntimeInstall> machineNodes()
+{
+    QStringList executables;
+    if (const QString onPath = QStandardPaths::findExecutable(QStringLiteral("node")); !onPath.isEmpty())
+        executables.append(onPath);
+    executables.append(versionManagerNodes());
     QList<RuntimeInstall> nodes;
     QSet<QString> seen;
     for (const QString &executable : std::as_const(executables)) {
@@ -243,25 +281,11 @@ std::optional<RuntimeInstall> Toolchains::runtime(const QString &tool,
 {
     const QList<RuntimeInstall> all = runtimes(tool);
     if (!path.isEmpty()) {
-        for (const RuntimeInstall &runtime : all) {
-            if (runtime.home == path || runtime.executable == path)
-                return runtime;
-        }
-        // Not among those found (a project's .venv): taken as it is.
-        if (QFileInfo(path).isExecutable() && tool == QLatin1String("python"))
-            return RuntimeInstall{tool, version, QFileInfo(path).absolutePath(), path, false};
-        if (tool == QLatin1String("jdk")) {
-            if (const std::optional<JavaRuntime> java = JavaRuntimes::inspect(path))
-                return RuntimeInstall{tool, QString::number(java->majorVersion), java->home, java->executable, false};
-        }
+        if (std::optional<RuntimeInstall> atPath = runtimeAt(path, tool, version, all))
+            return atPath;
     }
-    if (version.isEmpty()) {
-        if (all.isEmpty())
-            return std::nullopt;
-        return *std::max_element(all.begin(), all.end(), [](const RuntimeInstall &a, const RuntimeInstall &b) {
-            return newerFirst(b.version, a.version);
-        });
-    }
+    if (version.isEmpty())
+        return newest(all);
     for (const RuntimeInstall &runtime : all) {
         if (runtime.version == version)
             return runtime;
@@ -320,36 +344,46 @@ QString Toolchains::serverExecutable(const QString &server, const QString &versi
 
 void Toolchains::complete(LanguageSetup &setup) const
 {
-    if (setup.runtimeVersion.isEmpty()) {
-        if (setup.language == QLatin1String("python")) {
-            if (const std::optional<RuntimeInstall> python = runtime(QStringLiteral("python"), {}, setup.runtimePath))
-                setup.runtimeVersion = python->version;
-        } else {
-            setup.runtimeVersion = ToolCatalog::defaultRuntimeVersion(setup.language);
-        }
+    if (setup.runtimeVersion.isEmpty())
+        completeRuntimeVersion(setup);
+    if (setup.server.isEmpty())
+        completeServer(setup);
+    if (setup.serverVersion.isEmpty() && !setup.server.isEmpty())
+        completeServerVersion(setup);
+}
+
+void Toolchains::completeRuntimeVersion(LanguageSetup &setup) const
+{
+    if (setup.language != QLatin1String("python")) {
+        setup.runtimeVersion = ToolCatalog::defaultRuntimeVersion(setup.language);
+        return;
     }
-    if (setup.server.isEmpty()) {
-        const QStringList servers = ToolCatalog::servers(setup.language);
-        // The one of the PATH if there is one, else the preferred one.
-        for (const QString &server : servers) {
-            if (!systemProgram(server).isEmpty()) {
-                setup.server = server;
-                break;
-            }
-        }
-        if (setup.server.isEmpty() && !servers.isEmpty())
-            setup.server = servers.first();
-    }
-    if (setup.serverVersion.isEmpty() && !setup.server.isEmpty()) {
-        const ToolSpec *spec = ToolCatalog::find(setup.server);
-        const QStringList installed = installedVersions(setup.server);
-        if (!systemProgram(setup.server).isEmpty() || !spec)
-            setup.serverVersion = QLatin1String(ProjectLanguages::systemVersion);
-        else if (!installed.isEmpty())
-            setup.serverVersion = installed.first();
-        else
-            setup.serverVersion = spec->versions.value(0);
-    }
+    if (const std::optional<RuntimeInstall> python = runtime(QStringLiteral("python"), {}, setup.runtimePath))
+        setup.runtimeVersion = python->version;
+}
+
+void Toolchains::completeServer(LanguageSetup &setup) const
+{
+    const QStringList servers = ToolCatalog::servers(setup.language);
+    // The one of the PATH if there is one, else the preferred one.
+    const auto onPath =
+        std::ranges::find_if(servers, [this](const QString &server) { return !systemProgram(server).isEmpty(); });
+    if (onPath != servers.end())
+        setup.server = *onPath;
+    else if (!servers.isEmpty())
+        setup.server = servers.first();
+}
+
+void Toolchains::completeServerVersion(LanguageSetup &setup) const
+{
+    const ToolSpec *spec = ToolCatalog::find(setup.server);
+    const QStringList installed = installedVersions(setup.server);
+    if (!systemProgram(setup.server).isEmpty() || !spec)
+        setup.serverVersion = QLatin1String(ProjectLanguages::systemVersion);
+    else if (!installed.isEmpty())
+        setup.serverVersion = installed.first();
+    else
+        setup.serverVersion = spec->versions.value(0);
 }
 
 void Toolchains::refresh()

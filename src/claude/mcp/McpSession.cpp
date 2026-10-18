@@ -3,6 +3,7 @@
 #include "McpRegistry.h"
 
 #include <QCoreApplication>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLocalSocket>
@@ -53,6 +54,64 @@ QJsonObject toolResult(const McpResult &result)
     if (result.structured.isObject())
         object.insert(QLatin1String("structuredContent"), result.structured);
     return object;
+}
+
+QJsonObject initializeAnswer(const McpRegistry &registry, const QJsonObject &params)
+{
+    const QString requested = params.value(QLatin1String("protocolVersion")).toString();
+    const QStringList &versions = McpSession::protocolVersions();
+    const QString version = versions.contains(requested) ? requested : versions.first();
+    QJsonObject answer{
+        {QLatin1String("protocolVersion"), version},
+        {QLatin1String("capabilities"),
+         QJsonObject{{QLatin1String("tools"), QJsonObject{{QLatin1String("listChanged"), false}}},
+                     {QLatin1String("resources"),
+                      QJsonObject{{QLatin1String("subscribe"), true}, {QLatin1String("listChanged"), false}}},
+                     {QLatin1String("prompts"), QJsonObject{{QLatin1String("listChanged"), false}}},
+                     {QLatin1String("logging"), QJsonObject{}}}},
+        {QLatin1String("serverInfo"), QJsonObject{{QLatin1String("name"), QLatin1String("duet")},
+                                                  {QLatin1String("title"), QLatin1String("Duet")},
+                                                  {QLatin1String("version"), QCoreApplication::applicationVersion()}}},
+    };
+    if (!registry.instructions.isEmpty())
+        answer.insert(QLatin1String("instructions"), registry.instructions);
+    return answer;
+}
+
+// Fixed resources are listed by "uri", templates by "uriTemplate".
+enum class ResourceKind {
+    Fixed,
+    Template
+};
+
+QJsonArray resourcesJson(const QList<McpResource> &resources, ResourceKind kind)
+{
+    const bool templates = kind == ResourceKind::Template;
+    const QLatin1String uriKey = templates ? QLatin1String("uriTemplate") : QLatin1String("uri");
+    QJsonArray array;
+    for (const McpResource &resource : resources) {
+        if (resource.isTemplate != templates)
+            continue;
+        array.append(QJsonObject{{uriKey, resource.uri},
+                                 {QLatin1String("name"), resource.name},
+                                 {QLatin1String("title"), resource.title},
+                                 {QLatin1String("description"), resource.description},
+                                 {QLatin1String("mimeType"), resource.mimeType}});
+    }
+    return array;
+}
+
+QJsonObject promptJson(const McpPrompt &prompt)
+{
+    QJsonArray arguments;
+    for (const McpPromptArgument &argument : prompt.arguments)
+        arguments.append(QJsonObject{{QLatin1String("name"), argument.name},
+                                     {QLatin1String("description"), argument.description},
+                                     {QLatin1String("required"), argument.required}});
+    return QJsonObject{{QLatin1String("name"), prompt.name},
+                       {QLatin1String("title"), prompt.title},
+                       {QLatin1String("description"), prompt.description},
+                       {QLatin1String("arguments"), arguments}};
 }
 
 } // namespace
@@ -130,11 +189,11 @@ void McpSession::handleMessage(const QJsonObject &message)
 {
     const QString method = message.value(QLatin1String("method")).toString();
     const QJsonValue id = message.value(QLatin1String("id"));
-    const QJsonObject params = message.value(QLatin1String("params")).toObject();
     const bool notification = !message.contains(QLatin1String("id"));
     if (method.isEmpty()) {
         // A response to a request of ours (none are sent today) or garbage.
-        if (!notification && !message.contains(QLatin1String("result")) && !message.contains(QLatin1String("error")))
+        const bool isResponse = message.contains(QLatin1String("result")) || message.contains(QLatin1String("error"));
+        if (!notification && !isResponse)
             error(id, invalidRequest, QStringLiteral("Not a JSON-RPC request"));
         return;
     }
@@ -143,88 +202,99 @@ void McpSession::handleMessage(const QJsonObject &message)
             initialized_ = true;
         return; // cancellations and the like need no answer
     }
+    handleRequest(method, id, message.value(QLatin1String("params")).toObject());
+}
 
-    if (method == QLatin1String("initialize")) {
-        const QString requested = params.value(QLatin1String("protocolVersion")).toString();
-        const QString version = protocolVersions().contains(requested) ? requested : protocolVersions().first();
-        QJsonObject answer{
-            {QLatin1String("protocolVersion"), version},
-            {QLatin1String("capabilities"),
-             QJsonObject{{QLatin1String("tools"), QJsonObject{{QLatin1String("listChanged"), false}}},
-                         {QLatin1String("resources"),
-                          QJsonObject{{QLatin1String("subscribe"), true}, {QLatin1String("listChanged"), false}}},
-                         {QLatin1String("prompts"), QJsonObject{{QLatin1String("listChanged"), false}}},
-                         {QLatin1String("logging"), QJsonObject{}}}},
-            {QLatin1String("serverInfo"),
-             QJsonObject{{QLatin1String("name"), QLatin1String("duet")},
-                         {QLatin1String("title"), QLatin1String("Duet")},
-                         {QLatin1String("version"), QCoreApplication::applicationVersion()}}},
-        };
-        if (!registry_->instructions.isEmpty())
-            answer.insert(QLatin1String("instructions"), registry_->instructions);
-        result(id, answer);
-    } else if (method == QLatin1String("ping")) {
-        result(id, {});
-    } else if (method == QLatin1String("tools/list")) {
-        QJsonArray tools;
-        for (const McpTool &tool : registry_->tools())
-            tools.append(toolDeclaration(tool));
-        result(id, QJsonObject{{QLatin1String("tools"), tools}});
-    } else if (method == QLatin1String("tools/call")) {
-        callTool(id, params);
-    } else if (method == QLatin1String("resources/list")) {
-        QJsonArray resources;
-        for (const McpResource &resource : registry_->resources()) {
-            if (resource.isTemplate)
-                continue;
-            resources.append(QJsonObject{{QLatin1String("uri"), resource.uri},
-                                         {QLatin1String("name"), resource.name},
-                                         {QLatin1String("title"), resource.title},
-                                         {QLatin1String("description"), resource.description},
-                                         {QLatin1String("mimeType"), resource.mimeType}});
-        }
-        result(id, QJsonObject{{QLatin1String("resources"), resources}});
-    } else if (method == QLatin1String("resources/templates/list")) {
-        QJsonArray templates;
-        for (const McpResource &resource : registry_->resources()) {
-            if (!resource.isTemplate)
-                continue;
-            templates.append(QJsonObject{{QLatin1String("uriTemplate"), resource.uri},
-                                         {QLatin1String("name"), resource.name},
-                                         {QLatin1String("title"), resource.title},
-                                         {QLatin1String("description"), resource.description},
-                                         {QLatin1String("mimeType"), resource.mimeType}});
-        }
-        result(id, QJsonObject{{QLatin1String("resourceTemplates"), templates}});
-    } else if (method == QLatin1String("resources/read")) {
-        readResource(id, params);
-    } else if (method == QLatin1String("resources/subscribe")) {
-        subscriptions_.insert(params.value(QLatin1String("uri")).toString());
-        result(id, {});
-    } else if (method == QLatin1String("resources/unsubscribe")) {
-        subscriptions_.remove(params.value(QLatin1String("uri")).toString());
-        result(id, {});
-    } else if (method == QLatin1String("prompts/list")) {
-        QJsonArray prompts;
-        for (const McpPrompt &prompt : registry_->prompts()) {
-            QJsonArray arguments;
-            for (const McpPromptArgument &argument : prompt.arguments)
-                arguments.append(QJsonObject{{QLatin1String("name"), argument.name},
-                                             {QLatin1String("description"), argument.description},
-                                             {QLatin1String("required"), argument.required}});
-            prompts.append(QJsonObject{{QLatin1String("name"), prompt.name},
-                                       {QLatin1String("title"), prompt.title},
-                                       {QLatin1String("description"), prompt.description},
-                                       {QLatin1String("arguments"), arguments}});
-        }
-        result(id, QJsonObject{{QLatin1String("prompts"), prompts}});
-    } else if (method == QLatin1String("prompts/get")) {
-        getPrompt(id, params);
-    } else if (method == QLatin1String("logging/setLevel")) {
-        result(id, {});
-    } else {
+void McpSession::handleRequest(const QString &method, const QJsonValue &id, const QJsonObject &params)
+{
+    static const QHash<QString, RequestHandler> handlers{
+        {QStringLiteral("initialize"), &McpSession::initialize},
+        {QStringLiteral("ping"), &McpSession::acknowledge},
+        {QStringLiteral("logging/setLevel"), &McpSession::acknowledge},
+        {QStringLiteral("tools/list"), &McpSession::listTools},
+        {QStringLiteral("tools/call"), &McpSession::callTool},
+        {QStringLiteral("resources/list"), &McpSession::listResources},
+        {QStringLiteral("resources/templates/list"), &McpSession::listResourceTemplates},
+        {QStringLiteral("resources/read"), &McpSession::readResource},
+        {QStringLiteral("resources/subscribe"), &McpSession::subscribe},
+        {QStringLiteral("resources/unsubscribe"), &McpSession::unsubscribe},
+        {QStringLiteral("prompts/list"), &McpSession::listPrompts},
+        {QStringLiteral("prompts/get"), &McpSession::getPrompt},
+    };
+    const RequestHandler handler = handlers.value(method);
+    if (!handler) {
         error(id, methodNotFound, QStringLiteral("Unknown method %1").arg(method));
+        return;
     }
+    (this->*handler)(id, params);
+}
+
+void McpSession::initialize(const QJsonValue &id, const QJsonObject &params)
+{
+    result(id, initializeAnswer(*registry_, params));
+}
+
+void McpSession::acknowledge(const QJsonValue &id, const QJsonObject &)
+{
+    result(id, {});
+}
+
+void McpSession::listTools(const QJsonValue &id, const QJsonObject &)
+{
+    QJsonArray tools;
+    for (const McpTool &tool : registry_->tools())
+        tools.append(toolDeclaration(tool));
+    result(id, QJsonObject{{QLatin1String("tools"), tools}});
+}
+
+void McpSession::listResources(const QJsonValue &id, const QJsonObject &)
+{
+    result(id, QJsonObject{{QLatin1String("resources"), resourcesJson(registry_->resources(), ResourceKind::Fixed)}});
+}
+
+void McpSession::listResourceTemplates(const QJsonValue &id, const QJsonObject &)
+{
+    result(id, QJsonObject{{QLatin1String("resourceTemplates"),
+                            resourcesJson(registry_->resources(), ResourceKind::Template)}});
+}
+
+void McpSession::subscribe(const QJsonValue &id, const QJsonObject &params)
+{
+    subscriptions_.insert(params.value(QLatin1String("uri")).toString());
+    result(id, {});
+}
+
+void McpSession::unsubscribe(const QJsonValue &id, const QJsonObject &params)
+{
+    subscriptions_.remove(params.value(QLatin1String("uri")).toString());
+    result(id, {});
+}
+
+void McpSession::listPrompts(const QJsonValue &id, const QJsonObject &)
+{
+    QJsonArray prompts;
+    for (const McpPrompt &prompt : registry_->prompts())
+        prompts.append(promptJson(prompt));
+    result(id, QJsonObject{{QLatin1String("prompts"), prompts}});
+}
+
+McpProgress McpSession::progressFor(const QJsonValue &token)
+{
+    if (token.isUndefined() || token.isNull())
+        return [](double, double, const QString &) { };
+    const QPointer<McpSession> self(this);
+    return [self, token](double done, double total, const QString &message) {
+        if (!self)
+            return;
+        QJsonObject notice{{QLatin1String("progressToken"), token}, {QLatin1String("progress"), done}};
+        if (total > 0)
+            notice.insert(QLatin1String("total"), total);
+        if (!message.isEmpty())
+            notice.insert(QLatin1String("message"), message);
+        self->send(QJsonObject{{QLatin1String("jsonrpc"), QLatin1String("2.0")},
+                               {QLatin1String("method"), QLatin1String("notifications/progress")},
+                               {QLatin1String("params"), notice}});
+    };
 }
 
 void McpSession::callTool(const QJsonValue &id, const QJsonObject &params)
@@ -246,22 +316,8 @@ void McpSession::callTool(const QJsonValue &id, const QJsonObject &params)
         if (self)
             self->result(id, toolResult(outcome));
     };
-    McpProgress progress = [](double, double, const QString &) { };
-    const QJsonValue token = params.value(QLatin1String("_meta")).toObject().value(QLatin1String("progressToken"));
-    if (!token.isUndefined() && !token.isNull()) {
-        progress = [self, token](double done, double total, const QString &message) {
-            if (!self)
-                return;
-            QJsonObject notice{{QLatin1String("progressToken"), token}, {QLatin1String("progress"), done}};
-            if (total > 0)
-                notice.insert(QLatin1String("total"), total);
-            if (!message.isEmpty())
-                notice.insert(QLatin1String("message"), message);
-            self->send(QJsonObject{{QLatin1String("jsonrpc"), QLatin1String("2.0")},
-                                   {QLatin1String("method"), QLatin1String("notifications/progress")},
-                                   {QLatin1String("params"), notice}});
-        };
-    }
+    const McpProgress progress =
+        progressFor(params.value(QLatin1String("_meta")).toObject().value(QLatin1String("progressToken")));
     // Copies: the registry's tool may be gone by the time the user answers.
     const auto run = tool->run;
     if (!tool->confirm) {
@@ -271,10 +327,11 @@ void McpSession::callTool(const QJsonValue &id, const QJsonObject &params)
     const QString what = tool->describe ? tool->describe(arguments) : tool->title;
     registry_->confirm(tool->title.isEmpty() ? name : tool->title, what,
                        [run, arguments, reply, progress](bool allowed) {
-                           if (allowed)
-                               run(arguments, reply, progress);
-                           else
+                           if (!allowed) {
                                reply(McpResult::error(QStringLiteral("The user refused this action in Duet.")));
+                               return;
+                           }
+                           run(arguments, reply, progress);
                        });
 }
 

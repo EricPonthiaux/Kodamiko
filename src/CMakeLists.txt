@@ -249,13 +249,19 @@ if(GRAPHVIZ_FOUND)
     endif()
 endif()
 
-if(MSVC)
-    target_compile_options(duet_core PRIVATE /W4)
-else()
-    target_compile_options(duet_core PRIVATE -Wall -Wextra)
-endif()
+duet_enable_warnings(duet_core)
 
-qt_add_executable(duet WIN32 MACOSX_BUNDLE app/main.cpp app/MainWindow.cpp)
+qt_add_executable(duet WIN32 MACOSX_BUNDLE
+    app/main.cpp
+    app/MainWindow.cpp
+    app/MainWindowClaude.cpp
+    app/MainWindowEditing.cpp
+    app/MainWindowGit.cpp
+    app/MainWindowMenus.cpp
+    app/MainWindowProject.cpp
+    app/MainWindowRun.cpp
+    app/MainWindowSettings.cpp)
+duet_enable_warnings(duet)
 # Installed, it still finds the libraries linked from outside the system's
 # paths (Graphviz's plugins, in a directory of their own).
 set_target_properties(duet PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)

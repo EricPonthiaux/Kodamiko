@@ -292,6 +292,19 @@ LspClient *LanguageServers::runningClientFor(const QString &languageId) const
     return client && !client->hasFailed() ? client : nullptr;
 }
 
+// How a server is started: its command, and the environment it runs in.
+struct LanguageServers::ServerCommand {
+    QString program;
+    QStringList arguments;
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+
+    void prependPath(const QString &folder)
+    {
+        environment.insert(QStringLiteral("PATH"),
+                           folder + QDir::listSeparator() + environment.value(QStringLiteral("PATH")));
+    }
+};
+
 LspClient *LanguageServers::clientFor(const QString &languageId)
 {
     if (!enabled_ || folder_.isEmpty())
@@ -304,72 +317,92 @@ LspClient *LanguageServers::clientFor(const QString &languageId)
     if (LspClient *client = clients_.value(spec->name))
         return client->hasFailed() ? nullptr : client;
 
-    const QString name = spec->name;
-    const QStringList languages = spec->languages;
-    QString program = programFor(*spec);
-    QStringList arguments = spec->arguments;
-    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-    const auto fail = [this, &name, &languages](const QString &error) {
-        failures_.insert(name, error);
-        emit serverFailed(name, languages, error);
-    };
-    const auto prependPath = [&environment](const QString &folder) {
-        environment.insert(QStringLiteral("PATH"),
-                           folder + QDir::listSeparator() + environment.value(QStringLiteral("PATH")));
-    };
-
+    ServerCommand command{programFor(*spec), spec->arguments};
     // The project's runtime: its JDK, its Python.
     const LanguageSetup *setup = setupFor(languageId);
     std::optional<RuntimeInstall> runtime;
     if (setup && toolchains_)
         runtime = toolchains_->runtimeFor(*setup);
+    const RuntimeInstall *projectRuntime = runtime ? &*runtime : nullptr;
 
+    if (!runScriptWithNode(*spec, command))
+        return nullptr;
+
+    const bool isJdtls = spec->name == QLatin1String("jdtls");
+    if (isJdtls && !launchJdtls(*spec, projectRuntime, command))
+        return nullptr;
+    return startClient(*spec, command, setup, projectRuntime);
+}
+
+void LanguageServers::fail(const LanguageServerSpec &spec, const QString &error)
+{
+    failures_.insert(spec.name, error);
+    emit serverFailed(spec.name, spec.languages, error);
+}
+
+bool LanguageServers::runScriptWithNode(const LanguageServerSpec &spec, ServerCommand &command)
+{
     // Duet's npm installs are scripts, run with a Node recent enough.
-    const ToolSpec *tool = ToolCatalog::find(name);
-    if (tool && tool->script && toolchains_ && program.startsWith(toolchains_->root() + QLatin1Char('/'))) {
-        const std::optional<RuntimeInstall> node =
-            toolchains_->runtimeAtLeast(QStringLiteral("node"), tool->minimumRuntime);
-        if (!node) {
-            fail(tr("%1 needs Node.js %2 or newer: open the project settings to download it.")
-                     .arg(name)
-                     .arg(tool->minimumRuntime));
-            return nullptr;
-        }
-        arguments.prepend(program);
-        program = node->executable;
-        prependPath(QFileInfo(node->executable).absolutePath());
+    const ToolSpec *tool = ToolCatalog::find(spec.name);
+    const bool isDuetScript =
+        tool && tool->script && toolchains_ && command.program.startsWith(toolchains_->root() + QLatin1Char('/'));
+    if (!isDuetScript)
+        return true;
+    const std::optional<RuntimeInstall> node =
+        toolchains_->runtimeAtLeast(QStringLiteral("node"), tool->minimumRuntime);
+    if (!node) {
+        fail(spec, tr("%1 needs Node.js %2 or newer: open the project settings to download it.")
+                       .arg(spec.name)
+                       .arg(tool->minimumRuntime));
+        return false;
     }
+    command.arguments.prepend(command.program);
+    command.program = node->executable;
+    command.prependPath(QFileInfo(node->executable).absolutePath());
+    return true;
+}
 
-    if (name == QLatin1String("jdtls")) {
-        // jdtls keeps its index in a folder of its own, one per project.
-        const QString id =
-            QString::fromLatin1(QCryptographicHash::hash(folder_.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
-        const QString data =
-            QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/jdtls/") + id;
-        QDir().mkpath(data);
-        // jdtls itself runs on Java 21 or more, whatever the project's.
-        std::optional<JavaRuntime> java;
-        if (toolchains_) {
-            if (const std::optional<RuntimeInstall> jdk = toolchains_->runtimeAtLeast(QStringLiteral("jdk"), 21))
-                java = JavaRuntime{jdk->home, jdk->executable, jdk->version.toInt()};
-        } else {
-            java = JavaRuntimes::newest(21);
-        }
-        QString error;
-        const std::optional<Launch> launch = jdtlsLaunch(program, data, java, &error);
-        if (!launch) {
-            fail(error);
-            return nullptr;
-        }
-        program = launch->program;
-        arguments = launch->arguments;
-        // The project's build (Maven, Gradle) runs with the project's JDK.
-        const QString javaHome = runtime ? runtime->home : launch->javaHome;
-        environment.insert(QStringLiteral("JAVA_HOME"), javaHome);
-        prependPath(javaHome + QStringLiteral("/bin"));
+std::optional<JavaRuntime> LanguageServers::jdtlsJava() const
+{
+    // jdtls itself runs on Java 21 or more, whatever the project's.
+    if (!toolchains_)
+        return JavaRuntimes::newest(21);
+    if (const std::optional<RuntimeInstall> jdk = toolchains_->runtimeAtLeast(QStringLiteral("jdk"), 21))
+        return JavaRuntime{jdk->home, jdk->executable, jdk->version.toInt()};
+    return std::nullopt;
+}
+
+bool LanguageServers::launchJdtls(const LanguageServerSpec &spec, const RuntimeInstall *runtime, ServerCommand &command)
+{
+    // jdtls keeps its index in a folder of its own, one per project.
+    const QString id =
+        QString::fromLatin1(QCryptographicHash::hash(folder_.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
+    const QString data =
+        QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/jdtls/") + id;
+    QDir().mkpath(data);
+    QString error;
+    const std::optional<Launch> launch = jdtlsLaunch(command.program, data, jdtlsJava(), &error);
+    if (!launch) {
+        fail(spec, error);
+        return false;
     }
-    auto *client = new LspClient(program, arguments, folder_, this);
-    client->setEnvironment(environment);
+    command.program = launch->program;
+    command.arguments = launch->arguments;
+    // The project's build (Maven, Gradle) runs with the project's JDK.
+    const QString javaHome = runtime ? runtime->home : launch->javaHome;
+    command.environment.insert(QStringLiteral("JAVA_HOME"), javaHome);
+    command.prependPath(javaHome + QStringLiteral("/bin"));
+    return true;
+}
+
+LspClient *LanguageServers::startClient(const LanguageServerSpec &spec,
+                                        const ServerCommand &command,
+                                        const LanguageSetup *setup,
+                                        const RuntimeInstall *runtime)
+{
+    const QString name = spec.name;
+    auto *client = new LspClient(command.program, command.arguments, folder_, this);
+    client->setEnvironment(command.environment);
     // Without a project setup too: how completion behaves.
     const Options options = optionsFor(name, setup ? *setup : LanguageSetup(), runtime ? runtime->home : QString(),
                                        runtime ? runtime->executable : QString());
@@ -381,29 +414,36 @@ LspClient *LanguageServers::clientFor(const QString &languageId)
         client->setRequestHandler(handler.key(), handler.value());
     clients_.insert(name, client);
     connect(client, &LspClient::ready, this, [this, name] { emit statusMessage(tr("%1 is ready").arg(name)); });
-    connect(client, &LspClient::notificationReceived, this, [this](const QString &method, const QJsonValue &params) {
-        if (method != QLatin1String("textDocument/publishDiagnostics"))
-            return;
-        const QString path = QUrl(params.toObject().value("uri").toString()).toLocalFile();
-        if (path.isEmpty())
-            return;
-        diagnostics_.insert(path, params.toObject().value("diagnostics").toArray());
-        emit diagnosticsChanged(path);
-    });
-    connect(client, &LspClient::failed, this, [this, name, languages](const QString &message) {
+    connect(client, &LspClient::notificationReceived, this, &LanguageServers::receiveNotification);
+    connect(client, &LspClient::failed, this, [this, spec](const QString &message) {
         // Its documents must be opened again if it is restarted.
-        for (auto it = documents_.begin(); it != documents_.end();) {
-            if (it.value().server == name)
-                it = documents_.erase(it);
-            else
-                ++it;
-        }
-        failures_.insert(name, message);
-        emit serverFailed(name, languages, message);
+        forgetDocuments(spec.name);
+        fail(spec, message);
     });
     client->start();
     emit statusMessage(tr("Starting %1…").arg(name));
     return client;
+}
+
+void LanguageServers::receiveNotification(const QString &method, const QJsonValue &params)
+{
+    if (method != QLatin1String("textDocument/publishDiagnostics"))
+        return;
+    const QString path = QUrl(params.toObject().value("uri").toString()).toLocalFile();
+    if (path.isEmpty())
+        return;
+    diagnostics_.insert(path, params.toObject().value("diagnostics").toArray());
+    emit diagnosticsChanged(path);
+}
+
+void LanguageServers::forgetDocuments(const QString &server)
+{
+    for (auto it = documents_.begin(); it != documents_.end();) {
+        if (it.value().server == server)
+            it = documents_.erase(it);
+        else
+            ++it;
+    }
 }
 
 namespace {
@@ -502,10 +542,11 @@ LanguageServers::Options LanguageServers::optionsFor(const QString &server,
     } else if (server == QLatin1String("pyright")) {
         if (!runtimeExecutable.isEmpty())
             options.settings = QJsonObject{{"python", QJsonObject{{"pythonPath", runtimeExecutable}}}};
-    } else if ((server == QLatin1String("pylsp")) && (!runtimeExecutable.isEmpty()))
+    } else if (server == QLatin1String("pylsp") && !runtimeExecutable.isEmpty()) {
         options.settings = QJsonObject{
             {"pylsp",
              QJsonObject{{"plugins", QJsonObject{{"jedi", QJsonObject{{"environment", runtimeExecutable}}}}}}}};
+    }
 
     return options;
 }

@@ -51,6 +51,18 @@ bool confirmDiscard(QWidget *parent, const QString &question, const QString &det
     return box.clickedButton() == discard;
 }
 
+// "2 staged · 3 unstaged · rebase in progress", or that nothing changed.
+QString statusSummary(const RepositoryStatus &status)
+{
+    const bool isClean = status.staged.isEmpty() && status.unstaged.isEmpty();
+    QString summary =
+        isClean ? ChangesView::tr("No changes since the last commit")
+                : ChangesView::tr("%1 staged · %2 unstaged").arg(status.staged.size()).arg(status.unstaged.size());
+    if (!status.info.operation.isEmpty())
+        summary += ChangesView::tr(" · %1 in progress").arg(status.info.operation);
+    return summary;
+}
+
 } // namespace
 
 ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *parent)
@@ -252,6 +264,9 @@ void ChangesView::setFolder(const QString &folder)
 
 const QList<FileDiff> &ChangesView::files(Section section) const
 {
+    static const QList<FileDiff> none;
+    if (!status_)
+        return none;
     return section == Section::Staged ? status_->staged : status_->unstaged;
 }
 
@@ -299,9 +314,39 @@ void ChangesView::onStatusRead(const std::optional<RepositoryStatus> &status, co
     // change nothing: the list and the diff are rebuilt only on a change.
     if (status != status_ || error != error_)
         showStatus(status, error);
-    if (pendingSelection_)
-        selectNow(*std::exchange(pendingSelection_, std::nullopt));
+    if (pendingSelection_) {
+        const QString path = *pendingSelection_;
+        pendingSelection_.reset();
+        selectNow(path);
+    }
     emit refreshed();
+}
+
+ChangesView::ItemKey ChangesView::keyOf(const QTreeWidgetItem *item) const
+{
+    const int index = item->data(0, indexRole).toInt();
+    const auto section = static_cast<Section>(item->data(0, sectionRole).toInt());
+    const bool isFile = index >= 0 && status_;
+    return {static_cast<int>(section), isFile ? files(section).at(index).change.path : QString()};
+}
+
+void ChangesView::restoreSelection(const QList<ItemKey> &selected, const std::optional<ItemKey> &current)
+{
+    const QSignalBlocker blocker(list_);
+    for (QTreeWidgetItemIterator it(list_); *it; ++it) {
+        const ItemKey key = keyOf(*it);
+        if (selected.contains(key))
+            (*it)->setSelected(true);
+        if (current && key == *current)
+            list_->setCurrentItem(*it, 0, QItemSelectionModel::NoUpdate);
+    }
+}
+
+ChangesView::Section ChangesView::sectionToShow(Section preferred) const
+{
+    const Section other = preferred == Section::Staged ? Section::Unstaged : Section::Staged;
+    const bool onlyOtherHasChanges = files(preferred).isEmpty() && !files(other).isEmpty();
+    return onlyOtherHasChanges ? other : preferred;
 }
 
 void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QString &error)
@@ -309,33 +354,17 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
     error_ = error;
 
     // Selection to restore: section and path of each file.
-    const auto keyOf = [this](const QTreeWidgetItem *item) {
-        const int index = item->data(0, indexRole).toInt();
-        const Section section = static_cast<Section>(item->data(0, sectionRole).toInt());
-        return std::make_pair(static_cast<int>(section),
-                              index < 0 || !status_ ? QString() : files(section).at(index).change.path);
-    };
-    QList<std::pair<int, QString>> selected;
+    QList<ItemKey> selected;
     for (const QTreeWidgetItem *item : list_->selectedItems())
         selected.append(keyOf(item));
-    const std::optional<std::pair<int, QString>> current =
+    const std::optional<ItemKey> current =
         list_->currentItem() ? std::optional(keyOf(list_->currentItem())) : std::nullopt;
     const Section previousSection = shownSection_;
     const int firstLine = diff_->firstVisibleLine();
 
     status_ = std::move(status);
     rebuildList();
-
-    {
-        const QSignalBlocker blocker(list_);
-        for (QTreeWidgetItemIterator it(list_); *it; ++it) {
-            const auto key = keyOf(*it);
-            if (selected.contains(key))
-                (*it)->setSelected(true);
-            if (current && key == *current)
-                list_->setCurrentItem(*it, 0, QItemSelectionModel::NoUpdate);
-        }
-    }
+    restoreSelection(selected, current);
 
     showOperation();
     if (!status_) {
@@ -344,19 +373,11 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
         updateActions();
         return;
     }
-
-    QString summary = status_->staged.isEmpty() && status_->unstaged.isEmpty()
-                          ? tr("No changes since the last commit")
-                          : tr("%1 staged · %2 unstaged").arg(status_->staged.size()).arg(status_->unstaged.size());
-    if (!status_->info.operation.isEmpty())
-        summary += tr(" · %1 in progress").arg(status_->info.operation);
-    summary_->setText(summary);
+    summary_->setText(statusSummary(*status_));
 
     // Displayed section: that of the current file, otherwise the same as
     // before, otherwise the one that has changes.
-    Section section = current ? static_cast<Section>(current->first) : previousSection;
-    if (files(section).isEmpty() && !files(section == Section::Staged ? Section::Unstaged : Section::Staged).isEmpty())
-        section = section == Section::Staged ? Section::Unstaged : Section::Staged;
+    const Section section = sectionToShow(current ? static_cast<Section>(current->first) : previousSection);
     showSection(section);
     if (section == previousSection)
         diff_->setFirstVisibleLine(firstLine);
@@ -424,11 +445,14 @@ void ChangesView::showSection(Section section)
             shown.append({diff.change.path, changeStatusText(diff.change), shownPatches_.last()});
         }
     }
-    if (shown.isEmpty())
-        diff_->showMessage(status_ ? (section == Section::Staged ? tr("Nothing is staged") : tr("No changes"))
-                                   : QString());
-    else
+    if (!shown.isEmpty()) {
         diff_->setFiles(shown);
+        return;
+    }
+    if (!status_)
+        diff_->showMessage(QString());
+    else
+        diff_->showMessage(section == Section::Staged ? tr("Nothing is staged") : tr("No changes"));
 }
 
 void ChangesView::onCurrentItemChanged()
@@ -474,6 +498,8 @@ QList<ChangesView::FileRef> ChangesView::selectedFiles() const
 QStringList ChangesView::repoPaths(const QList<FileRef> &refs) const
 {
     QStringList paths;
+    if (!status_)
+        return paths;
     for (const FileRef &ref : refs) {
         const FileChange &change = files(ref.section).at(ref.index).change;
         paths.append(status_->info.repoPath(change.path));
@@ -485,7 +511,9 @@ QStringList ChangesView::repoPaths(const QList<FileRef> &refs) const
 
 QString ChangesView::folderPathspec() const
 {
-    return status_->info.prefix.isEmpty() ? QStringLiteral(".") : status_->info.prefix;
+    if (!status_ || status_->info.prefix.isEmpty())
+        return QStringLiteral(".");
+    return status_->info.prefix;
 }
 
 void ChangesView::updateActions()
@@ -505,10 +533,11 @@ void ChangesView::updateActions()
 
 void ChangesView::showOperation()
 {
-    const QString operation = status_ ? status_->info.operation : QString();
-    operationBar_->setVisible(!operation.isEmpty());
-    if (operation.isEmpty())
+    const bool hasOperation = status_ && !status_->info.operation.isEmpty();
+    operationBar_->setVisible(hasOperation);
+    if (!hasOperation)
         return;
+    const QString operation = status_->info.operation;
     // A conflicted file shows on both sides of the index.
     QSet<QString> conflicted;
     for (const QList<FileDiff> *section : {&status_->staged, &status_->unstaged}) {
@@ -540,7 +569,7 @@ void ChangesView::stageFiles(const QList<FileRef> &refs)
     QList<FileRef> unstaged;
     std::copy_if(refs.begin(), refs.end(), std::back_inserter(unstaged),
                  [](const FileRef &ref) { return ref.section == Section::Unstaged; });
-    if (unstaged.isEmpty())
+    if (unstaged.isEmpty() || !status_)
         return;
     commands_->run(tr("Staging"), [info = status_->info, paths = repoPaths(unstaged)] {
         GitOperations::stage(info, paths);
@@ -553,7 +582,7 @@ void ChangesView::unstageFiles(const QList<FileRef> &refs)
     QList<FileRef> staged;
     std::copy_if(refs.begin(), refs.end(), std::back_inserter(staged),
                  [](const FileRef &ref) { return ref.section == Section::Staged; });
-    if (staged.isEmpty())
+    if (staged.isEmpty() || !status_)
         return;
     commands_->run(tr("Unstaging"), [info = status_->info, paths = repoPaths(staged)] {
         GitOperations::unstage(info, paths);
@@ -566,7 +595,7 @@ void ChangesView::discardFiles(const QList<FileRef> &refs)
     QList<FileRef> unstaged;
     std::copy_if(refs.begin(), refs.end(), std::back_inserter(unstaged),
                  [](const FileRef &ref) { return ref.section == Section::Unstaged; });
-    if (unstaged.isEmpty())
+    if (unstaged.isEmpty() || !status_)
         return;
     const qsizetype created = std::count_if(unstaged.begin(), unstaged.end(), [this](const FileRef &ref) {
         return files(ref.section).at(ref.index).change.kind == ChangeKind::Added;
@@ -696,7 +725,7 @@ void ChangesView::showDiffMenu(const QPoint &position)
     QMenu *menu = diff_->createStandardContextMenu();
     QAction *first = menu->actions().value(0);
     const auto addAction = [&](const QString &text, auto slot) {
-        QAction *action = new QAction(text, menu);
+        auto *action = new QAction(text, menu);
         action->setEnabled(hasSelection && !busy);
         connect(action, &QAction::triggered, this, slot);
         menu->insertAction(first, action);
@@ -832,6 +861,8 @@ void ChangesView::commit()
 
 void ChangesView::runCommit(const QString &message, bool amend, bool stageEverything)
 {
+    if (!status_)
+        return;
     commands_->run(
         tr("Commit"),
         [info = status_->info, message, amend, stageEverything, path = folderPathspec()] {

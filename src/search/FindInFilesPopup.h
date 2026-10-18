@@ -10,6 +10,7 @@
 
 class EditorWidget;
 class QCheckBox;
+class QKeyEvent;
 class QLabel;
 class QLineEdit;
 class QToolButton;
@@ -51,13 +52,18 @@ signals:
     // `line` and `column` from 0, in characters.
     void matchChosen(const QString &filePath, int line, int column, int length);
 
-protected:
+public:
     bool eventFilter(QObject *watched, QEvent *event) override;
+
+protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
     void scheduleSearch();
     void showResults(const QList<FindMatch> &matches, bool truncated, int filesSearched);
+    QString summaryText(bool truncated, qsizetype fileCount) const;
+    bool handleSearchFieldKey(const QKeyEvent &key);
+    QToolButton *optionForShortcut(int key) const;
     void updatePreview();
     void fitLocationColumn();
     void openCurrent();

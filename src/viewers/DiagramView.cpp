@@ -21,6 +21,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <optional>
+
 #ifdef DUET_WITH_SVG
 #include <QSvgGenerator>
 #endif
@@ -146,26 +148,27 @@ bool DiagramView::load(const QString &path, QString *error)
         return false;
     }
     const QByteArray content = file.readAll();
-    diagram::document::Loaded loaded;
     QString message;
-    if (!diagram::document::load(*board_, absolutePath, content, loaded, &message)) {
+    const std::optional<diagram::document::Loaded> loaded =
+        diagram::document::load(*board_, absolutePath, content, &message);
+    if (!loaded) {
         if (error)
             *error = tr("Invalid diagram: %1").arg(message);
         return false;
     }
     filePath_ = absolutePath;
     diskContent_ = content;
-    codec_ = loaded.codec;
+    codec_ = loaded->codec;
     inspector_->setCodec(codec_);
     // Elements without a place (written by hand or by Claude) are laid out
     // or placed beside their neighbors; links without a curve are routed.
     // None of it is a change of the file.
-    canvas_->settle(loaded, false);
+    canvas_->settle(*loaded, false);
     board_->clearHistory();
     savedSnapshot_ = board_->snapshot(false);
     lastModified_ = false;
-    if (!loaded.warnings.isEmpty())
-        showMessage(loaded.warnings.first());
+    if (!loaded->warnings.isEmpty())
+        showMessage(loaded->warnings.first());
     canvas_->fitWhenShown();
     canvas_->fitView(false);
     emit modificationChanged(false);
@@ -181,14 +184,14 @@ bool DiagramView::save(QString *error)
 {
     if (filePath_.isEmpty() || !codec_)
         return false;
-    const QByteArray data = content();
+    const QByteArray bytes = content();
     QSaveFile file(filePath_);
-    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit()) {
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
         if (error)
             *error = file.errorString();
         return false;
     }
-    diskContent_ = data;
+    diskContent_ = bytes;
     savedSnapshot_ = board_->snapshot(false);
     updateModified();
     return true;
@@ -235,21 +238,33 @@ void DiagramView::updateZoom(qreal zoom)
     zoomLabel_->setText(QStringLiteral("%1 %").arg(qRound(zoom * 100)));
 }
 
+namespace {
+
+// The usual extension of a source in `language`; the file's own otherwise.
+QString sourceExtension(const QString &language, const QFileInfo &file)
+{
+    if (language == QLatin1String("plantuml"))
+        return QStringLiteral("puml");
+    if (language == QLatin1String("mermaid"))
+        return QStringLiteral("mmd");
+    return file.suffix();
+}
+
+} // namespace
+
 void DiagramView::exportSource()
 {
     if (!codec_)
         return;
     const QFileInfo info(filePath_);
-    const QString extension = codec_->language() == QLatin1String("plantuml")  ? QStringLiteral("puml")
-                              : codec_->language() == QLatin1String("mermaid") ? QStringLiteral("mmd")
-                                                                               : info.suffix();
+    const QString extension = sourceExtension(codec_->language(), info);
     const QString path = QFileDialog::getSaveFileName(
         this, tr("Export Source"), info.absoluteDir().filePath(info.completeBaseName() + QLatin1Char('.') + extension));
     if (path.isEmpty())
         return;
     QSaveFile file(path);
-    const QByteArray data = diagram::document::source(*board_, *codec_).toUtf8() + '\n';
-    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit()) {
+    const QByteArray source = diagram::document::source(*board_, *codec_).toUtf8() + '\n';
+    if (!file.open(QIODevice::WriteOnly) || file.write(source) != source.size() || !file.commit()) {
         showMessage(tr("Export failed: %1").arg(file.errorString()));
         return;
     }

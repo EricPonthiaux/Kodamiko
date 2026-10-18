@@ -109,9 +109,9 @@ public:
     const EditorOptions &options() const { return options_; }
 
     // Folds (or unfolds) the innermost block around the cursor.
-    void foldBlock(bool fold);
+    void foldBlock(bool collapse);
     // Folds (or unfolds) every block of the text.
-    void foldEverything(bool fold);
+    void foldEverything(bool collapse);
 
     // Key combinations QScintilla must leave to the application's shortcuts
     // (menu commands), in every editor. Without them, QScintilla takes the

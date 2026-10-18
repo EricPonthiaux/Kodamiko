@@ -6,6 +6,8 @@
 #include <QObject>
 #include <QTimeZone>
 
+#include <array>
+
 using libgit2::check;
 using libgit2::Ptr;
 
@@ -13,9 +15,9 @@ namespace {
 
 QString idOf(const git_oid *oid)
 {
-    char text[GIT_OID_MAX_HEXSIZE + 1] = {};
-    git_oid_tostr(text, sizeof text, oid);
-    return QString::fromLatin1(text);
+    std::array<char, GIT_OID_MAX_HEXSIZE + 1> text{};
+    git_oid_tostr(text.data(), text.size(), oid);
+    return QString::fromLatin1(text.data());
 }
 
 QDateTime dateOf(const git_time &time)
@@ -65,12 +67,13 @@ QHash<QString, QStringList> refsByCommit(git_repository *repository)
     return result;
 }
 
-CommitSummary summaryOf(const git_commit *commit, const QHash<QString, QStringList> &refs)
+// Not const: git_commit_summary caches the summary inside the commit.
+CommitSummary summaryOf(git_commit *commit, const QHash<QString, QStringList> &refs)
 {
     CommitSummary summary;
     summary.id = idOf(git_commit_id(commit));
     summary.shortId = summary.id.left(7);
-    summary.summary = QString::fromUtf8(git_commit_summary(const_cast<git_commit *>(commit)));
+    summary.summary = QString::fromUtf8(git_commit_summary(commit));
     const git_signature *author = git_commit_author(commit);
     summary.author = QString::fromUtf8(author->name);
     summary.email = QString::fromUtf8(author->email);
@@ -194,11 +197,11 @@ CommitDetails CommitDetails::read(const QString &folder, const QString &commitId
     }
 
     QByteArray prefixBytes = info->prefix.toUtf8();
-    char *pathspec[] = {prefixBytes.data()};
+    char *pathspec = prefixBytes.data();
     git_diff_options options;
     git_diff_options_init(&options, GIT_DIFF_OPTIONS_VERSION);
     if (!info->prefix.isEmpty()) {
-        options.pathspec.strings = pathspec;
+        options.pathspec.strings = &pathspec;
         options.pathspec.count = 1;
     }
     git_diff *diff = nullptr;

@@ -25,6 +25,7 @@
 #include <QVBoxLayout>
 
 #include <functional>
+#include <optional>
 
 namespace diagram {
 
@@ -184,121 +185,186 @@ void Inspector::endTyping()
     board_->pushHistory(base);
 }
 
+namespace {
+
+// What the properties panel shows: one shape or link (by id and type),
+// several elements, or the document (empty).
+QString selectionKey(const Board &board)
+{
+    if (const Shape *s = board.selectedShape())
+        return QStringLiteral("s:") + s->id + s->type;
+    if (const Link *l = board.selectedLink())
+        return QStringLiteral("l:") + l->id + l->type;
+    if (board.hasSelection())
+        return QStringLiteral("many");
+    return {};
+}
+
+// Removes every spacer but the last item, so that only one stretch ends
+// the layout.
+void keepOnlyFinalStretch(QVBoxLayout *layout)
+{
+    for (int i = layout->count() - 2; i >= 0; --i) {
+        if (layout->itemAt(i)->spacerItem())
+            delete layout->takeAt(i);
+    }
+}
+
+} // namespace
+
+bool Inspector::showsAlready(const QString &key) const
+{
+    if (!section_ || key != shown_)
+        return false;
+    const bool showsOneElement = key.startsWith(QLatin1Char('s')) || key.startsWith(QLatin1Char('l'));
+    if (!showsOneElement)
+        return true;
+    return section_->findChild<QWidget *>() && section_->isAncestorOf(QApplication::focusWidget());
+}
+
 void Inspector::rebuild()
 {
     if (updating_)
         return;
-    QString key;
-    if (const Shape *s = board_->selectedShape())
-        key = QStringLiteral("s:") + s->id + s->type;
-    else if (const Link *l = board_->selectedLink())
-        key = QStringLiteral("l:") + l->id + l->type;
-    else if (board_->hasSelection())
-        key = QStringLiteral("many");
+    const QString key = selectionKey(*board_);
     // Rebuilt only when what it shows changes, so that a field being typed
     // in keeps its focus.
-    if (section_ && key == shown_ && !key.startsWith(QLatin1Char('s')) && !key.startsWith(QLatin1Char('l')))
-        return;
-    if (section_ && key == shown_ && section_->findChild<QWidget *>() &&
-        section_->isAncestorOf(QApplication::focusWidget()))
+    if (showsAlready(key))
         return;
     shown_ = key;
     if (section_) {
         section_->hide();
         section_->deleteLater();
     }
-    if (board_->selectedShape()) {
+    if (board_->selectedShape())
         section_ = buildShapeSection();
-    } else if (board_->selectedLink()) {
+    else if (board_->selectedLink())
         section_ = buildLinkSection();
-    } else if (board_->hasSelection()) {
-        section_ = new QWidget(properties_);
-        auto *layout = new QVBoxLayout(section_);
-        layout->setContentsMargins(0, 0, 0, 0);
-        layout->addWidget(sectionTitle(
-            tr("%n elements", nullptr, int(board_->selection().size() + board_->linkSelection().size())).toUpper(),
-            section_));
-        if (!board_->selection().isEmpty()) {
-            layout->addWidget(fieldLabel(tr("Color"), section_));
-            layout->addWidget(
-                swatchGrid(swatches(), section_, [this](const QString &color) { board_->paintSelection(color); }));
-        }
-        layout->addStretch();
-    } else {
+    else if (board_->hasSelection())
+        section_ = buildSelectionSection();
+    else
         section_ = buildDocumentSection();
-    }
     propertiesLayout_->addWidget(section_);
     propertiesLayout_->addStretch();
-    // Only one stretch at the end.
-    for (int i = propertiesLayout_->count() - 2; i >= 0; --i) {
-        if (propertiesLayout_->itemAt(i)->spacerItem())
-            delete propertiesLayout_->takeAt(i);
+    keepOnlyFinalStretch(propertiesLayout_);
+}
+
+QWidget *Inspector::buildSelectionSection()
+{
+    auto *section = new QWidget(properties_);
+    auto *layout = new QVBoxLayout(section);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(sectionTitle(
+        tr("%n elements", nullptr, int(board_->selection().size() + board_->linkSelection().size())).toUpper(),
+        section));
+    if (!board_->selection().isEmpty()) {
+        layout->addWidget(fieldLabel(tr("Color"), section));
+        layout->addWidget(
+            swatchGrid(swatches(), section, [this](const QString &color) { board_->paintSelection(color); }));
     }
+    layout->addStretch();
+    return section;
 }
 
 namespace {
 
+using PropertyGetter = std::function<QVariant(const QString &)>;
+using PropertySetter = std::function<void(const QString &, const QVariant &, bool typing)>;
+
+// Where property fields go, and how they reach the element.
+struct PropertyForm {
+    QWidget *section;
+    QVBoxLayout *layout;
+    PropertyGetter get;
+    PropertySetter set;
+};
+
+void addTextField(const PropertyForm &form, const Property &property)
+{
+    const QString id = property.id;
+    const PropertySetter set = form.set;
+    form.layout->addWidget(fieldLabel(property.label, form.section));
+    auto *field = new QLineEdit(form.get(id).toString(), form.section);
+    QObject::connect(field, &QLineEdit::textEdited, form.section,
+                     [set, id](const QString &value) { set(id, value, true); });
+    QObject::connect(field, &QLineEdit::editingFinished, form.section,
+                     [set, id, field] { set(id, field->text(), false); });
+    form.layout->addWidget(field);
+}
+
+void addLinesField(const PropertyForm &form, const Property &property)
+{
+    const QString id = property.id;
+    const PropertySetter set = form.set;
+    form.layout->addWidget(fieldLabel(property.label, form.section));
+    auto *field = new QPlainTextEdit(form.get(id).toString(), form.section);
+    field->setTabChangesFocus(true);
+    field->setFixedHeight(field->fontMetrics().lineSpacing() * 5 + 12);
+    QObject::connect(field, &QPlainTextEdit::textChanged, form.section,
+                     [set, id, field] { set(id, field->toPlainText(), true); });
+    form.layout->addWidget(field);
+}
+
+void addChoiceField(const PropertyForm &form, const Property &property)
+{
+    const QString id = property.id;
+    const PropertySetter set = form.set;
+    form.layout->addWidget(fieldLabel(property.label, form.section));
+    auto *combo = new QComboBox(form.section);
+    for (const auto &[value, label] : property.choices)
+        combo->addItem(label, value);
+    const int at = combo->findData(form.get(id).toString());
+    if (at >= 0)
+        combo->setCurrentIndex(at);
+    QObject::connect(combo, &QComboBox::activated, form.section,
+                     [set, id, combo](int index) { set(id, combo->itemData(index), false); });
+    form.layout->addWidget(combo);
+}
+
+void addBoolField(const PropertyForm &form, const Property &property)
+{
+    const QString id = property.id;
+    const PropertySetter set = form.set;
+    auto *box = new QCheckBox(property.label, form.section);
+    box->setChecked(form.get(id).toBool());
+    QObject::connect(box, &QCheckBox::toggled, form.section, [set, id](bool checked) { set(id, checked, false); });
+    form.layout->addWidget(box);
+}
+
+void addNumberField(const PropertyForm &form, const Property &property)
+{
+    const QString id = property.id;
+    const PropertySetter set = form.set;
+    form.layout->addWidget(fieldLabel(property.label, form.section));
+    auto *spin = new QDoubleSpinBox(form.section);
+    spin->setRange(property.minimum, property.maximum);
+    spin->setValue(form.get(id).toDouble());
+    QObject::connect(spin, &QDoubleSpinBox::valueChanged, form.section,
+                     [set, id](double value) { set(id, value, false); });
+    form.layout->addWidget(spin);
+}
+
 // Widgets for the properties of a shape or a link; `get` and `set` reach the
 // element (looked up again each time: it may have been rebuilt).
-void addPropertyFields(QWidget *section,
-                       QVBoxLayout *layout,
-                       const QList<Property> &properties,
-                       const std::function<QVariant(const QString &)> &get,
-                       const std::function<void(const QString &, const QVariant &, bool typing)> &set)
+void addPropertyFields(const PropertyForm &form, const QList<Property> &properties)
 {
     for (const Property &property : properties) {
-        const QString id = property.id;
         switch (property.kind) {
-        case Property::Kind::Text: {
-            layout->addWidget(fieldLabel(property.label, section));
-            auto *field = new QLineEdit(get(id).toString(), section);
-            QObject::connect(field, &QLineEdit::textEdited, section,
-                             [set, id](const QString &value) { set(id, value, true); });
-            QObject::connect(field, &QLineEdit::editingFinished, section,
-                             [set, id, field] { set(id, field->text(), false); });
-            layout->addWidget(field);
+        case Property::Kind::Text:
+            addTextField(form, property);
             break;
-        }
-        case Property::Kind::Lines: {
-            layout->addWidget(fieldLabel(property.label, section));
-            auto *field = new QPlainTextEdit(get(id).toString(), section);
-            field->setTabChangesFocus(true);
-            field->setFixedHeight(field->fontMetrics().lineSpacing() * 5 + 12);
-            QObject::connect(field, &QPlainTextEdit::textChanged, section,
-                             [set, id, field] { set(id, field->toPlainText(), true); });
-            layout->addWidget(field);
+        case Property::Kind::Lines:
+            addLinesField(form, property);
             break;
-        }
-        case Property::Kind::Choice: {
-            layout->addWidget(fieldLabel(property.label, section));
-            auto *combo = new QComboBox(section);
-            for (const auto &[value, label] : property.choices)
-                combo->addItem(label, value);
-            const int at = combo->findData(get(id).toString());
-            if (at >= 0)
-                combo->setCurrentIndex(at);
-            QObject::connect(combo, &QComboBox::activated, section,
-                             [set, id, combo](int index) { set(id, combo->itemData(index), false); });
-            layout->addWidget(combo);
+        case Property::Kind::Choice:
+            addChoiceField(form, property);
             break;
-        }
-        case Property::Kind::Bool: {
-            auto *box = new QCheckBox(property.label, section);
-            box->setChecked(get(id).toBool());
-            QObject::connect(box, &QCheckBox::toggled, section, [set, id](bool checked) { set(id, checked, false); });
-            layout->addWidget(box);
+        case Property::Kind::Bool:
+            addBoolField(form, property);
             break;
-        }
-        case Property::Kind::Number: {
-            layout->addWidget(fieldLabel(property.label, section));
-            auto *spin = new QDoubleSpinBox(section);
-            spin->setRange(property.minimum, property.maximum);
-            spin->setValue(get(id).toDouble());
-            QObject::connect(spin, &QDoubleSpinBox::valueChanged, section,
-                             [set, id](double value) { set(id, value, false); });
-            layout->addWidget(spin);
+        case Property::Kind::Number:
+            addNumberField(form, property);
             break;
-        }
         }
     }
 }
@@ -314,32 +380,35 @@ QWidget *Inspector::buildShapeSection()
     layout->setSpacing(4);
     layout->addWidget(sectionTitle(typeLabel(shape->type).toUpper(), section));
     const QString id = shape->id;
-    addPropertyFields(
-        section, layout, shape->properties(),
-        [this, id](const QString &property) {
-            const Shape *s = board_->shape(id);
-            return s ? s->propertyValue(property) : QVariant();
-        },
-        [this, id](const QString &property, const QVariant &value, bool typing) {
-            Shape *s = board_->shape(id);
-            if (!s)
-                return;
-            beginTyping();
-            updating_ = true;
-            const QPointF center(s->cx(), s->cy());
-            s->setPropertyValue(property, value);
-            board_->measureShape(*s);
-            s->x = center.x() - s->w / 2;
-            s->y = center.y() - s->h / 2;
-            board_->containShape(*s, true);
-            board_->touch();
-            updating_ = false;
-            if (!typing) {
-                endTyping();
-                shown_.clear();
-                QTimer::singleShot(0, this, &Inspector::rebuild);
-            }
-        });
+    addPropertyFields({.section = section,
+                       .layout = layout,
+                       .get =
+                           [this, id](const QString &property) {
+                               const Shape *s = board_->shape(id);
+                               return s ? s->propertyValue(property) : QVariant();
+                           },
+                       .set =
+                           [this, id](const QString &property, const QVariant &value, bool typing) {
+                               Shape *s = board_->shape(id);
+                               if (!s)
+                                   return;
+                               beginTyping();
+                               updating_ = true;
+                               const QPointF center(s->cx(), s->cy());
+                               s->setPropertyValue(property, value);
+                               board_->measureShape(*s);
+                               s->x = center.x() - s->w / 2;
+                               s->y = center.y() - s->h / 2;
+                               board_->containShape(*s, true);
+                               board_->touch();
+                               updating_ = false;
+                               if (!typing) {
+                                   endTyping();
+                                   shown_.clear();
+                                   QTimer::singleShot(0, this, &Inspector::rebuild);
+                               }
+                           }},
+                      shape->properties());
     layout->addWidget(fieldLabel(tr("Color"), section));
     layout->addWidget(swatchGrid(swatches(), section, [this](const QString &color) { board_->paintSelection(color); }));
     auto *buttons = new QHBoxLayout;
@@ -378,32 +447,36 @@ QWidget *Inspector::buildLinkSection()
     const QString id = link->id;
     QList<Property> properties{{QStringLiteral("label"), tr("Label"), Property::Kind::Text, {}}};
     properties += link->properties();
-    addPropertyFields(
-        section, layout, properties,
-        [this, id](const QString &property) {
-            const Link *l = board_->link(id);
-            if (!l)
-                return QVariant();
-            return property == QLatin1String("label") ? QVariant(l->label) : l->propertyValue(property);
-        },
-        [this, id](const QString &property, const QVariant &value, bool typing) {
-            Link *l = board_->link(id);
-            if (!l)
-                return;
-            beginTyping();
-            updating_ = true;
-            if (property == QLatin1String("label"))
-                l->label = value.toString();
-            else
-                l->setPropertyValue(property, value);
-            board_->touch();
-            updating_ = false;
-            if (!typing) {
-                endTyping();
-                shown_.clear();
-                QTimer::singleShot(0, this, &Inspector::rebuild);
-            }
-        });
+    addPropertyFields({.section = section,
+                       .layout = layout,
+                       .get =
+                           [this, id](const QString &property) {
+                               const Link *l = board_->link(id);
+                               if (!l)
+                                   return QVariant();
+                               return property == QLatin1String("label") ? QVariant(l->label)
+                                                                         : l->propertyValue(property);
+                           },
+                       .set =
+                           [this, id](const QString &property, const QVariant &value, bool typing) {
+                               Link *l = board_->link(id);
+                               if (!l)
+                                   return;
+                               beginTyping();
+                               updating_ = true;
+                               if (property == QLatin1String("label"))
+                                   l->label = value.toString();
+                               else
+                                   l->setPropertyValue(property, value);
+                               board_->touch();
+                               updating_ = false;
+                               if (!typing) {
+                                   endTyping();
+                                   shown_.clear();
+                                   QTimer::singleShot(0, this, &Inspector::rebuild);
+                               }
+                           }},
+                      properties);
 
     layout->addWidget(fieldLabel(tr("Line style"), section));
     auto *line = new QComboBox(section);
@@ -497,19 +570,20 @@ void Inspector::applySource()
 {
     if (!codec_)
         return;
-    document::Loaded loaded;
     QString error;
-    if (!document::applySource(*board_, *codec_, source_->toPlainText(), loaded, &error)) {
+    const std::optional<document::Loaded> loaded =
+        document::applySource(*board_, *codec_, source_->toPlainText(), &error);
+    if (!loaded) {
         sourceError_->setText(error);
         sourceError_->show();
         return;
     }
-    if (loaded.codec)
-        codec_ = loaded.codec;
-    sourceError_->setVisible(!loaded.warnings.isEmpty());
-    sourceError_->setText(loaded.warnings.join(QLatin1Char('\n')));
+    if (loaded->codec)
+        codec_ = loaded->codec;
+    sourceError_->setVisible(!loaded->warnings.isEmpty());
+    sourceError_->setText(loaded->warnings.join(QLatin1Char('\n')));
     sourceVersion_ = ~quint64(0);
-    emit sourceApplied(loaded);
+    emit sourceApplied(*loaded);
 }
 
 } // namespace diagram

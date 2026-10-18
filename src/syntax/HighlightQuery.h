@@ -7,6 +7,7 @@
 #include <tree_sitter/api.h>
 
 #include <optional>
+#include <span>
 #include <vector>
 
 // Tree-sitter highlighting query (highlights.scm) compiled for a language.
@@ -41,7 +42,7 @@ private:
             Matches,
             AnyOf
         };
-        Kind kind;
+        Kind kind = Kind::Equals;
         bool negated = false;
         uint32_t captureId = 0;
         std::optional<uint32_t> otherCaptureId; // #eq? @a @b
@@ -50,6 +51,7 @@ private:
     };
 
     void compilePredicates();
+    std::optional<Predicate> compilePredicate(std::span<const TSQueryPredicateStep> steps) const;
     QString stringValue(uint32_t stringId) const;
     bool isSatisfied(const Predicate &predicate, const TSQueryMatch &match, const char *documentText) const;
 

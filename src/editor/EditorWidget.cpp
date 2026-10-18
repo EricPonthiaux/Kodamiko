@@ -19,6 +19,7 @@
 #include <Qsci/qscicommandset.h>
 
 #include <algorithm>
+#include <array>
 #include <utility>
 #include <vector>
 
@@ -59,9 +60,13 @@ QImage foldChevron(const QColor &color, bool open)
     painter.scale(foldMarkRatio, foldMarkRatio);
     painter.setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     const qreal center = foldMarkSize / 2.0;
-    const QPointF right[] = {{center - 1.5, center - 3.5}, {center + 2, center}, {center - 1.5, center + 3.5}};
-    const QPointF down[] = {{center - 3.5, center - 1.5}, {center, center + 2}, {center + 3.5, center - 1.5}};
-    painter.drawPolyline(open ? down : right, 3);
+    using Chevron = std::array<QPointF, 3>;
+    const Chevron right = {QPointF(center - 1.5, center - 3.5), QPointF(center + 2, center),
+                           QPointF(center - 1.5, center + 3.5)};
+    const Chevron down = {QPointF(center - 3.5, center - 1.5), QPointF(center, center + 2),
+                          QPointF(center + 3.5, center - 1.5)};
+    const Chevron &chevron = open ? down : right;
+    painter.drawPolyline(chevron.data(), int(chevron.size()));
     return image;
 }
 
@@ -78,7 +83,7 @@ int lineIndentation(const QsciScintilla &editor, int line)
 
 // The nearest non-blank line from `line` in the direction `step`; -1 if
 // there is none.
-int nonBlankLine(QsciScintilla &editor, int line, int step)
+int nonBlankLine(const QsciScintilla &editor, int line, int step)
 {
     const int count = editor.lines();
     for (; line >= 0 && line < count; line += step) {
@@ -88,46 +93,64 @@ int nonBlankLine(QsciScintilla &editor, int line, int step)
     return -1;
 }
 
-// The indentation guide of the block holding `line`, at the indentation of
-// the block's header. On a header the block it opens, on a closing bracket
-// the block it closes; a blank line belongs to the deeper of its neighbors.
-// None (column 0) for a block at the top level: Scintilla draws no guide
-// there.
-EditorWidget::ActiveGuide activeGuide(QsciScintilla &editor, int line)
+// The indentation of `line`; for a blank line, that of the deeper of its
+// non-blank neighbors.
+int effectiveIndentation(const QsciScintilla &editor, int line, int previous, int next)
+{
+    if (!isBlankLine(editor, line))
+        return lineIndentation(editor, line);
+    const int previousIndentation = previous >= 0 ? lineIndentation(editor, previous) : 0;
+    const int nextIndentation = next >= 0 ? lineIndentation(editor, next) : 0;
+    return std::max(previousIndentation, nextIndentation);
+}
+
+bool startsWithClosingBracket(const QsciScintilla &editor, int line)
+{
+    const auto first = editor.SendScintilla(QsciScintillaBase::SCI_GETCHARAT,
+                                            editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line));
+    return first == '}' || first == ')' || first == ']';
+}
+
+// The indentation of the nearest line above `line` less indented than
+// `indentation`: the header of the block holding `line`. 0 if there is none.
+int enclosingIndentation(const QsciScintilla &editor, int line, int indentation)
+{
+    for (int above = line - 1; above >= std::max(0, line - guideSearchLines); --above) {
+        if (!isBlankLine(editor, above) && lineIndentation(editor, above) < indentation)
+            return lineIndentation(editor, above);
+    }
+    return 0;
+}
+
+// Where a guide is drawn: its column, and a line of its block.
+struct GuideAnchor {
+    int column = 0;
+    int inside = 0;
+};
+
+// On a header the block it opens, on a closing bracket the block it closes,
+// elsewhere the block holding `line`.
+GuideAnchor guideAnchor(const QsciScintilla &editor, int line)
 {
     const int previous = nonBlankLine(editor, line - 1, -1);
     const int next = nonBlankLine(editor, line + 1, 1);
-    const bool blank = isBlankLine(editor, line);
-    const int indentation = !blank ? lineIndentation(editor, line)
-                                   : std::max(previous >= 0 ? lineIndentation(editor, previous) : 0,
-                                              next >= 0 ? lineIndentation(editor, next) : 0);
-    int column = -1;
-    int inside = line; // a line of the block
-    if (next >= 0 && lineIndentation(editor, next) > indentation) {
-        column = indentation;
-        inside = next;
-    } else if (!blank && previous >= 0 && lineIndentation(editor, previous) > indentation) {
-        const auto first = editor.SendScintilla(
-            QsciScintillaBase::SCI_GETCHARAT, editor.SendScintilla(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, line));
-        if (first == '}' || first == ')' || first == ']') {
-            column = indentation;
-            inside = previous;
-        }
-    }
-    if (column < 0) {
-        column = 0;
-        for (int above = line - 1; above >= std::max(0, line - guideSearchLines); --above) {
-            if (!isBlankLine(editor, above) && lineIndentation(editor, above) < indentation) {
-                column = lineIndentation(editor, above);
-                break;
-            }
-        }
-    }
-    if (column <= 0)
-        return {};
-    // The block: the lines around `inside` indented deeper than its header.
-    const auto inBlock = [&](int other) { return lineIndentation(editor, other) > column; };
-    int first = nonBlankLine(editor, inside, isBlankLine(editor, inside) ? -1 : 1);
+    const int indentation = effectiveIndentation(editor, line, previous, next);
+    const bool opensBlock = next >= 0 && lineIndentation(editor, next) > indentation;
+    if (opensBlock)
+        return {.column = indentation, .inside = next};
+    const bool followsDeeperLine = previous >= 0 && lineIndentation(editor, previous) > indentation;
+    const bool closesBlock = !isBlankLine(editor, line) && followsDeeperLine && startsWithClosingBracket(editor, line);
+    if (closesBlock)
+        return {.column = indentation, .inside = previous};
+    return {.column = enclosingIndentation(editor, line, indentation), .inside = line};
+}
+
+// The guide of the block around `anchor.inside`: the lines indented deeper
+// than its header.
+EditorWidget::ActiveGuide blockGuide(const QsciScintilla &editor, const GuideAnchor &anchor)
+{
+    const auto inBlock = [&](int other) { return lineIndentation(editor, other) > anchor.column; };
+    int first = nonBlankLine(editor, anchor.inside, isBlankLine(editor, anchor.inside) ? -1 : 1);
     if (first < 0 || !inBlock(first))
         return {};
     int last = first;
@@ -137,7 +160,20 @@ EditorWidget::ActiveGuide activeGuide(QsciScintilla &editor, int line)
     for (int below = nonBlankLine(editor, last + 1, 1); below >= 0 && inBlock(below) && below - last < guideSearchLines;
          below = nonBlankLine(editor, below + 1, 1))
         last = below;
-    return {column, first, last};
+    return {anchor.column, first, last};
+}
+
+// The indentation guide of the block holding `line`, at the indentation of
+// the block's header. On a header the block it opens, on a closing bracket
+// the block it closes; a blank line belongs to the deeper of its neighbors.
+// None (column 0) for a block at the top level: Scintilla draws no guide
+// there.
+EditorWidget::ActiveGuide activeGuide(const QsciScintilla &editor, int line)
+{
+    const GuideAnchor anchor = guideAnchor(editor, line);
+    if (anchor.column <= 0)
+        return {};
+    return blockGuide(editor, anchor);
 }
 
 QsciScintilla::EolMode toEolMode(LineEnding lineEnding)
@@ -275,7 +311,7 @@ void EditorWidget::showOpenFoldMarks(bool shown)
     SendScintilla(SCI_RGBAIMAGESETSCALE, 100);
 }
 
-void EditorWidget::foldBlock(bool fold)
+void EditorWidget::foldBlock(bool collapse)
 {
     if (!options_.codeFolding)
         return;
@@ -285,7 +321,7 @@ void EditorWidget::foldBlock(bool fold)
     getCursorPosition(&line, &index);
     const bool isHeader = SendScintilla(SCI_GETFOLDLEVEL, line) & SC_FOLDLEVELHEADERFLAG;
 
-    if (!fold) {
+    if (!collapse) {
         if (isHeader && !SendScintilla(SCI_GETFOLDEXPANDED, line))
             SendScintilla(SCI_FOLDLINE, line, SC_FOLDACTION_EXPAND);
         return;
@@ -301,10 +337,10 @@ void EditorWidget::foldBlock(bool fold)
     moveCursorOutOfFolds();
 }
 
-void EditorWidget::foldEverything(bool fold)
+void EditorWidget::foldEverything(bool collapse)
 {
     highlighter_->flush();
-    SendScintilla(SCI_FOLDALL, fold ? SC_FOLDACTION_CONTRACT : SC_FOLDACTION_EXPAND);
+    SendScintilla(SCI_FOLDALL, collapse ? SC_FOLDACTION_CONTRACT : SC_FOLDACTION_EXPAND);
     moveCursorOutOfFolds();
 }
 

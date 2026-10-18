@@ -91,6 +91,65 @@ void setFontSizeValue(QSpinBox *size, int value)
     size->setValue(value > 0 ? value : size->minimum());
 }
 
+void addDisabledItem(QComboBox *combo, const QString &text)
+{
+    combo->addItem(text);
+    if (const auto *model = qobject_cast<QStandardItemModel *>(combo->model()))
+        model->item(combo->count() - 1)->setEnabled(false);
+}
+
+// One link per download page: the Monaspace family shares one.
+QStringList downloadLinks(const QList<AppFonts::RecommendedFont> &missingFonts)
+{
+    QList<std::pair<QString, QStringList>> missing;
+    for (const AppFonts::RecommendedFont &font : missingFonts) {
+        if (missing.isEmpty() || missing.last().first != font.url)
+            missing.append({font.url, {}});
+        missing.last().second.append(font.name);
+    }
+    QStringList sources;
+    for (const auto &[url, names] : std::as_const(missing)) {
+        // "Monaspace" for its five styles.
+        const QString name = names.size() > 1 ? names.first().section(QLatin1Char(' '), 0, 0) : names.first();
+        sources.append(QStringLiteral("<a href=\"%1\">%2</a>").arg(url, name.toHtmlEscaped()));
+    }
+    return sources;
+}
+
+bool isOtherCodeFamily(const QString &family, const QStringList &recommended)
+{
+    const bool isUsableMonospace = QFontDatabase::isFixedPitch(family) && !QFontDatabase::isPrivateFamily(family);
+    return isUsableMonospace && !AppFonts::isBuiltInCode(family) && !recommended.contains(family);
+}
+
+// Fills `combo` with the built-in font, the recommended ones (those not
+// installed shown but disabled), then the other monospaced fonts
+// installed. Returns the download links of the missing recommended fonts.
+QStringList fillFontFamilies(QComboBox *combo)
+{
+    combo->addItem(QCoreApplication::translate("PreferencesPopup", "JetBrains Mono (built in)"), QString());
+    combo->insertSeparator(combo->count());
+    QStringList recommended;
+    QList<AppFonts::RecommendedFont> missing;
+    for (const AppFonts::RecommendedFont &font : AppFonts::recommendedFonts()) {
+        const QString family = AppFonts::installedFamily(font);
+        if (family.isEmpty()) {
+            addDisabledItem(combo,
+                            QCoreApplication::translate("PreferencesPopup", "%1 — not installed").arg(font.name));
+            missing.append(font);
+            continue;
+        }
+        combo->addItem(font.name, family);
+        recommended.append(family);
+    }
+    combo->insertSeparator(combo->count());
+    for (const QString &family : QFontDatabase::families()) {
+        if (isOtherCodeFamily(family, recommended))
+            combo->addItem(family, family);
+    }
+    return downloadLinks(missing);
+}
+
 // The side bar and the keymap, besides the shared rules (popupStyleSheet).
 constexpr const char *preferencesRules = R"(
 QFrame#preferencesSidebar { background: @window; border: none; border-right: 1px solid @line;
@@ -267,42 +326,9 @@ QWidget *PreferencesPopup::createAppearancePage()
 
     // Code font, with a sample in the chosen theme.
     auto *fontCard = new SettingsCard;
-    // The built-in font, the recommended ones (those not installed shown
-    // but disabled, with where to get them), then the other monospaced
-    // fonts installed.
     fontFamily_ = new QComboBox;
     fontFamily_->setMinimumWidth(240);
-    fontFamily_->addItem(tr("JetBrains Mono (built in)"), QString());
-    fontFamily_->insertSeparator(fontFamily_->count());
-    QStringList recommended;
-    // Missing fonts by download page: the Monaspace family shares one.
-    QList<std::pair<QString, QStringList>> missing;
-    for (const AppFonts::RecommendedFont &font : AppFonts::recommendedFonts()) {
-        const QString family = AppFonts::installedFamily(font);
-        if (!family.isEmpty()) {
-            fontFamily_->addItem(font.name, family);
-            recommended.append(family);
-            continue;
-        }
-        fontFamily_->addItem(tr("%1 — not installed").arg(font.name));
-        if (const auto *model = qobject_cast<QStandardItemModel *>(fontFamily_->model()))
-            model->item(fontFamily_->count() - 1)->setEnabled(false);
-        if (missing.isEmpty() || missing.last().first != font.url)
-            missing.append({font.url, {}});
-        missing.last().second.append(font.name);
-    }
-    QStringList sources;
-    for (const auto &[url, names] : std::as_const(missing)) {
-        // "Monaspace" for its five styles.
-        const QString name = names.size() > 1 ? names.first().section(QLatin1Char(' '), 0, 0) : names.first();
-        sources.append(QStringLiteral("<a href=\"%1\">%2</a>").arg(url, name.toHtmlEscaped()));
-    }
-    fontFamily_->insertSeparator(fontFamily_->count());
-    for (const QString &family : QFontDatabase::families()) {
-        if (QFontDatabase::isFixedPitch(family) && !QFontDatabase::isPrivateFamily(family) &&
-            !AppFonts::isBuiltInCode(family) && !recommended.contains(family))
-            fontFamily_->addItem(family, family);
-    }
+    const QStringList sources = fillFontFamilies(fontFamily_);
     fontSources_ = new QLabel;
     fontSources_->setObjectName(QStringLiteral("settingsDescription"));
     fontSources_->setWordWrap(true);

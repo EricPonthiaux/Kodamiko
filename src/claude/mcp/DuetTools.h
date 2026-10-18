@@ -1,5 +1,7 @@
 #pragma once
 
+#include "McpRegistry.h"
+
 #include <QList>
 #include <QString>
 
@@ -56,6 +58,13 @@ namespace DuetTools {
 
 // Server instructions: what Duet is and when to use its tools.
 QString instructions();
+
+// A tool's Run from a named function of the context: each tool's work is a
+// function of its own rather than a lambda inside the registration.
+using ToolHandler = void (*)(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply);
+using ImmediateToolHandler = McpResult (*)(const DuetToolContext &context, const QJsonObject &arguments);
+McpTool::Run handledBy(const DuetToolContext &context, ToolHandler handler);
+McpTool::Run handledBy(const DuetToolContext &context, ImmediateToolHandler handler);
 
 // Files and tabs: editor state, open files, file text, opening, saving.
 void registerEditorTools(McpRegistry &registry, const DuetToolContext &context);

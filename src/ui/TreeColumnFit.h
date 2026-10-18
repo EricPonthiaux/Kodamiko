@@ -20,7 +20,6 @@ public:
 
     void refit();
 
-protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:

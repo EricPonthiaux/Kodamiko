@@ -8,8 +8,10 @@
 #include <QHash>
 #include <QPainter>
 #include <QPainterPathStroker>
+#include <QSet>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <deque>
 
@@ -18,15 +20,24 @@ namespace diagram::mindmap {
 namespace {
 
 // Per presentation level: root, depth 1, depth 2+.
-const Font fonts[] = {Font(16, 600), Font(14, 500), Font(13)};
-constexpr qreal lineHeights[] = {23, 20, 19};
-constexpr qreal padX[] = {24, 18, 10};
-constexpr qreal padY[] = {16, 12, 6};
-constexpr qreal maxTextWidths[] = {220, 190, 170};
+const std::array<Font, 3> fonts{Font(16, 600), Font(14, 500), Font(13)};
+constexpr std::array<qreal, 3> lineHeights{23, 20, 19};
+constexpr std::array<qreal, 3> padX{24, 18, 10};
+constexpr std::array<qreal, 3> padY{16, 12, 6};
+constexpr std::array<qreal, 3> maxTextWidths{220, 190, 170};
 
 QString tr(const char *text)
 {
     return QCoreApplication::translate("MindmapDiagram", text);
+}
+
+// The text's native color: white on the root's solid fill, the ink on the
+// bubbles, muted on the leaves.
+QColor nativeInkOf(int depth, const Palette &palette)
+{
+    if (depth == 0)
+        return {Qt::white};
+    return depth == 1 ? palette.ink : palette.inkMuted;
 }
 
 } // namespace
@@ -99,45 +110,53 @@ void MindNode::draw(QPainter &painter, const Board &board, const ShapeState &sta
 {
     const int l = level(depth);
     const Style &style = board.style();
-    // Every bubble is rounded-sm, like the states and the rest of the board:
-    // no fully rounded stadium for the root and the first level.
-    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    if (!customFill.isEmpty()) {
-        shadowFill(painter, path, fillColor(style.palette.fill), style);
-        stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.shape.stroke),
-               state.selected ? 2 : shapeBorderWidth);
-    } else if (depth == 0) {
-        shadowFill(painter, path, style.palette.solid, style);
-        if (state.selected)
-            stroke(painter, path, style.shape.selectedStroke, 2);
-    } else if (depth == 1) {
-        shadowFill(painter, path, style.tones.sage, style);
-        stroke(painter, path, state.selected ? style.shape.selectedStroke : style.shape.stroke,
-               state.selected ? 2 : shapeBorderWidth);
-    } else {
-        // A leaf: no box, a fine underline carries the text (Mermaid's
-        // deepest level). The selection still outlines the hit box so that it
-        // stays graspable. The underline gets the short shadow of the bodies.
-        QPainterPath underline;
-        underline.moveTo(x + 2, y + h);
-        underline.lineTo(x + w - 2, y + h);
-        QPainterPathStroker stroker;
-        stroker.setWidth(1.5);
-        stroker.setCapStyle(Qt::RoundCap);
-        shadowFill(painter, stroker.createStroke(underline), style.palette.lifeline, style);
-        if (state.selected)
-            stroke(painter, roundRect(x - 2, y - 2, w + 4, h + 4, shapeRadiusSm), style.shape.selectedStroke, 1.5);
-    }
-
+    drawBody(painter, style, state.selected);
     if (state.editing)
         return;
-    const QColor nativeInk = depth == 0 ? QColor(Qt::white) : depth == 1 ? style.palette.ink : style.palette.inkMuted;
-    const QColor ink = textColor(nativeInk);
+    const QColor ink = textColor(nativeInkOf(depth, style.palette));
     qreal ty = cy() - ((std::max<qsizetype>(1, lines_.size()) - 1) * lineHeights[l]) / 2;
     for (const QString &line : lines_) {
         text::draw(painter, fonts[l], line, QPointF(cx(), ty), ink, Align::Center, Baseline::Middle);
         ty += lineHeights[l];
     }
+}
+
+void MindNode::drawBody(QPainter &painter, const Style &style, bool selected) const
+{
+    // Every bubble is rounded-sm, like the states and the rest of the board:
+    // no fully rounded stadium for the root and the first level.
+    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
+    if (!customFill.isEmpty()) {
+        shadowFill(painter, path, fillColor(style.palette.fill), style);
+        stroke(painter, path, strokeColor(selected ? style.shape.selectedStroke : style.shape.stroke),
+               selected ? 2 : shapeBorderWidth);
+    } else if (depth == 0) {
+        shadowFill(painter, path, style.palette.solid, style);
+        if (selected)
+            stroke(painter, path, style.shape.selectedStroke, 2);
+    } else if (depth == 1) {
+        shadowFill(painter, path, style.tones.sage, style);
+        stroke(painter, path, selected ? style.shape.selectedStroke : style.shape.stroke,
+               selected ? 2 : shapeBorderWidth);
+    } else {
+        drawLeafBody(painter, style, selected);
+    }
+}
+
+void MindNode::drawLeafBody(QPainter &painter, const Style &style, bool selected) const
+{
+    // A leaf: no box, a fine underline carries the text (Mermaid's deepest
+    // level). The selection still outlines the hit box so that it stays
+    // graspable. The underline gets the short shadow of the bodies.
+    QPainterPath underline;
+    underline.moveTo(x + 2, y + h);
+    underline.lineTo(x + w - 2, y + h);
+    QPainterPathStroker stroker;
+    stroker.setWidth(1.5);
+    stroker.setCapStyle(Qt::RoundCap);
+    shadowFill(painter, stroker.createStroke(underline), style.palette.lifeline, style);
+    if (selected)
+        stroke(painter, roundRect(x - 2, y - 2, w + 4, h + 4, shapeRadiusSm), style.shape.selectedStroke, 1.5);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +216,68 @@ void MindLink::draw(QPainter &painter, const Board &board, bool selected) const
 
 namespace diagram::families {
 
+namespace {
+
+struct Branches {
+    QHash<QString, QList<QString>> children;
+    QSet<QString> hasParent;
+};
+
+Branches branchesOf(const Board &board)
+{
+    Branches branches;
+    for (const auto &l : board.links()) {
+        if (l->from == l->to)
+            continue;
+        branches.children[l->from].append(l->to);
+        branches.hasParent.insert(l->to);
+    }
+    return branches;
+}
+
+// Breadth first from the nodes nobody points to, which keep their depth.
+QHash<QString, int> depthsFromRoots(const Board &board)
+{
+    const Branches branches = branchesOf(board);
+    QHash<QString, int> depths;
+    std::deque<QString> queue;
+    for (const auto &s : board.shapes()) {
+        const auto *node = dynamic_cast<const mindmap::MindNode *>(s.get());
+        if (node && !branches.hasParent.contains(s->id)) {
+            depths.insert(s->id, node->depth);
+            queue.push_back(s->id);
+        }
+    }
+    while (!queue.empty()) {
+        const QString parent = queue.front();
+        queue.pop_front();
+        for (const QString &child : branches.children.value(parent)) {
+            if (depths.contains(child))
+                continue;
+            depths.insert(child, depths.value(parent) + 1);
+            queue.push_back(child);
+        }
+    }
+    return depths;
+}
+
+// The depth follows the branches: a node attached to another one takes the
+// look of the level below it, as the source read again would give it. Nodes
+// nobody points to keep theirs (the root, a new idea).
+void resolveDepths(const Board &board)
+{
+    const QHash<QString, int> depths = depthsFromRoots(board);
+    for (const auto &s : board.shapes()) {
+        auto *node = dynamic_cast<mindmap::MindNode *>(s.get());
+        if (!node || !depths.contains(s->id) || depths.value(s->id) == node->depth)
+            continue;
+        node->depth = depths.value(s->id);
+        board.measureShape(*node);
+    }
+}
+
+} // namespace
+
 const Family &mindmap()
 {
     using namespace diagram::mindmap;
@@ -208,44 +289,7 @@ const Family &mindmap()
         f.links = {{QStringLiteral("mind"), [] { return std::unique_ptr<Link>(new MindLink); }}};
         f.defaultShape = QStringLiteral("mind");
         f.defaultLink = QStringLiteral("mind");
-        // The depth follows the branches: a node attached to another one
-        // takes the look of the level below it, as the source read again would
-        // give it. Nodes nobody points to keep theirs (the root, a new idea).
-        f.resolveLabels = [](Board &board) {
-            QHash<QString, QList<QString>> children;
-            QSet<QString> hasParent;
-            for (const auto &l : board.links()) {
-                if (l->from == l->to)
-                    continue;
-                children[l->from].append(l->to);
-                hasParent.insert(l->to);
-            }
-            QHash<QString, int> depths;
-            std::deque<QString> queue;
-            for (const auto &s : board.shapes()) {
-                if (const auto *node = dynamic_cast<const MindNode *>(s.get()); node && !hasParent.contains(s->id)) {
-                    depths.insert(s->id, node->depth);
-                    queue.push_back(s->id);
-                }
-            }
-            while (!queue.empty()) {
-                const QString id = queue.front();
-                queue.pop_front();
-                for (const QString &child : children.value(id)) {
-                    if (depths.contains(child))
-                        continue;
-                    depths.insert(child, depths.value(id) + 1);
-                    queue.push_back(child);
-                }
-            }
-            for (const auto &s : board.shapes()) {
-                auto *node = dynamic_cast<MindNode *>(s.get());
-                if (!node || !depths.contains(s->id) || depths.value(s->id) == node->depth)
-                    continue;
-                node->depth = depths.value(s->id);
-                board.measureShape(*node);
-            }
-        };
+        f.resolveLabels = resolveDepths;
         return f;
     }();
     return family;

@@ -49,6 +49,65 @@ void blankWord(QByteArray &text, const QByteArray &word)
     }
 }
 
+// The captures of one query match that describe a symbol.
+struct SymbolCaptures {
+    std::optional<TSNode> nameNode;
+    std::optional<TSNode> definitionNode;
+    std::optional<SymbolKind> kind;
+    bool declarationOnly = false;
+};
+
+// Reads "@name" and "@definition.<kind>" / "@declaration.<kind>" captures.
+SymbolCaptures symbolCaptures(const TSQueryMatch &match, const HighlightQuery &query)
+{
+    SymbolCaptures captures;
+    for (uint16_t i = 0; i < match.capture_count; ++i) {
+        const TSQueryCapture &capture = match.captures[i];
+        const QString captureName = query.captureName(capture.index);
+        if (captureName == QLatin1String("name")) {
+            captures.nameNode = capture.node;
+            continue;
+        }
+        const qsizetype dot = captureName.indexOf(QLatin1Char('.'));
+        const QStringView role = QStringView(captureName).left(dot);
+        const bool isSymbolRole = role == u"definition" || role == u"declaration";
+        if (dot < 0 || !isSymbolRole)
+            continue;
+        captures.kind = kindFromName(QStringView(captureName).mid(dot + 1));
+        captures.definitionNode = capture.node;
+        captures.declarationOnly = role == u"declaration";
+    }
+    return captures;
+}
+
+// The symbol the captures describe, if they name a known kind of definition.
+std::optional<RangedSymbol> rangedSymbol(const SymbolCaptures &captures, const QByteArray &text)
+{
+    if (!captures.definitionNode || !captures.kind)
+        return std::nullopt;
+    const TSNode definitionNode = *captures.definitionNode;
+
+    RangedSymbol ranged;
+    ranged.start = static_cast<int>(ts_node_start_byte(definitionNode));
+    ranged.end = static_cast<int>(ts_node_end_byte(definitionNode));
+    ranged.declarationOnly = captures.declarationOnly;
+    OutlineSymbol &symbol = ranged.symbol;
+    symbol.declarationOnly = captures.declarationOnly;
+    symbol.kind = *captures.kind;
+    symbol.startLine = static_cast<int>(ts_node_start_point(definitionNode).row);
+    symbol.endLine = static_cast<int>(ts_node_end_point(definitionNode).row);
+    if (captures.nameNode) {
+        const uint32_t start = ts_node_start_byte(*captures.nameNode);
+        symbol.name =
+            QString::fromUtf8(text.constData() + start, ts_node_end_byte(*captures.nameNode) - start).simplified();
+        symbol.position = static_cast<int>(start);
+    } else {
+        symbol.name = QStringLiteral("(anonymous)");
+        symbol.position = ranged.start;
+    }
+    return ranged;
+}
+
 } // namespace
 
 TreeSitterOutline::TreeSitterOutline(const TSLanguage *language,
@@ -82,47 +141,8 @@ std::vector<OutlineSymbol> TreeSitterOutline::symbols(const QByteArray &original
     while (ts_query_cursor_next_match(cursor_, &match)) {
         if (!query_.matchSatisfiesPredicates(match, text.constData()))
             continue;
-
-        std::optional<TSNode> nameNode;
-        std::optional<TSNode> definitionNode;
-        std::optional<SymbolKind> kind;
-        bool declarationOnly = false;
-        for (uint16_t i = 0; i < match.capture_count; ++i) {
-            const TSQueryCapture &capture = match.captures[i];
-            const QString captureName = query_.captureName(capture.index);
-            if (captureName == QLatin1String("name")) {
-                nameNode = capture.node;
-                continue;
-            }
-            const qsizetype dot = captureName.indexOf(QLatin1Char('.'));
-            const QStringView role = QStringView(captureName).left(dot);
-            if (dot < 0 || (role != u"definition" && role != u"declaration"))
-                continue;
-            kind = kindFromName(QStringView(captureName).mid(dot + 1));
-            definitionNode = capture.node;
-            declarationOnly = role == u"declaration";
-        }
-        if (!definitionNode || !kind)
-            continue;
-
-        RangedSymbol ranged;
-        ranged.start = static_cast<int>(ts_node_start_byte(*definitionNode));
-        ranged.end = static_cast<int>(ts_node_end_byte(*definitionNode));
-        ranged.declarationOnly = declarationOnly;
-        ranged.symbol.declarationOnly = declarationOnly;
-        OutlineSymbol &symbol = ranged.symbol;
-        symbol.kind = *kind;
-        symbol.startLine = static_cast<int>(ts_node_start_point(*definitionNode).row);
-        symbol.endLine = static_cast<int>(ts_node_end_point(*definitionNode).row);
-        if (nameNode) {
-            const uint32_t start = ts_node_start_byte(*nameNode);
-            symbol.name = QString::fromUtf8(text.constData() + start, ts_node_end_byte(*nameNode) - start).simplified();
-            symbol.position = static_cast<int>(start);
-        } else {
-            symbol.name = QStringLiteral("(anonymous)");
-            symbol.position = ranged.start;
-        }
-        flat.push_back(std::move(ranged));
+        if (std::optional<RangedSymbol> ranged = rangedSymbol(symbolCaptures(match, query_), text))
+            flat.push_back(std::move(*ranged));
     }
 
     ts_tree_delete(tree);

@@ -13,6 +13,7 @@ class EditorWidget;
 class LanguageServers;
 class LspClient;
 class ProblemStore;
+class QJsonArray;
 class QPoint;
 
 // What the file's language server knows about the code, in the editor:
@@ -26,11 +27,15 @@ class CodeIntelligence : public QObject {
     Q_OBJECT
 
 public:
-    CodeIntelligence(EditorTabs *tabs,
-                     LanguageServers *servers,
-                     CodeNavigator *navigator,
-                     ProblemStore *problems,
-                     QObject *parent = nullptr);
+    // What it works with; none is owned.
+    struct Services {
+        EditorTabs *tabs = nullptr;
+        LanguageServers *servers = nullptr;
+        CodeNavigator *navigator = nullptr;
+        ProblemStore *problems = nullptr;
+    };
+
+    explicit CodeIntelligence(const Services &services, QObject *parent = nullptr);
 
     // Documentation when the mouse rests on a name, parameters while a
     // call is typed.
@@ -73,6 +78,14 @@ private:
     // even before the server has indexed the project.
     void syncOpenEditors(LspClient *client, const QString &languageId);
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
+    // Shows the server's signature help `help` as a call tip.
+    void showSignatureHelp(const EditorWidget *editor, const QJsonObject &help, bool explicitRequest);
+    // Offers the usages `locations` of `word` in a menu, and goes to the
+    // chosen one.
+    void showUsages(EditorWidget *editor, const QString &word, QList<LspProtocol::Location> locations);
+    // Offers the server's `codeActions` in a menu, and carries out the
+    // chosen one.
+    void chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions);
     // Shows the problems of `path` in its editor.
     void showProblems(const QString &path);
     void showHover(EditorWidget *editor, int bytePosition, const QPoint &where, bool explicitRequest);

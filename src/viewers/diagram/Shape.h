@@ -11,6 +11,7 @@
 #include <QString>
 #include <QVariant>
 
+#include <array>
 #include <functional>
 #include <optional>
 #include <vector>
@@ -80,7 +81,7 @@ struct Property {
 
 class Shape {
 public:
-    Shape(QString type, qreal width = 120, qreal height = 60);
+    explicit Shape(QString typeName, qreal width = 120, qreal height = 60);
     virtual ~Shape();
 
     // Reads the properties the shape was created with (the JS constructor's
@@ -265,7 +266,7 @@ struct GraphvizEndpoint {
 
 class Link {
 public:
-    explicit Link(QString type);
+    explicit Link(QString typeName);
     virtual ~Link();
 
     virtual void load(const QJsonObject &props);
@@ -367,7 +368,9 @@ public:
     QString customLineStyle; // "solid", "dashed", "dotted" or empty
     QString customColor;     // "#rrggbb" or empty
     std::optional<qreal> customWidth;
-    std::optional<Spline> spline;
+    // Mutable: validSpline() drops a curve whose ends have moved, even
+    // through a const link.
+    mutable std::optional<Spline> spline;
 
     // A label place reserved by the layout, kept apart from the curve.
     struct ReservedLabel {
@@ -376,7 +379,7 @@ public:
         QPointF toAnchor;
     };
 
-    std::optional<ReservedLabel> layoutLabelPoint;
+    mutable std::optional<ReservedLabel> layoutLabelPoint; // dropped like `spline`
 
 protected:
     std::optional<QPointF> reservedLabelPoint(const Route &route, const Board &board) const;
@@ -397,7 +400,8 @@ void fillArrowHead(QPainter &painter,
                    qreal size,
                    const QColor &color,
                    qreal spread = graphvizNormalArrowSpread);
-QPointF bezierPoint(QPointF p0, QPointF p1, QPointF p2, QPointF p3, qreal t);
+// The point at `t` on the cubic Bézier of the four control points.
+QPointF bezierPoint(const std::array<QPointF, 4> &controls, qreal t);
 qreal distanceToSegment(QPointF point, QPointF a, QPointF b);
 QPointF polylineMidpoint(const std::vector<QPointF> &points);
 std::vector<QPointF> trimPolyline(const std::vector<QPointF> &points, qreal trimStart, qreal trimEnd);

@@ -22,6 +22,7 @@
 #include <QTabBar>
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 
 namespace {
@@ -32,6 +33,18 @@ constexpr qreal emptyMarkShare = 0.22;
 constexpr qreal emptyMarkMinimumSize = 48;
 constexpr qreal emptyMarkMaximumSize = 160;
 constexpr qreal emptyMarkOpacity = 0.35;
+
+// Asks whether to save the changes to `filePath` before its tab closes.
+// Returns false if the user cancels, or if the requested save fails.
+bool confirmClose(QWidget *parent, const QString &filePath, const std::function<bool()> &save)
+{
+    const auto answer = QMessageBox::question(parent, EditorTabs::tr("Unsaved Changes"),
+                                              EditorTabs::tr("Save changes to %1?").arg(QFileInfo(filePath).fileName()),
+                                              QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    if (answer == QMessageBox::Cancel)
+        return false;
+    return answer != QMessageBox::Save || save();
+}
 
 } // namespace
 
@@ -127,7 +140,8 @@ QWidget *EditorTabs::openFile(const QString &path)
     QWidget *page = editor;
     if (PreviewPage::hasPreview(absolutePath)) {
         auto *previewed = new PreviewPage(editor, theme_, this);
-        connect(previewed, &PreviewPage::openFileRequested, this, [this](const QString &path) { openFile(path); });
+        connect(previewed, &PreviewPage::openFileRequested, this,
+                [this](const QString &linkedPath) { openFile(linkedPath); });
         page = previewed;
     }
     const int index = addTab(page, QFileInfo(absolutePath).fileName());
@@ -356,15 +370,15 @@ QList<QWidget *> EditorTabs::pagesUnder(const QString &path) const
 
 bool EditorTabs::hasUnsavedChangesUnder(const QString &path) const
 {
-    for (QWidget *page : pagesUnder(path)) {
+    return std::ranges::any_of(pagesUnder(path), [this](QWidget *page) {
         if (const auto *editor = editorIn(page); editor && editor->isModified())
             return true;
 #ifdef DUET_WITH_DIAGRAMS
         if (const auto *diagram = qobject_cast<DiagramView *>(page); diagram && diagram->isModified())
             return true;
 #endif
-    }
-    return false;
+        return false;
+    });
 }
 
 void EditorTabs::closeFilesUnder(const QString &path)
@@ -537,7 +551,9 @@ void EditorTabs::formatEditor(EditorWidget *editor, bool quiet, bool saveAfter)
 
     formatting_.insert(editor, saveAfter);
     const QString text = editor->text();
-    CodeFormatter::start(*command, QFileInfo(editor->filePath()).absolutePath(), text, this,
+    const CodeFormatter::Job job{
+        .command = *command, .workDir = QFileInfo(editor->filePath()).absolutePath(), .text = text};
+    CodeFormatter::start(job, this,
                          [this, editor, guard = QPointer<EditorWidget>(editor), text,
                           quiet](const std::optional<QString> &formatted, const QString &error) {
                              const bool save = formatting_.take(editor);
@@ -630,22 +646,15 @@ void EditorTabs::closeCurrent()
 bool EditorTabs::closeTab(int index, bool askToSave)
 {
     auto *editor = editorIn(widget(index));
-    if (askToSave && editor && editor->isModified()) {
-        const auto answer = QMessageBox::question(
-            this, tr("Unsaved Changes"), tr("Save changes to %1?").arg(QFileInfo(editor->filePath()).fileName()),
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (answer == QMessageBox::Cancel || (answer == QMessageBox::Save && !saveEditor(editor)))
-            return false;
-    }
+    const bool mustAskForEditor = askToSave && editor && editor->isModified();
+    if (mustAskForEditor && !confirmClose(this, editor->filePath(), [this, editor] { return saveEditor(editor); }))
+        return false;
 #ifdef DUET_WITH_DIAGRAMS
     if (auto *diagram = qobject_cast<DiagramView *>(widget(index))) {
-        if (askToSave && diagram->isModified()) {
-            const auto answer = QMessageBox::question(
-                this, tr("Unsaved Changes"), tr("Save changes to %1?").arg(QFileInfo(diagram->filePath()).fileName()),
-                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-            if (answer == QMessageBox::Cancel || (answer == QMessageBox::Save && !saveDiagram(diagram)))
-                return false;
-        }
+        const bool mustAskForDiagram = askToSave && diagram->isModified();
+        const auto saveThisDiagram = [this, diagram] { return saveDiagram(diagram); };
+        if (mustAskForDiagram && !confirmClose(this, diagram->filePath(), saveThisDiagram))
+            return false;
         watcher_.unwatch(diagram->filePath());
     }
 #endif
@@ -671,12 +680,10 @@ bool EditorTabs::closeAll()
 bool EditorTabs::closeTabs(const QList<QWidget *> &pages)
 {
     // Indexes shift with each close, so work from the pages.
-    for (const QWidget *page : pages) {
+    return std::ranges::all_of(pages, [this](const QWidget *page) {
         const int index = indexOf(page);
-        if (index >= 0 && !closeTab(index))
-            return false;
-    }
-    return true;
+        return index < 0 || closeTab(index);
+    });
 }
 
 void EditorTabs::showTabContextMenu(const QPoint &pos)
@@ -719,43 +726,21 @@ void EditorTabs::syncWithDisk(const QString &path)
             emit statusMessage(tr("Could not reload %1: %2").arg(QFileInfo(path).fileName(), error));
         return;
     }
-
 #ifdef DUET_WITH_DIAGRAMS
     if (DiagramView *diagram = diagramViewFor(path)) {
-        const QString name = QFileInfo(path).fileName();
-        if (pathsBeingResolved_.contains(diagram->filePath()))
-            return;
-        if (!QFileInfo::exists(path)) {
-            emit statusMessage(tr("%1 was deleted from disk").arg(name));
-            return;
-        }
-        if (diagram->matchesDisk())
-            return; // our own save, or identical content
-        if (diagram->isModified()) {
-            pathsBeingResolved_.insert(diagram->filePath());
-            const auto answer = QMessageBox::question(this, tr("File Modified on Disk"),
-                                                      tr("%1 was modified on disk, but you have unsaved changes.\n\n"
-                                                         "Reload the file? Your changes will be lost.")
-                                                          .arg(name),
-                                                      QMessageBox::Yes | QMessageBox::No);
-            pathsBeingResolved_.remove(diagram->filePath());
-            if (answer != QMessageBox::Yes)
-                return;
-        }
-        QString error;
-        if (diagram->reloadFromDisk(&error))
-            emit statusMessage(tr("%1 reloaded from disk").arg(name));
-        else
-            emit statusMessage(tr("Could not reload %1: %2").arg(name, error));
+        syncDiagramWithDisk(diagram, path);
         return;
     }
 #endif
+    if (EditorWidget *editor = editorFor(path))
+        syncEditorWithDisk(editor, path);
+}
 
-    EditorWidget *editor = editorFor(path);
-    if (!editor || pathsBeingResolved_.contains(editor->filePath()))
+void EditorTabs::syncEditorWithDisk(EditorWidget *editor, const QString &path)
+{
+    if (pathsBeingResolved_.contains(editor->filePath()))
         return;
     const QString name = QFileInfo(path).fileName();
-
     if (!QFileInfo::exists(path)) {
         emit statusMessage(tr("%1 was deleted from disk").arg(name));
         return;
@@ -763,24 +748,53 @@ void EditorTabs::syncWithDisk(const QString &path)
     if (editor->matchesDisk())
         return; // our own save, or identical content
 
-    if (editor->isModified()) {
-        pathsBeingResolved_.insert(editor->filePath());
-        const auto answer =
-            QMessageBox::question(this, tr("File Modified on Disk"),
-                                  tr("%1 was modified on disk, but you have unsaved changes.\n\n"
-                                     "Reload the file? Your changes will be lost (Ctrl+Z brings them back).")
-                                      .arg(name),
-                                  QMessageBox::Yes | QMessageBox::No);
-        pathsBeingResolved_.remove(editor->filePath());
-        if (answer != QMessageBox::Yes)
-            return;
-    }
-
+    const QString question = tr("%1 was modified on disk, but you have unsaved changes.\n\n"
+                                "Reload the file? Your changes will be lost (Ctrl+Z brings them back).")
+                                 .arg(name);
+    if (editor->isModified() && !confirmReload(editor->filePath(), question))
+        return;
     QString error;
     if (editor->reloadFromDisk(&error))
         emit statusMessage(tr("%1 reloaded from disk").arg(name));
     else
         emit statusMessage(tr("Could not reload %1: %2").arg(name, error));
+}
+
+#ifdef DUET_WITH_DIAGRAMS
+void EditorTabs::syncDiagramWithDisk(DiagramView *diagram, const QString &path)
+{
+    if (pathsBeingResolved_.contains(diagram->filePath()))
+        return;
+    const QString name = QFileInfo(path).fileName();
+    if (!QFileInfo::exists(path)) {
+        emit statusMessage(tr("%1 was deleted from disk").arg(name));
+        return;
+    }
+    if (diagram->matchesDisk())
+        return; // our own save, or identical content
+
+    const QString question = tr("%1 was modified on disk, but you have unsaved changes.\n\n"
+                                "Reload the file? Your changes will be lost.")
+                                 .arg(name);
+    if (diagram->isModified() && !confirmReload(diagram->filePath(), question))
+        return;
+    QString error;
+    if (diagram->reloadFromDisk(&error))
+        emit statusMessage(tr("%1 reloaded from disk").arg(name));
+    else
+        emit statusMessage(tr("Could not reload %1: %2").arg(name, error));
+}
+#endif
+
+bool EditorTabs::confirmReload(const QString &filePath, const QString &question)
+{
+    // The question's event loop can bring the same change again: no second
+    // question meanwhile.
+    pathsBeingResolved_.insert(filePath);
+    const auto answer =
+        QMessageBox::question(this, tr("File Modified on Disk"), question, QMessageBox::Yes | QMessageBox::No);
+    pathsBeingResolved_.remove(filePath);
+    return answer == QMessageBox::Yes;
 }
 
 void EditorTabs::reloadChangeBases() const

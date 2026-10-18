@@ -62,7 +62,138 @@ std::optional<QString> fileText(const DuetToolContext &context, const QString &p
     return QString::fromUtf8(file.readAll());
 }
 
+void getEditorState(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+{
+    const QString folder = context.folder ? context.folder() : QString();
+    reply(McpResult::json(EditorContext::of(*context.tabs, folder).toJson()));
+}
+
+void getOpenFiles(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+{
+    const QHash<QString, QString> unsaved = context.tabs->unsavedTexts();
+    const QString current = context.tabs->currentFilePath();
+    QJsonArray files;
+    for (const QString &path : context.tabs->openFilePaths())
+        files.append(QJsonObject{{QStringLiteral("path"), context.relative(path)},
+                                 {QStringLiteral("current"), path == current},
+                                 {QStringLiteral("unsaved"), unsaved.contains(path)}});
+    reply(McpResult::json(QJsonObject{{QStringLiteral("files"), files}}));
+}
+
+void getFileText(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+{
+    const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
+    bool unsaved = false;
+    const std::optional<QString> text = fileText(context, path, &unsaved);
+    if (!text) {
+        reply(McpResult::error(QStringLiteral("Cannot read %1").arg(context.relative(path))));
+        return;
+    }
+    QStringList lines = text->split(QLatin1Char('\n'));
+    const int first = std::max(1, arguments.value(QStringLiteral("startLine")).toInt(1));
+    const int last = std::min(int(lines.size()), arguments.value(QStringLiteral("endLine")).toInt(int(lines.size())));
+    lines = lines.mid(first - 1, std::max(0, last - first + 1));
+    reply(McpResult::json(QJsonObject{{QStringLiteral("path"), context.relative(path)},
+                                      {QStringLiteral("unsaved"), unsaved},
+                                      {QStringLiteral("startLine"), first},
+                                      {QStringLiteral("text"), lines.join(QLatin1Char('\n'))}}));
+}
+
+void openFile(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+{
+    const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
+    if (!QFileInfo(path).isFile()) {
+        reply(McpResult::error(QStringLiteral("No file %1").arg(context.relative(path))));
+        return;
+    }
+    const int line = arguments.value(QStringLiteral("line")).toInt(0);
+    if (line > 0 && context.navigator) {
+        context.navigator->goToLine(path, line - 1, std::max(0, arguments.value(QStringLiteral("column")).toInt(1) - 1),
+                                    std::max(0, arguments.value(QStringLiteral("length")).toInt(0)));
+    } else if (!context.tabs->openFile(path)) {
+        reply(McpResult::error(QStringLiteral("Duet could not open %1").arg(context.relative(path))));
+        return;
+    }
+    reply(McpResult::message(QStringLiteral("Opened %1").arg(context.relative(path))));
+}
+
+// Saves the open file at `path` if it has changes; false if it could not be.
+bool saveOpenFile(const DuetToolContext &context, const QString &path)
+{
+    EditorWidget *editor = context.tabs->editorFor(path);
+    if (!editor)
+        return false;
+    QString error;
+    return !editor->isModified() || editor->save(&error);
+}
+
+void saveFiles(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+{
+    const QJsonArray paths = arguments.value(QStringLiteral("paths")).toArray();
+    if (paths.isEmpty()) {
+        const bool saved = context.tabs->saveAll();
+        reply(saved ? McpResult::message(QStringLiteral("Saved"))
+                    : McpResult::error(QStringLiteral("Some files could not be saved")));
+        return;
+    }
+    QStringList failed;
+    for (const QJsonValue &value : paths) {
+        const QString path = context.absolute(value.toString());
+        if (!saveOpenFile(context, path))
+            failed.append(context.relative(path));
+    }
+    reply(failed.isEmpty() ? McpResult::message(QStringLiteral("Saved"))
+                           : McpResult::error(QStringLiteral("Not saved: %1").arg(failed.join(QStringLiteral(", ")))));
+}
+
+void showDiff(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+{
+    context.tabs->showDiff(arguments.value(QStringLiteral("title")).toString(),
+                           arguments.value(QStringLiteral("diff")).toString());
+    reply(McpResult::message(QStringLiteral("Shown")));
+}
+
+QString reviewSelectionPrompt(const QJsonObject &arguments)
+{
+    const QString focus = arguments.value(QStringLiteral("focus")).toString();
+    return QStringLiteral("Get the code I selected in Duet (get_editor_state) and review it%1: "
+                          "point out problems with their line, then propose fixes, applying "
+                          "nothing until I agree.")
+        .arg(focus.isEmpty() ? QString() : QStringLiteral(", looking at ") + focus);
+}
+
+QString fixDiagnosticsPrompt(const QJsonObject &arguments)
+{
+    const QString path = arguments.value(QStringLiteral("path")).toString();
+    return QStringLiteral("Get the problems Duet's language servers report%1 (get_diagnostics), "
+                          "fix the errors, then check again with get_diagnostics until none "
+                          "is left. Tell me what you changed.")
+        .arg(path.isEmpty() ? QString() : QStringLiteral(" for ") + path);
+}
+
+QString explainSymbolPrompt(const QJsonObject &)
+{
+    return QStringLiteral("Take the symbol at my cursor in Duet (get_editor_state), find its "
+                          "definition and usages (get_symbol_info, find_definition, "
+                          "find_references) and explain what it does and how the project "
+                          "uses it, briefly.");
+}
+
 } // namespace
+
+McpTool::Run handledBy(const DuetToolContext &context, ToolHandler handler)
+{
+    return [context, handler](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
+        handler(context, arguments, reply);
+    };
+}
+
+McpTool::Run handledBy(const DuetToolContext &context, ImmediateToolHandler handler)
+{
+    return [context, handler](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
+        reply(handler(context, arguments));
+    };
+}
 
 void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
 {
@@ -86,10 +217,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &, const McpReply &reply, const McpProgress &) {
-            const QString folder = context.folder ? context.folder() : QString();
-            reply(McpResult::json(EditorContext::of(*context.tabs, folder).toJson()));
-        },
+        handledBy(context, getEditorState),
     });
 
     registry.addTool({
@@ -104,16 +232,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &, const McpReply &reply, const McpProgress &) {
-            const QHash<QString, QString> unsaved = context.tabs->unsavedTexts();
-            const QString current = context.tabs->currentFilePath();
-            QJsonArray files;
-            for (const QString &path : context.tabs->openFilePaths())
-                files.append(QJsonObject{{QStringLiteral("path"), context.relative(path)},
-                                         {QStringLiteral("current"), path == current},
-                                         {QStringLiteral("unsaved"), unsaved.contains(path)}});
-            reply(McpResult::json(QJsonObject{{QStringLiteral("files"), files}}));
-        },
+        handledBy(context, getOpenFiles),
     });
 
     registry.addTool({
@@ -131,24 +250,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
-            const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
-            bool unsaved = false;
-            const std::optional<QString> text = fileText(context, path, &unsaved);
-            if (!text) {
-                reply(McpResult::error(QStringLiteral("Cannot read %1").arg(context.relative(path))));
-                return;
-            }
-            QStringList lines = text->split(QLatin1Char('\n'));
-            const int first = std::max(1, arguments.value(QStringLiteral("startLine")).toInt(1));
-            const int last =
-                std::min(int(lines.size()), arguments.value(QStringLiteral("endLine")).toInt(int(lines.size())));
-            lines = lines.mid(first - 1, std::max(0, last - first + 1));
-            reply(McpResult::json(QJsonObject{{QStringLiteral("path"), context.relative(path)},
-                                              {QStringLiteral("unsaved"), unsaved},
-                                              {QStringLiteral("startLine"), first},
-                                              {QStringLiteral("text"), lines.join(QLatin1Char('\n'))}}));
-        },
+        handledBy(context, getFileText),
     });
 
     registry.addTool({
@@ -168,23 +270,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
-            const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
-            if (!QFileInfo(path).isFile()) {
-                reply(McpResult::error(QStringLiteral("No file %1").arg(context.relative(path))));
-                return;
-            }
-            const int line = arguments.value(QStringLiteral("line")).toInt(0);
-            if (line > 0 && context.navigator) {
-                context.navigator->goToLine(path, line - 1,
-                                            std::max(0, arguments.value(QStringLiteral("column")).toInt(1) - 1),
-                                            std::max(0, arguments.value(QStringLiteral("length")).toInt(0)));
-            } else if (!context.tabs->openFile(path)) {
-                reply(McpResult::error(QStringLiteral("Duet could not open %1").arg(context.relative(path))));
-                return;
-            }
-            reply(McpResult::message(QStringLiteral("Opened %1").arg(context.relative(path))));
-        },
+        handledBy(context, openFile),
     });
 
     registry.addTool({
@@ -200,30 +286,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         true,
         false,
         {},
-        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
-            const QJsonArray paths = arguments.value(QStringLiteral("paths")).toArray();
-            if (paths.isEmpty()) {
-                const bool saved = context.tabs->saveAll();
-                reply(saved ? McpResult::message(QStringLiteral("Saved"))
-                            : McpResult::error(QStringLiteral("Some files could not be saved")));
-                return;
-            }
-            QStringList failed;
-            for (const QJsonValue &value : paths) {
-                const QString path = context.absolute(value.toString());
-                EditorWidget *editor = context.tabs->editorFor(path);
-                if (!editor) {
-                    failed.append(context.relative(path));
-                    continue;
-                }
-                QString error;
-                if (editor->isModified() && !editor->save(&error))
-                    failed.append(context.relative(path));
-            }
-            reply(failed.isEmpty()
-                      ? McpResult::message(QStringLiteral("Saved"))
-                      : McpResult::error(QStringLiteral("Not saved: %1").arg(failed.join(QStringLiteral(", ")))));
-        },
+        handledBy(context, saveFiles),
     });
 
     registry.addTool({
@@ -240,11 +303,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         false,
         false,
         {},
-        [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
-            context.tabs->showDiff(arguments.value(QStringLiteral("title")).toString(),
-                                   arguments.value(QStringLiteral("diff")).toString());
-            reply(McpResult::message(QStringLiteral("Shown")));
-        },
+        handledBy(context, showDiff),
     });
 
     // Prompts: slash commands in the Claude session (/mcp__duet__…).
@@ -253,35 +312,17 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
          QStringLiteral("Review the selection"),
          QStringLiteral("Review the code selected in Duet"),
          {{QStringLiteral("focus"), QStringLiteral("What to look at (bugs, naming, performance…)"), false}},
-         [](const QJsonObject &arguments) {
-             const QString focus = arguments.value(QStringLiteral("focus")).toString();
-             return QStringLiteral("Get the code I selected in Duet (get_editor_state) and review it%1: "
-                                   "point out problems with their line, then propose fixes, applying "
-                                   "nothing until I agree.")
-                 .arg(focus.isEmpty() ? QString() : QStringLiteral(", looking at ") + focus);
-         }});
+         reviewSelectionPrompt});
     registry.addPrompt({QStringLiteral("fix-diagnostics"),
                         QStringLiteral("Fix the problems"),
                         QStringLiteral("Fix the errors the language servers report"),
                         {{QStringLiteral("path"), QStringLiteral("File (optional: the open files)"), false}},
-                        [](const QJsonObject &arguments) {
-                            const QString path = arguments.value(QStringLiteral("path")).toString();
-                            return QStringLiteral(
-                                       "Get the problems Duet's language servers report%1 (get_diagnostics), "
-                                       "fix the errors, then check again with get_diagnostics until none "
-                                       "is left. Tell me what you changed.")
-                                .arg(path.isEmpty() ? QString() : QStringLiteral(" for ") + path);
-                        }});
+                        fixDiagnosticsPrompt});
     registry.addPrompt({QStringLiteral("explain-symbol"),
                         QStringLiteral("Explain the symbol"),
                         QStringLiteral("Explain the symbol at the cursor: what it is, where it is used"),
                         {},
-                        [](const QJsonObject &) {
-                            return QStringLiteral("Take the symbol at my cursor in Duet (get_editor_state), find its "
-                                                  "definition and usages (get_symbol_info, find_definition, "
-                                                  "find_references) and explain what it does and how the project "
-                                                  "uses it, briefly.");
-                        }});
+                        explainSymbolPrompt});
 
     // The editor's state as a resource: clients that subscribe hear when
     // the user moves.

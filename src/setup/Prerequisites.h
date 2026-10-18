@@ -21,7 +21,7 @@ struct Prerequisite {
         Ok
     };
 
-    Id id;
+    Id id = Id::Git;
     QString name;
     QString purpose; // why the editor needs it
     Status status = Status::Missing;

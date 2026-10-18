@@ -65,6 +65,42 @@ QString family(const QString &languageId)
     return languageId;
 }
 
+// Whether text[start, end) is worth offering: long enough, not a number,
+// and not the word being typed (around `exclude`).
+bool isSuggestedWord(const QByteArray &text, int start, int end, int exclude)
+{
+    const bool isShort = end - start < 3;
+    const bool isNumber = text[start] >= '0' && text[start] <= '9';
+    const bool isBeingTyped = exclude >= start && exclude <= end;
+    return !isShort && !isNumber && !isBeingTyped;
+}
+
+// The literals of the expected type, for smart completion.
+QStringList literalsFor(const CompletionContext &context)
+{
+    const QString expected = ExpectedType::normalized(context.expectedType);
+    if (expected == QLatin1String("bool") || expected == QLatin1String("boolean"))
+        return {QStringLiteral("true"), QStringLiteral("false")};
+    if (expected.endsWith(QLatin1Char('*')))
+        return {context.languageId == QLatin1String("c") ? QStringLiteral("NULL") : QStringLiteral("nullptr")};
+    const QString &language = context.languageId;
+    const bool hasNull = language == QLatin1String("java") || language.startsWith(QLatin1Char('t')) ||
+                         language == QLatin1String("javascript");
+    const bool isObjectType = !expected.isEmpty() && expected[0].isUpper();
+    if (isObjectType && hasNull)
+        return {QStringLiteral("null")};
+    return {};
+}
+
+CompletionItem keywordItem(const QString &keyword)
+{
+    CompletionItem item;
+    item.label = keyword;
+    item.kind = CompletionItem::Kind::Keyword;
+    item.priority = 2;
+    return item;
+}
+
 } // namespace
 
 bool isIdentifierCharacter(QChar c)
@@ -92,10 +128,8 @@ QStringList DocumentWordsProvider::words(const QByteArray &text, int exclude)
         const int start = i;
         while (i < size && isIdentifierByte(text[i]))
             ++i;
-        if (i - start < 3 || (text[start] >= '0' && text[start] <= '9'))
+        if (!isSuggestedWord(text, start, i, exclude))
             continue;
-        if (exclude >= start && exclude <= i)
-            continue; // the word being typed
         const QByteArrayView word(text.constData() + start, i - start);
         const int d = std::abs(start - exclude);
         const auto it = distance.find(word);
@@ -410,38 +444,17 @@ void KeywordProvider::complete(const CompletionContext &context, const Callback 
 {
     QList<CompletionItem> items;
     if (context.mode == CompletionContext::Mode::Smart) {
-        // The literals of the expected type.
-        const QString expected = ExpectedType::normalized(context.expectedType);
-        QStringList literals;
-        if (expected == QLatin1String("bool") || expected == QLatin1String("boolean"))
-            literals = {QStringLiteral("true"), QStringLiteral("false")};
-        else if (expected.endsWith(QLatin1Char('*')))
-            literals = {context.languageId == QLatin1String("c") ? QStringLiteral("NULL") : QStringLiteral("nullptr")};
-        else if (!expected.isEmpty() && expected[0].isUpper() &&
-                 (context.languageId == QLatin1String("java") || context.languageId.startsWith(QLatin1Char('t')) ||
-                  context.languageId == QLatin1String("javascript")))
-            literals = {QStringLiteral("null")};
-        for (const QString &literal : literals) {
-            if (!keywords(context.languageId).contains(literal))
-                continue;
-            CompletionItem item;
-            item.label = literal;
-            item.kind = CompletionItem::Kind::Keyword;
-            item.priority = 2;
-            items.append(item);
+        for (const QString &literal : literalsFor(context)) {
+            if (keywords(context.languageId).contains(literal))
+                items.append(keywordItem(literal));
         }
         done(items, false);
         return;
     }
     // After ".", a member is expected, not a keyword.
     if (context.triggerCharacter.isNull()) {
-        for (const QString &keyword : keywordsAt(context.languageId, context.text, context.prefixStart)) {
-            CompletionItem item;
-            item.label = keyword;
-            item.kind = CompletionItem::Kind::Keyword;
-            item.priority = 2;
-            items.append(item);
-        }
+        for (const QString &keyword : keywordsAt(context.languageId, context.text, context.prefixStart))
+            items.append(keywordItem(keyword));
     }
     done(items, false);
 }
@@ -466,29 +479,7 @@ void ProjectSymbolsProvider::complete(const CompletionContext &context, const Ca
         done(items, false);
         return;
     }
-    if (!candidatesValid_ || candidatesRevision_ != index_->revision() || candidatesFamily_ != languages) {
-        candidates_.clear();
-        QSet<QString> seen; // a name once, even if declared in several places
-        for (const SymbolLocation &symbol : index_->symbols()) {
-            if (symbol.name.isEmpty() || family(symbol.languageId) != languages)
-                continue;
-            const CompletionItem::Kind kind = kindOf(symbol.kind);
-            if (kind == CompletionItem::Kind::Text)
-                continue;
-            const QString key = symbol.name + QLatin1Char('\n') + symbol.container;
-            if (seen.contains(key))
-                continue;
-            seen.insert(key);
-            CompletionItem item;
-            item.label = symbol.name;
-            item.kind = kind;
-            item.detail = symbol.container.isEmpty() ? QFileInfo(symbol.filePath).fileName() : symbol.container;
-            candidates_.push_back({item, symbol.filePath});
-        }
-        candidatesFamily_ = languages;
-        candidatesRevision_ = index_->revision();
-        candidatesValid_ = true;
-    }
+    refreshCandidates(languages);
     items.reserve(static_cast<qsizetype>(candidates_.size()));
     for (const Candidate &candidate : candidates_) {
         items.append(candidate.item);
@@ -496,4 +487,33 @@ void ProjectSymbolsProvider::complete(const CompletionContext &context, const Ca
         items.last().priority = candidate.filePath == context.filePath ? 6 : 5;
     }
     done(items, false);
+}
+
+void ProjectSymbolsProvider::refreshCandidates(const QString &languages)
+{
+    const bool isUpToDate =
+        candidatesValid_ && candidatesRevision_ == index_->revision() && candidatesFamily_ == languages;
+    if (isUpToDate)
+        return;
+    candidates_.clear();
+    QSet<QString> seen; // a name once, even if declared in several places
+    for (const SymbolLocation &symbol : index_->symbols()) {
+        if (symbol.name.isEmpty() || family(symbol.languageId) != languages)
+            continue;
+        const CompletionItem::Kind kind = kindOf(symbol.kind);
+        if (kind == CompletionItem::Kind::Text)
+            continue;
+        const QString key = symbol.name + QLatin1Char('\n') + symbol.container;
+        if (seen.contains(key))
+            continue;
+        seen.insert(key);
+        CompletionItem item;
+        item.label = symbol.name;
+        item.kind = kind;
+        item.detail = symbol.container.isEmpty() ? QFileInfo(symbol.filePath).fileName() : symbol.container;
+        candidates_.push_back({item, symbol.filePath});
+    }
+    candidatesFamily_ = languages;
+    candidatesRevision_ = index_->revision();
+    candidatesValid_ = true;
 }

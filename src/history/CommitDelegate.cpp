@@ -8,10 +8,22 @@
 #include <QPainter>
 #include <QTreeWidgetItem>
 
+#include <array>
+
 namespace {
 
 constexpr int padding = 12;
 constexpr int avatarSize = 28;
+
+// Item data roles of a commit row.
+constexpr int authorRole = Qt::UserRole + 60;
+constexpr int dateRole = Qt::UserRole + 61;
+constexpr int shortIdRole = Qt::UserRole + 62;
+constexpr int refsRole = Qt::UserRole + 63;
+
+// Soft colors, one per author.
+const std::array avatarColors{QColor("#7c6cf0"), QColor("#4c9be8"), QColor("#2fae8f"), QColor("#e07b53"),
+                              QColor("#d65d8f"), QColor("#9a7d4f"), QColor("#5a8f3c"), QColor("#c55bd8")};
 
 QColor dimmed(const QStyleOptionViewItem &option, bool selected)
 {
@@ -41,10 +53,10 @@ CommitDelegate::CommitDelegate(QObject *parent)
 void CommitDelegate::setCommit(QTreeWidgetItem *item, const CommitSummary &commit)
 {
     item->setText(0, commit.summary);
-    item->setData(0, AuthorRole, commit.author);
-    item->setData(0, DateRole, commit.date);
-    item->setData(0, ShortIdRole, commit.shortId);
-    item->setData(0, RefsRole, commit.refs);
+    item->setData(0, authorRole, commit.author);
+    item->setData(0, dateRole, commit.date);
+    item->setData(0, shortIdRole, commit.shortId);
+    item->setData(0, refsRole, commit.refs);
     item->setToolTip(0, QStringLiteral("%1\n%2 <%3>\n%4")
                             .arg(commit.summary, commit.author, commit.email,
                                  QLocale().toString(commit.date.toLocalTime(), QLocale::LongFormat)));
@@ -86,13 +98,9 @@ QPixmap CommitDelegate::avatar(const QString &name, int size, qreal ratio)
 
 QPixmap CommitDelegate::drawAvatar(const QString &name, int size, qreal ratio)
 {
-    // Soft colors, one per author.
-    static const QColor colors[] = {QColor("#7c6cf0"), QColor("#4c9be8"), QColor("#2fae8f"), QColor("#e07b53"),
-                                    QColor("#d65d8f"), QColor("#9a7d4f"), QColor("#5a8f3c"), QColor("#c55bd8")};
     // Claude in its own orange.
-    const QColor color = name.startsWith(QLatin1String("Claude"))
-                             ? QColor("#d97757")
-                             : colors[qHash(name) % (sizeof(colors) / sizeof(colors[0]))];
+    const QColor color = name.startsWith(QLatin1String("Claude")) ? QColor("#d97757")
+                                                                  : avatarColors.at(qHash(name) % avatarColors.size());
     QPixmap pixmap(QSize(size, size) * ratio);
     pixmap.setDevicePixelRatio(ratio);
     pixmap.fill(Qt::transparent);
@@ -143,7 +151,7 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
     const QRect rect = option.rect.adjusted(padding, 0, -padding, 0);
-    const QString author = index.data(AuthorRole).toString();
+    const QString author = index.data(authorRole).toString();
     const qreal ratio = painter->device()->devicePixelRatioF();
     const QRect avatarRect(rect.left(), rect.center().y() - avatarSize / 2, avatarSize, avatarSize);
     painter->drawPixmap(avatarRect, avatar(author, avatarSize, ratio));
@@ -159,7 +167,7 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     pillFont.setPointSizeF(option.font.pointSizeF() * 0.82);
     pillFont.setWeight(QFont::DemiBold);
     const QFontMetrics pillMetrics(pillFont);
-    for (const QString &name : index.data(RefsRole).toStringList()) {
+    for (const QString &name : index.data(refsRole).toStringList()) {
         const int width = pillMetrics.horizontalAdvance(name) + 12;
         const QRectF pill(x, top + (lineHeight - pillMetrics.height() - 2) / 2.0, width, pillMetrics.height() + 2);
         QColor fill = refColor(name);
@@ -187,7 +195,7 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     painter->setPen(dimmed(option, selected));
     const QString details =
         QStringLiteral("%1  ·  %2  ·  %3")
-            .arg(author, relativeDate(index.data(DateRole).toDateTime()), index.data(ShortIdRole).toString());
+            .arg(author, relativeDate(index.data(dateRole).toDateTime()), index.data(shortIdRole).toString());
     const QFontMetrics detailMetrics(detailFont);
     painter->drawText(QRect(left, rect.center().y() + 3, rect.right() - left, detailMetrics.height()),
                       Qt::AlignLeft | Qt::AlignVCenter,

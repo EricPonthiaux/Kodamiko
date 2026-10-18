@@ -68,6 +68,10 @@ public:
 private:
     QList<RuntimeInstall> managedRuntimes(const QString &tool) const;
     QList<RuntimeInstall> machineRuntimes(const QString &tool) const;
+    // The parts of complete(), each called when its field is empty.
+    void completeRuntimeVersion(LanguageSetup &setup) const;
+    void completeServer(LanguageSetup &setup) const;
+    void completeServerVersion(LanguageSetup &setup) const;
 
     QString root_;
     bool lookOnMachine_;

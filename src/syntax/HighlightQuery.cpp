@@ -1,5 +1,7 @@
 #include "HighlightQuery.h"
 
+#include <algorithm>
+
 namespace {
 
 QString errorTypeName(TSQueryError error)
@@ -97,52 +99,60 @@ void HighlightQuery::compilePredicates()
             uint32_t done = first;
             while (steps[done].type != TSQueryPredicateStepTypeDone)
                 ++done;
-
-            const TSQueryPredicateStep *operatorStep = &steps[first];
-            const uint32_t argumentCount = done - first - 1;
-            const TSQueryPredicateStep *arguments = operatorStep + 1;
+            const std::span<const TSQueryPredicateStep> predicateSteps(steps + first, done - first);
             first = done + 1;
 
-            if (operatorStep->type != TSQueryPredicateStepTypeString || argumentCount < 2 ||
-                arguments[0].type != TSQueryPredicateStepTypeCapture)
-                continue;
-
-            const QString op = stringValue(operatorStep->value_id);
-            const auto stringArgument = [&](uint32_t i) { return stringValue(arguments[i].value_id); };
-
-            Predicate predicate;
-            predicate.captureId = arguments[0].value_id;
-            predicate.negated = op.startsWith(QStringLiteral("not-"));
-            const QString baseOp = predicate.negated ? op.mid(4) : op;
-
-            if (baseOp == QStringLiteral("eq?")) {
-                predicate.kind = Predicate::Kind::Equals;
-                if (arguments[1].type == TSQueryPredicateStepTypeCapture)
-                    predicate.otherCaptureId = arguments[1].value_id;
-                else
-                    predicate.literals = {stringArgument(1)};
-            } else if (baseOp == QStringLiteral("match?")) {
-                predicate.kind = Predicate::Kind::Matches;
-                predicate.regex = QRegularExpression(stringArgument(1));
-            } else if (baseOp == QStringLiteral("any-of?")) {
-                predicate.kind = Predicate::Kind::AnyOf;
-                for (uint32_t i = 1; i < argumentCount; ++i)
-                    predicate.literals.append(stringArgument(i));
-            } else {
-                continue; // #is-not?, #set!...: no effect on highlighting
-            }
-            predicatesByPattern_[pattern].push_back(std::move(predicate));
+            if (std::optional<Predicate> predicate = compilePredicate(predicateSteps))
+                predicatesByPattern_[pattern].push_back(std::move(*predicate));
         }
     }
 }
 
+// `steps`: the operator then its arguments, without the final Done.
+// nullopt for a malformed predicate or one with no effect on highlighting.
+std::optional<HighlightQuery::Predicate> HighlightQuery::compilePredicate(
+    std::span<const TSQueryPredicateStep> steps) const
+{
+    if (steps.empty())
+        return std::nullopt;
+    const TSQueryPredicateStep &operatorStep = steps.front();
+    const std::span<const TSQueryPredicateStep> arguments = steps.subspan(1);
+    const bool isWellFormed = operatorStep.type == TSQueryPredicateStepTypeString && arguments.size() >= 2 &&
+                              arguments[0].type == TSQueryPredicateStepTypeCapture;
+    if (!isWellFormed)
+        return std::nullopt;
+
+    const QString op = stringValue(operatorStep.value_id);
+    const auto stringArgument = [&](size_t i) { return stringValue(arguments[i].value_id); };
+
+    Predicate predicate;
+    predicate.captureId = arguments[0].value_id;
+    predicate.negated = op.startsWith(QStringLiteral("not-"));
+    const QString baseOp = predicate.negated ? op.mid(4) : op;
+
+    if (baseOp == QStringLiteral("eq?")) {
+        predicate.kind = Predicate::Kind::Equals;
+        if (arguments[1].type == TSQueryPredicateStepTypeCapture)
+            predicate.otherCaptureId = arguments[1].value_id;
+        else
+            predicate.literals = {stringArgument(1)};
+    } else if (baseOp == QStringLiteral("match?")) {
+        predicate.kind = Predicate::Kind::Matches;
+        predicate.regex = QRegularExpression(stringArgument(1));
+    } else if (baseOp == QStringLiteral("any-of?")) {
+        predicate.kind = Predicate::Kind::AnyOf;
+        for (size_t i = 1; i < arguments.size(); ++i)
+            predicate.literals.append(stringArgument(i));
+    } else {
+        return std::nullopt; // #is-not?, #set!...: no effect on highlighting
+    }
+    return predicate;
+}
+
 bool HighlightQuery::matchSatisfiesPredicates(const TSQueryMatch &match, const char *documentText) const
 {
-    for (const Predicate &predicate : predicatesByPattern_[match.pattern_index]) {
-        if (!isSatisfied(predicate, match, documentText))
-            return false;
-    }
-    return true;
+    return std::ranges::all_of(predicatesByPattern_[match.pattern_index],
+                               [&](const Predicate &predicate) { return isSatisfied(predicate, match, documentText); });
 }
 
 bool HighlightQuery::isSatisfied(const Predicate &predicate, const TSQueryMatch &match, const char *documentText) const

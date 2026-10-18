@@ -45,7 +45,6 @@ public:
         case PM_MenuBarHMargin:
             return 4;
         case PM_MenuBarVMargin:
-            return 2;
         case PM_MenuBarItemSpacing:
             return 2;
         default:
@@ -154,10 +153,14 @@ int main(int argc, char *argv[])
     adoptLegacySettings();
     // Fusion follows the application palette on every system, which
     // enables the dark theme everywhere.
+    // The application owns the style it is given; the analyzer, which does
+    // not know it, reports the leak at the next statement.
+    // NOLINTBEGIN(clang-analyzer-cplusplus.NewDeleteLeaks)
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
     // Inter for the whole interface (embedded), at the system's size unless
     // Preferences ▸ Appearance sets one.
     QApplication::setFont(Preferences::load().interfaceFont());
+    // NOLINTEND(clang-analyzer-cplusplus.NewDeleteLeaks)
     // Every window's icon; on Wayland, the desktop file's icon.
     QApplication::setWindowIcon(BrandMark::windowIcon());
     QGuiApplication::setDesktopFileName(QStringLiteral("duet"));

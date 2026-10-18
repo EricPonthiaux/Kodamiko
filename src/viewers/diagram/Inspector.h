@@ -44,6 +44,11 @@ private:
     void endTyping();
     QWidget *buildShapeSection();
     QWidget *buildLinkSection();
+    // Several elements selected: their count and a color for the shapes.
+    QWidget *buildSelectionSection();
+    // Whether the section already shows `key` and must be kept (a field
+    // being typed in keeps its focus).
+    bool showsAlready(const QString &key) const;
     QWidget *buildDocumentSection();
 
     Board *board_;
