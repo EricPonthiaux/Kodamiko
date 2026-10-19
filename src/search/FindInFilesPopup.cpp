@@ -162,6 +162,7 @@ FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
     : OverlayPopup(QStringLiteral("findInFiles"), QSizeF(0.72, 0.8), QSize(760, 520), parent)
     , theme_(std::move(theme))
 {
+    setBehavior(Behavior::Transient);
     auto *title = new QLabel(tr("Find in Files"), this);
     AppFonts::setInterfaceFont(title, 1);
     summary_ = new QLabel(this);

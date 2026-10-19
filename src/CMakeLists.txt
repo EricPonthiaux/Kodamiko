@@ -65,6 +65,7 @@ add_library(duet_core STATIC
     editor/FindBar.cpp
     editor/MarkdownHtml.cpp
     editor/PreviewPage.cpp
+    editor/PreviewSite.cpp
     editor/PreviewTab.cpp
     editor/ScrollBarMarks.cpp
     editor/SymbolOccurrences.cpp
@@ -117,7 +118,7 @@ add_library(duet_core STATIC
     settings/Preferences.cpp
     settings/PreferencesPopup.cpp
     setup/Prerequisites.cpp
-    setup/PrerequisitesDialog.cpp
+    setup/PrerequisitesPopup.cpp
     syntax/HighlighterFactory.cpp
     syntax/HighlightQuery.cpp
     syntax/LanguageRegistry.cpp

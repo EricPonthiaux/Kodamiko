@@ -12,6 +12,7 @@
 #include "editor/EditorWidget.h"
 #include "syntax/ScintillaStyles.h"
 
+#include <QFontMetrics>
 #include <QKeyEvent>
 #include <QPainter>
 #include <QRegularExpression>
@@ -45,6 +46,17 @@ struct PreviewPlace {
     QPoint topLeft;
     int lineHeight = 0;
 };
+
+// The editor's theme with its code font at the size shown: Ctrl+wheel
+// zooms Scintilla's text by whole points, the theme's font does not.
+Theme shownTheme(const EditorWidget &editor)
+{
+    constexpr qreal smallestZoomedSize = 2; // Scintilla's floor
+    Theme theme = editor.theme();
+    const auto zoom = qreal(editor.SendScintilla(QsciScintillaBase::SCI_GETZOOM));
+    theme.font.setPointSizeF(std::max(theme.font.pointSizeF() + zoom, smallestZoomedSize));
+    return theme;
+}
 
 // The gray rest of the selected candidate after the cursor, with the key
 // that inserts it. Drawn over the editor: Scintilla has no inline virtual
@@ -569,7 +581,7 @@ void CompletionController::refilter()
     }
     if (!popup_) {
         popup_ = new CompletionPopup(editor_->window());
-        popup_->applyTheme(editor_->theme());
+        popup_->applyTheme(shownTheme(*editor_));
         connect(popup_, &CompletionPopup::activated, this, [this] { accept(); });
         connect(popup_, &CompletionPopup::currentChanged, this, &CompletionController::onCurrentChanged);
         popup_->installEventFilter(this); // shown or hidden: suspends the editor's tooltips
@@ -614,10 +626,13 @@ void CompletionController::showPopup()
         editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
     const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line_));
     const QWidget *parent = popup_->parentWidget();
-    // Aligned with the identifier's text: the badge's width to the left.
-    const QPoint below = viewport->mapTo(parent, QPoint(x - 34, y + lineHeight + 2));
+    const Theme theme = shownTheme(*editor_);
+    // Aligned with the identifier's text: the badge, a line high, and its
+    // margins to the left (see CompletionDelegate).
+    const int badgeWidth = QFontMetrics(theme.font).height() + 20;
+    const QPoint below = viewport->mapTo(parent, QPoint(x - badgeWidth, y + lineHeight + 2));
     const QPoint top = viewport->mapTo(parent, QPoint(x, y - 2));
-    popup_->applyTheme(editor_->theme());
+    popup_->applyTheme(theme);
     updateKeyHint();
     popup_->showAt(below, top.y());
 }
@@ -692,7 +707,7 @@ void CompletionController::updatePreview()
     }
     preview->show(item->label.mid(prefix.size()),
                   editor_->options().completionAcceptsEnter ? QStringLiteral("↵") : QStringLiteral("Tab"),
-                  editor_->theme(), previewPlaceAt(*editor_, position, line_));
+                  shownTheme(*editor_), previewPlaceAt(*editor_, position, line_));
 }
 
 void CompletionController::onModified(int position, int modificationType, int length)
@@ -1038,7 +1053,7 @@ void CompletionController::showFullLine()
     auto *preview = static_cast<InlinePreview *>(preview_);
     const long position = fullLinePosition_;
     const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
-    preview->show(fullLine_, QStringLiteral("Tab"), editor_->theme(), previewPlaceAt(*editor_, position, line));
+    preview->show(fullLine_, QStringLiteral("Tab"), shownTheme(*editor_), previewPlaceAt(*editor_, position, line));
 }
 
 void CompletionController::clearFullLine()

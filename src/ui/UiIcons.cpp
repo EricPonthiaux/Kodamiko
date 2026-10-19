@@ -68,6 +68,28 @@ const QHash<QString, Painter> &painters()
              p.drawPolyline(QPolygonF({QPointF(10.5, 4), QPointF(14.2, 8), QPointF(10.5, 12)}));
              p.drawLine(QPointF(9, 3), QPointF(7, 13));
          }},
+        {QStringLiteral("document"),
+         [](QPainter &p) {
+             p.drawPolygon(
+                 QPolygonF({QPointF(3, 1.5), QPointF(9, 1.5), QPointF(13, 5.5), QPointF(13, 14.5), QPointF(3, 14.5)}));
+             p.drawPolyline(QPolygonF({QPointF(9, 1.5), QPointF(9, 5.5), QPointF(13, 5.5)}));
+             p.drawLine(QPointF(5.5, 8.5), QPointF(10.5, 8.5));
+             p.drawLine(QPointF(5.5, 11), QPointF(9, 11));
+         }},
+        {QStringLiteral("split"),
+         [](QPainter &p) {
+             p.drawRoundedRect(QRectF(1.5, 2.5, 13, 11), 1.5, 1.5);
+             p.drawLine(QPointF(8, 2.5), QPointF(8, 13.5));
+         }},
+        {QStringLiteral("preview"),
+         [](QPainter &p) {
+             QPainterPath eye;
+             eye.moveTo(1, 8);
+             eye.cubicTo(4.5, 2, 11.5, 2, 15, 8);
+             eye.cubicTo(11.5, 14, 4.5, 14, 1, 8);
+             p.drawPath(eye);
+             p.drawEllipse(QPointF(8, 8), 2, 2);
+         }},
         {QStringLiteral("diff"),
          [](QPainter &p) {
              p.drawLine(QPointF(8, 2.5), QPointF(8, 9));

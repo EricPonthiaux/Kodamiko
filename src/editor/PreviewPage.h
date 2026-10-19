@@ -1,5 +1,6 @@
 #pragma once
 
+#include "PreviewSite.h"
 #include "ui/Theme.h"
 
 #include <QTimer>
@@ -11,6 +12,7 @@
 
 class CodeColorizer;
 class EditorWidget;
+class QLabel;
 class QSplitter;
 class QToolButton;
 
@@ -62,14 +64,15 @@ private:
     std::unique_ptr<CodeColorizer> colorizer_;
 };
 
-// An HTML page as a browser shows it, from the editor's text: relative
-// style sheets and images are found next to the file. The page's scripts
-// never run. Links leave the page as in MarkdownPreview.
+// An HTML page as a browser shows it, from the editor's text, its scripts
+// included. It is served with the files of `servedFolder` (PreviewSite):
+// its relative paths lead to them, but its scripts read no other file.
+// Links clicked leave the page as in MarkdownPreview.
 class HtmlPreview : public QWebEngineView {
     Q_OBJECT
 
 public:
-    explicit HtmlPreview(QWidget *parent = nullptr);
+    explicit HtmlPreview(const QString &servedFolder, QWidget *parent = nullptr);
 
     // Shows `text` as the page at `filePath`, at the same scroll position.
     void render(const QString &text, const QString &filePath);
@@ -92,6 +95,7 @@ private:
     void reload();
     void loadPage();
 
+    PreviewSite site_;
     QString text_;
     QString filePath_;
     bool loaded_ = false;
@@ -118,8 +122,10 @@ public:
         Preview
     };
 
-    // Takes `editor`, which holds the file.
-    PreviewPage(EditorWidget *editor, Theme theme, QWidget *parent = nullptr);
+    // Takes `editor`, which holds the file. An HTML page inside
+    // `projectFolder` can load every file of the project; outside, those of
+    // its own folder.
+    PreviewPage(EditorWidget *editor, Theme theme, QString projectFolder, QWidget *parent = nullptr);
 
     EditorWidget *editor() const { return editor_; }
 
@@ -150,7 +156,12 @@ protected:
     void showEvent(QShowEvent *event) override;
 
 private:
+    QWidget *createToolbar();
+    void updateToolbarIcons();
     void ensurePreview();
+    // The folder whose files an HTML page can load.
+    QString servedFolder() const;
+    void revealPreview();
     void updatePreview();
     void syncScroll();
     QWidget *preview() const;
@@ -159,11 +170,14 @@ private:
     EditorWidget *editor_;
     Theme theme_;
     Kind kind_;
+    QString projectFolder_;
     MarkdownPreview *markdown_ = nullptr;
     HtmlPreview *html_ = nullptr;
     QSplitter *splitter_;
+    QLabel *formatIcon_ = nullptr;
     static constexpr std::size_t modeCount = 3;
     std::array<QToolButton *, modeCount> buttons_{}; // indexed by Mode
+    bool hasRenderedPreview_ = false;
     Mode mode_ = Mode::Preview;
     QTimer updateTimer_;
 };

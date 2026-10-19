@@ -160,16 +160,24 @@ QPushButton:disabled { color: @muted; border-color: @line; }
 QToolButton { border-radius: 3px; padding: 2px 5px; }
 QToolButton:hover { background: @button; }
 QToolButton:checked { background: @selection; color: @accentText; }
+QFrame#previewToolbar { background: @base; border: none; border-bottom: 1px solid @line; }
+QLabel#previewFormat { color: @muted; background: transparent; }
+QFrame#previewModeSelector { background: @window; border: 1px solid @line; border-radius: 5px; }
+QFrame#previewModeSelector QToolButton { color: @muted; background: transparent; border: 1px solid transparent; border-radius: 3px; padding: 2px 6px; min-height: 16px; }
+QFrame#previewModeSelector QToolButton:hover { color: @text; background: @hover; }
+QFrame#previewModeSelector QToolButton:checked { color: @accentText; background: @previewActive; border-color: @previewBorder; }
+QFrame#previewModeSelector QToolButton:pressed { background: @selection; }
+QFrame#previewModeSelector QToolButton:focus { border-color: @accent; }
 QTabWidget::pane { border: none; }
 QTabBar::tab { background: transparent; color: @muted; padding: 8px 16px; border: none; }
 QTabBar::tab:hover { color: @text; background: @panel; }
 QTabBar::tab:selected { color: @accentText; background: @base; border-bottom: 2px solid @accent; }
 QTabBar::tab:bottom:selected { border-bottom: none; border-top: 2px solid @accent; }
-EditorTabs QTabBar::tab, QTabWidget#terminalTabs QTabBar::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
-EditorTabs QTabBar::tab:first, QTabWidget#terminalTabs QTabBar::tab:first { border-top-left-radius: 3px; }
-EditorTabs QTabBar::tab:last, QTabWidget#terminalTabs QTabBar::tab:last { border-top-right-radius: 3px; }
-EditorTabs QTabBar::tab:hover, QTabWidget#terminalTabs QTabBar::tab:hover { background: @hover; color: @text; }
-EditorTabs QTabBar::tab:selected, QTabWidget#terminalTabs QTabBar::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
+EditorTabs QTabBar::tab, QTabWidget#terminalTabs QTabBar::tab, QTabBar#goToTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
+EditorTabs QTabBar::tab:first, QTabWidget#terminalTabs QTabBar::tab:first, QTabBar#goToTabs::tab:first { border-top-left-radius: 3px; }
+EditorTabs QTabBar::tab:last, QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
+EditorTabs QTabBar::tab:hover, QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; }
+EditorTabs QTabBar::tab:selected, QTabWidget#terminalTabs QTabBar::tab:selected, QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
 QTabBar#modeTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
 QTabBar#modeTabs::tab:first { border-bottom-left-radius: 3px; }
@@ -207,6 +215,7 @@ QStatusBar { background: transparent; border-top: 1px solid @line; color: @muted
 TitleBar QMenuBar { background: transparent; border: none; }
 TitleBar QMenuBar::item { padding: 7px 14px; border-radius: 3px; }
 TitleBar QMenuBar::item:selected, TitleBar QMenuBar::item:pressed { background: @hover; color: @text; }
+TitleBar QMenuBar QToolButton { padding: 0; border: none; }
 TitleBar QToolButton#chip:hover, TitleBar QToolButton#chip:pressed { background: @hover; }
 TitleBar QToolButton#projectChip { padding: 0 8px; border: none; border-radius: 3px; background: transparent; }
 TitleBar QToolButton#projectChip:hover, TitleBar QToolButton#projectChip:pressed { background: @hover; }
@@ -263,6 +272,8 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         {"@checked", withAlpha(theme.foreground, 0.125)},
         {"@slate", selectionColor(theme)},
         {"@separator", withAlpha(theme.line, 0.7)},
+        {"@previewActive", mixed(theme.window, theme.accent, 0.16)},
+        {"@previewBorder", mixed(theme.window, theme.accent, 0.35)},
         // The run block: barely tinted with the accent, so the eye finds it.
         {"@runTint", mixed(theme.window, theme.accent, 0.08)},
         {"@runBorder", mixed(theme.window, theme.accent, 0.2)},
@@ -294,6 +305,12 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         sheet += QStringLiteral("QTabBar QToolButton::left-arrow { image: url(%1); width: 16px; height: 16px; }\n"
                                 "QTabBar QToolButton::right-arrow { image: url(%2); width: 16px; height: 16px; }\n")
                      .arg(left, right);
+    // The menu overflow button is only 12 px wide: the general tool-button
+    // padding hides its icon, and the platform's icon can be dark on dark.
+    const QString overflow = chevronIcon(QStringLiteral("menu-overflow-%1.svg").arg(theme.name), theme.foreground,
+                                         u"M3 4l4 4-4 4M8 4l4 4-4 4");
+    if (!overflow.isEmpty())
+        sheet += QStringLiteral("TitleBar QMenuBar QToolButton { image: url(%1); }\n").arg(overflow);
     // Styling the drop-down hides Qt's arrow: a chevron in its place.
     const QString down = chevronIcon(QStringLiteral("down-%1.svg").arg(theme.name), theme.mutedText, u"M4 6l4 4 4-4");
     if (!down.isEmpty())

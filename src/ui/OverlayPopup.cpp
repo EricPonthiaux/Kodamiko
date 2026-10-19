@@ -6,6 +6,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QSettings>
+#include <QWindow>
 
 namespace {
 
@@ -86,10 +87,14 @@ QRect OverlayPopup::placedGeometry() const
 {
     const QRect area = availableArea();
     const QSize size = panelSize();
-    // Centered across, a little above the middle (the optical center).
     const int x = area.left() + (area.width() - size.width()) / 2;
-    const int y = area.top() + std::max((area.height() - size.height()) / 3, 0);
+    // A panel sits a little above the middle (the optical center); a
+    // transient one, a search, right in the middle.
+    const int y = behavior_ == Behavior::Transient ? area.top() + (area.height() - size.height()) / 2
+                                                   : area.top() + std::max((area.height() - size.height()) / 3, 0);
     const QRect centered = QRect(QPoint(x, y), size).adjusted(-shadowWidth, -shadowWidth, shadowWidth, shadowWidth);
+    if (behavior_ == Behavior::Transient)
+        return keptInside(centered);
     return keptInside(centered.translated(QSettings().value(offsetKey()).toPoint()));
 }
 
@@ -115,6 +120,10 @@ void OverlayPopup::showCentered()
         applyMargins();
         place();
         parentWidget()->installEventFilter(watcher_); // window resized
+        // The window's own events: a press anywhere in it, whichever widget
+        // takes it.
+        if (behavior_ == Behavior::Transient && parentWidget()->windowHandle())
+            parentWidget()->windowHandle()->installEventFilter(watcher_);
     }
     show();
     raise();
@@ -125,6 +134,8 @@ void OverlayPopup::dismiss()
     if (!isVisible())
         return;
     parentWidget()->removeEventFilter(watcher_);
+    if (parentWidget()->windowHandle())
+        parentWidget()->windowHandle()->removeEventFilter(watcher_);
     hide();
     if (previousFocus_ && previousFocus_->isVisible())
         previousFocus_->setFocus();
@@ -199,9 +210,12 @@ void OverlayPopup::mouseReleaseEvent(QMouseEvent *event)
     QFrame::mouseReleaseEvent(event);
 }
 
-// The user's place, from now on: how far from the centered one.
+// The user's place, from now on: how far from the centered one. A
+// transient panel goes back to the center each time.
 void OverlayPopup::saveOffset()
 {
+    if (behavior_ == Behavior::Transient)
+        return;
     QSettings().remove(offsetKey());
     const QRect centered = placedGeometry();
     QSettings().setValue(offsetKey(), geometry().topLeft() - centered.topLeft());
@@ -223,6 +237,17 @@ void OverlayPopup::onWatchedEvent(QObject *watched, QEvent *event)
 {
     if (watched == parentWidget() && event->type() == QEvent::Resize)
         place();
+    else if (isPressOutside(watched, event))
+        dismiss();
+}
+
+bool OverlayPopup::isPressOutside(QObject *watched, QEvent *event) const
+{
+    if (event->type() != QEvent::MouseButtonPress || watched != parentWidget()->windowHandle())
+        return false;
+    // The window's coordinates are its widget's, the panel's parent.
+    const QPointF position = static_cast<QMouseEvent *>(event)->position();
+    return !geometry().contains(position.toPoint());
 }
 
 void OverlayPopup::paintEvent(QPaintEvent *)

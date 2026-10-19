@@ -5,6 +5,7 @@
 #include <QAbstractListModel>
 #include <QAccessible>
 #include <QApplication>
+#include <QFontMetrics>
 #include <QLabel>
 #include <QListView>
 #include <QPainter>
@@ -19,10 +20,11 @@
 namespace {
 
 constexpr int maximumRows = 10;
-constexpr int popupMinimumWidth = 300;
-constexpr int popupMaximumWidth = 600;
-constexpr int documentationWidth = 380;
-constexpr int documentationMaximumHeight = 320;
+// In characters and lines of the code font, so that the popup grows with it.
+constexpr int popupMinimumColumns = 34;
+constexpr int popupMaximumColumns = 68;
+constexpr int documentationColumns = 43;
+constexpr int documentationMaximumLines = 17;
 constexpr int resolveDelayMs = 150;
 const QString documentationSetting = QStringLiteral("completion/showDocumentation");
 
@@ -192,7 +194,7 @@ public:
         const auto [letter, category] = badgeOf(entry.item.kind);
         const int styleIndex = theme.syntaxStyleIndex(QString::fromLatin1(category));
         const QColor color = styleIndex >= 0 ? theme.syntaxStyles[styleIndex].second.foreground : theme.foreground;
-        const qreal side = std::min<qreal>(row.height() - 6, 18);
+        const qreal side = std::min<qreal>(row.height() - 6, QFontMetricsF(option.font).height());
         const QRectF badge(row.left() + 6, row.center().y() - side / 2, side, side);
         QColor tint = color;
         tint.setAlpha(theme.isDark ? 50 : 36);
@@ -507,11 +509,12 @@ void CompletionPopup::resolveDocumentation()
 void CompletionPopup::placeDocumentation()
 {
     const QWidget *area = parentWidget();
-    const int width = std::min(documentationWidth, std::max(area->width() / 3, 200));
+    const QFontMetrics metrics(view_->font());
+    const int width = std::min(documentationColumns * metrics.averageCharWidth(), std::max(area->width() / 3, 200));
     documentation_->setFixedWidth(width);
     const int height = std::min(documentation_->heightForWidth(width) > 0 ? documentation_->heightForWidth(width)
                                                                           : documentation_->sizeHint().height(),
-                                documentationMaximumHeight);
+                                documentationMaximumLines * metrics.height());
     documentation_->setFixedHeight(std::max(height, this->height() / 2));
     int x = geometry().right() + 4;
     if (x + width > area->width())
@@ -572,11 +575,11 @@ QStringList CompletionPopup::labels() const
 void CompletionPopup::fitSize()
 {
     const QFontMetrics metrics(view_->font());
-    int width = popupMinimumWidth;
+    int width = popupMinimumColumns * metrics.averageCharWidth();
     for (int i = 0; i < std::min(count(), 60); ++i) {
         const CompletionItem &item = model_->entries[i].item;
         // Badge, bold label, gap, detail and margins (see CompletionDelegate).
-        const int wanted = 56 + metrics.horizontalAdvance(item.label) * 11 / 10 +
+        const int wanted = metrics.height() + 38 + metrics.horizontalAdvance(item.label) * 11 / 10 +
                            (item.detail.isEmpty() ? 0 : 40 + metrics.horizontalAdvance(item.detail));
         width = std::max(width, wanted);
     }
@@ -587,7 +590,7 @@ void CompletionPopup::fitSize()
     const int hintHeight = hint_->isHidden() ? 0 : hint_->sizeHint().height();
     if (!hint_->isHidden())
         width = std::max(width, hint_->sizeHint().width() + 8); // the keys, in full
-    resize(std::min(width, popupMaximumWidth), rows * rowHeight + 8 + hintHeight);
+    resize(std::min(width, popupMaximumColumns * metrics.averageCharWidth()), rows * rowHeight + 8 + hintHeight);
 }
 
 void CompletionPopup::showAt(const QPoint &anchor, int anchorTop)

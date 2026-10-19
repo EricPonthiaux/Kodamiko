@@ -34,6 +34,7 @@
 #include <QMimeData>
 #include <QPointer>
 #include <QPushButton>
+#include <QScopeGuard>
 #include <QScrollBar>
 #include <QSettings>
 #include <QSignalSpy>
@@ -41,6 +42,7 @@
 #include <QStandardPaths>
 #include <QTabBar>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QToolButton>
 #include <QtTest>
 
@@ -197,6 +199,32 @@ private slots:
         QVERIFY(!QSettings().contains("overlays/testOffset"));
     }
 
+    void transientPopupsCloseOnAClickElsewhereAndReopenCentered()
+    {
+        QSettings().remove("overlays/transient");
+        QSettings().remove("overlays/transientOffset");
+        QWidget window;
+        window.resize(1000, 700);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        OverlayPopup popup("transient", QSizeF(0.5, 0.5), QSize(300, 200), &window);
+        popup.setBehavior(OverlayPopup::Behavior::Transient);
+        popup.showCentered();
+        QCOMPARE(popup.geometry().center(), window.rect().center());
+
+        // Moved, then a click inside: it stays open.
+        popup.move(popup.pos() + QPoint(80, 40));
+        QTest::mouseClick(window.windowHandle(), Qt::LeftButton, {}, popup.geometry().center());
+        QVERIFY(popup.isVisible());
+
+        QTest::mouseClick(window.windowHandle(), Qt::LeftButton, {}, QPoint(5, 5));
+        QVERIFY(!popup.isVisible());
+
+        popup.showCentered();
+        QCOMPARE(popup.geometry().center(), window.rect().center());
+        QVERIFY(!QSettings().contains("overlays/transientOffset"));
+    }
+
     void shadowMarginsSurviveAThemeChange()
     {
         // A style sheet resets the margins of the widgets it polishes: the
@@ -279,6 +307,68 @@ private slots:
         QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(true).cacheKey());
         bar.applyTheme(Theme::light());
         QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(false).cacheKey());
+    }
+
+    void titleBarOverflowRemainsVisibleAndOpensHiddenMenus_data()
+    {
+        QTest::addColumn<bool>("dark");
+        QTest::addColumn<int>("fontSize");
+        QTest::newRow("dark") << true << 11;
+        QTest::newRow("light") << false << 11;
+        QTest::newRow("dark-large-font") << true << 15;
+        QTest::newRow("light-large-font") << false << 15;
+    }
+
+    void titleBarOverflowRemainsVisibleAndOpensHiddenMenus()
+    {
+        QFETCH(const bool, dark);
+        QFETCH(const int, fontSize);
+        const QFont previousFont = QApplication::font();
+        const QPalette previousPalette = QApplication::palette();
+        const QString previousStyle = qApp->styleSheet();
+        const auto restore = qScopeGuard([&] {
+            qApp->setStyleSheet(previousStyle);
+            QApplication::setPalette(previousPalette);
+            QApplication::setFont(previousFont);
+        });
+        QFont font = previousFont;
+        font.setPointSize(fontSize);
+        QApplication::setFont(font);
+        const Theme theme = dark ? Theme::duet() : Theme::light();
+        ThemeStyle::apply(theme);
+        TitleBar bar;
+        bar.applyTheme(theme);
+        for (const auto *name : {"&File", "&Edit", "&View", "&Navigate", "&Claude", "&Git", "&Run", "&Help"})
+            bar.menuBar()->addMenu(name)->addAction("Action");
+        bar.setProject("duet", "/p/duet", nullptr);
+        bar.resize(400, bar.height());
+        bar.show();
+
+        auto *extension = bar.menuBar()->findChild<QToolButton *>("qt_menubar_ext_button");
+        QVERIFY(extension);
+        QTRY_VERIFY(extension->isVisible());
+        QCOMPARE(bar.childAt(extension->mapTo(&bar, extension->rect().center())), extension);
+        // Visibility alone is insufficient: padding used to leave a blank button.
+        const QImage image = extension->grab().toImage();
+        int visiblePixels = 0;
+        for (int y = image.height() / 4; y < 3 * image.height() / 4; ++y)
+            for (int x = 1; x < image.width() - 1; ++x)
+                if (qAbs(image.pixelColor(x, y).lightness() - theme.window.lightness()) > 40)
+                    ++visiblePixels;
+        QVERIFY2(visiblePixels >= 6, "The menu overflow arrow must be visible against the title bar");
+
+        const QMenu *overflow = extension->menu();
+        QVERIFY(overflow);
+        QVERIFY(overflow->actions().contains(bar.menuBar()->actions().last()));
+        const QSignalSpy opened(overflow, &QMenu::aboutToShow);
+        QTimer::singleShot(0, overflow, &QMenu::close);
+        QTest::mouseClick(extension, Qt::LeftButton);
+        QCOMPARE(opened.count(), 1);
+
+        bar.resize(1600, bar.height());
+        QTRY_VERIFY(!extension->isVisible());
+        bar.resize(400, bar.height());
+        QTRY_VERIFY(extension->isVisible());
     }
 
     void claudeIndicatorKeepsItsWidthAcrossStates()

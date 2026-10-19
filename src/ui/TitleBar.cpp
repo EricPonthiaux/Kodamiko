@@ -14,6 +14,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QTabBar>
 #include <QToolButton>
 #include <QWindow>
 
@@ -125,10 +126,14 @@ public:
     explicit BrandLogo(QWidget *parent)
         : QWidget(parent)
     {
-        setFixedSize(20, 20);
+        setObjectName(QStringLiteral("brandLogo"));
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        AppFonts::followApplicationFont(this, [this] { setFixedHeight(controlHeight()); });
         setAttribute(Qt::WA_TransparentForMouseEvents);
         setToolTip(QStringLiteral("Duet"));
     }
+
+    QSize sizeHint() const override { return {controlHeight(), controlHeight()}; }
 
 protected:
     void paintEvent(QPaintEvent *) override
@@ -149,17 +154,18 @@ TitleBar::TitleBar(QWidget *parent)
     leadingSpace_ = new QWidget(this);
     leadingSpace_->setFixedWidth(0);
     leadingSpace_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    leadingSpace_->hide();
 
     menuBar_ = new QMenuBar(this);
     menuBar_->setNativeMenuBar(false);
     menuBar_->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
 
     layout_ = new QHBoxLayout(this);
-    layout_->setContentsMargins(6, 0, 0, 0);
+    layout_->setContentsMargins(0, 0, 0, 0);
     layout_->setSpacing(4);
     layout_->addWidget(leadingSpace_);
-    layout_->addSpacing(4);
-    layout_->addWidget(new BrandLogo(this), 0, Qt::AlignVCenter);
+    logo_ = new BrandLogo(this);
+    layout_->addWidget(logo_, 0, Qt::AlignVCenter);
     layout_->addSpacing(2);
     layout_->addWidget(menuBar_, 0, Qt::AlignVCenter);
     layout_->addSpacing(8);
@@ -194,6 +200,25 @@ TitleBar::TitleBar(QWidget *parent)
 
     if (parent)
         parent->window()->installEventFilter(this); // maximized or not
+}
+
+void TitleBar::alignLogoWith(QTabBar *column)
+{
+    Q_ASSERT(column);
+    if (logoColumn_)
+        logoColumn_->removeEventFilter(this);
+    logoColumn_ = column;
+    column->installEventFilter(this);
+    updateLogoAlignment();
+}
+
+void TitleBar::updateLogoAlignment()
+{
+    if (!logoColumn_ || logoColumn_->count() == 0)
+        return;
+    // The tab bar can have spare width to the right of its actual tabs.
+    const QRect tab = logoColumn_->tabRect(0);
+    logo_->setFixedWidth(2 * tab.x() + tab.width());
 }
 
 QToolButton *TitleBar::addChip()
@@ -341,6 +366,7 @@ void TitleBar::setWindowControlsVisible(bool visible)
 void TitleBar::setLeadingSpace(int pixels)
 {
     leadingSpace_->setFixedWidth(pixels);
+    leadingSpace_->setVisible(pixels > 0);
 }
 
 WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const
@@ -411,6 +437,10 @@ void TitleBar::updateMaximizeButton()
 
 bool TitleBar::eventFilter(QObject *watched, QEvent *event)
 {
+    const bool columnChanged = event->type() == QEvent::Resize || event->type() == QEvent::LayoutRequest ||
+                               event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange;
+    if (watched == logoColumn_ && columnChanged)
+        QMetaObject::invokeMethod(this, &TitleBar::updateLogoAlignment, Qt::QueuedConnection);
     if (watched == window() && event->type() == QEvent::WindowStateChange)
         updateMaximizeButton();
     return QWidget::eventFilter(watched, event);

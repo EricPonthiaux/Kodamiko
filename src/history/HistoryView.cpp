@@ -60,6 +60,16 @@ QString commitCountText(const CommitLog &log)
     return QObject::tr("%1 commits").arg(log.commits.size());
 }
 
+// Whether `change` is the file or under the folder `filter` (an empty
+// filter: every file), by its path or the one it was renamed from.
+bool isFiltered(const FileChange &change, const QString &filter)
+{
+    const auto isUnder = [&filter](const QString &path) {
+        return path == filter || path.startsWith(filter + QLatin1Char('/'));
+    };
+    return filter.isEmpty() || isUnder(change.path) || (!change.oldPath.isEmpty() && isUnder(change.oldPath));
+}
+
 QLabel *mutedLabel(QWidget *parent)
 {
     auto *label = new QLabel(parent);
@@ -97,8 +107,8 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     connect(showAll_, &QToolButton::clicked, this, [this] { setPathFilter({}); });
 
     // "History" and the summary; the filter and the reload at the right.
-    auto *title = new QLabel(tr("History"), this);
-    AppFonts::setInterfaceFont(title, 1.15);
+    title_ = new QLabel(tr("History"), this);
+    AppFonts::setInterfaceFont(title_, 1.15);
     summary_->setEnabled(false); // dimmed
     // The title bar, a line under it.
     auto *titleBar = new QFrame(this);
@@ -108,7 +118,7 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     auto *header = new QHBoxLayout(titleBar);
     header->setContentsMargins(16, 10, 12, 10);
     header->setSpacing(10);
-    header->addWidget(title);
+    header->addWidget(title_);
     header->addWidget(summary_);
     header->addWidget(showAll_);
     header->addStretch();
@@ -265,8 +275,7 @@ void HistoryView::setFolder(const QString &folder)
 {
     folder_ = folder;
     ++generation_;
-    pathFilter_.clear();
-    showAll_->hide();
+    setPathFilterShown({});
     log_.reset();
     error_.clear();
     rebuildList();
@@ -281,10 +290,21 @@ HistoryView::~HistoryView()
 
 void HistoryView::setPathFilter(const QString &relativePath)
 {
-    pathFilter_ = relativePath;
+    setPathFilterShown(relativePath);
     ++generation_;
-    showAll_->setVisible(!relativePath.isEmpty());
     refresh();
+}
+
+void HistoryView::setPathFilterShown(const QString &relativePath)
+{
+    pathFilter_ = relativePath;
+    const bool isFiltered = !relativePath.isEmpty();
+    // A file, or a file deleted since: each commit shows only its diff.
+    filtersOnFile_ = isFiltered && !QFileInfo(QDir(folder_).filePath(relativePath)).isDir();
+    commitPane_->setVisible(!filtersOnFile_);
+    title_->setText(isFiltered ? tr("History of %1").arg(QFileInfo(relativePath).fileName()) : tr("History"));
+    title_->setToolTip(relativePath);
+    showAll_->setVisible(isFiltered);
 }
 
 void HistoryView::refresh()
@@ -404,12 +424,21 @@ void HistoryView::onFileSelectionChanged()
 {
     const QList<QTreeWidgetItem *> selected = files_->selectedItems();
     if (selected.isEmpty() || !details_) {
-        diffHeader_->setPlaceholder(details_ ? tr("Choose a file of the commit") : QString());
+        diffHeader_->setPlaceholder(diffPlaceholder());
         diff_->showMessage({});
         return;
     }
     const FileDiff &file = details_->files.at(selected.first()->data(0, fileIndexRole).toInt());
     diff_->setFiles({{file.change.path, changeStatusText(file.change), FilePatch::parse(file.patch)}});
+}
+
+// What to choose for a diff to show; nothing before a commit is chosen,
+// unless the commit pane, which says it, is hidden.
+QString HistoryView::diffPlaceholder() const
+{
+    if (details_)
+        return tr("Choose a file of the commit");
+    return filtersOnFile_ ? tr("Choose a commit to see its changes to %1").arg(pathFilter_) : QString();
 }
 
 void HistoryView::forgetCommit()
@@ -491,13 +520,18 @@ void HistoryView::showDetails()
                  details.files.size() == 1 ? tr("1 file changed") : tr("%1 files changed").arg(details.files.size()),
                  dark ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37"), QString::number(added),
                  dark ? QStringLiteral("#f85149") : QStringLiteral("#cf222e"), QString::number(removed)));
+    // Only the filtered file or folder: no need to look for it.
     for (int i = 0; i < details.files.size(); ++i) {
         const FileDiff &file = details.files[i];
+        if (!isFiltered(file.change, pathFilter_))
+            continue;
         auto *item = new QTreeWidgetItem(files_);
         FileChangeDelegate::setChange(item, file.change);
         FileChangeDelegate::setStats(item, patches[i]);
         item->setData(0, fileIndexRole, i);
     }
+    if (!pathFilter_.isEmpty() && files_->topLevelItemCount() == 1)
+        files_->setCurrentItem(files_->topLevelItem(0)); // the filtered file's diff right away
     commitPages_->setCurrentIndex(1);
     // Once the pane is laid out.
     QTimer::singleShot(0, this, &HistoryView::fitMessage);
@@ -598,7 +632,7 @@ void HistoryView::arrangePanes()
         splitter_->insertWidget(1, commitPane_);
     else
         leftSplitter_->insertWidget(1, commitPane_);
-    commitPane_->show();
+    commitPane_->setVisible(!filtersOnFile_);
     applyShares();
     arranging_ = false;
 }

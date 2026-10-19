@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "editor/PreviewSite.h"
 #include "git/LibGit2.h"
 #include "projects/ProjectConfig.h"
 #include "settings/Preferences.h"
@@ -148,6 +149,7 @@ int main(int argc, char *argv[])
 {
     // Required by Qt WebEngine (Markdown preview), before the application exists.
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+    PreviewSite::registerScheme();
     const QApplication app(argc, argv);
     // libgit2 stays initialized for the whole run: each read (change marks
     // while typing, file statuses) would otherwise set up and tear down its

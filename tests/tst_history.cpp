@@ -198,6 +198,66 @@ private slots:
         QCOMPARE(details.files[0].change.path, QStringLiteral("a.cpp"));
     }
 
+    void viewNamesTheFileItIsFilteredOn()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "a created", {{"src/a.txt", "a\n"}});
+        commit(dir, "b created", {{"b.txt", "b\n"}});
+        HistoryView view(Theme::dark());
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+
+        view.setPathFilter("src/a.txt");
+
+        QTRY_VERIFY(!refreshed.isEmpty());
+        const auto *commits = view.findChild<QTreeWidget *>("commits");
+        QCOMPARE(commits->topLevelItemCount(), 1);
+        const QList<QLabel *> labels = view.findChildren<QLabel *>();
+        QVERIFY(std::ranges::any_of(labels, [](const QLabel *label) { return label->text() == "History of a.txt"; }));
+    }
+
+    void fileHistoryShowsOnlyTheFileDiffOfEachCommit()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "both", {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
+        HistoryView view(Theme::dark());
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.setPathFilter("a.txt");
+        QTRY_VERIFY(!refreshed.isEmpty());
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *files = view.findChild<QTreeWidget *>("files");
+        const auto *diff = view.findChild<DiffView *>();
+
+        commits->setCurrentItem(commits->topLevelItem(0));
+
+        QTRY_VERIFY(diff->text().contains("a.txt"));
+        QVERIFY(!diff->text().contains("b.txt"));
+        QCOMPARE(files->topLevelItemCount(), 1);
+        QVERIFY(!files->isVisibleTo(&view)); // the commit pane: no list to look through
+    }
+
+    void folderHistoryListsOnlyTheFolderFiles()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "all", {{"src/a.txt", "a\n"}, {"src/b.txt", "b\n"}, {"c.txt", "c\n"}});
+        HistoryView view(Theme::dark());
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.setPathFilter("src");
+        QTRY_VERIFY(!refreshed.isEmpty());
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *files = view.findChild<QTreeWidget *>("files");
+
+        commits->setCurrentItem(commits->topLevelItem(0));
+
+        QTRY_COMPARE(files->topLevelItemCount(), 2);
+        QVERIFY(files->isVisibleTo(&view));
+    }
+
     void viewRevealsCommitThenFile()
     {
         const QTemporaryDir dir;

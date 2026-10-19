@@ -187,7 +187,7 @@ QWidget *EditorTabs::openFile(const QString &path)
     // A Markdown or HTML file opens with its preview.
     QWidget *page = editor;
     if (PreviewPage::hasPreview(absolutePath)) {
-        auto *previewed = new PreviewPage(editor, theme_, this);
+        auto *previewed = new PreviewPage(editor, theme_, projectFolder_, this);
         connect(previewed, &PreviewPage::openFileRequested, this,
                 [this](const QString &linkedPath) { openFile(linkedPath); });
         page = previewed;

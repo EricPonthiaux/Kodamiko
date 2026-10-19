@@ -58,6 +58,10 @@ public:
     // position or a search in it.
     void revealEditor(EditorWidget *editor) const;
     EditorWidget *editorFor(const QString &path) const;
+
+    // The open project: the HTML pages opened next can load its files.
+    void setProjectFolder(const QString &folder) { projectFolder_ = folder; }
+
     ImageView *imageViewFor(const QString &path) const;
     DiagramView *diagramViewFor(const QString &path) const;
 
@@ -171,6 +175,7 @@ private:
     void updateTabIcon(QWidget *page);
 
     Theme theme_;
+    QString projectFolder_;
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer
     bool formatOnSave_ = false;

@@ -22,6 +22,7 @@
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"
+#include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
@@ -79,6 +80,8 @@ void MainWindow::setTheme(const QString &name)
     newBranchPopup_->applyTheme(theme_);
     branchesPopup_->applyTheme(theme_);
     stashesPopup_->applyTheme(theme_);
+    if (prerequisitesPopup_)
+        prerequisitesPopup_->applyTheme(theme_);
     if (modeTabs_) {
         updateTabIcons();
         updateClaudeIndicator();

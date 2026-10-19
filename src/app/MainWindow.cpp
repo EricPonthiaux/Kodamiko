@@ -316,6 +316,7 @@ QWidget *MainWindow::createEditPage()
     sidebar_->addView(outlineView_, {}, tr("Outline"));
     sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
     sidebar_->addView(problemsView_, {}, tr("Problems"));
+    titleBar_->alignLogoWith(sidebar_->tabBar());
 
     editSplitter_ = new GripSplitter(Qt::Horizontal, this);
     editSplitter_->setChildrenCollapsible(false);

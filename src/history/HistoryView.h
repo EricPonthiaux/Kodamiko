@@ -73,6 +73,9 @@ private:
     void onFileSelectionChanged();
     void showCommit(const QString &id);
     void forgetCommit();
+    QString diffPlaceholder() const;
+    // The filter, named in the title, without reloading.
+    void setPathFilterShown(const QString &relativePath);
     void showDetails();
     // The message's body, its other details: a few lines, all of them once
     // expanded.
@@ -86,6 +89,8 @@ private:
 
     QString folder_;
     QString pathFilter_;
+    bool filtersOnFile_ = false; // the commit pane hidden: only the file's diff
+    QLabel *title_;              // names the filtered file
     QToolButton *showAll_;
     QToolButton *refreshButton_;
     QAction *searchIcon_;

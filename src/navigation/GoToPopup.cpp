@@ -97,9 +97,11 @@ GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
     , index_(index)
     , recent_(recent)
 {
+    setBehavior(Behavior::Transient);
     pool_.setMaxThreadCount(1);
 
     tabs_ = new QTabBar(this);
+    tabs_->setObjectName(QStringLiteral("goToTabs"));
     tabs_->setDrawBase(false);
     tabs_->setExpanding(false);
     tabs_->setFocusPolicy(Qt::NoFocus);

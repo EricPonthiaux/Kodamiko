@@ -265,7 +265,7 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
 
 Requirements:
 
-- **Qt 6.5 or newer** (Widgets, Network, PrintSupport, Test and WebEngine
+- **Qt 6.6 or newer** (Widgets, Network, PrintSupport, Test and WebEngine
   modules; Qt WebEngine needs WebChannel and Positioning);
 - CMake 3.24 or newer, Ninja, a C++20 compiler (GCC 11+, Clang 14+, MSVC 2022);
 - network access during the first configuration.

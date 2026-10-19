@@ -470,6 +470,43 @@ private slots:
         QCOMPARE(popup.count(), 200);
     }
 
+    void popupGrowsWithTheCodeFont()
+    {
+        QWidget parent;
+        parent.resize(1600, 1200);
+        CompletionItem item;
+        item.label = QStringLiteral("printValue");
+        CompletionPopup popup(&parent);
+        popup.setItems({item}, QString());
+        Theme theme = Theme::dark();
+        popup.applyTheme(theme);
+        popup.showAt({0, 0}, 0);
+        const QSize small = popup.size();
+
+        theme.font.setPointSizeF(theme.font.pointSizeF() * 2);
+        popup.applyTheme(theme);
+        popup.showAt({0, 0}, 0);
+
+        QVERIFY(popup.width() > small.width());
+        QVERIFY(popup.height() > small.height());
+    }
+
+    void popupFollowsTheEditorZoom()
+    {
+        const Fixture f("int printValue;\nint x = pri;\n", {1, 11});
+        f.controller->complete();
+        QTRY_VERIFY(f.controller->isActive());
+        const int unzoomedHeight = f.controller->popup()->height();
+        QTest::keyClick(f.editor, Qt::Key_Escape);
+        QTRY_VERIFY(!f.controller->isActive());
+
+        f.editor->SendScintilla(QsciScintillaBase::SCI_SETZOOM, 8);
+        f.controller->complete();
+        QTRY_VERIFY(f.controller->isActive());
+
+        QVERIFY(f.controller->popup()->height() > unzoomedHeight);
+    }
+
     void collectsDocumentWords()
     {
         QByteArray text;

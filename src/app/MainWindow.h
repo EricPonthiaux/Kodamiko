@@ -42,7 +42,7 @@ class NewBranchPopup;
 class NoticeBar;
 class OutlineView;
 class PreferencesPopup;
-class PrerequisitesDialog;
+class PrerequisitesPopup;
 class ProblemStore;
 class ProblemsView;
 class ProjectSettingsPopup;
@@ -391,7 +391,7 @@ private:
     BranchesPopup *branchesPopup_ = nullptr;
     StashesPopup *stashesPopup_ = nullptr;
     RecentFiles recentFiles_;
-    PrerequisitesDialog *prerequisitesDialog_ = nullptr;
+    PrerequisitesPopup *prerequisitesPopup_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;
     QAction *snapshotBeforePrompt_ = nullptr;
     QAction *shareEditorContext_ = nullptr;

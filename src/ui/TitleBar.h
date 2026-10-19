@@ -5,6 +5,7 @@
 
 #include <QAbstractButton>
 #include <QIcon>
+#include <QPointer>
 #include <QWidget>
 
 #include <optional>
@@ -14,6 +15,7 @@ class QHBoxLayout;
 class QLabel;
 class QMenu;
 class QMenuBar;
+class QTabBar;
 class QToolButton;
 
 // Window control drawn in the theme: minimize, maximize (restore when the
@@ -57,6 +59,9 @@ public:
 
     QMenuBar *menuBar() const { return menuBar_; }
 
+    // Centers the logo above the side-tab column, following its width as
+    // the layout or interface font changes.
+    void alignLogoWith(QTabBar *column);
     void setProject(const QString &name, const QString &toolTip, QMenu *menu);
     // Claude's state; hidden while there is no session (`status` empty).
     void setClaudeState(std::optional<ClaudeIndicator::Status> status, const QString &toolTip);
@@ -113,10 +118,13 @@ private:
     void sizeActionButton(const ActionButton &entry);
     void toggleMaximized();
     void updateMaximizeButton();
+    void updateLogoAlignment();
 
     Theme theme_;
     QHBoxLayout *layout_;
     QWidget *leadingSpace_;
+    QWidget *logo_;
+    QPointer<QTabBar> logoColumn_;
     QMenuBar *menuBar_;
     QToolButton *project_;
     ClaudeIndicator *claude_;

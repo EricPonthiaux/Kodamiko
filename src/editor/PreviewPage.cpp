@@ -3,8 +3,11 @@
 #include "CodeColorizer.h"
 #include "EditorWidget.h"
 #include "MarkdownHtml.h"
+#include "PreviewSite.h"
 #include "syntax/LanguageRegistry.h"
+#include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
+#include "ui/UiIcons.h"
 
 #include <QButtonGroup>
 #include <QColor>
@@ -13,9 +16,11 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QLabel>
 #include <QMenu>
 #include <QScrollBar>
 #include <QSettings>
@@ -47,6 +52,7 @@ QWebEngineProfile *previewProfile()
         settings->setAttribute(QWebEngineSettings::PluginsEnabled, false);
         settings->setAttribute(QWebEngineSettings::ErrorPageEnabled, false);
         settings->setAttribute(QWebEngineSettings::FocusOnNavigationEnabled, false);
+        PreviewSite::serveTo(created);
         return created;
     }();
     return profile;
@@ -61,9 +67,9 @@ public:
     {
     }
 
-    // The page's own address, when it was loaded from a text: "#heading"
-    // links to it stay in the page.
-    void setAddress(const QUrl &address) { address_ = address; }
+    // The site the page is served from: links to its files go to the
+    // editor. Not owned.
+    void setSite(const PreviewSite *site) { site_ = site; }
 
 protected:
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override
@@ -71,13 +77,11 @@ protected:
         if (type != NavigationTypeLinkClicked || !isMainFrame)
             return true; // the page itself
         // "#heading": within the page.
-        if (url.hasFragment() && (url.adjusted(QUrl::RemoveFragment) == this->url().adjusted(QUrl::RemoveFragment) ||
-                                  url.adjusted(QUrl::RemoveFragment) == address_))
+        if (url.hasFragment() && url.adjusted(QUrl::RemoveFragment) == this->url().adjusted(QUrl::RemoveFragment))
             return true;
-        if (url.isLocalFile()) {
-            const QString path = QDir::cleanPath(url.toLocalFile());
-            if (QFileInfo(path).isFile())
-                openFile_(path);
+        if (const std::optional<QString> path = localPath(url)) {
+            if (QFileInfo(*path).isFile())
+                openFile_(*path);
             return false;
         }
         QDesktopServices::openUrl(url);
@@ -85,8 +89,17 @@ protected:
     }
 
 private:
+    std::optional<QString> localPath(const QUrl &url) const
+    {
+        if (url.isLocalFile())
+            return QDir::cleanPath(url.toLocalFile());
+        if (site_)
+            return site_->localPath(url);
+        return std::nullopt;
+    }
+
     std::function<void(const QString &)> openFile_;
-    QUrl address_;
+    const PreviewSite *site_ = nullptr;
 };
 
 constexpr const char *scrollRatioScript =
@@ -196,10 +209,15 @@ void MarkdownPreview::contextMenuEvent(QContextMenuEvent *event)
     menu.exec(event->globalPos());
 }
 
-HtmlPreview::HtmlPreview(QWidget *parent)
+HtmlPreview::HtmlPreview(const QString &servedFolder, QWidget *parent)
     : QWebEngineView(parent)
+    , site_(servedFolder)
 {
-    setPage(new LinkRoutingPage(this, [this](const QString &path) { emit openFileRequested(path); }));
+    auto *routing = new LinkRoutingPage(this, [this](const QString &path) { emit openFileRequested(path); });
+    routing->setSite(&site_);
+    setPage(routing);
+    // The page's own scripts; its site keeps them away from other files.
+    page()->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
     // As in a browser, a page without a background of its own is white.
     page()->setBackgroundColor(Qt::white);
     connect(page(), &QWebEnginePage::loadFinished, this, [this] {
@@ -252,14 +270,7 @@ void HtmlPreview::loadPage()
 {
     loaded_ = false;
     pageLoading_ = true;
-    // Relative style sheets and images: the page's address is the file's.
-    const QUrl address = QUrl::fromLocalFile(filePath_);
-    static_cast<LinkRoutingPage *>(page())->setAddress(address);
-    // setHtml() takes at most 2 MB: beyond, the file as saved.
-    if (text_.toUtf8().size() > 2 * 1000 * 1000 - 4096)
-        load(address);
-    else
-        setHtml(text_, address);
+    load(site_.serve(filePath_, text_));
 }
 
 void HtmlPreview::scrollToRatio(double ratio)
@@ -284,12 +295,13 @@ void HtmlPreview::contextMenuEvent(QContextMenuEvent *event)
     menu.exec(event->globalPos());
 }
 
-PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QWidget *parent)
+PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QString projectFolder, QWidget *parent)
     : QWidget(parent)
     , editor_(editor)
     , theme_(std::move(theme))
     , kind_(LanguageRegistry::languageForFile(editor->filePath()) == QLatin1String("html") ? Kind::Html
                                                                                            : Kind::Markdown)
+    , projectFolder_(std::move(projectFolder))
 {
     editor_->setParent(this);
 
@@ -297,41 +309,10 @@ PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QWidget *parent)
     splitter_->setChildrenCollapsible(false);
     splitter_->addWidget(editor_);
 
-    auto *group = new QButtonGroup(this);
-    auto *toolbar = new QHBoxLayout;
-    toolbar->setContentsMargins(4, 2, 6, 2);
-    toolbar->setSpacing(2);
-    toolbar->addStretch();
-
-    struct ModeChoice {
-        QString name;
-        QString toolTip;
-    };
-
-    // In the order of Mode, whose values are the buttons' ids.
-    const std::array<ModeChoice, modeCount> choices = {{{tr("Editor"), tr("Editor only")},
-                                                        {tr("Split"), tr("Editor and preview side by side")},
-                                                        {tr("Preview"), tr("Preview only")}}};
-    for (std::size_t i = 0; i < choices.size(); ++i) {
-        auto *button = new QToolButton(this);
-        button->setText(choices[i].name);
-        button->setToolTip(choices[i].toolTip);
-        button->setCheckable(true);
-        button->setAutoRaise(true);
-        button->setFocusPolicy(Qt::NoFocus);
-        group->addButton(button, int(i));
-        toolbar->addWidget(button);
-        buttons_[i] = button;
-    }
-    connect(group, &QButtonGroup::idClicked, this, [this](int id) {
-        setMode(static_cast<Mode>(id));
-        QSettings().setValue(settingsKey(QStringLiteral("mode")), id);
-    });
-
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addLayout(toolbar);
+    layout->addWidget(createToolbar());
     layout->addWidget(splitter_, 1);
 
     updateTimer_.setSingleShot(true);
@@ -350,6 +331,79 @@ PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QWidget *parent)
     setFocusProxy(editor_);
 }
 
+QWidget *PreviewPage::createToolbar()
+{
+    auto *toolbar = new QFrame(this);
+    toolbar->setObjectName(QStringLiteral("previewToolbar"));
+    auto *layout = new QHBoxLayout(toolbar);
+    layout->setContentsMargins(10, 4, 10, 4);
+    layout->setSpacing(8);
+
+    auto *format = new QHBoxLayout;
+    format->setContentsMargins(0, 0, 0, 0);
+    format->setSpacing(5);
+    formatIcon_ = new QLabel(toolbar);
+    formatIcon_->setFixedSize(14, 14);
+    format->addWidget(formatIcon_, 0, Qt::AlignVCenter);
+    auto *label = new QLabel(kind_ == Kind::Html ? tr("HTML") : tr("Markdown"), toolbar);
+    label->setObjectName(QStringLiteral("previewFormat"));
+    AppFonts::setInterfaceFont(label, 0.9, QFont::Medium);
+    format->addWidget(label);
+    layout->addLayout(format);
+    layout->addStretch();
+
+    auto *selector = new QFrame(toolbar);
+    selector->setObjectName(QStringLiteral("previewModeSelector"));
+    selector->setAccessibleName(tr("Document view mode"));
+    auto *segments = new QHBoxLayout(selector);
+    segments->setContentsMargins(2, 2, 2, 2);
+    segments->setSpacing(2);
+    auto *group = new QButtonGroup(this);
+
+    struct ModeChoice {
+        QString name;
+        QString toolTip;
+    };
+
+    // In the order of Mode, whose values are the buttons' ids.
+    const std::array<ModeChoice, modeCount> choices = {{{tr("Editor"), tr("Editor only")},
+                                                        {tr("Split"), tr("Editor and preview side by side")},
+                                                        {tr("Preview"), tr("Preview only")}}};
+    for (std::size_t i = 0; i < choices.size(); ++i) {
+        auto *button = new QToolButton(selector);
+        button->setText(choices[i].name);
+        button->setToolTip(choices[i].toolTip);
+        button->setAccessibleName(choices[i].toolTip);
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        button->setIconSize(QSize(14, 14));
+        AppFonts::setInterfaceFont(button, 0.9, QFont::Normal);
+        button->setCheckable(true);
+        button->setAutoRaise(true);
+        button->setFocusPolicy(Qt::TabFocus);
+        button->setCursor(Qt::PointingHandCursor);
+        group->addButton(button, int(i));
+        segments->addWidget(button);
+        buttons_[i] = button;
+    }
+    connect(group, &QButtonGroup::idClicked, this, [this](int id) {
+        setMode(static_cast<Mode>(id));
+        QSettings().setValue(settingsKey(QStringLiteral("mode")), id);
+    });
+
+    layout->addWidget(selector);
+    return toolbar;
+}
+
+void PreviewPage::updateToolbarIcons()
+{
+    formatIcon_->setPixmap(
+        UiIcons::icon(QStringLiteral("document"), theme_.mutedText).pixmap(QSize(14, 14), devicePixelRatioF()));
+    const std::array<QString, modeCount> names = {QStringLiteral("code"), QStringLiteral("split"),
+                                                  QStringLiteral("preview")};
+    for (std::size_t i = 0; i < buttons_.size(); ++i)
+        buttons_[i]->setIcon(UiIcons::icon(names[i], buttons_[i]->isChecked() ? theme_.accentText : theme_.mutedText));
+}
+
 QString PreviewPage::settingsKey(const QString &name) const
 {
     return (kind_ == Kind::Html ? QStringLiteral("html/") : QStringLiteral("markdown/")) + name;
@@ -364,12 +418,15 @@ void PreviewPage::setMode(Mode mode)
 {
     mode_ = mode;
     buttons_[static_cast<std::size_t>(mode)]->setChecked(true);
+    updateToolbarIcons();
     if (mode != Mode::Editor && isVisible())
         ensurePreview();
     QWidget *shown = preview();
     editor_->setVisible(mode != Mode::Preview || !shown);
+    // Until its first page is drawn, a new web view shows an empty white
+    // or black surface: the page's place stays empty meanwhile.
     if (shown)
-        shown->setVisible(mode != Mode::Editor);
+        shown->setVisible(mode != Mode::Editor && hasRenderedPreview_);
     setFocusProxy(mode == Mode::Preview && shown ? shown : editor_);
     if (mode == Mode::Split) {
         const int half = std::max(splitter_->width() / 2, 100);
@@ -391,13 +448,30 @@ void PreviewPage::ensurePreview()
     if (preview())
         return;
     if (kind_ == Kind::Html) {
-        html_ = new HtmlPreview(this);
+        html_ = new HtmlPreview(servedFolder(), this);
         connect(html_, &HtmlPreview::openFileRequested, this, &PreviewPage::openFileRequested);
+        connect(html_, &HtmlPreview::rendered, this, &PreviewPage::revealPreview, Qt::SingleShotConnection);
     } else {
         markdown_ = new MarkdownPreview(theme_, this);
         connect(markdown_, &MarkdownPreview::openFileRequested, this, &PreviewPage::openFileRequested);
+        connect(markdown_, &MarkdownPreview::rendered, this, &PreviewPage::revealPreview, Qt::SingleShotConnection);
     }
+    preview()->hide();
     splitter_->addWidget(preview());
+}
+
+QString PreviewPage::servedFolder() const
+{
+    const QFileInfo file(editor_->filePath());
+    const bool isInProject =
+        !projectFolder_.isEmpty() && file.absoluteFilePath().startsWith(QDir(projectFolder_).absolutePath() + u'/');
+    return isInProject ? projectFolder_ : file.absolutePath();
+}
+
+void PreviewPage::revealPreview()
+{
+    hasRenderedPreview_ = true;
+    setMode(mode_); // shown, and in Split mode given half of the room
 }
 
 void PreviewPage::revealEditor()
@@ -436,6 +510,7 @@ void PreviewPage::syncScroll()
 void PreviewPage::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    updateToolbarIcons();
     editor_->applyTheme(theme);
     // An HTML page has its own colors.
     if (markdown_)

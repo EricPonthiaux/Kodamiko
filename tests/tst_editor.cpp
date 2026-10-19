@@ -8,6 +8,7 @@
 #include "editor/FindBar.h"
 #include "editor/MarkdownHtml.h"
 #include "editor/PreviewPage.h"
+#include "editor/PreviewSite.h"
 #include "editor/ScrollBarMarks.h"
 #include "editor/SymbolOccurrences.h"
 #include "git/GitProcess.h"
@@ -494,6 +495,23 @@ private slots:
         QSettings().remove("markdown/mode");
     }
 
+    void previewShowsOnceItsPageIsDrawn()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("README.md"), "# Hello\n");
+        QSettings().setValue("markdown/mode", 2); // Preview
+        EditorTabs tabs(Theme::dark());
+        const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("README.md")));
+
+        tabs.show();
+
+        QVERIFY(page->markdownPreview());
+        QVERIFY(!page->markdownPreview()->isVisible()); // an empty web view flashes
+        QTRY_VERIFY(page->markdownPreview()->isVisible());
+        QVERIFY(page->markdownPreview()->bodyHtml().contains("Hello"));
+        QSettings().remove("markdown/mode");
+    }
+
     void htmlTabsShowThePage()
     {
         const QTemporaryDir dir;
@@ -522,12 +540,41 @@ private slots:
             return text;
         };
         QVERIFY(pageText().contains("Hello"));
-        QCOMPARE(preview->title(), QString("Page")); // its scripts never run
+        QTRY_COMPARE(preview->title(), QString("ran")); // its scripts run
 
         // The page follows the text.
         page->editor()->setText("<html><body><p>Changed</p></body></html>");
         QTRY_VERIFY(preview->isReady() && pageText().contains("Changed"));
         QVERIFY(!page->markdownPreview());
+        QSettings().remove("html/mode");
+    }
+
+    void htmlPagesLoadTheProjectFilesButNoOther()
+    {
+        const QTemporaryDir dir;
+        const QString project = dir.filePath("project");
+        write(dir.filePath("secret.txt"), "secret");
+        write(project + "/data.txt", "inside");
+        write(project + "/scripts/answer.js", "export const answer = 42;");
+        write(project + "/site/index.html",
+              "<html><body><script type=\"module\">"
+              "import {answer} from '../scripts/answer.js';"
+              "const read = path => fetch(path).then(r => r.ok ? r.text() : 'refused', () => 'refused');"
+              "const texts = await Promise.all([read('../data.txt'), read('../../secret.txt'),"
+              "                                 read('" +
+                  QUrl::fromLocalFile(dir.filePath("secret.txt")).toString().toUtf8() +
+                  "')]);"
+                  "document.title = [answer, ...texts].join(' ');"
+                  "</script></body></html>");
+        QSettings().setValue("html/mode", 2); // Preview
+        EditorTabs tabs(Theme::dark());
+        tabs.setProjectFolder(project);
+        const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(project + "/site/index.html"));
+
+        tabs.show();
+
+        QTRY_VERIFY(page->htmlPreview());
+        QTRY_COMPARE(page->htmlPreview()->title(), QString("42 inside refused refused"));
         QSettings().remove("html/mode");
     }
 
@@ -742,6 +789,7 @@ private:
 int main(int argc, char *argv[])
 {
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+    PreviewSite::registerScheme();
     const QApplication app(argc, argv);
     TestEditor test;
     return QTest::qExec(&test, argc, argv);

@@ -44,6 +44,7 @@ void collect(const QMenu *menu, const QString &prefix, QList<QPair<QString, QAct
 CommandPalette::CommandPalette(QWidget *parent)
     : OverlayPopup(QStringLiteral("commandPalette"), QSizeF(0.45, 0.55), QSize(560, 360), parent)
 {
+    setBehavior(Behavior::Transient);
     search_ = new QLineEdit(this);
     search_->setPlaceholderText(tr("Type a command"));
     search_->setClearButtonEnabled(true);

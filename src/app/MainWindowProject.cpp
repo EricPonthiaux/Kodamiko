@@ -20,7 +20,7 @@
 #include "run/Runner.h"
 #include "search/FindInFilesPopup.h"
 #include "settings/PreferencesPopup.h"
-#include "setup/PrerequisitesDialog.h"
+#include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/InstallPlan.h"
 #include "ui/NoticeBar.h"
@@ -46,6 +46,7 @@ void MainWindow::openFolder(const QString &folder)
     const QString previousFolder = folder_;
     folder_ = QDir(folder).absolutePath();
     fileTree_->setRootPath(folder_);
+    editorTabs_->setProjectFolder(folder_);
     claudeConfigView_->setProjectFolder(folder_);
     claudeTouched_.clear();
     updateClaudeMarks();
@@ -199,35 +200,26 @@ TerminalWidget *MainWindow::addTerminal(const QString &title, const ProcessSpec 
 
 void MainWindow::showPrerequisites()
 {
-    if (!prerequisitesDialog_) {
-        // Not modal: installations run in a terminal tab of this window.
-        prerequisitesDialog_ = new PrerequisitesDialog(this);
-        connect(prerequisitesDialog_, &PrerequisitesDialog::installRequested, this,
+    if (!prerequisitesPopup_) {
+        prerequisitesPopup_ = new PrerequisitesPopup(theme_, this);
+        connect(prerequisitesPopup_, &PrerequisitesPopup::installRequested, this,
                 [this](const QString &title, const ProcessSpec &spec) {
                     const TerminalWidget *terminal = addTerminal(title, spec);
-                    connect(terminal, &TerminalWidget::finished, prerequisitesDialog_, [this] {
-                        prerequisitesDialog_->recheck();
-                        prerequisitesDialog_->show();
-                        prerequisitesDialog_->raise();
-                    });
+                    connect(terminal, &TerminalWidget::finished, prerequisitesPopup_, &PrerequisitesPopup::popup);
                 });
-        connect(prerequisitesDialog_, &PrerequisitesDialog::checked, this, [this] {
+        connect(prerequisitesPopup_, &PrerequisitesPopup::checked, this, [this] {
             // Freshly installed programs: use them right away.
             updateRepositoryInfo();
             if (mode_ == Mode::Diff)
                 changesView_->refresh();
-            const bool claudeFound = std::any_of(
-                prerequisitesDialog_->prerequisites().begin(), prerequisitesDialog_->prerequisites().end(),
-                [](const Prerequisite &p) {
-                    return p.id == Prerequisite::Id::ClaudeCode && p.status != Prerequisite::Status::Missing;
-                });
+            const bool claudeFound = std::any_of(prerequisitesPopup_->prerequisites().begin(),
+                                                 prerequisitesPopup_->prerequisites().end(), [](const Prerequisite &p) {
+                                                     return p.id == Prerequisite::Id::ClaudeCode &&
+                                                            p.status != Prerequisite::Status::Missing;
+                                                 });
             if (claudeFound && (!claudeTerminal_ || !claudeTerminal_->isRunning()))
                 startClaudeSession();
         });
-    } else {
-        prerequisitesDialog_->recheck();
     }
-    prerequisitesDialog_->show();
-    prerequisitesDialog_->raise();
-    prerequisitesDialog_->activateWindow();
+    prerequisitesPopup_->popup();
 }
