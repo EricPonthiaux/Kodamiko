@@ -443,7 +443,7 @@ void FileTreeView::addGitMenu(QMenu *menu, const QString &path, const QStringLis
     const bool isDir = QFileInfo(path).isDir();
     const std::optional<FileStatus> status = proxy_->statusOf(path, isDir);
     const bool changed = status && *status != FileStatus::Ignored;
-    // Rollback restores the index state: nothing to restore for a file git does not know.
+    // Rollback restores the last commit: nothing to restore for a file git does not know.
     const bool trackedChange = changed && *status != FileStatus::Untracked;
     QMenu *git = menu->addMenu(tr("&Git"));
     git->addAction(tr("Show &Diff"), this, [this, path] { emit showDiffRequested(path); })->setEnabled(changed);
@@ -463,8 +463,8 @@ void FileTreeView::confirmRollback(const QString &path)
 {
     const QFileInfo info(path);
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(info.absolutePath());
-    const QString message = (info.isDir() ? tr("Restore the files of “%1” to their state in the git index?")
-                                          : tr("Restore “%1” to its state in the git index?"))
+    const QString message = (info.isDir() ? tr("Restore the files of “%1” to their state in the last commit?")
+                                          : tr("Restore “%1” to its state in the last commit?"))
                                 .arg(path == rootPath_ ? QDir::toNativeSeparators(rootPath_) : info.fileName()) +
                             QLatin1Char('\n') +
                             tr("A snapshot is taken first: Git ▸ Restore a Snapshot brings the changes back.");

@@ -77,13 +77,14 @@ private:
     using Providers = std::map<QString, std::unique_ptr<IOutlineProvider>>;
     struct ScanResult;
 
-    static Providers createProviders();
+    // The provider of `languageId`, nullptr if it has none.
+    static IOutlineProvider *providerFor(Providers &providers, const QString &languageId);
     static ScanResult scan(const QString &folder, const QHash<QString, QDateTime> &known, Providers &providers);
     void apply(int generation, const ScanResult &result);
 
     QString folder_;
     QHash<QString, FileEntry> files_;
-    Providers workerProviders_; // used by one indexing at a time
+    Providers workerProviders_; // used by one indexing at a time, in its thread
     Providers providers_;       // for updateFile, in the UI thread
     QThreadPool pool_;
     int generation_ = 0; // results for a previous folder are ignored

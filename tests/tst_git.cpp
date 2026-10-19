@@ -387,6 +387,40 @@ private slots:
         }
     }
 
+    void rollbackRestoresTheLastCommitStagedChangesIncluded()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"staged.txt", "a\n"}, {"both.txt", "b\n"}});
+        write(project, "staged.txt", "staged\n");
+        write(project, "both.txt", "staged\n");
+        write(project, "new.txt", "new\n");
+        git(project, {"add", "-A"});
+        write(project, "both.txt", "staged then modified\n");
+
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        GitOperations::rollback(info, {"staged.txt", "both.txt", "new.txt"});
+
+        QCOMPARE(read(project, "staged.txt"), QByteArray("a\n"));
+        QCOMPARE(read(project, "both.txt"), QByteArray("b\n"));
+        QVERIFY(!QFileInfo::exists(project.filePath("new.txt")));
+        QVERIFY(git(project, {"status", "--porcelain"}).isEmpty());
+        QCOMPARE(Snapshots::list(project.path()).size(), 1); // the changes can come back
+    }
+
+    void rollbackWithoutACommitRemovesTheNewFiles()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {});
+        write(project, "new.txt", "new\n");
+        git(project, {"add", "new.txt"});
+
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        GitOperations::rollback(info, {"new.txt"});
+
+        QVERIFY(!QFileInfo::exists(project.filePath("new.txt")));
+        QVERIFY(git(project, {"ls-files"}).isEmpty());
+    }
+
     void discardKeepsASnapshot()
     {
         const QTemporaryDir project;

@@ -84,6 +84,24 @@ void discard(const RepositoryInfo &repository, const QStringList &paths)
         Git::run(repository.workDir, withPaths({QStringLiteral("restore"), QStringLiteral("--worktree")}, toRestore));
 }
 
+void rollback(const RepositoryInfo &repository, const QStringList &paths)
+{
+    if (paths.isEmpty())
+        return;
+    Snapshots::create(repository, discardReason(paths), paths);
+    if (repository.unborn) {
+        // No commit yet: every file is new.
+        Git::run(repository.workDir,
+                 withPaths({QStringLiteral("rm"), QStringLiteral("--quiet"), QStringLiteral("--cached")}, paths));
+        for (const QString &path : paths)
+            removeFile(repository.workDir, path);
+        return;
+    }
+    Git::run(repository.workDir, withPaths({QStringLiteral("restore"), QStringLiteral("--source=HEAD"),
+                                            QStringLiteral("--staged"), QStringLiteral("--worktree")},
+                                           paths));
+}
+
 void discardPatch(const RepositoryInfo &repository, const QStringList &paths, const QByteArray &patch)
 {
     if (patch.isEmpty())

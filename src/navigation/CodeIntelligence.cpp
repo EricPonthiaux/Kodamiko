@@ -3,8 +3,10 @@
 #include "CodeNavigator.h"
 #include "claude/ClaudeLint.h"
 #include "diagnostics/ProblemStore.h"
+#include "editor/CodeColorizer.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/MarkdownToolTip.h"
 #include "editor/SymbolOccurrences.h"
 #include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
@@ -150,6 +152,8 @@ CodeIntelligence::CodeIntelligence(const Services &services, QObject *parent)
     });
     connect(problems_, &ProblemStore::changed, this, &CodeIntelligence::showProblems);
 }
+
+CodeIntelligence::~CodeIntelligence() = default;
 
 void CodeIntelligence::showProblems(const QString &path)
 {
@@ -303,26 +307,29 @@ void CodeIntelligence::showHover(EditorWidget *editor, int bytePosition, const Q
     if (!client || (!explicitRequest && !client->isReady()))
         return;
     const int generation = ++hoverGeneration_;
-    client->request(
-        QStringLiteral("textDocument/hover"), positionParams(editor, bytePosition),
-        [this, generation, guard = QPointer<EditorWidget>(editor), where, explicitRequest](const QJsonValue &result,
-                                                                                           const QString &) {
-            // The completion list may have opened while the server answered.
-            if (generation != hoverGeneration_ || !guard || guard->areToolTipsSuspended())
-                return;
-            QString text = plainText(result.toObject().value("contents")).trimmed();
-            if (text.isEmpty()) {
-                if (explicitRequest)
-                    emit statusMessage(tr("No documentation here"));
-                return;
-            }
-            if (text.size() > maxDocumentationLength)
-                text = text.left(maxDocumentationLength) + QStringLiteral("…");
-            QToolTip::showText(
-                where,
-                QStringLiteral("<pre style=\"white-space: pre-wrap; margin: 0\">%1</pre>").arg(text.toHtmlEscaped()),
-                guard->viewport());
-        });
+    client->request(QStringLiteral("textDocument/hover"), positionParams(editor, bytePosition),
+                    [this, generation, guard = QPointer<EditorWidget>(editor), where,
+                     explicitRequest](const QJsonValue &result, const QString &) {
+                        // The completion list may have opened while the server answered.
+                        if (generation != hoverGeneration_ || !guard || guard->areToolTipsSuspended())
+                            return;
+                        QString text = hoverMarkdown(result.toObject().value("contents")).trimmed();
+                        if (text.isEmpty()) {
+                            if (explicitRequest)
+                                emit statusMessage(tr("No documentation here"));
+                            return;
+                        }
+                        if (text.size() > maxDocumentationLength)
+                            text = text.left(maxDocumentationLength) + QStringLiteral("…");
+                        QToolTip::showText(where, documentationHtml(text, *guard), guard->viewport());
+                    });
+}
+
+QString CodeIntelligence::documentationHtml(const QString &markdown, const EditorWidget &editor)
+{
+    if (!colorizer_)
+        colorizer_ = std::make_unique<CodeColorizer>();
+    return MarkdownToolTip::html(markdown, {editor.theme(), colorizer_.get(), editor.languageId()});
 }
 
 void CodeIntelligence::showDocumentation()

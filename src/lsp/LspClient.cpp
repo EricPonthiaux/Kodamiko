@@ -43,7 +43,7 @@ QJsonObject clientCapabilities()
     const QJsonObject textDocument{
         {"completion", completion},
         {"synchronization", synchronization},
-        {"hover", QJsonObject{{"contentFormat", QJsonArray{"plaintext"}}}},
+        {"hover", QJsonObject{{"contentFormat", QJsonArray{"markdown", "plaintext"}}}},
         {"signatureHelp", signatureHelp},
         {"definition", QJsonObject{{"linkSupport", true}}},
         {"declaration", QJsonObject{{"linkSupport", true}}},

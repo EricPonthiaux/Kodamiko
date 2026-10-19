@@ -135,7 +135,18 @@ void MainWindow::chooseFolder()
 
 void MainWindow::showProjectSettings()
 {
-    projectSettings_->popup(project_);
+    projectSettings()->popup(project_);
+}
+
+ProjectSettingsPopup *MainWindow::projectSettings()
+{
+    // Built on first use: its toolchain panel takes tens of milliseconds,
+    // too long for every project opening.
+    if (!projectSettings_) {
+        projectSettings_ = new ProjectSettingsPopup(toolchains_.get(), theme_, this);
+        connect(projectSettings_, &ProjectSettingsPopup::applied, this, &MainWindow::applyProject);
+    }
+    return projectSettings_;
 }
 
 void MainWindow::applyProject(const ProjectConfig &project)

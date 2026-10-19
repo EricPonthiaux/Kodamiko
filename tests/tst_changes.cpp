@@ -233,6 +233,61 @@ private slots:
         QCOMPARE(applied.first().at(0).toInt(), block);
     }
 
+    void blockButtonsHideWhenTheDiffScrolls()
+    {
+        const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n@@ -40 +40 @@\n-c\n+d\n@@ -80 +80 @@\n-e\n+f\n";
+        DiffView diff(Theme::dark());
+        const HunkActions actions(&diff);
+        diff.resize(600, 120); // a few lines: the last block needs scrolling
+        diff.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&diff));
+        diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
+        const int block = diff.hunkStart(diff.fileStart(0) + 2);
+        QVERIFY(block >= 0);
+        const QPoint over(100, diff.lineTop(block + 1) + 2);
+        QMouseEvent move(QEvent::MouseMove, over, diff.viewport()->mapToGlobal(over), Qt::NoButton, Qt::NoButton,
+                         Qt::NoModifier);
+        QApplication::sendEvent(diff.viewport(), &move);
+        const QList<QToolButton *> buttons = diff.viewport()->findChildren<QToolButton *>();
+        const auto anyVisible = [&buttons] {
+            return std::any_of(buttons.begin(), buttons.end(), [](const QToolButton *b) { return b->isVisible(); });
+        };
+        QVERIFY(anyVisible());
+
+        // As the keyboard scrolls: no wheel, no mouse move.
+        diff.goToChange(true);
+        diff.goToChange(true);
+
+        QTRY_VERIFY(!anyVisible());
+    }
+
+    void diffColorsTheCodeAsTheEditor()
+    {
+        const FilePatch patch = FilePatch::parse("@@ -1 +1 @@\n-// old comment\n+return value;\n");
+        DiffView diff(Theme::dark());
+        diff.setFiles({{"x.cpp", "modified", patch}});
+        int removed = -1;
+        int added = -1;
+        for (int i = 0; i < diff.displayedLines().size(); ++i) {
+            if (diff.displayedLines()[i].kind == DiffView::LineKind::Removed)
+                removed = i;
+            if (diff.displayedLines()[i].kind == DiffView::LineKind::Added)
+                added = i;
+        }
+        const auto styleAt = [&diff](int line) {
+            const long position = diff.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+            return int(diff.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position));
+        };
+
+        const int comment = styleAt(removed);
+        const int keyword = styleAt(added);
+
+        // Both sides colored, each with its own syntax style (not the plain one).
+        QVERIFY(comment != 0);
+        QVERIFY(keyword != 0);
+        QVERIFY(comment != keyword);
+    }
+
     void outsideARepository()
     {
         const QTemporaryDir project;

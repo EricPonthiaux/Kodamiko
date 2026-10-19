@@ -73,7 +73,8 @@ void MainWindow::setTheme(const QString &name)
     unsavedEditNotice_->applyTheme(theme_);
     toolRequestBar_->applyTheme(theme_);
     toolsNotice_->applyTheme(theme_);
-    projectSettings_->applyTheme(theme_);
+    if (projectSettings_)
+        projectSettings_->applyTheme(theme_);
     if (preferencesPopup_)
         preferencesPopup_->applyTheme(theme_);
     snapshotsPopup_->applyTheme(theme_);

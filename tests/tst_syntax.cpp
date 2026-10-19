@@ -8,6 +8,10 @@
 #include <Qsci/qsciscintilla.h>
 #include <QtTest>
 
+#include <array>
+#include <thread>
+#include <vector>
+
 class TestSyntax : public QObject {
     Q_OBJECT
 
@@ -103,6 +107,27 @@ private slots:
         QFETCH(const QString, path);
         QFETCH(const QString, language);
         QCOMPARE(LanguageRegistry::languageForFile(path), language);
+    }
+
+    // Before everyGrammarQueryCompiles: the grammars are not loaded yet.
+    void grammarsLoadFromSeveralThreadsAtOnce()
+    {
+        const QStringList languages = {"c", "cpp", "java", "javascript", "typescript", "tsx"};
+        constexpr int threadCount = 4;
+        std::array<QList<const TreeSitterGrammar *>, threadCount> loaded;
+        std::vector<std::thread> threads;
+        for (int i = 0; i < threadCount; ++i) {
+            threads.emplace_back([&languages, &grammars = loaded[std::size_t(i)]] {
+                for (const QString &language : languages)
+                    grammars.append(TreeSitterGrammars::forLanguage(language));
+            });
+        }
+        for (std::thread &thread : threads)
+            thread.join();
+
+        QVERIFY(!loaded[0].contains(nullptr));
+        for (const QList<const TreeSitterGrammar *> &grammars : loaded)
+            QCOMPARE(grammars, loaded[0]); // one grammar per language, whichever thread asked
     }
 
     void everyGrammarQueryCompiles_data()

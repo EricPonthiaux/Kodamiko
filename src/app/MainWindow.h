@@ -169,6 +169,8 @@ private:
     void chooseFile();
     // File ▸ Project Settings.
     void showProjectSettings();
+    // The project settings popup, built on first use.
+    ProjectSettingsPopup *projectSettings();
     void applyProject(const ProjectConfig &project);
     void closeProject();
     // Says when the project lacks tools Duet can download.

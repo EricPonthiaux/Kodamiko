@@ -7,6 +7,15 @@
 #include <utility>
 
 namespace LspProtocol {
+namespace {
+
+// `text` as a Markdown code block, highlighted as `language` if not empty.
+QString codeBlock(const QString &text, const QString &language)
+{
+    return QStringLiteral("```%1\n%2\n```").arg(language, text);
+}
+
+} // namespace
 
 QString uriOf(const QString &filePath)
 {
@@ -126,15 +135,21 @@ QString applyEdits(const QString &text, QList<TextEdit> edits)
     return result;
 }
 
-QString plainText(const QJsonValue &contents)
+QString hoverMarkdown(const QJsonValue &contents)
 {
     if (contents.isString())
-        return contents.toString();
-    if (contents.isObject())
-        return contents.toObject().value("value").toString(); // MarkupContent or {language, value}
+        return contents.toString(); // a MarkedString is Markdown
+    if (contents.isObject()) {
+        const QJsonObject object = contents.toObject();
+        const QString value = object.value("value").toString();
+        if (object.contains("language")) // MarkedString
+            return codeBlock(value, object.value("language").toString());
+        const bool isMarkdown = object.value("kind").toString() == QLatin1String("markdown"); // MarkupContent
+        return isMarkdown ? value : codeBlock(value, QString());
+    }
     QStringList parts;
     for (const QJsonValue &item : contents.toArray()) {
-        const QString part = plainText(item);
+        const QString part = hoverMarkdown(item);
         if (!part.isEmpty())
             parts.append(part);
     }

@@ -70,8 +70,9 @@ QList<TextEdit> applicationOrder(QList<TextEdit> edits);
 // `text` with `edits` applied; they must not overlap.
 QString applyEdits(const QString &text, QList<TextEdit> edits);
 
-// The text of a "hover" result's contents: MarkupContent, MarkedString,
-// or a list of MarkedStrings.
-QString plainText(const QJsonValue &contents);
+// The Markdown of a "hover" result's contents: MarkupContent (Markdown, or
+// plain text as a code block), MarkedString (a code block when it names its
+// language), or a list of MarkedStrings.
+QString hoverMarkdown(const QJsonValue &contents);
 
 } // namespace LspProtocol

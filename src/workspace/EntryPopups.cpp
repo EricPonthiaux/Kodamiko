@@ -1,6 +1,7 @@
 #include "EntryPopups.h"
 
 #include "ui/AppFonts.h"
+#include "ui/UiMetrics.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -16,7 +17,10 @@
 
 namespace {
 
-constexpr int popupWidth = 420;
+constexpr int minimumPopupWidth = 480;
+constexpr int maximumPopupWidth = 640;
+constexpr qreal popupWindowShare = 0.4;
+constexpr int windowMargin = 20;
 
 QString translate(const char *text)
 {
@@ -111,32 +115,38 @@ EntryTarget resolveRename(const QString &path, const QString &name)
 EntryPopup::EntryPopup(const QString &title, const QString &location, QWidget *parent)
     : QFrame(parent, Qt::Popup)
     , content_(new QVBoxLayout)
+    , location_(new QLabel(this))
     , error_(new QLabel(this))
 {
     setAttribute(Qt::WA_DeleteOnClose);
     setFrameShape(QFrame::StyledPanel);
 
     auto *titleLabel = new QLabel(title, this);
+    titleLabel->setTextFormat(Qt::PlainText);
+    titleLabel->setWordWrap(true);
     AppFonts::setInterfaceFont(titleLabel, 1);
-    auto *locationLabel = new QLabel(this);
-    locationLabel->setForegroundRole(QPalette::PlaceholderText);
-    locationLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    locationLabel->setText(locationLabel->fontMetrics().elidedText(location, Qt::ElideMiddle, popupWidth / 2));
-    locationLabel->setToolTip(location);
+    location_->setTextFormat(Qt::PlainText);
+    location_->setForegroundRole(QPalette::PlaceholderText);
+    location_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    location_->setToolTip(location);
+    location_->setVisible(!location.isEmpty());
 
+    error_->setTextFormat(Qt::PlainText);
     error_->setWordWrap(true);
     error_->setStyleSheet(QStringLiteral("color: %1;").arg(errorColor(palette())));
     error_->hide();
 
-    auto *header = new QHBoxLayout;
+    auto *header = new QVBoxLayout;
+    header->setSpacing(UiMetrics::scaled(4));
     header->addWidget(titleLabel);
-    header->addStretch();
-    header->addWidget(locationLabel);
+    header->addWidget(location_);
 
-    content_->setSpacing(6);
+    content_->setSpacing(UiMetrics::scaled(12));
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(8, 6, 8, 8);
-    layout->setSpacing(6);
+    const int horizontalPadding = UiMetrics::scaled(20);
+    const int verticalPadding = UiMetrics::scaled(16);
+    layout->setContentsMargins(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
+    layout->setSpacing(UiMetrics::scaled(12));
     layout->addLayout(header);
     layout->addLayout(content_);
     layout->addWidget(error_);
@@ -145,10 +155,17 @@ EntryPopup::EntryPopup(const QString &title, const QString &location, QWidget *p
 void EntryPopup::popup()
 {
     const QWidget *window = parentWidget()->window();
-    const int width = std::min(popupWidth, window->width() - 40);
+    const QRect available = window->contentsRect();
+    const int preferredWidth = std::clamp(qRound(available.width() * popupWindowShare),
+                                          UiMetrics::scaled(minimumPopupWidth), UiMetrics::scaled(maximumPopupWidth));
+    const int width = std::min(preferredWidth, std::max(1, available.width() - 2 * UiMetrics::scaled(windowMargin)));
     setFixedWidth(width);
-    adjustSize();
-    move(window->mapToGlobal(QPoint((window->width() - width) / 2, (window->height() - height()) / 3)));
+    const QMargins padding = layout()->contentsMargins();
+    const int locationWidth = std::max(0, contentsRect().width() - padding.left() - padding.right());
+    location_->setText(location_->fontMetrics().elidedText(location_->toolTip(), Qt::ElideMiddle, locationWidth));
+    resizeToContent();
+    const QPoint offset((available.width() - width) / 2, std::max(0, (available.height() - height()) / 3));
+    move(window->mapToGlobal(available.topLeft() + offset));
     show();
     focusContent();
 }
@@ -165,7 +182,14 @@ void EntryPopup::showError(const QString &message)
     error_->setText(message);
     error_->setVisible(!message.isEmpty());
     errorChanged(!message.isEmpty());
-    adjustSize();
+    resizeToContent();
+}
+
+void EntryPopup::resizeToContent()
+{
+    ensurePolished();
+    const int contentHeight = layout()->totalHeightForWidth(width());
+    resize(width(), contentHeight >= 0 ? contentHeight : sizeHint().height());
 }
 
 void EntryPopup::keyPressEvent(QKeyEvent *event)
@@ -186,6 +210,7 @@ NamePopup::NamePopup(const QString &title,
     , field_(new QLineEdit(this))
 {
     field_->setPlaceholderText(tr("Name, with “/” to create subfolders"));
+    field_->setMinimumHeight(UiMetrics::scaled(36));
     connect(field_, &QLineEdit::returnPressed, this, &NamePopup::accept);
     connect(field_, &QLineEdit::textEdited, this, [this] { showError({}); });
     content()->addWidget(field_);
@@ -216,10 +241,8 @@ void NamePopup::focusContent()
 void NamePopup::errorChanged(bool shown)
 {
     // The outline only: the field keeps the style's look otherwise.
-    field_->setStyleSheet(shown
-                              ? QStringLiteral("QLineEdit { border: 1px solid %1; border-radius: 3px; padding: 2px; }")
-                                    .arg(errorColor(palette()))
-                              : QString());
+    field_->setStyleSheet(shown ? QStringLiteral("QLineEdit { border-color: %1; }").arg(errorColor(palette()))
+                                : QString());
 }
 
 ConfirmPopup::ConfirmPopup(const Question &question, std::function<bool(ConfirmPopup *)> apply, QWidget *parent)
@@ -246,7 +269,7 @@ void ConfirmPopup::setMessage(const QString &message, const QString &actionText)
 {
     message_->setText(message);
     action_->setText(actionText);
-    adjustSize();
+    resizeToContent();
 }
 
 QString ConfirmPopup::message() const

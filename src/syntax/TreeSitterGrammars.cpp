@@ -8,6 +8,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 
 extern "C" {
 const TSLanguage *tree_sitter_c();
@@ -78,23 +79,14 @@ struct LoadedGrammar {
     std::unique_ptr<TreeSitterGrammar> grammar; // nullptr if the query is invalid
 };
 
-} // namespace
-
-const TreeSitterGrammar *forLanguage(const QString &languageId)
+// The language's queries, compiled: the costly part (tens of milliseconds
+// for C++).
+LoadedGrammar load(const QString &languageId, const GrammarDefinition &definition)
 {
-    static std::map<QString, LoadedGrammar> loaded;
-
-    if (const auto it = loaded.find(languageId); it != loaded.end())
-        return it->second.grammar.get();
-
-    const auto definition = definitions().find(languageId);
-    if (definition == definitions().end())
-        return nullptr;
-
-    const TSLanguage *language = definition->second.language();
+    const TSLanguage *language = definition.language();
     LoadedGrammar entry;
-    entry.query = std::make_unique<HighlightQuery>(language, readQuerySources(definition->second.queryResources));
-    entry.outline = std::make_unique<HighlightQuery>(language, readQuerySources({definition->second.outlineResource}));
+    entry.query = std::make_unique<HighlightQuery>(language, readQuerySources(definition.queryResources));
+    entry.outline = std::make_unique<HighlightQuery>(language, readQuerySources({definition.outlineResource}));
     if (!entry.outline->isValid()) {
         qWarning().noquote() << "Invalid outline query" << languageId << ":" << entry.outline->errorMessage();
         entry.outline.reset();
@@ -104,10 +96,32 @@ const TreeSitterGrammar *forLanguage(const QString &languageId)
             std::make_unique<TreeSitterGrammar>(TreeSitterGrammar{language, *entry.query, entry.outline.get()});
     else
         qWarning().noquote() << "Invalid highlighting query" << languageId << ":" << entry.query->errorMessage();
+    return entry;
+}
 
-    const TreeSitterGrammar *grammar = entry.grammar.get();
-    loaded.emplace(languageId, std::move(entry));
-    return grammar;
+} // namespace
+
+const TreeSitterGrammar *forLanguage(const QString &languageId)
+{
+    static std::map<QString, LoadedGrammar> loaded;
+    static std::mutex loadedMutex;
+
+    {
+        const std::scoped_lock lock(loadedMutex);
+        if (const auto it = loaded.find(languageId); it != loaded.end())
+            return it->second.grammar.get();
+    }
+    const auto definition = definitions().find(languageId);
+    if (definition == definitions().end())
+        return nullptr;
+    // Compiled without the lock: a thread asking for another language
+    // does not wait. Two threads may compile the same one; the first kept wins.
+    LoadedGrammar entry = load(languageId, definition->second);
+    const std::scoped_lock lock(loadedMutex);
+    const auto [kept, isNew] = loaded.try_emplace(languageId);
+    if (isNew)
+        kept->second = std::move(entry);
+    return kept->second.grammar.get();
 }
 
 } // namespace TreeSitterGrammars

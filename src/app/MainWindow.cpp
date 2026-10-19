@@ -289,8 +289,6 @@ void MainWindow::createPopups()
     branchesPopup_ = new BranchesPopup(gitActions_, theme_, this);
     connect(branchesPopup_, &BranchesPopup::newBranchRequested, this, &MainWindow::showNewBranch);
     stashesPopup_ = new StashesPopup(gitActions_, theme_, this);
-    projectSettings_ = new ProjectSettingsPopup(toolchains_.get(), theme_, this);
-    connect(projectSettings_, &ProjectSettingsPopup::applied, this, &MainWindow::applyProject);
     connect(newBranchPopup_, &NewBranchPopup::createRequested, this, &MainWindow::createBranch);
     findInFiles_ = new FindInFilesPopup(theme_, this);
     findInFiles_->setBufferProvider([this] { return editorTabs_->unsavedTexts(); });
@@ -446,7 +444,7 @@ QWidget *MainWindow::createEditorArea()
     editorLayout->addWidget(findBar_);
     // Tools of the project's setup not downloaded yet.
     toolsNotice_ = new NoticeBar(editorArea);
-    connect(toolsNotice_, &NoticeBar::actionClicked, this, [this] { projectSettings_->download(project_); });
+    connect(toolsNotice_, &NoticeBar::actionClicked, this, [this] { projectSettings()->download(project_); });
     editorLayout->addWidget(toolsNotice_);
     // A language server that cannot run, for the current file's language.
     serverNotice_ = new NoticeBar(editorArea);

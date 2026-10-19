@@ -7,6 +7,9 @@
 #include <QObject>
 #include <QStringList>
 
+#include <memory>
+
+class CodeColorizer;
 class CodeNavigator;
 class EditorTabs;
 class EditorWidget;
@@ -36,6 +39,7 @@ public:
     };
 
     explicit CodeIntelligence(const Services &services, QObject *parent = nullptr);
+    ~CodeIntelligence() override;
 
     // Documentation when the mouse rests on a name, parameters while a
     // call is typed.
@@ -94,6 +98,8 @@ private:
     void requestOccurrences(EditorWidget *editor, int bytePosition);
     // Menu under the cursor of `editor`; returns the chosen entry or -1.
     int chooseFrom(EditorWidget *editor, const QStringList &entries) const;
+    // Documentation in `markdown` as a tooltip, in the theme of `editor`.
+    QString documentationHtml(const QString &markdown, const EditorWidget &editor);
     void jumpTo(const LspProtocol::Location &location);
     QString describe(const LspProtocol::Location &location, QHash<QString, QStringList> &lines) const;
 
@@ -101,6 +107,9 @@ private:
     LanguageServers *servers_;
     CodeNavigator *navigator_;
     ProblemStore *problems_;
+    // Highlights the code of the documentation; built on first use (it
+    // holds a hidden editor).
+    std::unique_ptr<CodeColorizer> colorizer_;
     int hoverGeneration_ = 0; // answers for an older position are dropped
     int signatureGeneration_ = 0;
 };

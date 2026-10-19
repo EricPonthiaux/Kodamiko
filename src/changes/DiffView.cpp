@@ -347,18 +347,22 @@ BothSides collectSides(const QList<Line> &lines, int fileStart, int file)
     return sides;
 }
 
-// The style of each byte of each side, as `scratch` colors it.
+// The style of each byte of each side, as `scratch` colors it. One
+// SCI_GETSTYLEDTEXT per side rather than a message per byte: up to
+// maxHighlightedBytes of them.
 std::array<QByteArray, 2> scratchStyles(const QsciScintilla &scratch, const std::array<QByteArray, 2> &code)
 {
     std::array<QByteArray, 2> styles;
     for (size_t side = 0; side < code.size(); ++side) {
+        const qsizetype length = code[side].size();
         scratch.SendScintilla(QsciScintillaBase::SCI_SETTEXT, 0UL, code[side].constData());
         scratch.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0UL, -1L);
-        styles[side].resize(code[side].size());
-        for (qsizetype p = 0; p < code[side].size(); ++p) {
-            styles[side][p] = static_cast<char>(
-                scratch.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, static_cast<unsigned long>(p)));
-        }
+        // Each byte followed by its style, then two zero bytes.
+        QByteArray styled(2 * length + 2, '\0');
+        scratch.SendScintilla(QsciScintillaBase::SCI_GETSTYLEDTEXT, 0L, long(length), styled.data());
+        styles[side].resize(length);
+        for (qsizetype p = 0; p < length; ++p)
+            styles[side][p] = styled[2 * p + 1];
     }
     return styles;
 }

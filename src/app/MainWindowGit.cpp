@@ -166,7 +166,7 @@ void MainWindow::runGitOnTree(const QString &title, const QString &path, bool ro
     const int count = static_cast<int>(paths.size());
     gitCommands_->run(title, [info = *info, paths, rollback, count] {
         if (rollback) {
-            GitOperations::discard(info, paths);
+            GitOperations::rollback(info, paths);
             return count == 1 ? QObject::tr("1 file rolled back") : QObject::tr("%1 files rolled back").arg(count);
         }
         GitOperations::stage(info, paths);

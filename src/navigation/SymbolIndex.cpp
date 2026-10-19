@@ -48,8 +48,6 @@ struct SymbolIndex::ScanResult {
 
 SymbolIndex::SymbolIndex(QObject *parent)
     : QObject(parent)
-    , workerProviders_(createProviders())
-    , providers_(createProviders())
 {
     pool_.setMaxThreadCount(1);
 }
@@ -59,15 +57,15 @@ SymbolIndex::~SymbolIndex()
     pool_.waitForDone();
 }
 
-SymbolIndex::Providers SymbolIndex::createProviders()
+// Created on first use, in the thread that uses `providers`: compiling a
+// grammar's queries takes tens of milliseconds, too long for the UI thread
+// at startup, and a project rarely needs every language.
+IOutlineProvider *SymbolIndex::providerFor(Providers &providers, const QString &languageId)
 {
-    // OutlineProviders::create is not thread-safe: create everything here.
-    Providers providers;
-    for (const QString &languageId : codeLanguages) {
-        if (auto provider = OutlineProviders::create(languageId))
-            providers.emplace(languageId, std::move(provider));
-    }
-    return providers;
+    auto it = providers.find(languageId);
+    if (it == providers.end())
+        it = providers.emplace(languageId, OutlineProviders::create(languageId)).first;
+    return it->second.get();
 }
 
 void SymbolIndex::setFolder(const QString &folder)
@@ -128,9 +126,9 @@ SymbolIndex::ScanResult SymbolIndex::scan(const QString &folder,
     ScanResult result;
     ProjectFiles::Options options;
     options.maxFiles = maxFiles;
-    options.accept = [&providers](const QFileInfo &entry) {
+    options.accept = [](const QFileInfo &entry) {
         return entry.size() <= maxFileSize &&
-               providers.contains(LanguageRegistry::languageForFile(entry.absoluteFilePath()));
+               codeLanguages.contains(LanguageRegistry::languageForFile(entry.absoluteFilePath()));
     };
     for (const QFileInfo &entry : ProjectFiles::list(folder, options)) {
         const QString path = entry.absoluteFilePath();
@@ -139,10 +137,11 @@ SymbolIndex::ScanResult SymbolIndex::scan(const QString &folder,
         const QDateTime modified = entry.lastModified();
         if (known.value(path) == modified)
             continue;
+        IOutlineProvider *provider = providerFor(providers, languageId);
         QFile file(path);
-        if (!file.open(QIODevice::ReadOnly))
+        if (!provider || !file.open(QIODevice::ReadOnly))
             continue;
-        const auto symbols = providers.at(languageId)->symbols(file.readAll());
+        const auto symbols = provider->symbols(file.readAll());
         result.updated.insert(path, {modified, flatten(symbols, path, languageId)});
     }
     return result;
@@ -151,11 +150,13 @@ SymbolIndex::ScanResult SymbolIndex::scan(const QString &folder,
 void SymbolIndex::updateFile(const QString &path, const QByteArray &text)
 {
     const QString languageId = LanguageRegistry::languageForFile(path);
-    const auto provider = providers_.find(languageId);
-    if (provider == providers_.end())
+    if (!codeLanguages.contains(languageId))
+        return;
+    IOutlineProvider *provider = providerFor(providers_, languageId);
+    if (!provider)
         return;
     // Null date: the next indexing will reread the saved file.
-    files_.insert(path, {QDateTime(), flatten(provider->second->symbols(text), path, languageId)});
+    files_.insert(path, {QDateTime(), flatten(provider->symbols(text), path, languageId)});
     ++revision_;
 }
 

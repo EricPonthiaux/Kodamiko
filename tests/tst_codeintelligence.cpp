@@ -1,6 +1,8 @@
 #include "diagnostics/ProblemStore.h"
+#include "editor/CodeColorizer.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/MarkdownToolTip.h"
 #include "editor/SymbolOccurrences.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
@@ -14,6 +16,9 @@
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QTextBlock>
+#include <QTextCursor>
+#include <QTextDocument>
 #include <QToolTip>
 #include <QtTest>
 
@@ -93,10 +98,41 @@ private slots:
         QCOMPARE(offsetOf("é😀x\nz", {0, 3}), qsizetype(3)); // UTF-16 units
     }
 
-    void readsHoverContents()
+    void readsHoverContentsAsMarkdown()
     {
-        QCOMPARE(plainText(QJsonObject{{"kind", "plaintext"}, {"value", "int f()"}}), QString("int f()"));
-        QCOMPARE(plainText(QJsonArray{"a", QJsonObject{{"language", "cpp"}, {"value", "b"}}}), QString("a\n\nb"));
+        QCOMPARE(hoverMarkdown(QJsonObject{{"kind", "markdown"}, {"value", "**f**"}}), QString("**f**"));
+        // Plain text keeps its layout: a code block.
+        QCOMPARE(hoverMarkdown(QJsonObject{{"kind", "plaintext"}, {"value", "int f()"}}), QString("```\nint f()\n```"));
+        QCOMPARE(hoverMarkdown(QJsonArray{"a", QJsonObject{{"language", "cpp"}, {"value", "b"}}}),
+                 QString("a\n\n```cpp\nb\n```"));
+    }
+
+    void rendersDocumentationInTheEditorTheme()
+    {
+        const Theme theme = Theme::dark();
+        CodeColorizer colorizer;
+        const QString html = MarkdownToolTip::html("### `open`\n\nOpens a **file**, see `path`.\n\n```\nint f();\n```",
+                                                   {theme, &colorizer, "cpp"});
+
+        QTextDocument shown;
+        shown.setHtml(html);
+        QCOMPARE(shown.toPlainText(), QString("open\nOpens a file, see path.\nint f();"));
+        const auto formatAt = [&shown](const QString &word) {
+            QTextCursor cursor(&shown);
+            cursor.setPosition(int(shown.toPlainText().indexOf(word)) + 1);
+            return cursor.charFormat();
+        };
+        QCOMPARE(formatAt("open").foreground().color(), theme.accent); // heading
+        QCOMPARE(formatAt("file").fontWeight(), int(QFont::Bold));
+        QVERIFY(formatAt("path").fontFamilies().toStringList().contains("monospace")); // inline code
+        // The fence names no language: the editor's, highlighted as in the editor.
+        const QString category = colorizer.categorize("int f();", "cpp").first().category;
+        const TextStyle &keyword = theme.syntaxStyles.at(theme.syntaxStyleIndex(category)).second;
+        QCOMPARE(formatAt("int").foreground().color(), keyword.foreground);
+        // One background: the tooltip's.
+        QCOMPARE(formatAt("path").background().style(), Qt::NoBrush);
+        QCOMPARE(shown.findBlock(int(shown.toPlainText().indexOf("int"))).blockFormat().background().style(),
+                 Qt::NoBrush);
     }
 
     void findsTheHeaderOfASource()

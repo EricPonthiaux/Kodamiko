@@ -64,6 +64,7 @@ add_library(duet_core STATIC
     editor/FileWatcher.cpp
     editor/FindBar.cpp
     editor/MarkdownHtml.cpp
+    editor/MarkdownToolTip.cpp
     editor/PreviewPage.cpp
     editor/PreviewSite.cpp
     editor/PreviewTab.cpp

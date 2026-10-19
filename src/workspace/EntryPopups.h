@@ -25,9 +25,9 @@ EntryTarget resolveNewEntry(const QString &root, const QString &folder, const QS
 // name gives `path` back; a change of case only is accepted.
 EntryTarget resolveRename(const QString &path, const QString &name);
 
-// Small popup for an operation on a file or folder, in the manner of
-// IntelliJ's "New File": a bold title with the location in gray next to it,
-// then the content. Enter applies, Escape or a click outside cancels.
+// Compact popup for an operation on a file or folder: a bold title with
+// the location below, then the content. Its width follows the parent window
+// and interface font. Enter applies, Escape or a click outside cancels.
 // Errors appear in red at the bottom. It deletes itself when closed.
 class EntryPopup : public QFrame {
     Q_OBJECT
@@ -48,11 +48,15 @@ protected:
 
     QVBoxLayout *content() const { return content_; }
 
+    // Recomputes the height at the current width, including wrapped text.
+    void resizeToContent();
+
     // Called when the error appears or disappears.
     virtual void errorChanged(bool shown) { Q_UNUSED(shown); }
 
 private:
     QVBoxLayout *content_;
+    QLabel *location_;
     QLabel *error_;
 };
 

@@ -23,6 +23,10 @@ void applyToIndex(const RepositoryInfo &repository, const QByteArray &patch, Pat
 // Restores the files on disk to their state in the index; untracked files
 // are deleted. A snapshot is taken first (see Snapshots).
 void discard(const RepositoryInfo &repository, const QStringList &paths);
+// Restores the files, on disk and in the index, to their state in the last
+// commit: staged changes go too, and the files added since are removed from
+// the index and deleted. A snapshot is taken first (see Snapshots).
+void rollback(const RepositoryInfo &repository, const QStringList &paths);
 // Removes from the files on disk the lines of a patch built by
 // FilePatch::partial(…, PatchDirection::Reverse) from an "index → disk"
 // diff. `paths`: affected files, for the snapshot taken first.

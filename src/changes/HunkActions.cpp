@@ -38,6 +38,12 @@ HunkActions::HunkActions(DiffView *diff)
     connect(apply_, &QToolButton::clicked, this, [this] { emit applyRequested(hunkLine_); });
     connect(discard_, &QToolButton::clicked, this, [this] { emit discardRequested(hunkLine_); });
     connect(diff_, &DiffView::contentChanged, this, &HunkActions::hide);
+    // However it scrolls (wheel, keys, scroll bar), the blocks move under
+    // the buttons: they would act on a block they no longer face.
+    connect(diff_, &QsciScintillaBase::SCN_UPDATEUI, this, [this](int updated) {
+        if (updated & QsciScintillaBase::SC_UPDATE_V_SCROLL)
+            hide();
+    });
 }
 
 void HunkActions::setStaged(bool staged)
@@ -64,9 +70,6 @@ bool HunkActions::eventFilter(QObject *watched, QEvent *event)
         // Onto a button: they stay.
         if (!apply_->underMouse() && !discard_->underMouse())
             hide();
-        break;
-    case QEvent::Wheel:
-        hide(); // the blocks move under the mouse
         break;
     default:
         break;
