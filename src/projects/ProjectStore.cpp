@@ -80,4 +80,14 @@ ProjectConfig touch(const QString &path)
     return config;
 }
 
+QString startFolder(const QString &requested)
+{
+    if (!requested.isEmpty())
+        return requested;
+    QString lastFolder = QSettings().value(QStringLiteral("lastFolder")).toString();
+    if (!lastFolder.isEmpty())
+        return lastFolder;
+    return QDir::homePath();
+}
+
 } // namespace ProjectStore

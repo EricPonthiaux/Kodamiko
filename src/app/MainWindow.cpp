@@ -31,6 +31,7 @@
 #include "navigation/GoToPopup.h"
 #include "navigation/SymbolIndex.h"
 #include "outline/OutlineView.h"
+#include "projects/ProjectStore.h"
 #include "run/RunConfiguration.h"
 #include "run/Runner.h"
 #include "search/FindInFilesPopup.h"
@@ -80,17 +81,6 @@ namespace {
 // that the eye reads groups first.
 constexpr int statusGroupSpacing = 16;
 
-// The folder asked for, else the last one opened, else the home folder.
-QString startFolder(const QString &requested)
-{
-    if (!requested.isEmpty())
-        return requested;
-    QString lastFolder = QSettings().value(QStringLiteral("lastFolder")).toString();
-    if (!lastFolder.isEmpty())
-        return lastFolder;
-    return QDir::homePath();
-}
-
 QColor problemsIconColor(int errorCount, int warningCount, const QColor &noProblemColor)
 {
     if (errorCount > 0)
@@ -120,7 +110,7 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
     connect(&claudeActivity_, &ClaudeActivity::attentionRequested, this, &MainWindow::notify);
     if (!hookServer_.listen())
         statusBar()->showMessage(tr("Claude tracking unavailable: %1").arg(hookServer_.errorString()));
-    openFolder(startFolder(folder));
+    openFolder(ProjectStore::startFolder(folder));
     setMode(static_cast<Mode>(
         std::clamp(QSettings().value(QStringLiteral("viewMode"), static_cast<int>(Mode::Edit)).toInt(), 0, 3)));
     // New installation: say what is missing rather than failing later.

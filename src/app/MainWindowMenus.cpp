@@ -30,9 +30,6 @@
 #include <QSettings>
 #include <QTreeWidget>
 
-#include <array>
-#include <ranges>
-
 void MainWindow::createMenus()
 {
     createFileMenu();

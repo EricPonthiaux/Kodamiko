@@ -167,6 +167,29 @@ private slots:
         QVERIFY(!ProjectStore::find("/work/b"));
     }
 
+    void startsInTheRequestedFolderOverTheLastOne()
+    {
+        QSettings().setValue("lastFolder", "/work/last");
+
+        QCOMPARE(ProjectStore::startFolder("/work/requested"), QString("/work/requested"));
+    }
+
+    void startsInTheLastFolderWhenNoneIsRequested()
+    {
+        QSettings().setValue("lastFolder", "/work/last");
+
+        QCOMPARE(ProjectStore::startFolder({}), QString("/work/last"));
+    }
+
+    void startsInTheHomeFolderWithoutALastOne() { QCOMPARE(ProjectStore::startFolder({}), QDir::homePath()); }
+
+    void startsInTheHomeFolderWhenTheLastOneIsEmpty()
+    {
+        QSettings().setValue("lastFolder", "");
+
+        QCOMPARE(ProjectStore::startFolder({}), QDir::homePath());
+    }
+
     void namesTheDownloads()
     {
         const Platform linuxX64{"linux", "x64"};

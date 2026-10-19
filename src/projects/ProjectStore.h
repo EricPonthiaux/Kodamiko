@@ -17,5 +17,8 @@ void remove(const QString &path);
 // Marks `path` as opened now, adding it (not configured) if it is new;
 // returns its configuration.
 ProjectConfig touch(const QString &path);
+// The folder a new window opens: `requested` if not empty, else the last
+// folder a window closed on (QSettings "lastFolder"), else the home folder.
+QString startFolder(const QString &requested);
 
 } // namespace ProjectStore
