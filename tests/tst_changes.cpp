@@ -93,20 +93,20 @@ private slots:
                                                  "@@ -40 +40,0 @@\n"
                                                  "-gone\n"
                                                  "\\ No newline at end of file\n");
-        const QList<DiffView::Line> lines = DiffView::layout({{"x.cpp", "modified", patch}});
+        const QList<DiffLine> lines = DiffLayout::lines({{"x.cpp", "modified", patch}});
         QStringList texts;
-        for (const DiffView::Line &line : lines)
+        for (const DiffLine &line : lines)
             texts.append(line.text);
         QCOMPARE(texts, QStringList({"", "x.cpp   modified   +1 −2", "⋯ lines 10–12  ·  void run()", "keep", "old",
                                      "new", "end", "⋯ line 40", "gone", "No line break at the end of the file"}));
-        QCOMPARE(lines[0].kind, DiffView::LineKind::Spacer);
-        QCOMPARE(lines[1].kind, DiffView::LineKind::FileHeader);
+        QCOMPARE(lines[0].kind, DiffLineKind::Spacer);
+        QCOMPARE(lines[1].kind, DiffLineKind::FileHeader);
         QCOMPARE(lines[1].emphasis, 5);    // "x.cpp"
         QCOMPARE(lines[1].statsStart, 19); // "+1 −2"
-        QCOMPARE(lines[4].kind, DiffView::LineKind::Removed);
+        QCOMPARE(lines[4].kind, DiffLineKind::Removed);
         QCOMPARE(lines[4].oldNumber, 11);
         QCOMPARE(lines[4].newNumber, 0);
-        QCOMPARE(lines[5].kind, DiffView::LineKind::Added);
+        QCOMPARE(lines[5].kind, DiffLineKind::Added);
         QCOMPARE(lines[5].newNumber, 11);
         QCOMPARE(lines[6].oldNumber, 12);
         QCOMPARE(lines[6].newNumber, 12);
@@ -136,24 +136,24 @@ private slots:
         view.setFiles({{"dump.log", "added", {}, true}});
 
         QCOMPARE(view.displayedLines().last().text, QString("File too large to show"));
-        QCOMPARE(view.displayedLines().last().kind, DiffView::LineKind::Note);
+        QCOMPARE(view.displayedLines().last().kind, DiffLineKind::Note);
     }
 
     void diffShowsChangedWords()
     {
-        using Range = DiffView::Range;
+        using Range = TextRange;
         // One word replaced: only it stands out, on both sides.
-        const auto [before, after] = DiffView::wordChanges("int count = 0;", "int total = 0;");
+        const auto [before, after] = WordDiff::changes("int count = 0;", "int total = 0;");
         QCOMPARE(before, QList<Range>({{4, 5}}));
         QCOMPARE(after, QList<Range>({{4, 5}}));
         // Two neighbouring words: one range, the space between them with them.
-        QCOMPARE(DiffView::wordChanges("call(a, b)", "call(x y, b)").second, QList<Range>({{5, 3}}));
+        QCOMPARE(WordDiff::changes("call(a, b)", "call(x y, b)").second, QList<Range>({{5, 3}}));
         // Rewritten: nothing stands out.
-        QVERIFY(DiffView::wordChanges("return value;", "throw Error(\"no\");").first.isEmpty());
+        QVERIFY(WordDiff::changes("return value;", "throw Error(\"no\");").first.isEmpty());
 
         // Removed then added lines face each other in the layout.
         const FilePatch patch = FilePatch::parse("@@ -1,2 +1,2 @@\n-int count = 0;\n-gone\n+int total = 0;\n");
-        const QList<DiffView::Line> lines = DiffView::layout({{"x.cpp", "", patch}});
+        const QList<DiffLine> lines = DiffLayout::lines({{"x.cpp", "", patch}});
         QCOMPARE(lines[3].changes, QList<Range>({{4, 5}}));
         QVERIFY(lines[4].changes.isEmpty());
         QCOMPARE(lines[5].changes, QList<Range>({{4, 5}}));
@@ -162,8 +162,8 @@ private slots:
     void diffHidesHeadingsOfProse()
     {
         const FilePatch patch = FilePatch::parse("@@ -10 +10 @@ a sentence cut\n-a\n+b\n");
-        QCOMPARE(DiffView::layout({{"x.md", "", patch}})[2].text, QString("⋯ line 10"));
-        QCOMPARE(DiffView::layout({{"x.cpp", "", patch}})[2].text, QString("⋯ line 10  ·  a sentence cut"));
+        QCOMPARE(DiffLayout::lines({{"x.md", "", patch}})[2].text, QString("⋯ line 10"));
+        QCOMPARE(DiffLayout::lines({{"x.cpp", "", patch}})[2].text, QString("⋯ line 10  ·  a sentence cut"));
     }
 
     void diffHeaderFollowsTheFileAtTheTop()
@@ -195,10 +195,10 @@ private slots:
         diff.resize(600, 40);
         diff.show();
         diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
-        const QList<DiffView::Line> &lines = diff.displayedLines();
+        const QList<DiffLine> &lines = diff.displayedLines();
         QList<int> blocks;
         for (int i = 0; i < lines.size(); ++i) {
-            if (lines[i].kind == DiffView::LineKind::HunkHeader)
+            if (lines[i].kind == DiffLineKind::HunkHeader)
                 blocks.append(i);
         }
         QCOMPARE(blocks.size(), 2);
@@ -221,7 +221,7 @@ private slots:
         diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
         int block = -1;
         for (int i = 0; i < diff.displayedLines().size(); ++i) {
-            if (diff.displayedLines()[i].kind == DiffView::LineKind::Added)
+            if (diff.displayedLines()[i].kind == DiffLineKind::Added)
                 block = diff.hunkStart(i);
         }
         QVERIFY(block >= 0);
@@ -279,9 +279,9 @@ private slots:
         int removed = -1;
         int added = -1;
         for (int i = 0; i < diff.displayedLines().size(); ++i) {
-            if (diff.displayedLines()[i].kind == DiffView::LineKind::Removed)
+            if (diff.displayedLines()[i].kind == DiffLineKind::Removed)
                 removed = i;
-            if (diff.displayedLines()[i].kind == DiffView::LineKind::Added)
+            if (diff.displayedLines()[i].kind == DiffLineKind::Added)
                 added = i;
         }
         const auto styleAt = [&diff](int line) {
@@ -306,9 +306,9 @@ private slots:
 
         diff.setFiles({{"x.cpp", "modified", patch}, {"y.cpp", "modified", patch}});
 
-        const QList<DiffView::Line> &lines = diff.displayedLines();
+        const QList<DiffLine> &lines = diff.displayedLines();
         const int lastAdded = static_cast<int>(lines.size()) - 1;
-        QCOMPARE(lines[lastAdded].kind, DiffView::LineKind::Added);
+        QCOMPARE(lines[lastAdded].kind, DiffLineKind::Added);
         const long position = diff.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, lastAdded);
         QVERIFY(diff.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position) != 0);
     }
