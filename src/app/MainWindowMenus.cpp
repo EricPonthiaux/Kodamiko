@@ -164,6 +164,10 @@ void MainWindow::createViewMenu()
     toggleTerminal->setShortcut(QKeySequence(Qt::Key_F11));
     toggleTerminal->setShortcutContext(Qt::ApplicationShortcut);
     connect(toggleTerminal, &QAction::triggered, this, &MainWindow::toggleTerminalMode);
+    detachTerminalsAction_ = view->addAction(tr("Terminals in a Separate &Window"));
+    detachTerminalsAction_->setCheckable(true);
+    detachTerminalsAction_->setToolTip(tr("The terminal tabs in a window of their own, to put on another screen"));
+    connect(detachTerminalsAction_, &QAction::toggled, this, &MainWindow::setTerminalsDetached);
     view->addSeparator();
     view->addAction(tr("File &Outline"), QKeySequence(tr("Ctrl+Shift+O")), this, &MainWindow::showOutline);
     view->addAction(tr("&Problems"), QKeySequence(tr("Alt+6")), this, [this] {

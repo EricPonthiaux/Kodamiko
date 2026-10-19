@@ -27,6 +27,15 @@ TrailingTabButton::TrailingTabButton(QTabWidget *tabs, QAbstractButton *button)
     button_->show();
 }
 
+void TrailingTabButton::setEndButton(QAbstractButton *button)
+{
+    endButton_ = button;
+    endButton_->setParent(tabs_);
+    endButton_->raise();
+    endButton_->show();
+    place();
+}
+
 bool TrailingTabButton::eventFilter(QObject *watched, QEvent *event)
 {
     switch (event->type()) {
@@ -53,7 +62,16 @@ void TrailingTabButton::place()
     button_->setVisible(bar->isVisible());
     const QRect barRect = bar->geometry();
     const QSize size = button_->sizeHint();
-    room_->setFixedWidth(size.width() + gap); // the icon may have come since
+    const QSize endSize = endButton_ ? endButton_->sizeHint() : QSize();
+    // The icons may have come since.
+    room_->setFixedWidth(size.width() + gap + (endButton_ ? endSize.width() + gap : 0));
+    if (endButton_) {
+        endButton_->setVisible(bar->isVisible());
+        const QPoint end(tabs_->width() - endSize.width() - gap,
+                         barRect.top() + (barRect.height() - endSize.height()) / 2);
+        if (endButton_->pos() != end || endButton_->size() != endSize)
+            endButton_->setGeometry(QRect(end, endSize));
+    }
     int x = barRect.left() + gap;
     if (bar->count() > 0)
         x = barRect.left() + bar->tabRect(bar->count() - 1).right() + 1 + gap;

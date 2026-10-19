@@ -11,6 +11,7 @@
 #include "run/RunConfigurationMenu.h"
 #include "run/Runner.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/DetachablePage.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
 #include "workspace/SidePanel.h"
@@ -257,7 +258,7 @@ void MainWindow::runConfiguration(const RunConfiguration &configuration)
     // The run's terminal comes to the front, whatever its kind.
     terminalTabs_->setCurrentIndex(index);
     updateTerminalPage();
-    setMode(Mode::Terminal);
+    showTerminals();
     terminal->setFocus();
     runner_->start(configuration, terminal);
 }
@@ -300,7 +301,7 @@ void MainWindow::stopRun()
     const std::optional<RunConfiguration> selected = runner_->selected();
     if (selected && running.contains(selected->name))
         name = selected->name;
-    if (mode_ == Mode::Terminal) {
+    if (mode_ == Mode::Terminal || terminalWindow_->isDetached()) {
         for (const QString &candidate : running) {
             if (runner_->terminal(candidate) == terminalTabs_->currentWidget())
                 name = candidate;

@@ -146,6 +146,7 @@ add_library(duet_core STATIC
     ui/AppFonts.cpp
     ui/BrandMark.cpp
     ui/ClaudeIndicator.cpp
+    ui/DetachablePage.cpp
     ui/FileIcons.cpp
     ui/GripSplitter.cpp
     ui/HoverCloseButtons.cpp
@@ -162,7 +163,9 @@ add_library(duet_core STATIC
     ui/TreeMetrics.cpp
     ui/UiIcons.cpp
     ui/UiMetrics.cpp
+    ui/WindowControls.cpp
     ui/WindowFrame.cpp
+    ui/WindowTitleBar.cpp
     viewers/DiagramKinds.cpp
     viewers/ImageView.cpp
     welcome/LanguageChoices.cpp

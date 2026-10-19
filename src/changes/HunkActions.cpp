@@ -17,7 +17,6 @@ namespace {
 constexpr int rightMargin = 8;
 constexpr int iconSize = 14;
 
-// A frame styled as the previews' view mode selector, in `parent`.
 QFrame *actionBar(QWidget *parent)
 {
     auto *bar = new QFrame(parent);

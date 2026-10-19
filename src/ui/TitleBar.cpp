@@ -13,14 +13,12 @@
 #include <QMenuBar>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QPainterPath>
 #include <QTabBar>
 #include <QToolButton>
 #include <QWindow>
 
 namespace {
 
-constexpr int controlWidth = 46;
 // Between the run block and the search actions, then before the window
 // controls.
 constexpr int groupSpacing = 14;
@@ -38,84 +36,6 @@ int controlHeight()
 }
 
 } // namespace
-
-WindowButton::WindowButton(Kind kind, QWidget *parent)
-    : QAbstractButton(parent)
-    , kind_(kind)
-    , theme_(Theme::dark())
-{
-    setFocusPolicy(Qt::NoFocus);
-    setCursor(Qt::ArrowCursor);
-}
-
-QSize WindowButton::sizeHint() const
-{
-    return {controlWidth, UiMetrics::scaled(UiMetrics::titleBarHeight)};
-}
-
-void WindowButton::applyTheme(const Theme &theme)
-{
-    theme_ = theme;
-    update();
-}
-
-void WindowButton::enterEvent(QEnterEvent *event)
-{
-    hovered_ = true;
-    update();
-    QAbstractButton::enterEvent(event);
-}
-
-void WindowButton::leaveEvent(QEvent *event)
-{
-    hovered_ = false;
-    update();
-    QAbstractButton::leaveEvent(event);
-}
-
-void WindowButton::paintEvent(QPaintEvent *)
-{
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    QColor color = theme_.foreground;
-    if (hovered_ || isDown()) {
-        // Closing turns red, as everywhere.
-        const QColor background =
-            kind_ == Kind::Close ? QColor("#e81123") : theme_.hover.lighter(theme_.isDark ? 140 : 97);
-        painter.fillRect(rect(), isDown() ? background.darker(115) : background);
-        if (kind_ == Kind::Close)
-            color = Qt::white;
-    }
-    painter.setPen(QPen(color, 1.1));
-    painter.setBrush(Qt::NoBrush);
-    const QPointF center = QRectF(rect()).center();
-    const qreal half = 5;
-    switch (kind_) {
-    case Kind::Minimize:
-        painter.drawLine(QPointF(center.x() - half, center.y()), QPointF(center.x() + half, center.y()));
-        break;
-    case Kind::Maximize:
-        if (window()->isMaximized()) {
-            // Restore: two overlapping squares.
-            painter.drawRoundedRect(QRectF(center.x() - half, center.y() - half + 2, 2 * half - 2, 2 * half - 2), 1.5,
-                                    1.5);
-            QPainterPath back;
-            back.moveTo(center.x() - half + 2, center.y() - half + 2);
-            back.lineTo(center.x() - half + 2, center.y() - half);
-            back.lineTo(center.x() + half, center.y() - half);
-            back.lineTo(center.x() + half, center.y() + half - 2);
-            back.lineTo(center.x() + half - 2, center.y() + half - 2);
-            painter.drawPath(back);
-        } else {
-            painter.drawRoundedRect(QRectF(center.x() - half, center.y() - half, 2 * half, 2 * half), 1.5, 1.5);
-        }
-        break;
-    case Kind::Close:
-        painter.drawLine(QPointF(center.x() - half, center.y() - half), QPointF(center.x() + half, center.y() + half));
-        painter.drawLine(QPointF(center.x() + half, center.y() - half), QPointF(center.x() - half, center.y() + half));
-        break;
-    }
-}
 
 namespace {
 
@@ -185,21 +105,9 @@ TitleBar::TitleBar(QWidget *parent)
     layout_->addLayout(actions_);
     layout_->addSpacing(windowControlsSpacing);
 
-    minimize_ = new WindowButton(WindowButton::Kind::Minimize, this);
-    minimize_->setToolTip(tr("Minimize"));
-    connect(minimize_, &QAbstractButton::clicked, this, [this] { window()->showMinimized(); });
-    maximize_ = new WindowButton(WindowButton::Kind::Maximize, this);
-    connect(maximize_, &QAbstractButton::clicked, this, &TitleBar::toggleMaximized);
-    close_ = new WindowButton(WindowButton::Kind::Close, this);
-    close_->setToolTip(tr("Close"));
-    connect(close_, &QAbstractButton::clicked, this, [this] { window()->close(); });
-    for (WindowButton *button : {minimize_, maximize_, close_})
-        layout_->addWidget(button);
-    updateMaximizeButton();
+    controls_ = new WindowControls(this);
+    layout_->addWidget(controls_);
     AppFonts::followApplicationFont(this, [this] { applyMetrics(); });
-
-    if (parent)
-        parent->window()->installEventFilter(this); // maximized or not
 }
 
 void TitleBar::alignLogoWith(QTabBar *column)
@@ -347,8 +255,8 @@ void TitleBar::applyMetrics()
     runDivider_->setFixedSize(1, control - 12);
     for (const ActionButton &entry : std::as_const(actionButtons_))
         sizeActionButton(entry);
-    for (WindowButton *button : {minimize_, maximize_, close_})
-        button->updateGeometry();
+    for (const auto kind : {WindowButton::Kind::Minimize, WindowButton::Kind::Maximize, WindowButton::Kind::Close})
+        controls_->button(kind)->updateGeometry();
 }
 
 void TitleBar::sizeActionButton(const ActionButton &entry)
@@ -359,8 +267,7 @@ void TitleBar::sizeActionButton(const ActionButton &entry)
 
 void TitleBar::setWindowControlsVisible(bool visible)
 {
-    for (WindowButton *button : {minimize_, maximize_, close_})
-        button->setVisible(visible);
+    controls_->setVisible(visible);
 }
 
 void TitleBar::setLeadingSpace(int pixels)
@@ -371,15 +278,7 @@ void TitleBar::setLeadingSpace(int pixels)
 
 WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const
 {
-    switch (kind) {
-    case WindowButton::Kind::Minimize:
-        return minimize_;
-    case WindowButton::Kind::Maximize:
-        return maximize_;
-    case WindowButton::Kind::Close:
-        break;
-    }
-    return close_;
+    return controls_->button(kind);
 }
 
 void TitleBar::applyTheme(const Theme &theme)
@@ -387,8 +286,7 @@ void TitleBar::applyTheme(const Theme &theme)
     theme_ = theme;
     project_->setIcon(FileIcons::folder(theme.isDark)); // the files tree's
     claude_->applyTheme(theme);
-    for (WindowButton *button : {minimize_, maximize_, close_})
-        button->applyTheme(theme);
+    controls_->applyTheme(theme);
     for (const ActionButton &entry : std::as_const(actionButtons_))
         entry.button->setIcon(UiIcons::icon(entry.iconName, entry.color.isValid() ? entry.color : theme.foreground));
     update();
@@ -414,25 +312,10 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
 void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        toggleMaximized();
+        WindowControls::toggleMaximized(window());
         return;
     }
     QWidget::mouseDoubleClickEvent(event);
-}
-
-void TitleBar::toggleMaximized()
-{
-    QWidget *top = window();
-    if (top->isMaximized())
-        top->showNormal();
-    else
-        top->showMaximized();
-}
-
-void TitleBar::updateMaximizeButton()
-{
-    maximize_->setToolTip(window()->isMaximized() ? tr("Restore") : tr("Maximize"));
-    maximize_->update();
 }
 
 bool TitleBar::eventFilter(QObject *watched, QEvent *event)
@@ -441,7 +324,5 @@ bool TitleBar::eventFilter(QObject *watched, QEvent *event)
                                event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange;
     if (watched == logoColumn_ && columnChanged)
         QMetaObject::invokeMethod(this, &TitleBar::updateLogoAlignment, Qt::QueuedConnection);
-    if (watched == window() && event->type() == QEvent::WindowStateChange)
-        updateMaximizeButton();
     return QWidget::eventFilter(watched, event);
 }

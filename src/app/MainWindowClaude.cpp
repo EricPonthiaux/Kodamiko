@@ -19,6 +19,7 @@
 #include "git/Snapshots.h"
 #include "navigation/SymbolIndex.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
@@ -143,7 +144,7 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     terminalTabs_->setCurrentIndex(0);
     updateTerminalPage();
     claudeTerminal_->start(*spec);
-    if (mode_ == Mode::Terminal)
+    if (mode_ == Mode::Terminal || terminalWindow_->isDetached())
         claudeTerminal_->setFocus();
     updateClaudeIndicator();
     updateClaudeWatched();
@@ -161,7 +162,7 @@ void MainWindow::showClaudeSession()
         }
     }
     terminalTabs_->setCurrentWidget(claudeTerminal_);
-    setMode(Mode::Terminal);
+    showTerminals();
 }
 
 // Claude reads part of its configuration only when it starts: a new
@@ -177,7 +178,7 @@ void MainWindow::restartClaudeSession()
         QMessageBox::warning(this, tr("Claude Session"), error);
         return;
     }
-    setMode(Mode::Terminal);
+    showTerminals();
 }
 
 void MainWindow::showEffectiveSettings(bool open)
@@ -269,7 +270,9 @@ void MainWindow::updateClaudeIndicator()
 
 void MainWindow::updateClaudeWatched()
 {
-    claudeActivity_.setWatched(claudeTerminal_ && isActiveWindow() && mode_ == Mode::Terminal &&
+    // In the main window or in the terminals' own: the window it is in.
+    const bool terminalsShown = mode_ == Mode::Terminal || terminalWindow_->isDetached();
+    claudeActivity_.setWatched(claudeTerminal_ && claudeTerminal_->isActiveWindow() && terminalsShown &&
                                terminalTabs_->currentWidget() == claudeTerminal_);
 }
 
@@ -279,7 +282,8 @@ void MainWindow::notify(const QString &title, const QString &message)
         return;
     QApplication::alert(this);
     // In the window, the dot on the tabs is enough.
-    if (isActiveWindow() || !QSystemTrayIcon::isSystemTrayAvailable() || !QSystemTrayIcon::supportsMessages())
+    const bool isDuetActive = isActiveWindow() || (claudeTerminal_ && claudeTerminal_->isActiveWindow());
+    if (isDuetActive || !QSystemTrayIcon::isSystemTrayAvailable() || !QSystemTrayIcon::supportsMessages())
         return;
     if (!trayIcon_) {
         QIcon icon = QApplication::windowIcon();
@@ -581,5 +585,5 @@ void MainWindow::typeInClaudePrompt(const QString &text, PromptEntry entry)
         QTimer::singleShot(submitDelayMs, claudeTerminal_, &TerminalWidget::pressEnter);
     }
     terminalTabs_->setCurrentWidget(claudeTerminal_);
-    setMode(Mode::Terminal);
+    showTerminals();
 }

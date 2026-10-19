@@ -23,6 +23,7 @@
 #include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/InstallPlan.h"
+#include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/UiIcons.h"
 #include "welcome/ProjectSettingsPopup.h"
@@ -83,6 +84,7 @@ void MainWindow::openFolder(const QString &folder)
     if (mode_ == Mode::History)
         historyView_->refresh();
     setWindowTitle(QStringLiteral("%1 — Duet").arg(QFileInfo(folder_).fileName()));
+    terminalWindow_->setWindowTitle(tr("Terminals — %1").arg(QFileInfo(folder_).fileName()));
     updateProjectMenu();
 }
 
@@ -203,7 +205,7 @@ TerminalWidget *MainWindow::addTerminal(const QString &title, const ProcessSpec 
     terminalTabs_->setTabIcon(index, UiIcons::icon(QStringLiteral("terminal"), theme_.mutedText));
     terminalTabs_->setCurrentIndex(index);
     updateTerminalPage();
-    setMode(Mode::Terminal);
+    showTerminals();
     terminal->start(spec);
     terminal->setFocus();
     return terminal;

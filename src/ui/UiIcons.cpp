@@ -296,6 +296,22 @@ const QHash<QString, Painter> &painters()
                                      {8, 12.5},
                                      {12.5, 12.5}}));
          }},
+        // A window, an arrow leaving it by its top right corner.
+        {QStringLiteral("detach"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF(
+                 {QPointF(7.5, 2.5), QPointF(2.5, 2.5), QPointF(2.5, 13.5), QPointF(13.5, 13.5), QPointF(13.5, 8.5)}));
+             p.drawLine(QPointF(7.5, 8.5), QPointF(13.5, 2.5));
+             p.drawPolyline(QPolygonF({QPointF(9.5, 2.5), QPointF(13.5, 2.5), QPointF(13.5, 6.5)}));
+         }},
+        // A window, an arrow entering it toward its bottom left corner.
+        {QStringLiteral("attach"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF(
+                 {QPointF(7.5, 2.5), QPointF(2.5, 2.5), QPointF(2.5, 13.5), QPointF(13.5, 13.5), QPointF(13.5, 8.5)}));
+             p.drawLine(QPointF(13.5, 2.5), QPointF(6.5, 9.5));
+             p.drawPolyline(QPolygonF({QPointF(6.5, 5.5), QPointF(6.5, 9.5), QPointF(10.5, 9.5)}));
+         }},
         // A window with a panel on its right side.
         {QStringLiteral("side-panel"),
          [](QPainter &p) {

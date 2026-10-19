@@ -3,6 +3,7 @@
 #include "git/GitProcess.h"
 #include "ui/AppFonts.h"
 #include "ui/ClaudeIndicator.h"
+#include "ui/DetachablePage.h"
 #include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/OverlayPopup.h"
@@ -39,6 +40,7 @@
 #include <QSettings>
 #include <QSignalSpy>
 #include <QSizeGrip>
+#include <QStackedWidget>
 #include <QStandardPaths>
 #include <QTabBar>
 #include <QTemporaryDir>
@@ -1071,6 +1073,110 @@ private slots:
             tabs.addTab(new QWidget, QString("terminal %1").arg(i));
         QTRY_VERIFY(button->geometry().right() < tabs.width());
         QVERIFY(button->isVisible());
+    }
+
+    void endButtonKeepsTheEndOfTheTabBar()
+    {
+        QTabWidget tabs;
+        tabs.setDocumentMode(true);
+        tabs.resize(800, 300);
+        auto *add = new QToolButton;
+        add->setText("+");
+        auto *end = new QToolButton;
+        end->setText("E");
+        auto *trailing = new TrailingTabButton(&tabs, add);
+        trailing->setEndButton(end);
+        tabs.addTab(new QWidget, "first");
+        tabs.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&tabs));
+
+        QTRY_VERIFY(end->geometry().right() < tabs.width());
+        QVERIFY(end->x() > tabs.width() - end->width() - 8);
+
+        // Tabs filling the bar: "+" stays before the end button.
+        for (int i = 0; i < 30; ++i)
+            tabs.addTab(new QWidget, QString("terminal %1").arg(i));
+        QTRY_VERIFY(add->geometry().right() < end->x());
+        QVERIFY(end->isVisible());
+    }
+
+    void detachedPageMovesToAWindowAndComesBackWhenItCloses()
+    {
+        QSettings().remove("detachTest");
+        QStackedWidget stack;
+        auto *first = new QLabel("first", &stack);
+        auto *page = new QLabel("page", &stack);
+        stack.addWidget(first);
+        stack.addWidget(page);
+        stack.setCurrentWidget(page);
+        stack.show();
+        auto *detachable = new DetachablePage(&stack, page, "detachTest", {"Window", "Away", "Back"});
+        const QSignalSpy changed(detachable, &DetachablePage::detachedChanged);
+
+        detachable->detach();
+
+        QVERIFY(detachable->isDetached());
+        QCOMPARE(stack.indexOf(page), -1);
+        QCOMPARE(stack.currentIndex(), 1); // the placeholder, in the page's place
+        QVERIFY(page->window() != stack.window());
+        QVERIFY(page->window()->isVisible());
+        QCOMPARE(page->window()->windowTitle(), QString("Window"));
+        QVERIFY(QSettings().value("detachTest/detached").toBool());
+
+        page->window()->close();
+
+        QVERIFY(!detachable->isDetached());
+        QCOMPARE(stack.indexOf(page), 1);
+        QCOMPARE(stack.currentWidget(), page);
+        QCOMPARE(changed.size(), 2);
+        QVERIFY(!QSettings().value("detachTest/detached").toBool());
+        QSettings().remove("detachTest");
+    }
+
+    void raisingTheDetachedWindowKeepsItMaximized()
+    {
+        QSettings().remove("detachTest");
+        QStackedWidget stack;
+        auto *page = new QLabel("page", &stack);
+        stack.addWidget(page);
+        auto *detachable = new DetachablePage(&stack, page, "detachTest", {"Window", "Away", "Back"});
+        detachable->detach();
+        page->window()->showMaximized();
+        QTRY_VERIFY(page->window()->isMaximized());
+
+        detachable->raiseWindow(); // as a new terminal does
+
+        QVERIFY(page->window()->isMaximized());
+        page->window()->showMinimized();
+        detachable->raiseWindow();
+        QVERIFY(!page->window()->isMinimized());
+        QVERIFY(page->window()->isMaximized());
+        detachable->attach();
+        QSettings().remove("detachTest");
+    }
+
+    void detachedPageIsDetachedAgainWhereItWas()
+    {
+        QSettings().remove("detachTest");
+        const QRect placed(120, 90, 500, 300);
+        {
+            QStackedWidget stack;
+            auto *page = new QLabel("page", &stack);
+            stack.addWidget(page);
+            auto *detachable = new DetachablePage(&stack, page, "detachTest", {"Window", "Away", "Back"});
+            detachable->detach();
+            page->window()->setGeometry(placed);
+        } // closing the application with the page away
+
+        QStackedWidget stack;
+        auto *page = new QLabel("page", &stack);
+        stack.addWidget(page);
+        auto *detachable = new DetachablePage(&stack, page, "detachTest", {"Window", "Away", "Back"});
+        detachable->restore();
+
+        QVERIFY(detachable->isDetached());
+        QCOMPARE(page->window()->geometry().size(), placed.size());
+        QSettings().remove("detachTest");
     }
 };
 

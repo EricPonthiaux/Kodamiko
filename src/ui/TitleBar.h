@@ -2,8 +2,8 @@
 
 #include "ClaudeIndicator.h"
 #include "Theme.h"
+#include "WindowControls.h"
 
-#include <QAbstractButton>
 #include <QIcon>
 #include <QPointer>
 #include <QWidget>
@@ -17,33 +17,6 @@ class QMenu;
 class QMenuBar;
 class QTabBar;
 class QToolButton;
-
-// Window control drawn in the theme: minimize, maximize (restore when the
-// window is maximized) or close.
-class WindowButton : public QAbstractButton {
-    Q_OBJECT
-
-public:
-    enum class Kind {
-        Minimize,
-        Maximize,
-        Close
-    };
-
-    WindowButton(Kind kind, QWidget *parent);
-    void applyTheme(const Theme &theme);
-    QSize sizeHint() const override;
-
-protected:
-    void paintEvent(QPaintEvent *event) override;
-    void enterEvent(QEnterEvent *event) override;
-    void leaveEvent(QEvent *event) override;
-
-private:
-    Kind kind_;
-    Theme theme_;
-    bool hovered_ = false;
-};
 
 // Duet's own title bar, in the manner of IntelliJ's main toolbar: the
 // menu, the project (with the recent folders), Claude's state,
@@ -116,8 +89,6 @@ private:
     // Sizes from UiMetrics, at the application font's size.
     void applyMetrics();
     void sizeActionButton(const ActionButton &entry);
-    void toggleMaximized();
-    void updateMaximizeButton();
     void updateLogoAlignment();
 
     Theme theme_;
@@ -138,7 +109,5 @@ private:
     QHBoxLayout *actions_;
 
     QList<ActionButton> actionButtons_;
-    WindowButton *minimize_;
-    WindowButton *maximize_;
-    WindowButton *close_;
+    WindowControls *controls_;
 };

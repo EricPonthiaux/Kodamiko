@@ -41,6 +41,7 @@
 #include "setup/Prerequisites.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
+#include "ui/DetachablePage.h"
 #include "ui/GripSplitter.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/NoticeBar.h"
@@ -63,6 +64,8 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMenu>
+#include <QMenuBar>
 #include <QSettings>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -91,6 +94,19 @@ QColor problemsIconColor(int errorCount, int warningCount, const QColor &noProbl
     return noProblemColor;
 }
 
+// Every command of `menu`'s menus and submenus.
+QList<QAction *> menuCommands(const QWidget *menu)
+{
+    QList<QAction *> commands;
+    for (QAction *action : menu->actions()) {
+        if (const QMenu *submenu = action->menu())
+            commands += menuCommands(submenu);
+        else if (!action->isSeparator())
+            commands.append(action);
+    }
+    return commands;
+}
+
 } // namespace
 
 MainWindow::MainWindow(const QString &folder, QWidget *parent)
@@ -104,6 +120,8 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
     createWidgets();
     createMenus();
     applyKeymap(Keymap::loadOverrides());
+    // The menus' shortcuts work from the terminals' window too.
+    terminalWindow_->setWindowActions(menuCommands(titleBar_->menuBar()));
     restoreSettings();
     connect(&hookServer_, &HookServer::hookReceived, this, &MainWindow::onHookReceived);
     registerMcpTools();
@@ -240,6 +258,18 @@ void MainWindow::createCentralWidget()
     modes_->addWidget(createEditPage());
     modes_->addWidget(changesView_);
     modes_->addWidget(historyView_);
+    terminalWindow_ = new DetachablePage(
+        modes_, terminalPage_, QStringLiteral("terminalWindow"),
+        {tr("Terminals — Duet"), tr("The terminals are in a window of their own."), tr("Bring the Terminals Back")});
+    connect(terminalWindow_, &DetachablePage::detachedChanged, this, [this](bool detached) {
+        updateTerminalWindowControls();
+        // Away in their own window, the terminals have no mode tab here.
+        modeTabs_->setTabVisible(static_cast<int>(Mode::Terminal), !detached);
+        if (detached && mode_ == Mode::Terminal)
+            setMode(modeBeforeTerminal_);
+        updateClaudeWatched();
+    });
+    connect(terminalWindow_, &DetachablePage::windowActivationChanged, this, &MainWindow::updateClaudeWatched);
     auto *central = new QWidget(this);
     auto *centralLayout = new QVBoxLayout(central);
     centralLayout->setContentsMargins(0, 0, 0, 0);
@@ -517,7 +547,14 @@ QWidget *MainWindow::createTerminalPage()
     newTerminalButton_->setFocusPolicy(Qt::NoFocus);
     newTerminalButton_->setToolTip(tr("New Terminal (Ctrl+Shift+T)"));
     connect(newTerminalButton_, &QToolButton::clicked, this, &MainWindow::newShell);
-    new TrailingTabButton(terminalTabs_, newTerminalButton_); // right after the last tab
+    auto *trailing = new TrailingTabButton(terminalTabs_, newTerminalButton_); // right after the last tab
+    // The terminals, tabs and all, to a window of their own, on any screen.
+    detachTerminalsButton_ = new QToolButton(terminalTabs_);
+    detachTerminalsButton_->setAutoRaise(true);
+    detachTerminalsButton_->setFocusPolicy(Qt::NoFocus);
+    connect(detachTerminalsButton_, &QToolButton::clicked, this,
+            [this] { setTerminalsDetached(!terminalWindow_->isDetached()); });
+    trailing->setEndButton(detachTerminalsButton_);
 
     auto *hint = new QLabel(tr("No terminal open\n\n"
                                "Ctrl+Shift+L: start the Claude session"),
@@ -636,6 +673,7 @@ void MainWindow::restoreSettings()
         setSystemTitleBar(system);
     }
     restoreGeometry(settings.value(QStringLiteral("geometry")).toByteArray());
+    terminalWindow_->restore();
     editSplitter_->restoreState(settings.value(QStringLiteral("editSplitter")).toByteArray());
     changesView_->splitter()->restoreState(settings.value(QStringLiteral("diffSplitter")).toByteArray());
     historyView_->restoreState(settings.value(QStringLiteral("historySplitter")).toByteArray());
@@ -669,6 +707,16 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::setMode(Mode mode)
 {
+    // Terminals in their own window: it comes to the front instead, and
+    // the main window keeps (or gets) another mode.
+    if (mode == Mode::Terminal && terminalWindow_->isDetached()) {
+        if (modes_->currentIndex() == static_cast<int>(Mode::Terminal))
+            setMode(modeBeforeTerminal_);
+        else if (modeActions_)
+            modeActions_->actions().at(static_cast<int>(mode_))->setChecked(true);
+        showTerminals();
+        return;
+    }
     if (mode != Mode::Terminal)
         modeBeforeTerminal_ = mode;
     mode_ = mode;
@@ -720,6 +768,38 @@ void MainWindow::updateTerminalPage()
     terminalPage_->setCurrentIndex(terminalTabs_->count() > 0 ? 1 : 0);
 }
 
+void MainWindow::showTerminals()
+{
+    if (terminalWindow_->isDetached()) {
+        terminalWindow_->raiseWindow();
+        if (QWidget *terminal = terminalTabs_->currentWidget())
+            terminal->setFocus();
+        return;
+    }
+    setMode(Mode::Terminal);
+}
+
+void MainWindow::setTerminalsDetached(bool detached)
+{
+    if (detached)
+        terminalWindow_->detach();
+    else
+        terminalWindow_->attach();
+}
+
+void MainWindow::updateTerminalWindowControls()
+{
+    const bool detached = terminalWindow_->isDetached();
+    if (detachTerminalsAction_) {
+        const QSignalBlocker blocker(detachTerminalsAction_);
+        detachTerminalsAction_->setChecked(detached);
+    }
+    detachTerminalsButton_->setIcon(
+        UiIcons::icon(detached ? QStringLiteral("attach") : QStringLiteral("detach"), theme_.mutedText));
+    detachTerminalsButton_->setToolTip(detached ? tr("Bring the terminals back to the main window")
+                                                : tr("Move the terminals to a window of their own"));
+}
+
 void MainWindow::setSystemTitleBar(bool system)
 {
 #ifdef Q_OS_MACOS
@@ -734,6 +814,7 @@ void MainWindow::setSystemTitleBar(bool system)
 #endif
 #else
     frame_->setFrameless(!system);
+    terminalWindow_->setFrameless(!system);
     titleBar_->setWindowControlsVisible(!system);
     statusBar()->setSizeGripEnabled(system); // Duet's frame resizes from its edges
 #endif
@@ -759,6 +840,7 @@ void MainWindow::updateTabIcons()
     syncButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
     cancelGitButton_->setIcon(UiIcons::icon(QStringLiteral("stop"), color));
     emptyNewTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
+    updateTerminalWindowControls();
     for (int i = 0; i < terminalTabs_->count(); ++i) {
         const QWidget *terminal = terminalTabs_->widget(i);
         if (terminal == claudeTerminal_)

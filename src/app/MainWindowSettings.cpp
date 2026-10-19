@@ -24,6 +24,7 @@
 #include "settings/PreferencesPopup.h"
 #include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -52,6 +53,7 @@ void MainWindow::setTheme(const QString &name)
     ThemeStyle::apply(theme_);
     titleBar_->applyTheme(theme_);
     frame_->applyTheme(theme_);
+    terminalWindow_->applyTheme(theme_);
     branchButton_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme_.mutedText));
     fileTree_->setSearchHighlight(theme_.findHighlight);
     fileTree_->setDarkIcons(theme_.isDark);

@@ -24,6 +24,7 @@ class CodeIntelligence;
 class CodeNavigator;
 class CommandPalette;
 class CompletionService;
+class DetachablePage;
 class EditorStatus;
 class EditorTabs;
 class EditorWidget;
@@ -210,6 +211,13 @@ private:
     void toggleTerminalMode();
     void showOutline();
     void updateTerminalPage();
+    // The terminals to the front: their window when they are in one, else
+    // the Terminal mode.
+    void showTerminals();
+    // The terminals' window in, or out of, the main window.
+    void setTerminalsDetached(bool detached);
+    // The View menu's check and the button over the terminal tabs.
+    void updateTerminalWindowControls();
 
     void onHookReceived(const HookEvent &event);
     // Dot on the Claude tab and on the Terminal mode tab.
@@ -359,6 +367,9 @@ private:
     QToolButton *emptyNewTerminalButton_ = nullptr; // the same, when no terminal is open
     TerminalWidget *claudeTerminal_ = nullptr;
     QStackedWidget *terminalPage_ = nullptr;
+    DetachablePage *terminalWindow_ = nullptr;     // terminalPage_ in a window of its own
+    QToolButton *detachTerminalsButton_ = nullptr; // at the right of the terminal tabs
+    QAction *detachTerminalsAction_ = nullptr;     // View menu
     ChangesView *changesView_ = nullptr;
     HistoryView *historyView_ = nullptr;
     GitCommands *gitCommands_ = nullptr;
