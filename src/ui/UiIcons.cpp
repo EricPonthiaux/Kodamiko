@@ -256,6 +256,12 @@ const QHash<QString, Painter> &painters()
              p.drawPolyline(QPolygonF({QPointF(4.5, 2.5), QPointF(8, 6), QPointF(11.5, 2.5)}));
              p.drawPolyline(QPolygonF({QPointF(4.5, 13.5), QPointF(8, 10), QPointF(11.5, 13.5)}));
          }},
+        // Two chevrons pointing apart.
+        {QStringLiteral("expand-all"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF({QPointF(4.5, 6), QPointF(8, 2.5), QPointF(11.5, 6)}));
+             p.drawPolyline(QPolygonF({QPointF(4.5, 10), QPointF(8, 13.5), QPointF(11.5, 10)}));
+         }},
         // Three boxes in a tree: the diagram laid out.
         {QStringLiteral("arrange"),
          [](QPainter &p) {

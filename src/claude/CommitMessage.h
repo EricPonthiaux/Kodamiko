@@ -71,12 +71,15 @@ private:
                        const QString &error,
                        const QString &workDir,
                        int generation);
+    void onOutput(int generation);
     void onProcessFinished(int generation);
+    void handleReply(const QString &errorOutput);
     void fail(const QString &error);
     void setRunning(bool running);
 
     QThreadPool pool_;
     QProcess *process_ = nullptr;
+    QByteArray output_; // what `process_` printed so far
     QTimer *timeout_;
     int generation_ = 0;
     bool running_ = false;

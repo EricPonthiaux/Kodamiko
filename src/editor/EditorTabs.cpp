@@ -8,6 +8,7 @@
 #include "ui/BrandMark.h"
 #include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
+#include "ui/TabBarBaseLine.h"
 #include "ui/UiIcons.h"
 #include "viewers/ImageView.h"
 #ifdef DUET_WITH_DIAGRAMS
@@ -64,23 +65,15 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     connect(tabBar(), &QWidget::customContextMenuRequested, this, &EditorTabs::showTabContextMenu);
     connect(&watcher_, &FileWatcher::fileChanged, this, &EditorTabs::syncWithDisk);
     new HoverCloseButtons(tabBar());
+    baseLine_ = new TabBarBaseLine(tabBar());
+    baseLine_->setColor(theme_.line);
 }
 
 void EditorTabs::paintEvent(QPaintEvent *event)
 {
     QTabWidget::paintEvent(event);
-    if (count() == 0) {
+    if (count() == 0)
         paintEmptyMark();
-        return;
-    }
-    // Leave the selected tab open onto its document.
-    QPainter painter(this);
-    painter.setPen(theme_.line);
-    const int y = tabBar()->geometry().bottom();
-    const QRect current = tabBar()->tabRect(currentIndex()).translated(tabBar()->pos());
-    if (current.left() > 0)
-        painter.drawLine(0, y, current.left(), y);
-    painter.drawLine(current.right(), y, width(), y);
 }
 
 void EditorTabs::paintEmptyMark()
@@ -895,6 +888,7 @@ void EditorTabs::updateTabIcon(QWidget *page)
 void EditorTabs::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    baseLine_->setColor(theme.line);
     update();
     for (int i = 0; i < count(); ++i)
         updateTabIcon(widget(i));

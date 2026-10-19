@@ -531,6 +531,7 @@ QWidget *MainWindow::createTerminalPage()
     terminalTabs_->setObjectName(QStringLiteral("terminalTabs"));
     terminalTabs_->setTabsClosable(true);
     terminalTabs_->setDocumentMode(true);
+    terminalTabs_->tabBar()->setDrawBase(false);
     new HoverCloseButtons(terminalTabs_->tabBar());
     connect(terminalTabs_, &QTabWidget::tabCloseRequested, this, [this](int index) {
         QWidget *terminal = terminalTabs_->widget(index);

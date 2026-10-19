@@ -4,6 +4,7 @@
 #include "OutlineProviders.h"
 #include "editor/EditorWidget.h"
 #include "ui/TreeColumnFit.h"
+#include "ui/ViewHeader.h"
 
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -13,6 +14,7 @@
 #include <QPainter>
 #include <QScrollBar>
 #include <QStackedWidget>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
@@ -98,6 +100,7 @@ QIcon iconFor(SymbolKind kind)
 
 OutlineView::OutlineView(QWidget *parent)
     : QWidget(parent)
+    , header_(new ViewHeader(tr("Outline"), this))
     , filter_(new QLineEdit(this))
     , tree_(new QTreeWidget(this))
     , placeholder_(new QLabel(this))
@@ -140,9 +143,15 @@ OutlineView::OutlineView(QWidget *parent)
     toolbar->setContentsMargins(4, 2, 2, 2);
     toolbar->addWidget(filter_);
 
+    connect(header_->addButton(QStringLiteral("expand-all"), tr("Expand All")), &QToolButton::clicked, this,
+            [this] { setAllExpanded(true); });
+    connect(header_->addButton(QStringLiteral("collapse-all"), tr("Collapse All")), &QToolButton::clicked, this,
+            [this] { setAllExpanded(false); });
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+    layout->addWidget(header_);
     layout->addLayout(toolbar);
     layout->addWidget(stack_, 1);
 
@@ -183,6 +192,19 @@ void OutlineView::focusFilter()
 {
     filter_->setFocus();
     filter_->selectAll();
+}
+
+void OutlineView::setIconColor(const QColor &color)
+{
+    header_->setIconColor(color);
+}
+
+void OutlineView::setAllExpanded(bool expanded)
+{
+    for (QTreeWidgetItemIterator it(tree_); *it; ++it) {
+        if ((*it)->childCount() > 0)
+            (*it)->setExpanded(expanded);
+    }
 }
 
 void OutlineView::showEvent(QShowEvent *event)

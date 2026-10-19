@@ -245,11 +245,13 @@ void CommitMessageGenerator::onChangesRead(const std::optional<CommitMessage::Ch
         return;
     }
 
+    output_.clear();
     process_ = new QProcess(this);
     process_->setProgram(spec->program);
     process_->setArguments(spec->arguments);
     process_->setWorkingDirectory(spec->workingDirectory);
     process_->setProcessEnvironment(spec->environment);
+    connect(process_, &QProcess::readyReadStandardOutput, this, [this, generation] { onOutput(generation); });
     connect(process_, &QProcess::finished, this, [this, generation] { onProcessFinished(generation); });
     connect(process_, &QProcess::errorOccurred, this, [this, generation](QProcess::ProcessError processError) {
         if (processError == QProcess::FailedToStart && generation == generation_)
@@ -260,17 +262,33 @@ void CommitMessageGenerator::onChangesRead(const std::optional<CommitMessage::Ch
     process_->closeWriteChannel();
 }
 
+void CommitMessageGenerator::onOutput(int generation)
+{
+    if (generation != generation_ || !process_)
+        return;
+    output_ += process_->readAllStandardOutput();
+    // `claude` prints its reply as one JSON line, then takes a while to exit:
+    // the reply is shown as soon as it is complete.
+    const bool isComplete = output_.endsWith('\n') && QJsonDocument::fromJson(output_).isObject();
+    if (isComplete)
+        handleReply(QString());
+}
+
 void CommitMessageGenerator::onProcessFinished(int generation)
 {
     if (generation != generation_ || !process_)
         return;
-    const QByteArray output = process_->readAllStandardOutput();
-    const QString errorOutput = QString::fromUtf8(process_->readAllStandardError()).trimmed();
+    output_ += process_->readAllStandardOutput();
+    handleReply(QString::fromUtf8(process_->readAllStandardError()).trimmed());
+}
+
+void CommitMessageGenerator::handleReply(const QString &errorOutput)
+{
     QString error;
-    const std::optional<QString> message = CommitMessage::parseReply(output, &error);
+    const std::optional<QString> message = CommitMessage::parseReply(output_, &error);
     if (!message) {
         // Without JSON, `claude` explains itself on its error output.
-        fail(output.trimmed().isEmpty() && !errorOutput.isEmpty() ? errorOutput : error);
+        fail(output_.trimmed().isEmpty() && !errorOutput.isEmpty() ? errorOutput : error);
         return;
     }
     cancel();

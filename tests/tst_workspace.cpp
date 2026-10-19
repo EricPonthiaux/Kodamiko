@@ -1,17 +1,22 @@
+#include "diagnostics/ProblemStore.h"
+#include "diagnostics/ProblemsView.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/GitProcess.h"
+#include "lsp/LanguageServers.h"
 #include "ui/AppFonts.h"
 #include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/OverlayPopup.h"
+#include "ui/TabBarBaseLine.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
 #include "ui/TrailingLayout.h"
 #include "ui/TrailingTabButton.h"
 #include "ui/TreeMetrics.h"
+#include "ui/ViewHeader.h"
 #include "ui/WindowFrame.h"
 #include "workspace/CommandPalette.h"
 #include "workspace/EntryPopups.h"
@@ -46,6 +51,7 @@
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QToolButton>
+#include <QTreeWidget>
 #include <QtTest>
 
 namespace {
@@ -1075,6 +1081,90 @@ private slots:
         QVERIFY(button->isVisible());
     }
 
+    void terminalTabsAreAsTallAsEditorTabs()
+    {
+        ThemeStyle::apply(Theme::dark());
+        EditorTabs editors(Theme::dark());
+        editors.addTab(new QLabel("code"), "main.cpp");
+        QTabWidget terminals;
+        terminals.setObjectName("terminalTabs");
+        terminals.setTabsClosable(true);
+        terminals.setDocumentMode(true);
+        terminals.addTab(new QLabel("shell"), "Terminal");
+
+        editors.show();
+        terminals.show();
+
+        QTRY_VERIFY(editors.tabBar()->height() > 0);
+        QCOMPARE(terminals.tabBar()->height(), editors.tabBar()->height());
+    }
+
+    void baseLineRunsUnderTheTabsButTheCurrentOne()
+    {
+        QTabWidget tabs;
+        tabs.setDocumentMode(true);
+        tabs.addTab(new QWidget, "first");
+        tabs.addTab(new QWidget, "second");
+        auto *line = new TabBarBaseLine(tabs.tabBar());
+        line->setColor(Qt::red);
+        tabs.resize(600, 200);
+        tabs.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&tabs));
+
+        QTabBar *bar = tabs.tabBar();
+        QVERIFY(!bar->drawBase()); // the style's own, at the top in some styles
+        const auto colorUnder = [&](int tab) {
+            const QImage image = bar->grab().toImage();
+            return image.pixelColor(bar->tabRect(tab).center().x(), bar->height() - 1);
+        };
+        QCOMPARE(colorUnder(1), QColor(Qt::red));
+        QVERIFY(colorUnder(0) != QColor(Qt::red));
+        tabs.setCurrentIndex(1);
+        QTRY_VERIFY(colorUnder(1) != QColor(Qt::red));
+        QCOMPARE(colorUnder(0), QColor(Qt::red));
+    }
+
+    void problemsHeaderCountsAndFoldsTheProblems()
+    {
+        LanguageServers servers;
+        ProblemStore store(&servers);
+        Problem warning;
+        warning.path = "/project/main.cpp";
+        warning.severity = Diagnostic::Severity::Warning;
+        warning.message = "unused variable";
+        Problem error = warning;
+        error.severity = Diagnostic::Severity::Error;
+        error.message = "no member named foo";
+        Problem other = error;
+        other.path = "/project/other.cpp";
+        store.setBuildProblems("build", {warning, error, other});
+        ProblemsView view(&store);
+        view.setProjectFolder("/project");
+
+        const auto *header = view.findChild<ViewHeader *>();
+        QVERIFY(header);
+        const auto texts = [header] {
+            QStringList result;
+            for (const QLabel *label : header->findChildren<QLabel *>()) {
+                if (label->isVisibleTo(header))
+                    result.append(label->text());
+            }
+            return result;
+        };
+        QTRY_COMPARE(view.tree()->topLevelItemCount(), 2);
+        QVERIFY(texts().contains("Problems"));
+        QVERIFY(texts().join(' ').contains(QString::number(2))); // two errors
+
+        const QList<QToolButton *> buttons = header->findChildren<QToolButton *>();
+        QCOMPARE(buttons.size(), 2); // Expand All, Collapse All
+        buttons.at(1)->click();
+        QVERIFY(!view.tree()->topLevelItem(0)->isExpanded());
+        QVERIFY(!view.tree()->topLevelItem(1)->isExpanded());
+        buttons.at(0)->click();
+        QVERIFY(view.tree()->topLevelItem(0)->isExpanded());
+        QVERIFY(view.tree()->topLevelItem(1)->isExpanded());
+    }
+
     void endButtonKeepsTheEndOfTheTabBar()
     {
         QTabWidget tabs;
@@ -1092,6 +1182,13 @@ private slots:
 
         QTRY_VERIFY(end->geometry().right() < tabs.width());
         QVERIFY(end->x() > tabs.width() - end->width() - 8);
+        // Square buttons, centered rather than as tall as the bar.
+        const QRect bar = tabs.tabBar()->geometry();
+        for (const QToolButton *button : {add, end}) {
+            QCOMPARE(button->width(), button->height());
+            QVERIFY(button->height() <= bar.height());
+            QCOMPARE(button->y() - bar.top(), bar.bottom() - button->geometry().bottom());
+        }
 
         // Tabs filling the bar: "+" stays before the end button.
         for (int i = 0; i < 30; ++i)

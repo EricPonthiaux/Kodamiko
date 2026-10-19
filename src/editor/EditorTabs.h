@@ -14,6 +14,7 @@
 
 class DiagramView;
 class ImageView;
+class TabBarBaseLine;
 
 // Tabs for open files (and displayed diffs). Reloads files modified on
 // disk — by Claude in particular — and asks what to do if the user had
@@ -175,6 +176,7 @@ private:
     void updateTabIcon(QWidget *page);
 
     Theme theme_;
+    TabBarBaseLine *baseLine_ = nullptr; // over the tab bar, which owns it
     QString projectFolder_;
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer

@@ -3,6 +3,7 @@
 #include "ProblemStore.h"
 #include "ui/FileIcons.h"
 #include "ui/TreeColumnFit.h"
+#include "ui/ViewHeader.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -11,6 +12,7 @@
 #include <QPainter>
 #include <QScrollBar>
 #include <QStackedWidget>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -176,13 +178,15 @@ QTreeWidgetItem *addFileItem(QTreeWidget *tree, const FileProblems &file, const 
 ProblemsView::ProblemsView(ProblemStore *problems, QWidget *parent)
     : QWidget(parent)
     , problems_(problems)
-    , summary_(new QLabel(this))
+    , header_(new ViewHeader(tr("Problems"), this))
     , tree_(new QTreeWidget(this))
     , placeholder_(new QLabel(tr("No problems"), this))
     , stack_(new QStackedWidget(this))
 {
-    summary_->setEnabled(false);
-    summary_->setContentsMargins(8, 4, 8, 4);
+    connect(header_->addButton(QStringLiteral("expand-all"), tr("Expand All")), &QToolButton::clicked, this,
+            [this] { setAllExpanded(true); });
+    connect(header_->addButton(QStringLiteral("collapse-all"), tr("Collapse All")), &QToolButton::clicked, this,
+            [this] { setAllExpanded(false); });
 
     tree_->header()->hide();
     tree_->setUniformRowHeights(true);
@@ -204,7 +208,7 @@ ProblemsView::ProblemsView(ProblemStore *problems, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(summary_);
+    layout->addWidget(header_);
     layout->addWidget(stack_, 1);
 
     refreshTimer_.setSingleShot(true);
@@ -227,6 +231,17 @@ void ProblemsView::setDarkIcons(bool dark)
         return;
     darkIcons_ = dark;
     refresh();
+}
+
+void ProblemsView::setIconColor(const QColor &color)
+{
+    header_->setIconColor(color);
+}
+
+void ProblemsView::setAllExpanded(bool expanded)
+{
+    for (int i = 0; i < tree_->topLevelItemCount(); ++i)
+        tree_->topLevelItem(i)->setExpanded(expanded);
 }
 
 void ProblemsView::scheduleRefresh()
@@ -271,8 +286,7 @@ void ProblemsView::refresh()
     columnFit_->refit();
 
     stack_->setCurrentWidget(files.isEmpty() ? static_cast<QWidget *>(placeholder_) : tree_);
-    summary_->setText(files.isEmpty() ? QString() : countText(errors, warnings));
-    summary_->setVisible(!files.isEmpty());
+    header_->setDetail(countText(errors, warnings));
     if (errors != errors_ || warnings != warnings_) {
         errors_ = errors;
         warnings_ = warnings;

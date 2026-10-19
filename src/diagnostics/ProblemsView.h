@@ -10,6 +10,7 @@ class QStackedWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 class TreeColumnFit;
+class ViewHeader;
 
 // Problems pane: every problem of the project (the language servers', the
 // builds'), by file, the files with errors first. A click opens the file
@@ -23,6 +24,8 @@ public:
     // Folders are shown relative to it.
     void setProjectFolder(const QString &folder);
     void setDarkIcons(bool dark);
+    // Color of the header's line icons, from the theme.
+    void setIconColor(const QColor &color);
 
     QTreeWidget *tree() const { return tree_; }
 
@@ -39,6 +42,8 @@ private:
     void scheduleRefresh();
     void refresh();
     void activate(QTreeWidgetItem *item);
+    // Every file; remembered as for a click on each.
+    void setAllExpanded(bool expanded);
 
     ProblemStore *problems_;
     QString folder_;
@@ -48,7 +53,7 @@ private:
     int warnings_ = 0;
     QSet<QString> collapsedFiles_;
 
-    QLabel *summary_;
+    ViewHeader *header_;
     QTreeWidget *tree_;
     TreeColumnFit *columnFit_;
     QLabel *placeholder_;

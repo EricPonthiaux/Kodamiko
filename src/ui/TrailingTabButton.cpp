@@ -5,9 +5,21 @@
 #include <QTabBar>
 #include <QTabWidget>
 
+#include <algorithm>
+
 namespace {
 
 constexpr int gap = 4;
+
+// Square, as wide as `button` would be, rather than as tall as the bar.
+// Of the bar's height parity: centered on it to the pixel.
+QSize buttonSize(const QAbstractButton *button, int barHeight)
+{
+    int side = std::min(button->sizeHint().width(), barHeight);
+    if ((barHeight - side) % 2 != 0)
+        ++side;
+    return {side, side};
+}
 
 } // namespace
 
@@ -61,22 +73,23 @@ void TrailingTabButton::place()
     const QTabBar *bar = tabs_->tabBar();
     button_->setVisible(bar->isVisible());
     const QRect barRect = bar->geometry();
-    const QSize size = button_->sizeHint();
-    const QSize endSize = endButton_ ? endButton_->sizeHint() : QSize();
+    const QSize size = buttonSize(button_, barRect.height());
+    const QSize endSize = endButton_ ? buttonSize(endButton_, barRect.height()) : QSize();
+    const int top = barRect.top() + (barRect.height() - size.height()) / 2;
     // The icons may have come since.
     room_->setFixedWidth(size.width() + gap + (endButton_ ? endSize.width() + gap : 0));
     if (endButton_) {
         endButton_->setVisible(bar->isVisible());
-        const QPoint end(tabs_->width() - endSize.width() - gap,
-                         barRect.top() + (barRect.height() - endSize.height()) / 2);
-        if (endButton_->pos() != end || endButton_->size() != endSize)
-            endButton_->setGeometry(QRect(end, endSize));
+        const int endTop = barRect.top() + (barRect.height() - endSize.height()) / 2;
+        const QRect end(QPoint(tabs_->width() - endSize.width() - gap, endTop), endSize);
+        if (endButton_->geometry() != end)
+            endButton_->setGeometry(end);
     }
     int x = barRect.left() + gap;
     if (bar->count() > 0)
         x = barRect.left() + bar->tabRect(bar->count() - 1).right() + 1 + gap;
     x = std::min(x, barRect.right() + 1 + gap); // the tabs fill the bar: in the kept room
-    const QPoint position(x, barRect.top() + (barRect.height() - size.height()) / 2);
-    if (button_->pos() != position || button_->size() != size)
-        button_->setGeometry(QRect(position, size));
+    const QRect geometry(QPoint(x, top), size);
+    if (button_->geometry() != geometry)
+        button_->setGeometry(geometry);
 }

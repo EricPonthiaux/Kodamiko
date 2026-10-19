@@ -18,6 +18,7 @@ class QStackedWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 class TreeColumnFit;
+class ViewHeader;
 
 // Outline pane: the symbols of the current editor's file (functions,
 // classes, headings...). A click places the cursor on the symbol; the symbol
@@ -34,6 +35,8 @@ public:
     void setEditor(EditorWidget *editor);
     // Gives focus to the filter field.
     void focusFilter();
+    // Color of the header's line icons, from the theme.
+    void setIconColor(const QColor &color);
 
     QTreeWidget *tree() const { return tree_; }
 
@@ -50,6 +53,8 @@ private:
     void applyFilter();
     void selectSymbolAtCursor();
     void jumpTo(QTreeWidgetItem *item);
+    // Every symbol with children; remembered as for a click on each.
+    void setAllExpanded(bool expanded);
     QTreeWidgetItem *firstMatchingItem() const;
     QString pathOf(QTreeWidgetItem *item) const;
 
@@ -63,6 +68,7 @@ private:
     // Items collapsed by the user, per file, kept from one computation to the next.
     QHash<QString, QSet<QString>> collapsedPaths_;
 
+    ViewHeader *header_;
     QLineEdit *filter_;
     QTreeWidget *tree_;
     TreeColumnFit *columnFit_;

@@ -17,6 +17,7 @@
 #include "editor/FindBar.h"
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
+#include "outline/OutlineView.h"
 #include "search/FindInFilesPopup.h"
 #include "settings/FontSettings.h"
 #include "settings/Keymap.h"
@@ -60,6 +61,8 @@ void MainWindow::setTheme(const QString &name)
     filesPanel_->setIconColor(theme_.foreground);
     claudeConfigView_->setDarkIcons(theme_.isDark);
     claudeConfigView_->setIconColor(theme_.foreground);
+    outlineView_->setIconColor(theme_.foreground);
+    problemsView_->setIconColor(theme_.foreground);
     problemsView_->setDarkIcons(theme_.isDark);
     sidebar_->applyTheme(theme_);
     editorTabs_->applyTheme(theme_);

@@ -173,6 +173,7 @@ QTabBar::tab:hover { color: @text; background: @panel; }
 QTabBar::tab:selected { color: @accentText; background: @base; border-bottom: 2px solid @accent; }
 QTabBar::tab:bottom:selected { border-bottom: none; border-top: 2px solid @accent; }
 QTabWidget#terminalTabs QTabBar::tab, QTabBar#goToTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
+QTabWidget#terminalTabs QTabBar::tab { padding: 7px 12px 9px; margin-top: 4px; border: 1px solid transparent; border-top: 2px solid transparent; border-bottom: none; }
 QTabWidget#terminalTabs QTabBar::tab:first, QTabBar#goToTabs::tab:first { border-top-left-radius: 3px; }
 QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
 QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; }

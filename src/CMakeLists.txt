@@ -153,6 +153,7 @@ add_library(duet_core STATIC
     ui/KdeThemes.cpp
     ui/NoticeBar.cpp
     ui/OverlayPopup.cpp
+    ui/TabBarBaseLine.cpp
     ui/PopupWidgets.cpp
     ui/Theme.cpp
     ui/ThemeStyle.cpp
@@ -163,6 +164,7 @@ add_library(duet_core STATIC
     ui/TreeMetrics.cpp
     ui/UiIcons.cpp
     ui/UiMetrics.cpp
+    ui/ViewHeader.cpp
     ui/WindowControls.cpp
     ui/WindowFrame.cpp
     ui/WindowTitleBar.cpp
