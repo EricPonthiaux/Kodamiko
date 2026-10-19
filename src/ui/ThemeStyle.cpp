@@ -161,12 +161,12 @@ QToolButton:hover { background: @button; }
 QToolButton:checked { background: @selection; color: @accentText; }
 QFrame#previewToolbar { background: @base; border: none; border-bottom: 1px solid @line; }
 QLabel#previewFormat { color: @muted; background: transparent; }
-QFrame#modeSelector { background: @window; border: 1px solid @line; border-radius: 6px; }
-QFrame#modeSelector QToolButton { color: @muted; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 3px 8px; min-height: 16px; }
-QFrame#modeSelector QToolButton:hover { color: @text; background: @hover; }
+QFrame#modeSelector, QFrame#hunkActions { background: @window; border: 1px solid @line; border-radius: 6px; }
+QFrame#modeSelector QToolButton, QFrame#hunkActions QToolButton { color: @muted; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 3px 8px; min-height: 16px; }
+QFrame#modeSelector QToolButton:hover, QFrame#hunkActions QToolButton:hover { color: @text; background: @hover; }
 QFrame#modeSelector QToolButton:checked { color: @accentText; background: @modeActive; border-color: @modeBorder; }
-QFrame#modeSelector QToolButton:pressed { background: @selection; }
-QFrame#modeSelector QToolButton:focus { border-color: @accent; }
+QFrame#modeSelector QToolButton:pressed, QFrame#hunkActions QToolButton:pressed { background: @selection; }
+QFrame#modeSelector QToolButton:focus, QFrame#hunkActions QToolButton:focus { border-color: @accent; }
 QTabWidget::pane { border: none; }
 QTabBar::tab { background: transparent; color: @muted; padding: 8px 16px; border: none; }
 QTabBar::tab:hover { color: @text; background: @panel; }
@@ -223,8 +223,6 @@ QLabel#historyMuted { color: @muted; }
 QToolButton#linkButton { padding: 0; color: @accent; }
 QToolButton#linkButton:hover { background: transparent; text-decoration: underline; }
 QFrame#diffHeader { border: none; border-bottom: 1px solid @line; background: @window; }
-QToolButton#hunkAction { background: @button; border: 1px solid @border; border-radius: 3px; padding: 0 8px; }
-QToolButton#hunkAction:hover { border-color: @highlight; }
 QFrame#card QPlainTextEdit { background: @base; }
 QStatusBar { background: transparent; border-top: 1px solid @line; color: @muted; }
 TitleBar QMenuBar { background: transparent; border: none; }

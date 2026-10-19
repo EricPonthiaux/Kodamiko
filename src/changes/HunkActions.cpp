@@ -1,7 +1,12 @@
 #include "HunkActions.h"
 
 #include "DiffView.h"
+#include "ui/AppFonts.h"
+#include "ui/Theme.h"
+#include "ui/UiIcons.h"
 
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QToolButton>
 
@@ -10,17 +15,32 @@
 namespace {
 
 constexpr int rightMargin = 8;
-constexpr int spacing = 4;
+constexpr int iconSize = 14;
 
-QToolButton *actionButton(QWidget *parent, const QString &text, const QString &toolTip)
+// A frame styled as the previews' view mode selector, in `parent`.
+QFrame *actionBar(QWidget *parent)
 {
-    auto *button = new QToolButton(parent);
-    button->setObjectName(QStringLiteral("hunkAction"));
+    auto *bar = new QFrame(parent);
+    bar->setObjectName(QStringLiteral("hunkActions"));
+    auto *layout = new QHBoxLayout(bar);
+    layout->setContentsMargins(2, 2, 2, 2);
+    layout->setSpacing(2);
+    bar->hide();
+    return bar;
+}
+
+QToolButton *actionButton(QFrame *bar, const QString &text, const QString &toolTip)
+{
+    auto *button = new QToolButton(bar);
     button->setText(text);
     button->setToolTip(toolTip);
+    button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    button->setIconSize(QSize(iconSize, iconSize));
+    AppFonts::setInterfaceFont(button, 0.9, QFont::Normal);
+    button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setCursor(Qt::ArrowCursor);
-    button->hide();
+    button->setCursor(Qt::PointingHandCursor);
+    bar->layout()->addWidget(button);
     return button;
 }
 
@@ -29,8 +49,9 @@ QToolButton *actionButton(QWidget *parent, const QString &text, const QString &t
 HunkActions::HunkActions(DiffView *diff)
     : QObject(diff)
     , diff_(diff)
-    , apply_(actionButton(diff->viewport(), tr("Stage"), tr("Stage this block")))
-    , discard_(actionButton(diff->viewport(), tr("Discard…"), tr("Discard this block (a copy is kept)")))
+    , bar_(actionBar(diff->viewport()))
+    , apply_(actionButton(bar_, tr("Stage"), tr("Stage this block")))
+    , discard_(actionButton(bar_, tr("Discard…"), tr("Discard this block (a copy is kept)")))
 {
     diff_->viewport()->setMouseTracking(true);
     diff_->viewport()->installEventFilter(this);
@@ -51,7 +72,17 @@ void HunkActions::setStaged(bool staged)
     staged_ = staged;
     apply_->setText(staged ? tr("Unstage") : tr("Stage"));
     apply_->setToolTip(staged ? tr("Unstage this block") : tr("Stage this block"));
+    apply_->setIcon(staged ? unstageIcon_ : stageIcon_);
+    discard_->setVisible(!staged);
     hide();
+}
+
+void HunkActions::applyTheme(const Theme &theme)
+{
+    stageIcon_ = UiIcons::icon(QStringLiteral("plus"), theme.mutedText);
+    unstageIcon_ = UiIcons::icon(QStringLiteral("minus"), theme.mutedText);
+    apply_->setIcon(staged_ ? unstageIcon_ : stageIcon_);
+    discard_->setIcon(UiIcons::icon(QStringLiteral("discard"), theme.mutedText));
 }
 
 void HunkActions::setEnabled(bool enabled)
@@ -67,8 +98,8 @@ bool HunkActions::eventFilter(QObject *watched, QEvent *event)
         placeAt(static_cast<QMouseEvent *>(event)->position().toPoint().y());
         break;
     case QEvent::Leave:
-        // Onto a button: they stay.
-        if (!apply_->underMouse() && !discard_->underMouse())
+        // Onto the buttons: they stay.
+        if (!bar_->underMouse())
             hide();
         break;
     default:
@@ -87,22 +118,16 @@ void HunkActions::placeAt(int y)
         return;
     }
     hunkLine_ = hunkLine;
+    // Centered on the separator, which it may overlap a little.
     const int top = std::max(0, diff_->lineTop(hunkLine));
-    int right = diff_->viewport()->width() - rightMargin;
-    for (QToolButton *button : {discard_, apply_}) {
-        const bool shown = button == apply_ || !staged_;
-        button->setVisible(shown);
-        if (!shown)
-            continue;
-        button->adjustSize();
-        const int height = std::min(button->height(), lineHeight);
-        button->setGeometry(right - button->width(), top + (lineHeight - height) / 2, button->width(), height);
-        right -= button->width() + spacing;
-    }
+    bar_->adjustSize();
+    const int barTop = std::max(0, top + (lineHeight - bar_->height()) / 2);
+    bar_->move(diff_->viewport()->width() - rightMargin - bar_->width(), barTop);
+    bar_->show();
+    bar_->raise();
 }
 
 void HunkActions::hide()
 {
-    apply_->hide();
-    discard_->hide();
+    bar_->hide();
 }
