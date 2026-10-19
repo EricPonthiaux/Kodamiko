@@ -8,11 +8,14 @@
 
 #include <functional>
 
+class ScratchEditors;
+
 // File shown by a DiffView.
 struct DiffFile {
     QString path;   // as shown in its title bar
     QString status; // "modified", "added", "renamed from x.cpp"…
     FilePatch patch;
+    bool isTooLarge = false; // listed without its patch, see FileDiff
 };
 
 // Diff without git's notation, for reading: a title bar per file with its
@@ -117,8 +120,11 @@ private:
     // A line number right-justified for the margin; blank when `value` is 0.
     QString marginNumber(int value) const;
     void defineStyles();
-    // Colors the code of file `file` as the editor would.
-    void highlightSyntax(int file);
+    // Colors the code of every file as the editor would, within a budget.
+    void highlightFiles();
+    // Colors the code of file `file` with `scratches` if it fits in
+    // `budget` bytes; returns the bytes colored.
+    qsizetype highlightSyntax(int file, ScratchEditors &scratches, qsizetype budget);
     // Styles displayed line `line` from the scratch editor's styles of its
     // bytes, through `diffStyle`.
     void styleRuns(int line, QByteArrayView scratchStyles, const std::function<int(int)> &diffStyle);

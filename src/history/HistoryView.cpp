@@ -429,7 +429,7 @@ void HistoryView::onFileSelectionChanged()
         return;
     }
     const FileDiff &file = details_->files.at(selected.first()->data(0, fileIndexRole).toInt());
-    diff_->setFiles({{file.change.path, changeStatusText(file.change), FilePatch::parse(file.patch)}});
+    diff_->setFiles({{file.change.path, changeStatusText(file.change), FilePatch::parse(file.patch), file.isTooLarge}});
 }
 
 // What to choose for a diff to show; nothing before a commit is chosen,

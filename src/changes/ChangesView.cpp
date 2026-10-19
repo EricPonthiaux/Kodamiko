@@ -434,7 +434,7 @@ void ChangesView::showSection(Section section)
     if (status_) {
         for (const FileDiff &diff : files(section)) {
             shownPatches_.append(FilePatch::parse(diff.patch));
-            shown.append({diff.change.path, changeStatusText(diff.change), shownPatches_.last()});
+            shown.append({diff.change.path, changeStatusText(diff.change), shownPatches_.last(), diff.isTooLarge});
         }
     }
     if (!shown.isEmpty()) {
@@ -777,6 +777,7 @@ void ChangesView::generateCommitMessage()
 void ChangesView::applyTheme(const Theme &theme)
 {
     diff_->applyTheme(theme);
+    hunkActions_->applyTheme(theme);
     const QColor color = theme.foreground;
     stageButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     unstageButton_->setIcon(UiIcons::icon(QStringLiteral("minus"), color));

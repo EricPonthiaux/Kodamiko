@@ -63,8 +63,11 @@ QJsonArray diffsJson(const QList<FileDiff> &diffs, bool patches)
                          {QStringLiteral("change"), kindName(diff.change.kind)}};
         if (!diff.change.oldPath.isEmpty())
             item.insert(QStringLiteral("oldPath"), diff.change.oldPath);
-        if (patches)
+        const bool hasPatch = patches && !diff.isTooLarge;
+        if (hasPatch)
             item.insert(QStringLiteral("patch"), truncatedPatch(diff.patch));
+        else if (patches)
+            item.insert(QStringLiteral("tooLargeToDiff"), true);
         array.append(item);
     }
     return array;

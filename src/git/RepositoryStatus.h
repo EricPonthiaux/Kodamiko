@@ -42,8 +42,12 @@ struct RepositoryInfo {
 struct FileDiff {
     FileChange change;
     // Raw unified diff (paths relative to the repository root): the file's
-    // bytes are kept as is, so that it can be reapplied.
+    // bytes are kept as is, so that it can be reapplied. Empty when
+    // `isTooLarge`.
     QByteArray patch;
+    // A file too large to be compared line by line (over 1 MiB on either
+    // side): only listed.
+    bool isTooLarge = false;
 
     bool operator==(const FileDiff &) const = default;
 };

@@ -124,6 +124,17 @@ RepositoryInfo readInfo(git_repository *repository, const QString &folder)
     return info;
 }
 
+// The patch of a larger file is not computed: its content would be read,
+// kept and shown on each refresh, which a few logs or dumps left untracked
+// are enough to make slow. A size libgit2 does not know yet (a blob of a
+// tree) counts as 0.
+constexpr git_object_size_t maxDiffedFileBytes = git_object_size_t(1024) * 1024;
+
+bool isTooLargeToDiff(const git_diff_delta *delta)
+{
+    return delta->old_file.size > maxDiffedFileBytes || delta->new_file.size > maxDiffedFileBytes;
+}
+
 } // namespace
 
 namespace libgit2 {
@@ -152,6 +163,11 @@ QList<FileDiff> fileDiffs(git_diff *diff, const QString &prefix)
     QList<FileDiff> result;
     const size_t deltaCount = git_diff_num_deltas(diff);
     for (size_t i = 0; i < deltaCount; ++i) {
+        const git_diff_delta *delta = git_diff_get_delta(diff, i);
+        if (isTooLargeToDiff(delta)) {
+            result.append({fileChangeOf(delta, prefix), {}, true});
+            continue;
+        }
         git_patch *patch = nullptr;
         check(git_patch_from_diff(&patch, diff, i), "Computing the diff");
         const Ptr<git_patch> patchGuard(patch);
@@ -159,7 +175,7 @@ QList<FileDiff> fileDiffs(git_diff *diff, const QString &prefix)
         check(git_patch_to_buf(&buffer, patch), "Formatting the diff");
         const QByteArray text(buffer.ptr, static_cast<qsizetype>(buffer.size));
         git_buf_dispose(&buffer);
-        result.append({fileChangeOf(git_diff_get_delta(diff, i), prefix), text});
+        result.append({fileChangeOf(delta, prefix), text});
     }
     return result;
 }

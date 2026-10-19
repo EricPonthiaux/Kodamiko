@@ -142,6 +142,26 @@ private slots:
         QVERIFY(find(result.unstaged, "src/new.js")->patch.contains("+let x;"));
     }
 
+    void statusListsFilesOverOneMebibyteWithoutTheirDiff()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"data.csv", "a\n"}});
+        const QByteArray large(2 * 1024 * 1024, 'x');
+        write(project, "data.csv", large);
+        write(project, "dump.log", large);
+        write(project, "small.txt", "s\n");
+
+        const RepositoryStatus result = status(project);
+
+        QCOMPARE(find(result.unstaged, "dump.log")->change.kind, ChangeKind::Added);
+        QVERIFY(find(result.unstaged, "dump.log")->isTooLarge);
+        QVERIFY(find(result.unstaged, "dump.log")->patch.isEmpty());
+        QCOMPARE(find(result.unstaged, "data.csv")->change.kind, ChangeKind::Modified);
+        QVERIFY(find(result.unstaged, "data.csv")->isTooLarge);
+        QVERIFY(!find(result.unstaged, "small.txt")->isTooLarge);
+        QVERIFY(find(result.unstaged, "small.txt")->patch.contains("+s"));
+    }
+
     void statusOfASubfolderUsesRelativePaths()
     {
         const QTemporaryDir project;

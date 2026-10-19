@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -48,8 +49,10 @@ constexpr int removedWords = 9;
 
 constexpr int numberMargin = 0;
 constexpr int stripMargin = 1;
-// Beyond this, a file's code is not colored: the diff appears at once.
-constexpr qsizetype maxHighlightedBytes = qsizetype(512) * 1024;
+// Beyond these, a file's code, then the remaining files' code, is not
+// colored: the diff appears at once.
+constexpr qsizetype maxHighlightedFileBytes = qsizetype(512) * 1024;
+constexpr qsizetype maxHighlightedBytes = qsizetype(2) * 1024 * 1024;
 
 QColor mix(const QColor &a, const QColor &b, double share)
 {
@@ -201,15 +204,23 @@ Line fileTitle(const DiffFile &file, int fileIndex)
     return title;
 }
 
-// What stands in place of the blocks of a patch that has none.
-Line noTextNote(const FilePatch &patch, int fileIndex)
+QString noTextReason(const DiffFile &file)
 {
-    const bool binary = std::any_of(patch.header.begin(), patch.header.end(), [](const QByteArray &line) {
+    if (file.isTooLarge)
+        return DiffView::tr("File too large to show");
+    const QList<QByteArray> &header = file.patch.header;
+    const bool binary = std::any_of(header.begin(), header.end(), [](const QByteArray &line) {
         return line.startsWith("Binary files") || line.startsWith("GIT binary patch");
     });
+    return binary ? DiffView::tr("Binary file") : DiffView::tr("No changes to the text");
+}
+
+// What stands in place of the blocks of a patch that has none.
+Line noTextNote(const DiffFile &file, int fileIndex)
+{
     Line note;
     note.kind = LineKind::Note;
-    note.text = binary ? DiffView::tr("Binary file") : DiffView::tr("No changes to the text");
+    note.text = noTextReason(file);
     note.location = {fileIndex, -1, -1};
     return note;
 }
@@ -349,7 +360,7 @@ BothSides collectSides(const QList<Line> &lines, int fileStart, int file)
 
 // The style of each byte of each side, as `scratch` colors it. One
 // SCI_GETSTYLEDTEXT per side rather than a message per byte: up to
-// maxHighlightedBytes of them.
+// maxHighlightedFileBytes of them.
 std::array<QByteArray, 2> scratchStyles(const QsciScintilla &scratch, const std::array<QByteArray, 2> &code)
 {
     std::array<QByteArray, 2> styles;
@@ -368,6 +379,42 @@ std::array<QByteArray, 2> scratchStyles(const QsciScintilla &scratch, const std:
 }
 
 } // namespace
+
+// Off-screen editors that color code, one per language, for one render:
+// creating an editor and its highlighter for each file would cost more
+// than coloring the file.
+class ScratchEditors {
+public:
+    explicit ScratchEditors(const Theme &theme)
+        : theme_(theme)
+    {
+    }
+
+    // The editor coloring `language`; nullptr if the language has no highlighter.
+    QsciScintilla *forLanguage(const QString &language)
+    {
+        if (const auto it = scratches_.find(language); it != scratches_.end())
+            return it->second.editor.get();
+        Scratch scratch{std::make_unique<QsciScintilla>(), HighlighterFactory::create(language)};
+        if (scratch.highlighter) {
+            scratch.highlighter->attach(scratch.editor.get());
+            scratch.highlighter->applyTheme(theme_);
+        } else {
+            scratch.editor.reset();
+        }
+        return scratches_.emplace(language, std::move(scratch)).first->second.editor.get();
+    }
+
+private:
+    // The highlighter goes before the editor it is attached to.
+    struct Scratch {
+        std::unique_ptr<QsciScintilla> editor;
+        std::unique_ptr<ISyntaxHighlighter> highlighter;
+    };
+
+    const Theme &theme_;
+    std::map<QString, Scratch> scratches_;
+};
 
 DiffView::DiffView(const Theme &theme, QWidget *parent)
     : QsciScintilla(parent)
@@ -437,7 +484,7 @@ QList<DiffView::Line> DiffView::layout(const QList<DiffFile> &files)
 
         const FilePatch &patch = file.patch;
         if (patch.hunks.isEmpty()) {
-            lines.append(noTextNote(patch, f));
+            lines.append(noTextNote(file, f));
             continue;
         }
         // Git takes the heading of a block from the last line starting with
@@ -547,8 +594,7 @@ void DiffView::render()
     clearMarginText();
     for (int i = 0; i < lines_.size(); ++i)
         styleLine(i, decorateLine(i));
-    for (int file = 0; file < fileStarts_.size(); ++file)
-        highlightSyntax(file);
+    highlightFiles();
 
     // No numbers to show (a message): no margin.
     const bool numbered = std::any_of(lines_.begin(), lines_.end(),
@@ -639,24 +685,28 @@ void DiffView::styleStats(const Line &title, long start, long length)
     SendScintilla(SCI_SETSTYLING, start + length - minusStart, removedStatsStyle);
 }
 
-void DiffView::highlightSyntax(int file)
+void DiffView::highlightFiles()
+{
+    ScratchEditors scratches(theme_);
+    qsizetype budget = maxHighlightedBytes;
+    for (int file = 0; file < fileStarts_.size(); ++file)
+        budget -= highlightSyntax(file, scratches, budget);
+}
+
+qsizetype DiffView::highlightSyntax(int file, ScratchEditors &scratches, qsizetype budget)
 {
     const QString language = LanguageRegistry::languageForFile(paths_.value(file));
     if (language == LanguageRegistry::plainText)
-        return;
+        return 0;
 
     const BothSides sides = collectSides(lines_, fileStarts_[file], file);
-    const bool isTooLong = sides.code[oldSide].size() + sides.code[newSide].size() > maxHighlightedBytes;
-    if (sides.places.isEmpty() || isTooLong)
-        return;
-
-    QsciScintilla scratch;
-    const std::unique_ptr<ISyntaxHighlighter> highlighter = HighlighterFactory::create(language);
-    if (!highlighter)
-        return;
-    highlighter->attach(&scratch);
-    highlighter->applyTheme(theme_);
-    const std::array<QByteArray, 2> styles = scratchStyles(scratch, sides.code);
+    const qsizetype size = sides.code[oldSide].size() + sides.code[newSide].size();
+    if (sides.places.isEmpty() || size > std::min(budget, maxHighlightedFileBytes))
+        return 0;
+    QsciScintilla *scratch = scratches.forLanguage(language);
+    if (!scratch)
+        return 0;
+    const std::array<QByteArray, 2> styles = scratchStyles(*scratch, sides.code);
 
     // The scratch editor's styles become the diff's, by their look.
     const long plain = scintillaColor(theme_.foreground);
@@ -665,15 +715,16 @@ void DiffView::highlightSyntax(int file)
         int &style = styleOf[scratchStyle & 0xff];
         if (style >= 0)
             return style;
-        const long foreground = scratch.SendScintilla(SCI_STYLEGETFORE, scratchStyle);
-        const bool bold = scratch.SendScintilla(SCI_STYLEGETBOLD, scratchStyle);
-        const bool italic = scratch.SendScintilla(SCI_STYLEGETITALIC, scratchStyle);
+        const long foreground = scratch->SendScintilla(SCI_STYLEGETFORE, scratchStyle);
+        const bool bold = scratch->SendScintilla(SCI_STYLEGETBOLD, scratchStyle);
+        const bool italic = scratch->SendScintilla(SCI_STYLEGETITALIC, scratchStyle);
         const bool isPlain = foreground == plain && !bold && !italic;
         style = isPlain ? plainStyle : syntaxStyle(foreground, bold, italic);
         return style;
     };
     for (const SidePlace &place : sides.places)
         styleRuns(place.line, QByteArrayView(styles[place.side]).sliced(place.offset), diffStyle);
+    return size;
 }
 
 void DiffView::styleRuns(int line, QByteArrayView scratchStyles, const std::function<int(int)> &diffStyle)

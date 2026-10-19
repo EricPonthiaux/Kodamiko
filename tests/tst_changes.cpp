@@ -129,6 +129,16 @@ private slots:
         QVERIFY(!view.text().contains("@@"));
     }
 
+    void diffSaysAFileIsTooLargeToShow()
+    {
+        DiffView view(Theme::dark());
+
+        view.setFiles({{"dump.log", "added", {}, true}});
+
+        QCOMPARE(view.displayedLines().last().text, QString("File too large to show"));
+        QCOMPARE(view.displayedLines().last().kind, DiffView::LineKind::Note);
+    }
+
     void diffShowsChangedWords()
     {
         using Range = DiffView::Range;
@@ -286,6 +296,21 @@ private slots:
         QVERIFY(comment != 0);
         QVERIFY(keyword != 0);
         QVERIFY(comment != keyword);
+    }
+
+    void diffColorsEveryFileOfALanguage()
+    {
+        // One scratch editor colors every C++ file: the second one too.
+        const FilePatch patch = FilePatch::parse("@@ -1 +1 @@\n-// old comment\n+return value;\n");
+        DiffView diff(Theme::dark());
+
+        diff.setFiles({{"x.cpp", "modified", patch}, {"y.cpp", "modified", patch}});
+
+        const QList<DiffView::Line> &lines = diff.displayedLines();
+        const int lastAdded = static_cast<int>(lines.size()) - 1;
+        QCOMPARE(lines[lastAdded].kind, DiffView::LineKind::Added);
+        const long position = diff.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, lastAdded);
+        QVERIFY(diff.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position) != 0);
     }
 
     void outsideARepository()
