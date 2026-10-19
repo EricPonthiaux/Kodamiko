@@ -353,7 +353,7 @@ QWidget *PreviewPage::createToolbar()
     layout->addStretch();
 
     auto *selector = new QFrame(toolbar);
-    selector->setObjectName(QStringLiteral("previewModeSelector"));
+    selector->setObjectName(QStringLiteral("modeSelector"));
     selector->setAccessibleName(tr("Document view mode"));
     auto *segments = new QHBoxLayout(selector);
     segments->setContentsMargins(2, 2, 2, 2);

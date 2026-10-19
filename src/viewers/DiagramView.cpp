@@ -6,11 +6,15 @@
 #include "diagram/Family.h"
 #include "diagram/Graphviz.h"
 #include "diagram/Inspector.h"
+#include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
+#include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QImage>
 #include <QLabel>
@@ -30,15 +34,44 @@
 namespace {
 
 constexpr int messageMs = 4000;
+constexpr int groupSpacingPx = 12;
 
-QToolButton *toolButton(const QString &text, const QString &toolTip, QWidget *parent)
+// `heightPx` is given for the default interface font.
+QToolButton *toolButton(const QString &text,
+                        const QString &toolTip,
+                        QWidget *parent,
+                        int heightPx = UiMetrics::toolbarButtonSize)
 {
     auto *button = new QToolButton(parent);
     button->setText(text);
     button->setToolTip(toolTip);
+    button->setAccessibleName(text.isEmpty() ? toolTip : text);
     button->setAutoRaise(true);
-    button->setFocusPolicy(Qt::NoFocus);
+    button->setFocusPolicy(Qt::TabFocus);
+    AppFonts::followApplicationFont(button, [button, heightPx] {
+        button->setMinimumHeight(UiMetrics::scaled(heightPx));
+        const int iconSize = UiMetrics::scaled(UiMetrics::chipIconSize);
+        button->setIconSize(QSize(iconSize, iconSize));
+    });
     return button;
+}
+
+// An icon that shows or hides a part of the view, shown at first.
+QToolButton *visibilityButton(const QString &toolTip, QWidget *parent)
+{
+    auto *button = toolButton(QString(), toolTip, parent);
+    button->setCheckable(true);
+    button->setChecked(true);
+    return button;
+}
+
+// The thin vertical line between two groups of commands.
+QFrame *divider(QWidget *parent)
+{
+    auto *line = new QFrame(parent);
+    line->setObjectName(QStringLiteral("diagramToolbarDivider"));
+    AppFonts::followApplicationFont(line, [line] { line->setFixedSize(1, UiMetrics::scaled(18)); });
+    return line;
 }
 
 } // namespace
@@ -48,64 +81,12 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     , board_(new diagram::Board(this))
     , canvas_(new diagram::Canvas(board_, this))
     , inspector_(new diagram::Inspector(board_, canvas_, this))
-    , zoomLabel_(new QLabel(this))
     , message_(new QLabel(this))
     , messageTimer_(new QTimer(this))
 {
-    // Toolbar.
-    auto *layOut = toolButton(tr("Lay Out"), tr("Arrange the diagram automatically (Ctrl+L)"), this);
-    connect(layOut, &QToolButton::clicked, canvas_, [this] { canvas_->arrange(true); });
-    auto *fit = toolButton(tr("Fit"), tr("Show the whole diagram (F)"), this);
-    connect(fit, &QToolButton::clicked, this, [this] { canvas_->fitView(true); });
-    auto *zoomOut = toolButton(QStringLiteral("−"), tr("Zoom out (Ctrl+-)"), this);
-    connect(zoomOut, &QToolButton::clicked, this, [this] { canvas_->zoomBy(1 / 1.25); });
-    auto *zoomIn = toolButton(QStringLiteral("+"), tr("Zoom in (Ctrl+=)"), this);
-    connect(zoomIn, &QToolButton::clicked, this, [this] { canvas_->zoomBy(1.25); });
-    zoomLabel_->setMinimumWidth(zoomLabel_->fontMetrics().horizontalAdvance(QStringLiteral("400 %")));
-    zoomLabel_->setAlignment(Qt::AlignCenter);
-    zoomLabel_->setToolTip(tr("Zoom (Ctrl+0: 100 %)"));
-    message_->setForegroundRole(QPalette::PlaceholderText);
-
-    auto *more = toolButton(tr("More"), tr("Export and panels"), this);
-    more->setPopupMode(QToolButton::InstantPopup);
-    auto *menu = new QMenu(more);
-    menu->addAction(tr("Export Source…"), this, &DiagramView::exportSource);
-#ifdef DUET_WITH_SVG
-    menu->addAction(tr("Export SVG…"), this, &DiagramView::exportSvg);
-#endif
-    menu->addAction(tr("Export PNG…"), this, &DiagramView::exportPng);
-    menu->addSeparator();
-    QAction *grid = menu->addAction(tr("Grid"));
-    grid->setCheckable(true);
-    grid->setChecked(true);
-    connect(grid, &QAction::toggled, canvas_, &diagram::Canvas::setGridVisible);
-    QAction *showInspector = menu->addAction(tr("Properties Panel"));
-    showInspector->setCheckable(true);
-    showInspector->setChecked(true);
-    connect(showInspector, &QAction::toggled, inspector_, &QWidget::setVisible);
-    more->setMenu(menu);
-
-    // Its own background and a line under it: the canvas starts below.
-    auto *toolbarArea = new QWidget(this);
-    toolbarArea->setObjectName(QStringLiteral("viewToolbar"));
-    toolbarArea->setAttribute(Qt::WA_StyledBackground);
-    auto *toolbar = new QHBoxLayout(toolbarArea);
-    toolbar->setContentsMargins(6, 2, 6, 3);
-    toolbar->setSpacing(2);
-    toolbar->addWidget(layOut);
-    toolbar->addWidget(fit);
-    toolbar->addSpacing(8);
-    toolbar->addWidget(zoomOut);
-    toolbar->addWidget(zoomLabel_);
-    toolbar->addWidget(zoomIn);
-    toolbar->addSpacing(12);
-    toolbar->addWidget(message_, 1);
-    toolbar->addWidget(more);
-
-    // Body.
-    inspector_->setMinimumWidth(220);
+    AppFonts::followApplicationFont(inspector_, [this] { inspector_->setMinimumWidth(UiMetrics::scaled(220)); });
     auto *splitter = new GripSplitter(Qt::Horizontal, this);
-    splitter->addWidget(canvas_);
+    splitter->addWidget(createCanvasColumn());
     splitter->addWidget(inspector_);
     splitter->setStretchFactor(0, 1);
     splitter->setCollapsible(0, false);
@@ -114,8 +95,7 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(toolbarArea);
-    layout->addWidget(splitter, 1);
+    layout->addWidget(splitter);
 
     connect(canvas_, &diagram::Canvas::zoomChanged, this, &DiagramView::updateZoom);
     connect(canvas_, &diagram::Canvas::message, this, &DiagramView::showMessage);
@@ -129,9 +109,112 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     applyTheme(theme);
     updateZoom(canvas_->zoom());
     setFocusProxy(canvas_);
+    // Without it, the first toolbar button takes the focus when the window
+    // shows, and its focus outline reads as a pressed button.
+    canvas_->setFocus();
 }
 
 DiagramView::~DiagramView() = default;
+
+// The toolbar over the canvas alone, so that the properties panel has its
+// own header beside it, at the same height.
+QWidget *DiagramView::createCanvasColumn()
+{
+    auto *column = new QWidget(this);
+    auto *layout = new QVBoxLayout(column);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(createToolbar(column));
+    layout->addWidget(canvas_, 1);
+    return column;
+}
+
+// Grouped by function: arrange; frame, zoom and grid; the messages; then
+// export and the properties panel, which stays reachable once hidden.
+QWidget *DiagramView::createToolbar(QWidget *parent)
+{
+    auto *area = new QWidget(parent);
+    area->setObjectName(QStringLiteral("diagramToolbar"));
+    area->setAttribute(Qt::WA_StyledBackground);
+    UiMetrics::setScaledHeight(area, UiMetrics::panelHeaderHeight);
+
+    layOutButton_ = toolButton(tr("Lay Out"), tr("Arrange the diagram automatically (Ctrl+L)"), area);
+    // QToolButton has no icon/text spacing property; spaces follow the font size.
+    layOutButton_->setText(QStringLiteral("  ") + layOutButton_->text());
+    layOutButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    connect(layOutButton_, &QToolButton::clicked, canvas_, [this] { canvas_->arrange(true); });
+    fitButton_ = toolButton(tr("Fit"), tr("Show the whole diagram (F)"), area);
+    fitButton_->setText(QStringLiteral("  ") + fitButton_->text());
+    fitButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    connect(fitButton_, &QToolButton::clicked, this, [this] { canvas_->fitView(true); });
+    gridButton_ = visibilityButton(tr("Show the grid"), area);
+    connect(gridButton_, &QToolButton::toggled, canvas_, &diagram::Canvas::setGridVisible);
+    panelButton_ = visibilityButton(tr("Show the properties panel"), area);
+    connect(panelButton_, &QToolButton::toggled, inspector_, &QWidget::setVisible);
+    message_->setForegroundRole(QPalette::PlaceholderText);
+    message_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+
+    auto *layout = new QHBoxLayout(area);
+    layout->setContentsMargins(8, 0, 8, 0);
+    layout->setSpacing(4);
+    layout->addWidget(layOutButton_);
+    layout->addSpacing(4);
+    layout->addWidget(divider(area), 0, Qt::AlignVCenter);
+    layout->addSpacing(4);
+    layout->addWidget(fitButton_);
+    layout->addWidget(createZoomControl(area));
+    layout->addWidget(gridButton_);
+    layout->addSpacing(groupSpacingPx);
+    layout->addWidget(message_, 1);
+    layout->addWidget(createExportButton(area));
+    layout->addWidget(panelButton_);
+    return area;
+}
+
+// One framed control: zoom out, the zoom (which resets it), zoom in. Its
+// buttons are shorter by the frame, so that it is as high as the others.
+QWidget *DiagramView::createZoomControl(QWidget *parent)
+{
+    auto *frame = new QFrame(parent);
+    frame->setObjectName(QStringLiteral("diagramZoom"));
+    // As high as its buttons, not as the toolbar.
+    frame->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    const int heightPx = UiMetrics::toolbarButtonSize - 4;
+    auto *zoomOut = toolButton(QStringLiteral("−"), tr("Zoom out (Ctrl+-)"), frame, heightPx);
+    connect(zoomOut, &QToolButton::clicked, this, [this] { canvas_->zoomBy(1 / 1.25); });
+    auto *zoomIn = toolButton(QStringLiteral("+"), tr("Zoom in (Ctrl+=)"), frame, heightPx);
+    connect(zoomIn, &QToolButton::clicked, this, [this] { canvas_->zoomBy(1.25); });
+    zoomButton_ = toolButton(QString(), tr("Reset the zoom to 100 % (Ctrl+0)"), frame, heightPx);
+    zoomButton_->setAccessibleName(tr("Reset zoom"));
+    AppFonts::followApplicationFont(zoomButton_, [this] {
+        zoomButton_->setMinimumWidth(zoomButton_->fontMetrics().horizontalAdvance(QStringLiteral("400 %")) + 16);
+    });
+    connect(zoomButton_, &QToolButton::clicked, canvas_, &diagram::Canvas::resetZoom);
+
+    auto *layout = new QHBoxLayout(frame);
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(0);
+    layout->addWidget(zoomOut);
+    layout->addWidget(zoomButton_);
+    layout->addWidget(zoomIn);
+    return frame;
+}
+
+QToolButton *DiagramView::createExportButton(QWidget *parent)
+{
+    exportButton_ = toolButton(tr("Export"), tr("Export the diagram"), parent);
+    exportButton_->setObjectName(QStringLiteral("diagramExport"));
+    exportButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    exportButton_->setPopupMode(QToolButton::InstantPopup);
+    auto *menu = new QMenu(exportButton_);
+    menu->addAction(tr("Source…"), this, &DiagramView::exportSource);
+#ifdef DUET_WITH_SVG
+    menu->addAction(tr("SVG Image…"), this, &DiagramView::exportSvg);
+#endif
+    menu->addAction(tr("PNG Image…"), this, &DiagramView::exportPng);
+    exportButton_->setMenu(menu);
+    return exportButton_;
+}
 
 bool DiagramView::isDiagramFile(const QString &path)
 {
@@ -225,6 +308,11 @@ void DiagramView::updateModified()
 void DiagramView::applyTheme(const Theme &theme)
 {
     board_->setStyle(diagram::Style::fromTheme(theme));
+    layOutButton_->setIcon(UiIcons::icon(QStringLiteral("arrange"), theme.foreground));
+    fitButton_->setIcon(UiIcons::icon(QStringLiteral("fit"), theme.foreground));
+    exportButton_->setIcon(UiIcons::icon(QStringLiteral("export"), theme.foreground));
+    gridButton_->setIcon(UiIcons::icon(QStringLiteral("grid"), theme.foreground));
+    panelButton_->setIcon(UiIcons::icon(QStringLiteral("side-panel"), theme.foreground));
 }
 
 void DiagramView::showMessage(const QString &text)
@@ -235,7 +323,7 @@ void DiagramView::showMessage(const QString &text)
 
 void DiagramView::updateZoom(qreal zoom)
 {
-    zoomLabel_->setText(QStringLiteral("%1 %").arg(qRound(zoom * 100)));
+    zoomButton_->setText(QStringLiteral("%1 %").arg(qRound(zoom * 100)));
 }
 
 namespace {

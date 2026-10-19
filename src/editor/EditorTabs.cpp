@@ -57,6 +57,8 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     setTabsClosable(true);
     setMovable(true);
     setDocumentMode(true);
+    tabBar()->setExpanding(false);
+    tabBar()->setElideMode(Qt::ElideRight);
     connect(this, &QTabWidget::tabCloseRequested, this, [this](int index) { closeTab(index); });
     tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(tabBar(), &QWidget::customContextMenuRequested, this, &EditorTabs::showTabContextMenu);
@@ -71,12 +73,14 @@ void EditorTabs::paintEvent(QPaintEvent *event)
         paintEmptyMark();
         return;
     }
-    // A line under the tabs, the whole width: the page starts below. The
-    // tabs are transparent but the current one, which has its own line.
+    // Leave the selected tab open onto its document.
     QPainter painter(this);
-    painter.setPen(palette().color(QPalette::Mid));
+    painter.setPen(theme_.line);
     const int y = tabBar()->geometry().bottom();
-    painter.drawLine(0, y, width(), y);
+    const QRect current = tabBar()->tabRect(currentIndex()).translated(tabBar()->pos());
+    if (current.left() > 0)
+        painter.drawLine(0, y, current.left(), y);
+    painter.drawLine(current.right(), y, width(), y);
 }
 
 void EditorTabs::paintEmptyMark()

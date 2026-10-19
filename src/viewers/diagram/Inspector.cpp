@@ -5,13 +5,16 @@
 #include "Document.h"
 #include "Family.h"
 #include "ui/AppFonts.h"
+#include "ui/UiMetrics.h"
 
 #include <QApplication>
+#include <QButtonGroup>
 #include <QCheckBox>
 #include <QClipboard>
 #include <QColorDialog>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -19,7 +22,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QTabWidget>
+#include <QStackedWidget>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -135,18 +138,19 @@ Inspector::Inspector(Board *board, Canvas *canvas, QWidget *parent)
     sourceLayout->addWidget(sourceError_);
     sourceLayout->addLayout(buttons);
 
-    auto *tabs = new QTabWidget(this);
-    tabs->setDocumentMode(true);
-    tabs->addTab(scroll, tr("Properties"));
-    tabs->addTab(sourcePage, tr("Source"));
+    auto *pages = new QStackedWidget(this);
+    pages->addWidget(scroll);
+    pages->addWidget(sourcePage);
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(tabs);
+    layout->setSpacing(0);
+    layout->addWidget(createModeSelector(pages));
+    layout->addWidget(pages, 1);
 
     sourceTimer_->setSingleShot(true);
     sourceTimer_->setInterval(250);
     connect(sourceTimer_, &QTimer::timeout, this, &Inspector::refreshSource);
-    connect(tabs, &QTabWidget::currentChanged, this, [this](int) { refreshSource(); });
+    connect(pages, &QStackedWidget::currentChanged, this, [this](int) { refreshSource(); });
     connect(board_, &Board::selectionChanged, this, [this] {
         endTyping();
         rebuild();
@@ -157,6 +161,42 @@ Inspector::Inspector(Board *board, Canvas *canvas, QWidget *parent)
         sourceTimer_->start();
     });
     rebuild();
+}
+
+// Two segments in one frame, Properties and Source: the panel's modes, set
+// apart from the document tabs above.
+QWidget *Inspector::createModeSelector(QStackedWidget *pages)
+{
+    auto *bar = new QWidget(this);
+    bar->setObjectName(QStringLiteral("diagramInspectorHeader"));
+    bar->setAttribute(Qt::WA_StyledBackground);
+    // The height of the diagram's toolbar beside it: one line under both.
+    UiMetrics::setScaledHeight(bar, UiMetrics::panelHeaderHeight);
+    auto *barLayout = new QHBoxLayout(bar);
+    barLayout->setContentsMargins(8, 0, 8, 0);
+    auto *selector = new QFrame(bar);
+    selector->setObjectName(QStringLiteral("modeSelector"));
+    selector->setAccessibleName(tr("Panel mode"));
+    auto *segments = new QHBoxLayout(selector);
+    segments->setContentsMargins(2, 2, 2, 2);
+    segments->setSpacing(2);
+    auto *group = new QButtonGroup(this);
+    // In the order of the pages, whose indexes are the buttons' ids.
+    const QStringList names = {tr("Properties"), tr("Source")};
+    for (int i = 0; i < names.size(); ++i) {
+        auto *button = new QToolButton(selector);
+        button->setText(names[i]);
+        button->setCheckable(true);
+        button->setChecked(i == 0);
+        button->setAutoRaise(true);
+        button->setFocusPolicy(Qt::TabFocus);
+        button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        group->addButton(button, i);
+        segments->addWidget(button);
+    }
+    connect(group, &QButtonGroup::idClicked, pages, &QStackedWidget::setCurrentIndex);
+    barLayout->addWidget(selector);
+    return bar;
 }
 
 void Inspector::setCodec(const Codec *codec)

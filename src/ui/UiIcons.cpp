@@ -256,6 +256,52 @@ const QHash<QString, Painter> &painters()
              p.drawPolyline(QPolygonF({QPointF(4.5, 2.5), QPointF(8, 6), QPointF(11.5, 2.5)}));
              p.drawPolyline(QPolygonF({QPointF(4.5, 13.5), QPointF(8, 10), QPointF(11.5, 13.5)}));
          }},
+        // Three boxes in a tree: the diagram laid out.
+        {QStringLiteral("arrange"),
+         [](QPainter &p) {
+             p.drawRect(QRectF(5.5, 1.5, 5, 4));
+             p.drawRect(QRectF(1.5, 10.5, 5, 4));
+             p.drawRect(QRectF(9.5, 10.5, 5, 4));
+             p.drawPolyline(QPolygonF({QPointF(4, 10.5), QPointF(4, 8), QPointF(12, 8), QPointF(12, 10.5)}));
+             p.drawLine(QPointF(8, 5.5), QPointF(8, 8));
+         }},
+        // Four corners framing the view.
+        {QStringLiteral("fit"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF({QPointF(2, 5.5), QPointF(2, 2), QPointF(5.5, 2)}));
+             p.drawPolyline(QPolygonF({QPointF(10.5, 2), QPointF(14, 2), QPointF(14, 5.5)}));
+             p.drawPolyline(QPolygonF({QPointF(14, 10.5), QPointF(14, 14), QPointF(10.5, 14)}));
+             p.drawPolyline(QPolygonF({QPointF(5.5, 14), QPointF(2, 14), QPointF(2, 10.5)}));
+             p.drawRect(QRectF(5.5, 5.5, 5, 5));
+         }},
+        // An arrow rising out of a tray.
+        {QStringLiteral("export"),
+         [](QPainter &p) {
+             p.drawPolyline(
+                 QPolygonF({QPointF(2.5, 9.5), QPointF(2.5, 13.5), QPointF(13.5, 13.5), QPointF(13.5, 9.5)}));
+             p.drawLine(QPointF(8, 10), QPointF(8, 2));
+             p.drawPolyline(QPolygonF({QPointF(4.8, 5), QPointF(8, 1.8), QPointF(11.2, 5)}));
+         }},
+        // Nine dots: the canvas's grid.
+        {QStringLiteral("grid"),
+         [](QPainter &p) {
+             p.setPen(QPen(p.pen().color(), 2.4, Qt::SolidLine, Qt::RoundCap));
+             p.drawPoints(QPolygonF({{3.5, 3.5},
+                                     {8, 3.5},
+                                     {12.5, 3.5},
+                                     {3.5, 8},
+                                     {8, 8},
+                                     {12.5, 8},
+                                     {3.5, 12.5},
+                                     {8, 12.5},
+                                     {12.5, 12.5}}));
+         }},
+        // A window with a panel on its right side.
+        {QStringLiteral("side-panel"),
+         [](QPainter &p) {
+             p.drawRoundedRect(QRectF(1.5, 2.5, 13, 11), 1.5, 1.5);
+             p.drawLine(QPointF(10, 2.5), QPointF(10, 13.5));
+         }},
         // Three dots, one above the other.
         {QStringLiteral("more"),
          [](QPainter &p) {

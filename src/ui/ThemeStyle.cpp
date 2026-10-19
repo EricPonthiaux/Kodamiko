@@ -134,22 +134,21 @@ QPalette palette(const Theme &theme)
     return palette;
 }
 
-// Every theme's controls: rounded fields and menus, focus outlines in the
-// accent color, a gradient on the selected menu items and rows, an underlined
-// current tab, thin scroll bars; the colors come from the theme.
+// Every theme's controls share the same geometry; their surfaces, selected
+// tabs and focus outlines take their colors from the active theme.
 QString styleSheet(const Theme &theme)
 {
     QString sheet = QStringLiteral(R"(
 QToolTip { color: @text; background: @button; border: 1px solid @border; border-radius: 3px; padding: 4px 6px; }
 QMenuBar { background: @window; border-bottom: 1px solid @line; }
-QMenuBar::item { padding: 4px 10px; border-radius: 3px; background: transparent; }
-QMenuBar::item:selected { background: @button; color: @accentText; }
-QMenu { background: @panel; border: 1px solid @border; border-radius: 4px; padding: 4px; }
-QMenu::item { padding: 5px 28px 5px 22px; border-radius: 2px; }
+QMenuBar::item { padding: 5px 10px; border-radius: 5px; background: transparent; }
+QMenuBar::item:selected, QMenuBar::item:pressed { background: @hover; color: @text; }
+QMenu { background: @panel; color: @text; border: 1px solid @border; border-radius: 7px; padding: 6px; }
+QMenu::item { padding: 6px 28px 6px 22px; border: 1px solid transparent; border-radius: 4px; }
 QMenu::icon { padding-left: 32px; }
 QMenu::item:selected { color: @text; background: @slate; }
 QMenu::item:disabled { color: @muted; }
-QMenu::separator { height: 1px; background: @separator; margin: 5px 12px; }
+QMenu::separator { height: 1px; background: @separator; margin: 6px 10px; }
 QLineEdit, QPlainTextEdit, QTextBrowser { background: @base; border: 1px solid @border; border-radius: 3px; padding: 4px 8px; selection-background-color: @highlight; }
 QLineEdit:focus, QPlainTextEdit:focus { border: 1px solid @accent; }
 QPushButton { background: @button; border: 1px solid @border; border-radius: 3px; padding: 4px 14px; }
@@ -162,22 +161,26 @@ QToolButton:hover { background: @button; }
 QToolButton:checked { background: @selection; color: @accentText; }
 QFrame#previewToolbar { background: @base; border: none; border-bottom: 1px solid @line; }
 QLabel#previewFormat { color: @muted; background: transparent; }
-QFrame#previewModeSelector { background: @window; border: 1px solid @line; border-radius: 5px; }
-QFrame#previewModeSelector QToolButton { color: @muted; background: transparent; border: 1px solid transparent; border-radius: 3px; padding: 2px 6px; min-height: 16px; }
-QFrame#previewModeSelector QToolButton:hover { color: @text; background: @hover; }
-QFrame#previewModeSelector QToolButton:checked { color: @accentText; background: @previewActive; border-color: @previewBorder; }
-QFrame#previewModeSelector QToolButton:pressed { background: @selection; }
-QFrame#previewModeSelector QToolButton:focus { border-color: @accent; }
+QFrame#modeSelector { background: @window; border: 1px solid @line; border-radius: 6px; }
+QFrame#modeSelector QToolButton { color: @muted; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 3px 8px; min-height: 16px; }
+QFrame#modeSelector QToolButton:hover { color: @text; background: @hover; }
+QFrame#modeSelector QToolButton:checked { color: @accentText; background: @modeActive; border-color: @modeBorder; }
+QFrame#modeSelector QToolButton:pressed { background: @selection; }
+QFrame#modeSelector QToolButton:focus { border-color: @accent; }
 QTabWidget::pane { border: none; }
 QTabBar::tab { background: transparent; color: @muted; padding: 8px 16px; border: none; }
 QTabBar::tab:hover { color: @text; background: @panel; }
 QTabBar::tab:selected { color: @accentText; background: @base; border-bottom: 2px solid @accent; }
 QTabBar::tab:bottom:selected { border-bottom: none; border-top: 2px solid @accent; }
-EditorTabs QTabBar::tab, QTabWidget#terminalTabs QTabBar::tab, QTabBar#goToTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
-EditorTabs QTabBar::tab:first, QTabWidget#terminalTabs QTabBar::tab:first, QTabBar#goToTabs::tab:first { border-top-left-radius: 3px; }
-EditorTabs QTabBar::tab:last, QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
-EditorTabs QTabBar::tab:hover, QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; }
-EditorTabs QTabBar::tab:selected, QTabWidget#terminalTabs QTabBar::tab:selected, QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
+QTabWidget#terminalTabs QTabBar::tab, QTabBar#goToTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
+QTabWidget#terminalTabs QTabBar::tab:first, QTabBar#goToTabs::tab:first { border-top-left-radius: 3px; }
+QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
+QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; }
+QTabWidget#terminalTabs QTabBar::tab:selected, QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
+EditorTabs QTabBar { background: @window; }
+EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 7px 12px; margin-top: 4px; min-width: 64px; max-width: 240px; border: 1px solid transparent; border-top: 2px solid transparent; border-bottom: none; border-top-left-radius: 6px; border-top-right-radius: 6px; }
+EditorTabs QTabBar::tab:hover { background: @hover; color: @text; }
+EditorTabs QTabBar::tab:selected { background: @base; color: @accentText; border-color: @line; border-top-color: @accent; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
 QTabBar#modeTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
 QTabBar#modeTabs::tab:first { border-bottom-left-radius: 3px; }
@@ -189,7 +192,19 @@ QTabBar QToolButton { background: @window; border: none; border-radius: 0; paddi
 QTabBar QToolButton:hover { background: @button; }
 QTabBar QToolButton:disabled { background: @window; }
 QWidget#sideStrip { background: @window; border-right: 1px solid @border; }
-QWidget#viewToolbar { background: @window; border-bottom: 1px solid @border; }
+QWidget#diagramToolbar { background: @base; border-bottom: 1px solid @line; }
+QWidget#diagramToolbar QToolButton { color: @text; background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 3px 8px; }
+QWidget#diagramToolbar QToolButton:hover { background: @hover; }
+QWidget#diagramToolbar QToolButton:pressed { background: @selection; }
+QWidget#diagramToolbar QToolButton:focus { border-color: @accent; }
+QWidget#diagramToolbar QToolButton:disabled { color: @muted; }
+QWidget#diagramToolbar QToolButton:checked { background: @modeActive; border-color: @modeBorder; }
+QWidget#diagramToolbar QToolButton:checked:hover { background: @hover; }
+QFrame#diagramToolbarDivider { background: @line; }
+QFrame#diagramZoom { background: @window; border: 1px solid @line; border-radius: 6px; }
+QWidget#diagramToolbar QFrame#diagramZoom QToolButton { border: 1px solid transparent; border-radius: 4px; padding: 1px 5px; }
+QWidget#diagramToolbar QFrame#diagramZoom QToolButton:focus { border-color: @accent; }
+QWidget#diagramInspectorHeader { background: @base; border-bottom: 1px solid @line; }
 QTabBar#sideTabs { background: transparent; }
 QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 4px; background: transparent; border: 1px solid transparent; border-radius: 3px; color: @muted; }
 QTabBar#sideTabs::tab:hover { background: transparent; border-color: @accent; color: @text; }
@@ -213,12 +228,12 @@ QToolButton#hunkAction:hover { border-color: @highlight; }
 QFrame#card QPlainTextEdit { background: @base; }
 QStatusBar { background: transparent; border-top: 1px solid @line; color: @muted; }
 TitleBar QMenuBar { background: transparent; border: none; }
-TitleBar QMenuBar::item { padding: 7px 14px; border-radius: 3px; }
+TitleBar QMenuBar::item { padding: 6px 10px; border-radius: 5px; }
 TitleBar QMenuBar::item:selected, TitleBar QMenuBar::item:pressed { background: @hover; color: @text; }
 TitleBar QMenuBar QToolButton { padding: 0; border: none; }
 TitleBar QToolButton#chip:hover, TitleBar QToolButton#chip:pressed { background: @hover; }
-TitleBar QToolButton#projectChip { padding: 0 8px; border: none; border-radius: 3px; background: transparent; }
-TitleBar QToolButton#projectChip:hover, TitleBar QToolButton#projectChip:pressed { background: @hover; }
+TitleBar QToolButton#projectChip { padding: 0 8px; border: 1px solid @line; border-radius: 5px; background: @panel; }
+TitleBar QToolButton#projectChip:hover, TitleBar QToolButton#projectChip:pressed { background: @hover; border-color: @border; }
 TitleBar QToolButton#projectChip::menu-indicator { image: none; width: 0; }
 TitleBar QToolButton#titleAction { padding: 0; border-radius: 3px; }
 TitleBar QToolButton#titleAction:hover, TitleBar QToolButton#titleAction:pressed { background: @hover; }
@@ -272,8 +287,9 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         {"@checked", withAlpha(theme.foreground, 0.125)},
         {"@slate", selectionColor(theme)},
         {"@separator", withAlpha(theme.line, 0.7)},
-        {"@previewActive", mixed(theme.window, theme.accent, 0.16)},
-        {"@previewBorder", mixed(theme.window, theme.accent, 0.35)},
+        // The checked segment of a mode selector (preview, diagram panel).
+        {"@modeActive", mixed(theme.window, theme.accent, 0.16)},
+        {"@modeBorder", mixed(theme.window, theme.accent, 0.35)},
         // The run block: barely tinted with the accent, so the eye finds it.
         {"@runTint", mixed(theme.window, theme.accent, 0.08)},
         {"@runBorder", mixed(theme.window, theme.accent, 0.2)},
@@ -283,14 +299,14 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         sheet.replace(name, color.name(color.alpha() == 255 ? QColor::HexRgb : QColor::HexArgb));
 
     const QString cross = crossIcon(QStringLiteral("close-%1.svg").arg(theme.name), theme.mutedText);
-    const QString crossHover = crossIcon(QStringLiteral("close-%1-hover.svg").arg(theme.name), Qt::white);
+    const QString crossHover = crossIcon(QStringLiteral("close-%1-hover.svg").arg(theme.name), theme.foreground);
     if (!cross.isEmpty() && !crossHover.isEmpty())
         // The margin is taken from the button's own size: AppStyle widens the
         // button by the right margin, and any other margin would shrink the cross.
         sheet += QStringLiteral("QTabBar::close-button { image: url(%1); subcontrol-position: right; border-radius: "
                                 "3px; margin: 0 8px 0 0; }\n"
                                 "QTabBar::close-button:hover { image: url(%2); background: %3; }\n")
-                     .arg(cross, crossHover, theme.highlight.name());
+                     .arg(cross, crossHover, theme.hover.name());
 
     if (const QString check = checkIcon(QStringLiteral("check-%1.svg").arg(theme.name), Qt::white); !check.isEmpty())
         sheet += QStringLiteral("QCheckBox::indicator { width: 14px; height: 14px; }\n"
@@ -314,7 +330,12 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
     // Styling the drop-down hides Qt's arrow: a chevron in its place.
     const QString down = chevronIcon(QStringLiteral("down-%1.svg").arg(theme.name), theme.mutedText, u"M4 6l4 4 4-4");
     if (!down.isEmpty())
-        sheet += QStringLiteral("QComboBox::down-arrow { image: url(%1); width: 12px; height: 12px; }\n").arg(down);
+        sheet +=
+            QStringLiteral("QComboBox::down-arrow { image: url(%1); width: 12px; height: 12px; }\n"
+                           "QWidget#diagramToolbar QToolButton#diagramExport { padding-right: 18px; }\n"
+                           "QToolButton#diagramExport::menu-indicator { image: url(%1); width: 10px; height: 10px; "
+                           "subcontrol-position: right center; subcontrol-origin: padding; right: 4px; }\n")
+                .arg(down);
     return sheet;
 }
 

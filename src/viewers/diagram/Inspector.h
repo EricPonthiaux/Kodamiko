@@ -10,6 +10,7 @@ class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
+class QStackedWidget;
 class QTimer;
 class QVBoxLayout;
 
@@ -36,6 +37,7 @@ signals:
     void sourceApplied(const diagram::document::Loaded &loaded);
 
 private:
+    QWidget *createModeSelector(QStackedWidget *pages);
     void rebuild();
     void refreshSource();
     void applySource();

@@ -1,0 +1,71 @@
+{
+  "format": "sciilo-board",
+  "version": 1,
+  "canvas": {
+    "width": 1200,
+    "height": 800
+  },
+  "elements": [
+    {
+      "id": "s4",
+      "type": "node",
+      "shape": "hexagon",
+      "x": 753.15,
+      "y": 182.26,
+      "width": 180,
+      "height": 82,
+      "label": "Step",
+      "tone": "info",
+      "fill": "#2e7d32",
+      "parent": "s5"
+    },
+    {
+      "id": "s2",
+      "type": "node",
+      "shape": "rectangle",
+      "x": 468.54,
+      "y": 298.37,
+      "width": 180,
+      "height": 76,
+      "label": "New element",
+      "fill": "#d84315",
+      "parent": "s5"
+    },
+    {
+      "id": "s1",
+      "type": "node",
+      "shape": "rounded",
+      "x": 405.8,
+      "y": 144.26,
+      "width": 180,
+      "height": 76,
+      "label": "New idea",
+      "tone": "info",
+      "fill": "#1565c0",
+      "parent": "s5"
+    },
+    {
+      "id": "s3",
+      "type": "node",
+      "shape": "triangle",
+      "x": 646.15,
+      "y": 404.36,
+      "width": 197,
+      "height": 108,
+      "label": "Key point",
+      "tone": "warning",
+      "fill": "#c8e6c9",
+      "parent": "s5"
+    },
+    {
+      "id": "s5",
+      "type": "frame",
+      "x": 222.05,
+      "y": 37.24,
+      "width": 931.86,
+      "height": 628.11,
+      "title": "New section",
+      "tone": "warning"
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 
 class QLabel;
 class QTimer;
+class QToolButton;
 
 namespace diagram {
 class Board;
@@ -19,8 +20,9 @@ class Inspector;
 // explainer boards, Flowboard's .flow), opened in a tab instead of a text
 // editor: the canvas (elements are added from its context menus) and the
 // properties of the selection with the diagram's source, in the editor's
-// theme. Saving goes through the editor (Ctrl+S); the toolbar lays the
-// diagram out, zooms, and exports it.
+// theme. Saving goes through the editor (Ctrl+S); the toolbar above the
+// canvas groups its commands: arrange; frame, zoom and grid; export; the
+// properties panel.
 class DiagramView : public QWidget {
     Q_OBJECT
 
@@ -59,6 +61,10 @@ signals:
     void modificationChanged(bool modified);
 
 private:
+    QWidget *createCanvasColumn();
+    QWidget *createToolbar(QWidget *parent);
+    QWidget *createZoomControl(QWidget *parent);
+    QToolButton *createExportButton(QWidget *parent);
     void showMessage(const QString &text);
     void updateZoom(qreal zoom);
     void updateModified();
@@ -70,7 +76,12 @@ private:
     diagram::Canvas *canvas_;
     diagram::Inspector *inspector_;
     const diagram::Codec *codec_ = nullptr;
-    QLabel *zoomLabel_;
+    QToolButton *layOutButton_ = nullptr;
+    QToolButton *fitButton_ = nullptr;
+    QToolButton *exportButton_ = nullptr;
+    QToolButton *gridButton_ = nullptr;
+    QToolButton *panelButton_ = nullptr;
+    QToolButton *zoomButton_ = nullptr; // shows the zoom; resets it to 100 %
     QLabel *message_;
     QTimer *messageTimer_;
     QString filePath_;
