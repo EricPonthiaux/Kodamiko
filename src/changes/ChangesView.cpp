@@ -634,7 +634,7 @@ QHash<int, PatchSelection> ChangesView::diffSelection(int line, bool *lines) con
 {
     // Displayed file that contains a diff line, and the position in its patch.
     const auto locate = [this](int diffLine) -> std::tuple<int, int, int> {
-        const DiffView::Location location = diff_->locate(diffLine);
+        const DiffLocation location = diff_->locate(diffLine);
         return {location.file, location.hunk, location.line};
     };
 

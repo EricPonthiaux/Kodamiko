@@ -5,13 +5,18 @@ add_library(duet_core STATIC
     changes/ChangesView.cpp
     changes/CommitPanel.cpp
     changes/DiffHeaderBar.cpp
+    changes/DiffLayout.cpp
+    changes/DiffStyles.cpp
+    changes/DiffSyntaxHighlighter.cpp
     changes/DiffView.cpp
     changes/FileChangeDelegate.cpp
     changes/GitActions.cpp
     changes/HunkActions.cpp
     changes/NewBranchPopup.cpp
+    changes/ScratchEditors.cpp
     changes/SnapshotsPopup.cpp
     changes/StashesPopup.cpp
+    changes/WordDiff.cpp
     claude/ClaudeActivity.cpp
     claude/ClaudeConfig.cpp
     claude/ClaudeConfigView.cpp
