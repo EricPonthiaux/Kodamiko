@@ -31,7 +31,9 @@ Preferences Preferences::load()
         const int size = settings.value(key, 0).toInt();
         return size <= 0 ? 0 : std::clamp(size, minimumFontSize, maximumFontSize);
     };
-    preferences.interfaceFontSize = fontSize(QStringLiteral("interfaceFont/size"));
+    // 0 before 11 was the default: the system's size.
+    const int interfaceFontSize = fontSize(QStringLiteral("interfaceFont/size"));
+    preferences.interfaceFontSize = interfaceFontSize > 0 ? interfaceFontSize : AppFonts::defaultInterfaceSize;
     preferences.treeFontSize = fontSize(QStringLiteral("treeFont/size"));
     preferences.systemTitleBar = settings.value(QStringLiteral("systemTitleBar"), false).toBool();
 
@@ -119,8 +121,7 @@ void Preferences::applyTypography(Theme &target) const
 QFont Preferences::interfaceFont() const
 {
     QFont font = AppFonts::interfaceFont();
-    if (interfaceFontSize > 0)
-        font.setPointSize(interfaceFontSize);
+    font.setPointSize(interfaceFontSize);
     return font;
 }
 

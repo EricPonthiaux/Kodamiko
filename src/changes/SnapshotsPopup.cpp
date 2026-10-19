@@ -2,10 +2,10 @@
 
 #include "git/GitCommands.h"
 #include "ui/AppFonts.h"
+#include "ui/FileIcons.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
-#include "workspace/FileIcons.h"
 
 #include <QFileInfo>
 #include <QHBoxLayout>

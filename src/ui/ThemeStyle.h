@@ -2,6 +2,7 @@
 
 #include "Theme.h"
 
+#include <QFont>
 #include <QPalette>
 
 // The editor theme applied to the whole interface.
@@ -14,8 +15,16 @@ QPalette palette(const Theme &theme);
 QString styleSheet(const Theme &theme);
 // Sets both on the application.
 void apply(const Theme &theme);
+// Sets the application font (Preferences ▸ Fonts) on every widget
+// without a font of its own. Under a style sheet, QApplication::setFont
+// alone reaches only the top-level windows (the popup menus), not their
+// children (the menu bar, the tabs).
+void applyFont(const QFont &font);
 // Selected menu items and rows: slate blue, the accent little saturated, on
 // which the theme's text stays readable.
 QColor selectionColor(const Theme &theme);
+// `base` with `share` (0 to 1) of `tint` mixed in, opaque: the tints of the
+// interface, which follow the theme.
+QColor mixed(const QColor &base, const QColor &tint, qreal share);
 
 } // namespace ThemeStyle

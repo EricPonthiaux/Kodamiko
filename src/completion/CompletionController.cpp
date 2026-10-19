@@ -572,6 +572,7 @@ void CompletionController::refilter()
         popup_->applyTheme(editor_->theme());
         connect(popup_, &CompletionPopup::activated, this, [this] { accept(); });
         connect(popup_, &CompletionPopup::currentChanged, this, &CompletionController::onCurrentChanged);
+        popup_->installEventFilter(this); // shown or hidden: suspends the editor's tooltips
     }
     const QString prefix = textBetween(prefixStart_, position);
     if (choosing_) {
@@ -1118,6 +1119,10 @@ void CompletionController::applyEdits(const QList<TextEdit> &edits,
 
 bool CompletionController::eventFilter(QObject *watched, QEvent *event)
 {
+    const bool isPopupShownOrHidden =
+        watched == popup_ && (event->type() == QEvent::Show || event->type() == QEvent::Hide);
+    if (isPopupShownOrHidden)
+        editor_->setToolTipsSuspended(event->type() == QEvent::Show);
     if (watched != editor_)
         return false;
     if (event->type() == QEvent::FocusOut) {

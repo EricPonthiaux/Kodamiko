@@ -35,6 +35,7 @@
 #include "run/RunConfiguration.h"
 #include "run/Runner.h"
 #include "search/FindInFilesPopup.h"
+#include "settings/FontSettings.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "setup/Prerequisites.h"
@@ -253,7 +254,7 @@ void MainWindow::createCentralWidget()
     commandPalette_ = new CommandPalette(this);
     createPopups();
 
-    applyTreeFont(Preferences::load().treeFont());
+    FontSettings::applyTreeFont(Preferences::load().treeFont(), this);
 
     resize(1400, 900);
 }

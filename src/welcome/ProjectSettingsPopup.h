@@ -9,7 +9,9 @@ class ProjectSetupPanel;
 class Toolchains;
 
 // File ▸ Project Settings: the setup of the open project's languages, and
-// the download of what they need, over the main window.
+// the download of what they need, over the main window, in two columns as
+// Preferences (see ProjectSetupForm). Cancel leaves the setup as it was,
+// Apply saves it and stays open, OK saves it and closes.
 class ProjectSettingsPopup : public OverlayPopup {
     Q_OBJECT
 
@@ -23,7 +25,7 @@ public:
     void applyTheme(const Theme &theme);
 
 signals:
-    // Saved, its tools downloaded (or skipped).
+    // Saved by Apply or OK, its tools downloaded (or skipped).
     void applied(const ProjectConfig &project);
 
 protected:

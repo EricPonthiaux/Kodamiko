@@ -7,13 +7,14 @@
 #include <QVBoxLayout>
 
 ProjectSettingsPopup::ProjectSettingsPopup(Toolchains *toolchains, const Theme &theme, QWidget *parent)
-    : OverlayPopup(QStringLiteral("projectSettings"), QSizeF(0.55, 0.78), QSize(760, 560), parent)
-    , panel_(new ProjectSetupPanel(toolchains, tr("Apply"), this))
+    : OverlayPopup(QStringLiteral("projectSettings"), QSizeF(0.6, 0.76), QSize(860, 560), parent)
+    , panel_(new ProjectSetupPanel(toolchains, ProjectSetupPanel::Purpose::Settings, this))
 {
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
     layout->addWidget(panel_);
     connect(panel_, &ProjectSetupPanel::cancelled, this, &OverlayPopup::dismiss);
+    connect(panel_, &ProjectSetupPanel::applied, this, &ProjectSettingsPopup::applied);
     connect(panel_, &ProjectSetupPanel::done, this, [this](const ProjectConfig &project) {
         dismiss();
         emit applied(project);

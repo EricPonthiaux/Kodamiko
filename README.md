@@ -247,16 +247,19 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   maximizes it. *View ▸ Use System Title Bar* brings the system's frame back
   (tiling window managers); on macOS, the traffic lights stay, over
   Duet's bar.
-- **Typography**: the interface is set in [Inter](https://rsms.me/inter/) and the code
-  (editor, diffs, terminal) in [JetBrains Mono](https://www.jetbrains.com/lp/mono/),
-  both embedded so that Duet looks the same on every system; lines of code
-  at 1.5 times the font size, with room between the line numbers and the
-  text. *Preferences ▸ Appearance* sets the code font's weight (Light,
-  Regular, Medium), the line height, and programming ligatures in the
-  editor ("->" drawn as an arrow; the terminal keeps one character per
-  cell). Geist Mono, Commit Mono, Monaspace and Iosevka are offered first
-  when installed, with where to get them otherwise. Ligatures need Qt 6.7
-  for fonts other than the embedded one.
+- **Typography**: the interface (menus, panels, trees) is set in
+  [Ubuntu Sans](https://design.ubuntu.com/font) and the code (editor, diffs,
+  terminal) in Ubuntu Sans Mono, both embedded so that Duet looks the same on
+  every system; [JetBrains Mono](https://www.jetbrains.com/lp/mono/), embedded
+  too, is the other code font offered. Lines of code at 1.5 times the font
+  size, with room between the line numbers and the text. *Preferences ▸
+  Fonts* sets the code font, its weight (Light, Regular, Medium), the line
+  height, programming ligatures in the editor ("->" drawn as an arrow, with
+  a font that has them such as JetBrains Mono; the terminal keeps one
+  character per cell), and the sizes of the interface and the trees. Geist
+  Mono, Commit Mono, Monaspace and Iosevka are offered first when installed,
+  with where to get them otherwise. Ligatures need Qt 6.7 for fonts other
+  than the embedded ones.
 
 ## Building
 
@@ -535,4 +538,5 @@ by QScintilla. Third-party components:
 | libgit2 | GPL v2 with linking exception |
 | cmark-gfm | BSD 2-Clause |
 | github-markdown-css, Octicons (in `third_party/`) | MIT |
-| Inter, JetBrains Mono (in `third_party/fonts/`) | SIL Open Font License 1.1 |
+| Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | Ubuntu Font Licence 1.0 |
+| JetBrains Mono (in `third_party/fonts/`) | SIL Open Font License 1.1 |

@@ -6,9 +6,11 @@
 // Panel shown over the window, in the manner of IntelliJ's popups (Search
 // Everywhere, Find in Files): centered in the window, with a soft shadow
 // and rounded corners. Its edges and corners resize it, like a window's;
-// until the user does, its size follows the window's. Escape (handled by
-// the subclass) or a click elsewhere in the window closes it; the focus
-// then goes back where it was.
+// until the user does, its size follows the window's. Dragged from a place
+// without a control of its own (its header, its footer), it moves; both
+// the size and the place are kept. A click elsewhere leaves it open: only
+// Escape (handled by the subclass), its close button or its own buttons
+// close it; the focus then goes back where it was.
 //
 // It is a child of the window rather than a window of its own: Wayland
 // does not let an application place its windows, so only a child is
@@ -29,7 +31,7 @@ public:
     void showCentered();
     // Hides it and gives the focus back.
     void dismiss();
-    // Forgets the size chosen by the user.
+    // Forgets the size and the place chosen by the user.
     void resetSize();
 
 protected:
@@ -42,13 +44,21 @@ protected:
 
 private:
     class Watcher;
-    // Window resized, click elsewhere (seen by a separate object: the
-    // subclasses filter their own children's events).
+    // Window resized (seen by a separate object: the subclasses filter
+    // their own children's events).
     void onWatchedEvent(QObject *watched, QEvent *event);
     // Room the window offers: its contents, less a margin.
     QRect availableArea() const;
     QSize panelSize() const;
+    // Where the panel goes, shadow included: centered, then moved by the
+    // user's offset, within the window.
+    QRect placedGeometry() const;
+    // `geometry` moved into the window's room.
+    QRect keptInside(QRect geometry) const;
     void place();
+    void saveOffset();
+    // Where the user's place is kept, beside the size.
+    QString offsetKey() const;
     // Room for the shadow around the contents.
     void applyMargins();
 
@@ -57,8 +67,9 @@ private:
     QSize minimum_;
     Watcher *watcher_;
     QPointer<QWidget> previousFocus_;
-    // Resizing in progress: the edges dragged, from where.
+    // Resizing in progress: the edges dragged; or moving.
     Qt::Edges resizeEdges_;
-    QPoint resizeStart_; // in the window
-    QRect resizeGeometry_;
+    bool isMoving_ = false;
+    QPoint dragStart_; // in the window
+    QRect dragGeometry_;
 };

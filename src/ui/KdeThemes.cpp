@@ -1,6 +1,7 @@
 #include "KdeThemes.h"
 
 #include "AppFonts.h"
+#include "ThemeStyle.h"
 
 #include <QDirIterator>
 #include <QFile>
@@ -51,14 +52,6 @@ constexpr std::array<std::pair<const char *, const char *>, 28> styleOfCapture{{
 // the most saturated is taken.
 constexpr std::array accentCandidates{"Function", "ControlFlow", "DataType", "Keyword", "Import"};
 
-// `base` with `share` of `tint`, opaque.
-QColor mixed(const QColor &base, const QColor &tint, qreal share)
-{
-    return QColor::fromRgbF(float(base.redF() + (tint.redF() - base.redF()) * share),
-                            float(base.greenF() + (tint.greenF() - base.greenF()) * share),
-                            float(base.blueF() + (tint.blueF() - base.blueF()) * share));
-}
-
 QColor colorOf(const QJsonObject &object, const char *key, const QColor &fallback)
 {
     const QColor color(object.value(QLatin1String(key)).toString());
@@ -94,9 +87,10 @@ void setEditorColors(Theme &theme, const QJsonObject &editor, const QJsonObject 
     theme.foreground = textStyle(styles, "Normal", theme.isDark ? QColor("#cfcfc2") : QColor("#1f1c1b")).foreground;
     theme.caret = theme.foreground;
     theme.caretLine = colorOf(editor, "CurrentLine", theme.background);
-    theme.selection = colorOf(editor, "TextSelection", mixed(theme.background, theme.foreground, 0.2));
+    theme.selection = colorOf(editor, "TextSelection", ThemeStyle::mixed(theme.background, theme.foreground, 0.2));
     theme.marginBackground = colorOf(editor, "IconBorder", theme.background);
-    theme.marginForeground = colorOf(editor, "LineNumbers", mixed(theme.background, theme.foreground, 0.45));
+    theme.marginForeground =
+        colorOf(editor, "LineNumbers", ThemeStyle::mixed(theme.background, theme.foreground, 0.45));
     theme.currentLineNumber = colorOf(editor, "CurrentLineNumber", theme.foreground);
     theme.braceMatch = colorOf(editor, "BracketMatching", theme.selection);
     // A search's matches are drawn translucent: a vivid color, the
@@ -112,13 +106,13 @@ void setInterfaceColors(Theme &theme, const QJsonObject &styles)
 {
     const QColor &background = theme.background;
     const QColor &text = theme.foreground;
-    theme.window = theme.isDark ? background.darker(115) : mixed(background, text, 0.06);
-    theme.alternateBase = mixed(background, text, 0.04);
-    theme.button = mixed(background, text, 0.09);
-    theme.hover = mixed(background, text, 0.05);
-    theme.line = mixed(background, text, 0.10);
-    theme.border = mixed(background, text, 0.20);
-    theme.mutedText = mixed(text, background, 0.4);
+    theme.window = theme.isDark ? background.darker(115) : ThemeStyle::mixed(background, text, 0.06);
+    theme.alternateBase = ThemeStyle::mixed(background, text, 0.04);
+    theme.button = ThemeStyle::mixed(background, text, 0.09);
+    theme.hover = ThemeStyle::mixed(background, text, 0.05);
+    theme.line = ThemeStyle::mixed(background, text, 0.10);
+    theme.border = ThemeStyle::mixed(background, text, 0.20);
+    theme.mutedText = ThemeStyle::mixed(text, background, 0.4);
     theme.highlight = theme.selection;
     theme.accent = accentOf(styles, text, theme.selection);
     theme.accentText = theme.isDark ? text.lighter(115) : text;

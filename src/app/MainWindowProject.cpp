@@ -35,8 +35,6 @@
 #include <QSettings>
 
 #include <algorithm>
-#include <array>
-#include <ranges>
 
 void MainWindow::openFolder(const QString &folder)
 {

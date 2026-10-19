@@ -2,11 +2,14 @@
 
 #include <QGuiApplication>
 #include <QHash>
+#include <QIconEngine>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
 
+#include <algorithm>
 #include <array>
+#include <utility>
 
 namespace {
 
@@ -48,27 +51,101 @@ QPainterPath pageOutline(const QRectF &rect, qreal fold)
     return path;
 }
 
+// The icons are drawn on a 16-unit square.
+constexpr qreal iconUnits = 16;
+
+// An icon drawn at the size asked for: sharp at the tree's size (the
+// text's height), where a 16-pixel picture would be scaled and blurred.
+class PaintedIconEngine : public QIconEngine {
+public:
+    QPixmap pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state) override
+    {
+        return scaledPixmap(size, mode, state, 1.0);
+    }
+
+    QPixmap scaledPixmap(const QSize &size, QIcon::Mode mode, QIcon::State state, qreal scale) override
+    {
+        QPixmap pixmap(size * scale);
+        pixmap.setDevicePixelRatio(scale);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        paint(&painter, QRect(QPoint(), size), mode, state);
+        return pixmap;
+    }
+
+protected:
+    // `painter` set up to draw on the 16-unit square, centered in `rect`.
+    static void enterUnits(QPainter &painter, const QRect &rect)
+    {
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setRenderHint(QPainter::TextAntialiasing);
+        const qreal side = std::min(rect.width(), rect.height());
+        painter.translate(rect.left() + (rect.width() - side) / 2, rect.top() + (rect.height() - side) / 2);
+        painter.scale(side / iconUnits, side / iconUnits);
+    }
+};
+
 using Draw = void (*)(QPainter &, const QString &, bool);
+
+class DrawnIconEngine : public PaintedIconEngine {
+public:
+    DrawnIconEngine(QString kind, bool dark, Draw draw)
+        : kind_(std::move(kind))
+        , dark_(dark)
+        , draw_(draw)
+    {
+    }
+
+    void paint(QPainter *painter, const QRect &rect, QIcon::Mode, QIcon::State) override
+    {
+        painter->save();
+        enterUnits(*painter, rect);
+        draw_(*painter, kind_, dark_);
+        painter->restore();
+    }
+
+    QIconEngine *clone() const override { return new DrawnIconEngine(*this); }
+
+private:
+    QString kind_;
+    bool dark_;
+    Draw draw_;
+};
+
+// `base` with an orange dot (Claude's color) in its corner.
+class ClaudeDotEngine : public PaintedIconEngine {
+public:
+    explicit ClaudeDotEngine(QIcon base)
+        : base_(std::move(base))
+    {
+    }
+
+    void paint(QPainter *painter, const QRect &rect, QIcon::Mode mode, QIcon::State state) override
+    {
+        base_.paint(painter, rect, Qt::AlignCenter, mode, state);
+        painter->save();
+        enterUnits(*painter, rect);
+        painter->setPen(QPen(QGuiApplication::palette().color(QPalette::Base), 1.2));
+        painter->setBrush(QColor("#d97757"));
+        painter->drawEllipse(QRectF(8.5, 8.5, 7, 7));
+        painter->restore();
+    }
+
+    QIconEngine *clone() const override { return new ClaudeDotEngine(*this); }
+
+private:
+    QIcon base_;
+};
 
 QIcon render(const QString &kind, bool dark, Draw draw)
 {
-    QIcon icon;
-    for (const qreal ratio : {1.0, 2.0}) {
-        QPixmap pixmap(QSize(16, 16) * ratio);
-        pixmap.setDevicePixelRatio(ratio);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing);
-        painter.setRenderHint(QPainter::TextAntialiasing);
-        draw(painter, kind, dark);
-        icon.addPixmap(pixmap);
-    }
-    return icon;
+    return QIcon(new DrawnIconEngine(kind, dark, draw)); // the icon owns its engine
 }
 
+// A neutral gray, readable on every theme's side bar.
 QColor lineColor(bool dark)
 {
-    return dark ? QColor("#9a93b8") : QColor("#6c707e");
+    return dark ? QColor("#a1a5ae") : QColor("#6c707e");
 }
 
 void drawPage(QPainter &painter, const QString &kind, bool dark)
@@ -115,7 +192,7 @@ void drawPage(QPainter &painter, const QString &kind, bool dark)
 
 void drawFolder(QPainter &painter, const QString &, bool dark)
 {
-    const QColor fill = dark ? QColor("#8f86b5") : QColor("#8c94a8");
+    const QColor fill = lineColor(dark);
     QPainterPath path;
     path.moveTo(1.5, 4);
     path.quadTo(1.5, 2.5, 3, 2.5);
@@ -236,21 +313,7 @@ QIcon withClaudeDot(const QIcon &icon)
     const qint64 key = icon.cacheKey();
     if (const auto it = cache.constFind(key); it != cache.cend())
         return *it;
-    QIcon result;
-    for (const qreal ratio : {1.0, 2.0}) {
-        QPixmap pixmap = icon.pixmap(QSize(16, 16), ratio);
-        if (pixmap.isNull()) {
-            pixmap = QPixmap(QSize(16, 16) * ratio);
-            pixmap.setDevicePixelRatio(ratio);
-            pixmap.fill(Qt::transparent);
-        }
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(QPen(QGuiApplication::palette().color(QPalette::Base), 1.2));
-        painter.setBrush(QColor("#d97757"));
-        painter.drawEllipse(QRectF(8.5, 8.5, 7, 7));
-        result.addPixmap(pixmap);
-    }
+    const QIcon result(new ClaudeDotEngine(icon)); // the icon owns its engine
     cache.insert(key, result);
     return result;
 }

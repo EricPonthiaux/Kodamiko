@@ -2,7 +2,7 @@
 
 #include "git/ChangeKindStyle.h"
 #include "git/FilePatch.h"
-#include "workspace/FileIcons.h"
+#include "ui/FileIcons.h"
 
 #include <QApplication>
 #include <QPainter>

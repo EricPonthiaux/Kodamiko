@@ -18,6 +18,7 @@
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
 #include "search/FindInFilesPopup.h"
+#include "settings/FontSettings.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"
@@ -25,7 +26,6 @@
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
-#include "ui/TreeMetrics.h"
 #include "ui/UiIcons.h"
 #include "ui/WindowFrame.h"
 #include "welcome/ProjectSettingsPopup.h"
@@ -34,10 +34,8 @@
 #include "workspace/SidePanel.h"
 
 #include <QActionGroup>
-#include <QApplication>
 #include <QSettings>
 #include <QToolButton>
-#include <QTreeView>
 
 QString MainWindow::savedThemeName()
 {
@@ -117,13 +115,10 @@ void MainWindow::applyPreferences(const Preferences &preferences)
 {
     const Preferences previous = Preferences::load();
     preferences.save();
-    if (preferences.interfaceFont() != previous.interfaceFont())
-        QApplication::setFont(preferences.interfaceFont());
+    FontSettings::apply(preferences, previous, this);
     if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont() ||
         preferences.codeLineHeight != previous.codeLineHeight || preferences.ligatures != previous.ligatures)
         setTheme(preferences.theme);
-    if (preferences.treeFont() != previous.treeFont())
-        applyTreeFont(preferences.treeFont());
     // The menus' commands apply their own settings.
     systemTitleBar_->setChecked(preferences.systemTitleBar);
     formatOnSave_->setChecked(preferences.formatOnSave);
@@ -136,11 +131,4 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     warmUpLanguageServers();
     applyFullLine(preferences);
     filesPanel_->setAlwaysSelectOpenedFile(preferences.alwaysSelectOpenedFile);
-}
-
-// Files, outline and changes: same proportions everywhere.
-void MainWindow::applyTreeFont(const QFont &font)
-{
-    for (QTreeView *tree : findChildren<QTreeView *>())
-        applyTreeMetrics(tree, font);
 }

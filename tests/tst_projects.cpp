@@ -5,14 +5,20 @@
 #include "toolchains/Installer.h"
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
+#include "welcome/ProjectSettingsPopup.h"
 #include "welcome/ProjectSetupForm.h"
+#include "welcome/ProjectSetupPanel.h"
 #include "welcome/WelcomeWindow.h"
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QLabel>
 #include <QListWidget>
 #include <QProcess>
+#include <QPushButton>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QStandardPaths>
@@ -37,6 +43,27 @@ void fakeInstall(const Toolchains &toolchains, const QString &tool, const QStrin
     QFile::setPermissions(folder + QLatin1Char('/') + executable,
                           QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
     write(folder + QStringLiteral("/.complete"), "");
+}
+
+ProjectConfig javaProject(const QString &path)
+{
+    ProjectConfig project;
+    project.path = path;
+    project.name = "p";
+    project.configured = true;
+    project.languages.append({"java", true, "17", {}, "jdtls", "1.61.0"});
+    return project;
+}
+
+// C++ with a clangd already downloaded: nothing to download.
+ProjectConfig cppProject(const QString &path, const Toolchains &toolchains)
+{
+    fakeInstall(toolchains, "clangd", "23.1.0", "bin/clangd");
+    ProjectConfig project;
+    project.path = path;
+    project.name = "p";
+    project.languages.append({"cpp", true, "c++20", {}, "clangd", "23.1.0"});
+    return project;
 }
 
 QStringList titles(const QList<InstallStep> &steps)
@@ -351,6 +378,106 @@ private slots:
         QCOMPARE(shown.languages.size(), 1);
         QCOMPARE(shown.languages.first(), project.languages.first());
         QVERIFY(shown.configured);
+    }
+
+    void setupListsTheUsedLanguagesFirstAndTheOthersOff()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+
+        form.setProject(javaProject(dir.path()), {});
+
+        QCOMPARE(form.languageList()->item(0)->text(), QString("Java"));
+        for (int row = 1; row < form.languageList()->count(); ++row)
+            QVERIFY(form.languageList()->item(row)->text().endsWith(" · Off"));
+        QCOMPARE(form.currentLanguage(), QString("java"));
+    }
+
+    void setupShowsTheSelectedLanguageAlone()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+        form.setProject(javaProject(dir.path()), {});
+
+        form.languageList()->setCurrentRow(form.languageList()->count() - 1);
+
+        const QString last = form.languageList()->currentItem()->text();
+        QVERIFY(last.startsWith(ProjectLanguages::title(form.currentLanguage())));
+    }
+
+    void setupListsShowTheValueAndItsStateUnder()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+        form.resize(860, 560);
+        form.show();
+
+        form.setProject(javaProject(dir.path()), {});
+
+        const QList<QComboBox *> combos = form.findChildren<QComboBox *>();
+        const auto jdk =
+            std::ranges::find_if(combos, [](const QComboBox *combo) { return combo->currentText() == "JDK 17"; });
+        QVERIFY(jdk != combos.end());
+        const auto *state = (*jdk)->parentWidget()->findChild<QLabel *>("settingState");
+        QCOMPARE(state->text(), QString("Will download"));
+    }
+
+    void turningALanguageOffMarksItOffWhereItIs()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+        form.setProject(javaProject(dir.path()), {});
+        const QList<QCheckBox *> switches = form.findChildren<QCheckBox *>();
+        const auto java = std::ranges::find_if(switches, [](const QCheckBox *box) { return box->isChecked(); });
+        QVERIFY(java != switches.end());
+
+        (*java)->setChecked(false);
+
+        QCOMPARE(form.languageList()->item(0)->text(), QString("Java · Off"));
+        QVERIFY(!form.project().languages.first().enabled);
+    }
+
+    void projectSettingsApplyStaysOpenAndOkCloses()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        QWidget window;
+        window.resize(1200, 800);
+        window.show();
+        ProjectSettingsPopup popup(&toolchains, Theme::dark(), &window);
+        const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
+        popup.popup(cppProject(dir.path(), toolchains));
+        const auto *panel = popup.findChild<ProjectSetupPanel *>();
+
+        panel->applyButton()->click();
+
+        QCOMPARE(applied.size(), 1);
+        QVERIFY(popup.isVisible());
+        QVERIFY(ProjectStore::find(dir.path()).has_value());
+        panel->okButton()->click();
+        QCOMPARE(applied.size(), 2);
+        QVERIFY(!popup.isVisible());
+    }
+
+    void projectSettingsCancelLeavesTheSetup()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        QWidget window;
+        window.show();
+        ProjectSettingsPopup popup(&toolchains, Theme::dark(), &window);
+        const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
+        popup.popup(cppProject(dir.path(), toolchains));
+
+        popup.findChild<ProjectSetupPanel *>()->cancelButton()->click();
+
+        QCOMPARE(applied.size(), 0);
+        QVERIFY(!popup.isVisible());
+        QVERIFY(!ProjectStore::find(dir.path()).has_value());
     }
 
     void listsTheProjects()

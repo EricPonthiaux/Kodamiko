@@ -1,9 +1,10 @@
 #include "ClaudeConfigView.h"
 
 #include "ui/AppFonts.h"
+#include "ui/FileIcons.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 #include "workspace/EntryPopups.h"
-#include "workspace/FileIcons.h"
 
 #include <QAction>
 #include <QApplication>
@@ -135,7 +136,7 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
 
     auto *header = new QFrame(this);
     header->setObjectName(QStringLiteral("viewHeader"));
-    header->setFixedHeight(34);
+    UiMetrics::setScaledHeight(header, UiMetrics::panelHeaderHeight);
     auto *toolbar = new QHBoxLayout(header);
     toolbar->setContentsMargins(10, 0, 6, 0);
     toolbar->setSpacing(2);

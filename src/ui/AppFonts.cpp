@@ -14,8 +14,9 @@ namespace {
 // The families of the embedded fonts, empty until load() registers them.
 struct Families {
     QString interface;
-    QString code;     // without ligatures
-    QString ligature; // the same with them
+    QString code;
+    QString jetBrains;         // without ligatures
+    QString jetBrainsLigature; // the same with them
 };
 
 Families &embedded()
@@ -62,12 +63,15 @@ void load()
     if (loaded || !QGuiApplication::instance())
         return;
     loaded = true;
-    embedded().interface = addFont(QStringLiteral(":/fonts/Inter-Variable.ttf"));
+    embedded().interface = addFont(QStringLiteral(":/fonts/UbuntuSans-Variable.ttf"));
+    addFont(QStringLiteral(":/fonts/UbuntuSans-VariableItalic.ttf"));
+    embedded().code = addFont(QStringLiteral(":/fonts/UbuntuSansMono-Variable.ttf"));
+    addFont(QStringLiteral(":/fonts/UbuntuSansMono-VariableItalic.ttf"));
     // The "NL" version has no programming ligatures: the terminal and, by
     // default, the editor use it. The other one is for the editor when the
     // ligatures are on.
-    embedded().code = addFont(QStringLiteral(":/fonts/JetBrainsMonoNL-Regular.ttf"));
-    embedded().ligature = addFont(QStringLiteral(":/fonts/JetBrainsMono-Regular.ttf"));
+    embedded().jetBrains = addFont(QStringLiteral(":/fonts/JetBrainsMonoNL-Regular.ttf"));
+    embedded().jetBrainsLigature = addFont(QStringLiteral(":/fonts/JetBrainsMono-Regular.ttf"));
     for (const char *style : {"Italic", "Light", "LightItalic", "Medium", "MediumItalic", "Bold", "BoldItalic"}) {
         addFont(QStringLiteral(":/fonts/JetBrainsMonoNL-%1.ttf").arg(QLatin1String(style)));
         addFont(QStringLiteral(":/fonts/JetBrainsMono-%1.ttf").arg(QLatin1String(style)));
@@ -95,8 +99,13 @@ void setInterfaceFont(QWidget *widget, qreal scale, QFont::Weight weight, qreal 
             font.setLetterSpacing(QFont::AbsoluteSpacing, letterSpacing);
         widget->setFont(font);
     };
+    followApplicationFont(widget, apply);
+}
+
+void followApplicationFont(QObject *owner, std::function<void()> apply)
+{
     apply();
-    new ApplicationFontFollower(widget, apply); // owned by `widget`
+    new ApplicationFontFollower(owner, std::move(apply)); // owned by `owner`
 }
 
 QFont codeFont(qreal pointSize)
@@ -113,14 +122,24 @@ QFont codeFont(qreal pointSize)
 bool isBuiltInCode(const QString &family)
 {
     load();
-    return !family.isEmpty() && (family == embedded().code || family == embedded().ligature);
+    const Families &fonts = embedded();
+    return !family.isEmpty() &&
+           (family == fonts.code || family == fonts.jetBrains || family == fonts.jetBrainsLigature);
+}
+
+QString jetBrainsMono()
+{
+    load();
+    return embedded().jetBrains;
 }
 
 QFont withLigatures(QFont font, bool ligatures)
 {
     load();
-    if (isBuiltInCode(font.family()))
-        font.setFamily(ligatures ? embedded().ligature : embedded().code);
+    const bool isJetBrains = !font.family().isEmpty() &&
+                             (font.family() == embedded().jetBrains || font.family() == embedded().jetBrainsLigature);
+    if (isJetBrains)
+        font.setFamily(ligatures ? embedded().jetBrainsLigature : embedded().jetBrains);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     font.setFeature(QFont::Tag("liga"), ligatures ? 1 : 0);
     font.setFeature(QFont::Tag("calt"), ligatures ? 1 : 0);

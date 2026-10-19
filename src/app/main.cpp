@@ -163,8 +163,8 @@ int main(int argc, char *argv[])
     // not know it, reports the leak at the next statement.
     // NOLINTBEGIN(clang-analyzer-cplusplus.NewDeleteLeaks)
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
-    // Inter for the whole interface (embedded), at the system's size unless
-    // Preferences ▸ Appearance sets one.
+    // Ubuntu Sans for the whole interface (embedded), at 11 pt unless
+    // Preferences ▸ Fonts sets one.
     QApplication::setFont(Preferences::load().interfaceFont());
     // NOLINTEND(clang-analyzer-cplusplus.NewDeleteLeaks)
     // Every window's icon; on Wayland, the desktop file's icon.

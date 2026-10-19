@@ -128,6 +128,14 @@ public:
     // documentation of a setting...), from a byte position; empty: nothing.
     void setHoverHelp(std::function<QString(int)> help);
 
+    // While the completion list is open, no tooltip covers it (problems,
+    // help, the language server's documentation): the one shown is hidden,
+    // the next ones wait until it closes. The same goes for the context
+    // menu, on its own.
+    void setToolTipsSuspended(bool suspended);
+
+    bool areToolTipsSuspended() const { return toolTipsSuspended_ || isContextMenuShown_; }
+
     // Marks of the lines that differ from the git index.
     ChangeGutter *changeGutter() const { return changeGutter_; }
 
@@ -194,6 +202,10 @@ private:
     ActiveGuide activeGuide_;
     QList<QAction *> fileActions_;
     std::function<QString(int)> hoverHelp_;
+    bool toolTipsSuspended_ = false;
+    // Apart from toolTipsSuspended_: opening the menu closes the completion
+    // list, which lifts that one.
+    bool isContextMenuShown_ = false;
     // QScintilla's keys for each of its commands, before releaseReservedKeys.
     QList<std::pair<int, int>> defaultCommandKeys_;
 };

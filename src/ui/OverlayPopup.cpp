@@ -82,14 +82,30 @@ QSize OverlayPopup::panelSize() const
     return size.expandedTo(minimum_).boundedTo(area.size());
 }
 
-void OverlayPopup::place()
+QRect OverlayPopup::placedGeometry() const
 {
     const QRect area = availableArea();
     const QSize size = panelSize();
     // Centered across, a little above the middle (the optical center).
     const int x = area.left() + (area.width() - size.width()) / 2;
     const int y = area.top() + std::max((area.height() - size.height()) / 3, 0);
-    setGeometry(QRect(QPoint(x, y), size).adjusted(-shadowWidth, -shadowWidth, shadowWidth, shadowWidth));
+    const QRect centered = QRect(QPoint(x, y), size).adjusted(-shadowWidth, -shadowWidth, shadowWidth, shadowWidth);
+    return keptInside(centered.translated(QSettings().value(offsetKey()).toPoint()));
+}
+
+QRect OverlayPopup::keptInside(QRect geometry) const
+{
+    const QRect bounds = availableArea().adjusted(-shadowWidth, -shadowWidth, shadowWidth, shadowWidth);
+    geometry.moveLeft(
+        std::clamp(geometry.left(), bounds.left(), std::max(bounds.left(), bounds.right() - geometry.width() + 1)));
+    geometry.moveTop(
+        std::clamp(geometry.top(), bounds.top(), std::max(bounds.top(), bounds.bottom() - geometry.height() + 1)));
+    return geometry;
+}
+
+void OverlayPopup::place()
+{
+    setGeometry(placedGeometry());
 }
 
 void OverlayPopup::showCentered()
@@ -99,7 +115,6 @@ void OverlayPopup::showCentered()
         applyMargins();
         place();
         parentWidget()->installEventFilter(watcher_); // window resized
-        qApp->installEventFilter(watcher_);           // clicks elsewhere
     }
     show();
     raise();
@@ -109,7 +124,6 @@ void OverlayPopup::dismiss()
 {
     if (!isVisible())
         return;
-    qApp->removeEventFilter(watcher_);
     parentWidget()->removeEventFilter(watcher_);
     hide();
     if (previousFocus_ && previousFocus_->isVisible())
@@ -119,6 +133,7 @@ void OverlayPopup::dismiss()
 void OverlayPopup::resetSize()
 {
     QSettings().remove(settingsKey_);
+    QSettings().remove(offsetKey());
     if (isVisible())
         place();
 }
@@ -126,27 +141,35 @@ void OverlayPopup::resetSize()
 void OverlayPopup::mousePressEvent(QMouseEvent *event)
 {
     const Qt::Edges edges = WindowFrame::edgesAt(event->position().toPoint(), size(), shadowWidth);
-    if (event->button() == Qt::LeftButton && edges) {
-        resizeEdges_ = edges;
-        resizeStart_ = mapToParent(event->position().toPoint());
-        resizeGeometry_ = geometry();
+    if (event->button() != Qt::LeftButton) {
+        QFrame::mousePressEvent(event);
         return;
     }
-    QFrame::mousePressEvent(event);
+    // Inside, the press reaches the panel only where no control took it.
+    resizeEdges_ = edges;
+    isMoving_ = !edges;
+    dragStart_ = mapToParent(event->position().toPoint());
+    dragGeometry_ = geometry();
+    if (isMoving_)
+        setCursor(Qt::ClosedHandCursor);
 }
 
 void OverlayPopup::mouseMoveEvent(QMouseEvent *event)
 {
+    // Positions in the window: the panel moves while it is dragged.
+    const QPoint delta = mapToParent(event->position().toPoint()) - dragStart_;
+    if (isMoving_) {
+        setGeometry(keptInside(dragGeometry_.translated(delta)));
+        return;
+    }
     if (!resizeEdges_) {
         setCursor(WindowFrame::cursorFor(WindowFrame::edgesAt(event->position().toPoint(), size(), shadowWidth)));
         QFrame::mouseMoveEvent(event);
         return;
     }
-    // Positions in the window: the panel moves while it is resized.
-    const QPoint delta = mapToParent(event->position().toPoint()) - resizeStart_;
     const QRect bounds = availableArea().adjusted(-shadowWidth, -shadowWidth, shadowWidth, shadowWidth);
     const QSize smallest = minimum_ + QSize(2 * shadowWidth, 2 * shadowWidth);
-    QRect rect = resizeGeometry_;
+    QRect rect = dragGeometry_;
     if (resizeEdges_ & Qt::LeftEdge)
         rect.setLeft(std::clamp(rect.left() + delta.x(), bounds.left(), rect.right() - smallest.width()));
     if (resizeEdges_ & Qt::RightEdge)
@@ -160,33 +183,46 @@ void OverlayPopup::mouseMoveEvent(QMouseEvent *event)
 
 void OverlayPopup::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (isMoving_) {
+        isMoving_ = false;
+        unsetCursor();
+        saveOffset();
+        return;
+    }
     if (resizeEdges_) {
         resizeEdges_ = {};
         // The user's size, from now on.
         QSettings().setValue(settingsKey_, size() - QSize(2 * shadowWidth, 2 * shadowWidth));
+        saveOffset();
         return;
     }
     QFrame::mouseReleaseEvent(event);
 }
 
+// The user's place, from now on: how far from the centered one.
+void OverlayPopup::saveOffset()
+{
+    QSettings().remove(offsetKey());
+    const QRect centered = placedGeometry();
+    QSettings().setValue(offsetKey(), geometry().topLeft() - centered.topLeft());
+}
+
+QString OverlayPopup::offsetKey() const
+{
+    return settingsKey_ + QStringLiteral("Offset");
+}
+
 void OverlayPopup::leaveEvent(QEvent *event)
 {
-    if (!resizeEdges_)
+    if (!resizeEdges_ && !isMoving_)
         unsetCursor();
     QFrame::leaveEvent(event);
 }
 
 void OverlayPopup::onWatchedEvent(QObject *watched, QEvent *event)
 {
-    if (watched == parentWidget() && event->type() == QEvent::Resize) {
+    if (watched == parentWidget() && event->type() == QEvent::Resize)
         place();
-    } else if (event->type() == QEvent::MouseButtonPress && watched->isWidgetType()) {
-        // A click in the window, outside the panel and its edges: closes it.
-        // Menus and other windows do not count.
-        const auto *widget = static_cast<QWidget *>(watched);
-        if (widget->window() == parentWidget()->window() && widget != this && !isAncestorOf(widget))
-            dismiss();
-    }
 }
 
 void OverlayPopup::paintEvent(QPaintEvent *)

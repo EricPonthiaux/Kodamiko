@@ -1,10 +1,13 @@
 #pragma once
 
+#include "ClaudeIndicator.h"
 #include "Theme.h"
 
 #include <QAbstractButton>
 #include <QIcon>
 #include <QWidget>
+
+#include <optional>
 
 class QFrame;
 class QHBoxLayout;
@@ -55,7 +58,8 @@ public:
     QMenuBar *menuBar() const { return menuBar_; }
 
     void setProject(const QString &name, const QString &toolTip, QMenu *menu);
-    void setClaudeState(const QIcon &icon, const QString &text, const QString &toolTip);
+    // Claude's state; hidden while there is no session (`status` empty).
+    void setClaudeState(std::optional<ClaudeIndicator::Status> status, const QString &toolTip);
     // Buttons at the right, before the window controls, with one of the
     // UiIcons (drawn in the theme's colors).
     void addActionButton(QAction *action, const QString &iconName);
@@ -93,10 +97,20 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    struct ActionButton {
+        QToolButton *button;
+        QString iconName;
+        QColor color;
+        int inset = 0; // smaller by this, inside the run block
+    };
+
     QToolButton *addChip();
     QFrame *createRunBlock();
     // `color` defaults to the theme's foreground.
     QToolButton *actionButton(QAction *action, const QString &iconName, const QColor &color = {});
+    // Sizes from UiMetrics, at the application font's size.
+    void applyMetrics();
+    void sizeActionButton(const ActionButton &entry);
     void toggleMaximized();
     void updateMaximizeButton();
 
@@ -105,20 +119,15 @@ private:
     QWidget *leadingSpace_;
     QMenuBar *menuBar_;
     QToolButton *project_;
-    QToolButton *claude_;
+    ClaudeIndicator *claude_;
     QFrame *runBlock_ = nullptr;
     QToolButton *run_ = nullptr;
+    QFrame *runDivider_ = nullptr;
     QHBoxLayout *runActions_ = nullptr;
     QToolButton *runButton_ = nullptr;
     QToolButton *stopButton_ = nullptr;
     bool running_ = false;
     QHBoxLayout *actions_;
-
-    struct ActionButton {
-        QToolButton *button;
-        QString iconName;
-        QColor color;
-    };
 
     QList<ActionButton> actionButtons_;
     WindowButton *minimize_;

@@ -140,7 +140,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , pages_(new QStackedWidget(this))
     , search_(new QLineEdit(this))
     , list_(new QListWidget(this))
-    , setup_(new ProjectSetupPanel(toolchains_.get(), tr("Open Project"), this))
+    , setup_(new ProjectSetupPanel(toolchains_.get(), ProjectSetupPanel::Purpose::FirstSetup, this))
 {
     const Preferences preferences = Preferences::load();
     theme_ = Theme::named(preferences.theme);

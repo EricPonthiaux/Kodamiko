@@ -1,8 +1,8 @@
 #include "ProblemsView.h"
 
 #include "ProblemStore.h"
+#include "ui/FileIcons.h"
 #include "ui/TreeColumnFit.h"
-#include "workspace/FileIcons.h"
 
 #include <QDir>
 #include <QFileInfo>

@@ -3,13 +3,19 @@
 #include "settings/PreferencesPopup.h"
 #include "syntax/ScintillaStyles.h"
 #include "ui/AppFonts.h"
+#include "ui/PopupWidgets.h"
 #include "ui/Theme.h"
 
 #include <QAction>
+#include <QComboBox>
 #include <QLabel>
+#include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPushButton>
 #include <QSettings>
+#include <QSpinBox>
+#include <QStackedWidget>
 #include <QTreeWidget>
 #include <Qsci/qsciscintilla.h>
 #include <QtTest>
@@ -67,6 +73,7 @@ private slots:
     void typographyReachesTheTheme()
     {
         Preferences preferences;
+        preferences.codeFontFamily = AppFonts::jetBrainsMono(); // the built-in font with ligatures
         preferences.codeFontWeight = QFont::Light;
         preferences.codeLineHeight = 1.8;
         preferences.ligatures = true;
@@ -101,6 +108,7 @@ private slots:
             return editor.viewport()->grab().toImage();
         };
         Preferences preferences;
+        preferences.codeFontFamily = AppFonts::jetBrainsMono(); // the built-in font with ligatures
         const QImage plain = draw(preferences);
         const long plainHeight = editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0);
         preferences.ligatures = true;
@@ -157,6 +165,83 @@ private slots:
         QCOMPARE(Keymap::loadOverrides(), overrides);
         Keymap::saveOverrides({});
         QVERIFY(!QSettings().contains("keymap"));
+    }
+
+    void codeAndInterfaceAreInUbuntuSansByDefault()
+    {
+        const Preferences preferences;
+
+        QCOMPARE(preferences.codeFont().family(), QString("Ubuntu Sans Mono"));
+        QVERIFY(AppFonts::isBuiltInCode(preferences.codeFont().family()));
+        QCOMPARE(preferences.interfaceFont().family(), QString("Ubuntu Sans"));
+        QCOMPARE(preferences.treeFont().family(), QString("Ubuntu Sans"));
+    }
+
+    void dialogKeepsThemesAndFontsOnSeparatePages()
+    {
+        QWidget window;
+        const PreferencesPopup popup(Theme::dark(), &window);
+        const auto *nav = popup.findChild<QListWidget *>(QStringLiteral("popupNav"));
+        const auto *pages = popup.findChild<QStackedWidget *>();
+        const auto titleOfPage = [nav, pages](const QWidget *widget) {
+            while (widget && widget->parentWidget() != pages)
+                widget = widget->parentWidget();
+            return nav->item(pages->indexOf(widget))->text();
+        };
+
+        const QList<ThemeCard *> themes = popup.findChildren<ThemeCard *>();
+        QVERIFY(!themes.isEmpty());
+        for (const ThemeCard *theme : themes)
+            QCOMPARE(titleOfPage(theme), QString("Appearance"));
+        const QList<QComboBox *> combos = popup.findChildren<QComboBox *>();
+        const auto codeFont = std::ranges::find_if(
+            combos, [](const QComboBox *combo) { return combo->findText("JetBrains Mono (built in)") >= 0; });
+        QVERIFY(codeFont != combos.end());
+        QCOMPARE(titleOfPage(*codeFont), QString("Fonts"));
+        const QList<QSpinBox *> sizes = popup.findChildren<QSpinBox *>();
+        for (const QSpinBox *size : sizes) {
+            if (size->suffix() == " pt")
+                QCOMPARE(titleOfPage(size), QString("Fonts"));
+        }
+    }
+
+    void popupStaysOpenAfterAClickElsewhere()
+    {
+        QWidget window;
+        window.resize(1200, 800);
+        QPushButton elsewhere("Elsewhere", &window);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        PreferencesPopup popup(Theme::dark(), &window);
+        popup.showCentered();
+
+        QTest::mouseClick(&elsewhere, Qt::LeftButton);
+
+        QVERIFY(popup.isVisible());
+    }
+
+    void popupMovesWhenDraggedByItsHeaderAndKeepsItsPlace()
+    {
+        QWidget window;
+        window.resize(1200, 800);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        PreferencesPopup popup(Theme::dark(), &window);
+        popup.showCentered();
+        const QPoint centered = popup.pos();
+        auto *header = popup.findChild<QWidget *>("popupHeader");
+        const QPoint grip(header->width() / 2, header->height() / 2);
+
+        QTest::mousePress(header, Qt::LeftButton, {}, grip);
+        QTest::mouseMove(header, grip + QPoint(40, 30));
+        QTest::mouseRelease(header, Qt::LeftButton, {}, grip + QPoint(40, 30));
+
+        QCOMPARE(popup.pos(), centered + QPoint(40, 30));
+        popup.dismiss();
+        popup.showCentered();
+        QCOMPARE(popup.pos(), centered + QPoint(40, 30));
+        popup.resetSize();
+        QCOMPARE(popup.pos(), centered);
     }
 
     void dialogReturnsItsSettings()

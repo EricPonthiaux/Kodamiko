@@ -112,6 +112,7 @@ add_library(duet_core STATIC
     run/Runner.cpp
     search/FindInFiles.cpp
     search/FindInFilesPopup.cpp
+    settings/FontSettings.cpp
     settings/Keymap.cpp
     settings/Preferences.cpp
     settings/PreferencesPopup.cpp
@@ -137,6 +138,8 @@ add_library(duet_core STATIC
     toolchains/Toolchains.cpp
     ui/AppFonts.cpp
     ui/BrandMark.cpp
+    ui/ClaudeIndicator.cpp
+    ui/FileIcons.cpp
     ui/GripSplitter.cpp
     ui/HoverCloseButtons.cpp
     ui/KdeThemes.cpp
@@ -151,9 +154,11 @@ add_library(duet_core STATIC
     ui/TreeColumnFit.cpp
     ui/TreeMetrics.cpp
     ui/UiIcons.cpp
+    ui/UiMetrics.cpp
     ui/WindowFrame.cpp
     viewers/DiagramKinds.cpp
     viewers/ImageView.cpp
+    welcome/LanguageChoices.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
     welcome/ProjectSetupPanel.cpp
@@ -161,7 +166,6 @@ add_library(duet_core STATIC
     welcome/WelcomeWindow.cpp
     workspace/CommandPalette.cpp
     workspace/EntryPopups.cpp
-    workspace/FileIcons.cpp
     workspace/FileOperations.cpp
     workspace/FilesPanel.cpp
     workspace/FileTreeView.cpp
@@ -218,13 +222,17 @@ qt_add_resources(duet_core kde_themes
     BASE ${PROJECT_SOURCE_DIR}/third_party/ksyntaxhighlighting-themes
     FILES ${kde_themes})
 
-# Interface and code fonts, the same on every system. JetBrains Mono comes
+# Interface and code fonts, the same on every system: Ubuntu Sans and
+# Ubuntu Sans Mono by default; JetBrains Mono, the other code font, comes
 # without ligatures (NL) and with them (the editor's option).
 qt_add_resources(duet_core fonts
     PREFIX /fonts
     BASE ${PROJECT_SOURCE_DIR}/third_party/fonts
     FILES
-        ${PROJECT_SOURCE_DIR}/third_party/fonts/Inter-Variable.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/UbuntuSans-Variable.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/UbuntuSans-VariableItalic.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/UbuntuSansMono-Variable.ttf
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/UbuntuSansMono-VariableItalic.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Regular.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Italic.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/JetBrainsMonoNL-Light.ttf

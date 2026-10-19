@@ -21,7 +21,10 @@ class QVBoxLayout;
 // as @accent, @accentText, @text, @muted, @window, @panel, @base, @line,
 // @hover, @selection and @slate (ThemeStyle::selectionColor). Object names: "popupHeader", "settingsCard",
 // "settingsSeparator", "settingsSection", "settingsDescription",
-// "pageDescription", "footerHint", "popupFooter".
+// "pageDescription", "footerHint", "popupFooter"; for a popup in two
+// columns, "popupSidebar" (the left one), "popupNav" (its list),
+// "navHeading" (a title above it) and "settingState" (a line under a
+// field).
 QString popupStyleSheet(const Theme &theme, const QString &extra = {});
 
 // A theme to choose: a miniature editor in its colors, with its name.

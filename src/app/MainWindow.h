@@ -297,8 +297,6 @@ private:
     void applyPreferences(const Preferences &preferences);
     // Full Line completion on or off, with its server.
     void applyFullLine(const Preferences &preferences);
-    // The side trees' text, rows and indentation in `font`.
-    void applyTreeFont(const QFont &font);
     // Menu shortcuts, with the user's changes; QScintilla leaves them to the
     // menus.
     void applyKeymap(const Keymap::Overrides &overrides);

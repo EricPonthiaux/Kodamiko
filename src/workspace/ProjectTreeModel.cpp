@@ -1,7 +1,7 @@
 #include "ProjectTreeModel.h"
 
-#include "FileIcons.h"
 #include "git/IgnoreRules.h"
+#include "ui/FileIcons.h"
 
 #include <QDir>
 #include <QMimeData>

@@ -2,10 +2,10 @@
 
 #include "CommandPalette.h"
 #include "EntryPopups.h"
-#include "FileIcons.h"
 #include "FileOperations.h"
 #include "LastCommits.h"
 #include "ProjectTreeModel.h"
+#include "ui/FileIcons.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/TreeMetrics.h"
 #include "viewers/DiagramKinds.h"

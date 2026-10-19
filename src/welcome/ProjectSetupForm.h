@@ -2,23 +2,25 @@
 
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
+#include "ui/Theme.h"
 
 #include <QWidget>
 
-#include <optional>
-
+class QCheckBox;
 class QComboBox;
 class QLabel;
-class QVBoxLayout;
-struct RuntimeInstall;
-class SettingsCard;
+class QListWidget;
+class QPushButton;
+class QStackedWidget;
 class Toolchains;
-class QCheckBox;
 
-// The setup of a project's languages, one card each: whether it is used,
-// its runtime (JDK, Node, Python, C++ standard), its language server and
-// the server's version. Each version says whether it is downloaded
-// already, on the machine, or still to download.
+// The setup of a project's languages, in two columns as Preferences: at the
+// left, the languages (those the project uses first, the others marked
+// Off) and Detect Again; at the right, the selected one's settings: whether
+// it is used, its runtime (JDK, Node, Python, C++ standard), its language
+// server and the server's version. Each list shows the values alone; the
+// line under it says whether the one chosen is downloaded already, on the
+// machine (and where), or still to download.
 class ProjectSetupForm : public QWidget {
     Q_OBJECT
 
@@ -32,6 +34,15 @@ public:
     ProjectConfig project() const;
     // Detects the project's languages again and shows what was found.
     void detectAgain();
+    void applyTheme(const Theme &theme);
+
+    // The languages, in the order shown, and the one shown at the right.
+    // For tests.
+    QListWidget *languageList() const { return list_; }
+
+    QString currentLanguage() const;
+    // Shows `family`'s settings.
+    void selectLanguage(const QString &family);
 
     // A setup for `folder` from what its files say.
     static ProjectConfig detectedProject(const QString &folder,
@@ -42,33 +53,37 @@ signals:
     void changed();
 
 private:
-    struct Card {
+    // The settings of one language, at the right.
+    struct Page {
         QString family;
         QLabel *evidence{};
         QCheckBox *enabled{};
         QComboBox *runtime{};
+        QLabel *runtimeState{};
         QComboBox *server{};
         QComboBox *serverVersion{};
-        QList<QWidget *> rows; // hidden when turned off
+        QLabel *serverState{};
+        QWidget *settings{};   // hidden when turned off
+        QLabel *offHint{};     // shown instead
+        QWidget *versionRow{}; // hidden without a server
     };
 
-    void build(Card &card);
-    void fill(Card &card, const LanguageSetup &setup, const QString &evidence);
-    void fillRuntimes(Card &card, const LanguageSetup &setup);
-    // Each fills `combo` and returns the index of `setup`'s runtime, -1 if
-    // not listed.
-    static int fillCppStandards(QComboBox *combo, const LanguageSetup &setup);
-    int fillPythons(QComboBox *combo, const LanguageSetup &setup) const;
-    int fillToolRuntimes(QComboBox *combo, const QString &family, const LanguageSetup &setup) const;
-    // `executable`, relative to the project when inside it.
-    QString pythonLocation(const QString &executable) const;
-    static QString runtimeState(const std::optional<RuntimeInstall> &found);
-    void fillServerVersions(Card &card, const QString &server, const QString &selected);
-    void updateRows(Card &card);
-    LanguageSetup setupOf(const Card &card) const;
+    QWidget *createSidebar();
+    QWidget *createPage(Page &page);
+    void connectPage(const Page &page);
+    Page &pageOf(const QString &family);
+    void fill(Page &page, const LanguageSetup &setup, const QString &evidence);
+    void fillServerVersions(const Page &page, const QString &server, const QString &selected);
+    void updatePage(const Page &page);
+    // The languages used first; `keep` stays selected.
+    void fillList(const QString &keep);
+    void updateListItem(const Page &page);
+    LanguageSetup setupOf(const Page &page) const;
 
     Toolchains *toolchains_;
     ProjectConfig project_;
-    QList<Card> cards_;
-    QVBoxLayout *layout_;
+    QList<Page> pages_;
+    QListWidget *list_ = nullptr;
+    QStackedWidget *stack_ = nullptr;
+    QPushButton *detect_ = nullptr;
 };

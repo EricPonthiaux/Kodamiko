@@ -1,5 +1,6 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "ui/FileIcons.h"
 #include "workspace/EntryPopups.h"
 #include "workspace/FileTreeView.h"
 #include "workspace/FileUndoStack.h"
@@ -57,6 +58,36 @@ class TestFileTree : public QObject {
     Q_OBJECT
 
 private slots:
+
+    void folderIconIsDrawnAtTheSizeAsked()
+    {
+        const QImage icon = FileIcons::folder(true).pixmap(QSize(32, 32), 1.0).toImage();
+
+        QCOMPARE(icon.size(), QSize(32, 32));
+        // Drawn across the whole square, not a 16-pixel picture in its corner.
+        int right = 0;
+        for (int y = 0; y < icon.height(); ++y) {
+            for (int x = 0; x < icon.width(); ++x) {
+                if (qAlpha(icon.pixel(x, y)) > 0)
+                    right = std::max(right, x);
+            }
+        }
+        QVERIFY(right >= 26);
+    }
+
+    void folderIconIsANeutralGray()
+    {
+        for (const bool dark : {true, false}) {
+            const QImage icon = FileIcons::folder(dark).pixmap(QSize(32, 32), 1.0).toImage();
+            QColor outline;
+            for (int x = 0; x < icon.width() && !outline.isValid(); ++x) {
+                if (qAlpha(icon.pixel(x, 16)) == 255)
+                    outline = QColor(icon.pixel(x, 16));
+            }
+            QVERIFY(outline.isValid());
+            QVERIFY2(outline.hsvSaturation() < 40, qPrintable(outline.name())); // no violet
+        }
+    }
 
     void problemsColorFilesAndTheirFoldersBeforeGitStates()
     {

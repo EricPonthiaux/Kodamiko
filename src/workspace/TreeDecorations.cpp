@@ -1,10 +1,10 @@
 #include "TreeDecorations.h"
 
 #include "CommandPalette.h"
-#include "FileIcons.h"
 #include "FileOperations.h"
 #include "FileTreeView.h"
 #include "ProjectTreeModel.h"
+#include "ui/FileIcons.h"
 
 #include <QDateTime>
 #include <QDir>

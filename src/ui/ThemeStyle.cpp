@@ -4,6 +4,9 @@
 #include <QDir>
 #include <QFile>
 #include <QStandardPaths>
+#include <QWidget>
+
+#include <utility>
 
 namespace {
 
@@ -59,17 +62,49 @@ QColor withAlpha(QColor color, qreal alpha)
     return color;
 }
 
-// `base` with `share` of `tint` mixed in, opaque.
+// The style sheet gives each widget it polishes the font it had then, as
+// if set on it, so the application font no longer reaches it: the widgets
+// without a font of their own inherit it again. Those with one (code,
+// trees, AppFonts::setInterfaceFont) keep it.
+void inheritApplicationFont()
+{
+    const QList<QWidget *> widgets = QApplication::allWidgets();
+    for (QWidget *widget : widgets) {
+        if (!widget->testAttribute(Qt::WA_SetFont))
+            widget->setFont(QFont());
+    }
+}
+
+// A new style sheet gives each widget back the font it had when first
+// polished: those set since (the trees' after Preferences, a diff's code
+// font) are set again. It also brings back the platform theme's font for
+// each class (KDE's for menu bars, item views, labels...) over the
+// application font, which setting the application font again removes.
+void setStyleSheetKeepingFonts(const QString &sheet)
+{
+    QList<std::pair<QWidget *, QFont>> ownFonts;
+    const QList<QWidget *> widgets = QApplication::allWidgets();
+    for (QWidget *widget : widgets) {
+        if (widget->testAttribute(Qt::WA_SetFont))
+            ownFonts.append({widget, widget->font()});
+    }
+    qApp->setStyleSheet(sheet);
+    QApplication::setFont(QApplication::font());
+    inheritApplicationFont();
+    for (const auto &[widget, font] : std::as_const(ownFonts))
+        widget->setFont(font);
+}
+
+} // namespace
+
+namespace ThemeStyle {
+
 QColor mixed(const QColor &base, const QColor &tint, qreal share)
 {
     return QColor::fromRgbF(float(base.redF() + (tint.redF() - base.redF()) * share),
                             float(base.greenF() + (tint.greenF() - base.greenF()) * share),
                             float(base.blueF() + (tint.blueF() - base.blueF()) * share));
 }
-
-} // namespace
-
-namespace ThemeStyle {
 
 QPalette palette(const Theme &theme)
 {
@@ -170,7 +205,7 @@ QToolButton#hunkAction:hover { border-color: @highlight; }
 QFrame#card QPlainTextEdit { background: @base; }
 QStatusBar { background: transparent; border-top: 1px solid @line; color: @muted; }
 TitleBar QMenuBar { background: transparent; border: none; }
-TitleBar QMenuBar::item { padding: 6px 10px; border-radius: 3px; }
+TitleBar QMenuBar::item { padding: 7px 14px; border-radius: 3px; }
 TitleBar QMenuBar::item:selected, TitleBar QMenuBar::item:pressed { background: @hover; color: @text; }
 TitleBar QToolButton#chip:hover, TitleBar QToolButton#chip:pressed { background: @hover; }
 TitleBar QToolButton#projectChip { padding: 0 8px; border: none; border-radius: 3px; background: transparent; }
@@ -259,6 +294,10 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         sheet += QStringLiteral("QTabBar QToolButton::left-arrow { image: url(%1); width: 16px; height: 16px; }\n"
                                 "QTabBar QToolButton::right-arrow { image: url(%2); width: 16px; height: 16px; }\n")
                      .arg(left, right);
+    // Styling the drop-down hides Qt's arrow: a chevron in its place.
+    const QString down = chevronIcon(QStringLiteral("down-%1.svg").arg(theme.name), theme.mutedText, u"M4 6l4 4 4-4");
+    if (!down.isEmpty())
+        sheet += QStringLiteral("QComboBox::down-arrow { image: url(%1); width: 12px; height: 12px; }\n").arg(down);
     return sheet;
 }
 
@@ -276,7 +315,13 @@ void apply(const Theme &theme)
         QApplication::setPalette(colors);
     const QString sheet = styleSheet(theme);
     if (qApp->styleSheet() != sheet)
-        qApp->setStyleSheet(sheet);
+        setStyleSheetKeepingFonts(sheet);
+}
+
+void applyFont(const QFont &font)
+{
+    QApplication::setFont(font);
+    inheritApplicationFont();
 }
 
 } // namespace ThemeStyle

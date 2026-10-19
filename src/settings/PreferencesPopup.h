@@ -21,7 +21,7 @@ class PopupHeader;
 class QCheckBox;
 
 // File ▸ Preferences, a popup over the window like Find in Files: a side
-// bar of pages (Appearance, Editor, Files, Claude, Keymap), each made of
+// bar of pages (Appearance, Fonts, Editor, Files, Claude, Keymap), each made of
 // cards of settings. Changes apply on OK or Apply; Cancel, Escape or a
 // click elsewhere leave everything as it was.
 class PreferencesPopup : public OverlayPopup {
@@ -69,6 +69,7 @@ private:
     // Miniatures of `themes`, four in a row, added to themes_.
     QWidget *themeGrid(const QList<Theme> &themes);
     QWidget *createAppearancePage();
+    QWidget *createFontsPage();
     QWidget *createEditorPage();
     QWidget *createFilesPage();
     QWidget *createClaudePage();

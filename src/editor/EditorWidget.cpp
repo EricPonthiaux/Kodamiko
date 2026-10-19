@@ -14,6 +14,7 @@
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
+#include <QPointer>
 #include <QTimer>
 #include <QToolTip>
 #include <Qsci/qscicommandset.h>
@@ -391,7 +392,12 @@ void EditorWidget::contextMenuEvent(QContextMenuEvent *event)
             SendScintilla(SCI_GOTOPOS, position);
     }
 
+    const QPointer<EditorWidget> guard(this); // an action may close the file
+    isContextMenuShown_ = true;
+    QToolTip::hideText();
     createContextMenu()->exec(event->globalPos());
+    if (guard)
+        isContextMenuShown_ = false;
 }
 
 std::unique_ptr<QMenu> EditorWidget::createContextMenu()
@@ -735,9 +741,16 @@ void EditorWidget::enableDwell()
         SendScintilla(SCI_SETMOUSEDWELLTIME, hoverDelayMs);
 }
 
+void EditorWidget::setToolTipsSuspended(bool suspended)
+{
+    toolTipsSuspended_ = suspended;
+    if (suspended)
+        QToolTip::hideText();
+}
+
 void EditorWidget::showHoverInfo(int position, const QPoint &point)
 {
-    if (position < 0 || !isActiveWindow())
+    if (position < 0 || !isActiveWindow() || areToolTipsSuspended())
         return;
     QStringList messages;
     for (const Diagnostic &diagnostic : std::as_const(diagnostics_)) {

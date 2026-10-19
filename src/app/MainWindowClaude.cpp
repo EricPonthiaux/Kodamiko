@@ -44,9 +44,6 @@
 #include <QTabWidget>
 #include <QTimer>
 
-#include <array>
-#include <ranges>
-
 namespace {
 
 // Between a prompt pasted in Claude's terminal and the Enter that sends it.
@@ -56,25 +53,29 @@ constexpr int notificationMs = 10000;
 
 constexpr qsizetype snapshotPromptLength = 60;
 
-// Dot drawn in front of the Claude tabs: amber while Claude works, blue
-// when it waits for the user, green when a response is ready.
-QIcon activityIcon(ClaudeActivity::State state, const Theme &theme)
+// The indicator's state for the activity's.
+ClaudeIndicator::Status indicatorStatus(ClaudeActivity::State state)
 {
-    const bool dark = theme.isDark;
-    QColor color;
     switch (state) {
     case ClaudeActivity::State::Idle:
-        return {};
+        return ClaudeIndicator::Status::Ready;
     case ClaudeActivity::State::Working:
-        color = QColor(dark ? "#e5c07b" : "#c18401");
-        break;
+        return ClaudeIndicator::Status::Working;
     case ClaudeActivity::State::NeedsInput:
-        color = QColor(dark ? "#61afef" : "#4078f2");
-        break;
+        return ClaudeIndicator::Status::NeedsYou;
     case ClaudeActivity::State::Done:
-        color = QColor(dark ? "#98c379" : "#50a14f");
-        break;
+        return ClaudeIndicator::Status::Done;
     }
+    return ClaudeIndicator::Status::Ready;
+}
+
+// Dot drawn in front of the Claude tabs while Claude works, waits or has
+// finished, in the title bar indicator's color.
+QIcon activityIcon(ClaudeActivity::State state, const Theme &theme)
+{
+    if (state == ClaudeActivity::State::Idle)
+        return {};
+    const QColor color = claudeStatusColor(indicatorStatus(state), theme);
     QIcon icon;
     for (const qreal ratio : {1.0, 2.0}) {
         QPixmap pixmap(QSize(16, 16) * ratio);
@@ -129,6 +130,9 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     claudeTerminal_->applyTheme(theme_);
     claudeTerminal_->installEventFilter(this); // Escape interrupts the response, Ctrl+C too
     connect(claudeTerminal_, &TerminalWidget::finished, &claudeActivity_, &ClaudeActivity::reset);
+    // The indicator leaves the title bar with the session, even when Claude
+    // was already idle.
+    connect(claudeTerminal_, &TerminalWidget::finished, this, &MainWindow::updateClaudeIndicator);
     claudeActivity_.reset();
     claudeStatus_ = {};
     updateUsage();
@@ -255,21 +259,8 @@ void MainWindow::updateClaudeIndicator()
     }
     modeTabs_->setTabIcon(0, idle ? UiIcons::icon(QStringLiteral("terminal"), theme_.mutedText) : icon);
     modeTabs_->updateGeometry(); // see updateTabIcons()
-    QString label;
-    switch (state) {
-    case ClaudeActivity::State::Working:
-        label = tr("Claude is working");
-        break;
-    case ClaudeActivity::State::NeedsInput:
-        label = tr("Claude needs you");
-        break;
-    case ClaudeActivity::State::Done:
-        label = tr("Claude has finished");
-        break;
-    case ClaudeActivity::State::Idle:
-        break;
-    }
-    titleBar_->setClaudeState(icon, label,
+    const bool hasSession = claudeTerminal_ && claudeTerminal_->isRunning();
+    titleBar_->setClaudeState(hasSession ? std::optional(indicatorStatus(state)) : std::nullopt,
                               description + QLatin1Char('\n') + tr("Show the Claude session (Ctrl+Shift+L)"));
     const QString modeHint = tr("Full-screen terminals (Ctrl+1)");
     modeTabs_->setTabToolTip(0, state == ClaudeActivity::State::Idle ? modeHint

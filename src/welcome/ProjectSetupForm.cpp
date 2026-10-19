@@ -1,27 +1,34 @@
 #include "ProjectSetupForm.h"
 
-#include "toolchains/ToolCatalog.h"
+#include "LanguageChoices.h"
 #include "toolchains/Toolchains.h"
+#include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
+#include "ui/UiIcons.h"
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QListWidget>
+#include <QPushButton>
+#include <QScrollArea>
 #include <QSignalBlocker>
+#include <QStackedWidget>
 #include <QVBoxLayout>
-#include <QVersionNumber>
 
 #include <algorithm>
 
 namespace {
 
-const QString versionKey = QStringLiteral("version");
-const QString pathKey = QStringLiteral("path");
+constexpr int familyRole = Qt::UserRole;
 
-QVariant item(const QString &version, const QString &path = {})
+// The group of the runtime: what builds the code, or what runs it.
+QString runtimeGroup(const QString &family)
 {
-    return QVariantMap{{versionKey, version}, {pathKey, path}};
+    const bool builds = family == QLatin1String("cpp") || family == QLatin1String("java");
+    return builds ? QObject::tr("Build") : QObject::tr("Runtime");
 }
 
 QString runtimeLabel(const QString &family)
@@ -38,30 +45,57 @@ QString runtimeLabel(const QString &family)
 QString runtimeDescription(const QString &family)
 {
     if (family == QLatin1String("java"))
-        return QObject::tr("The Java the project is built with (JAVA_HOME of Maven and Gradle).");
+        return QObject::tr("JAVA_HOME of Maven and Gradle.");
     if (family == QLatin1String("javascript"))
-        return QObject::tr("The Node.js the project runs on.");
+        return QObject::tr("What the project runs on.");
     if (family == QLatin1String("python"))
-        return QObject::tr("Its packages are the ones completed. Duet does not download Python.");
+        return QObject::tr("Its packages are the ones completed.");
     return QObject::tr("For the files compile_commands.json does not cover.");
 }
 
-// The first item of `combo` for `version`, whatever its path; -1 if none.
-int indexOfVersion(const QComboBox *combo, const QString &version)
+QComboBox *settingCombo()
 {
-    for (int i = 0; i < combo->count(); ++i) {
-        if (combo->itemData(i).toMap().value(versionKey) == version)
-            return i;
-    }
-    return -1;
+    auto *combo = new QComboBox;
+    combo->setMinimumWidth(240);
+    return combo;
 }
 
-QString serverTitle(const QString &id)
+QLabel *stateLabel()
 {
-    if (id.isEmpty())
-        return QObject::tr("None (words of the project only)");
-    const ToolSpec *spec = ToolCatalog::find(id);
-    return spec ? spec->title : id;
+    auto *label = new QLabel;
+    label->setObjectName(QStringLiteral("settingState"));
+    label->setWordWrap(true);
+    label->setMaximumWidth(320);
+    return label;
+}
+
+// A list with, under it, what its value means on this machine.
+QWidget *fieldWithState(QComboBox *combo, QLabel *state)
+{
+    auto *field = new QWidget;
+    auto *layout = new QVBoxLayout(field);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(4);
+    layout->addWidget(combo);
+    layout->addWidget(state);
+    return field;
+}
+
+QScrollArea *scrolled(QWidget *content)
+{
+    auto *holder = new QWidget;
+    holder->setObjectName(QStringLiteral("pageContent"));
+    auto *layout = new QVBoxLayout(holder);
+    layout->setContentsMargins(20, 16, 20, 16);
+    layout->addWidget(content);
+    layout->addStretch();
+    auto *scroll = new QScrollArea;
+    scroll->setObjectName(QStringLiteral("pageScroll"));
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setWidget(holder);
+    return scroll;
 }
 
 } // namespace
@@ -69,60 +103,141 @@ QString serverTitle(const QString &id)
 ProjectSetupForm::ProjectSetupForm(Toolchains *toolchains, QWidget *parent)
     : QWidget(parent)
     , toolchains_(toolchains)
-    , layout_(new QVBoxLayout(this))
+    , stack_(new QStackedWidget(this))
 {
-    layout_->setContentsMargins(0, 0, 0, 0);
-    layout_->setSpacing(8);
     for (const QString &family : ProjectLanguages::families()) {
-        Card card;
-        card.family = family;
-        build(card);
-        cards_.append(card);
+        Page page;
+        page.family = family;
+        stack_->addWidget(scrolled(createPage(page)));
+        pages_.append(page);
     }
-    layout_->addStretch();
+    for (const Page &page : std::as_const(pages_))
+        connectPage(page);
+
+    auto *layout = new QHBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(createSidebar());
+    layout->addWidget(stack_, 1);
 }
 
-void ProjectSetupForm::build(Card &card)
+QWidget *ProjectSetupForm::createSidebar()
 {
-    layout_->addWidget(sectionHeading(ProjectLanguages::title(card.family)));
-    auto *settings = new SettingsCard(this);
-    card.enabled = new QCheckBox(this);
-    card.runtime = new QComboBox(this);
-    card.server = new QComboBox(this);
-    card.serverVersion = new QComboBox(this);
-    for (QComboBox *combo : {card.runtime, card.server, card.serverVersion}) {
-        combo->setMinimumWidth(300);
-        combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    }
-    // The description of the first row says why it was found (set by fill).
-    const QWidget *enabledRow =
-        settings->addRow(tr("Use %1").arg(ProjectLanguages::title(card.family)), QStringLiteral(" "), card.enabled);
-    card.evidence = enabledRow->findChild<QLabel *>(QStringLiteral("settingsDescription"));
-    card.rows = {
-        settings->addRow(runtimeLabel(card.family), runtimeDescription(card.family), card.runtime),
-        settings->addRow(tr("Language server"), tr("Completes members, imports, signatures."), card.server),
-        settings->addRow(tr("Server version"), tr("Downloaded by Duet, or the one in your PATH."), card.serverVersion)};
-    layout_->addWidget(settings);
+    auto *sidebar = new QFrame(this);
+    sidebar->setObjectName(QStringLiteral("popupSidebar"));
+    // "JavaScript/TypeScript · Off" whole.
+    sidebar->setFixedWidth(220);
+    auto *heading = new QLabel(tr("LANGUAGES"), sidebar);
+    heading->setObjectName(QStringLiteral("navHeading"));
+    AppFonts::setInterfaceFont(heading, 0.85, QFont::DemiBold, 0.6);
+    list_ = new QListWidget(sidebar);
+    list_->setObjectName(QStringLiteral("popupNav"));
+    list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    connect(list_, &QListWidget::currentItemChanged, this, [this](const QListWidgetItem *current) {
+        if (current)
+            selectLanguage(current->data(familyRole).toString());
+    });
+    detect_ = new QPushButton(tr("Detect Again"), sidebar);
+    detect_->setToolTip(tr("Looks at the project's files again; nothing is saved before Apply"));
+    connect(detect_, &QPushButton::clicked, this, &ProjectSetupForm::detectAgain);
 
-    const QString family = card.family;
-    const auto cardOf = [this, family]() -> Card & {
-        return *std::find_if(cards_.begin(), cards_.end(), [&](const Card &c) { return c.family == family; });
-    };
-    connect(card.enabled, &QAbstractButton::toggled, this, [this, cardOf] {
-        updateRows(cardOf());
+    auto *layout = new QVBoxLayout(sidebar);
+    layout->setContentsMargins(8, 12, 8, 10);
+    layout->setSpacing(6);
+    layout->addWidget(heading);
+    layout->addWidget(list_, 1);
+    layout->addWidget(detect_, 0, Qt::AlignLeft);
+    return sidebar;
+}
+
+QWidget *ProjectSetupForm::createPage(Page &page)
+{
+    auto *content = new QWidget;
+    auto *title = new QLabel(ProjectLanguages::title(page.family), content);
+    AppFonts::setInterfaceFont(title, 1.05, QFont::DemiBold);
+    page.enabled = new QCheckBox(tr("Enabled"), content);
+    page.enabled->setLayoutDirection(Qt::RightToLeft); // the box after its text
+    auto *titleRow = new QHBoxLayout;
+    titleRow->addWidget(title);
+    titleRow->addStretch();
+    titleRow->addWidget(page.enabled);
+    page.evidence = new QLabel(content);
+    page.evidence->setObjectName(QStringLiteral("pageDescription"));
+    page.evidence->setWordWrap(true);
+
+    page.runtime = settingCombo();
+    page.runtimeState = stateLabel();
+    page.server = settingCombo();
+    page.serverVersion = settingCombo();
+    page.serverState = stateLabel();
+    auto *runtimeCard = new SettingsCard;
+    runtimeCard->addRow(runtimeLabel(page.family), runtimeDescription(page.family),
+                        fieldWithState(page.runtime, page.runtimeState));
+    auto *serverCard = new SettingsCard;
+    serverCard->addRow(tr("Language server"), tr("Completes members, imports, signatures."), page.server);
+    page.versionRow = serverCard->addRow(tr("Version"), tr("Downloaded by Duet, or the system's."),
+                                         fieldWithState(page.serverVersion, page.serverState));
+
+    page.settings = new QWidget(content);
+    auto *settingsLayout = new QVBoxLayout(page.settings);
+    settingsLayout->setContentsMargins(0, 0, 0, 0);
+    settingsLayout->setSpacing(0);
+    settingsLayout->addWidget(sectionHeading(runtimeGroup(page.family)));
+    settingsLayout->addWidget(runtimeCard);
+    settingsLayout->addSpacing(16);
+    settingsLayout->addWidget(sectionHeading(tr("Code intelligence")));
+    settingsLayout->addWidget(serverCard);
+
+    page.offHint = new QLabel(tr("Turn it on to choose how the project is built and completed."), content);
+    page.offHint->setObjectName(QStringLiteral("pageDescription"));
+    page.offHint->setWordWrap(true);
+
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(4);
+    layout->addLayout(titleRow);
+    layout->addWidget(page.evidence);
+    layout->addSpacing(14);
+    layout->addWidget(page.settings);
+    layout->addWidget(page.offHint);
+    return content;
+}
+
+void ProjectSetupForm::connectPage(const Page &page)
+{
+    const QString family = page.family;
+    connect(page.enabled, &QAbstractButton::toggled, this, [this, family] {
+        updatePage(pageOf(family));
+        updateListItem(pageOf(family));
         emit changed();
     });
-    connect(card.runtime, &QComboBox::currentIndexChanged, this, &ProjectSetupForm::changed);
-    connect(card.server, &QComboBox::currentIndexChanged, this, [this, cardOf] {
-        Card &current = cardOf();
+    const auto update = [this, family] {
+        updatePage(pageOf(family));
+        emit changed();
+    };
+    connect(page.runtime, &QComboBox::currentIndexChanged, this, update);
+    connect(page.serverVersion, &QComboBox::currentIndexChanged, this, update);
+    connect(page.server, &QComboBox::currentIndexChanged, this, [this, family] {
+        const Page &current = pageOf(family);
         LanguageSetup setup = setupOf(current);
         setup.serverVersion.clear();
         toolchains_->complete(setup);
         fillServerVersions(current, setup.server, setup.serverVersion);
-        updateRows(current);
+        updatePage(current);
         emit changed();
     });
-    connect(card.serverVersion, &QComboBox::currentIndexChanged, this, &ProjectSetupForm::changed);
+}
+
+ProjectSetupForm::Page &ProjectSetupForm::pageOf(const QString &family)
+{
+    const auto found = std::ranges::find(pages_, family, &Page::family);
+    Q_ASSERT(found != pages_.end());
+    return *found;
+}
+
+void ProjectSetupForm::applyTheme(const Theme &theme)
+{
+    detect_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
 }
 
 ProjectConfig ProjectSetupForm::detectedProject(const QString &folder,
@@ -149,22 +264,23 @@ ProjectConfig ProjectSetupForm::detectedProject(const QString &folder,
 void ProjectSetupForm::setProject(const ProjectConfig &project, const QList<DetectedLanguage> &detected)
 {
     project_ = project;
-    for (Card &card : cards_) {
+    for (Page &page : pages_) {
         LanguageSetup setup;
-        setup.language = card.family;
+        setup.language = page.family;
         setup.enabled = false;
-        if (const LanguageSetup *saved = project.language(card.family))
+        if (const LanguageSetup *saved = project.language(page.family))
             setup = *saved;
         toolchains_->complete(setup);
         QString evidence = tr("Not found in the project.");
         for (const DetectedLanguage &language : detected) {
-            if (language.language == card.family)
+            if (language.language == page.family)
                 evidence = tr("Found: %1").arg(language.evidence);
         }
-        if (!project.language(card.family) && detected.isEmpty() && project.configured)
+        if (!project.language(page.family) && detected.isEmpty() && project.configured)
             evidence = tr("Not used by the project.");
-        fill(card, setup, evidence);
+        fill(page, setup, evidence);
     }
+    fillList(currentLanguage());
     emit changed();
 }
 
@@ -176,148 +292,97 @@ void ProjectSetupForm::detectAgain()
     setProject(project, detected);
 }
 
-void ProjectSetupForm::fill(Card &card, const LanguageSetup &setup, const QString &evidence)
+void ProjectSetupForm::fill(Page &page, const LanguageSetup &setup, const QString &evidence)
 {
     // The switch is not blocked: it draws its knob from its own signal.
-    const QSignalBlocker serverBlocker(card.server);
-    card.evidence->setText(evidence);
-    card.enabled->setChecked(setup.enabled);
+    const QSignalBlocker serverBlocker(page.server);
+    page.evidence->setText(evidence);
+    page.enabled->setChecked(setup.enabled);
 
-    fillRuntimes(card, setup);
-
-    card.server->clear();
-    for (const QString &id : ToolCatalog::servers(card.family))
-        card.server->addItem(serverTitle(id), id);
-    card.server->addItem(serverTitle({}), QString());
-    card.server->setCurrentIndex(std::max(0, card.server->findData(setup.server)));
-    fillServerVersions(card, setup.server, setup.serverVersion);
-    updateRows(card);
-}
-
-void ProjectSetupForm::fillRuntimes(Card &card, const LanguageSetup &setup)
-{
-    const QSignalBlocker blocker(card.runtime);
-    card.runtime->clear();
-    int selected = -1;
-    if (card.family == QLatin1String("cpp"))
-        selected = fillCppStandards(card.runtime, setup);
-    else if (card.family == QLatin1String("python"))
-        selected = fillPythons(card.runtime, setup);
-    else
-        selected = fillToolRuntimes(card.runtime, card.family, setup);
-    card.runtime->setCurrentIndex(std::max(0, selected));
-}
-
-int ProjectSetupForm::fillCppStandards(QComboBox *combo, const LanguageSetup &setup)
-{
-    for (const QString &standard : ToolCatalog::runtimeVersions(QStringLiteral("cpp")))
-        combo->addItem(QString(standard).replace(QLatin1String("c++"), QLatin1String("C++")), item(standard));
-    return combo->findData(item(setup.runtimeVersion));
-}
-
-int ProjectSetupForm::fillPythons(QComboBox *combo, const LanguageSetup &setup) const
-{
-    QList<RuntimeInstall> pythons = toolchains_->runtimes(QStringLiteral("python"));
-    const bool listed = std::any_of(pythons.cbegin(), pythons.cend(), [&](const RuntimeInstall &python) {
-        return python.executable == setup.runtimePath;
-    });
-    if (!setup.runtimePath.isEmpty() && !listed)
-        pythons.prepend({QStringLiteral("python"), setup.runtimeVersion, QFileInfo(setup.runtimePath).absolutePath(),
-                         setup.runtimePath, false});
-    for (const RuntimeInstall &python : std::as_const(pythons)) {
-        const QString version = python.version.isEmpty() ? tr("?") : python.version;
-        combo->addItem(tr("Python %1 — %2").arg(version, pythonLocation(python.executable)),
-                       item(python.version, python.executable));
+    {
+        const QSignalBlocker runtimeBlocker(page.runtime);
+        LanguageChoices::fillRuntimes(page.runtime, setup, *toolchains_, project_.path);
     }
-    if (pythons.isEmpty())
-        combo->addItem(tr("No Python found on this machine"), item(setup.runtimeVersion));
-    const int selected = combo->findData(item(setup.runtimeVersion, setup.runtimePath));
-    return selected >= 0 ? selected : indexOfVersion(combo, setup.runtimeVersion);
+
+    LanguageChoices::fillServers(page.server, page.family, setup.server);
+    fillServerVersions(page, setup.server, setup.serverVersion);
+    updatePage(page);
 }
 
-QString ProjectSetupForm::pythonLocation(const QString &executable) const
+void ProjectSetupForm::fillServerVersions(const Page &page, const QString &server, const QString &selected)
 {
-    const bool isInProject = !project_.path.isEmpty() && executable.startsWith(project_.path + QLatin1Char('/'));
-    if (isInProject)
-        return tr("the project's %1").arg(QDir(project_.path).relativeFilePath(executable));
-    return QDir::toNativeSeparators(executable);
+    const QSignalBlocker blocker(page.serverVersion);
+    LanguageChoices::fillServerVersions(page.serverVersion, server, selected, *toolchains_);
 }
 
-int ProjectSetupForm::fillToolRuntimes(QComboBox *combo, const QString &family, const LanguageSetup &setup) const
+void ProjectSetupForm::updatePage(const Page &page)
 {
-    const QString tool = ToolCatalog::runtimeOf(family);
-    const ToolSpec *spec = ToolCatalog::find(tool);
-    QStringList versions = ToolCatalog::runtimeVersions(family);
-    for (const RuntimeInstall &runtime : toolchains_->runtimes(tool)) {
-        if (!versions.contains(runtime.version))
-            versions.append(runtime.version);
+    page.settings->setVisible(page.enabled->isChecked());
+    page.offHint->setVisible(!page.enabled->isChecked());
+    page.versionRow->setVisible(!page.server->currentData().toString().isEmpty());
+    const QString runtimeState = page.runtime->currentData(LanguageChoices::stateRole).toString();
+    page.runtimeState->setText(runtimeState);
+    page.runtimeState->setVisible(!runtimeState.isEmpty());
+    page.serverState->setText(page.serverVersion->currentData(LanguageChoices::stateRole).toString());
+}
+
+void ProjectSetupForm::fillList(const QString &keep)
+{
+    const QSignalBlocker blocker(list_);
+    list_->clear();
+    for (const bool used : {true, false}) {
+        for (const Page &page : std::as_const(pages_)) {
+            if (page.enabled->isChecked() != used)
+                continue;
+            auto *entry = new QListWidgetItem(list_);
+            entry->setData(familyRole, page.family);
+            entry->setSizeHint(QSize(0, 30));
+            updateListItem(page);
+        }
     }
-    if (!setup.runtimeVersion.isEmpty() && !versions.contains(setup.runtimeVersion))
-        versions.append(setup.runtimeVersion);
-    std::sort(versions.begin(), versions.end(),
-              [](const QString &a, const QString &b) { return a.toInt() > b.toInt(); });
-    const QString title = spec ? spec->title : tool;
-    for (const QString &version : std::as_const(versions)) {
-        const QString state = runtimeState(toolchains_->runtime(tool, version));
-        combo->addItem(tr("%1 %2 — %3").arg(title, version, state), item(version));
-    }
-    return combo->findData(item(setup.runtimeVersion));
+    const QString shown = keep.isEmpty() ? list_->item(0)->data(familyRole).toString() : keep;
+    selectLanguage(shown);
 }
 
-QString ProjectSetupForm::runtimeState(const std::optional<RuntimeInstall> &found)
+void ProjectSetupForm::updateListItem(const Page &page)
 {
-    if (!found)
-        return tr("will download");
-    return found->managed ? tr("downloaded") : tr("on this machine");
-}
-
-void ProjectSetupForm::fillServerVersions(Card &card, const QString &server, const QString &selected)
-{
-    const QSignalBlocker blocker(card.serverVersion);
-    card.serverVersion->clear();
-    if (server.isEmpty())
-        return;
-    const QString system = toolchains_->systemProgram(server);
-    card.serverVersion->addItem(system.isEmpty() ? tr("From the PATH — not found")
-                                                 : tr("From the PATH — %1").arg(QDir::toNativeSeparators(system)),
-                                QLatin1String(ProjectLanguages::systemVersion));
-    QStringList versions;
-    if (const ToolSpec *spec = ToolCatalog::find(server))
-        versions = spec->versions;
-    for (const QString &version : toolchains_->installedVersions(server)) {
-        if (!versions.contains(version))
-            versions.append(version);
+    const QString title = ProjectLanguages::title(page.family);
+    for (int row = 0; row < list_->count(); ++row) {
+        QListWidgetItem *entry = list_->item(row);
+        if (entry->data(familyRole) == page.family)
+            entry->setText(page.enabled->isChecked() ? title : tr("%1 · Off").arg(title));
     }
-    std::sort(versions.begin(), versions.end(), [](const QString &a, const QString &b) {
-        return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
-    });
-    for (const QString &version : std::as_const(versions)) {
-        const QString state = toolchains_->isInstalled(server, version) ? tr("downloaded") : tr("will download");
-        card.serverVersion->addItem(tr("%1 — %2").arg(version, state), version);
-    }
-    card.serverVersion->setCurrentIndex(std::max(0, card.serverVersion->findData(selected)));
 }
 
-void ProjectSetupForm::updateRows(Card &card)
+QString ProjectSetupForm::currentLanguage() const
 {
-    const bool enabled = card.enabled->isChecked();
-    for (QWidget *row : std::as_const(card.rows))
-        row->setVisible(enabled);
-    // No server: no version to choose.
-    if (enabled)
-        card.rows.last()->setVisible(!card.server->currentData().toString().isEmpty());
+    const QListWidgetItem *current = list_->currentItem();
+    return current ? current->data(familyRole).toString() : QString();
 }
 
-LanguageSetup ProjectSetupForm::setupOf(const Card &card) const
+void ProjectSetupForm::selectLanguage(const QString &family)
+{
+    for (int row = 0; row < list_->count(); ++row) {
+        if (list_->item(row)->data(familyRole) != family)
+            continue;
+        const QSignalBlocker blocker(list_);
+        list_->setCurrentRow(row);
+    }
+    const auto found = std::ranges::find(pages_, family, &Page::family);
+    if (found != pages_.end())
+        stack_->setCurrentIndex(int(found - pages_.begin()));
+}
+
+LanguageSetup ProjectSetupForm::setupOf(const Page &page) const
 {
     LanguageSetup setup;
-    setup.language = card.family;
-    setup.enabled = card.enabled->isChecked();
-    const QVariantMap runtime = card.runtime->currentData().toMap();
-    setup.runtimeVersion = runtime.value(versionKey).toString();
-    setup.runtimePath = runtime.value(pathKey).toString();
-    setup.server = card.server->currentData().toString();
-    setup.serverVersion = setup.server.isEmpty() ? QString() : card.serverVersion->currentData().toString();
+    setup.language = page.family;
+    setup.enabled = page.enabled->isChecked();
+    const LanguageChoices::Runtime runtime = LanguageChoices::selectedRuntime(page.runtime);
+    setup.runtimeVersion = runtime.version;
+    setup.runtimePath = runtime.path;
+    setup.server = page.server->currentData().toString();
+    setup.serverVersion = setup.server.isEmpty() ? QString() : page.serverVersion->currentData().toString();
     return setup;
 }
 
@@ -326,10 +391,10 @@ ProjectConfig ProjectSetupForm::project() const
     ProjectConfig project = project_;
     project.configured = true;
     project.languages.clear();
-    for (const Card &card : cards_) {
+    for (const Page &page : pages_) {
         // The languages the project does not use are not kept.
-        const LanguageSetup setup = setupOf(card);
-        if (setup.enabled || project_.language(card.family))
+        const LanguageSetup setup = setupOf(page);
+        if (setup.enabled || project_.language(page.family))
             project.languages.append(setup);
     }
     return project;

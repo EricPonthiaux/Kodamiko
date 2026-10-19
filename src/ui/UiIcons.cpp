@@ -253,6 +253,12 @@ const QHash<QString, Painter> &painters()
              p.setBrush(p.pen().color());
              p.drawPath(half);
          }},
+        // A capital A: the fonts.
+        {QStringLiteral("fonts"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF({QPointF(3, 13.5), QPointF(8, 2.5), QPointF(13, 13.5)}));
+             p.drawLine(QPointF(5, 9.5), QPointF(11, 9.5));
+         }},
         {QStringLiteral("keyboard"),
          [](QPainter &p) {
              p.drawRoundedRect(QRectF(1, 3.5, 14, 9), 2, 2);

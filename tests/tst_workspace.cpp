@@ -2,6 +2,8 @@
 #include "editor/EditorWidget.h"
 #include "git/GitProcess.h"
 #include "ui/AppFonts.h"
+#include "ui/ClaudeIndicator.h"
+#include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/OverlayPopup.h"
 #include "ui/ThemeStyle.h"
@@ -12,7 +14,6 @@
 #include "ui/WindowFrame.h"
 #include "workspace/CommandPalette.h"
 #include "workspace/EntryPopups.h"
-#include "workspace/FileIcons.h"
 #include "workspace/FileOperations.h"
 #include "workspace/FileTreeView.h"
 #include "workspace/FilesPanel.h"
@@ -146,7 +147,7 @@ private slots:
         AppFonts::setInterfaceFont(title, 1.5);
         QCOMPARE(title->font().pointSizeF(), 15.0);
         QCOMPARE(title->font().weight(), QFont::DemiBold);
-        font.setPointSizeF(12); // Preferences ▸ Appearance
+        font.setPointSizeF(12); // Preferences ▸ Fonts
         QApplication::setFont(font);
         QCOMPARE(title->font().pointSizeF(), 18.0);
         QApplication::setFont(previous);
@@ -155,6 +156,7 @@ private slots:
     void overlayPopupsAreCenteredAndResizable()
     {
         QSettings().remove("overlays/test");
+        QSettings().remove("overlays/testOffset");
         QWidget window;
         window.resize(1000, 700);
         auto *button = new QPushButton("elsewhere", &window);
@@ -181,8 +183,9 @@ private slots:
         const QSize chosen = QSettings().value("overlays/test").toSize();
         QCOMPARE(chosen, popup.size() - QSize(2 * shadow, 2 * shadow));
 
-        QTest::mouseClick(button, Qt::LeftButton); // a click elsewhere closes it
-        QVERIFY(!popup.isVisible());
+        QTest::mouseClick(button, Qt::LeftButton); // a click elsewhere leaves it open
+        QVERIFY(popup.isVisible());
+        popup.dismiss();
         popup.showCentered();
         QCOMPARE(popup.size(), chosen + QSize(2 * shadow, 2 * shadow));
         window.resize(500, 400); // too small: the panel shrinks to fit
@@ -191,6 +194,7 @@ private slots:
         QVERIFY(!popup.isVisible());
         popup.resetSize();
         QVERIFY(!QSettings().contains("overlays/test"));
+        QVERIFY(!QSettings().contains("overlays/testOffset"));
     }
 
     void shadowMarginsSurviveAThemeChange()
@@ -266,6 +270,38 @@ private slots:
         QCOMPARE(WindowFrame::edgesAt({margin + 2, 300}, size, margin), Qt::Edges());
     }
 
+    void projectChipShowsTheFilesTreeFolder()
+    {
+        TitleBar bar;
+        const auto *chip = bar.findChild<QToolButton *>("projectChip");
+
+        bar.applyTheme(Theme::dark());
+        QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(true).cacheKey());
+        bar.applyTheme(Theme::light());
+        QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(false).cacheKey());
+    }
+
+    void claudeIndicatorKeepsItsWidthAcrossStates()
+    {
+        ClaudeIndicator indicator;
+        const int readyWidth = indicator.sizeHint().width();
+
+        indicator.setStatus(ClaudeIndicator::Status::NeedsYou);
+
+        QCOMPARE(indicator.sizeHint().width(), readyWidth);
+    }
+
+    void claudeIndicatorTakesItsColorsFromTheTheme()
+    {
+        for (const Theme &theme : {Theme::duet(), Theme::purple(), Theme::light()}) {
+            QCOMPARE(claudeStatusColor(ClaudeIndicator::Status::Working, theme), theme.warning);
+            QCOMPARE(claudeStatusColor(ClaudeIndicator::Status::NeedsYou, theme), theme.accent);
+            QCOMPARE(claudeStatusColor(ClaudeIndicator::Status::Ready, theme), theme.mutedText);
+        }
+        QVERIFY(claudeStatusColor(ClaudeIndicator::Status::Done, Theme::light()) !=
+                claudeStatusColor(ClaudeIndicator::Status::Done, Theme::dark()));
+    }
+
     void frameAndTitleBarFollowTheWindow()
     {
         QMainWindow window;
@@ -285,14 +321,18 @@ private slots:
         auto *project = new QMenu(&window);
         project->addAction("other");
         titleBar->setProject("duet", "/p/duet", project);
-        titleBar->setClaudeState({}, "Claude is working", "details");
+        titleBar->setClaudeState(ClaudeIndicator::Status::Working, "details");
         QStringList texts;
         for (const QToolButton *button : titleBar->findChildren<QToolButton *>())
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
         QVERIFY(texts.contains(" duet  ▾"));
-        QVERIFY(texts.contains("Claude is working"));
-        titleBar->setClaudeState({}, {}, {});
+        auto *indicator = titleBar->findChild<ClaudeIndicator *>();
+        QVERIFY(indicator->isVisibleTo(titleBar));
+        QCOMPARE(indicator->status(), ClaudeIndicator::Status::Working);
+        QCOMPARE(indicator->toolTip(), "details");
+        titleBar->setClaudeState(std::nullopt, {});
+        QVERIFY(!indicator->isVisibleTo(titleBar));
 
         QAction action("Go to File");
         int triggered = 0;

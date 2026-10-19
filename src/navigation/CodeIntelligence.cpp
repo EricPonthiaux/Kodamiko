@@ -183,7 +183,7 @@ void CodeIntelligence::attach(EditorWidget *editor)
 
     editor->SendScintilla(QsciScintillaBase::SCI_SETMOUSEDWELLTIME, hoverDelayMs);
     connect(editor, &QsciScintillaBase::SCN_DWELLSTART, this, [this, editor](int position, int x, int y) {
-        if (position >= 0 && editor->isActiveWindow())
+        if (position >= 0 && editor->isActiveWindow() && !editor->areToolTipsSuspended())
             showHover(editor, position, editor->viewport()->mapToGlobal(QPoint(x, y + 12)), false);
     });
     connect(editor, &QsciScintillaBase::SCN_DWELLEND, this, [this] {
@@ -307,7 +307,8 @@ void CodeIntelligence::showHover(EditorWidget *editor, int bytePosition, const Q
         QStringLiteral("textDocument/hover"), positionParams(editor, bytePosition),
         [this, generation, guard = QPointer<EditorWidget>(editor), where, explicitRequest](const QJsonValue &result,
                                                                                            const QString &) {
-            if (generation != hoverGeneration_ || !guard)
+            // The completion list may have opened while the server answered.
+            if (generation != hoverGeneration_ || !guard || guard->areToolTipsSuspended())
                 return;
             QString text = plainText(result.toObject().value("contents")).trimmed();
             if (text.isEmpty()) {

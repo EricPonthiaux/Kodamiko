@@ -154,6 +154,12 @@ QFrame#settingsCard { background: transparent; border: none; border-radius: 0; }
 QFrame#settingsSeparator { background: @line; border: none; margin: 0; }
 QScrollArea#pageScroll, QWidget#pageContent { background: transparent; border: none; }
 QFrame#popupFooter { border: none; border-top: 1px solid @line; }
+QFrame#popupSidebar { background: @window; border: none; border-right: 1px solid @line; }
+QListWidget#popupNav { background: transparent; border: none; outline: 0; }
+QListWidget#popupNav::item { padding: 5px 8px; margin: 1px 0; border-radius: 2px; color: @text; }
+QListWidget#popupNav::item:hover { background: @hover; }
+QListWidget#popupNav::item:selected { background: @slate; color: @text; }
+QLabel#navHeading, QLabel#settingState { color: @muted; }
 )") + extra;
     const QList<std::pair<QString, QColor>> colors = {
         {"@accentText", theme.accentText},

@@ -123,12 +123,14 @@ bool isOtherCodeFamily(const QString &family, const QStringList &recommended)
     return isUsableMonospace && !AppFonts::isBuiltInCode(family) && !recommended.contains(family);
 }
 
-// Fills `combo` with the built-in font, the recommended ones (those not
+// Fills `combo` with the built-in fonts, the recommended ones (those not
 // installed shown but disabled), then the other monospaced fonts
 // installed. Returns the download links of the missing recommended fonts.
 QStringList fillFontFamilies(QComboBox *combo)
 {
-    combo->addItem(QCoreApplication::translate("PreferencesPopup", "JetBrains Mono (built in)"), QString());
+    combo->addItem(QCoreApplication::translate("PreferencesPopup", "Ubuntu Sans Mono (built in)"), QString());
+    combo->addItem(QCoreApplication::translate("PreferencesPopup", "JetBrains Mono (built in)"),
+                   AppFonts::jetBrainsMono());
     combo->insertSeparator(combo->count());
     QStringList recommended;
     QList<AppFonts::RecommendedFont> missing;
@@ -151,13 +153,8 @@ QStringList fillFontFamilies(QComboBox *combo)
     return downloadLinks(missing);
 }
 
-// The side bar and the keymap, besides the shared rules (popupStyleSheet).
+// The keymap, besides the shared rules (popupStyleSheet).
 constexpr const char *preferencesRules = R"(
-QFrame#preferencesSidebar { background: @window; border: none; border-right: 1px solid @line; }
-QListWidget#preferencesNav { background: transparent; border: none; outline: 0; }
-QListWidget#preferencesNav::item { padding: 5px 8px; margin: 1px 0; border-radius: 2px; color: @text; }
-QListWidget#preferencesNav::item:hover { background: @hover; }
-QListWidget#preferencesNav::item:selected { background: @slate; color: @text; }
 QLabel#keymapNote { color: @accent; }
 QTreeWidget#keymapList { background: transparent; border: none; border-top: 1px solid @line; }
 QTreeWidget#keymapList::item { padding: 0 6px; }
@@ -173,6 +170,7 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
     pages_ = new QStackedWidget(this);
     QWidget *sidebar = createSidebar();
     addPage(QStringLiteral("appearance"), tr("Appearance"), createAppearancePage());
+    addPage(QStringLiteral("fonts"), tr("Fonts"), createFontsPage());
     addPage(QStringLiteral("code"), tr("Editor"), createEditorPage());
     addPage(QStringLiteral("files"), tr("Files"), createFilesPage());
     addPage(QStringLiteral("claude"), tr("Claude"), createClaudePage());
@@ -226,11 +224,11 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
 QWidget *PreferencesPopup::createSidebar()
 {
     auto *sidebar = new QFrame(this);
-    sidebar->setObjectName(QStringLiteral("preferencesSidebar"));
+    sidebar->setObjectName(QStringLiteral("popupSidebar"));
     sidebar->setFixedWidth(190);
 
     pageList_ = new QListWidget(sidebar);
-    pageList_->setObjectName(QStringLiteral("preferencesNav"));
+    pageList_->setObjectName(QStringLiteral("popupNav"));
     pageList_->setIconSize(QSize(16, 16));
     pageList_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     pageList_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -279,7 +277,9 @@ QWidget *PreferencesPopup::page(const QString &title, const QString &description
     auto *holderLayout = new QVBoxLayout(holder);
     holderLayout->setContentsMargins(16, 0, 16, 16);
     holderLayout->addWidget(content);
-    holderLayout->addStretch();
+    // A stretch factor, not 0: with word-wrapped labels the layout would
+    // otherwise share the spare height with the cards and pull their rows apart.
+    holderLayout->addStretch(1);
     auto *scroll = new QScrollArea(page);
     scroll->setObjectName(QStringLiteral("pageScroll"));
     scroll->setWidgetResizable(true);
@@ -332,6 +332,26 @@ QWidget *PreferencesPopup::createAppearancePage()
     layout->addWidget(mutedLabel(tr("The editor themes of Kate and KDevelop; the panels around the editor take "
                                     "their colors.")));
 
+    systemTitleBar_ = new QCheckBox(content);
+#ifdef Q_OS_MACOS
+    systemTitleBar_->hide(); // macOS keeps its own frame and traffic lights
+#else
+    auto *windowCard = new SettingsCard;
+    windowCard->addRow(tr("System title bar"),
+                       tr("The system's window frame instead of Duet's, for tiling window managers."), systemTitleBar_);
+    addGroup(layout, tr("Window"), windowCard);
+#endif
+
+    return page(tr("Appearance"), tr("Colors and window frame."), content);
+}
+
+QWidget *PreferencesPopup::createFontsPage()
+{
+    auto *content = new QWidget;
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
     // Code font, with a sample in the chosen theme.
     auto *fontCard = new SettingsCard;
     fontFamily_ = new QComboBox;
@@ -371,31 +391,24 @@ QWidget *PreferencesPopup::createAppearancePage()
     fontCard->addRow(tr("Line height"), tr("Lines of code, as a multiple of the font size (not in the terminals)."),
                      lineHeight_);
     fontCard->addRow(tr("Ligatures"),
-                     tr("In the editor, \"->\", \"!=\" or \"=>\" drawn as one sign. The terminals keep one "
-                        "character per cell."),
+                     tr("In the editor, \"->\", \"!=\" or \"=>\" drawn as one sign, with a font that has "
+                        "them (JetBrains Mono). The terminals keep one character per cell."),
                      ligatures_);
     fontCard->addWidget(fontPreview_);
     addGroup(layout, tr("Code font"), fontCard);
 
-    // Interface font: Inter, at the system's size unless one is chosen.
+    // Interface font: Ubuntu Sans, 11 pt unless another size is chosen.
     auto *interfaceCard = new SettingsCard;
-    interfaceFontSize_ = defaultableFontSize(tr("System"));
+    interfaceFontSize_ = new QSpinBox;
+    interfaceFontSize_->setRange(Preferences::minimumFontSize, Preferences::maximumFontSize);
+    interfaceFontSize_->setSuffix(tr(" pt"));
+    interfaceFontSize_->setMinimumWidth(140);
     treeFontSize_ = defaultableFontSize(tr("Code font size"));
     interfaceCard->addRow(tr("Menus and panels"), tr("Menus, tabs, buttons, panels and dialogs."), interfaceFontSize_);
     interfaceCard->addRow(tr("Navigation trees"), tr("The files, the outline and the changes."), treeFontSize_);
     addGroup(layout, tr("Interface font"), interfaceCard);
 
-    systemTitleBar_ = new QCheckBox(content);
-#ifdef Q_OS_MACOS
-    systemTitleBar_->hide(); // macOS keeps its own frame and traffic lights
-#else
-    auto *windowCard = new SettingsCard;
-    windowCard->addRow(tr("System title bar"),
-                       tr("The system's window frame instead of Duet's, for tiling window managers."), systemTitleBar_);
-    addGroup(layout, tr("Window"), windowCard);
-#endif
-
-    return page(tr("Appearance"), tr("Colors, fonts and window frame."), content);
+    return page(tr("Fonts"), tr("The code's, the interface's and the trees'."), content);
 }
 
 QWidget *PreferencesPopup::createEditorPage()
@@ -704,7 +717,7 @@ void PreferencesPopup::load(const Preferences &preferences,
     fontWeight_->setCurrentIndex(weight);
     lineHeight_->setValue(preferences.codeLineHeight);
     ligatures_->setChecked(preferences.ligatures);
-    setFontSizeValue(interfaceFontSize_, preferences.interfaceFontSize);
+    interfaceFontSize_->setValue(preferences.interfaceFontSize);
     setFontSizeValue(treeFontSize_, preferences.treeFontSize);
     systemTitleBar_->setChecked(preferences.systemTitleBar);
     codeFolding_->setChecked(preferences.editor.codeFolding);
@@ -763,7 +776,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.codeFontWeight = fontWeight_->currentData().toInt();
     preferences.codeLineHeight = lineHeight_->value();
     preferences.ligatures = ligatures_->isChecked();
-    preferences.interfaceFontSize = fontSizeValue(interfaceFontSize_);
+    preferences.interfaceFontSize = interfaceFontSize_->value();
     preferences.treeFontSize = fontSizeValue(treeFontSize_);
     preferences.systemTitleBar = systemTitleBar_->isChecked();
     preferences.editor.codeFolding = codeFolding_->isChecked();

@@ -2,7 +2,9 @@
 
 #include "AppFonts.h"
 #include "BrandMark.h"
+#include "FileIcons.h"
 #include "UiIcons.h"
+#include "UiMetrics.h"
 
 #include <QAction>
 #include <QFrame>
@@ -17,17 +19,22 @@
 
 namespace {
 
-constexpr int barHeight = 40;
 constexpr int controlWidth = 46;
-// The height of every control but the window's: chips, buttons, the run
-// block; the menu titles' padding comes close (see ThemeStyle).
-constexpr int controlHeight = 30;
 // Between the run block and the search actions, then before the window
 // controls.
 constexpr int groupSpacing = 14;
 constexpr int windowControlsSpacing = 12;
 const QColor runColor("#4fa36b");
 const QColor stopColor("#d9534f");
+// The run block's border, around its buttons.
+constexpr int runBlockInset = 2;
+
+// The height of every control but the window's: chips, buttons, the run
+// block; the menu titles' padding comes close (see ThemeStyle).
+int controlHeight()
+{
+    return UiMetrics::scaled(UiMetrics::toolbarButtonSize);
+}
 
 } // namespace
 
@@ -42,7 +49,7 @@ WindowButton::WindowButton(Kind kind, QWidget *parent)
 
 QSize WindowButton::sizeHint() const
 {
-    return {controlWidth, barHeight};
+    return {controlWidth, UiMetrics::scaled(UiMetrics::titleBarHeight)};
 }
 
 void WindowButton::applyTheme(const Theme &theme)
@@ -137,7 +144,6 @@ TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
     , theme_(Theme::dark())
 {
-    setFixedHeight(barHeight);
     setAttribute(Qt::WA_StyledBackground, false);
 
     leadingSpace_ = new QWidget(this);
@@ -159,11 +165,11 @@ TitleBar::TitleBar(QWidget *parent)
     layout_->addSpacing(8);
     project_ = addChip();
     project_->setObjectName(QStringLiteral("projectChip"));
-    project_->setIconSize(QSize(16, 16));
     AppFonts::setInterfaceFont(project_, 1);
     layout_->addStretch(1);
-    claude_ = addChip();
-    connect(claude_, &QToolButton::clicked, this, &TitleBar::claudeClicked);
+    claude_ = new ClaudeIndicator(this);
+    layout_->addWidget(claude_);
+    connect(claude_, &ClaudeIndicator::clicked, this, &TitleBar::claudeClicked);
     claude_->hide();
     layout_->addStretch(1);
     layout_->addWidget(createRunBlock());
@@ -184,6 +190,7 @@ TitleBar::TitleBar(QWidget *parent)
     for (WindowButton *button : {minimize_, maximize_, close_})
         layout_->addWidget(button);
     updateMaximizeButton();
+    AppFonts::followApplicationFont(this, [this] { applyMetrics(); });
 
     if (parent)
         parent->window()->installEventFilter(this); // maximized or not
@@ -197,7 +204,6 @@ QToolButton *TitleBar::addChip()
     chip->setPopupMode(QToolButton::InstantPopup);
     chip->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     chip->setObjectName(QStringLiteral("chip"));
-    chip->setFixedHeight(controlHeight);
     layout_->addWidget(chip);
     return chip;
 }
@@ -207,7 +213,6 @@ QFrame *TitleBar::createRunBlock()
 {
     runBlock_ = new QFrame(this);
     runBlock_->setObjectName(QStringLiteral("runBlock"));
-    runBlock_->setFixedHeight(controlHeight);
     auto *row = new QHBoxLayout(runBlock_);
     row->setContentsMargins(1, 1, 1, 1);
     row->setSpacing(0);
@@ -216,12 +221,10 @@ QFrame *TitleBar::createRunBlock()
     run_->setFocusPolicy(Qt::NoFocus);
     run_->setPopupMode(QToolButton::InstantPopup);
     run_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    run_->setFixedHeight(controlHeight - 2);
     row->addWidget(run_);
-    auto *divider = new QFrame(runBlock_);
-    divider->setObjectName(QStringLiteral("runDivider"));
-    divider->setFixedSize(1, controlHeight - 12);
-    row->addWidget(divider, 0, Qt::AlignVCenter);
+    runDivider_ = new QFrame(runBlock_);
+    runDivider_->setObjectName(QStringLiteral("runDivider"));
+    row->addWidget(runDivider_, 0, Qt::AlignVCenter);
     runActions_ = new QHBoxLayout;
     runActions_->setSpacing(0);
     row->addLayout(runActions_);
@@ -238,11 +241,11 @@ void TitleBar::setProject(const QString &name, const QString &toolTip, QMenu *me
     project_->setMenu(menu);
 }
 
-void TitleBar::setClaudeState(const QIcon &icon, const QString &text, const QString &toolTip)
+void TitleBar::setClaudeState(std::optional<ClaudeIndicator::Status> status, const QString &toolTip)
 {
-    claude_->setVisible(!text.isEmpty());
-    claude_->setIcon(icon);
-    claude_->setText(text);
+    claude_->setVisible(status.has_value());
+    if (status)
+        claude_->setStatus(*status);
     claude_->setToolTip(toolTip);
 }
 
@@ -252,9 +255,9 @@ QToolButton *TitleBar::actionButton(QAction *action, const QString &iconName, co
     button->setObjectName(QStringLiteral("titleAction"));
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setFixedSize(controlHeight, controlHeight);
     button->setIcon(UiIcons::icon(iconName, color.isValid() ? color : theme_.foreground));
     actionButtons_.append({button, iconName, color});
+    sizeActionButton(actionButtons_.last());
     button->setIconSize(QSize(16, 16));
     const auto update = [button, action] {
         const QString shortcut = action->shortcut().toString(QKeySequence::NativeText);
@@ -294,13 +297,39 @@ void TitleBar::setRunActions(QAction *run, QAction *stop)
     runButton_ = actionButton(run, QStringLiteral("run"), runColor);
     stopButton_ = actionButton(stop, QStringLiteral("stop"), stopColor);
     // One shown at a time, at the same place and size: nothing moves.
-    for (QToolButton *button : {runButton_, stopButton_}) {
-        button->setObjectName(QStringLiteral("runAction"));
-        button->setFixedSize(controlHeight - 2, controlHeight - 2);
-        runActions_->addWidget(button);
+    for (ActionButton &entry : actionButtons_) {
+        if (entry.button != runButton_ && entry.button != stopButton_)
+            continue;
+        entry.button->setObjectName(QStringLiteral("runAction"));
+        entry.inset = runBlockInset;
+        sizeActionButton(entry);
+        runActions_->addWidget(entry.button);
     }
     runButton_->setVisible(runBlock_->isVisibleTo(this) && !running_);
     stopButton_->setVisible(runBlock_->isVisibleTo(this) && running_);
+}
+
+void TitleBar::applyMetrics()
+{
+    setFixedHeight(UiMetrics::scaled(UiMetrics::titleBarHeight));
+    const int control = controlHeight();
+    project_->setFixedHeight(control);
+    claude_->setFixedHeight(control);
+    const int folderSize = UiMetrics::scaled(UiMetrics::chipIconSize);
+    project_->setIconSize(QSize(folderSize, folderSize));
+    runBlock_->setFixedHeight(control);
+    run_->setFixedHeight(control - runBlockInset);
+    runDivider_->setFixedSize(1, control - 12);
+    for (const ActionButton &entry : std::as_const(actionButtons_))
+        sizeActionButton(entry);
+    for (WindowButton *button : {minimize_, maximize_, close_})
+        button->updateGeometry();
+}
+
+void TitleBar::sizeActionButton(const ActionButton &entry)
+{
+    const int size = controlHeight() - entry.inset;
+    entry.button->setFixedSize(size, size);
 }
 
 void TitleBar::setWindowControlsVisible(bool visible)
@@ -330,7 +359,8 @@ WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const
 void TitleBar::applyTheme(const Theme &theme)
 {
     theme_ = theme;
-    project_->setIcon(UiIcons::icon(QStringLiteral("folder"), theme.mutedText));
+    project_->setIcon(FileIcons::folder(theme.isDark)); // the files tree's
+    claude_->applyTheme(theme);
     for (WindowButton *button : {minimize_, maximize_, close_})
         button->applyTheme(theme);
     for (const ActionButton &entry : std::as_const(actionButtons_))

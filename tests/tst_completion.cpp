@@ -23,6 +23,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
+#include <QToolTip>
 #include <QtTest>
 
 namespace {
@@ -226,6 +227,51 @@ private slots:
         QCOMPARE(f.editor->text(3), QString("    prv\n"));
         QTest::keyClick(f.editor, Qt::Key_Space);
         QVERIFY(!f.controller->isActive());
+    }
+
+    void editorToolTipsWaitWhileTheListIsOpen()
+    {
+        Fixture f("int printValue;\nint main() {\n    \n}\n", {2, 4});
+        f.editor->setHoverHelp([](int) { return QStringLiteral("Help"); });
+        f.window.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&f.window));
+        QTest::keyClicks(f.editor, "pri");
+        QTRY_VERIFY(f.controller->isActive());
+
+        emit f.editor->SCN_DWELLSTART(0, 10, 10);
+
+        QVERIFY(f.editor->areToolTipsSuspended());
+        QVERIFY(!QToolTip::isVisible());
+    }
+
+    void editorToolTipsComeBackOnceTheListCloses()
+    {
+        Fixture f("int printValue;\nint main() {\n    \n}\n", {2, 4});
+        f.editor->setHoverHelp([](int) { return QStringLiteral("Help"); });
+        f.window.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&f.window));
+        QTest::keyClicks(f.editor, "pri");
+        QTRY_VERIFY(f.controller->isActive());
+        QTest::keyClick(f.editor, Qt::Key_Escape);
+
+        emit f.editor->SCN_DWELLSTART(0, 10, 10);
+
+        QVERIFY(!f.editor->areToolTipsSuspended());
+        QTRY_VERIFY(QToolTip::isVisible() && QToolTip::text().contains("Help"));
+        QToolTip::hideText();
+    }
+
+    void openingTheListHidesTheToolTipShown()
+    {
+        const Fixture f("int printValue;\nint main() {\n    \n}\n", {2, 4});
+        QToolTip::showText(f.editor->viewport()->mapToGlobal(QPoint(10, 10)), QStringLiteral("Server message"),
+                           f.editor->viewport());
+        QTRY_VERIFY(QToolTip::isVisible());
+
+        QTest::keyClicks(f.editor, "pri");
+        QTRY_VERIFY(f.controller->isActive());
+
+        QTRY_VERIFY(!QToolTip::isVisible());
     }
 
     void modesDecideWhenThePopupOpens()

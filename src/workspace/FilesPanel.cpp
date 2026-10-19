@@ -2,6 +2,7 @@
 
 #include "ui/AppFonts.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QActionGroup>
 #include <QFrame>
@@ -123,7 +124,7 @@ FilesPanel::FilesPanel(QWidget *parent)
     // The header: room around its controls, a line under it.
     auto *header = new QFrame(this);
     header->setObjectName(QStringLiteral("viewHeader"));
-    header->setFixedHeight(34);
+    UiMetrics::setScaledHeight(header, UiMetrics::panelHeaderHeight);
     auto *toolbar = new QHBoxLayout(header);
     toolbar->setContentsMargins(6, 0, 6, 0);
     toolbar->setSpacing(2);

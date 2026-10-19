@@ -12,6 +12,7 @@
 #include "editor/SymbolOccurrences.h"
 #include "git/GitProcess.h"
 
+#include <QContextMenuEvent>
 #include <QLineEdit>
 #include <QScrollBar>
 #include <QSettings>
@@ -20,7 +21,9 @@
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTextBlock>
+#include <QTimer>
 #include <QToolButton>
+#include <QToolTip>
 #include <Qsci/qscicommandset.h>
 #include <QtTest>
 
@@ -255,6 +258,34 @@ private slots:
         QVERIFY(!editor.createContextMenu()->actions().contains(&explain));
         QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
         QCOMPARE(editor.createContextMenu()->actions().value(0), &explain);
+    }
+
+    void contextMenuSuspendsTheToolTipsWhileOpen()
+    {
+        EditorWidget editor(Theme::dark());
+        editor.setText("int value;\n");
+        editor.setHoverHelp([](int) { return QStringLiteral("Help"); });
+        editor.resize(400, 200);
+        editor.show();
+        editor.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&editor));
+        bool suspendedWhileOpen = false;
+        bool toolTipWhileOpen = true;
+        QTimer::singleShot(0, &editor, [&] {
+            suspendedWhileOpen = editor.areToolTipsSuspended();
+            emit editor.SCN_DWELLSTART(0, 10, 10);
+            toolTipWhileOpen = QToolTip::isVisible();
+            if (QWidget *menu = QApplication::activePopupWidget())
+                menu->close();
+        });
+
+        QContextMenuEvent rightClick(QContextMenuEvent::Mouse, QPoint(10, 10),
+                                     editor.viewport()->mapToGlobal(QPoint(10, 10)));
+        QApplication::sendEvent(editor.viewport(), &rightClick);
+
+        QVERIFY(suspendedWhileOpen);
+        QVERIFY(!toolTipWhileOpen);
+        QVERIFY(!editor.areToolTipsSuspended()); // back once it closes
     }
 
     void highlightsEveryOccurrenceOfTheNameAtTheCursor()

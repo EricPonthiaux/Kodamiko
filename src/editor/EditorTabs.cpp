@@ -6,10 +6,10 @@
 #include "EditorWidget.h"
 #include "PreviewPage.h"
 #include "ui/BrandMark.h"
+#include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/UiIcons.h"
 #include "viewers/ImageView.h"
-#include "workspace/FileIcons.h"
 #ifdef DUET_WITH_DIAGRAMS
 #include "viewers/DiagramView.h"
 #endif

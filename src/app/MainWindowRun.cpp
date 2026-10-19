@@ -3,7 +3,7 @@
 
 #include "MainWindow.h"
 #include "claude/mcp/DuetTools.h"
-#include "diagnostics/ProblemsView.h"
+#include "diagnostics/ProblemsView.h" // IWYU pragma: keep (ProblemsView * -> QWidget * needs the full type)
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/FileStatuses.h"
@@ -26,7 +26,6 @@
 #include <QWidgetAction>
 
 #include <algorithm>
-#include <array>
 #include <ranges>
 
 namespace {
