@@ -928,6 +928,24 @@ private slots:
         QVERIFY(!QFileInfo::exists(Git::run(worktree.path, {"rev-parse", "--git-path", "rebase-merge"}).trimmed()));
     }
 
+    void leavesTheRebaseAnAgentIsInTheMiddleOfAlone()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/a.txt", "agent\n");
+        Git::run(worktree.path, {"commit", "-qam", "agent"});
+        write(project, "a.txt", "user\n");
+        git(project, {"commit", "-qam", "user"});
+        QVERIFY_THROWS_EXCEPTION(GitError, Git::run(worktree.path, {"rebase", "main"}));
+
+        const RebaseResult result = Worktrees::rebase(worktree, "main");
+
+        QCOMPARE(result.pendingOperation, QString("rebase"));
+        QVERIFY(!result.succeeded());
+        QVERIFY(QFileInfo::exists(Git::run(worktree.path, {"rev-parse", "--git-path", "rebase-merge"}).trimmed()));
+    }
+
     void mergesAnAgentsCommitsIntoTheCurrentBranch()
     {
         const QTemporaryDir project;
@@ -969,6 +987,7 @@ private slots:
 
         QVERIFY(sentBack.wait());
         QVERIFY(sentBack.first().at(1).toString().contains("a.txt"));
+        QCOMPARE(sentBack.first().at(2).toString(), Worktrees::head(worktree));
         QCOMPARE(read(project, "a.txt"), QByteArray("user\n"));
     }
 

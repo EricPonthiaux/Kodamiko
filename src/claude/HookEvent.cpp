@@ -69,6 +69,7 @@ std::optional<HookEvent> HookEvent::fromJson(const QByteArray &json)
 
     HookEvent event;
     event.sessionId = object.value(QLatin1String("session_id")).toString();
+    event.workingDirectory = object.value(QLatin1String("cwd")).toString();
 
     if (eventName == QLatin1String("Stop") || eventName == QLatin1String("StopFailure")) {
         event.kind = Kind::ResponseFinished;
@@ -99,6 +100,7 @@ std::optional<HookEvent> HookEvent::fromJson(const QByteArray &json)
         event.status = object.value(QLatin1String("status")).toObject();
         // The session is named in the status Claude Code passed, not beside it.
         event.sessionId = event.status.value(QLatin1String("session_id")).toString();
+        event.workingDirectory = event.status.value(QLatin1String("cwd")).toString();
         return event;
     }
     if (eventName == QLatin1String("PostToolUse"))

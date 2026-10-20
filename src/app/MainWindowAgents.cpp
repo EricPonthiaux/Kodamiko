@@ -20,7 +20,6 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QTabWidget>
-#include <QTimer>
 #include <QUuid>
 
 #include <memory>
@@ -34,9 +33,6 @@ enum class WorktreeFate {
     Cancel,         // the tab stays open
 };
 
-// Apart from the paste: an Enter read with the pasted text may be taken for
-// a new line in the prompt (as in MainWindow::typeInClaudePrompt).
-constexpr int submitDelayMs = 150;
 // A commit message's first line, cut beyond this.
 constexpr int subjectLength = 72;
 
@@ -63,13 +59,6 @@ QString commitMessage(const Worktree &worktree, const QString &lastPrompt)
     const QString shortened =
         subject.size() > subjectLength ? subject.left(subjectLength - 1) + QChar(0x2026) : subject;
     return QObject::tr("%1: %2").arg(worktree.name, shortened);
-}
-
-// Types `text` in an agent's prompt and submits it.
-void submitToAgent(TerminalWidget *terminal, const QString &text)
-{
-    terminal->paste(text);
-    QTimer::singleShot(submitDelayMs, terminal, &TerminalWidget::pressEnter);
 }
 
 // What to do with the worktree of a closing session that holds work.
@@ -230,23 +219,34 @@ bool MainWindow::handleAgentHook(const HookEvent &event)
         return false;
     agentSessions_.handle(event);
     if (event.kind == HookEvent::Kind::ResponseFinished)
-        queueAgentCommits(agent->worktree);
+        queueAgentCommits(agent->worktree, agent->sentBackHead);
     return true;
 }
 
-void MainWindow::queueAgentCommits(const Worktree &worktree)
+void MainWindow::queueAgentCommits(const Worktree &worktree, const QString &sentBackHead)
 {
+    struct Commits {
+        bool hasCommits = false;
+        QString head;
+    };
+
     // Filled by the job, off the UI thread, then read on it: shared by the two.
-    const auto hasCommits = std::make_shared<bool>(false);
+    const auto commits = std::make_shared<Commits>();
     gitCommands_->runQuietly(
-        [worktree, hasCommits] {
-            *hasCommits = Worktrees::hasCommitsToMerge(worktree);
+        [worktree, commits] {
+            commits->hasCommits = Worktrees::hasCommitsToMerge(worktree);
+            commits->head = Worktrees::head(worktree);
             return QString();
         },
-        [this, worktree, hasCommits](const QString &, const QString &error) {
-            if (!error.isEmpty())
+        [this, worktree, sentBackHead, commits](const QString &, const QString &error) {
+            if (!error.isEmpty()) {
                 showStatus(tr("Could not read %1's commits: %2").arg(worktree.name, error));
-            else if (*hasCommits)
+                return;
+            }
+            // Sent back unchanged, they would be sent back again, turn after
+            // turn: the agent answered without fixing them.
+            const bool isNewWork = commits->hasCommits && commits->head != sentBackHead;
+            if (isNewWork)
                 agentMerges_->enqueue(worktree);
         });
 }
@@ -317,7 +317,7 @@ void MainWindow::onAgentMerged(const Worktree &worktree,
         removeAgentWorktree(worktree);
 }
 
-void MainWindow::onAgentSentBack(const Worktree &worktree, const QString &report)
+void MainWindow::onAgentSentBack(const Worktree &worktree, const QString &report, const QString &head)
 {
     const AgentSessions::Agent *agent = agentSessions_.findByName(worktree.name);
     const bool isRunning = agent && agent->terminal && agent->terminal->isRunning();
@@ -325,8 +325,8 @@ void MainWindow::onAgentSentBack(const Worktree &worktree, const QString &report
         onAgentMergeFailed(worktree, report);
         return;
     }
-    submitToAgent(agent->terminal, report);
-    showStatus(tr("%1's commits were not merged: it was told why").arg(worktree.name));
+    agentSessions_.sendBack(worktree.name, report, head);
+    showStatus(tr("%1's commits were not merged: it is told why").arg(worktree.name));
 }
 
 void MainWindow::onAgentMergeFailed(const Worktree &worktree, const QString &message)

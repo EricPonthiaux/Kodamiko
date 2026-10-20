@@ -202,7 +202,9 @@ private:
     // An agent's hook: its activity, and its new commits to the merge queue
     // when it finished a response. False for a hook of the main session.
     bool handleAgentHook(const HookEvent &event);
-    void queueAgentCommits(const Worktree &worktree);
+    // Queues the agent's commits unless there are none, or its last commit is
+    // `sentBackHead`, the one last sent back.
+    void queueAgentCommits(const Worktree &worktree, const QString &sentBackHead);
     // Claude ▸ Merge Agent's Work, for the agent whose tab is shown.
     void mergeCurrentAgent();
     // Commits the agent's remaining changes, its last prompt as the message,
@@ -214,8 +216,9 @@ private:
                        const QString &branch,
                        const QString &head,
                        AgentMergeQueue::AfterMerge afterMerge);
-    // Conflicts or a failing check: typed in the agent's prompt for it to fix.
-    void onAgentSentBack(const Worktree &worktree, const QString &report);
+    // Conflicts or a failing check of its commits up to `head`: typed in the
+    // agent's prompt for it to fix.
+    void onAgentSentBack(const Worktree &worktree, const QString &report, const QString &head);
     void onAgentMergeFailed(const Worktree &worktree, const QString &message);
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);

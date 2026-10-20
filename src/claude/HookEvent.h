@@ -25,6 +25,9 @@ struct HookEvent {
 
     Kind kind{};
     QString sessionId;
+    // The session's current directory ("cwd"): it outlives the session id,
+    // which /clear and /resume replace.
+    QString workingDirectory;
     QStringList filePaths; // EditRequested, FilesEdited: absolute paths
     QString prompt;        // PromptSubmitted
     // EditRequested, PermissionRequested: the tool name; NeedsAttention: Claude's message;

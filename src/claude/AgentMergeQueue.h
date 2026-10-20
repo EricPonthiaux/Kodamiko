@@ -43,9 +43,10 @@ signals:
     void progress(const QString &message);
     // `branch` now ends with the worktree's commits, up to `head`.
     void merged(const Worktree &worktree, const QString &branch, const QString &head, AfterMerge afterMerge);
-    // The agent has to act: its commits conflict with the branch, or fail
-    // the check. `report` tells it what happened and what to do.
-    void sentBack(const Worktree &worktree, const QString &report);
+    // The agent has to act: its commits up to `head` conflict with the
+    // branch, or fail the check. `report` tells it what happened and what to
+    // do.
+    void sentBack(const Worktree &worktree, const QString &report, const QString &head);
     // The merge stopped for a reason the user handles: their changes in the
     // way, no current branch, git failing.
     void failed(const Worktree &worktree, const QString &message);
@@ -54,7 +55,8 @@ private:
     struct Request {
         Worktree worktree;
         AfterMerge afterMerge = AfterMerge::KeepWorktree;
-        int attempts = 0; // replays, redone when the branch moved meanwhile
+        int attempts = 0;     // replays, redone when the branch moved meanwhile
+        QString replayedHead; // the worktree's last commit after the replay
     };
 
     // The request being merged: the first of the queue.
@@ -63,7 +65,7 @@ private:
     void finishCurrent();
     // Starts the current request's merge: replays its commits.
     void rebase();
-    void onRebased(const RebaseResult &result, const QString &branch);
+    void onRebased(const RebaseResult &result, const QString &branch, const QString &head);
     void runCheck(const QString &branch);
     void onChecked(int exitCode, const QString &branch);
     void fastForward(const QString &branch);
