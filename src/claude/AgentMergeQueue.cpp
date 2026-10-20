@@ -21,6 +21,7 @@ constexpr int reportedOutputLines = 60;
 struct RebaseOutcome {
     RebaseResult result;
     QString branch; // the checkout's current branch, replayed on
+    QString head;   // the worktree's last commit afterwards
 };
 
 QString lastLines(const QString &output, int count)
@@ -81,18 +82,27 @@ void AgentMergeQueue::rebase()
         [folder = folder_, worktree = current().worktree, outcome] {
             outcome->branch = currentBranch(folder);
             outcome->result = Worktrees::rebase(worktree, outcome->branch);
+            outcome->head = Worktrees::head(worktree);
             return QString();
         },
-        [this, outcome] { onRebased(outcome->result, outcome->branch); },
+        [this, outcome] { onRebased(outcome->result, outcome->branch, outcome->head); },
         [this](const GitError &error) {
             fail(error.message());
             return true;
         });
 }
 
-void AgentMergeQueue::onRebased(const RebaseResult &result, const QString &branch)
+void AgentMergeQueue::onRebased(const RebaseResult &result, const QString &branch, const QString &head)
 {
-    if (!result.succeeded()) {
+    current().replayedHead = head;
+    if (!result.pendingOperation.isEmpty()) {
+        // The agent is busy with it: it ends another turn once it is done.
+        emit progress(tr("%1 is in the middle of a %2: its commits are not merged yet")
+                          .arg(current().worktree.name, result.pendingOperation));
+        finishCurrent();
+        return;
+    }
+    if (!result.conflicts.isEmpty()) {
         sendBack(tr("Duet could not merge your commits into %1: replayed on it, they conflict in %2. Run `git rebase "
                     "%1` in your worktree, resolve the conflicts and finish the rebase, then end your turn: Duet "
                     "merges again.")
@@ -178,6 +188,6 @@ void AgentMergeQueue::fail(const QString &message)
 
 void AgentMergeQueue::sendBack(const QString &report)
 {
-    emit sentBack(current().worktree, report);
+    emit sentBack(current().worktree, report, current().replayedHead);
     finishCurrent();
 }

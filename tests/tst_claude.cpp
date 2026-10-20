@@ -224,6 +224,35 @@ private slots:
         QCOMPARE(agents.find(&terminal)->activity->state(), ClaudeActivity::State::Working);
     }
 
+    void followsAnAgentWhoseSessionWasRenewedByItsDirectory()
+    {
+        const QTemporaryDir worktree;
+        QVERIFY(QDir(worktree.path()).mkdir("src"));
+        AgentSessions agents;
+        TerminalWidget terminal;
+        agents.add({.name = "agent-1", .path = worktree.path()}, "agent-session", &terminal);
+        const HookEvent afterClear{.kind = HookEvent::Kind::PromptSubmitted,
+                                   .sessionId = "cleared-session",
+                                   .workingDirectory = worktree.filePath("src")};
+
+        agents.handle(afterClear);
+
+        QCOMPARE(agents.find(&terminal)->sessionId, QStringLiteral("cleared-session"));
+        QCOMPARE(agents.find(&terminal)->activity->state(), ClaudeActivity::State::Working);
+        QVERIFY(!agents.owns({.kind = HookEvent::Kind::PromptSubmitted,
+                              .sessionId = "main-session",
+                              .workingDirectory = QDir(worktree.path()).filePath("..")}));
+    }
+
+    void hookEventsNameTheirDirectory()
+    {
+        const std::optional<HookEvent> event =
+            HookEvent::fromJson(R"({"hook_event_name":"Stop","session_id":"s1","cwd":"/work/agent-1"})");
+
+        QVERIFY(event);
+        QCOMPARE(event->workingDirectory, QStringLiteral("/work/agent-1"));
+    }
+
     void statusLineEventNamesItsSession()
     {
         const std::optional<HookEvent> event = HookEvent::fromJson(

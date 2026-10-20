@@ -19,10 +19,13 @@ struct Worktree {
 
 // What replaying a worktree's commits on a branch gave.
 struct RebaseResult {
+    // The operation the worktree was in the middle of ("rebase", "merge"…):
+    // nothing was replayed, so as not to undo it. Empty if none.
+    QString pendingOperation;
     // Files both sides changed; the rebase was undone. Empty on success.
     QStringList conflicts;
 
-    bool succeeded() const { return conflicts.isEmpty(); }
+    bool succeeded() const { return pendingOperation.isEmpty() && conflicts.isEmpty(); }
 };
 
 // The worktrees of Claude sessions: creating, inspecting, merging and
@@ -56,7 +59,9 @@ bool hasCommitsToMerge(const Worktree &worktree);
 void commitChanges(const Worktree &worktree, const QString &message);
 
 // Replays the worktree's commits on `onto` (a branch of the repository).
-// Uncommitted changes are put aside meanwhile and brought back.
+// Uncommitted changes are put aside meanwhile and brought back. Nothing
+// happens while the worktree is in the middle of an operation (the agent's
+// own rebase…): see RebaseResult::pendingOperation.
 RebaseResult rebase(const Worktree &worktree, const QString &onto);
 
 // Moves the checkout's current branch forward to `branch`, as "git merge

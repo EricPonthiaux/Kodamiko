@@ -110,6 +110,10 @@ void commitChanges(const Worktree &worktree, const QString &message)
 
 RebaseResult rebase(const Worktree &worktree, const QString &onto)
 {
+    // Its conflicts would be taken for the replay's, and undone with it.
+    const std::optional<RepositoryInfo> state = RepositoryInfo::read(worktree.path);
+    if (state && !state->operation.isEmpty())
+        return {.pendingOperation = state->operation};
     try {
         Git::run(worktree.path, {QStringLiteral("rebase"), QStringLiteral("--autostash"), onto}, {},
                  Git::englishMessages());
