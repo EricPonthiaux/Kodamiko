@@ -24,7 +24,8 @@
 #include <QTimer>
 
 #include <algorithm>
-#include <memory>
+#include <functional>
+#include <optional>
 #include <utility>
 
 namespace DuetTools {
