@@ -10,8 +10,6 @@
 
 namespace {
 
-// A style sheet can only take images from files: the tab close cross is
-// written to the cache folder. Returns its path, empty if it cannot be written.
 QString writeIcon(const QString &name, const QString &svg)
 {
     const QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/theme");
@@ -62,10 +60,6 @@ QColor withAlpha(QColor color, qreal alpha)
     return color;
 }
 
-// The style sheet gives each widget it polishes the font it had then, as
-// if set on it, so the application font no longer reaches it: the widgets
-// without a font of their own inherit it again. Those with one (code,
-// trees, AppFonts::setInterfaceFont) keep it.
 void inheritApplicationFont()
 {
     const QList<QWidget *> widgets = QApplication::allWidgets();
@@ -75,11 +69,6 @@ void inheritApplicationFont()
     }
 }
 
-// A new style sheet gives each widget back the font it had when first
-// polished: those set since (the trees' after Preferences, a diff's code
-// font) are set again. It also brings back the platform theme's font for
-// each class (KDE's for menu bars, item views, labels...) over the
-// application font, which setting the application font again removes.
 void setStyleSheetKeepingFonts(const QString &sheet)
 {
     QList<std::pair<QWidget *, QFont>> ownFonts;
@@ -134,8 +123,6 @@ QPalette palette(const Theme &theme)
     return palette;
 }
 
-// Every theme's controls share the same geometry; their surfaces, selected
-// tabs and focus outlines take their colors from the active theme.
 QString styleSheet(const Theme &theme)
 {
     QString sheet = QStringLiteral(R"(
