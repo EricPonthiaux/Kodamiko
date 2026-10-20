@@ -15,6 +15,7 @@ add_library(duet_core STATIC
     changes/DiffViewSideBySide.cpp
     changes/DiscardConfirmation.cpp
     changes/FileChangeDelegate.cpp
+    changes/FoldedFileList.cpp
     changes/GitActions.cpp
     changes/HunkActions.cpp
     changes/NewBranchPopup.cpp

@@ -206,11 +206,15 @@ const QHash<QString, Painter> &painters()
              p.drawPolyline(QPolygonF(
                  {QPointF(10.5, 3.5), QPointF(10.5, 2.5), QPointF(2.5, 2.5), QPointF(2.5, 10.5), QPointF(3.5, 10.5)}));
          }},
-        // Previous and next: chevrons up and down.
+        // Previous and next: chevrons up and down, left and right.
         {QStringLiteral("up"),
          [](QPainter &p) { p.drawPolyline(QPolygonF({QPointF(4, 10), QPointF(8, 6), QPointF(12, 10)})); }},
         {QStringLiteral("down"),
          [](QPainter &p) { p.drawPolyline(QPolygonF({QPointF(4, 6), QPointF(8, 10), QPointF(12, 6)})); }},
+        {QStringLiteral("left"),
+         [](QPainter &p) { p.drawPolyline(QPolygonF({QPointF(10, 4), QPointF(6, 8), QPointF(10, 12)})); }},
+        {QStringLiteral("right"),
+         [](QPainter &p) { p.drawPolyline(QPolygonF({QPointF(6, 4), QPointF(10, 8), QPointF(6, 12)})); }},
         // Close: a cross.
         {QStringLiteral("close"),
          [](QPainter &p) {
@@ -330,6 +334,12 @@ const QHash<QString, Painter> &painters()
          [](QPainter &p) {
              p.drawRoundedRect(QRectF(1.5, 2.5, 13, 11), 1.5, 1.5);
              p.drawLine(QPointF(10, 2.5), QPointF(10, 13.5));
+         }},
+        // A window with a panel on its left side.
+        {QStringLiteral("file-list"),
+         [](QPainter &p) {
+             p.drawRoundedRect(QRectF(1.5, 2.5, 13, 11), 1.5, 1.5);
+             p.drawLine(QPointF(6, 2.5), QPointF(6, 13.5));
          }},
         // A funnel.
         {QStringLiteral("filter"),

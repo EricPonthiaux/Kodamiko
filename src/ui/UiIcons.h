@@ -10,7 +10,8 @@
 // "history", "files", "outline", "claude", "locate", "appearance",
 // "keyboard", "settings", "collapse-all", "filter", "more", "run", "stop", "build",
 // "debug", "test", "problems", "check", "document", "split", "preview", "arrange",
-// "fit", "export", "grid", "side-panel".
+// "fit", "export", "grid", "side-panel", "file-list", "up", "down", "left",
+// "right".
 namespace UiIcons {
 
 QIcon icon(const QString &name, const QColor &color);

@@ -14,7 +14,8 @@ class QToolButton;
 // The bar above a DiffView, out of its scrolled text: the file at the top
 // of the view as it scrolls (its name, its folder and state, its counts),
 // the buttons that show the two versions side by side and hide whitespace
-// changes, and those that go to the previous or next block of changes.
+// changes, and those that go to the previous or next block of changes. While
+// file navigation is shown, two arrows go to the previous or next file.
 class DiffHeaderBar : public QFrame {
     Q_OBJECT
 
@@ -24,6 +25,9 @@ public:
 
     // Shown while the view shows no file.
     void setPlaceholder(const QString &text);
+    // The previous and next file arrows, for when no file list is in view;
+    // hidden at first, and while the view shows a single file.
+    void setFileNavigationShown(bool shown);
     void applyTheme(const Theme &theme);
 
     // Whitespace::Ignore while the whitespace button is checked; Compare at first.
@@ -43,6 +47,7 @@ protected:
 
 private:
     void follow();
+    void updateFileButtons(int file, int fileCount);
     int controlsHeight() const;
 
     DiffView *diff_;
@@ -54,5 +59,8 @@ private:
     QToolButton *whitespace_;
     QToolButton *previous_;
     QToolButton *next_;
+    QToolButton *previousFile_;
+    QToolButton *nextFile_;
+    bool isFileNavigationShown_ = false;
     bool dark_ = true;
 };

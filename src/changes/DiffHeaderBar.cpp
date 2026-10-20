@@ -24,6 +24,8 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     , whitespace_(new QToolButton(this))
     , previous_(new QToolButton(this))
     , next_(new QToolButton(this))
+    , previousFile_(new QToolButton(this))
+    , nextFile_(new QToolButton(this))
 {
     setObjectName(QStringLiteral("diffHeader"));
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
@@ -41,6 +43,15 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
         const DiffView::Direction direction = buttonDirection;
         connect(button, &QToolButton::clicked, this, [this, direction] { diff_->goToChange(direction); });
     }
+    for (const auto &[button, toolTip, buttonDirection] :
+         {std::tuple{previousFile_, tr("Previous file (Alt+Up)"), DiffView::Direction::Previous},
+          std::tuple{nextFile_, tr("Next file (Alt+Down)"), DiffView::Direction::Next}}) {
+        button->setAutoRaise(true);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setToolTip(toolTip);
+        const DiffView::Direction direction = buttonDirection;
+        connect(button, &QToolButton::clicked, this, [this, direction] { diff_->goToFile(direction); });
+    }
 
     sideBySide_->setCheckable(true);
     sideBySide_->setAutoRaise(true);
@@ -57,6 +68,8 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 4, 6, 4);
     layout->setSpacing(8);
+    layout->addWidget(previousFile_);
+    layout->addWidget(nextFile_);
     layout->addWidget(name_);
     layout->addWidget(details_, 1);
     layout->addWidget(stats_);
@@ -78,6 +91,12 @@ void DiffHeaderBar::setPlaceholder(const QString &text)
     follow();
 }
 
+void DiffHeaderBar::setFileNavigationShown(bool shown)
+{
+    isFileNavigationShown_ = shown;
+    follow();
+}
+
 Whitespace DiffHeaderBar::whitespace() const
 {
     return whitespace_->isChecked() ? Whitespace::Ignore : Whitespace::Compare;
@@ -90,14 +109,17 @@ void DiffHeaderBar::applyTheme(const Theme &theme)
     whitespace_->setIcon(UiIcons::icon(QStringLiteral("whitespace"), theme.foreground));
     previous_->setIcon(UiIcons::icon(QStringLiteral("up"), theme.foreground));
     next_->setIcon(UiIcons::icon(QStringLiteral("down"), theme.foreground));
+    previousFile_->setIcon(UiIcons::icon(QStringLiteral("left"), theme.foreground));
+    nextFile_->setIcon(UiIcons::icon(QStringLiteral("right"), theme.foreground));
     follow();
 }
 
 int DiffHeaderBar::controlsHeight() const
 {
     const QMargins margins = contentsMargins() + layout()->contentsMargins();
-    const int buttons = std::max({sideBySide_->sizeHint().height(), whitespace_->sizeHint().height(),
-                                  previous_->sizeHint().height(), next_->sizeHint().height()});
+    const int buttons =
+        std::max({sideBySide_->sizeHint().height(), whitespace_->sizeHint().height(), previous_->sizeHint().height(),
+                  next_->sizeHint().height(), previousFile_->sizeHint().height(), nextFile_->sizeHint().height()});
     return buttons + margins.top() + margins.bottom();
 }
 
@@ -133,12 +155,14 @@ void DiffHeaderBar::follow()
     whitespace_->setVisible(hasFile || whitespace_->isChecked());
     sideBySide_->setVisible(hasFile);
     if (!hasFile) {
+        updateFileButtons(0, 0);
         name_->clear();
         details_->setText(placeholder_);
         details_->setToolTip(placeholder_);
         return;
     }
     const int file = std::max(0, diff_->locate(diff_->firstVisibleLine()).file);
+    updateFileButtons(file, int(files.size()));
     const DiffView::FileSummary &shown = files.value(file, files.first());
     const qsizetype slash = shown.path.lastIndexOf(QLatin1Char('/'));
     name_->setText(shown.path.mid(slash + 1));
@@ -159,4 +183,13 @@ void DiffHeaderBar::follow()
                         .arg(shown.added)
                         .arg(red)
                         .arg(shown.removed));
+}
+
+void DiffHeaderBar::updateFileButtons(int file, int fileCount)
+{
+    const bool isVisible = isFileNavigationShown_ && fileCount > 1;
+    previousFile_->setVisible(isVisible);
+    nextFile_->setVisible(isVisible);
+    previousFile_->setEnabled(file > 0);
+    nextFile_->setEnabled(file < fileCount - 1);
 }

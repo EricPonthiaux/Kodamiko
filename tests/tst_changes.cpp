@@ -6,6 +6,7 @@
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
+#include "changes/FoldedFileList.h"
 #include "changes/GitActions.h"
 #include "changes/HunkActions.h"
 #include "changes/NewBranchPopup.h"
@@ -79,6 +80,16 @@ QStringList textsOf(const QList<DiffLine> &lines)
     for (const DiffLine &line : lines)
         texts.append(line.text);
     return texts;
+}
+
+// The button of `parent` whose tooltip is `toolTip`; nullptr if none.
+QToolButton *buttonWithToolTip(const QWidget *parent, const QString &toolTip)
+{
+    for (QToolButton *button : parent->findChildren<QToolButton *>()) {
+        if (button->toolTip() == toolTip)
+            return button;
+    }
+    return nullptr;
 }
 
 // A line added after line 29 of 49: line 30 of 50.
@@ -266,6 +277,55 @@ private slots:
         QCOMPARE(columns.newSide[5].location.line, columns.oldSide[5].location.line);
         QCOMPARE(columns.oldSide[4].oldNumber, 11);
         QCOMPARE(columns.newSide[4].newNumber, 11);
+    }
+
+    void foldingTheFileListShowsTheBarAndTheFileArrows()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        write(project, "b.txt", "b\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "a2\n");
+        write(project, "b.txt", "b2\n");
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 400);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        const auto *column = view.findChild<QFrame *>("changesColumn");
+        const auto *bar = view.findChild<FoldedFileList *>();
+        const auto *header = view.findChild<DiffHeaderBar *>();
+        QToolButton *nextFile = buttonWithToolTip(header, "Next file (Alt+Down)");
+        QVERIFY(nextFile);
+        QVERIFY(!bar->isVisible());
+        QVERIFY(!nextFile->isVisible());
+
+        buttonWithToolTip(&view, "Hide the file list")->click();
+
+        QVERIFY(!column->isVisible());
+        QVERIFY(bar->isVisible());
+        QVERIFY(nextFile->isVisible());
+    }
+
+    void theBarsIconBringsTheFileListBack()
+    {
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 400);
+        view.show();
+        view.setFileListVisible(false);
+        const auto *bar = view.findChild<FoldedFileList *>();
+
+        buttonWithToolTip(bar, "Show the file list")->click();
+
+        QVERIFY(view.isFileListVisible());
+        QVERIFY(!bar->isVisible());
+        QVERIFY(view.splitter()->sizes().constFirst() > 0);
     }
 
     void diffHeaderLinesUpWithTheFileActionsWithOrWithoutFiles()

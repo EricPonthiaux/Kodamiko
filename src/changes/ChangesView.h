@@ -18,6 +18,7 @@ class CommitPanel;
 class DiffHeaderBar;
 class HunkActions;
 class DiffView;
+class FoldedFileList;
 class GitCommands;
 class QFrame;
 class QLabel;
@@ -62,6 +63,12 @@ public:
     void applyTheme(const Theme &theme);
 
     QSplitter *splitter() const { return splitter_; }
+
+    // The file column (actions, list, commit area); folded away, a thin bar
+    // stands for it at the left edge and the diff's header shows arrows to
+    // go from file to file. Visible at first.
+    bool isFileListVisible() const;
+    void setFileListVisible(bool visible);
 
     // The bar shown while a merge or rebase is in progress.
     QWidget *operationBar() const { return operationBar_; }
@@ -173,6 +180,9 @@ private:
     DiffHeaderBar *diffHeader_;
     HunkActions *hunkActions_;
     GripSplitter *splitter_;
+    QFrame *fileColumn_; // the splitter's first pane
+    FoldedFileList *foldedList_;
+    QToolButton *foldButton_;
     QFrame *fileActions_; // Stage, Unstage, Discard, above the list
     QToolButton *stageButton_;
     QToolButton *unstageButton_;

@@ -189,6 +189,7 @@ QTabBar QToolButton { background: @window; border: none; border-radius: 0; paddi
 QTabBar QToolButton:hover { background: @button; }
 QTabBar QToolButton:disabled { background: @window; }
 QWidget#sideStrip { background: @window; border-right: 1px solid @border; }
+QFrame#foldedFileList { background: @window; border: none; border-right: 1px solid @line; }
 QWidget#diagramToolbar { background: @base; border-bottom: 1px solid @line; }
 QWidget#diagramToolbar QToolButton { color: @text; background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 3px 8px; }
 QWidget#diagramToolbar QToolButton:hover { background: @hover; }

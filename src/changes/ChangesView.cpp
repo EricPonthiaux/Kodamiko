@@ -8,6 +8,7 @@
 #include "DiffView.h"
 #include "DiscardConfirmation.h"
 #include "FileChangeDelegate.h"
+#include "FoldedFileList.h"
 #include "HunkActions.h"
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
@@ -36,6 +37,7 @@ namespace {
 constexpr int sectionRole = Qt::UserRole;
 constexpr int indexRole = Qt::UserRole + 1; // -1 on a section title or a folder
 constexpr int treeIndentation = 14;
+constexpr int fileColumnWidth = 320;
 
 // "2 staged · 3 unstaged · rebase in progress", or that nothing changed.
 QString statusSummary(const RepositoryStatus &status)
@@ -70,6 +72,9 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     , diffHeader_(new DiffHeaderBar(diff_, this))
     , hunkActions_(new HunkActions(diff_))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
+    , fileColumn_(new QFrame(this))
+    , foldedList_(new FoldedFileList(this))
+    , foldButton_(new QToolButton(this))
     , stageButton_(new QToolButton(this))
     , unstageButton_(new QToolButton(this))
     , discardButton_(new QToolButton(this))
@@ -88,6 +93,11 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     connect(stageButton_, &QToolButton::clicked, this, [this] { stageFiles(selectedFiles()); });
     connect(unstageButton_, &QToolButton::clicked, this, [this] { unstageFiles(selectedFiles()); });
     connect(discardButton_, &QToolButton::clicked, this, [this] { discardFiles(selectedFiles()); });
+    foldButton_->setAutoRaise(true);
+    foldButton_->setFocusPolicy(Qt::NoFocus);
+    foldButton_->setToolTip(tr("Hide the file list"));
+    connect(foldButton_, &QToolButton::clicked, this, [this] { setFileListVisible(false); });
+    connect(foldedList_, &FoldedFileList::expandRequested, this, [this] { setFileListVisible(true); });
 
     refreshButton_ = new QToolButton(this);
     QToolButton *refreshButton = refreshButton_;
@@ -118,6 +128,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     auto *fileActionsLayout = new QHBoxLayout(fileActions_);
     fileActionsLayout->setContentsMargins(4, 4, 4, 4);
     fileActionsLayout->setSpacing(2);
+    fileActionsLayout->addWidget(foldButton_);
     fileActionsLayout->addWidget(stageButton_);
     fileActionsLayout->addWidget(unstageButton_);
     fileActionsLayout->addStretch();
@@ -188,9 +199,8 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     connect(commitPanel_, &CommitPanel::messageRequested, this, &ChangesView::commitMessageRequested);
 
     // The column: the file actions, the list, the commit area fixed below.
-    auto *left = new QFrame(this);
-    left->setObjectName(QStringLiteral("changesColumn"));
-    auto *leftLayout = new QVBoxLayout(left);
+    fileColumn_->setObjectName(QStringLiteral("changesColumn"));
+    auto *leftLayout = new QVBoxLayout(fileColumn_);
     leftLayout->setContentsMargins(0, 0, 0, 0);
     leftLayout->setSpacing(0);
     leftLayout->addWidget(fileActions_);
@@ -223,17 +233,30 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     rightLayout->addWidget(diffHeader_);
     rightLayout->addWidget(diff_, 1);
 
-    splitter_->addWidget(left);
+    splitter_->addWidget(fileColumn_);
     splitter_->addWidget(right);
     splitter_->setStretchFactor(1, 1);
-    splitter_->setSizes({320, 1080});
+    splitter_->setSizes({fileColumnWidth, 1080});
+    // Dragged down to nothing, the column is folded as by its button.
+    connect(splitter_, &QSplitter::splitterMoved, this, [this] {
+        if (splitter_->sizes().constFirst() == 0)
+            setFileListVisible(false);
+    });
+
+    // The folded column's bar, then the columns.
+    foldedList_->hide();
+    auto *columns = new QHBoxLayout;
+    columns->setContentsMargins(0, 0, 0, 0);
+    columns->setSpacing(0);
+    columns->addWidget(foldedList_);
+    columns->addWidget(splitter_, 1);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(titleBar);
     layout->addWidget(operationArea_);
-    layout->addWidget(splitter_);
+    layout->addLayout(columns);
 
     connect(commands_, &GitCommands::busyChanged, this, [this](bool busy) {
         updateActions();
@@ -732,9 +755,29 @@ void ChangesView::applyTheme(const Theme &theme)
     unstageButton_->setIcon(UiIcons::icon(QStringLiteral("minus"), color));
     discardButton_->setIcon(UiIcons::icon(QStringLiteral("discard"), color));
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
+    foldButton_->setIcon(UiIcons::icon(QStringLiteral("file-list"), color));
+    foldedList_->applyTheme(theme);
     commitPanel_->applyTheme(theme);
     diffHeader_->applyTheme(theme);
     alignBars(theme);
+}
+
+bool ChangesView::isFileListVisible() const
+{
+    return !fileColumn_->isHidden();
+}
+
+void ChangesView::setFileListVisible(bool visible)
+{
+    fileColumn_->setVisible(visible);
+    foldedList_->setVisible(!visible);
+    diffHeader_->setFileNavigationShown(!visible);
+    if (!visible)
+        return;
+    // Folded by a drag, the column has no width left to come back with.
+    const QList<int> sizes = splitter_->sizes();
+    if (sizes.constFirst() == 0)
+        splitter_->setSizes({fileColumnWidth, std::max(0, sizes.constLast() - fileColumnWidth)});
 }
 
 void ChangesView::alignBars(const Theme &theme)
