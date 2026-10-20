@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "claude/AgentCheckPopup.h"
 #include "claude/AgentSessions.h"
 #include "claude/ClaudeActivity.h"
 #include "claude/ClaudeConfig.h"
@@ -7,6 +8,7 @@
 #include "claude/ClaudeLauncher.h"
 #include "claude/ClaudeLint.h"
 #include "claude/ClaudeUsage.h"
+#include "claude/CloseAgentPopup.h"
 #include "claude/CodeRequest.h"
 #include "claude/CommitMessage.h"
 #include "claude/DiagramRequest.h"
@@ -14,15 +16,20 @@
 #include "claude/EffectiveSettings.h"
 #include "claude/HookEvent.h"
 #include "claude/HookServer.h"
+#include "claude/NewAgentPopup.h"
 #include "claude/UnsavedEditGuard.h"
 #include "editor/EditorWidget.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/MessagePopup.h"
 #include "ui/Theme.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLabel>
+#include <QLineEdit>
 #include <QProcess>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTreeWidget>
@@ -235,6 +242,99 @@ private slots:
         terminal.reset();
 
         QVERIFY(!agents.owns({.kind = HookEvent::Kind::PromptSubmitted, .sessionId = "agent-session"}));
+    }
+
+    void newAgentPopupChecksTheName()
+    {
+        QWidget window;
+        NewAgentPopup popup(Theme::dark(), &window);
+        popup.load("agent-1", NewAgentPopup::UncommittedChanges::None);
+        QSignalSpy requested(&popup, &NewAgentPopup::startRequested);
+        QVERIFY(popup.startButton()->isEnabled()); // the suggested name
+
+        popup.nameField()->clear();
+        QTest::keyClicks(popup.nameField(), "fix login");
+        QCOMPARE(popup.nameField()->text(), QString("fix-login")); // as typed
+        QVERIFY(popup.message()->text().contains("duet/fix-login"));
+        popup.nameField()->setText("bad..name");
+        QVERIFY(!popup.startButton()->isEnabled());
+
+        popup.nameField()->setText("reviewer");
+        popup.start();
+
+        QCOMPARE(requested.count(), 1);
+        QCOMPARE(requested.first().at(0).toString(), QString("reviewer"));
+    }
+
+    void closeAgentPopupReportsTheChosenFateOfTheWorktreeAskedFor()
+    {
+        QWidget window;
+        CloseAgentPopup popup(Theme::dark(), &window);
+        popup.load({.name = "agent-1", .path = "/repo/.claude/worktrees/agent-1", .branch = "duet/agent-1"});
+        QString chosenName;
+        std::optional<CloseAgentPopup::WorktreeFate> chosenFate;
+        connect(&popup, &CloseAgentPopup::fateChosen, this,
+                [&](const Worktree &worktree, CloseAgentPopup::WorktreeFate fate) {
+                    chosenName = worktree.name;
+                    chosenFate = fate;
+                });
+
+        popup.keepButton()->click();
+
+        QCOMPARE(chosenName, QString("agent-1"));
+        QCOMPARE(chosenFate, CloseAgentPopup::WorktreeFate::Keep);
+    }
+
+    void closeAgentPopupAsksForEachWorktreeOnceInTurn()
+    {
+        QWidget window;
+        CloseAgentPopup popup(Theme::dark(), &window);
+        QStringList chosen;
+        connect(&popup, &CloseAgentPopup::fateChosen, this,
+                [&](const Worktree &worktree, CloseAgentPopup::WorktreeFate) { chosen.append(worktree.name); });
+
+        popup.load({.name = "agent-1"});
+        popup.load({.name = "agent-2"});
+        popup.load({.name = "agent-1"}); // its tab closed again
+        popup.load({.name = "agent-3"});
+
+        QCOMPARE(popup.waitingCount(), 2);
+        popup.keepButton()->click();
+        QCOMPARE(popup.asked()->name, QString("agent-2"));
+        popup.next(); // cancelled: agent-2's tab stays open
+        popup.deleteButton()->click();
+        QCOMPARE(chosen, QStringList({"agent-1", "agent-3"}));
+        QVERIFY(!popup.asked());
+    }
+
+    void messagePopupShowsTheWaitingMessagesInTurn()
+    {
+        QWidget window;
+        MessagePopup popup(QStringLiteral("claude"), QStringLiteral("testMessage"), Theme::dark(), &window);
+
+        popup.load("Merge agent-1", "Conflicts");
+        popup.load("Merge agent-1", "Conflicts"); // repeated
+        popup.load("Merge agent-2", "Check failed");
+
+        QCOMPARE(popup.text(), QString("Conflicts"));
+        QCOMPARE(popup.waitingCount(), 1);
+        popup.next();
+        QCOMPARE(popup.text(), QString("Check failed"));
+        popup.next();
+        QVERIFY(popup.text().isEmpty());
+    }
+
+    void agentCheckPopupSavesTheTrimmedCommand()
+    {
+        QWidget window;
+        AgentCheckPopup popup(Theme::dark(), &window);
+        QSignalSpy saved(&popup, &AgentCheckPopup::saved);
+        popup.commandField()->setText("  ctest --test-dir build ");
+
+        popup.save();
+
+        QCOMPARE(saved.count(), 1);
+        QCOMPARE(saved.first().at(0).toString(), QString("ctest --test-dir build"));
     }
 
     void findsTheUserStatusLine()

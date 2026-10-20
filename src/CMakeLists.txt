@@ -22,6 +22,7 @@ add_library(duet_core STATIC
     changes/SnapshotsPopup.cpp
     changes/StashesPopup.cpp
     changes/WordDiff.cpp
+    claude/AgentCheckPopup.cpp
     claude/AgentMergeQueue.cpp
     claude/AgentSessions.cpp
     claude/ClaudeActivity.cpp
@@ -32,6 +33,7 @@ add_library(duet_core STATIC
     claude/ClaudeLauncher.cpp
     claude/ClaudeTrust.cpp
     claude/ClaudeUsage.cpp
+    claude/CloseAgentPopup.cpp
     claude/CodeRequest.cpp
     claude/CommitMessage.cpp
     claude/DiagramRequest.cpp
@@ -40,6 +42,7 @@ add_library(duet_core STATIC
     claude/EffectiveSettings.cpp
     claude/HookEvent.cpp
     claude/HookServer.cpp
+    claude/NewAgentPopup.cpp
     claude/mcp/CodeTools.cpp
     claude/mcp/EditorTools.cpp
     claude/mcp/GitTools.cpp
@@ -168,6 +171,7 @@ add_library(duet_core STATIC
     ui/HoverCloseButtons.cpp
     ui/HoverProgress.cpp
     ui/KdeThemes.cpp
+    ui/MessagePopup.cpp
     ui/Motion.cpp
     ui/NoticeBar.cpp
     ui/OverlayPopup.cpp

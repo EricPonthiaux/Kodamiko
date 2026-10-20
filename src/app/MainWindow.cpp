@@ -8,8 +8,10 @@
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
+#include "claude/AgentCheckPopup.h"
 #include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLinter.h"
+#include "claude/NewAgentPopup.h"
 #include "claude/mcp/DuetTools.h"
 #include "completion/CodeGeneration.h"
 #include "completion/CompletionController.h"
@@ -47,6 +49,7 @@
 #include "ui/DetachablePage.h"
 #include "ui/GripSplitter.h"
 #include "ui/HoverCloseButtons.h"
+#include "ui/MessagePopup.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -325,6 +328,13 @@ void MainWindow::createPopups()
     connect(branchesPopup_, &BranchesPopup::newBranchRequested, this, &MainWindow::showNewBranch);
     stashesPopup_ = new StashesPopup(gitActions_, theme_, this);
     connect(newBranchPopup_, &NewBranchPopup::createRequested, this, &MainWindow::createBranch);
+    newAgentPopup_ = new NewAgentPopup(theme_, this);
+    connect(newAgentPopup_, &NewAgentPopup::startRequested, this, &MainWindow::createAgentWorktree);
+    closeAgentPopup_ = new CloseAgentPopup(theme_, this);
+    connect(closeAgentPopup_, &CloseAgentPopup::fateChosen, this, &MainWindow::closeAgentTab);
+    agentCheckPopup_ = new AgentCheckPopup(theme_, this);
+    connect(agentCheckPopup_, &AgentCheckPopup::saved, this, &MainWindow::setAgentCheckCommand);
+    agentMessage_ = new MessagePopup(QStringLiteral("claude"), QStringLiteral("agentMessage"), theme_, this);
     findInFiles_ = new FindInFilesPopup(theme_, this);
     findInFiles_->setBufferProvider([this] { return editorTabs_->unsavedTexts(); });
     connect(findInFiles_, &FindInFilesPopup::matchChosen, this,

@@ -4,7 +4,9 @@
 // own (see Worktrees), in a terminal tab of its own.
 
 #include "MainWindow.h"
+#include "claude/AgentCheckPopup.h"
 #include "claude/ClaudeLauncher.h"
+#include "claude/NewAgentPopup.h"
 #include "editor/EditorTabs.h"
 #include "git/FileChange.h"
 #include "git/FileStatuses.h"
@@ -13,12 +15,10 @@
 #include "git/Worktrees.h"
 #include "projects/ProjectStore.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/MessagePopup.h"
 
 #include <QFileInfo>
-#include <QInputDialog>
-#include <QMessageBox>
 #include <QPointer>
-#include <QPushButton>
 #include <QTabWidget>
 #include <QTimer>
 #include <QUuid>
@@ -26,13 +26,6 @@
 #include <memory>
 
 namespace {
-
-enum class WorktreeFate {
-    Keep,
-    Delete,
-    MergeAndDelete, // its changes committed, merged, then the worktree goes
-    Cancel,         // the tab stays open
-};
 
 // Apart from the paste: an Enter read with the pasted text may be taken for
 // a new line in the prompt (as in MainWindow::typeInClaudePrompt).
@@ -72,28 +65,6 @@ void submitToAgent(TerminalWidget *terminal, const QString &text)
     QTimer::singleShot(submitDelayMs, terminal, &TerminalWidget::pressEnter);
 }
 
-// What to do with the worktree of a closing session that holds work.
-WorktreeFate askWorktreeFate(QWidget *parent, const Worktree &worktree)
-{
-    QMessageBox box(QMessageBox::Question, QObject::tr("Close %1").arg(worktree.name),
-                    QObject::tr("The worktree of %1 holds changes or commits that are not merged.\n\n"
-                                "Folder: %2\nBranch: %3")
-                        .arg(worktree.name, worktree.path, worktree.branch),
-                    QMessageBox::Cancel, parent);
-    const QPushButton *merge = box.addButton(QObject::tr("Merge and Delete"), QMessageBox::AcceptRole);
-    const QPushButton *keep = box.addButton(QObject::tr("Keep the Worktree"), QMessageBox::AcceptRole);
-    const QPushButton *remove = box.addButton(QObject::tr("Delete the Worktree"), QMessageBox::DestructiveRole);
-    box.setDefaultButton(QMessageBox::Cancel);
-    box.exec();
-    if (box.clickedButton() == merge)
-        return WorktreeFate::MergeAndDelete;
-    if (box.clickedButton() == keep)
-        return WorktreeFate::Keep;
-    if (box.clickedButton() == remove)
-        return WorktreeFate::Delete;
-    return WorktreeFate::Cancel;
-}
-
 } // namespace
 
 void MainWindow::newAgentSession()
@@ -109,31 +80,31 @@ void MainWindow::newAgentSession()
         return;
     }
     if (!repository || repository->unborn) {
-        QMessageBox::information(this, tr("New Claude Session in Worktree"),
-                                 tr("A Claude session besides the main one works in a git worktree: open a folder "
-                                    "of a git repository that has at least one commit."));
+        agentMessage_->popup(tr("New Claude Session in Worktree"),
+                             tr("A Claude session besides the main one works in a git worktree: open a folder of a "
+                                "git repository that has at least one commit."));
         return;
     }
-    QString label = tr("Name of the session, of its worktree and of its branch (duet/<name>):");
     // The statuses also list the ignored folders, for the tree to dim them.
     const bool hasUncommittedChanges =
         std::ranges::any_of(fileStatuses_->statuses(), [](FileStatus status) { return status != FileStatus::Ignored; });
-    if (hasUncommittedChanges)
-        label += QLatin1Char('\n') + tr("The worktree starts from the last commit: your uncommitted changes will "
-                                        "not be in it.");
-    bool accepted = false;
-    const QString name = QInputDialog::getText(this, tr("New Claude Session in Worktree"), label, QLineEdit::Normal,
-                                               suggestedName, &accepted)
-                             .trimmed();
-    if (!accepted || name.isEmpty())
-        return;
+    newAgentPopup_->popup(suggestedName, hasUncommittedChanges ? NewAgentPopup::UncommittedChanges::Some
+                                                               : NewAgentPopup::UncommittedChanges::None);
+}
+
+void MainWindow::createAgentWorktree(const QString &name)
+{
     // Filled by the job, off the UI thread, then read on it once the job
     // succeeded: shared by the two.
     const auto worktree = std::make_shared<Worktree>();
     gitCommands_->run(
         tr("New worktree"),
-        [repository = *repository, name, worktree] {
-            *worktree = Worktrees::add(repository, name);
+        [folder = folder_, name, worktree] {
+            // Read again: the folder may have changed while the popup was open.
+            const std::optional<RepositoryInfo> repository = RepositoryInfo::read(folder);
+            if (!repository)
+                throw GitError(QObject::tr("The folder is not in a git repository"));
+            *worktree = Worktrees::add(*repository, name);
             return QObject::tr("Worktree %1 created on the branch %2").arg(worktree->name, worktree->branch);
         },
         [this, worktree] { startAgentSession(*worktree); });
@@ -154,8 +125,7 @@ void MainWindow::startAgentSession(const Worktree &worktree)
     const std::optional<ProcessSpec> spec =
         ClaudeLauncher::claudeProcess(worktree.path, hookServer_.serverName(), &error, options);
     if (!spec) {
-        QMessageBox::warning(this, tr("Claude Session"),
-                             tr("%1\n\nThe worktree stays in %2.").arg(error, worktree.path));
+        agentMessage_->popup(tr("Claude Session"), tr("%1\n\nThe worktree stays in %2.").arg(error, worktree.path));
         return;
     }
     TerminalWidget *terminal = addTerminal(tr("Claude · %1").arg(worktree.name), *spec);
@@ -180,30 +150,37 @@ void MainWindow::closeAgentSession(TerminalWidget *terminal)
             if (!error.isEmpty())
                 showStatus(tr("Could not inspect the worktree %1: %2").arg(worktree.path, error));
             if (tab)
-                endAgentSession(tab, worktree, *hasWork); // an unreadable worktree counts as holding work
+                endAgentSession(worktree, *hasWork); // an unreadable worktree counts as holding work
         });
 }
 
-void MainWindow::endAgentSession(TerminalWidget *terminal, const Worktree &worktree, bool hasWork)
+void MainWindow::endAgentSession(const Worktree &worktree, bool hasWork)
 {
-    const WorktreeFate fate = hasWork ? askWorktreeFate(this, worktree) : WorktreeFate::Delete;
-    if (fate == WorktreeFate::Cancel)
-        return;
-    const AgentSessions::Agent *agent = agentSessions_.find(terminal);
+    if (hasWork)
+        closeAgentPopup_->popup(worktree); // answered in closeAgentTab()
+    else
+        closeAgentTab(worktree, CloseAgentPopup::WorktreeFate::Delete);
+}
+
+void MainWindow::closeAgentTab(const Worktree &worktree, CloseAgentPopup::WorktreeFate fate)
+{
+    // The tab may have gone while the popup was open (its session ended).
+    const AgentSessions::Agent *agent = agentSessions_.findByName(worktree.name);
     const QString lastPrompt = agent ? agent->lastPrompt : QString();
-    terminalTabs_->removeTab(terminalTabs_->indexOf(terminal));
-    terminal->terminate();
-    terminal->deleteLater();
-    updateTerminalPage();
+    if (TerminalWidget *terminal = agent ? agent->terminal.data() : nullptr) {
+        terminalTabs_->removeTab(terminalTabs_->indexOf(terminal));
+        terminal->terminate();
+        terminal->deleteLater();
+        updateTerminalPage();
+    }
     switch (fate) {
-    case WorktreeFate::Delete:
+    case CloseAgentPopup::WorktreeFate::Delete:
         removeAgentWorktree(worktree);
         break;
-    case WorktreeFate::MergeAndDelete:
+    case CloseAgentPopup::WorktreeFate::MergeAndDelete:
         mergeAgentWork(worktree, lastPrompt, AgentMergeQueue::AfterMerge::RemoveWorktree);
         break;
-    case WorktreeFate::Keep:
-    case WorktreeFate::Cancel:
+    case CloseAgentPopup::WorktreeFate::Keep:
         showStatus(tr("Worktree kept in %1, on the branch %2").arg(worktree.path, worktree.branch));
         break;
     }
@@ -286,17 +263,12 @@ void MainWindow::mergeAgentWork(const Worktree &worktree,
 
 void MainWindow::editAgentCheckCommand()
 {
-    // The dialog's label takes "&" for a shortcut marker: doubled, it shows.
-    QString example = QStringLiteral("cmake -B build && cmake --build build && ctest --test-dir build");
-    example.replace(QLatin1Char('&'), QStringLiteral("&&"));
-    const QString label =
-        tr("Command run in an agent's worktree before its commits are merged; empty: none.\nExample: %1").arg(example);
-    bool accepted = false;
-    const QString command = QInputDialog::getText(this, tr("Check Before Merging Agents"), label, QLineEdit::Normal,
-                                                  project_.agentCheckCommand, &accepted);
-    if (!accepted)
-        return;
-    project_.agentCheckCommand = command.trimmed();
+    agentCheckPopup_->popup(project_.agentCheckCommand);
+}
+
+void MainWindow::setAgentCheckCommand(const QString &command)
+{
+    project_.agentCheckCommand = command;
     ProjectStore::save(project_);
     agentMerges_->setCheckCommand(project_.agentCheckCommand);
 }
@@ -333,7 +305,7 @@ void MainWindow::onAgentMergeFailed(const Worktree &worktree, const QString &mes
 {
     showStatus(tr("%1's work was not merged; its worktree stays in %2").arg(worktree.name, worktree.path));
     notify(tr("Agent work not merged"), message);
-    QMessageBox::warning(this, tr("Merge %1").arg(worktree.name),
+    agentMessage_->popup(tr("Merge %1").arg(worktree.name),
                          tr("%1's work was not merged into the current branch.\n\n%2\n\nIts worktree stays in %3, "
                             "on the branch %4: use Claude ▸ Merge Agent's Work once the problem is solved.")
                              .arg(worktree.name, message, worktree.path, worktree.branch));

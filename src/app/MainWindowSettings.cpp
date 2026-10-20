@@ -8,8 +8,10 @@
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
+#include "claude/AgentCheckPopup.h"
 #include "claude/ClaudeConfigView.h"
 #include "claude/EditorContext.h"
+#include "claude/NewAgentPopup.h"
 #include "claude/mcp/DuetTools.h"
 #include "completion/CompletionController.h"
 #include "completion/CompletionService.h"
@@ -29,6 +31,7 @@
 #include "terminal/TerminalWidget.h"
 #include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
+#include "ui/MessagePopup.h"
 #include "ui/Motion.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
@@ -94,6 +97,10 @@ void MainWindow::setTheme(const QString &name)
     newBranchPopup_->applyTheme(theme_);
     branchesPopup_->applyTheme(theme_);
     stashesPopup_->applyTheme(theme_);
+    newAgentPopup_->applyTheme(theme_);
+    closeAgentPopup_->applyTheme(theme_);
+    agentCheckPopup_->applyTheme(theme_);
+    agentMessage_->applyTheme(theme_);
     if (prerequisitesPopup_)
         prerequisitesPopup_->applyTheme(theme_);
     if (modeTabs_) {

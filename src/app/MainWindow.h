@@ -5,6 +5,7 @@
 #include "claude/AgentMergeQueue.h"
 #include "claude/AgentSessions.h"
 #include "claude/ClaudeActivity.h"
+#include "claude/CloseAgentPopup.h"
 #include "claude/CodeRequest.h"
 #include "claude/HookServer.h"
 #include "claude/mcp/McpRegistry.h"
@@ -20,6 +21,7 @@
 #include <memory>
 #include <optional>
 
+class AgentCheckPopup;
 class AskpassServer;
 class BranchesPopup;
 class ChangesView;
@@ -44,6 +46,8 @@ class GoToPopup;
 class HistoryView;
 class LanguageServers;
 class LocalFullLineModel;
+class MessagePopup;
+class NewAgentPopup;
 class NewBranchPopup;
 class NewProjectPopup;
 class NoticeBar;
@@ -193,11 +197,15 @@ private:
     // Claude ▸ New Claude Session in Worktree: any session besides the main
     // one works in a worktree of its own, never in the user's checkout.
     void newAgentSession();
+    void createAgentWorktree(const QString &name);
     void startAgentSession(const Worktree &worktree);
     // Closing an agent's tab: its worktree goes when it holds no work; else
-    // the user keeps it or deletes it.
+    // the user merges it, keeps it or deletes it (closeAgentPopup_, which
+    // asks for each closed tab in turn).
     void closeAgentSession(TerminalWidget *terminal);
-    void endAgentSession(TerminalWidget *terminal, const Worktree &worktree, bool hasWork);
+    void endAgentSession(const Worktree &worktree, bool hasWork);
+    // Closes the agent's tab, if it is still open, then does `fate`.
+    void closeAgentTab(const Worktree &worktree, CloseAgentPopup::WorktreeFate fate);
     void removeAgentWorktree(const Worktree &worktree);
     // An agent's hook: its activity, and its new commits to the merge queue
     // when it finished a response. False for a hook of the main session.
@@ -210,6 +218,7 @@ private:
     void mergeAgentWork(const Worktree &worktree, const QString &lastPrompt, AgentMergeQueue::AfterMerge afterMerge);
     // Claude ▸ Check Before Merging Agents: the project's check command.
     void editAgentCheckCommand();
+    void setAgentCheckCommand(const QString &command);
     void onAgentMerged(const Worktree &worktree,
                        const QString &branch,
                        const QString &head,
@@ -449,6 +458,12 @@ private:
     NewBranchPopup *newBranchPopup_ = nullptr;
     BranchesPopup *branchesPopup_ = nullptr;
     StashesPopup *stashesPopup_ = nullptr;
+    NewAgentPopup *newAgentPopup_ = nullptr;
+    CloseAgentPopup *closeAgentPopup_ = nullptr;
+    AgentCheckPopup *agentCheckPopup_ = nullptr;
+    // What the agents' sessions and merges have to tell the user, one
+    // message after the other.
+    MessagePopup *agentMessage_ = nullptr;
     RecentFiles recentFiles_;
     PrerequisitesPopup *prerequisitesPopup_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;
