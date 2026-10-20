@@ -31,6 +31,7 @@
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
 #include "ui/WindowFrame.h"
+#include "welcome/NewProjectPopup.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "workspace/FileTreeView.h"
 #include "workspace/FilesPanel.h"
@@ -80,6 +81,8 @@ void MainWindow::setTheme(const QString &name)
     toolsNotice_->applyTheme(theme_);
     if (projectSettings_)
         projectSettings_->applyTheme(theme_);
+    if (newProjectPopup_)
+        newProjectPopup_->applyTheme(theme_);
     if (preferencesPopup_)
         preferencesPopup_->applyTheme(theme_);
     snapshotsPopup_->applyTheme(theme_);

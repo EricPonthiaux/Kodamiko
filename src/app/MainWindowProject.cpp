@@ -26,6 +26,7 @@
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/UiIcons.h"
+#include "welcome/NewProjectPopup.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "welcome/ProjectSetupForm.h"
 #include "workspace/FileTreeView.h"
@@ -132,6 +133,23 @@ void MainWindow::chooseFolder()
     openFolder(folder);
     // A new project: its detected setup, to check.
     if (imported && folder_ == QDir(folder).absolutePath())
+        showProjectSettings();
+}
+
+void MainWindow::showNewProject()
+{
+    if (!newProjectPopup_) {
+        newProjectPopup_ = new NewProjectPopup(theme_, this);
+        connect(newProjectPopup_, &NewProjectPopup::created, this, &MainWindow::openNewProject);
+    }
+    newProjectPopup_->popup();
+}
+
+void MainWindow::openNewProject(const QString &folder)
+{
+    openFolder(folder);
+    // Its setup, detected from the template's files, to check.
+    if (folder_ == QDir(folder).absolutePath())
         showProjectSettings();
 }
 

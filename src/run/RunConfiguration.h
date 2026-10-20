@@ -5,13 +5,14 @@
 #include <QMap>
 #include <QString>
 
-// A command the project is built, run or tested with, in the manner of
+// A command the project is built, run, debugged or tested with, in the manner of
 // IntelliJ's run configurations: run by the system's shell in a terminal
 // tab, from a folder of the project.
 struct RunConfiguration {
     enum class Kind {
         Build,
         Run,
+        Debug, // runs the program under a debugger, or waiting for one
         Test
     };
 
@@ -29,7 +30,7 @@ struct RunConfiguration {
 
 namespace RunConfigurations {
 
-// "build", "run", "test", and back (Run for an unknown name).
+// "build", "run", "debug", "test", and back (Run for an unknown name).
 QString kindName(RunConfiguration::Kind kind);
 RunConfiguration::Kind kindNamed(const QString &name);
 

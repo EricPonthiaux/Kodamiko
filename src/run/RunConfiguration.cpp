@@ -205,6 +205,8 @@ QString kindName(RunConfiguration::Kind kind)
     switch (kind) {
     case RunConfiguration::Kind::Build:
         return QStringLiteral("build");
+    case RunConfiguration::Kind::Debug:
+        return QStringLiteral("debug");
     case RunConfiguration::Kind::Test:
         return QStringLiteral("test");
     case RunConfiguration::Kind::Run:
@@ -217,6 +219,8 @@ RunConfiguration::Kind kindNamed(const QString &name)
 {
     if (name == QLatin1String("build"))
         return RunConfiguration::Kind::Build;
+    if (name == QLatin1String("debug"))
+        return RunConfiguration::Kind::Debug;
     if (name == QLatin1String("test"))
         return RunConfiguration::Kind::Test;
     return RunConfiguration::Kind::Run;

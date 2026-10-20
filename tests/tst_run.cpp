@@ -75,7 +75,11 @@ private slots:
         test.name = "Tests";
         test.kind = RunConfiguration::Kind::Test;
         test.command = "ctest";
-        const QList<RunConfiguration> configurations{build, test};
+        RunConfiguration debug;
+        debug.name = "Debug";
+        debug.kind = RunConfiguration::Kind::Debug;
+        debug.command = "gdb build/app";
+        const QList<RunConfiguration> configurations{build, test, debug};
         QCOMPARE(RunConfigurations::parse(RunConfigurations::serialize(configurations)), configurations);
 
         // Entries without a name or a command are skipped; an unknown kind runs.

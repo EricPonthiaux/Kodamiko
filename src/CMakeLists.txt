@@ -23,6 +23,7 @@ add_library(duet_core STATIC
     claude/ClaudeLint.cpp
     claude/ClaudeLinter.cpp
     claude/ClaudeLauncher.cpp
+    claude/ClaudeTrust.cpp
     claude/ClaudeUsage.cpp
     claude/CodeRequest.cpp
     claude/CommitMessage.cpp
@@ -113,6 +114,7 @@ add_library(duet_core STATIC
     projects/ProjectConfig.cpp
     projects/ProjectDetector.cpp
     projects/ProjectStore.cpp
+    projects/ProjectTemplates.cpp
     run/BuildOutputParser.cpp
     run/RunConfiguration.cpp
     run/RunConfigurationMenu.cpp
@@ -171,6 +173,8 @@ add_library(duet_core STATIC
     viewers/DiagramKinds.cpp
     viewers/ImageView.cpp
     welcome/LanguageChoices.cpp
+    welcome/NewProjectForm.cpp
+    welcome/NewProjectPopup.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
     welcome/ProjectSetupPanel.cpp

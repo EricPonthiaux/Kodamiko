@@ -51,6 +51,7 @@ void MainWindow::createMenus()
 void MainWindow::createFileMenu()
 {
     QMenu *file = titleBar_->menuBar()->addMenu(tr("&File"));
+    file->addAction(tr("New &Project…"), this, &MainWindow::showNewProject);
     file->addAction(tr("&New File…"), QKeySequence::New, this, [this] {
         setMode(Mode::Edit);
         fileTree_->createFile();
@@ -351,6 +352,7 @@ void MainWindow::updateProjectMenu()
     projectMenu_->setToolTipsVisible(true);
     if (listed > 0)
         projectMenu_->addSeparator();
+    projectMenu_->addAction(tr("New Project…"), this, &MainWindow::showNewProject);
     projectMenu_->addAction(tr("Open Folder…"), QKeySequence(tr("Ctrl+K, Ctrl+O")), this, &MainWindow::chooseFolder);
     projectMenu_->addAction(tr("Close Project"), this, &MainWindow::closeProject);
     titleBar_->setProject(QFileInfo(folder_).fileName(), QDir::toNativeSeparators(folder_), projectMenu_);

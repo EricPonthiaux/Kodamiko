@@ -379,14 +379,14 @@ private slots:
         QTRY_VERIFY(extension->isVisible());
     }
 
-    void claudeIndicatorKeepsItsWidthAcrossStates()
+    void claudeIndicatorKeepsItsSizeAcrossStates()
     {
         ClaudeIndicator indicator;
-        const int readyWidth = indicator.sizeHint().width();
+        const QSize readySize = indicator.sizeHint();
 
         indicator.setStatus(ClaudeIndicator::Status::NeedsYou);
 
-        QCOMPARE(indicator.sizeHint().width(), readyWidth);
+        QCOMPARE(indicator.sizeHint(), readySize);
     }
 
     void claudeIndicatorTakesItsColorsFromTheTheme()

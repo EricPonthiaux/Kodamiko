@@ -1,10 +1,14 @@
+#include "claude/ClaudeTrust.h"
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
 #include "projects/ProjectStore.h"
+#include "projects/ProjectTemplates.h"
+#include "run/RunConfiguration.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Installer.h"
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
+#include "welcome/NewProjectForm.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "welcome/ProjectSetupForm.h"
 #include "welcome/ProjectSetupPanel.h"
@@ -15,7 +19,10 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QProcess>
 #include <QPushButton>
@@ -87,9 +94,17 @@ private slots:
         QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_projects"));
         QSettings().clear();
+        // Claude's state of the tests, not the user's ~/.claude.json.
+        qputenv("CLAUDE_CONFIG_DIR", claudeConfig_.path().toUtf8());
     }
 
-    void cleanup() { QSettings().clear(); }
+    void cleanupTestCase() { qunsetenv("CLAUDE_CONFIG_DIR"); }
+
+    void cleanup()
+    {
+        QSettings().clear();
+        QFile::remove(claudeConfig_.filePath(".claude.json"));
+    }
 
     void parsesJavaVersions()
     {
@@ -503,6 +518,177 @@ private slots:
         QCOMPARE(chosen.first().first().value<ProjectConfig>().path, dir.filePath("alpha"));
     }
 
+    void templateIsDetectedWithItsRuntime_data()
+    {
+        QTest::addColumn<QString>("family");
+        QTest::addColumn<QString>("runtimeVersion");
+        for (const QString family : {"cpp", "java", "javascript"})
+            QTest::newRow(qPrintable(family)) << family << ToolCatalog::defaultRuntimeVersion(family);
+        QTest::newRow("python") << QString("python") << QString("3.12");
+    }
+
+    void templateIsDetectedWithItsRuntime()
+    {
+        QFETCH(QString, family);
+        QFETCH(QString, runtimeVersion);
+        const QTemporaryDir dir;
+        QString error;
+
+        QVERIFY2(ProjectTemplates::create(family, dir.filePath("My App"), &error), qPrintable(error));
+
+        const QList<DetectedLanguage> found = ProjectDetector::detect(dir.filePath("My App"));
+        QCOMPARE(found.size(), 1);
+        QCOMPARE(found.first().language, family);
+        QCOMPARE(found.first().runtimeVersion, runtimeVersion);
+    }
+
+    void templateConfiguresBuildRunAndDebug_data()
+    {
+        QTest::addColumn<QString>("family");
+        for (const QString &family : ProjectLanguages::families())
+            QTest::newRow(qPrintable(family)) << family;
+    }
+
+    void templateConfiguresBuildRunAndDebug()
+    {
+        QFETCH(QString, family);
+        const QTemporaryDir dir;
+        QString error;
+        QVERIFY2(ProjectTemplates::create(family, dir.filePath("My App"), &error), qPrintable(error));
+        QFile file(RunConfigurations::filePath(dir.filePath("My App")));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+
+        const QList<RunConfiguration> configurations = RunConfigurations::parse(file.readAll(), &error);
+
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QList<RunConfiguration::Kind> kinds;
+        for (const RunConfiguration &configuration : configurations)
+            kinds.append(configuration.kind);
+        const QList<RunConfiguration::Kind> expected{RunConfiguration::Kind::Build, RunConfiguration::Kind::Run,
+                                                     RunConfiguration::Kind::Debug};
+        QCOMPARE(kinds, expected);
+        QVERIFY(!configurations.last().command.contains("{{"));
+    }
+
+    void namesTheTemplateFilesAfterTheFolder()
+    {
+        const QTemporaryDir dir;
+        QString error;
+
+        QVERIFY(ProjectTemplates::create("python", dir.filePath("My App"), &error));
+
+        QVERIFY(QFileInfo::exists(dir.filePath("My App/src/my_app/__main__.py")));
+        QFile pyproject(dir.filePath("My App/pyproject.toml"));
+        QVERIFY(pyproject.open(QIODevice::ReadOnly));
+        QVERIFY(pyproject.readAll().contains("name = \"my_app\""));
+    }
+
+    void makesAnIdentifierOfTheProjectName()
+    {
+        QCOMPARE(ProjectTemplates::identifierOf("My App!"), QString("my_app"));
+        QCOMPARE(ProjectTemplates::identifierOf("--web-front--"), QString("web_front"));
+        QCOMPARE(ProjectTemplates::identifierOf("2048"), QString("project_2048"));
+        QCOMPARE(ProjectTemplates::identifierOf("Éclair"), QString("clair"));
+        QCOMPARE(ProjectTemplates::identifierOf("???"), QString("project"));
+    }
+
+    void templateRefusesAFolderThatIsNotEmpty()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("taken/notes.txt"), "keep me");
+        QString error;
+
+        QVERIFY(!ProjectTemplates::create("cpp", dir.filePath("taken"), &error));
+
+        QVERIFY(!error.isEmpty());
+        QVERIFY(!QFileInfo::exists(dir.filePath("taken/CMakeLists.txt")));
+    }
+
+    void newProjectFormCreatesTheProjectWithARepository()
+    {
+        const QTemporaryDir dir;
+        NewProjectForm form;
+        form.nameEdit()->setText("demo");
+        form.locationEdit()->setText(dir.path());
+        form.templateList()->setCurrentRow(1); // C++
+        form.gitCheck()->setChecked(true);
+        QSignalSpy created(&form, &NewProjectForm::created);
+
+        form.createButton()->click();
+
+        QCOMPARE(created.size(), 1);
+        QCOMPARE(created.first().first().toString(), dir.filePath("demo"));
+        QVERIFY(QFileInfo::exists(dir.filePath("demo/CMakeLists.txt")));
+        QVERIFY(QFileInfo(dir.filePath("demo/.git")).isDir());
+        const std::optional<ProjectConfig> project = ProjectStore::find(dir.filePath("demo"));
+        QVERIFY(project.has_value());
+        QVERIFY(!project->configured); // its languages are chosen next
+        QVERIFY(ClaudeTrust::isTrusted(dir.filePath("demo")));
+    }
+
+    void trustingAFolderKeepsTheRestOfClaudesState()
+    {
+        const QTemporaryDir dir;
+        write(claudeConfig_.filePath(".claude.json"),
+              R"({"theme": "dark", "projects": {"/elsewhere": {"hasTrustDialogAccepted": true}}})");
+        QString error;
+
+        QVERIFY2(ClaudeTrust::trust(dir.path(), &error), qPrintable(error));
+
+        QVERIFY(ClaudeTrust::isTrusted(dir.path()));
+        QVERIFY(ClaudeTrust::isTrusted("/elsewhere"));
+        QFile file(claudeConfig_.filePath(".claude.json"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(file.readAll()).object().value("theme").toString(), QString("dark"));
+    }
+
+    void trustLeavesAStateFileThatIsNotJsonAsItWas()
+    {
+        const QTemporaryDir dir;
+        write(claudeConfig_.filePath(".claude.json"), "{ nope");
+        QString error;
+
+        QVERIFY(!ClaudeTrust::trust(dir.path(), &error));
+
+        QVERIFY(!error.isEmpty());
+        QFile file(claudeConfig_.filePath(".claude.json"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("{ nope"));
+    }
+
+    void newProjectFormCannotCreateOverAnExistingFolder()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("demo/main.c"), "");
+        NewProjectForm form;
+        form.locationEdit()->setText(dir.path());
+
+        form.nameEdit()->setText("demo");
+        QVERIFY(!form.createButton()->isEnabled());
+        form.nameEdit()->setText("demo2");
+        QVERIFY(form.createButton()->isEnabled());
+        form.nameEdit()->setText("a/b");
+        QVERIFY(!form.createButton()->isEnabled());
+    }
+
+    void newProjectGoesOnToItsSetup()
+    {
+        const QTemporaryDir dir;
+        WelcomeWindow window;
+        window.showNewProject();
+        NewProjectForm *form = window.newProjectForm();
+        form->nameEdit()->setText("demo");
+        form->locationEdit()->setText(dir.path());
+        form->templateList()->setCurrentRow(0); // empty
+        form->gitCheck()->setChecked(false);
+
+        form->createButton()->click();
+
+        QVERIFY(QFileInfo(dir.filePath("demo")).isDir());
+        QVERIFY(!QFileInfo::exists(dir.filePath("demo/.git")));
+        QVERIFY(window.findChild<ProjectSetupPanel *>()->isVisibleTo(&window));
+    }
+
     // Downloads for real: DUET_NETWORK_TESTS=1.
     void downloadsNodeAndPyright()
     {
@@ -524,6 +710,9 @@ private slots:
         QVERIFY(toolchains.runtime("node", "24"));
         QVERIFY(QFileInfo::exists(toolchains.installedExecutable("pyright", "1.1.414")));
     }
+
+private:
+    QTemporaryDir claudeConfig_;
 };
 
 QTEST_MAIN(TestProjects)

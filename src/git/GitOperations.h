@@ -36,6 +36,10 @@ void discardPatch(const RepositoryInfo &repository, const QStringList &paths, co
 // abbreviated identifier of the created commit.
 QString commit(const RepositoryInfo &repository, const QString &message, bool amend);
 
+// Creates an empty repository in `folder` ("git init"): its branch is the
+// one the user's init.defaultBranch names.
+void init(const QString &folder);
+
 // Deletes a file from the working directory, along with the folders above
 // it that become empty.
 void removeFile(const QString &workDir, const QString &path);

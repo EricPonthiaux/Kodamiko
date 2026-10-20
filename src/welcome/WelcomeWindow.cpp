@@ -1,5 +1,6 @@
 #include "WelcomeWindow.h"
 
+#include "NewProjectForm.h"
 #include "ProjectSetupForm.h"
 #include "ProjectSetupPanel.h"
 #include "projects/ProjectStore.h"
@@ -141,6 +142,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , search_(new QLineEdit(this))
     , list_(new QListWidget(this))
     , setup_(new ProjectSetupPanel(toolchains_.get(), ProjectSetupPanel::Purpose::FirstSetup, this))
+    , newProject_(new NewProjectForm(this))
 {
     const Preferences preferences = Preferences::load();
     theme_ = Theme::named(preferences.theme);
@@ -180,7 +182,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     hint->setWordWrap(true);
     sideLayout->addWidget(hint);
 
-    // The projects page: search, import, the list.
+    // The projects page: search, new, import, the list.
     auto *projects = new QWidget(this);
     projects->installEventFilter(this);
     search_->setObjectName(QStringLiteral("welcomeSearch"));
@@ -188,12 +190,15 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     search_->setClearButtonEnabled(true);
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &WelcomeWindow::filter);
+    auto *create = new QPushButton(tr("New Project…"), projects);
+    connect(create, &QPushButton::clicked, this, &WelcomeWindow::showNewProject);
     auto *import = new QPushButton(tr("Import Project…"), projects);
     import->setDefault(true);
     connect(import, &QPushButton::clicked, this, &WelcomeWindow::importProject);
     auto *top = new QHBoxLayout;
     top->setSpacing(8);
     top->addWidget(search_, 1);
+    top->addWidget(create);
     top->addWidget(import);
     // Duet's frame has no title bar: a close button of its own.
     auto *close = new WindowButton(WindowButton::Kind::Close, projects);
@@ -224,11 +229,12 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     pages_->addWidget(setup_);
     setup_->applyTheme(theme_);
     connect(setup_, &ProjectSetupPanel::done, this, &WelcomeWindow::projectChosen);
-    connect(setup_, &ProjectSetupPanel::cancelled, this, [this] {
-        reload();
-        pages_->setCurrentIndex(0);
-        search_->setFocus();
-    });
+    connect(setup_, &ProjectSetupPanel::cancelled, this, &WelcomeWindow::showProjects);
+    pages_->addWidget(newProject_);
+    newProject_->applyTheme(theme_);
+    connect(newProject_, &NewProjectForm::cancelled, this, &WelcomeWindow::showProjects);
+    // Its languages, detected from the template's files, to check.
+    connect(newProject_, &NewProjectForm::created, this, &WelcomeWindow::configure);
 
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -332,6 +338,19 @@ void WelcomeWindow::configure(const QString &path)
     pages_->setCurrentIndex(1);
 }
 
+void WelcomeWindow::showProjects()
+{
+    reload();
+    pages_->setCurrentIndex(0);
+    search_->setFocus();
+}
+
+void WelcomeWindow::showNewProject()
+{
+    pages_->setCurrentWidget(newProject_);
+    newProject_->reset();
+}
+
 void WelcomeWindow::importProject()
 {
     const QString folder = QFileDialog::getExistingDirectory(this, tr("Import Project"), QDir::homePath());
@@ -400,6 +419,10 @@ void WelcomeWindow::keyPressEvent(QKeyEvent *event)
             close();
             return;
         }
+    }
+    if (pages_->currentWidget() == newProject_ && event->key() == Qt::Key_Escape) {
+        showProjects();
+        return;
     }
     QWidget::keyPressEvent(event);
 }

@@ -40,6 +40,7 @@ class HistoryView;
 class LanguageServers;
 class LocalFullLineModel;
 class NewBranchPopup;
+class NewProjectPopup;
 class NoticeBar;
 class OutlineView;
 class PreferencesPopup;
@@ -167,6 +168,9 @@ private:
     void saveSession();
     void restoreSession();
     void chooseFolder();
+    // File ▸ New Project; the project created opens with its setup to check.
+    void showNewProject();
+    void openNewProject(const QString &folder);
     void chooseFile();
     // File ▸ Project Settings.
     void showProjectSettings();
@@ -335,6 +339,7 @@ private:
     std::unique_ptr<Toolchains> toolchains_;
     ProjectConfig project_;
     ProjectSettingsPopup *projectSettings_ = nullptr;
+    NewProjectPopup *newProjectPopup_ = nullptr; // built on first use
     NoticeBar *toolsNotice_ = nullptr;
     bool closingProject_ = false;
     NoticeBar *serverNotice_ = nullptr;

@@ -7,7 +7,7 @@
 // "plus", "minus", "discard", "refresh", "terminal", "code", "diff",
 // "history", "files", "outline", "claude", "locate", "appearance",
 // "keyboard", "settings", "collapse-all", "more", "run", "stop", "build",
-// "test", "problems", "check", "document", "split", "preview", "arrange",
+// "debug", "test", "problems", "check", "document", "split", "preview", "arrange",
 // "fit", "export", "grid", "side-panel".
 namespace UiIcons {
 

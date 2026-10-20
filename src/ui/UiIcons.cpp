@@ -383,6 +383,18 @@ const QHash<QString, Painter> &painters()
                                       QPointF(6.4, 5.5), QPointF(4.8, 6.3)}));
              p.drawLine(QPointF(7.5, 6.6), QPointF(13.8, 12.9));
          }},
+        // A bug: its body, its head, three legs on each side.
+        {QStringLiteral("debug"),
+         [](QPainter &p) {
+             p.drawEllipse(QPointF(8, 9.4), 3.6, 4.6);
+             p.drawArc(QRectF(5.6, 2.4, 4.8, 4.4), 0, 180 * 16);
+             p.drawLines(QList<QLineF>{{QPointF(1.8, 6.2), QPointF(4.4, 7)},
+                                       {QPointF(1.8, 8.8), QPointF(4.4, 9.6)},
+                                       {QPointF(1.8, 11.4), QPointF(4.4, 12.2)},
+                                       {QPointF(11.6, 7), QPointF(14.2, 6.2)},
+                                       {QPointF(11.6, 9.6), QPointF(14.2, 8.8)},
+                                       {QPointF(11.6, 12.2), QPointF(14.2, 11.4)}});
+         }},
         // A flask.
         {QStringLiteral("test"),
          [](QPainter &p) {

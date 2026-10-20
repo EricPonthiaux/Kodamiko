@@ -30,13 +30,6 @@ QString managedDir()
 #endif
 }
 
-// The file holding Claude Code's state, user MCP servers included.
-QString stateFile()
-{
-    return qEnvironmentVariableIsSet("CLAUDE_CONFIG_DIR") ? QDir(configDir()).filePath(QStringLiteral(".claude.json"))
-                                                          : QDir::home().filePath(QStringLiteral(".claude.json"));
-}
-
 QByteArray readHead(const QString &path)
 {
     QFile file(path);
@@ -224,6 +217,12 @@ QString configDir()
 {
     return qEnvironmentVariableIsSet("CLAUDE_CONFIG_DIR") ? qEnvironmentVariable("CLAUDE_CONFIG_DIR")
                                                           : QDir::home().filePath(QStringLiteral(".claude"));
+}
+
+QString stateFile()
+{
+    return qEnvironmentVariableIsSet("CLAUDE_CONFIG_DIR") ? QDir(configDir()).filePath(QStringLiteral(".claude.json"))
+                                                          : QDir::home().filePath(QStringLiteral(".claude.json"));
 }
 
 QString autoMemoryDir(const QString &projectDir)

@@ -123,6 +123,11 @@ QString commit(const RepositoryInfo &repository, const QString &message, bool am
         .trimmed();
 }
 
+void init(const QString &folder)
+{
+    Git::run(folder, {QStringLiteral("init"), QStringLiteral("--quiet")});
+}
+
 void removeFile(const QString &workDir, const QString &path)
 {
     const QString absolute = QDir(workDir).filePath(path);

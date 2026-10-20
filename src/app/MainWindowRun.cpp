@@ -38,6 +38,8 @@ QLatin1String runKindIconName(RunConfiguration::Kind kind)
         return QLatin1String("build");
     case RunConfiguration::Kind::Run:
         return QLatin1String("run");
+    case RunConfiguration::Kind::Debug:
+        return QLatin1String("debug");
     case RunConfiguration::Kind::Test:
         return QLatin1String("test");
     }
@@ -143,6 +145,8 @@ void MainWindow::fillRunMenu(QMenu *menu, bool run)
         switch (configuration.kind) {
         case RunConfiguration::Kind::Build:
             return tr("Build");
+        case RunConfiguration::Kind::Debug:
+            return tr("Debug");
         case RunConfiguration::Kind::Test:
             return tr("Test");
         case RunConfiguration::Kind::Run:
@@ -279,7 +283,9 @@ void MainWindow::onRunFinished(const RunConfiguration &configuration, int exitCo
     showStatus(runFinishedMessage(configuration, exitCode, errors, warnings));
 
     const bool failed = exitCode != 0;
-    if (exitCode != -1 && configuration.kind != RunConfiguration::Kind::Run) {
+    const bool isBuildOrTest =
+        configuration.kind == RunConfiguration::Kind::Build || configuration.kind == RunConfiguration::Kind::Test;
+    if (exitCode != -1 && isBuildOrTest) {
         // A build or tests that went on out of sight.
         const bool hasProblemsToShow = errors > 0 || (failed && warnings > 0);
         if (mode_ == Mode::Edit && hasProblemsToShow)

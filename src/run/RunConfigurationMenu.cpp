@@ -26,6 +26,8 @@ QString iconOf(RunConfiguration::Kind kind)
     switch (kind) {
     case RunConfiguration::Kind::Build:
         return QStringLiteral("build");
+    case RunConfiguration::Kind::Debug:
+        return QStringLiteral("debug");
     case RunConfiguration::Kind::Test:
         return QStringLiteral("test");
     case RunConfiguration::Kind::Run:

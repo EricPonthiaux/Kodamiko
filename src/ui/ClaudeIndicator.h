@@ -5,11 +5,12 @@
 #include <QAbstractButton>
 #include <QTimer>
 
-// Claude's state in the title bar: [ ✳ Claude │ Working ], tinted like the
-// run block in the color of the state, at the same width whatever the state
-// so that the bar does not move. Its icon says the state without the color:
-// a star whose branches light up in turn while Claude works, a bubble when
-// it needs the user, a check when a response is ready, a dim star at rest.
+// Claude's state in the title bar: Claude's star alone, in a square tinted
+// like the run block in the color of the state. Its animation says the state
+// without the color: the branches light up in turn while Claude works, the
+// star breathes when Claude needs the user, it twinkles when a response
+// arrives then shines still, and stays dim at rest. The state's name is in
+// the tooltip.
 class ClaudeIndicator : public QAbstractButton {
     Q_OBJECT
 
@@ -38,15 +39,15 @@ protected:
 
 private:
     void paintBackground(QPainter &painter, const QColor &color) const;
-    void paintIcon(QPainter &painter, const QRectF &box, const QColor &color) const;
     void paintStar(QPainter &painter, const QRectF &box, const QColor &color) const;
-    void advanceLitBranch();
+    qreal branchOpacity(int branch) const;
+    void advanceFrame();
 
     Status status_ = Status::Ready;
     Theme theme_;
     bool hovered_ = false;
-    int litBranch_ = 0; // the brightest branch of the star, while working
-    QTimer sparkTimer_;
+    int frame_ = 0; // the animation's step since the state changed
+    QTimer animationTimer_;
 };
 
 // The color of `status` in `theme`: amber (the theme's warning) while Claude

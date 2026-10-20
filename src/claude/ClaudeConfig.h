@@ -50,6 +50,9 @@ struct Entry {
 
 // Claude Code's configuration folder: $CLAUDE_CONFIG_DIR, or ~/.claude.
 QString configDir();
+// The file holding Claude Code's state (user MCP servers, the folders the
+// user trusts...): $CLAUDE_CONFIG_DIR/.claude.json, or ~/.claude.json.
+QString stateFile();
 // The folder Claude keeps its own memory of `projectDir` in.
 QString autoMemoryDir(const QString &projectDir);
 

@@ -7,6 +7,7 @@
 
 #include <memory>
 
+class NewProjectForm;
 class ProjectSetupPanel;
 class QLineEdit;
 class QListWidget;
@@ -17,7 +18,8 @@ class WindowFrame;
 
 // The window Duet opens with, before the main one, in the manner of
 // IntelliJ's welcome screen: the projects opened before, to search and
-// reopen, and Import Project to add a folder. A project not set up yet
+// reopen, New Project to create one (NewProjectForm) and Import Project to
+// add a folder. A project not set up yet
 // gets its languages chosen first; then what it needs is downloaded, and
 // projectChosen comes.
 class WelcomeWindow : public QWidget {
@@ -36,6 +38,11 @@ public:
 
     QListWidget *projectList() const { return list_; }
 
+    // The New Project page, shown by its button. For tests.
+    NewProjectForm *newProjectForm() const { return newProject_; }
+
+    void showNewProject();
+
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 signals:
@@ -46,6 +53,7 @@ protected:
 
 private:
     void importProject();
+    void showProjects();
     void filter(const QString &text);
     // The languages `project` uses, as shown under its name; none until set up.
     static QStringList shownLanguages(const ProjectConfig &project);
@@ -59,4 +67,5 @@ private:
     QLineEdit *search_;
     QListWidget *list_;
     ProjectSetupPanel *setup_;
+    NewProjectForm *newProject_;
 };
