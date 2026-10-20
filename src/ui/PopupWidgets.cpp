@@ -186,7 +186,6 @@ ThemeCard::ThemeCard(const Theme &theme, QWidget *parent)
     , theme_(theme)
 {
     setCheckable(true);
-    setCursor(Qt::PointingHandCursor);
     setFocusPolicy(Qt::TabFocus);
     setToolTip(theme.title);
     // Narrower in a narrow popup: the four themes stay side by side.

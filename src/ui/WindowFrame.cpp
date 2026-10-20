@@ -68,7 +68,6 @@ void WindowFrame::setFrameless(bool frameless)
     // The native window is recreated with its new flags.
     window_->setAttribute(Qt::WA_TranslucentBackground, frameless);
     window_->setWindowFlag(Qt::FramelessWindowHint, frameless);
-    window_->setMouseTracking(frameless);
     updateMargins();
     if (visible)
         window_->show();
@@ -119,9 +118,19 @@ void WindowFrame::paint()
 
 bool WindowFrame::eventFilter(QObject *watched, QEvent *event)
 {
+    // The native window sees every move, over a child or not: the widget
+    // itself would miss the one leaving the shadow for a child, and its
+    // resize cursor would stay, inherited by every child.
+    if (watched == window_->windowHandle() && event->type() == QEvent::MouseMove)
+        updateCursor(static_cast<QMouseEvent *>(event));
     if (watched != window_)
         return false;
     switch (event->type()) {
+    case QEvent::Show:
+        // Each new native window (one per change of frame) is watched.
+        if (window_->windowHandle())
+            window_->windowHandle()->installEventFilter(this);
+        break;
     case QEvent::Paint:
         if (frameless_)
             paint();
@@ -134,9 +143,6 @@ bool WindowFrame::eventFilter(QObject *watched, QEvent *event)
         // A style sheet resets the margins (at each change of theme).
         if (frameless_)
             QMetaObject::invokeMethod(this, &WindowFrame::updateMargins, Qt::QueuedConnection);
-        break;
-    case QEvent::MouseMove:
-        updateCursor(static_cast<QMouseEvent *>(event));
         break;
     case QEvent::MouseButtonPress:
         return startResize(static_cast<QMouseEvent *>(event));
@@ -154,7 +160,15 @@ void WindowFrame::updateCursor(const QMouseEvent *mouse)
 {
     if (!drawsShadow() || mouse->buttons() != Qt::NoButton)
         return;
-    window_->setCursor(cursorFor(edgesAt(mouse->position().toPoint(), window_->size(), shadowWidth)));
+    // The native window's coordinates are the widget's.
+    const QPoint position = mouse->position().toPoint();
+    const Qt::Edges edges = edgesAt(position, window_->size(), shadowWidth);
+    // A child under the mouse takes the press, so it is not a resize.
+    const bool isOverFrame = edges && !window_->childAt(position);
+    if (isOverFrame)
+        window_->setCursor(cursorFor(edges));
+    else if (window_->testAttribute(Qt::WA_SetCursor))
+        window_->unsetCursor();
 }
 
 bool WindowFrame::startResize(const QMouseEvent *mouse)

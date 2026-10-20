@@ -74,7 +74,6 @@ ClaudeIndicator::ClaudeIndicator(QWidget *parent)
     , theme_(Theme::dark())
 {
     setFocusPolicy(Qt::NoFocus);
-    setCursor(Qt::PointingHandCursor);
     setAccessibleName(QStringLiteral("Claude: %1").arg(claudeStatusText(status_)));
     connect(&animationTimer_, &QTimer::timeout, this, &ClaudeIndicator::advanceFrame);
 }

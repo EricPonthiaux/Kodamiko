@@ -19,7 +19,6 @@ WindowButton::WindowButton(Kind kind, QWidget *parent)
     , theme_(Theme::dark())
 {
     setFocusPolicy(Qt::NoFocus);
-    setCursor(Qt::ArrowCursor);
 }
 
 QSize WindowButton::sizeHint() const

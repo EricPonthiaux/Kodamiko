@@ -120,9 +120,9 @@ void OverlayPopup::showCentered()
         applyMargins();
         place();
         parentWidget()->installEventFilter(watcher_); // window resized
-        // The window's own events: a press anywhere in it, whichever widget
-        // takes it.
-        if (behavior_ == Behavior::Transient && parentWidget()->windowHandle())
+        // The window's own events: a press or a move anywhere in it,
+        // whichever widget takes it.
+        if (parentWidget()->windowHandle())
             parentWidget()->windowHandle()->installEventFilter(watcher_);
     }
     show();
@@ -237,8 +237,21 @@ void OverlayPopup::onWatchedEvent(QObject *watched, QEvent *event)
 {
     if (watched == parentWidget() && event->type() == QEvent::Resize)
         place();
-    else if (isPressOutside(watched, event))
+    else if (behavior_ == Behavior::Transient && isPressOutside(watched, event))
         dismiss();
+    else if (event->type() == QEvent::MouseMove && watched == parentWidget()->windowHandle())
+        dropEdgeCursorOverChild(static_cast<QMouseEvent *>(event));
+}
+
+// The panel misses the move leaving its edge for one of its controls: its
+// resize cursor would stay, inherited by every control without one.
+void OverlayPopup::dropEdgeCursorOverChild(const QMouseEvent *mouse)
+{
+    if (resizeEdges_ || isMoving_ || !testAttribute(Qt::WA_SetCursor))
+        return;
+    // The window's coordinates are its widget's, the panel's parent.
+    if (childAt(mapFromParent(mouse->position().toPoint())))
+        unsetCursor();
 }
 
 bool OverlayPopup::isPressOutside(QObject *watched, QEvent *event) const

@@ -6,6 +6,7 @@
 #include "lsp/LanguageServers.h"
 #include "ui/AppFonts.h"
 #include "ui/ClaudeIndicator.h"
+#include "ui/ClickableCursors.h"
 #include "ui/DetachablePage.h"
 #include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
@@ -38,6 +39,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QPointer>
 #include <QPushButton>
 #include <QScopeGuard>
@@ -85,6 +87,60 @@ class TestWorkspace : public QObject {
     Q_OBJECT
 
 private slots:
+
+    void initTestCase() { ClickableCursors::install(); }
+
+    // The widgets are children: a window always keeps a cursor of its own.
+    void clickableControlsShowThePointingHand()
+    {
+        QWidget window;
+        const QToolButton button(&window);
+        const QComboBox combo(&window);
+        QToolButton disabled(&window);
+        disabled.setEnabled(false);
+        QToolButton ownCursor(&window);
+        ownCursor.setCursor(Qt::CrossCursor);
+
+        window.ensurePolished();
+
+        QCOMPARE(button.cursor().shape(), Qt::PointingHandCursor);
+        QCOMPARE(combo.cursor().shape(), Qt::PointingHandCursor);
+        QCOMPARE(disabled.cursor().shape(), Qt::ArrowCursor);
+        QCOMPARE(ownCursor.cursor().shape(), Qt::CrossCursor);
+    }
+
+    void reenabledButtonShowsThePointingHandAgain()
+    {
+        QWidget window;
+        QToolButton button(&window);
+        window.ensurePolished();
+
+        button.setEnabled(false);
+        QCOMPARE(button.cursor().shape(), Qt::ArrowCursor);
+        button.setEnabled(true);
+
+        QCOMPARE(button.cursor().shape(), Qt::PointingHandCursor);
+    }
+
+    void tabBarShowsThePointingHandOnlyOverATab()
+    {
+        QWidget window;
+        QTabBar tabBar(&window);
+        tabBar.setExpanding(false); // room beside the tab
+        tabBar.addTab(QStringLiteral("One"));
+        tabBar.resize(400, 30);
+        window.ensurePolished();
+        const auto moveTo = [&tabBar](QPoint position) {
+            QMouseEvent move(QEvent::MouseMove, position, tabBar.mapToGlobal(position), Qt::NoButton, Qt::NoButton,
+                             Qt::NoModifier);
+            QApplication::sendEvent(&tabBar, &move);
+        };
+
+        moveTo(tabBar.tabRect(0).center());
+        QCOMPARE(tabBar.cursor().shape(), Qt::PointingHandCursor);
+        moveTo({390, 15});
+        QCOMPARE(tabBar.cursor().shape(), Qt::ArrowCursor);
+    }
 
     void paletteMatchesLettersInOrder()
     {

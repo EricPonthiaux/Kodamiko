@@ -57,12 +57,14 @@ protected:
 
 private:
     class Watcher;
-    // Window resized (seen by a separate object: the subclasses filter
-    // their own children's events).
+    // Window resized, presses and moves in it (seen by a separate object:
+    // the subclasses filter their own children's events).
     void onWatchedEvent(QObject *watched, QEvent *event);
     // A press in the window out of the panel. One in a menu or a list
     // opened from the panel is not: they are windows of their own.
     bool isPressOutside(QObject *watched, QEvent *event) const;
+    // Back to the controls' own cursor when the mouse is over one.
+    void dropEdgeCursorOverChild(const QMouseEvent *mouse);
     // Room the window offers: its contents, less a margin.
     QRect availableArea() const;
     QSize panelSize() const;

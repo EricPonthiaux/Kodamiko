@@ -38,7 +38,6 @@ QToolButton *actionButton(QFrame *bar, const QString &text, const QString &toolT
     AppFonts::setInterfaceFont(button, 0.9, QFont::Normal);
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setCursor(Qt::PointingHandCursor);
     bar->layout()->addWidget(button);
     return button;
 }

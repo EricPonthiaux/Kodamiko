@@ -40,7 +40,8 @@ private:
     void updateMargins();
     void paint();
     bool drawsShadow() const;
-    // The resize cursor over the shadow, while no button is held.
+    // The resize cursor over the shadow, while no button is held; the
+    // children's own elsewhere.
     void updateCursor(const QMouseEvent *mouse);
     // A left press on the shadow resizes the window; returns whether it did.
     bool startResize(const QMouseEvent *mouse);

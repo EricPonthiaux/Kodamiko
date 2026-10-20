@@ -4,6 +4,7 @@
 #include "projects/ProjectConfig.h"
 #include "settings/Preferences.h"
 #include "ui/BrandMark.h"
+#include "ui/ClickableCursors.h"
 #include "welcome/WelcomeWindow.h"
 
 #include <QApplication>
@@ -151,6 +152,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     PreviewSite::registerScheme();
     const QApplication app(argc, argv);
+    ClickableCursors::install();
     // libgit2 stays initialized for the whole run: each read (change marks
     // while typing, file statuses) would otherwise set up and tear down its
     // global state.

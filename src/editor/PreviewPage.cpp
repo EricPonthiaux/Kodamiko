@@ -380,7 +380,6 @@ QWidget *PreviewPage::createToolbar()
         button->setCheckable(true);
         button->setAutoRaise(true);
         button->setFocusPolicy(Qt::TabFocus);
-        button->setCursor(Qt::PointingHandCursor);
         group->addButton(button, int(i));
         segments->addWidget(button);
         buttons_[i] = button;
