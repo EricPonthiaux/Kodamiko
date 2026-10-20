@@ -507,7 +507,7 @@ QWidget *MainWindow::createEditorArea()
     // Claude was kept from overwriting unsaved changes.
     unsavedEditNotice_ = new NoticeBar(editorArea);
     connect(unsavedEditNotice_, &NoticeBar::actionClicked, this, [this] {
-        if (editorTabs_->saveAll())
+        if (editorTabs_->saveAllNow())
             unsavedEditNotice_->hide();
     });
     editorLayout->addWidget(unsavedEditNotice_);

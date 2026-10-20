@@ -530,10 +530,20 @@ bool EditorTabs::saveCurrent()
 
 bool EditorTabs::saveAll()
 {
+    return saveModified([this](EditorWidget *editor) { return startSaving(editor); });
+}
+
+bool EditorTabs::saveAllNow()
+{
+    return saveModified([this](EditorWidget *editor) { return saveEditor(editor); });
+}
+
+bool EditorTabs::saveModified(const std::function<bool(EditorWidget *)> &save)
+{
     bool allSaved = true;
     for (EditorWidget *editor : editors()) {
         if (editor->isModified())
-            allSaved = startSaving(editor) && allSaved;
+            allSaved = save(editor) && allSaved;
     }
 #ifdef DUET_WITH_DIAGRAMS
     for (DiagramView *view : diagramViews()) {
@@ -698,26 +708,29 @@ void EditorTabs::closeCurrent()
 
 bool EditorTabs::closeTab(int index, bool askToSave)
 {
-    auto *editor = editorIn(widget(index));
-    const bool mustAskForEditor = askToSave && editor && editor->isModified();
-    if (mustAskForEditor && !confirmClose(this, editor->filePath(), [this, editor] { return saveEditor(editor); }))
+    // The question's event loop can close tabs (a file deleted on disk):
+    // the page is found again after it, never by its old index.
+    const QPointer<QWidget> page = widget(index);
+    if (askToSave && !askToSaveBeforeClosing(page))
         return false;
-#ifdef DUET_WITH_DIAGRAMS
-    if (auto *diagram = qobject_cast<DiagramView *>(widget(index))) {
-        const bool mustAskForDiagram = askToSave && diagram->isModified();
-        const auto saveThisDiagram = [this, diagram] { return saveDiagram(diagram); };
-        if (mustAskForDiagram && !confirmClose(this, diagram->filePath(), saveThisDiagram))
-            return false;
-        watcher_.unwatch(diagram->filePath());
-    }
-#endif
-    if (editor && !editor->filePath().isEmpty())
-        watcher_.unwatch(editor->filePath());
-    if (const auto *image = qobject_cast<ImageView *>(widget(index)))
-        watcher_.unwatch(image->filePath());
-    QWidget *page = widget(index);
-    removeTab(index);
+    if (!page || indexOf(page) < 0)
+        return true; // closed meanwhile
+    if (const QString path = filePathOf(page); !path.isEmpty())
+        watcher_.unwatch(path);
+    removeTab(indexOf(page));
     page->deleteLater();
+    return true;
+}
+
+bool EditorTabs::askToSaveBeforeClosing(QWidget *page)
+{
+    // Closed while the question is open: nothing left to save.
+    if (const QPointer<EditorWidget> editor = editorIn(page); editor && editor->isModified())
+        return confirmClose(this, editor->filePath(), [this, editor] { return !editor || saveEditor(editor); });
+#ifdef DUET_WITH_DIAGRAMS
+    if (const QPointer<DiagramView> diagram = qobject_cast<DiagramView *>(page); diagram && diagram->isModified())
+        return confirmClose(this, diagram->filePath(), [this, diagram] { return !diagram || saveDiagram(diagram); });
+#endif
     return true;
 }
 
@@ -804,8 +817,11 @@ void EditorTabs::syncEditorWithDisk(EditorWidget *editor, const QString &path)
     const QString question = tr("%1 was modified on disk, but you have unsaved changes.\n\n"
                                 "Reload the file? Your changes will be lost (Ctrl+Z brings them back).")
                                  .arg(name);
+    const QPointer<EditorWidget> guard = editor;
     if (editor->isModified() && !confirmReload(editor->filePath(), question))
         return;
+    if (!guard)
+        return; // tab closed while the question was open
     QString error;
     if (editor->reloadFromDisk(&error))
         emit statusMessage(tr("%1 reloaded from disk").arg(name));
@@ -829,8 +845,11 @@ void EditorTabs::syncDiagramWithDisk(DiagramView *diagram, const QString &path)
     const QString question = tr("%1 was modified on disk, but you have unsaved changes.\n\n"
                                 "Reload the file? Your changes will be lost.")
                                  .arg(name);
+    const QPointer<DiagramView> guard = diagram;
     if (diagram->isModified() && !confirmReload(diagram->filePath(), question))
         return;
+    if (!guard)
+        return; // tab closed while the question was open
     QString error;
     if (diagram->reloadFromDisk(&error))
         emit statusMessage(tr("%1 reloaded from disk").arg(name));

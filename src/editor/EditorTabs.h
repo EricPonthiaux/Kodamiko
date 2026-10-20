@@ -12,6 +12,7 @@
 #include <QSet>
 #include <QTabWidget>
 
+#include <functional>
 #include <optional>
 
 class DiagramView;
@@ -96,6 +97,10 @@ public:
     // finished: true then only means the save has started.
     bool saveCurrent();
     bool saveAll();
+    // Saves every modified file now, formatting first (blocking) with format
+    // on save: true means all of them are written, for a caller that reads
+    // or builds the files next.
+    bool saveAllNow();
     void closeCurrent();
     // Closes all tabs, asking for confirmation if there are unsaved changes.
     bool closeAll();
@@ -165,6 +170,11 @@ private:
     // Saves soon: formats first, off the UI thread, with format on save.
     bool startSaving(EditorWidget *editor);
     bool writeEditor(EditorWidget *editor);
+    // Asks whether to save the page's changes, and saves them; false if the
+    // user cancels or the save fails.
+    bool askToSaveBeforeClosing(QWidget *page);
+    // Saves the modified editors with `save`, and the modified diagrams.
+    bool saveModified(const std::function<bool(EditorWidget *)> &save);
     // `quiet`: no message when the file has no installed formatter or is
     // already formatted (format on save). `saveAfter`: writes the file
     // once formatted, whatever the outcome.

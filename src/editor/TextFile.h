@@ -31,6 +31,11 @@ struct DecodedText {
 namespace TextFile {
 
 DecodedText decode(const QByteArray &bytes);
+// `format`, but UTF-8 when ISO-8859-1 cannot hold every character of
+// `text`: a "€" typed in such a file changes its encoding rather than
+// being written as "?".
+TextFileFormat formatFor(const QString &text, TextFileFormat format);
+// The bytes of `text` in `formatFor(text, format)`.
 QByteArray encode(const QString &text, const TextFileFormat &format);
 
 // nullopt (with `error`) if the file is unreadable or binary.

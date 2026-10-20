@@ -7,10 +7,10 @@
 #include "claude/EditorContext.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/TextFile.h"
 #include "navigation/CodeNavigator.h"
 
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -58,10 +58,11 @@ std::optional<QString> fileText(const DuetToolContext &context, const QString &p
         return buffers.value(path);
     }
     *unsaved = false;
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly))
+    QString error;
+    const std::optional<DecodedText> decoded = TextFile::load(path, &error);
+    if (!decoded)
         return std::nullopt;
-    return QString::fromUtf8(file.readAll());
+    return decoded->text;
 }
 
 void getEditorState(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
@@ -133,7 +134,7 @@ void saveFiles(const DuetToolContext &context, const QJsonObject &arguments, con
 {
     const QJsonArray paths = arguments.value(QStringLiteral("paths")).toArray();
     if (paths.isEmpty()) {
-        const bool saved = context.tabs->saveAll();
+        const bool saved = context.tabs->saveAllNow();
         reply(saved ? McpResult::message(QStringLiteral("Saved"))
                     : McpResult::error(QStringLiteral("Some files could not be saved")));
         return;

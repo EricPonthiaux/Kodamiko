@@ -211,6 +211,22 @@ private slots:
         QCOMPARE(editor.message, QStringLiteral("Done"));
     }
 
+    void readsAClosedFileInItsOwnEncoding()
+    {
+        Editor editor;
+        write(editor.folder, QStringLiteral("latin1.txt"), "caf\xE9\n");
+        write(editor.folder, QStringLiteral("bom.txt"), "\xEF\xBB\xBFtext\n");
+
+        const auto fileText = [&editor](const QString &path) {
+            return structured(editor.call(QStringLiteral("get_file_text"), {{QStringLiteral("path"), path}}))
+                .value(QStringLiteral("text"))
+                .toString();
+        };
+
+        QCOMPARE(fileText(QStringLiteral("latin1.txt")), QStringLiteral("café\n"));
+        QCOMPARE(fileText(QStringLiteral("bom.txt")), QStringLiteral("text\n"));
+    }
+
     // Git, and the snapshots that need the user's agreement to restore.
     void readsAndActsOnGit()
     {

@@ -240,7 +240,7 @@ void MainWindow::buildProject()
 void MainWindow::runConfiguration(const RunConfiguration &configuration)
 {
     // What runs is what the editor shows.
-    editorTabs_->saveAll();
+    editorTabs_->saveAllNow();
     TerminalWidget *previous = runner_->terminal(configuration.name);
     if (previous && previous->isRunning())
         previous->terminate();

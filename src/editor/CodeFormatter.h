@@ -51,7 +51,7 @@ struct Job {
 };
 
 using Done = std::function<void(const std::optional<QString> &formatted, const QString &error)>;
-void start(const Job &job, QObject *context, const Done &done);
+void start(const Job &job, const QObject *context, const Done &done);
 
 // Where `position` (an offset in `before`) ends up in `after`: at the same
 // number of non-blank characters from the start. Formatters mostly move

@@ -33,6 +33,6 @@ std::optional<Style> parse(const QByteArray &dumpedConfig);
 // Asks clang-format, without blocking, for the style of `filePath`. `done`
 // is called with nullopt when clang-format is not installed or fails, never
 // after `context` is destroyed.
-void load(const QString &filePath, QObject *context, const std::function<void(std::optional<Style>)> &done);
+void load(const QString &filePath, const QObject *context, const std::function<void(std::optional<Style>)> &done);
 
 } // namespace ClangFormatStyle

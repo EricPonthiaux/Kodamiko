@@ -7,6 +7,7 @@
 #include "editor/EditorStatus.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/FileWatcher.h"
 #include "editor/FindBar.h"
 #include "editor/MarkdownHtml.h"
 #include "editor/PreviewPage.h"
@@ -15,8 +16,11 @@
 #include "editor/SymbolOccurrences.h"
 #include "git/GitProcess.h"
 
+#include <QApplication>
 #include <QContextMenuEvent>
 #include <QLineEdit>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QScrollBar>
 #include <QSettings>
 #include <QSignalSpy>
@@ -714,6 +718,101 @@ private slots:
         tabs.currentEditor()->setText("int h(){return 4;}\n");
         QTRY_COMPARE(saved.size(), 2);
         QCOMPARE(tabs.currentEditor()->text(), QString("int h(){return 4;}\n"));
+    }
+
+    void savingALatin1FileWithAnEuroWritesItInUtf8()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("a.txt"), "caf\xE9\n");
+        EditorWidget editor(Theme::dark());
+        QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
+        QVERIFY(editor.format().isLatin1);
+        const QSignalSpy formatChanged(&editor, &EditorWidget::formatChanged);
+
+        editor.setText(QStringLiteral("café 5 €\n"));
+        QVERIFY(editor.save(nullptr));
+
+        QFile file(dir.filePath("a.txt"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QStringLiteral("café 5 €\n").toUtf8());
+        QVERIFY(!editor.format().isLatin1);
+        QCOMPARE(formatChanged.size(), 1);
+    }
+
+    void reloadKeepsTheTextAfterANulByte()
+    {
+        const QTemporaryDir dir;
+        // Past the 8 KiB the binary check reads.
+        const QByteArray start(10000, 'a');
+        write(dir.filePath("a.txt"), start + "\n");
+        EditorWidget editor(Theme::dark());
+        QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
+
+        const QByteArray changed = start + QByteArray("\0end\n", 5);
+        write(dir.filePath("a.txt"), changed);
+        QVERIFY(editor.reloadFromDisk(nullptr));
+
+        QCOMPARE(QByteArray(editor.utf8Bytes()), changed);
+    }
+
+    void saveAllNowWritesTheFormattedFilesBeforeReturning()
+    {
+        if (QStandardPaths::findExecutable("clang-format").isEmpty())
+            QSKIP("clang-format is not installed");
+        const QTemporaryDir dir;
+        write(dir.filePath(".clang-format"), "BasedOnStyle: LLVM\n");
+        write(dir.filePath("a.cpp"), "int f();\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openFile(dir.filePath("a.cpp")));
+        tabs.setFormatOnSave(true);
+        tabs.currentEditor()->setText("int g(){return 2;}\n");
+
+        QVERIFY(tabs.saveAllNow());
+
+        QFile file(dir.filePath("a.cpp"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("int g() { return 2; }\n"));
+    }
+
+    void closingATabAfterItsQuestionClosesNoOtherTab()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("a.txt"), "a\n");
+        write(dir.filePath("b.txt"), "b\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openFile(dir.filePath("a.txt")));
+        QVERIFY(tabs.openFile(dir.filePath("b.txt")));
+        tabs.currentEditor()->setText("changed\n");
+
+        // While "Save changes to b.txt?" is open, a.txt's tab is closed
+        // (deleted on disk), then the user discards b.txt's changes.
+        QTimer::singleShot(0, &tabs, [&tabs, &dir] {
+            tabs.closeFilesUnder(dir.filePath("a.txt"));
+            auto *question = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            QVERIFY(question);
+            question->button(QMessageBox::Discard)->click();
+        });
+        tabs.closeCurrent();
+
+        QCOMPARE(tabs.count(), 0);
+    }
+
+    void watchesAFileDeletedThenCreatedAgain()
+    {
+        const QTemporaryDir dir;
+        const QString path = dir.filePath("a.txt");
+        write(path, "a\n");
+        FileWatcher watcher;
+        watcher.watch(path);
+        const QSignalSpy changed(&watcher, &FileWatcher::fileChanged);
+
+        QVERIFY(QFile::remove(path));
+        QTRY_COMPARE(changed.size(), 1);
+        write(path, "b\n");
+        QTRY_COMPARE(changed.size(), 2);
+        write(path, "c\n");
+
+        QTRY_COMPARE(changed.size(), 3);
     }
 
     void formatDocumentReportsAMissingFormatter()

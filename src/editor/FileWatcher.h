@@ -10,7 +10,8 @@
 // Watches open files and reports their modifications on disk.
 //
 // Bursts of notifications (a tool writing a file in several steps) are
-// merged into a single signal per file.
+// merged into a single signal per file. A file deleted then created again
+// (git checkout) is still watched: its folder reports its return.
 class FileWatcher : public QObject {
     Q_OBJECT
 
@@ -25,6 +26,7 @@ signals:
 
 private:
     void onFileChanged(const QString &path);
+    void onFolderChanged(const QString &folder);
     void emitPendingChanges();
 
     QFileSystemWatcher watcher_;

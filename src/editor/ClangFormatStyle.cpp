@@ -51,22 +51,27 @@ std::optional<Style> parse(const QByteArray &dumpedConfig)
     return style;
 }
 
-void load(const QString &filePath, QObject *context, const std::function<void(std::optional<Style>)> &done)
+void load(const QString &filePath, const QObject *context, const std::function<void(std::optional<Style>)> &done)
 {
-    auto *process = new QProcess(context);
+    // Not a child of `context`: a widget deletes its children before
+    // disconnecting them, and the process's end would then reach a
+    // half-destroyed `context`. The process deletes itself once it ends.
+    auto *process = new QProcess;
     auto *timer = new QTimer(process);
     timer->setSingleShot(true);
     QObject::connect(timer, &QTimer::timeout, process, [process] { process->kill(); });
-    // Received by `context`: its destruction disconnects them before it
-    // deletes the process, so `done` never runs then.
-    QObject::connect(process, &QProcess::errorOccurred, context, [process, done](QProcess::ProcessError error) {
-        if (error != QProcess::FailedToStart)
-            return; // the end is reported by finished
-        process->deleteLater();
-        done(std::nullopt);
+    QObject::connect(process, &QProcess::finished, process, &QObject::deleteLater);
+    QObject::connect(process, &QProcess::errorOccurred, process, [process](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart)
+            process->deleteLater();
+    });
+    // Received by `context`: its destruction disconnects them, so `done`
+    // never runs then.
+    QObject::connect(process, &QProcess::errorOccurred, context, [done](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart)
+            done(std::nullopt); // otherwise, the end is reported by finished
     });
     QObject::connect(process, &QProcess::finished, context, [process, done](int exitCode, QProcess::ExitStatus status) {
-        process->deleteLater();
         const bool succeeded = status == QProcess::NormalExit && exitCode == 0;
         done(succeeded ? parse(process->readAllStandardOutput()) : std::nullopt);
     });

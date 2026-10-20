@@ -12,16 +12,15 @@
 #include "editor/CodeFormatter.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspProtocol.h"
 #include "navigation/CodeIntelligence.h"
 #include "syntax/LanguageRegistry.h"
 
-#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QPointer>
-#include <QSaveFile>
 #include <QTimer>
 
 #include <algorithm>
@@ -43,8 +42,9 @@ QString textOf(const DuetToolContext &context, const QString &path)
     const QHash<QString, QString> buffers = context.tabs->unsavedTexts();
     if (buffers.contains(path))
         return buffers.value(path);
-    QFile file(path);
-    return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+    QString error;
+    const std::optional<DecodedText> decoded = TextFile::load(path, &error);
+    return decoded ? decoded->text : QString();
 }
 
 QString severityName(int severity)
@@ -565,14 +565,11 @@ void applyCodeAction(const DuetToolContext &context, const QJsonObject &argument
         });
 }
 
+// Writes `text` to `path` in the file's own encoding (BOM, ISO-8859-1).
 bool writeText(const QString &path, const QString &text, QString *error)
 {
-    QSaveFile file(path);
-    const QByteArray bytes = text.toUtf8();
-    if (file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit())
-        return true;
-    *error = file.errorString();
-    return false;
+    const std::optional<DecodedText> current = TextFile::load(path, error);
+    return current && TextFile::save(path, text, current->format, error);
 }
 
 // Puts the formatter's text in the file's editor, or on disk when it is
@@ -587,6 +584,10 @@ McpResult formattedResult(const DuetToolContext &context,
     const QString formatted = result.structured.toObject().value(QStringLiteral("text")).toString();
     if (formatted == text)
         return McpResult::message(QStringLiteral("Already formatted"));
+    // Typed or written meanwhile: the formatted text would erase it.
+    if (textOf(context, path) != text)
+        return McpResult::error(
+            QStringLiteral("%1 changed while it was formatted: nothing applied").arg(context.relative(path)));
     if (EditorWidget *editor = context.tabs->editorFor(path)) {
         editor->applyFormattedText(formatted);
     } else if (QString error; !writeText(path, formatted, &error)) {

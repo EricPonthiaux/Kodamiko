@@ -7,6 +7,8 @@
 #include <QSaveFile>
 #include <QStringDecoder>
 
+#include <algorithm>
+
 namespace TextFile {
 namespace {
 
@@ -57,10 +59,19 @@ DecodedText decode(const QByteArray &bytes)
     return result;
 }
 
+TextFileFormat formatFor(const QString &text, TextFileFormat format)
+{
+    const auto isLatin1 = [](QChar character) { return character.unicode() <= 0xFF; };
+    if (format.isLatin1 && !std::ranges::all_of(text, isLatin1))
+        format.isLatin1 = false;
+    return format;
+}
+
 QByteArray encode(const QString &text, const TextFileFormat &format)
 {
-    QByteArray bytes = format.isLatin1 ? text.toLatin1() : text.toUtf8();
-    if (format.hasUtf8Bom)
+    const TextFileFormat written = formatFor(text, format);
+    QByteArray bytes = written.isLatin1 ? text.toLatin1() : text.toUtf8();
+    if (written.hasUtf8Bom)
         bytes.prepend(utf8Bom);
     return bytes;
 }

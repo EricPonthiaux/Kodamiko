@@ -36,6 +36,14 @@ private slots:
         QCOMPARE(TextFile::decode("caf\xE9").text, QStringLiteral("café"));
     }
 
+    void writesInUtf8WhatLatin1CannotHold()
+    {
+        const TextFileFormat latin1 = TextFile::decode("caf\xE9").format;
+        QVERIFY(TextFile::formatFor(QStringLiteral("café"), latin1).isLatin1);
+        QVERIFY(!TextFile::formatFor(QStringLiteral("café 5 €"), latin1).isLatin1);
+        QCOMPARE(TextFile::encode(QStringLiteral("café 5 €"), latin1), QStringLiteral("café 5 €").toUtf8());
+    }
+
     void refusesBinaryFiles()
     {
         QTemporaryFile file;

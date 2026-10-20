@@ -545,9 +545,15 @@ bool EditorWidget::save(QString *error)
 {
     if (filePath_.isEmpty() || isReadOnly())
         return true;
-    if (!TextFile::save(filePath_, text(), format_, error))
+    const QString content = text();
+    const TextFileFormat written = TextFile::formatFor(content, format_);
+    if (!TextFile::save(filePath_, content, written, error))
         return false;
     setModified(false);
+    if (written.isLatin1 != format_.isLatin1) {
+        format_ = written;
+        emit formatChanged();
+    }
     return true;
 }
 
@@ -566,9 +572,11 @@ bool EditorWidget::reloadFromDisk(QString *error)
         setEolMode(toEolMode(decoded->format.lineEnding));
     format_ = decoded->format;
     emit formatChanged();
-    // Replace (rather than setText) so that Ctrl+Z restores the previous text.
-    selectAll();
-    replaceSelectedText(decoded->text);
+    // Replace (rather than setText) so that Ctrl+Z restores the previous
+    // text; a target with its length, as a selection stops at a NUL byte.
+    const QByteArray bytes = decoded->text.toUtf8();
+    SendScintilla(SCI_SETTARGETRANGE, 0UL, SendScintilla(SCI_GETLENGTH));
+    SendScintilla(SCI_REPLACETARGET, static_cast<unsigned long>(bytes.size()), bytes.constData());
     setModified(false);
 
     setCursorPosition(std::min(line, lines() - 1), index);

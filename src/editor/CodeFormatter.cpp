@@ -174,13 +174,23 @@ std::optional<QString> run(const Command &command, const QString &workDir, const
     return resultOf(process, name, text, error);
 }
 
-void start(const Job &job, QObject *context, const Done &done)
+void start(const Job &job, const QObject *context, const Done &done)
 {
     const QString name = QFileInfo(job.command.program).completeBaseName();
     const QString &text = job.text;
-    auto *process = new QProcess(context);
+    // Not a child of `context`: a widget deletes its children before
+    // disconnecting them, and the process's end would then reach a
+    // half-destroyed `context`. Without `context`, the process still ends:
+    // killed on timeout, deleted once it has exited.
+    auto *process = new QProcess;
     auto *timer = new QTimer(process);
     timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, process, &QProcess::kill);
+    QObject::connect(process, &QProcess::finished, process, &QObject::deleteLater);
+    QObject::connect(process, &QProcess::errorOccurred, process, [process](QProcess::ProcessError code) {
+        if (code == QProcess::FailedToStart)
+            process->deleteLater();
+    });
 
     // Exactly one outcome: the first one disconnects the others.
     const auto finish = [process, timer, done](const std::optional<QString> &formatted, const QString &error) {
