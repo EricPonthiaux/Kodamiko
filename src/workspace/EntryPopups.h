@@ -78,6 +78,7 @@ private:
     PopupHeader *header_;
     QVBoxLayout *content_;
     QLabel *error_;
+    QFrame *footer_;
     QLabel *hint_;
     QHBoxLayout *footerButtons_;
 };

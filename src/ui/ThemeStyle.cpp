@@ -241,7 +241,7 @@ QFrame#runDivider { background: @runBorder; }
 QToolButton#chip { padding: 4px 9px; border-radius: 3px; }
 QToolButton#chip:hover { background: @button; }
 QToolButton#chip::menu-indicator { image: none; width: 0; }
-QStatusBar QToolButton#chip { background: @hover; border: 1px solid @line; }
+QStatusBar QToolButton#chip { padding: 1px 9px; background: @hover; border: 1px solid @line; }
 QStatusBar QToolButton#chip:hover { background: @button; }
 QFrame#viewHeader { border: none; border-bottom: 1px solid @line; }
 QToolButton#viewSelector { padding: 4px 6px; border-radius: 3px; }

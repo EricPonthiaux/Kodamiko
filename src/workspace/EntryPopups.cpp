@@ -23,8 +23,8 @@ namespace {
 
 constexpr int minimumPopupWidth = 480;
 constexpr qreal popupWindowShare = 0.36;
-// The header's margins and close button, beside the location.
-constexpr int headerReservePx = 64;
+// The header's margins, icon and close button, beside the location.
+constexpr int headerReservePx = 100;
 
 QString translate(const char *text)
 {
@@ -122,6 +122,7 @@ EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, QString
     , header_(new PopupHeader(QStringLiteral("document"), title, this))
     , content_(new QVBoxLayout)
     , error_(new QLabel(this))
+    , footer_(new QFrame(this))
     , hint_(new QLabel(this))
     , footerButtons_(new QHBoxLayout)
 {
@@ -139,13 +140,12 @@ EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, QString
     body->addLayout(content_);
     body->addWidget(error_);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    hint_->setParent(footer);
+    footer_->setObjectName(QStringLiteral("popupFooter"));
+    hint_->setParent(footer_);
     hint_->setObjectName(QStringLiteral("footerHint"));
     hint_->setText(tr("Enter to apply · Esc to cancel"));
     footerButtons_->setSpacing(8);
-    auto *footerLayout = new QHBoxLayout(footer);
+    auto *footerLayout = new QHBoxLayout(footer_);
     footerLayout->setContentsMargins(16, 10, 16, 10);
     footerLayout->setSpacing(8);
     footerLayout->addWidget(hint_, 1);
@@ -156,7 +156,7 @@ EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, QString
     layout->setSpacing(0);
     layout->addWidget(header_);
     layout->addLayout(body);
-    layout->addWidget(footer);
+    layout->addWidget(footer_);
 
     const Theme &theme = ThemeStyle::applied();
     setStyleSheet(
@@ -216,11 +216,12 @@ void EntryPopup::resizeToContent()
     if (!isVisible())
         return;
     ensurePolished();
+    // Wide enough for the footer's hint and buttons side by side.
+    const int panelWidth = std::max({minimumPopupWidth, footer_->sizeHint().width() + 2, width() - 2 * shadowWidth});
     // The location on one line, cut in the middle: the end of a path matters.
-    const int locationWidth = std::max(0, width() - 2 * shadowWidth - headerReservePx);
-    header_->setSubtitle(fontMetrics().elidedText(location_, Qt::ElideMiddle, locationWidth));
-    const int panelHeight = layout()->totalHeightForWidth(width()) - 2 * shadowWidth;
-    setMinimumPanelSize(QSize(minimumPopupWidth, std::max(panelHeight, 0)));
+    header_->setSubtitle(fontMetrics().elidedText(location_, Qt::ElideMiddle, panelWidth - headerReservePx));
+    const int panelHeight = layout()->totalHeightForWidth(panelWidth + 2 * shadowWidth) - 2 * shadowWidth;
+    setMinimumPanelSize(QSize(panelWidth, std::max(panelHeight, 0)));
 }
 
 void EntryPopup::keyPressEvent(QKeyEvent *event)
