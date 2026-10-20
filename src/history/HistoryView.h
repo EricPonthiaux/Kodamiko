@@ -8,6 +8,7 @@
 
 #include <optional>
 
+class CommitDelegate;
 class DiffHeaderBar;
 class DiffView;
 class QAction;
@@ -114,6 +115,7 @@ private:
     bool filtersOnFile_ = false; // the commit pane hidden: only the file's diff
     QLabel *title_;              // names the filtered file
     QToolButton *showAll_;
+    QToolButton *allBranches_; // checked: every branch, not only HEAD's commits
     QToolButton *refreshButton_;
     QAction *searchIcon_;
     std::optional<CommitLog> log_;
@@ -125,7 +127,9 @@ private:
     int generation_ = 0;
     bool reading_ = false;
     bool refreshPending_ = false;
-    int commitLimit_ = 0;   // commits to read, see loadMoreIfAtEnd()
+    int commitLimit_ = 0; // commits to read, see loadMoreIfAtEnd()
+    CommitDelegate *commitDelegate_;
+    int graphLanes_ = 0;    // of the list's graph; 0 without one
     QString detailsWanted_; // commit whose details are being read
     QString fileToKeep_;    // chosen again once the commit is read again
 

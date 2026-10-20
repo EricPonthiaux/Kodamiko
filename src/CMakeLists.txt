@@ -2,6 +2,7 @@
 # tests link against it.
 add_library(duet_core STATIC
     changes/BranchesPopup.cpp
+    changes/ChangeTree.cpp
     changes/ChangesView.cpp
     changes/ChangesViewDiff.cpp
     changes/CommitPanel.cpp
@@ -98,7 +99,9 @@ add_library(duet_core STATIC
     git/Snapshots.cpp
     git/Stashes.cpp
     history/CommitDelegate.cpp
+    history/CommitGraph.cpp
     history/HistoryView.cpp
+    history/HistoryViewCommit.cpp
     lsp/LanguageServers.cpp
     lsp/LspClient.cpp
     lsp/LspCompletionProvider.cpp

@@ -106,9 +106,15 @@ Magit.
 
 ### Historique
 
-1. **Graphe des branches** et choix de la branche ou de toutes les refs.
-   Seul HEAD est parcouru. C'est l'élément central chez Fork, GitKraken,
-   Sublime Merge et JetBrains.
+1. ✅ **Fait.** ~~**Graphe des branches**~~ : une colonne à gauche des
+   avatars, une voie et une couleur par lignée, des courbes vers chaque
+   parent d'une fusion, et les voies qui se rejoignent au point de
+   divergence (`CommitGraph::layOut`, testé à part). Le bouton « All
+   Branches » parcourt toutes les branches locales et distantes
+   (`LogScope::AllBranches`). Le graphe est masqué quand des commits
+   manquent dans la liste (filtre par chemin, sous-dossier ouvert ou filtre
+   texte), parce que ses lignes traverseraient des trous. Restent : choisir
+   une seule autre branche, et le choix gardé d'une session à l'autre.
 2. ✅ **Fait.** ~~**Pagination ou défilement infini**~~ : 500 commits
    d'abord, puis deux fois plus chaque fois que la fin de la liste devient
    visible. Chaque lecture reprend au début, mais le doublement garde un
@@ -142,10 +148,8 @@ Magit.
 - **Booléens qui changent le comportement** :
   `applyDiffSelection(line, bool discard)` (§2) ; il faudrait un
   `enum class`. `DiffView::goToChange` prend maintenant un `Direction`.
-- **Taille de `HistoryView.cpp`** : 780 lignes, à la limite des 800 de
-  §8. Le volet du commit (`createCommitPane`, `showDetails`,
-  `messageHtml`) pourrait aller dans son propre fichier, comme
-  `ChangesViewDiff.cpp`.
+- ✅ ~~**Taille de `HistoryView.cpp`**~~ : le volet du commit est dans
+  `HistoryViewCommit.cpp` (470 + 359 lignes).
 - **Fonctions trop longues** : le constructeur de `ChangesView`
   (~170 lignes), `HistoryView::createCommitPane` et `showDetails` dépassent
   largement l'objectif de 40 lignes.
@@ -172,5 +176,5 @@ Dans l'ordre, pour le meilleur rapport valeur/effort :
    Fait.
 4. ✅ ~~Ajouter le suivi des renommages dans l'historique d'un fichier,
    puis la pagination.~~ Fait.
-5. Les deux gros chantiers : ✅ ~~le diff côte à côte~~ (fait), puis le
-   graphe des branches.
+5. ✅ ~~Les deux gros chantiers : le diff côte à côte, puis le graphe des
+   branches.~~ Faits.

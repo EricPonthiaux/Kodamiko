@@ -78,7 +78,8 @@ CommitSummary summaryOf(git_commit *commit, const QHash<QString, QStringList> &r
     summary.author = QString::fromUtf8(author->name);
     summary.email = QString::fromUtf8(author->email);
     summary.date = dateOf(author->when);
-    summary.parentCount = static_cast<int>(git_commit_parentcount(commit));
+    for (unsigned int i = 0; i < git_commit_parentcount(commit); ++i)
+        summary.parentIds.append(idOf(git_commit_parent_id(commit, i)));
     summary.refs = refs.value(summary.id);
     return summary;
 }
@@ -159,7 +160,7 @@ QString pathBefore(git_repository *repository, const git_commit *commit, const Q
 
 } // namespace
 
-std::optional<CommitLog> CommitLog::read(const QString &folder, int limit, const QString &path)
+std::optional<CommitLog> CommitLog::read(const QString &folder, int limit, const QString &path, LogScope scope)
 {
     const std::optional<RepositoryInfo> info = RepositoryInfo::read(folder);
     if (!info)
@@ -179,6 +180,10 @@ std::optional<CommitLog> CommitLog::read(const QString &folder, int limit, const
     const Ptr<git_revwalk> walkGuard(walk);
     check(git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL | GIT_SORT_TIME), "Walking the history");
     check(git_revwalk_push_head(walk), "Walking the history");
+    if (scope == LogScope::AllBranches) {
+        check(git_revwalk_push_glob(walk, "refs/heads"), "Walking the branches");
+        check(git_revwalk_push_glob(walk, "refs/remotes"), "Walking the branches");
+    }
 
     // Repository path whose commits are kept; empty: all of them.
     QString filter = path.isEmpty() ? info->prefix : info->repoPath(path);

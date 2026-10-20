@@ -1,4 +1,5 @@
 #include "changes/BranchesPopup.h"
+#include "changes/ChangeTree.h"
 #include "changes/ChangesView.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
@@ -690,6 +691,82 @@ private slots:
         const QByteArray staged = Git::run(project.path(), {"diff", "--cached"});
         QVERIFY(staged.contains("-4\n+four"));
         QVERIFY(!staged.contains("+ten"));
+    }
+
+    void filesShowInTheirFoldersSortedAndMerged()
+    {
+        QTreeWidget tree;
+        const QStringList paths{"src/changes/b.cpp", "src/changes/a.cpp", "src/git/x.cpp", "README.md",
+                                "docs/guide/intro.md"};
+
+        const QList<QTreeWidgetItem *> rows = ChangeTree::addFiles(tree.invisibleRootItem(), paths);
+        for (qsizetype i = 0; i < rows.size(); ++i)
+            FileChangeDelegate::setChange(rows[i], {ChangeKind::Modified, paths[i], {}});
+
+        QCOMPARE(rows.size(), 5);
+        QCOMPARE(tree.topLevelItemCount(), 3);                          // docs/guide, src, then README.md
+        QCOMPARE(tree.topLevelItem(0)->text(0), QString("docs/guide")); // a folder of one folder: merged
+        QCOMPARE(tree.topLevelItem(1)->text(0), QString("src"));
+        QCOMPARE(tree.topLevelItem(2), rows[3]);
+        QTreeWidgetItem *changes = tree.topLevelItem(1)->child(0);
+        QCOMPARE(changes->text(0), QString("changes"));
+        QCOMPARE(changes->data(0, FileChangeDelegate::folderRole).toString(), QString("src/changes"));
+        QCOMPARE(changes->child(0), rows[1]); // a.cpp before b.cpp
+        QCOMPARE(ChangeTree::filesUnder(tree.topLevelItem(1)), QList<QTreeWidgetItem *>({rows[1], rows[0], rows[2]}));
+        QVERIFY(ChangeTree::comesBefore("src/z.cpp", "a.cpp")); // a folder before a file
+        QVERIFY(ChangeTree::comesBefore("src/a.cpp", "src/B.cpp"));
+        QVERIFY(!ChangeTree::comesBefore("src/b.cpp", "src/a.cpp"));
+    }
+
+    void aFolderStandsForItsFilesAndStaysClosed()
+    {
+        const QTemporaryDir project;
+        write(project, "src/a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "src/a.txt", "a2\n");
+        write(project, "src/b.txt", "b\n");
+        write(project, "c.txt", "c\n");
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show(); // refreshed after a git command only when shown
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *list = view.findChild<QTreeWidget *>();
+        QTreeWidgetItem *src = list->topLevelItem(0)->child(0);
+        QVERIFY(FileChangeDelegate::isFolder(src));
+        // The diff in the list's order: the folder's files first.
+        QStringList diffOrder;
+        for (const DiffView::FileSummary &file : view.findChild<DiffView *>()->fileSummaries())
+            diffOrder.append(file.path);
+        QCOMPARE(diffOrder, QStringList({"src/a.txt", "src/b.txt", "c.txt"}));
+        src->setExpanded(false);
+        list->setCurrentItem(src);
+        QToolButton *stage = nullptr;
+        for (QToolButton *button : view.findChildren<QToolButton *>()) {
+            if (button->text() == QLatin1String("Stage"))
+                stage = button;
+        }
+        QVERIFY(stage && stage->isEnabled());
+
+        stage->click();
+
+        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (1)", "Staged (2)"}));
+        QTreeWidgetItem *stagedSrc = list->topLevelItem(1)->child(0);
+        QCOMPARE(stagedSrc->text(0), QString("src"));
+        QVERIFY(stagedSrc->isExpanded()); // another section: its own folder
+        write(project, "c.txt", "c2\n");
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 3);
+        // The list rebuilt, the folder closed by hand stays closed.
+        list->topLevelItem(1)->child(0)->setExpanded(false);
+        write(project, "c.txt", "c3\n");
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 4);
+        QVERIFY(!list->topLevelItem(1)->child(0)->isExpanded());
     }
 
     void snapshotsPopupListsAndRestores()

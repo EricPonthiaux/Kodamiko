@@ -1,7 +1,10 @@
+#include "changes/ChangeTree.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "git/CommitLog.h"
 #include "git/GitProcess.h"
+#include "history/CommitDelegate.h"
+#include "history/CommitGraph.h"
 #include "history/HistoryView.h"
 
 #include <QLabel>
@@ -86,6 +89,15 @@ void importCommits(const QTemporaryDir &dir, int count)
     git(dir, {"reset", "-q", "--hard", "main"});
 }
 
+// A commit named `id` with `parents`, for the graph.
+CommitSummary node(const QString &id, const QStringList &parents)
+{
+    CommitSummary commit;
+    commit.id = id;
+    commit.parentIds = parents;
+    return commit;
+}
+
 QStringList summaries(const CommitLog &log)
 {
     QStringList result;
@@ -150,7 +162,56 @@ private slots:
         QCOMPARE(newest.shortId, newest.id.left(7));
         QCOMPARE(newest.refs, QStringList({"main"}));
         QCOMPARE(log.commits[1].refs, QStringList({"v1"}));
-        QCOMPARE(log.commits[2].parentCount, 0);
+        QVERIFY(log.commits[2].parentIds.isEmpty());
+        QCOMPARE(log.commits[1].parentIds, QStringList({log.commits[2].id}));
+    }
+
+    void graphOfALinearHistoryIsOneLane()
+    {
+        const QList<GraphRow> rows = CommitGraph::layOut({node("c", {"b"}), node("b", {"a"}), node("a", {})});
+
+        QCOMPARE(CommitGraph::laneCount(rows), 1);
+        QVERIFY(rows[0].upper.isEmpty()); // nothing above the newest
+        QCOMPARE(rows[0].lower, QList<GraphSegment>({{0, 0, 0}}));
+        QCOMPARE(rows[1].upper, QList<GraphSegment>({{0, 0, 0}}));
+        QVERIFY(rows[2].lower.isEmpty()); // nothing below the first commit
+    }
+
+    void graphOpensALaneForAMergedBranchAndJoinsItAtTheFork()
+    {
+        const QList<GraphRow> rows =
+            CommitGraph::layOut({node("m", {"a", "b"}), node("a", {"base"}), node("b", {"base"}), node("base", {})});
+
+        QCOMPARE(CommitGraph::laneCount(rows), 2);
+        QCOMPARE(rows[0].lower, QList<GraphSegment>({{0, 1, 1}, {0, 0, 0}})); // to b, then to a
+        QCOMPARE(rows[1].lane, 0);
+        QCOMPARE(rows[2].lane, 1);
+        QCOMPARE(rows[2].color, 1);
+        QCOMPARE(rows[3].lane, 0);
+        QCOMPARE(rows[3].upper, QList<GraphSegment>({{0, 0, 0}, {1, 0, 1}})); // both lines join base
+    }
+
+    void graphGivesEachBranchTipItsOwnLane()
+    {
+        const QList<GraphRow> rows = CommitGraph::layOut({node("x", {"base"}), node("y", {"base"}), node("base", {})});
+
+        QCOMPARE(rows[1].lane, 1);
+        QCOMPARE(rows[1].upper, QList<GraphSegment>({{0, 0, 0}})); // nothing leads to y
+        QCOMPARE(rows[2].upper, QList<GraphSegment>({{0, 0, 0}, {1, 0, 1}}));
+    }
+
+    void logOfAllBranches()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "base", {{"a.txt", "a\n"}});
+        git(dir, {"checkout", "-q", "-b", "topic"});
+        commit(dir, "on topic", {{"b.txt", "b\n"}});
+        git(dir, {"checkout", "-q", "main"});
+        commit(dir, "on main", {{"c.txt", "c\n"}});
+
+        QCOMPARE(summaries(*CommitLog::read(dir.path())), QStringList({"on main", "base"}));
+        QCOMPARE(CommitLog::read(dir.path(), 2000, {}, LogScope::AllBranches)->commits.size(), 3);
     }
 
     void logMarksADetachedHead()
@@ -425,6 +486,43 @@ private slots:
         QVERIFY(!commits->topLevelItem(1199)->isHidden()); // the oldest, found
     }
 
+    void historyDrawsTheGraphOfEveryBranch()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "base", {{"a.txt", "a\n"}});
+        git(dir, {"checkout", "-q", "-b", "topic"});
+        commit(dir, "on topic", {{"b.txt", "b\n"}});
+        git(dir, {"checkout", "-q", "main"});
+        commit(dir, "on main", {{"c.txt", "c\n"}});
+        HistoryView view(Theme::dark());
+        view.resize(900, 600);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *delegate = qobject_cast<CommitDelegate *>(commits->itemDelegate());
+        QCOMPARE(commits->topLevelItemCount(), 2);
+        QCOMPARE(delegate->graphLanes(), 1);
+        QToolButton *allBranches = nullptr;
+        for (QToolButton *button : view.findChildren<QToolButton *>()) {
+            if (button->text() == QLatin1String("All Branches"))
+                allBranches = button;
+        }
+        QVERIFY(allBranches);
+
+        allBranches->click();
+
+        QTRY_COMPARE(commits->topLevelItemCount(), 3);
+        QCOMPARE(delegate->graphLanes(), 2);
+        view.findChild<QLineEdit *>()->setText("topic");
+        QCOMPARE(delegate->graphLanes(), 0); // its lines would cross hidden rows
+        view.findChild<QLineEdit *>()->clear();
+        QCOMPARE(delegate->graphLanes(), 2);
+    }
+
     void folderHistoryListsOnlyTheFolderFiles()
     {
         const QTemporaryDir dir;
@@ -440,7 +538,9 @@ private slots:
 
         commits->setCurrentItem(commits->topLevelItem(0));
 
-        QTRY_COMPARE(files->topLevelItemCount(), 2);
+        QTRY_COMPARE(files->topLevelItemCount(), 1);
+        QCOMPARE(files->topLevelItem(0)->text(0), QString("src")); // the folder, holding both
+        QCOMPARE(ChangeTree::filesUnder(files->topLevelItem(0)).size(), 2);
         QVERIFY(files->isVisibleTo(&view));
     }
 

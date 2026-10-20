@@ -4,6 +4,7 @@
 #include "git/RepositoryStatus.h"
 #include "ui/Theme.h"
 
+#include <QSet>
 #include <QThreadPool>
 #include <QWidget>
 
@@ -109,6 +110,11 @@ private:
     void showStatus(std::optional<RepositoryStatus> status, const QString &error);
     void selectNow(const QString &relativePath);
     void rebuildList();
+    // Gives the folder rows under `parent` their section, recursively, and
+    // closes those the user had closed.
+    void markFolders(QTreeWidgetItem *parent, Section section);
+    // The row of file `index` of `section`; nullptr if there is none.
+    QTreeWidgetItem *fileRow(Section section, int index) const;
     void showSection(Section section);
     void onCurrentItemChanged();
     void updateActions();
@@ -146,6 +152,7 @@ private:
     bool reading_ = false;
     bool refreshPending_ = false;
     std::optional<QString> pendingSelection_; // for selectFile()
+    QSet<ItemKey> collapsedFolders_;
 
     QLabel *summary_;
     QWidget *operationBar_;

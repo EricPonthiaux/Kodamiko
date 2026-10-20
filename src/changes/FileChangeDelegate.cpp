@@ -140,6 +140,18 @@ void paintNameAndFolder(const Row &row, const QRect &area, const QString &name, 
                       smallMetrics.elidedText(folder, Qt::ElideLeft, available - nameWidth));
 }
 
+void paintFolder(const Row &row, const QString &label)
+{
+    const int iconSize = 16;
+    const QRect icon(row.rect.left(), row.rect.center().y() - iconSize / 2, iconSize, iconSize);
+    FileIcons::folder(isDark(row.option.palette)).paint(row.painter, icon);
+    const QRect text(icon.right() + 9, row.rect.top(), row.rect.right() - icon.right() - 9, row.rect.height());
+    row.painter->setFont(row.option.font);
+    row.painter->setPen(row.option.palette.color(QPalette::Text));
+    row.painter->drawText(text, Qt::AlignLeft | Qt::AlignVCenter,
+                          QFontMetrics(row.option.font).elidedText(label, Qt::ElideMiddle, text.width()));
+}
+
 } // namespace
 
 FileChangeDelegate::FileChangeDelegate(QObject *parent)
@@ -160,6 +172,18 @@ void FileChangeDelegate::setStats(QTreeWidgetItem *item, const FilePatch &patch)
 {
     item->setData(0, addedRole, patch.addedLines());
     item->setData(0, removedRole, patch.removedLines());
+}
+
+void FileChangeDelegate::setFolder(QTreeWidgetItem *item, const QString &label, const QString &path)
+{
+    item->setText(0, label);
+    item->setData(0, folderRole, path);
+    item->setToolTip(0, path);
+}
+
+bool FileChangeDelegate::isFolder(const QTreeWidgetItem *item)
+{
+    return item->data(0, folderRole).isValid();
 }
 
 void FileChangeDelegate::setSection(QTreeWidgetItem *item, const QString &title, int count)
@@ -202,14 +226,22 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     }
 
     // Background, selection and hover from the style.
+    const QString label = item.text;
     item.text.clear();
     item.icon = QIcon();
     style->drawControl(QStyle::CE_ItemViewItem, &item, painter, widget);
+    if (index.data(folderRole).isValid()) {
+        paintFolder(row, label);
+        painter->restore();
+        return;
+    }
 
     const QString path = index.data(pathRole).toString();
     const auto kind = static_cast<ChangeKind>(index.data(kindRole).toInt());
     const QString name = path.mid(path.lastIndexOf(QLatin1Char('/')) + 1);
-    const QString folder = folderLabel(path, kind, index.data(oldPathRole).toString());
+    // Under a folder row, the folder is said already.
+    const bool isUnderAFolder = index.parent().data(folderRole).isValid();
+    const QString folder = folderLabel(isUnderAFolder ? name : path, kind, index.data(oldPathRole).toString());
 
     const int iconSize = 16;
     int x = row.rect.left();

@@ -1,5 +1,6 @@
 #include "CommitDelegate.h"
 
+#include "CommitGraph.h"
 #include "git/CommitLog.h"
 #include "ui/AppFonts.h"
 
@@ -7,9 +8,12 @@
 #include <QHash>
 #include <QLocale>
 #include <QPainter>
+#include <QPainterPath>
 #include <QTreeWidgetItem>
 
+#include <algorithm>
 #include <array>
+#include <tuple>
 
 namespace {
 
@@ -23,6 +27,16 @@ constexpr int authorRole = Qt::UserRole + 60;
 constexpr int dateRole = Qt::UserRole + 61;
 constexpr int shortIdRole = Qt::UserRole + 62;
 constexpr int refsRole = Qt::UserRole + 63;
+constexpr int graphRole = Qt::UserRole + 64;
+
+constexpr int laneWidth = 14;
+constexpr int dotRadius = 4;
+// Wider graphs are cut at the right: the summary keeps its room.
+constexpr int maximumShownLanes = 10;
+
+// One color per line of history, in turn.
+const std::array laneColors{QColor("#4c9be8"), QColor("#2fae8f"), QColor("#e07b53"), QColor("#c55bd8"),
+                            QColor("#d6a33c"), QColor("#d65d8f"), QColor("#5a8f3c"), QColor("#7c6cf0")};
 
 // Soft colors, one per author.
 const std::array avatarColors{QColor("#7c6cf0"), QColor("#4c9be8"), QColor("#2fae8f"), QColor("#e07b53"),
@@ -40,6 +54,24 @@ QColor muted(const QColor &color)
 {
     const QColor hsl = color.toHsl();
     return QColor::fromHslF(hsl.hslHueF(), hsl.hslSaturationF() * 0.55, hsl.lightnessF() * 0.9);
+}
+
+QColor laneColor(int color)
+{
+    return laneColors.at(size_t(color) % laneColors.size());
+}
+
+// Straight down, or curving from one lane to the other.
+void drawSegment(QPainter *painter, QPointF from, QPointF to)
+{
+    QPainterPath path(from);
+    if (qFuzzyCompare(from.x(), to.x())) {
+        path.lineTo(to);
+    } else {
+        const qreal middle = (from.y() + to.y()) / 2;
+        path.cubicTo(QPointF(from.x(), middle), QPointF(to.x(), middle), to);
+    }
+    painter->drawPath(path);
 }
 
 QString initials(const QString &name)
@@ -70,6 +102,16 @@ void CommitDelegate::setCommit(QTreeWidgetItem *item, const CommitSummary &commi
     item->setToolTip(0, QStringLiteral("%1\n%2 <%3>\n%4")
                             .arg(commit.summary, commit.author, commit.email,
                                  QLocale().toString(commit.date.toLocalTime(), QLocale::LongFormat)));
+}
+
+void CommitDelegate::setGraphRow(QTreeWidgetItem *item, const GraphRow &row)
+{
+    item->setData(0, graphRole, QVariant::fromValue(row));
+}
+
+void CommitDelegate::setGraphLanes(int lanes)
+{
+    graphLanes_ = std::min(lanes, maximumShownLanes);
 }
 
 QString CommitDelegate::relativeDate(const QDateTime &date, const QDateTime &now)
@@ -159,7 +201,12 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
-    const QRect rect = option.rect.adjusted(padding, 0, -padding, 0);
+    QRect rect = option.rect.adjusted(padding, 0, -padding, 0);
+    if (const QVariant graph = index.data(graphRole); graphLanes_ > 0 && graph.isValid()) {
+        const QRect column(rect.left() - padding / 2, option.rect.top(), graphLanes_ * laneWidth, option.rect.height());
+        paintGraph(painter, option, graph.value<GraphRow>(), column);
+        rect.setLeft(column.right() + padding / 2);
+    }
     const QString author = index.data(authorRole).toString();
     const qreal ratio = painter->device()->devicePixelRatioF();
     const QRect avatarRect(rect.left(), rect.center().y() - avatarSize / 2, avatarSize, avatarSize);
@@ -196,6 +243,29 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     painter->drawText(QRect(secondLine.left(), secondLine.top(), detailsWidth, secondLine.height()),
                       Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(detailFont).elidedText(details, Qt::ElideRight, detailsWidth));
+    painter->restore();
+}
+
+void CommitDelegate::paintGraph(QPainter *painter,
+                                const QStyleOptionViewItem &option,
+                                const GraphRow &row,
+                                const QRect &rect)
+{
+    const auto x = [&rect](int lane) { return rect.left() + lane * laneWidth + laneWidth / 2.0; };
+    const qreal middle = rect.top() + rect.height() / 2.0;
+    painter->save();
+    painter->setClipRect(rect);
+    for (const auto &[half, top, bottom] : {std::tuple{&row.upper, qreal(rect.top()), middle},
+                                            std::tuple{&row.lower, middle, qreal(rect.bottom() + 1)}}) {
+        for (const GraphSegment &segment : *half) {
+            painter->setPen(QPen(laneColor(segment.color), 2));
+            drawSegment(painter, QPointF(x(segment.from), top), QPointF(x(segment.to), bottom));
+        }
+    }
+    // The dot, ringed with the row's background to stand out from its lines.
+    painter->setPen(QPen(option.palette.color(QPalette::Base), 2));
+    painter->setBrush(laneColor(row.color));
+    painter->drawEllipse(QPointF(x(row.lane), middle), dotRadius + 1, dotRadius + 1);
     painter->restore();
 }
 

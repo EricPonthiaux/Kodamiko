@@ -15,8 +15,8 @@ struct CommitSummary {
     QString summary; // first line of the message
     QString author;
     QString email;
-    QDateTime date; // author date
-    int parentCount = 0;
+    QDateTime date;        // author date
+    QStringList parentIds; // full identifiers, the first parent first
     // Branches and tags pointing to this commit ("main", "origin/main",
     // "v1.0"), with HEAD first if it points to it.
     QStringList refs;
@@ -27,7 +27,15 @@ struct CommitSummary {
     bool operator==(const CommitSummary &) const = default;
 };
 
-// Commits of HEAD, newest first. If the open folder is a subfolder of the
+// Which commits a log walks: those of HEAD, or of every local and remote
+// branch (HEAD included, even detached).
+enum class LogScope {
+    Head,
+    AllBranches
+};
+
+// Commits of HEAD (or of every branch), newest first, a commit before its
+// parents. If the open folder is a subfolder of the
 // repository, only the commits that modify it are kept; with `path` (relative
 // to the open folder), only those that modify that file or folder. A file is
 // followed across its renames within the open folder, like "git log
@@ -40,7 +48,10 @@ struct CommitLog {
     bool operator==(const CommitLog &) const = default;
 
     // Returns nullopt outside a git repository. Throws GitError on failure.
-    static std::optional<CommitLog> read(const QString &folder, int limit = 2000, const QString &path = {});
+    static std::optional<CommitLog> read(const QString &folder,
+                                         int limit = 2000,
+                                         const QString &path = {},
+                                         LogScope scope = LogScope::Head);
 };
 
 // Contents of a commit: full message and changes relative to its first
