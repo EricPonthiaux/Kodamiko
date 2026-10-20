@@ -8,8 +8,9 @@
 #include <QList>
 #include <QStringList>
 
+#include <atomic>
+#include <memory>
 #include <optional>
-#include <stop_token>
 
 // Commit as shown in the history list.
 struct CommitSummary {
@@ -66,8 +67,10 @@ struct LogOptions {
     // Only the commits whose changes (against their first parent) involve a
     // text; merges are left out, as by git log.
     std::optional<ContentSearch> contents;
-    // Requested: the walk stops, the log is left incomplete.
-    std::stop_token stop;
+    // Set (by the reader that shares it): the walk stops, the log is left
+    // incomplete. Not std::stop_token: Apple's libc++ still marks it
+    // experimental.
+    std::shared_ptr<const std::atomic_bool> stop = std::make_shared<std::atomic_bool>(false);
 };
 
 // Commits of HEAD (or of every branch), newest first, a commit before its

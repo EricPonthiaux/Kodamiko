@@ -183,7 +183,7 @@ void HistoryView::setFolder(const QString &folder)
 
 HistoryView::~HistoryView()
 {
-    stopReading_.request_stop();
+    *stopReading_ = true;
     pool_.waitForDone();
 }
 
@@ -196,8 +196,8 @@ void HistoryView::setPathFilter(const QString &relativePath)
 void HistoryView::abandonReading()
 {
     ++generation_;
-    stopReading_.request_stop();
-    stopReading_ = std::stop_source();
+    *stopReading_ = true;
+    stopReading_ = std::make_shared<std::atomic_bool>(false);
 }
 
 void HistoryView::restartReading()
@@ -236,7 +236,7 @@ void HistoryView::refresh()
         .path = pathFilter_,
         .scope = allBranches_->isChecked() ? LogScope::AllBranches : LogScope::Head,
         .contents = contents_,
-        .stop = stopReading_.get_token(),
+        .stop = stopReading_,
     };
     pool_.start([this, folder = folder_, options, generation = generation_] {
         QString error;

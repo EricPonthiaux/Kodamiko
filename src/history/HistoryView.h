@@ -10,8 +10,9 @@
 #include <QTimer>
 #include <QWidget>
 
+#include <atomic>
+#include <memory>
 #include <optional>
-#include <stop_token>
 
 class CommitDelegate;
 class DiffHeaderBar;
@@ -141,7 +142,9 @@ private:
     // changes with the folder, the path filter and the content search.
     QThreadPool pool_;
     int generation_ = 0;
-    std::stop_source stopReading_;
+    // Shared with the reading in progress (LogOptions::stop), which may
+    // outlive its replacement.
+    std::shared_ptr<std::atomic_bool> stopReading_ = std::make_shared<std::atomic_bool>(false);
     // The content search of the log read; the query's, once typed.
     std::optional<ContentSearch> contents_;
     bool searchingContents_ = false;

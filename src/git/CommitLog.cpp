@@ -235,7 +235,7 @@ std::optional<CommitLog> CommitLog::read(const QString &folder, const LogOptions
         walk.contents.emplace(*options.contents);
 
     git_oid oid;
-    while (!options.stop.stop_requested() && git_revwalk_next(&oid, revwalk.get()) == 0) {
+    while (!*options.stop && git_revwalk_next(&oid, revwalk.get()) == 0) {
         git_commit *commit = nullptr;
         check(git_commit_lookup(&commit, repository.get(), &oid), "Reading a commit");
         const Ptr<git_commit> commitGuard(commit);

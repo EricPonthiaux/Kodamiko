@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "terminal/IPty.h"
+#include "terminal/ProcessSpec.h"
 #include "terminal/TerminalWidget.h"
 
 #include <QImage>
