@@ -12,6 +12,7 @@
 #include "git/Snapshots.h"
 #include "git/Worktrees.h"
 
+#include <QFileInfo>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -1043,12 +1044,112 @@ private slots:
         GitCommands commands;
         AgentMergeQueue queue(&commands);
         queue.setFolder(project.path());
-        QSignalSpy failed(&queue, &AgentMergeQueue::failed);
+        QSignalSpy waiting(&queue, &AgentMergeQueue::waiting);
 
         queue.enqueue(worktree);
 
-        QVERIFY(failed.wait());
+        QVERIFY(waiting.wait());
         QCOMPARE(read(project, "a.txt"), QByteArray("unsaved user change\n"));
+        QCOMPARE(waiting.first().at(1).toStringList(), QStringList{"a.txt"});
+    }
+
+    void mergesWaitingWorkOnceTheUsersFilesAreClean()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/a.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        write(project, "a.txt", "user change\n");
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        FileStatusReader statuses;
+        statuses.setFolder(project.path());
+        queue.watch(&statuses);
+        QSignalSpy waiting(&queue, &AgentMergeQueue::waiting);
+        QSignalSpy merged(&queue, &AgentMergeQueue::merged);
+        QSignalSpy statusesChanged(&statuses, &FileStatusReader::statusesChanged);
+        queue.enqueue(worktree);
+        QVERIFY(waiting.wait());
+
+        // The file states change while a.txt is still changed: it waits on.
+        write(project, "notes.txt", "user notes\n");
+        statuses.refresh();
+        QVERIFY(statusesChanged.wait());
+        QCOMPARE(queue.waitingWorktrees().size(), 1);
+        QCOMPARE(merged.size(), 0);
+
+        // a.txt discarded: the next file states bring the work in.
+        git(project, {"checkout", "--", "a.txt"});
+        statuses.refresh();
+
+        QVERIFY(merged.wait());
+        QCOMPARE(read(project, "a.txt"), QByteArray("agent\n"));
+        QCOMPARE(read(project, "notes.txt"), QByteArray("user notes\n"));
+        QVERIFY(queue.waitingWorktrees().isEmpty());
+    }
+
+    void dropsTheWaitingWorkOfADeletedWorktree()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo repository = *RepositoryInfo::read(project.path());
+        const Worktree worktree = Worktrees::add(repository, "agent-1");
+        write(project, ".claude/worktrees/agent-1/a.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        write(project, "a.txt", "user change\n");
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        FileStatusReader statuses;
+        statuses.setFolder(project.path());
+        queue.watch(&statuses);
+        QSignalSpy waiting(&queue, &AgentMergeQueue::waiting);
+        QSignalSpy statusesChanged(&statuses, &FileStatusReader::statusesChanged);
+        queue.enqueue(worktree);
+        QVERIFY(waiting.wait());
+        Worktrees::remove(repository, worktree);
+        QSignalSpy progress(&queue, &AgentMergeQueue::progress);
+
+        git(project, {"checkout", "--", "a.txt"});
+        statuses.refresh();
+
+        QVERIFY(statusesChanged.wait());
+        QVERIFY(queue.waitingWorktrees().isEmpty());
+        QCOMPARE(progress.size(), 0); // no merge started
+    }
+
+    void forgetsTheWaitingWorkOfAnotherFolder()
+    {
+        const QTemporaryDir project;
+        const QTemporaryDir other;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/a.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        write(project, "a.txt", "user change\n");
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        QSignalSpy waiting(&queue, &AgentMergeQueue::waiting);
+        queue.enqueue(worktree);
+        QVERIFY(waiting.wait());
+
+        queue.setFolder(other.path());
+
+        QVERIFY(queue.waitingWorktrees().isEmpty());
+    }
+
+    void namesTheFilesThatKeepAMergeOut()
+    {
+        RepositoryInfo repository;
+        repository.workDir = "/repo";
+        const QString error = "error: Your local changes to the following files would be overwritten by merge:\n"
+                              "\ta.txt\n\tsrc/b.cpp\n"
+                              "Please commit your changes or stash them before you merge.\nAborting";
+
+        QCOMPARE(Worktrees::blockingFiles(repository, error), QStringList({"/repo/a.txt", "/repo/src/b.cpp"}));
     }
 
 private:

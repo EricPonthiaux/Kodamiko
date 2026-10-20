@@ -285,8 +285,15 @@ void MainWindow::onAgentMerged(const Worktree &worktree,
     const QString message = tr("%1's work is merged into %2").arg(worktree.name, branch);
     showStatus(message);
     notify(tr("Agent work merged"), message);
-    if (afterMerge == AgentMergeQueue::AfterMerge::RemoveWorktree)
-        removeAgentWorktree(worktree);
+    if (afterMerge == AgentMergeQueue::AfterMerge::KeepWorktree) {
+        agentMessage_->popup(tr("Merge %1").arg(worktree.name),
+                             tr("%1\n\nIts worktree stays in %2, on the branch %3: the agent can go on working there.")
+                                 .arg(message, worktree.path, worktree.branch));
+        return;
+    }
+    agentMessage_->popup(tr("Merge %1").arg(worktree.name),
+                         tr("%1\n\nIts worktree and its branch %2 are deleted.").arg(message, worktree.branch));
+    removeAgentWorktree(worktree);
 }
 
 void MainWindow::onAgentSentBack(const Worktree &worktree, const QString &report, const QString &head)
