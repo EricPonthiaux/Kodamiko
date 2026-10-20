@@ -44,6 +44,9 @@ struct DuetToolContext {
     std::function<TerminalWidget *(const QString &title, const ProcessSpec &spec)> addTerminal;
     // Shows the Diff mode on a file (relative path; empty: the list).
     std::function<void(const QString &)> showChanges;
+    // Puts a commit message in the Diff mode's commit field, for the user to
+    // review and commit.
+    std::function<void(const QString &)> setCommitMessage;
     // The repository changed (files restored, staged, committed).
     std::function<void()> repositoryChanged;
 

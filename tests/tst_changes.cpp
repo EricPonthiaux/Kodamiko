@@ -8,7 +8,6 @@
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
-#include "claude/CommitMessage.h"
 #include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
@@ -202,12 +201,56 @@ private slots:
                 blocks.append(i);
         }
         QCOMPARE(blocks.size(), 2);
-        diff.goToChange(true);
+        diff.goToChange(DiffView::Direction::Next);
         QCOMPARE(diff.firstVisibleLine(), blocks[0]);
-        diff.goToChange(true);
+        diff.goToChange(DiffView::Direction::Next);
         QCOMPARE(diff.firstVisibleLine(), blocks[1]);
-        diff.goToChange(false);
+        diff.goToChange(DiffView::Direction::Previous);
         QCOMPARE(diff.firstVisibleLine(), blocks[0]);
+    }
+
+    void keysGoFromBlockToBlockAndFileToFile()
+    {
+        const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n@@ -40 +40 @@\n-c\n+d\n";
+        DiffView diff(Theme::dark());
+        diff.resize(600, 40);
+        diff.show();
+        diff.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&diff));
+        diff.setFocus();
+        diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}, {"y.txt", "modified", FilePatch::parse(patch)}});
+        const int firstBlock = diff.hunkStart(diff.fileStart(0) + 2);
+
+        QTest::keyClick(&diff, Qt::Key_F7);
+        QCOMPARE(diff.firstVisibleLine(), firstBlock);
+        int line = 0;
+        int index = 0;
+        diff.getCursorPosition(&line, &index);
+        QCOMPARE(line, firstBlock); // on the block, for Space
+
+        QTest::keyClick(&diff, Qt::Key_Down, Qt::AltModifier);
+        QCOMPARE(diff.firstVisibleLine(), diff.fileStart(1));
+        QTest::keyClick(&diff, Qt::Key_Up, Qt::AltModifier);
+        QCOMPARE(diff.firstVisibleLine(), diff.fileStart(0));
+    }
+
+    void removedLinesOpenAtTheNextLineLeft()
+    {
+        const QByteArray patch = "@@ -1,3 +1,2 @@\n a\n-b\n c\n@@ -9,2 +8 @@\n z\n-end\n";
+        DiffView diff(Theme::dark());
+        diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
+        const QList<DiffLine> &lines = diff.displayedLines();
+        QList<int> removed;
+        for (int i = 0; i < lines.size(); ++i) {
+            if (lines[i].kind == DiffLineKind::Removed)
+                removed.append(i);
+        }
+        QCOMPARE(removed.size(), 2);
+
+        QCOMPARE(diff.newFileLine(removed[0]), 1);        // "c", line 2
+        QCOMPARE(diff.newFileLine(removed[1]), 8);        // after "z", the last line
+        QCOMPARE(diff.newFileLine(diff.fileStart(0)), 0); // the title bar: the first line shown
+        QCOMPARE(diff.newFileLine(removed[0] - 1), 0);    // "a" itself
     }
 
     void blockButtonsActOnTheBlockUnderTheMouse()
@@ -265,8 +308,8 @@ private slots:
         QVERIFY(anyVisible());
 
         // As the keyboard scrolls: no wheel, no mouse move.
-        diff.goToChange(true);
-        diff.goToChange(true);
+        diff.goToChange(DiffView::Direction::Next);
+        diff.goToChange(DiffView::Direction::Next);
 
         QTRY_VERIFY(!anyVisible());
     }
@@ -368,6 +411,44 @@ private slots:
         QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (0)", "Staged (0)"}));
         QVERIFY(message->toPlainText().isEmpty());
         QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("second\n"));
+    }
+
+    void spaceStagesTheBlockAtTheCursorAndF4OpensItsLine()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "one\n2\n3\n4\n5\n6\n7\n8\n9\nten\n");
+
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 600);
+        view.show();
+        view.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&view));
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *diff = view.findChild<DiffView *>();
+        diff->setFocus();
+        QTest::keyClick(diff, Qt::Key_F7);
+        QTest::keyClick(diff, Qt::Key_F7); // the second block: lines 7 to 10
+
+        const QSignalSpy opened(&view, &ChangesView::openFileRequested);
+        QTest::keyClick(diff, Qt::Key_F4);
+        QCOMPARE(opened.size(), 1);
+        QCOMPARE(opened.first().at(0).toString(), QString("a.txt"));
+        QCOMPARE(opened.first().at(1).toInt(), 6); // the block's first line
+
+        QTest::keyClick(diff, Qt::Key_Space);
+        const auto *list = view.findChild<QTreeWidget *>();
+        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (1)", "Staged (1)"}));
+        const QByteArray staged = Git::run(project.path(), {"diff", "--cached"});
+        QVERIFY(staged.contains("+ten"));
+        QVERIFY(!staged.contains("+one"));
     }
 
     void snapshotsPopupListsAndRestores()
@@ -555,54 +636,8 @@ private slots:
         QVERIFY(!view.operationBar()->isVisible());
     }
 
-    void readsTheChangesOfTheNextCommit()
+    void generateAsksTheClaudeSessionForTheMessage()
     {
-        const QTemporaryDir project;
-        write(project, "a.txt", "a\n");
-        Git::run(project.path(), {"init", "-q", "-b", "main"});
-        Git::run(project.path(), {"add", "-A"});
-        Git::run(project.path(), {"commit", "-qm", "Add a"});
-
-        // Amending the first commit: against the empty tree.
-        const RepositoryInfo info = *RepositoryInfo::read(project.path());
-        CommitMessage::Changes changes = CommitMessage::read(info, true, false, {});
-        QCOMPARE(changes.recentSubjects, QStringList{"Add a"});
-        QVERIFY(changes.diff.contains("+a"));
-
-        write(project, "a.txt", "b\n");
-        write(project, "b.txt", "staged\n");
-        write(project, "new.txt", "n\n");
-        Git::run(project.path(), {"add", "b.txt"});
-
-        changes = CommitMessage::read(info, false, false, {});
-        QVERIFY(changes.diff.contains("+staged"));
-        QVERIFY(!changes.diff.contains("+b"));
-        QVERIFY(changes.stat.contains("b.txt"));
-        QVERIFY(changes.untracked.isEmpty());
-
-        changes = CommitMessage::read(info, false, true, {});
-        QVERIFY(changes.diff.contains("+staged"));
-        QVERIFY(changes.diff.contains("+b"));
-        QCOMPARE(changes.untracked, QStringList{"new.txt"});
-    }
-
-#ifndef Q_OS_WIN
-    // With a stand-in for the `claude` command, found in the PATH.
-    void generatesTheCommitMessage()
-    {
-        const QTemporaryDir bin;
-        const QString claude = bin.filePath("claude");
-        QFile script(claude);
-        QVERIFY(script.open(QIODevice::WriteOnly));
-        script.write("#!/bin/sh\n"
-                     "cat > \"$0.input\"\n"
-                     "echo \"$@\" > \"$0.arguments\"\n"
-                     "printf '%s' '{\"type\":\"result\",\"is_error\":false,\"result\":\"Change a\\n\\nBecause.\"}'\n");
-        script.close();
-        script.setPermissions(script.permissions() | QFileDevice::ExeOwner);
-        const QByteArray path = qgetenv("PATH");
-        qputenv("PATH", bin.path().toUtf8() + ':' + path);
-
         const QTemporaryDir project;
         write(project, "a.txt", "a\n");
         Git::run(project.path(), {"init", "-q", "-b", "main"});
@@ -616,26 +651,21 @@ private slots:
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
-
+        const QSignalSpy requested(&view, &ChangesView::commitMessageRequested);
         auto *message = view.findChild<QPlainTextEdit *>();
         message->setPlainText("mine");
+
         view.generateCommitMessage(); // nothing staged: every change
-        QTRY_COMPARE(message->toPlainText(), QString("Change a\n\nBecause."));
-        qputenv("PATH", path);
+        QCOMPARE(requested.size(), 1);
+        const QString request = requested.first().at(0).toString();
+        QVERIFY(request.contains("set_commit_message"));
+        QVERIFY(request.contains("nothing is staged"));
 
-        QFile input(claude + ".input");
-        QVERIFY(input.open(QIODevice::ReadOnly));
-        const QByteArray sent = input.readAll();
-        QVERIFY(sent.contains("Recent commits:\nAdd a\n"));
-        QVERIFY(sent.contains("+b"));
-        QFile arguments(claude + ".arguments");
-        QVERIFY(arguments.open(QIODevice::ReadOnly));
-        QVERIFY(arguments.readAll().startsWith("--print --model haiku"));
-
+        view.showCommitMessage("Change a\n\nBecause.");
+        QCOMPARE(message->toPlainText(), QString("Change a\n\nBecause."));
         message->undo(); // what was written before comes back
         QCOMPARE(message->toPlainText(), QString("mine"));
     }
-#endif
 
 private:
     QTemporaryFile config_;

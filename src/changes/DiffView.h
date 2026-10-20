@@ -5,13 +5,16 @@
 
 #include <Qsci/qsciscintilla.h>
 
+#include <optional>
+
 // Diff without git's notation, for reading: a title bar per file with its
 // added and removed line counts, a separator per block of changes ("⋯ lines
 // 40–48 · function"), the lines themselves without "+" or "-", colored as in
 // the editor, added ones on a green background and removed ones on a red
 // one, the words that changed within a line brighter still, and in the
 // margin their numbers before and after. Read only; the text can be selected
-// and copied.
+// and copied. F7 and Shift+F7 go to the next and previous block, Alt+Down
+// and Alt+Up to the next and previous file.
 class DiffView : public QsciScintilla {
     Q_OBJECT
 
@@ -22,6 +25,11 @@ public:
         QString status;
         int added = 0;
         int removed = 0;
+    };
+
+    enum class Direction {
+        Previous,
+        Next
     };
 
     explicit DiffView(const Theme &theme, QWidget *parent = nullptr);
@@ -39,8 +47,16 @@ public:
     // The block separator of the block holding displayed line `line`; -1
     // outside a block.
     int hunkStart(int line) const;
-    // Scrolls the next (or previous) block of changes to the top.
-    void goToChange(bool forward);
+    // Scrolls the next (or previous) block of changes to the top and puts
+    // the cursor on its separator. Next after the cursor when it is in view,
+    // otherwise after the top of the view.
+    void goToChange(Direction direction);
+    // Same for the next (or previous) file's title bar.
+    void goToFile(Direction direction);
+    // The line, from 0, of the file's new version that displayed line `line`
+    // stands for: the line itself, or the next line of the new version for a
+    // removed line, a block separator or a title bar.
+    int newFileLine(int line) const;
     // Where displayed line `line` is in the viewport, and the lines' height.
     int lineTop(int line) const;
     int lineHeight() const;
@@ -54,6 +70,12 @@ signals:
     void contentChanged();
 
 private:
+    void addShortcuts();
+    // The first displayed line of `kind` after (or before) the cursor or the
+    // top of the view, see goToChange().
+    std::optional<int> nextLineOfKind(DiffLineKind kind, Direction direction) const;
+    // Scrolls displayed line `line` to the top with the cursor on it.
+    void showAtTop(int line);
     void render();
     // Markers and margin text of displayed line `line`; returns the style of its text.
     int decorateLine(int line);

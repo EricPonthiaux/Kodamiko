@@ -150,24 +150,6 @@ QString javaVersionFromPom(const QByteArray &pom)
     return {};
 }
 
-QString javaVersionFromGradle(const QByteArray &script)
-{
-    const QString text = QString::fromUtf8(script);
-    static const QList<QRegularExpression> expressions{
-        QRegularExpression(QStringLiteral(R"(JavaLanguageVersion\s*\.\s*of\s*\(\s*['"]?(\d+))")),
-        QRegularExpression(QStringLiteral(R"(jvmToolchain\s*\(?\s*(\d+))")),
-        QRegularExpression(
-            QStringLiteral(R"((?:source|target)Compatibility\s*=?\s*JavaVersion\s*\.\s*VERSION_(\d+(?:_\d+)?))")),
-        QRegularExpression(QStringLiteral(R"((?:source|target)Compatibility\s*=?\s*['"]?(\d+(?:\.\d+)?))")),
-    };
-    for (const QRegularExpression &expression : expressions) {
-        const QRegularExpressionMatch match = expression.match(text);
-        if (match.hasMatch())
-            return javaMajor(match.captured(1).replace(QLatin1Char('_'), QLatin1Char('.')));
-    }
-    return {};
-}
-
 QString nodeMajor(const QString &spec)
 {
     static const QRegularExpression number(QStringLiteral(R"(^\s*(?:[v=^~><]|>=|<=)*\s*(\d+))"));
@@ -256,28 +238,22 @@ void detectJavaVersionFiles(const ProjectScan &project, DetectedLanguage &java)
     }
 }
 
-void detectJavaBuildFiles(const ProjectScan &project, DetectedLanguage &java)
+void detectJavaBuildFile(const ProjectScan &project, DetectedLanguage &java)
 {
-    for (const QString &name :
-         {QStringLiteral("pom.xml"), QStringLiteral("build.gradle.kts"), QStringLiteral("build.gradle")}) {
-        const QString path = project.marker(name);
-        if (path.isEmpty())
-            continue;
-        if (java.evidence.isEmpty())
-            java.evidence = project.relative(path);
-        if (!java.runtimeVersion.isEmpty())
-            continue;
-        const QByteArray text = readFile(path);
-        java.runtimeVersion = name == QLatin1String("pom.xml") ? ProjectDetector::javaVersionFromPom(text)
-                                                               : ProjectDetector::javaVersionFromGradle(text);
-    }
+    const QString path = project.marker(QStringLiteral("pom.xml"));
+    if (path.isEmpty())
+        return;
+    if (java.evidence.isEmpty())
+        java.evidence = project.relative(path);
+    if (java.runtimeVersion.isEmpty())
+        java.runtimeVersion = ProjectDetector::javaVersionFromPom(readFile(path));
 }
 
 DetectedLanguage detectJava(const ProjectScan &project)
 {
     DetectedLanguage java{QStringLiteral("java"), {}, {}, {}};
     detectJavaVersionFiles(project, java);
-    detectJavaBuildFiles(project, java);
+    detectJavaBuildFile(project, java);
     const int files = project.count({QStringLiteral("java")});
     if (java.evidence.isEmpty() && files >= minimumSources)
         java.evidence = filesEvidence(files, QStringLiteral("java"));

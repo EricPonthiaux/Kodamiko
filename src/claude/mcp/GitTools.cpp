@@ -3,6 +3,7 @@
 #include "DuetTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
+#include "claude/CommitMessage.h"
 #include "git/Branches.h"
 #include "git/CommitLog.h"
 #include "git/GitCommands.h"
@@ -294,6 +295,18 @@ McpResult showChanges(const DuetToolContext &context, const QJsonObject &argumen
     const QString path = arguments.value(QStringLiteral("path")).toString();
     context.showChanges(path.isEmpty() ? QString() : relativePathArgument(context, arguments));
     return McpResult::message(QStringLiteral("Shown"));
+}
+
+McpResult setCommitMessage(const DuetToolContext &context, const QJsonObject &arguments)
+{
+    if (!context.setCommitMessage)
+        return McpResult::error(QStringLiteral("Not available"));
+    const QString message = CommitMessage::tidy(arguments.value(QStringLiteral("message")).toString());
+    if (message.isEmpty())
+        return McpResult::error(QStringLiteral("The message is empty"));
+    context.setCommitMessage(message);
+    return McpResult::message(
+        QStringLiteral("The message is in Duet's commit field: the user reviews it, then commits."));
 }
 
 QString describeStaging(const DuetToolContext &context, const QJsonObject &arguments)
@@ -693,6 +706,16 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
                                 {QStringLiteral("amend"), boolean(QStringLiteral("Amend the last commit"))}},
                                {QStringLiteral("message")})},
         describeCommit, handledBy(context, commit)));
+
+    registry.addTool(McpTool::acting(
+        {.name = QStringLiteral("set_commit_message"),
+         .title = QStringLiteral("Set the commit message"),
+         .description = QStringLiteral("Puts a commit message in Duet's commit field, in the Diff mode, for the user "
+                                       "to review and commit; nothing is committed. Use it when the user asks for "
+                                       "the message of the next commit."),
+         .inputSchema = object({{QStringLiteral("message"), string(QStringLiteral("Commit message"))}},
+                               {QStringLiteral("message")})},
+        handledBy(context, setCommitMessage)));
 
     registerBranchTools(registry, context);
 }

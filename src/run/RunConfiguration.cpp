@@ -22,7 +22,7 @@ bool exists(const QString &folder, const QString &name)
     return QFileInfo::exists(folder + QLatin1Char('/') + name);
 }
 
-// A wrapper script of the project (mvnw, gradlew) as the shell runs it.
+// A wrapper script of the project (mvnw) as the shell runs it.
 QString wrapper(const QString &name)
 {
 #ifdef Q_OS_WIN
@@ -131,17 +131,6 @@ void detectJava(const QString &folder, QList<RunConfiguration> &found)
         found.append(make(QStringLiteral("Maven: compile"), Kind::Build, mvn + QStringLiteral(" compile")));
         found.append(make(QStringLiteral("Maven: package"), Kind::Build, mvn + QStringLiteral(" package")));
         found.append(make(QStringLiteral("Maven: test"), Kind::Test, mvn + QStringLiteral(" test")));
-    }
-    if (exists(folder, QStringLiteral("build.gradle")) || exists(folder, QStringLiteral("build.gradle.kts")) ||
-        exists(folder, QStringLiteral("settings.gradle")) || exists(folder, QStringLiteral("settings.gradle.kts"))) {
-        const QString gradle =
-            exists(folder, QStringLiteral("gradlew")) ? wrapper(QStringLiteral("gradlew")) : QStringLiteral("gradle");
-        found.append(make(QStringLiteral("Gradle: build"), Kind::Build, gradle + QStringLiteral(" build")));
-        found.append(make(QStringLiteral("Gradle: test"), Kind::Test, gradle + QStringLiteral(" test")));
-        const QByteArray script =
-            readFile(folder + QStringLiteral("/build.gradle")) + readFile(folder + QStringLiteral("/build.gradle.kts"));
-        if (script.contains("application"))
-            found.append(make(QStringLiteral("Gradle: run"), Kind::Run, gradle + QStringLiteral(" run")));
     }
 }
 

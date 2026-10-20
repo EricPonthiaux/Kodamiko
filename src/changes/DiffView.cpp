@@ -5,6 +5,7 @@
 #include "syntax/ScintillaStyles.h"
 
 #include <QFontMetrics>
+#include <QShortcut>
 
 #include <algorithm>
 
@@ -38,6 +39,19 @@ DiffView::DiffView(const Theme &theme, QWidget *parent)
     for (int margin = 2; margin < 5; ++margin)
         setMarginWidth(margin, 0);
     applyTheme(theme);
+    addShortcuts();
+}
+
+void DiffView::addShortcuts()
+{
+    const auto add = [this](const QKeySequence &keys, auto slot) {
+        const auto *shortcut = new QShortcut(keys, this, nullptr, nullptr, Qt::WidgetShortcut);
+        connect(shortcut, &QShortcut::activated, this, slot);
+    };
+    add(QKeySequence(Qt::Key_F7), [this] { goToChange(Direction::Next); });
+    add(QKeySequence(Qt::SHIFT | Qt::Key_F7), [this] { goToChange(Direction::Previous); });
+    add(QKeySequence(Qt::ALT | Qt::Key_Down), [this] { goToFile(Direction::Next); });
+    add(QKeySequence(Qt::ALT | Qt::Key_Up), [this] { goToFile(Direction::Previous); });
 }
 
 void DiffView::setFiles(const QList<DiffFile> &files)
@@ -99,16 +113,54 @@ int DiffView::hunkStart(int line) const
     return -1;
 }
 
-void DiffView::goToChange(bool forward)
+void DiffView::goToChange(Direction direction)
 {
-    const int first = firstVisibleLine();
-    const int step = forward ? 1 : -1;
-    for (int i = first + step; i >= 0 && i < lines_.size(); i += step) {
-        if (lines_[i].kind == DiffLineKind::HunkHeader) {
-            setFirstVisibleLine(i);
-            return;
-        }
+    if (const auto separator = nextLineOfKind(DiffLineKind::HunkHeader, direction))
+        showAtTop(*separator);
+}
+
+void DiffView::goToFile(Direction direction)
+{
+    if (const auto title = nextLineOfKind(DiffLineKind::FileHeader, direction))
+        showAtTop(*title);
+}
+
+std::optional<int> DiffView::nextLineOfKind(DiffLineKind kind, Direction direction) const
+{
+    int cursorLine = 0;
+    int index = 0;
+    getCursorPosition(&cursorLine, &index);
+    const int top = firstVisibleLine();
+    const bool isCursorInView = cursorLine >= top && cursorLine < top + int(SendScintilla(SCI_LINESONSCREEN));
+    const int step = direction == Direction::Next ? 1 : -1;
+    for (int i = (isCursorInView ? cursorLine : top) + step; i >= 0 && i < lines_.size(); i += step) {
+        if (lines_[i].kind == kind)
+            return i;
     }
+    return std::nullopt;
+}
+
+void DiffView::showAtTop(int line)
+{
+    setCursorPosition(line, 0); // scrolls to the cursor: first
+    setFirstVisibleLine(line);
+}
+
+int DiffView::newFileLine(int line) const
+{
+    const int file = locate(line).file;
+    if (file < 0)
+        return 0;
+    for (int i = line; i < lines_.size() && lines_[i].location.file == file; ++i) {
+        if (lines_[i].newNumber > 0)
+            return lines_[i].newNumber - 1;
+    }
+    // Removed lines at the end of the file: the line after the last one left.
+    for (int i = line - 1; i >= 0 && lines_[i].location.file == file; --i) {
+        if (lines_[i].newNumber > 0)
+            return lines_[i].newNumber;
+    }
+    return 0;
 }
 
 int DiffView::lineTop(int line) const

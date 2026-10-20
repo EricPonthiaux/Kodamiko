@@ -3,6 +3,7 @@
 #include "CommitPanel.h"
 #include "DiffHeaderBar.h"
 #include "DiffView.h"
+#include "DiscardConfirmation.h"
 #include "FileChangeDelegate.h"
 #include "HunkActions.h"
 #include "git/ChangeKindStyle.h"
@@ -17,7 +18,6 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QMenu>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSet>
 #include <QSplitter>
@@ -32,22 +32,6 @@ namespace {
 
 constexpr int sectionRole = Qt::UserRole;
 constexpr int indexRole = Qt::UserRole + 1; // -1 on a section title
-
-QString discardHint()
-{
-    return QObject::tr("A copy is kept: Git menu ▸ Restore a Snapshot.");
-}
-
-// "Discard" rather than "Cancel", which would be confused with the Cancel button.
-bool confirmDiscard(QWidget *parent, const QString &question, const QString &details)
-{
-    QMessageBox box(QMessageBox::Warning, QObject::tr("Discard Changes"), question, QMessageBox::NoButton, parent);
-    box.setInformativeText(details.isEmpty() ? discardHint() : details + QLatin1Char(' ') + discardHint());
-    const QPushButton *discard = box.addButton(QObject::tr("Discard"), QMessageBox::DestructiveRole);
-    box.setDefaultButton(box.addButton(QObject::tr("Keep"), QMessageBox::RejectRole));
-    box.exec();
-    return box.clickedButton() == discard;
-}
 
 // "2 staged · 3 unstaged · rebase in progress", or that nothing changed.
 QString statusSummary(const RepositoryStatus &status)
@@ -175,10 +159,11 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
             return;
         const FileChange &change = files(static_cast<Section>(item->data(0, sectionRole).toInt())).at(index).change;
         if (change.kind != ChangeKind::Deleted)
-            emit openFileRequested(change.path);
+            emit openFileRequested(change.path, 0);
     });
 
     connect(commitPanel_, &CommitPanel::statusMessage, this, &ChangesView::statusMessage);
+    connect(commitPanel_, &CommitPanel::messageRequested, this, &ChangesView::commitMessageRequested);
 
     // The column: the file actions, the list, the commit area fixed below.
     auto *left = new QFrame(this);
@@ -193,6 +178,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     diff_->setContextMenuPolicy(Qt::CustomContextMenu);
     diff_->setToolTip({});
     connect(diff_, &QWidget::customContextMenuRequested, this, &ChangesView::showDiffMenu);
+    addDiffShortcuts();
     // A block's buttons act on the whole block, whatever lines are selected.
     connect(hunkActions_, &HunkActions::applyRequested, this, [this](int line) {
         diff_->selectAll(false);
@@ -352,6 +338,7 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
         list_->currentItem() ? std::optional(keyOf(list_->currentItem())) : std::nullopt;
     const Section previousSection = shownSection_;
     const int firstLine = diff_->firstVisibleLine();
+    const int cursorLine = diffCursorLine();
 
     status_ = std::move(status);
     rebuildList();
@@ -370,8 +357,11 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
     // before, otherwise the one that has changes.
     const Section section = sectionToShow(current ? static_cast<Section>(current->first) : previousSection);
     showSection(section);
-    if (section == previousSection)
+    if (section == previousSection) {
+        // The cursor near the block just staged: Space goes on with the next.
+        diff_->setCursorPosition(std::min(cursorLine, diff_->lines() - 1), 0);
         diff_->setFirstVisibleLine(firstLine);
+    }
     updateActions();
 }
 
@@ -598,11 +588,11 @@ void ChangesView::discardFiles(const QList<FileRef> &refs)
             : tr("Discard changes to %n file(s)?", nullptr, static_cast<int>(unstaged.size()));
     const QString details =
         created > 0 ? tr("%n untracked file(s) will be deleted.", nullptr, static_cast<int>(created)) : QString();
-    if (!confirmDiscard(this, question, details))
+    if (!DiscardConfirmation::ask(this, question, details))
         return;
     commands_->run(tr("Discarding changes"), [info = status_->info, paths = repoPaths(unstaged)] {
         GitOperations::discard(info, paths);
-        return QObject::tr("Changes discarded. %1").arg(discardHint());
+        return QObject::tr("Changes discarded. %1").arg(DiscardConfirmation::hint());
     });
 }
 
@@ -630,112 +620,6 @@ void ChangesView::unstageAll()
     });
 }
 
-QHash<int, PatchSelection> ChangesView::diffSelection(int line, bool *lines) const
-{
-    // Displayed file that contains a diff line, and the position in its patch.
-    const auto locate = [this](int diffLine) -> std::tuple<int, int, int> {
-        const DiffLocation location = diff_->locate(diffLine);
-        return {location.file, location.hunk, location.line};
-    };
-
-    QHash<int, PatchSelection> result;
-    *lines = false;
-    if (diff_->hasSelectedText()) {
-        int lineFrom = 0;
-        int indexFrom = 0;
-        int lineTo = 0;
-        int indexTo = 0;
-        diff_->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
-        if (indexTo == 0 && lineTo > lineFrom)
-            --lineTo; // selection that ends at the start of a line
-        for (int l = lineFrom; l <= lineTo; ++l) {
-            const auto [file, hunk, hunkLine] = locate(l);
-            if (file >= 0 && hunk >= 0 && hunkLine >= 0 && shownPatches_[file].hunks[hunk].isChange(hunkLine))
-                result[file][hunk].insert(hunkLine);
-        }
-        if (!result.isEmpty()) {
-            *lines = true;
-            return result;
-        }
-    }
-    const auto [file, hunk, hunkLine] = locate(line);
-    Q_UNUSED(hunkLine);
-    if (file >= 0 && hunk >= 0)
-        result[file] = shownPatches_[file].selectHunk(hunk);
-    return result;
-}
-
-void ChangesView::applyDiffSelection(int line, bool discard)
-{
-    if (!status_)
-        return;
-    bool lines = false;
-    const QHash<int, PatchSelection> selection = diffSelection(line, &lines);
-    if (selection.isEmpty())
-        return;
-
-    // Stage: patch applied as is to the index. Unstage: applied in reverse
-    // to the index. Discard: applied in reverse to the files.
-    const PatchDirection direction =
-        shownSection_ == Section::Unstaged && !discard ? PatchDirection::Forward : PatchDirection::Reverse;
-    QByteArray patch;
-    QList<FileRef> touched;
-    for (auto it = selection.begin(); it != selection.end(); ++it) {
-        patch += shownPatches_[it.key()].partial(it.value(), direction);
-        touched.append({shownSection_, it.key()});
-    }
-    if (patch.isEmpty())
-        return;
-
-    if (discard) {
-        if (!confirmDiscard(this, lines ? tr("Discard the selected lines?") : tr("Discard this hunk?"), {}))
-            return;
-        commands_->run(tr("Discarding changes"), [info = status_->info, paths = repoPaths(touched), patch] {
-            GitOperations::discardPatch(info, paths, patch);
-            return QObject::tr("Changes discarded. %1").arg(discardHint());
-        });
-        return;
-    }
-    commands_->run(shownSection_ == Section::Unstaged ? tr("Staging") : tr("Unstaging"),
-                   [info = status_->info, patch, direction] {
-                       GitOperations::applyToIndex(info, patch, direction);
-                       return QString();
-                   });
-}
-
-void ChangesView::showDiffMenu(const QPoint &position)
-{
-    int line = diff_->lineAt(position);
-    if (line < 0) {
-        int index = 0;
-        diff_->getCursorPosition(&line, &index);
-    }
-    bool lines = false;
-    const bool hasSelection = status_ && !diffSelection(line, &lines).isEmpty();
-    const bool busy = commands_->isBusy();
-
-    QMenu *menu = diff_->createStandardContextMenu();
-    QAction *first = menu->actions().value(0);
-    const auto addAction = [&](const QString &text, auto slot) {
-        auto *action = new QAction(text, menu);
-        action->setEnabled(hasSelection && !busy);
-        connect(action, &QAction::triggered, this, slot);
-        menu->insertAction(first, action);
-    };
-    if (shownSection_ == Section::Unstaged) {
-        addAction(lines ? tr("Stage Selected Lines") : tr("Stage This Hunk"),
-                  [this, line] { applyDiffSelection(line, false); });
-        addAction(lines ? tr("Discard Selected Lines…") : tr("Discard This Hunk…"),
-                  [this, line] { applyDiffSelection(line, true); });
-    } else {
-        addAction(lines ? tr("Unstage Selected Lines") : tr("Unstage This Hunk"),
-                  [this, line] { applyDiffSelection(line, false); });
-    }
-    menu->insertSeparator(first);
-    menu->exec(diff_->viewport()->mapToGlobal(position));
-    delete menu;
-}
-
 void ChangesView::showListMenu(const QPoint &position)
 {
     const QList<FileRef> selection = selectedFiles();
@@ -758,7 +642,7 @@ void ChangesView::showListMenu(const QPoint &position)
         const FileChange &change = files(selection.first().section).at(selection.first().index).change;
         if (change.kind != ChangeKind::Deleted) {
             menu.addSeparator();
-            menu.addAction(tr("Open File"), this, [this, path = change.path] { emit openFileRequested(path); });
+            menu.addAction(tr("Open File"), this, [this, path = change.path] { emit openFileRequested(path, 0); });
         }
     }
     menu.exec(list_->viewport()->mapToGlobal(position));
@@ -772,6 +656,11 @@ void ChangesView::focusCommitMessage()
 void ChangesView::generateCommitMessage()
 {
     commitPanel_->generateMessage();
+}
+
+void ChangesView::showCommitMessage(const QString &message)
+{
+    commitPanel_->showGeneratedMessage(message);
 }
 
 void ChangesView::applyTheme(const Theme &theme)

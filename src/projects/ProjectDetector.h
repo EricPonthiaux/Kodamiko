@@ -5,7 +5,7 @@
 #include <QString>
 
 // What a project's files say about its languages: the build files and
-// version files (pom.xml, build.gradle, .nvmrc, pyproject.toml,
+// version files (pom.xml, .nvmrc, pyproject.toml,
 // CMakeLists.txt...) near its root, and the extensions of its sources.
 struct DetectedLanguage {
     QString language;       // a ProjectLanguages family
@@ -25,9 +25,6 @@ QList<DetectedLanguage> detect(const QString &folder);
 // "17" from <maven.compiler.release>, <maven.compiler.source>, <release>
 // or <java.version> ("1.8" gives "8"; ${properties} are resolved).
 QString javaVersionFromPom(const QByteArray &pom);
-// "17" from a toolchain (JavaLanguageVersion.of(17), jvmToolchain(17)) or
-// sourceCompatibility (JavaVersion.VERSION_17, '17', 1.8).
-QString javaVersionFromGradle(const QByteArray &script);
 // "17" from "17.0.2", "1.8", "java=17.0.2-tem" (.sdkmanrc)...
 QString javaMajor(const QString &version);
 // "20" from "v20.11.1", ">=18", "^22.1", "20"; empty for "lts/*" or "node".

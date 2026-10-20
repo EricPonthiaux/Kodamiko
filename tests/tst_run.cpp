@@ -138,19 +138,13 @@ private slots:
         const QTemporaryDir dir;
         write(dir.path() + "/pom.xml", "<project/>");
         write(dir.path() + "/mvnw", "#!/bin/sh\n");
-        QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
+        const QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
         QVERIFY(named(found, "Maven: compile"));
 #ifdef Q_OS_WIN
         QCOMPARE(named(found, "Maven: test")->command, QString("mvnw test"));
 #else
         QCOMPARE(named(found, "Maven: test")->command, QString("./mvnw test"));
 #endif
-
-        const QTemporaryDir gradle;
-        write(gradle.path() + "/build.gradle.kts", "plugins { application }\n");
-        found = RunConfigurations::detect(gradle.path());
-        QCOMPARE(names(found), (QStringList{"Gradle: build", "Gradle: test", "Gradle: run"}));
-        QCOMPARE(found.first().command, QString("gradle build"));
     }
 
     void detectsMakeTargets()

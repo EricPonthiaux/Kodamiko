@@ -1,86 +1,26 @@
 #pragma once
 
-#include "git/RepositoryStatus.h"
-
-#include <QByteArray>
-#include <QObject>
 #include <QString>
-#include <QStringList>
-#include <QThreadPool>
 
-#include <optional>
-
-class QProcess;
-class QTimer;
-
-// Commit message written by Claude from the changes about to be committed,
-// through a one-off `claude --print` run: it works with the user's own
-// Claude Code login (subscription or API key), as in a console.
+// Commit message written by the Claude session in Duet's terminal: Duet
+// types the request in its prompt, Claude reads the changes with its own
+// tools and hands the message back with the set_commit_message tool. The
+// session knows why the changes were made, which the diff does not say.
 namespace CommitMessage {
 
-// What the commit will contain.
-struct Changes {
-    QStringList recentSubjects; // most recent first
-    QByteArray stat;            // "git diff --stat"
-    QByteArray diff;
-    QStringList untracked; // files the commit will add, not in `diff`
+// What the next commit will hold, as CommitPanel decides it.
+enum class Scope {
+    Staged,     // the index
+    Everything, // nothing staged: every change under the pathspec
+    Amend       // the last commit with the index
 };
 
-// Reads the changes of the next commit: the index, or with `amend` the index
-// against the parent of HEAD, or with `stageEverything` (nothing staged yet:
-// the commit will stage `pathspec` first) every change under `pathspec`.
-// Synchronous; throws GitError.
-Changes read(const RepositoryInfo &repository, bool amend, bool stageEverything, const QString &pathspec);
+// The request typed in the session's prompt, for `scope`; `pathspec` (the
+// open folder within the repository, empty for all of it) for Everything.
+QString request(Scope scope, const QString &pathspec);
 
-// Instructions given to Claude as its system prompt.
-QString systemPrompt();
-
-// Standard input of `claude --print`: the recent subjects, then the changes,
-// the diff cut after `diffLimit` bytes (the stat still lists every file).
-QByteArray input(const Changes &changes, int diffLimit = 100'000);
-
-// The message in the JSON printed by `claude --print --output-format json`,
-// without the fences or quotes Claude may add; nullopt with `error` set if
-// Claude failed (not logged in, usage limit…) or replied nothing.
-std::optional<QString> parseReply(const QByteArray &json, QString *error);
+// A message handed by Claude, as git expects it: without the fences or
+// quotes Claude may add, the body's long lines wrapped at 72 columns.
+QString tidy(const QString &message);
 
 } // namespace CommitMessage
-
-// Runs one generation at a time, off the UI thread, and reports it with
-// finished() or failed(); start() again or cancel() drops the one running.
-class CommitMessageGenerator : public QObject {
-    Q_OBJECT
-    Q_DISABLE_COPY_MOVE(CommitMessageGenerator)
-
-public:
-    explicit CommitMessageGenerator(QObject *parent = nullptr);
-    ~CommitMessageGenerator() override;
-
-    void start(const RepositoryInfo &repository, bool amend, bool stageEverything, const QString &pathspec);
-    void cancel();
-
-    bool isRunning() const { return running_; }
-
-signals:
-    void runningChanged(bool running);
-    void finished(const QString &message);
-    void failed(const QString &error);
-
-private:
-    void onChangesRead(const std::optional<CommitMessage::Changes> &changes,
-                       const QString &error,
-                       const QString &workDir,
-                       int generation);
-    void onOutput(int generation);
-    void onProcessFinished(int generation);
-    void handleReply(const QString &errorOutput);
-    void fail(const QString &error);
-    void setRunning(bool running);
-
-    QThreadPool pool_;
-    QProcess *process_ = nullptr;
-    QByteArray output_; // what `process_` printed so far
-    QTimer *timeout_;
-    int generation_ = 0;
-    bool running_ = false;
-};

@@ -8,8 +8,8 @@
 #include <QStringList>
 
 // Reads the problems in the output of a build as it arrives, terminal
-// escapes included: GCC and Clang, MSVC, javac (alone, through Maven or
-// Gradle), Kotlin, TypeScript, ESLint, Rust, Go, CMake and Python's
+// escapes included: GCC and Clang, MSVC, javac (alone or through Maven),
+// Kotlin, TypeScript, ESLint, Rust, Go, CMake and Python's
 // tracebacks. A problem is kept only when its file exists, relative paths
 // read from the command's folder, then from the project's.
 class BuildOutputParser {

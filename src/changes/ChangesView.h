@@ -24,7 +24,9 @@ class QTreeWidgetItem;
 
 // "Diff" mode: pending changes, split as in "git status" between staged ones
 // (ready to commit) and the rest. Here you stage or unstage files, hunks or
-// lines, discard changes and commit. Operations go through GitCommands.
+// lines, discard changes and commit. Operations go through GitCommands. In
+// the diff, Space stages (or unstages) the selected lines or the block at
+// the cursor, Delete discards them, F4 opens the file at the cursor's line.
 class ChangesView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(ChangesView)
@@ -45,9 +47,11 @@ public:
     void stageAll();
     void unstageAll();
     void focusCommitMessage();
-    // Has Claude write the commit message from the changes to commit; while
-    // it writes, stops it.
+    // Asks the Claude session for the commit message of the changes to
+    // commit (commitMessageRequested()); see showCommitMessage().
     void generateCommitMessage();
+    // Puts `message`, written by Claude, in the commit field.
+    void showCommitMessage(const QString &message);
 
     void applyTheme(const Theme &theme);
 
@@ -61,9 +65,11 @@ public:
     QPushButton *continueButton() const { return continueButton_; }
 
 signals:
-    // Path relative to the project folder.
-    void openFileRequested(const QString &relativePath);
+    // Path relative to the project folder; `line` from 0.
+    void openFileRequested(const QString &relativePath, int line);
     void statusMessage(const QString &message);
+    // `request`, to type in the Claude session's prompt.
+    void commitMessageRequested(const QString &request);
     // The state read by refresh() is shown.
     void refreshed();
     // The operation in progress (merge, rebase…): go on, leave out the
@@ -115,6 +121,10 @@ private:
     // hunk under `line` without a selection. `lines` tells which of the two.
     QHash<int, PatchSelection> diffSelection(int line, bool *lines) const;
     void applyDiffSelection(int line, bool discard);
+    void addDiffShortcuts();
+    int diffCursorLine() const;
+    // The file of displayed line `line` in the editor, at the line facing it.
+    void openFileAt(int line);
     void showDiffMenu(const QPoint &position);
     void showListMenu(const QPoint &position);
 

@@ -232,11 +232,12 @@ void MainWindow::createCodeServices()
 void MainWindow::createGitViews()
 {
     changesView_ = new ChangesView(theme_, gitCommands_, this);
-    connect(changesView_, &ChangesView::openFileRequested, this, [this](const QString &relativePath) {
+    connect(changesView_, &ChangesView::openFileRequested, this, [this](const QString &relativePath, int line) {
         setMode(Mode::Edit);
-        editorTabs_->openFile(absolutePath(relativePath));
+        navigator_->goToLine(absolutePath(relativePath), line);
     });
     connect(changesView_, &ChangesView::statusMessage, this, &MainWindow::showStatus);
+    connect(changesView_, &ChangesView::commitMessageRequested, this, &MainWindow::askClaudeForCommitMessage);
     connect(changesView_, &ChangesView::continueRequested, gitActions_, &GitActions::continueOperation);
     connect(changesView_, &ChangesView::skipRequested, gitActions_, &GitActions::skipCommit);
     connect(changesView_, &ChangesView::abortRequested, gitActions_, &GitActions::abortOperation);

@@ -21,12 +21,12 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   per file, a separator per block ("⋯ lines 40–48 · function"), added lines
   on green and removed ones on red without "+" or "-", and the line numbers
   before and after in the margin (History mode shows its diffs the same way).
-  **Generate** (Ctrl+Alt+G, next to *Commit*) has Claude write the commit
-  message from the changes to commit (everything when nothing is staged, the
-  whole commit with *Amend*), in the style of the recent commits: a one-off
-  `claude --print` with Haiku and no tools, outside the session, so it works
-  with your usual Claude Code login, subscription included. The message
-  replaces the text, which Ctrl+Z brings back; *Stop* cancels.
+  **Generate** (Ctrl+Alt+G, next to *Commit*) asks the Claude session in the
+  terminal for the commit message of the changes to commit (everything when
+  nothing is staged, the whole commit with *Amend*), in the style of the
+  recent commits: the session knows why the changes were made. Claude hands
+  the message back with the `set_commit_message` tool, without committing;
+  it replaces the text, which Ctrl+Z brings back.
 - **History mode**: the commits of the current branch, filterable by
   message, author or hash, with their branches and tags; for each one, its
   message, its files and its diff. Commits read on two lines, in the manner

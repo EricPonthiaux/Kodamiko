@@ -388,7 +388,7 @@ bool LanguageServers::launchJdtls(const LanguageServerSpec &spec, const RuntimeI
     }
     command.program = launch->program;
     command.arguments = launch->arguments;
-    // The project's build (Maven, Gradle) runs with the project's JDK.
+    // The project's build (Maven) runs with the project's JDK.
     const QString javaHome = runtime ? runtime->home : launch->javaHome;
     command.environment.insert(QStringLiteral("JAVA_HOME"), javaHome);
     command.prependPath(javaHome + QStringLiteral("/bin"));

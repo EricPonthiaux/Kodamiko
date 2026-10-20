@@ -272,6 +272,16 @@ void MainWindow::createBranch(const QString &name, bool switchTo)
         [this] { onRepositoryChanged(); });
 }
 
+void MainWindow::askClaudeForCommitMessage(const QString &request)
+{
+    if (!exposeTools_->isChecked()) {
+        showStatus(tr("Claude hands the commit message back through Duet's tools: turn on Claude ▸ Expose Duet's "
+                      "Tools to Claude, then restart the session"));
+        return;
+    }
+    typeInClaudePrompt(request, PromptEntry::Submitted);
+}
+
 void MainWindow::showBranches()
 {
     branchesPopup_->popup(folder_);

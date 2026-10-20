@@ -3,12 +3,14 @@
 add_library(duet_core STATIC
     changes/BranchesPopup.cpp
     changes/ChangesView.cpp
+    changes/ChangesViewDiff.cpp
     changes/CommitPanel.cpp
     changes/DiffHeaderBar.cpp
     changes/DiffLayout.cpp
     changes/DiffStyles.cpp
     changes/DiffSyntaxHighlighter.cpp
     changes/DiffView.cpp
+    changes/DiscardConfirmation.cpp
     changes/FileChangeDelegate.cpp
     changes/GitActions.cpp
     changes/HunkActions.cpp

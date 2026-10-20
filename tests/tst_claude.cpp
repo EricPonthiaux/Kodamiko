@@ -767,53 +767,31 @@ private slots:
         QVERIFY(agent[0].message.contains("name"));
     }
 
-    void parsesCommitMessageReply()
+    void tidiesTheCommitMessageClaudeHandsBack()
     {
-        const auto parse = [](const char *json, QString *error) {
-            return CommitMessage::parseReply(json, error).value_or(QStringLiteral("<none>"));
-        };
-        QString error;
-        QCOMPARE(parse("{\"type\":\"result\",\"is_error\":false,\"result\":\"Add a\\n\\nBody\\n\"}", &error),
-                 QStringLiteral("Add a\n\nBody"));
-        QCOMPARE(parse("{\"is_error\":false,\"result\":\"```text\\nAdd a\\n```\"}", &error), QStringLiteral("Add a"));
-        QCOMPARE(parse("{\"is_error\":false,\"result\":\"\\\"Add a\\\"\"}", &error), QStringLiteral("Add a"));
-
-        QCOMPARE(parse("{\"is_error\":true,\"result\":\"Not logged in\"}", &error), QStringLiteral("<none>"));
-        QCOMPARE(error, QStringLiteral("Not logged in"));
-        error.clear();
-        QCOMPARE(parse("{\"is_error\":false,\"result\":\"  \"}", &error), QStringLiteral("<none>"));
-        QVERIFY(!error.isEmpty());
-        QCOMPARE(parse("Error: no TTY", &error), QStringLiteral("<none>"));
+        QCOMPARE(CommitMessage::tidy("Add a\n\nBody\n"), QStringLiteral("Add a\n\nBody"));
+        QCOMPARE(CommitMessage::tidy("```text\nAdd a\n```"), QStringLiteral("Add a"));
+        QCOMPARE(CommitMessage::tidy("\"Add a\""), QStringLiteral("Add a"));
+        QVERIFY(CommitMessage::tidy("  ").isEmpty());
 
         // The body is wrapped at 72 columns, a list item under its text.
         const QString word = QStringLiteral("abcdefghi"); // 10 characters with its space
         const QString summary = QStringList(8, word).join(' ') + " longer";
-        const QString json = QJsonDocument(QJsonObject{{"is_error", false},
-                                                       {"result", summary + "\n\n" + QStringList(10, word).join(' ') +
-                                                                      "\n- " + QStringList(8, word).join(' ')}})
-                                 .toJson();
-        const QString message = CommitMessage::parseReply(json.toUtf8(), &error).value_or(QString());
+        const QString message = CommitMessage::tidy(summary + "\n\n" + QStringList(10, word).join(' ') + "\n- " +
+                                                    QStringList(8, word).join(' '));
         const QString seven = QStringList(7, word).join(' ');
         QCOMPARE(message.split('\n'),
                  QStringList({summary, "", seven, QStringList(3, word).join(' '), "- " + seven, "  " + word}));
     }
 
-    void commitMessageInputCutsTheDiff()
+    void commitMessageRequestSaysWhatTheCommitHolds()
     {
-        CommitMessage::Changes changes;
-        changes.recentSubjects = {"Add b", "Add a"};
-        changes.stat = " a.txt | 2 +-\n";
-        changes.diff = QByteArray(50, 'x');
-        changes.untracked = {"new.txt"};
-        const QByteArray whole = CommitMessage::input(changes);
-        QVERIFY(whole.startsWith("Recent commits:\nAdd b\nAdd a\n"));
-        QVERIFY(whole.contains(" a.txt | 2 +-"));
-        QVERIFY(whole.contains("New files:\nnew.txt\n"));
-        QVERIFY(whole.endsWith(QByteArray(50, 'x')));
-
-        const QByteArray cut = CommitMessage::input(changes, 10);
-        QVERIFY(cut.contains(QByteArray(10, 'x') + "\n[diff truncated]"));
-        QVERIFY(!cut.contains(QByteArray(11, 'x')));
+        using CommitMessage::Scope;
+        QVERIFY(CommitMessage::request(Scope::Staged, {}).contains("git diff --cached)"));
+        QVERIFY(CommitMessage::request(Scope::Amend, {}).contains("git diff --cached HEAD^"));
+        QVERIFY(CommitMessage::request(Scope::Everything, "src").contains("git diff HEAD -- src"));
+        QVERIFY(CommitMessage::request(Scope::Everything, {}).contains("git diff HEAD -- ."));
+        QVERIFY(!CommitMessage::request(Scope::Staged, {}).contains('\n'));
     }
 
 private:

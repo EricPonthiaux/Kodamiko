@@ -45,7 +45,7 @@ QString runtimeLabel(const QString &family)
 QString runtimeDescription(const QString &family)
 {
     if (family == QLatin1String("java"))
-        return QObject::tr("JAVA_HOME of Maven and Gradle.");
+        return QObject::tr("JAVA_HOME of Maven.");
     if (family == QLatin1String("javascript"))
         return QObject::tr("What the project runs on.");
     if (family == QLatin1String("python"))

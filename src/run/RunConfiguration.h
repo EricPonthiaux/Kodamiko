@@ -48,7 +48,7 @@ QByteArray serialize(const QList<RunConfiguration> &configurations);
 
 // The configurations the build files at the project's root offer:
 // CMakePresets.json (or CMakeLists.txt), package.json scripts, Maven,
-// Gradle, Cargo, Makefile. Builds first.
+// Cargo, Makefile. Builds first.
 QList<RunConfiguration> detect(const QString &projectFolder);
 
 // Those of .duet/run.json, then the detected ones whose name the file does

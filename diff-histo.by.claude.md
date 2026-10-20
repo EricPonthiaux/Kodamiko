@@ -59,13 +59,17 @@ Magit.
 2. **Afficher plus de contexte** (↑/↓ sur le séparateur `⋯`), comme GitHub,
    VS Code et JetBrains.
 3. **Ignorer les espaces** et choisir le nombre de lignes de contexte.
-4. **Ouvrir le fichier à la ligne du diff.** `openFileRequested` ne transmet
-   que le chemin. JetBrains et VS Code sautent à la ligne, et l'édition
-   directe dans le diff est le standard JetBrains.
-5. **Raccourcis clavier.** Il n'en existe aucun pour changement
-   suivant/précédent (F7 / Maj+F7 chez JetBrains), stager, ou passer au
-   fichier suivant. Magit et lazygit montrent qu'un flux entièrement au
-   clavier est très apprécié.
+4. ✅ **Fait.** ~~**Ouvrir le fichier à la ligne du diff.**~~ F4 ou le menu
+   « Open in Editor » ouvrent le fichier à la ligne sous le curseur
+   (`DiffView::newFileLine` ; une ligne supprimée mène à la ligne suivante
+   restée). Reste à faire : l'édition directe dans le diff (JetBrains), et
+   la même chose dans l'historique.
+5. ✅ **Fait.** ~~**Raccourcis clavier.**~~ F7 / Maj+F7 bloc suivant ou
+   précédent et Alt+↓ / Alt+↑ fichier suivant ou précédent (diff et
+   historique) ; Espace stage ou déstage, Suppr discard, F4 ouvre (vue
+   Diff). La navigation part du curseur s'il est visible, sinon du haut de
+   la vue, et le curseur reste près du bloc après un stage : Espace
+   enchaîne les blocs comme dans lazygit.
 6. Gros diffs : replier un fichier, marquer un fichier comme vu, charger à la
    demande au-delà d'une taille donnée (GitHub).
 7. Éditeur de fusion à 3 panneaux pour les conflits. Aujourd'hui la barre
@@ -97,19 +101,18 @@ Magit.
 
 ## 4. Écarts avec CLAUDE.md
 
-- **Taille des fichiers** : `DiffView.cpp` fait 794 lignes et
-  `ChangesView.cpp` 787, presque à la limite de 800. Pour `DiffView`, trois
-  découpages se présentent naturellement : `WordDiff` (tokenize/LCS),
-  `DiffLayout` (`layout`, `appendHunk`…) et `DiffSyntax` (`collectSides`,
-  `scratchStyles`).
+- ✅ ~~**Taille des fichiers**~~ : `DiffView` est découpé (`WordDiff`,
+  `DiffLayout`, `DiffStyles`, `DiffSyntaxHighlighter`). Le volet diff de
+  `ChangesView` est dans `ChangesViewDiff.cpp`, et la confirmation du
+  discard dans `DiscardConfirmation`.
 - **`delete menu;`** dans `ChangesView::showDiffMenu` (§5 : pas de
   `delete`). Un `std::unique_ptr<QMenu>` convient.
 - **Paramètre de sortie** `bool *lines` dans `diffSelection` (§5 : la sortie
   doit être une valeur de retour). Un struct `{selection, isLines}` le
   remplace.
 - **Booléens qui changent le comportement** :
-  `applyDiffSelection(line, bool discard)` et `goToChange(bool forward)`
-  (§2). Il faudrait des `enum class`.
+  `applyDiffSelection(line, bool discard)` (§2) ; il faudrait un
+  `enum class`. `DiffView::goToChange` prend maintenant un `Direction`.
 - **Fonctions trop longues** : le constructeur de `ChangesView`
   (~170 lignes), `HistoryView::createCommitPane` et `showDetails` dépassent
   largement l'objectif de 40 lignes.
@@ -130,8 +133,8 @@ Magit.
 Dans l'ordre, pour le meilleur rapport valeur/effort :
 
 1. ✅ ~~Corriger les bugs 1 et 3, qui sont petits et sans risque.~~ Fait.
-2. Ajouter les raccourcis clavier et l'ouverture du fichier à la ligne du
-   diff.
+2. ✅ ~~Ajouter les raccourcis clavier et l'ouverture du fichier à la ligne
+   du diff.~~ Fait.
 3. Ajouter « afficher plus de contexte » et « ignorer les espaces ».
 4. Ajouter le suivi des renommages dans l'historique d'un fichier, puis la
    pagination.

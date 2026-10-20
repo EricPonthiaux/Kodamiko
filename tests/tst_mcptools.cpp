@@ -46,6 +46,7 @@ struct Editor {
     QList<TerminalWidget *> terminals;
     QString message;
     QString changesShown;
+    QString commitMessage;
     bool allow = true;
     QStringList asked;
 
@@ -73,6 +74,7 @@ struct Editor {
         context.showChanges = [this](const QString &path) {
             changesShown = path.isEmpty() ? QStringLiteral("*") : path;
         };
+        context.setCommitMessage = [this](const QString &text) { commitMessage = text; };
         DuetTools::registerEditorTools(registry, context);
         DuetTools::registerWorkspaceTools(registry, context);
         DuetTools::registerGitTools(registry, context);
@@ -278,6 +280,13 @@ private slots:
 
         editor.call(QStringLiteral("show_changes"), {{QStringLiteral("path"), QStringLiteral("a.txt")}});
         QCOMPARE(editor.changesShown, QStringLiteral("a.txt"));
+
+        // The message goes to the commit field, unasked: nothing is committed.
+        const int askedBefore = int(editor.asked.size());
+        editor.call(QStringLiteral("set_commit_message"),
+                    {{QStringLiteral("message"), QStringLiteral("```\nThird\n```")}});
+        QCOMPARE(editor.commitMessage, QStringLiteral("Third"));
+        QCOMPARE(int(editor.asked.size()), askedBefore);
     }
 
     // Branches, a remote, stashes and merges; what changes is asked first.

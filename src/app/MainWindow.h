@@ -300,6 +300,9 @@ private:
     void createBranch(const QString &name, bool switchTo);
     // Git ▸ Branches and Git ▸ Stashes.
     void showBranches();
+    // Types `request` in the Claude session's prompt; Claude answers with
+    // Duet's set_commit_message tool, so they must be exposed to it.
+    void askClaudeForCommitMessage(const QString &request);
     void showStashes();
     // What git or ssh asks while talking to a remote: a password, a key
     // passphrase, whether to trust a host. Nothing when the user cancels.

@@ -332,6 +332,10 @@ void MainWindow::registerMcpTools()
         if (!relativePath.isEmpty())
             changesView_->selectFile(relativePath);
     };
+    context.setCommitMessage = [this](const QString &message) {
+        setMode(Mode::Diff);
+        changesView_->showCommitMessage(message);
+    };
     context.repositoryChanged = [this] { onRepositoryChanged(); };
     DuetTools::registerEditorTools(mcpRegistry_, context);
     DuetTools::registerWorkspaceTools(mcpRegistry_, context);

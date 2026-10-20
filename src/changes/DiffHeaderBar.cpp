@@ -26,13 +26,14 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     details_->setObjectName(QStringLiteral("historyMuted"));
     details_->setMinimumWidth(0);
     details_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    for (const auto &[button, toolTip, forward] :
-         {std::tuple{previous_, tr("Previous change"), false}, std::tuple{next_, tr("Next change"), true}}) {
+    for (const auto &[button, toolTip, buttonDirection] :
+         {std::tuple{previous_, tr("Previous change (Shift+F7)"), DiffView::Direction::Previous},
+          std::tuple{next_, tr("Next change (F7)"), DiffView::Direction::Next}}) {
         button->setAutoRaise(true);
         button->setFocusPolicy(Qt::NoFocus);
         button->setToolTip(toolTip);
-        const bool isForward = forward;
-        connect(button, &QToolButton::clicked, this, [this, isForward] { diff_->goToChange(isForward); });
+        const DiffView::Direction direction = buttonDirection;
+        connect(button, &QToolButton::clicked, this, [this, direction] { diff_->goToChange(direction); });
     }
 
     auto *layout = new QHBoxLayout(this);

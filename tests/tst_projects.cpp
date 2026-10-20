@@ -118,13 +118,6 @@ private slots:
                                                      "</properties>"),
                  QString("21"));
         QVERIFY(ProjectDetector::javaVersionFromPom("<project/>").isEmpty());
-        QCOMPARE(ProjectDetector::javaVersionFromGradle(
-                     "java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }"),
-                 QString("21"));
-        QCOMPARE(ProjectDetector::javaVersionFromGradle("kotlin { jvmToolchain(17) }"), QString("17"));
-        QCOMPARE(ProjectDetector::javaVersionFromGradle("sourceCompatibility = JavaVersion.VERSION_11"), QString("11"));
-        QCOMPARE(ProjectDetector::javaVersionFromGradle("sourceCompatibility = JavaVersion.VERSION_1_8"), QString("8"));
-        QCOMPARE(ProjectDetector::javaVersionFromGradle("sourceCompatibility = '17'"), QString("17"));
         QCOMPARE(ProjectDetector::javaMajor("17.0.2-tem"), QString("17"));
     }
 
