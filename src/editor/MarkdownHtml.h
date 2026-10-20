@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QString>
 
 class CodeColorizer;
@@ -13,15 +14,17 @@ class CodeColorizer;
 namespace MarkdownHtml {
 
 // Body of the document (what goes inside <article class="markdown-body">).
+// Headings carry their source line (1-based) in a "data-line" attribute.
 // `colorizer` highlights the code blocks; nullptr leaves them plain.
 QString body(const QString &markdown, CodeColorizer *colorizer);
 
-// Whole page: GitHub's style sheet (dark or light) and its layout,
-// `body` in the article. Page scripts are forbidden.
-QString page(const QString &body, bool dark);
+// Whole page: GitHub's light style sheet and its layout, `body` in the
+// article. Page scripts are forbidden. The preview looks like GitHub
+// whatever the editor theme.
+QString page(const QString &body);
 
-// GitHub's page color, dark or light: the page's background.
-QString pageColor(bool dark);
+// GitHub's light page color: the page's background.
+QColor pageColor();
 
 // "My Title!" → "my-title", as GitHub names heading anchors.
 QString headingAnchor(const QString &heading);

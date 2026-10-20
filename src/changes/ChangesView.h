@@ -2,6 +2,7 @@
 
 #include "git/FilePatch.h"
 #include "git/RepositoryStatus.h"
+#include "ui/GripSplitter.h"
 #include "ui/Theme.h"
 
 #include <QSet>
@@ -16,6 +17,7 @@ class DiffHeaderBar;
 class HunkActions;
 class DiffView;
 class GitCommands;
+class QFrame;
 class QLabel;
 class QPushButton;
 class QSplitter;
@@ -139,6 +141,9 @@ private:
     void openFileAt(int line);
     void showDiffMenu(const QPoint &position);
     void showListMenu(const QPoint &position);
+    // The file actions and the diff's header, side by side, take the same
+    // height, and their rules make one line across the handle between them.
+    void alignBars(const Theme &theme);
 
     GitCommands *commands_;
     QString folder_;
@@ -155,6 +160,7 @@ private:
     QSet<ItemKey> collapsedFolders_;
 
     QLabel *summary_;
+    QWidget *operationArea_; // the bar and its margins, hidden together
     QWidget *operationBar_;
     QLabel *operationText_;
     QPushButton *continueButton_;
@@ -164,7 +170,8 @@ private:
     DiffView *diff_;
     DiffHeaderBar *diffHeader_;
     HunkActions *hunkActions_;
-    QSplitter *splitter_;
+    GripSplitter *splitter_;
+    QFrame *fileActions_; // Stage, Unstage, Discard, above the list
     QToolButton *stageButton_;
     QToolButton *unstageButton_;
     QToolButton *discardButton_;

@@ -2,6 +2,7 @@
 
 #include "CommitDelegate.h"
 #include "CommitGraph.h"
+#include "HistorySearchField.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "ui/AppFonts.h"
@@ -15,7 +16,6 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
 #include <QMenu>
 #include <QScopeGuard>
 #include <QScrollBar>
@@ -36,6 +36,8 @@ constexpr int wideLayoutWidth = 1180;
 // Commits read at first; twice as many each time the end of the list comes
 // into view, so that the walk, restarted each time, stays linear overall.
 constexpr int firstCommitLimit = 500;
+// A content search reads the whole history: started once typing pauses.
+constexpr int contentsDelayMs = 600;
 
 // "12 commits", "Last 500 commits"…
 QString commitCountText(const CommitLog &log)
@@ -54,7 +56,7 @@ QString commitCountText(const CommitLog &log)
 HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     : QWidget(parent)
     , summary_(new QLabel(this))
-    , filter_(new QLineEdit(this))
+    , filter_(new HistorySearchField(this))
     , commits_(new QTreeWidget(this))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
     , leftSplitter_(new GripSplitter(Qt::Vertical, this))
@@ -65,11 +67,10 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     refreshButton_->setFocusPolicy(Qt::NoFocus);
     connect(refreshButton_, &QToolButton::clicked, this, &HistoryView::refresh);
 
-    filter_->setPlaceholderText(tr("Filter: message, author, ID"));
-    filter_->setClearButtonEnabled(true);
-    filter_->setMaximumWidth(420);
-    searchIcon_ = filter_->addAction(QIcon(), QLineEdit::LeadingPosition);
-    connect(filter_, &QLineEdit::textChanged, this, &HistoryView::applyFilter);
+    connect(filter_, &HistorySearchField::queryChanged, this, &HistoryView::onQueryChanged);
+    contentsTimer_.setSingleShot(true);
+    contentsTimer_.setInterval(contentsDelayMs);
+    connect(&contentsTimer_, &QTimer::timeout, this, &HistoryView::searchContents);
 
     allBranches_ = new QToolButton(this);
     allBranches_->setText(tr("All Branches"));
@@ -78,10 +79,7 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     allBranches_->setAutoRaise(true);
     allBranches_->setFocusPolicy(Qt::NoFocus);
     allBranches_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    connect(allBranches_, &QToolButton::toggled, this, [this] {
-        commitLimit_ = firstCommitLimit;
-        refresh();
-    });
+    connect(allBranches_, &QToolButton::toggled, this, &HistoryView::restartReading);
 
     showAll_ = new QToolButton(this);
     showAll_->setText(tr("Show All"));
@@ -170,7 +168,7 @@ QWidget *HistoryView::createDiffPane()
 void HistoryView::setFolder(const QString &folder)
 {
     folder_ = folder;
-    ++generation_;
+    abandonReading();
     commitLimit_ = firstCommitLimit;
     setPathFilterShown({});
     log_.reset();
@@ -182,13 +180,26 @@ void HistoryView::setFolder(const QString &folder)
 
 HistoryView::~HistoryView()
 {
+    stopReading_.request_stop();
     pool_.waitForDone();
 }
 
 void HistoryView::setPathFilter(const QString &relativePath)
 {
     setPathFilterShown(relativePath);
+    restartReading();
+}
+
+void HistoryView::abandonReading()
+{
     ++generation_;
+    stopReading_.request_stop();
+    stopReading_ = std::stop_source();
+}
+
+void HistoryView::restartReading()
+{
+    abandonReading();
     commitLimit_ = firstCommitLimit;
     refresh();
 }
@@ -215,13 +226,20 @@ void HistoryView::refresh()
     }
     reading_ = true;
     refreshPending_ = false;
-    // A path filter walks the whole history: off the UI thread.
-    const LogScope scope = allBranches_->isChecked() ? LogScope::AllBranches : LogScope::Head;
-    pool_.start([this, folder = folder_, path = pathFilter_, limit = commitLimit_, scope, generation = generation_] {
+    // A path filter or a content search walks the whole history: off the UI
+    // thread.
+    const LogOptions options{
+        .limit = commitLimit_,
+        .path = pathFilter_,
+        .scope = allBranches_->isChecked() ? LogScope::AllBranches : LogScope::Head,
+        .contents = contents_,
+        .stop = stopReading_.get_token(),
+    };
+    pool_.start([this, folder = folder_, options, generation = generation_] {
         QString error;
         std::optional<CommitLog> log;
         try {
-            log = CommitLog::read(folder, limit, path, scope);
+            log = CommitLog::read(folder, options);
             if (!log)
                 error = tr("This folder is not in a git repository.");
         } catch (const GitError &exception) {
@@ -240,9 +258,11 @@ void HistoryView::onLogRead(const std::optional<CommitLog> &log, const QString &
         refresh(); // outdated: read again
         return;
     }
+    searchingContents_ = false;
     // Refreshed on every repository change: rebuilt only if it changed.
     if (log != log_ || error != error_)
         showLog(log, error);
+    updateSummary();
     emit refreshed();
     loadMoreIfAtEnd(); // reached while reading
 }
@@ -254,10 +274,16 @@ void HistoryView::loadMoreIfAtEnd()
     // While the list is rebuilt, its scroll bar says nothing of its end.
     if (commits_->topLevelItemCount() != log_->commits.size())
         return;
-    if (!isEndInView())
+    if (!isEndInView() || isPastFirstDay())
         return;
     commitLimit_ *= 2;
     refresh();
+}
+
+bool HistoryView::isPastFirstDay() const
+{
+    const std::optional<QDate> after = filter_->query().after;
+    return after && log_ && !log_->commits.isEmpty() && log_->commits.last().date.date() < *after;
 }
 
 bool HistoryView::isEndInView() const
@@ -283,17 +309,9 @@ void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
     rebuildList();
 
     if (!log_) {
-        summary_->setText(error);
         forgetCommit();
         return;
     }
-    QString summary = commitCountText(*log_);
-    if (!pathFilter_.isEmpty())
-        summary += tr(" touching %1").arg(pathFilter_);
-    else if (!log_->info.prefix.isEmpty())
-        summary += tr(" touching %1").arg(log_->info.prefix);
-    summary_->setText(summary);
-
     // The chosen commit stays chosen if it still exists.
     for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
         if (commits_->topLevelItem(i)->data(0, idRole).toString() == current) {
@@ -319,7 +337,7 @@ void HistoryView::rebuildList()
         items.append(item);
     }
     // A commit filtered out breaks the lines between those kept: no graph.
-    const bool showsEveryCommit = pathFilter_.isEmpty() && log_->info.prefix.isEmpty();
+    const bool showsEveryCommit = pathFilter_.isEmpty() && log_->info.prefix.isEmpty() && !contents_;
     const QList<GraphRow> graph = showsEveryCommit ? CommitGraph::layOut(log_->commits) : QList<GraphRow>();
     for (qsizetype i = 0; i < graph.size(); ++i)
         CommitDelegate::setGraphRow(items[i], graph[i]);
@@ -328,23 +346,59 @@ void HistoryView::rebuildList()
     applyFilter();
 }
 
+void HistoryView::onQueryChanged()
+{
+    applyFilter();
+    // A search of the changes only once typing pauses; another query
+    // cancels the one waiting.
+    if (filter_->query().contents != contents_)
+        contentsTimer_.start();
+    else
+        contentsTimer_.stop();
+}
+
+void HistoryView::searchContents()
+{
+    contents_ = filter_->query().contents;
+    searchingContents_ = contents_.has_value() && !folder_.isEmpty();
+    // The commits shown are not those searched: none until they are read.
+    log_.reset();
+    rebuildList();
+    forgetCommit();
+    restartReading();
+    updateSummary();
+}
+
 void HistoryView::applyFilter()
 {
     if (!log_)
         return; // no rows to filter
-    const QString text = filter_->text().trimmed();
-    for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
-        QTreeWidgetItem *item = commits_->topLevelItem(i);
-        const CommitSummary &commit = log_->commits.at(i);
-        const bool match =
-            text.isEmpty() || commit.summary.contains(text, Qt::CaseInsensitive) ||
-            commit.author.contains(text, Qt::CaseInsensitive) || commit.email.contains(text, Qt::CaseInsensitive) ||
-            commit.id.startsWith(text, Qt::CaseInsensitive) || commit.refs.contains(text, Qt::CaseInsensitive);
-        item->setHidden(!match);
-    }
-    // Rows hidden by the text filter would break its lines too.
-    commitDelegate_->setGraphLanes(text.isEmpty() ? graphLanes_ : 0);
+    const CommitQuery &query = filter_->query();
+    for (int i = 0; i < commits_->topLevelItemCount(); ++i)
+        commits_->topLevelItem(i)->setHidden(!query.matches(log_->commits.at(i)));
+    // Rows hidden by the filter would break its lines too.
+    commitDelegate_->setGraphLanes(query.keepsEveryCommit() ? graphLanes_ : 0);
     commits_->viewport()->update();
+}
+
+void HistoryView::updateSummary()
+{
+    if (searchingContents_) {
+        summary_->setText(tr("Searching the changes…"));
+        return;
+    }
+    if (!log_) {
+        summary_->setText(error_);
+        return;
+    }
+    QString summary = commitCountText(*log_);
+    if (contents_)
+        summary += tr(" changing \"%1\"").arg(contents_->pattern);
+    if (!pathFilter_.isEmpty())
+        summary += tr(" touching %1").arg(pathFilter_);
+    else if (!log_->info.prefix.isEmpty())
+        summary += tr(" touching %1").arg(log_->info.prefix);
+    summary_->setText(summary);
 }
 
 void HistoryView::onCommitSelectionChanged()
@@ -384,9 +438,15 @@ void HistoryView::applyTheme(const Theme &theme)
     diffHeader_->applyTheme(theme);
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
     allBranches_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme.foreground));
-    searchIcon_->setIcon(UiIcons::icon(QStringLiteral("search"), theme.mutedText));
+    filter_->applyTheme(theme);
     copyId_->setIcon(UiIcons::icon(QStringLiteral("copy"), theme.mutedText));
     commitId_->setFont(AppFonts::codeFont(font().pointSizeF() * 0.95));
+    // The diff header's bottom border reaches the handle's line; nothing at
+    // its left to join.
+    const int headerHeight = diffHeader_->sizeHint().height();
+    diffHeader_->setFixedHeight(headerHeight);
+    splitter_->setHandleRule(splitter_->indexOf(diffHeader_->parentWidget()),
+                             {headerHeight - 1, Qt::RightEdge, theme.line});
 }
 
 void HistoryView::resizeEvent(QResizeEvent *event)

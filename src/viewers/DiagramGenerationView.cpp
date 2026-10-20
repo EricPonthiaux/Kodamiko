@@ -4,6 +4,7 @@
 #include "claude/ClaudeLauncher.h"
 #include "claude/DiagramRequest.h"
 #include "ui/AppFonts.h"
+#include "ui/Motion.h"
 
 #include <QDir>
 #include <QFile>
@@ -38,11 +39,13 @@ public:
             angle_ = (angle_ + 6) % 360;
             update();
         });
+        connect(&Motion::policy(), &Motion::Policy::enabledChanged, this, [this] { updateMotion(); });
     }
 
     void setSpinning(bool spinning)
     {
-        spinning ? timer_->start() : timer_->stop();
+        spinning_ = spinning;
+        updateMotion();
         setVisible(spinning);
     }
 
@@ -61,8 +64,18 @@ protected:
     }
 
 private:
+    void updateMotion()
+    {
+        if (spinning_ && Motion::policy().isEnabled())
+            timer_->start();
+        else
+            timer_->stop();
+        update();
+    }
+
     QTimer *timer_;
     int angle_ = 0;
+    bool spinning_ = false;
 };
 
 QString errorColor(const QPalette &palette)

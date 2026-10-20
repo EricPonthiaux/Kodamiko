@@ -85,6 +85,7 @@ add_library(duet_core STATIC
     git/Askpass.cpp
     git/Branches.cpp
     git/CommitLog.cpp
+    git/ContentMatcher.cpp
     git/FilePatch.cpp
     git/FileStatuses.cpp
     git/GitCommands.cpp
@@ -100,6 +101,8 @@ add_library(duet_core STATIC
     git/Stashes.cpp
     history/CommitDelegate.cpp
     history/CommitGraph.cpp
+    history/CommitQuery.cpp
+    history/HistorySearchField.cpp
     history/HistoryView.cpp
     history/HistoryViewCommit.cpp
     lsp/LanguageServers.cpp
@@ -160,11 +163,14 @@ add_library(duet_core STATIC
     ui/FileIcons.cpp
     ui/GripSplitter.cpp
     ui/HoverCloseButtons.cpp
+    ui/HoverProgress.cpp
     ui/KdeThemes.cpp
+    ui/Motion.cpp
     ui/NoticeBar.cpp
     ui/OverlayPopup.cpp
     ui/TabBarBaseLine.cpp
     ui/PopupWidgets.cpp
+    ui/PopupMotion.cpp
     ui/Theme.cpp
     ui/ThemeStyle.cpp
     ui/TitleBar.cpp
@@ -223,7 +229,6 @@ qt_add_resources(duet_core markdown_assets
     PREFIX /markdown
     BASE ${PROJECT_SOURCE_DIR}/third_party
     FILES
-        ${PROJECT_SOURCE_DIR}/third_party/github-markdown-css/github-markdown-dark.css
         ${PROJECT_SOURCE_DIR}/third_party/github-markdown-css/github-markdown-light.css
         ${PROJECT_SOURCE_DIR}/third_party/octicons/info-16.svg
         ${PROJECT_SOURCE_DIR}/third_party/octicons/light-bulb-16.svg

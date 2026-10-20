@@ -341,6 +341,12 @@ void EditorTabs::revealEditor(EditorWidget *editor) const
         previewed->revealEditor();
 }
 
+void EditorTabs::scrollPreviewToCaret(EditorWidget *editor) const
+{
+    if (auto *previewed = qobject_cast<PreviewPage *>(pageOf(editor)))
+        previewed->scrollPreviewToCaret();
+}
+
 EditorWidget *EditorTabs::editorFor(const QString &path) const
 {
     const QString absolutePath = QFileInfo(path).absoluteFilePath();

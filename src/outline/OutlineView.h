@@ -42,6 +42,10 @@ public:
 
     bool eventFilter(QObject *watched, QEvent *event) override;
 
+signals:
+    // A symbol was clicked: the caret of `editor` is on it.
+    void symbolActivated(EditorWidget *editor);
+
 protected:
     void showEvent(QShowEvent *event) override;
 

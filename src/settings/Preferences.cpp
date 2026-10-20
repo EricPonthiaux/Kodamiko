@@ -36,6 +36,7 @@ Preferences Preferences::load()
     preferences.interfaceFontSize = interfaceFontSize > 0 ? interfaceFontSize : AppFonts::defaultInterfaceSize;
     preferences.treeFontSize = fontSize(QStringLiteral("treeFont/size"));
     preferences.systemTitleBar = settings.value(QStringLiteral("systemTitleBar"), false).toBool();
+    preferences.animations = settings.value(QStringLiteral("interface/animations"), true).toBool();
 
     preferences.editor.codeFolding = settings.value(QStringLiteral("editor/codeFolding"), true).toBool();
     preferences.editor.wrapLines = settings.value(QStringLiteral("editor/wrapLines"), false).toBool();
@@ -80,6 +81,7 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("interfaceFont/size"), interfaceFontSize);
     settings.setValue(QStringLiteral("treeFont/size"), treeFontSize);
     settings.setValue(QStringLiteral("systemTitleBar"), systemTitleBar);
+    settings.setValue(QStringLiteral("interface/animations"), animations);
 
     settings.setValue(QStringLiteral("editor/codeFolding"), editor.codeFolding);
     settings.setValue(QStringLiteral("editor/wrapLines"), editor.wrapLines);

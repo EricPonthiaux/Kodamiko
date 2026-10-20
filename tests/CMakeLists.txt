@@ -35,6 +35,7 @@ duet_add_test(tst_terminalpaint)
 duet_add_test(tst_setup)
 duet_add_test(tst_settings)
 duet_add_test(tst_fontsettings)
+duet_add_test(tst_motion)
 if(GRAPHVIZ_FOUND)
     duet_add_test(tst_diagramview)
     # One test per diagram family.

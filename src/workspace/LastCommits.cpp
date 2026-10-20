@@ -11,7 +11,8 @@ namespace {
 QString readLastCommit(const QString &folder, const QString &path)
 {
     try {
-        const std::optional<CommitLog> log = CommitLog::read(folder, 1, QDir(folder).relativeFilePath(path));
+        const std::optional<CommitLog> log =
+            CommitLog::read(folder, {.limit = 1, .path = QDir(folder).relativeFilePath(path)});
         if (!log || log->commits.isEmpty())
             return {};
         const CommitSummary &commit = log->commits.first();

@@ -379,6 +379,7 @@ void OutlineView::jumpTo(QTreeWidgetItem *item)
     editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, item->data(0, positionRole).toInt());
     editor_->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
     editor_->setFocus();
+    emit symbolActivated(editor_);
 }
 
 // First symbol matching the filter (simply the first one without a filter).

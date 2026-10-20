@@ -1,5 +1,7 @@
 #include "SidePanel.h"
 
+#include "ui/Motion.h"
+
 #include <QEvent>
 #include <QImage>
 #include <QPainter>
@@ -156,6 +158,9 @@ void SidePanel::setPanelVisible(bool visible)
 {
     if (visible == isPanelVisible())
         return;
+    // Folding is immediate: the editor takes the room back at once.
+    if (visible)
+        Motion::fadeIn(this);
     setVisible(visible);
     emit panelVisibilityChanged(visible);
 }

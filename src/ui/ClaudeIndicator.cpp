@@ -1,5 +1,6 @@
 #include "ClaudeIndicator.h"
 
+#include "Motion.h"
 #include "ThemeStyle.h"
 
 #include <QCoreApplication>
@@ -76,6 +77,7 @@ ClaudeIndicator::ClaudeIndicator(QWidget *parent)
     setFocusPolicy(Qt::NoFocus);
     setAccessibleName(QStringLiteral("Claude: %1").arg(claudeStatusText(status_)));
     connect(&animationTimer_, &QTimer::timeout, this, &ClaudeIndicator::advanceFrame);
+    connect(&Motion::policy(), &Motion::Policy::enabledChanged, this, &ClaudeIndicator::updateAnimation);
 }
 
 void ClaudeIndicator::setStatus(Status status)
@@ -85,7 +87,16 @@ void ClaudeIndicator::setStatus(Status status)
     status_ = status;
     setAccessibleName(QStringLiteral("Claude: %1").arg(claudeStatusText(status)));
     frame_ = 0;
-    switch (status) {
+    updateAnimation();
+}
+
+void ClaudeIndicator::updateAnimation()
+{
+    animationTimer_.stop();
+    update();
+    if (!Motion::policy().isEnabled())
+        return;
+    switch (status_) {
     case Status::Working:
         animationTimer_.start(sparkStep);
         break;
@@ -128,12 +139,13 @@ void ClaudeIndicator::paintEvent(QPaintEvent *)
 
 void ClaudeIndicator::paintBackground(QPainter &painter, const QColor &color) const
 {
-    const bool highlighted = hovered_ || isDown();
-    QColor background = ThemeStyle::mixed(theme_.window, color, highlighted ? hoverShare : backgroundShare);
+    const qreal highlight = isDown() ? 1.0 : hover_.progress();
+    const qreal share = backgroundShare + (hoverShare - backgroundShare) * highlight;
+    QColor background = ThemeStyle::mixed(theme_.window, color, share);
     QColor border = ThemeStyle::mixed(theme_.window, color, borderShare);
     if (status_ == Status::Ready) {
         // At rest it stays discreet: the theme's own neutral colors.
-        background = highlighted ? theme_.hover : theme_.window;
+        background = ThemeStyle::mixed(theme_.window, theme_.hover, highlight);
         border = theme_.line;
     }
     painter.setPen(QPen(border, 1));
@@ -163,6 +175,8 @@ void ClaudeIndicator::paintStar(QPainter &painter, const QRectF &box, const QCol
 // short branches flash in turn, then the star shines still.
 qreal ClaudeIndicator::branchOpacity(int branch) const
 {
+    if (!Motion::policy().isEnabled())
+        return 1;
     switch (status_) {
     case Status::Working: {
         const int litBranch = frame_ % branchCount;
@@ -197,15 +211,13 @@ void ClaudeIndicator::advanceFrame()
 
 void ClaudeIndicator::enterEvent(QEnterEvent *event)
 {
-    hovered_ = true;
-    update();
+    hover_.setHovered(true);
     QAbstractButton::enterEvent(event);
 }
 
 void ClaudeIndicator::leaveEvent(QEvent *event)
 {
-    hovered_ = false;
-    update();
+    hover_.setHovered(false);
     QAbstractButton::leaveEvent(event);
 }
 

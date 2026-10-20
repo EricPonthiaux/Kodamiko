@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HoverProgress.h"
 #include "Theme.h"
 
 #include <QAbstractButton>
@@ -46,7 +47,7 @@ protected:
 
 private:
     Theme theme_;
-    bool hovered_ = false;
+    HoverProgress hover_{this};
 };
 
 // A section of settings: rows separated by thin lines, flush with the

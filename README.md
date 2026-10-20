@@ -247,6 +247,13 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   maximizes it. *View ▸ Use System Title Bar* brings the system's frame back
   (tiling window managers); on macOS, the traffic lights stay, over
   Duet's bar.
+- **Interface motion**: menus and popups appear with a short fade and
+  scale using Material 3 easing, and dismiss without delaying input.
+  *Preferences ▸ Appearance ▸ Motion ▸ Interface animations* turns motion
+  on or off with *OK* or *Apply*, without restarting. This also controls
+  hover feedback, status animations and diagram transitions; disabling it
+  finishes running transitions immediately. Native system dialogs keep
+  the system's behavior.
 - **Typography**: the interface (menus, panels, trees) is set in
   [Ubuntu Sans](https://design.ubuntu.com/font) and the code (editor, diffs,
   terminal) in Ubuntu Sans Mono, both embedded so that Duet looks the same on

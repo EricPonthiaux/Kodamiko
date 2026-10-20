@@ -16,6 +16,7 @@
 #include "git/Snapshots.h"
 #include "git/Stashes.h"
 #include "ui/PopupWidgets.h"
+#include "ui/ThemeStyle.h"
 
 #include <QCheckBox>
 #include <QLabel>
@@ -28,6 +29,7 @@
 #include <QTemporaryDir>
 #include <QToolButton>
 #include <QTreeWidget>
+#include <QVBoxLayout>
 #include <QtTest>
 
 namespace {
@@ -262,6 +264,41 @@ private slots:
         QCOMPARE(columns.newSide[5].location.line, columns.oldSide[5].location.line);
         QCOMPARE(columns.oldSide[4].oldNumber, 11);
         QCOMPARE(columns.newSide[4].newNumber, 11);
+    }
+
+    void diffHeaderLinesUpWithTheFileActionsWithOrWithoutFiles()
+    {
+        ThemeStyle::apply(Theme::dark()); // the buttons' height, as in the application
+        const QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 300);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        const auto *header = view.findChild<DiffHeaderBar *>();
+        const auto *fileActions = view.findChild<QFrame *>("fileActions");
+        const auto bottomOf = [&view](const QWidget *bar) { return bar->mapTo(&view, QPoint(0, bar->height())).y(); };
+
+        view.refresh(); // no changes: the header hides its buttons
+        QTRY_COMPARE(refreshed.size(), 1);
+        QTRY_COMPARE(bottomOf(header), bottomOf(fileActions));
+        write(project, "a.txt", "b\n");
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 2);
+        QTRY_COMPARE(bottomOf(header), bottomOf(fileActions));
+        // The columns right under the title bar: the handle's line meets its rule.
+        QCOMPARE(view.splitter()->y(), view.findChild<QFrame *>("viewTitleBar")->geometry().bottom() + 1);
+        // Across the handle between them too: one line.
+        QWidget *handle = view.splitter()->handle(1);
+        const QImage image = handle->grab().toImage();
+        const int ruleY = header->height() - 1;
+        for (int x = 0; x < image.width(); ++x)
+            QCOMPARE(image.pixelColor(x, ruleY), Theme::dark().line);
     }
 
     void sideBySideScrollsBothSidesTogether()

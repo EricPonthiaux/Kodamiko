@@ -27,6 +27,7 @@ struct Preferences {
     // never below the interface's.
     int treeFontSize = 0;
     bool systemTitleBar = false;
+    bool animations = true;
 
     // Editor
     EditorOptions editor;

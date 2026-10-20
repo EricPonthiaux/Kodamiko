@@ -1,5 +1,6 @@
 #include "CommitLog.h"
 
+#include "ContentMatcher.h"
 #include "LibGit2.h"
 
 #include <QHash>
@@ -12,6 +13,17 @@ using libgit2::check;
 using libgit2::Ptr;
 
 namespace {
+
+// What a log's walk keeps, and where it is.
+struct LogWalk {
+    git_repository *repository = nullptr;
+    QString prefix; // the open folder in the repository
+    bool followsPath = false;
+    // Repository path whose commits are kept (empty: all of them); for a
+    // followed file, its name in the commits walked next.
+    QString filter;
+    std::optional<ContentMatcher> contents;
+};
 
 QString idOf(const git_oid *oid)
 {
@@ -74,6 +86,7 @@ CommitSummary summaryOf(git_commit *commit, const QHash<QString, QStringList> &r
     summary.id = idOf(git_commit_id(commit));
     summary.shortId = summary.id.left(7);
     summary.summary = QString::fromUtf8(git_commit_summary(commit));
+    summary.message = QString::fromUtf8(git_commit_message(commit)).trimmed();
     const git_signature *author = git_commit_author(commit);
     summary.author = QString::fromUtf8(author->name);
     summary.email = QString::fromUtf8(author->email);
@@ -158,9 +171,41 @@ QString pathBefore(git_repository *repository, const git_commit *commit, const Q
     return renamed.isEmpty() || !renamed.startsWith(prefix) ? path : renamed;
 }
 
+// A walk from HEAD, or from every branch, newest first and a commit before
+// its parents.
+Ptr<git_revwalk> startWalk(git_repository *repository, LogScope scope)
+{
+    git_revwalk *walk = nullptr;
+    check(git_revwalk_new(&walk, repository), "Walking the history");
+    Ptr<git_revwalk> result(walk);
+    check(git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL | GIT_SORT_TIME), "Walking the history");
+    check(git_revwalk_push_head(walk), "Walking the history");
+    if (scope == LogScope::AllBranches) {
+        check(git_revwalk_push_glob(walk, "refs/heads"), "Walking the branches");
+        check(git_revwalk_push_glob(walk, "refs/remotes"), "Walking the branches");
+    }
+    return result;
+}
+
+// The repository path `commit` is kept for (the filter; empty without one),
+// or nullopt if the walk leaves it out. A followed file is then looked for
+// under its name before the commit.
+std::optional<QString> keptPath(LogWalk &walk, const git_commit *commit)
+{
+    if (!walk.filter.isEmpty() && !touchesPath(commit, walk.filter))
+        return std::nullopt;
+    QString path = walk.filter;
+    // Followed even across the commits the content search leaves out.
+    if (walk.followsPath)
+        walk.filter = pathBefore(walk.repository, commit, walk.filter, walk.prefix);
+    if (walk.contents && !walk.contents->matches(walk.repository, commit, path))
+        return std::nullopt;
+    return path;
+}
+
 } // namespace
 
-std::optional<CommitLog> CommitLog::read(const QString &folder, int limit, const QString &path, LogScope scope)
+std::optional<CommitLog> CommitLog::read(const QString &folder, const LogOptions &options)
 {
     const std::optional<RepositoryInfo> info = RepositoryInfo::read(folder);
     if (!info)
@@ -174,37 +219,34 @@ std::optional<CommitLog> CommitLog::read(const QString &folder, int limit, const
     const libgit2::Session session;
     const Ptr<git_repository> repository = requireRepository(folder);
     const QHash<QString, QStringList> refs = refsByCommit(repository.get());
+    const Ptr<git_revwalk> revwalk = startWalk(repository.get(), options.scope);
+    LogWalk walk{
+        .repository = repository.get(),
+        .prefix = info->prefix,
+        .followsPath = !options.path.isEmpty(),
+        .filter = options.path.isEmpty() ? info->prefix : info->repoPath(options.path),
+        .contents = std::nullopt,
+    };
+    if (walk.filter.endsWith(QLatin1Char('/')))
+        walk.filter.chop(1);
+    if (options.contents)
+        walk.contents.emplace(*options.contents);
 
-    git_revwalk *walk = nullptr;
-    check(git_revwalk_new(&walk, repository.get()), "Walking the history");
-    const Ptr<git_revwalk> walkGuard(walk);
-    check(git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL | GIT_SORT_TIME), "Walking the history");
-    check(git_revwalk_push_head(walk), "Walking the history");
-    if (scope == LogScope::AllBranches) {
-        check(git_revwalk_push_glob(walk, "refs/heads"), "Walking the branches");
-        check(git_revwalk_push_glob(walk, "refs/remotes"), "Walking the branches");
-    }
-
-    // Repository path whose commits are kept; empty: all of them.
-    QString filter = path.isEmpty() ? info->prefix : info->repoPath(path);
-    if (filter.endsWith(QLatin1Char('/')))
-        filter.chop(1);
     git_oid oid;
-    while (git_revwalk_next(&oid, walk) == 0) {
+    while (!options.stop.stop_requested() && git_revwalk_next(&oid, revwalk.get()) == 0) {
         git_commit *commit = nullptr;
         check(git_commit_lookup(&commit, repository.get(), &oid), "Reading a commit");
         const Ptr<git_commit> commitGuard(commit);
-        if (!filter.isEmpty() && !touchesPath(commit, filter))
+        const std::optional<QString> path = keptPath(walk, commit);
+        if (!path)
             continue;
-        if (log.commits.size() == limit) {
+        if (log.commits.size() == options.limit) {
             log.truncated = true;
             break;
         }
         log.commits.append(summaryOf(commit, refs));
-        if (path.isEmpty())
-            continue;
-        log.commits.last().path = filter.mid(info->prefix.size());
-        filter = pathBefore(repository.get(), commit, filter, info->prefix);
+        if (walk.followsPath)
+            log.commits.last().path = path->mid(info->prefix.size());
     }
     return log;
 }

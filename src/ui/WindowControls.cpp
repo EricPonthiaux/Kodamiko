@@ -1,5 +1,6 @@
 #include "WindowControls.h"
 
+#include "ThemeStyle.h"
 #include "UiMetrics.h"
 
 #include <QEvent>
@@ -34,15 +35,13 @@ void WindowButton::applyTheme(const Theme &theme)
 
 void WindowButton::enterEvent(QEnterEvent *event)
 {
-    hovered_ = true;
-    update();
+    hover_.setHovered(true);
     QAbstractButton::enterEvent(event);
 }
 
 void WindowButton::leaveEvent(QEvent *event)
 {
-    hovered_ = false;
-    update();
+    hover_.setHovered(false);
     QAbstractButton::leaveEvent(event);
 }
 
@@ -51,13 +50,16 @@ void WindowButton::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     QColor color = theme_.foreground;
-    if (hovered_ || isDown()) {
+    const qreal highlight = isDown() ? 1.0 : hover_.progress();
+    if (highlight > 0) {
         // Closing turns red, as everywhere.
-        const QColor background =
-            kind_ == Kind::Close ? QColor("#e81123") : theme_.hover.lighter(theme_.isDark ? 140 : 97);
-        painter.fillRect(rect(), isDown() ? background.darker(115) : background);
+        QColor background = kind_ == Kind::Close ? QColor("#e81123") : theme_.hover.lighter(theme_.isDark ? 140 : 97);
+        if (isDown())
+            background = background.darker(115);
+        background.setAlphaF(highlight);
+        painter.fillRect(rect(), background);
         if (kind_ == Kind::Close)
-            color = Qt::white;
+            color = ThemeStyle::mixed(color, Qt::white, highlight);
     }
     painter.setPen(QPen(color, 1.1));
     painter.setBrush(Qt::NoBrush);

@@ -4,16 +4,18 @@
 #include "ui/Theme.h"
 
 #include <QThreadPool>
+#include <QTimer>
 #include <QWidget>
 
 #include <optional>
+#include <stop_token>
 
 class CommitDelegate;
 class DiffHeaderBar;
 class DiffView;
-class QAction;
 class QLabel;
-class QLineEdit;
+class GripSplitter;
+class HistorySearchField;
 class QSplitter;
 class QStackedWidget;
 class QTextBrowser;
@@ -22,10 +24,10 @@ class QTreeWidget;
 class QTreeWidgetItem;
 
 // "History" mode: commits of HEAD (those touching the open folder),
-// filterable. Three panes that stay put whatever is chosen: the commits;
-// the chosen commit (its summary, author, date and ID, its message, its
-// files); the diff of the chosen file against the first parent. A narrow
-// window puts the commit under the list. The repository is only read.
+// searchable (HistorySearchField): the commits read are filtered as the
+// query is typed; a search of their changes reads the history again. Three panes that stay put whatever is chosen: the
+// commits; the chosen commit (its summary, author, date and ID, its message, its files); the diff of the chosen file
+// against the first parent. A narrow window puts the commit under the list. The repository is only read.
 class HistoryView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(HistoryView)
@@ -65,6 +67,10 @@ protected:
 private:
     QWidget *createCommitPane();
     QWidget *createDiffPane();
+    // The log being read is outdated: its walk stops, its result is dropped.
+    void abandonReading();
+    // The history read again from its newest commits.
+    void restartReading();
     void onLogRead(const std::optional<CommitLog> &log, const QString &error, int generation);
     void showLog(std::optional<CommitLog> log, const QString &error);
 
@@ -80,6 +86,9 @@ private:
     // Reads twice as many commits when the end of the list is in view: the
     // list scrolled to its end, or rows hidden by the filter.
     void loadMoreIfAtEnd();
+    // Whether the last commit read is older than the query's after: date:
+    // the commits read next would all be hidden.
+    bool isPastFirstDay() const;
     // The last row the filter leaves is in the viewport.
     bool isEndInView() const;
     // The chosen commit again, as the header's whitespace button says; its
@@ -91,7 +100,11 @@ private:
     // Shows the diff of the commit's file at `path`, if listed.
     void chooseFile(const QString &path);
     void rebuildList();
+    void onQueryChanged();
+    // The query's content search, typed a moment ago: the history read again.
+    void searchContents();
     void applyFilter();
+    void updateSummary();
     void onCommitSelectionChanged();
     void onFileSelectionChanged();
     void showCommit(const QString &id);
@@ -117,14 +130,18 @@ private:
     QToolButton *showAll_;
     QToolButton *allBranches_; // checked: every branch, not only HEAD's commits
     QToolButton *refreshButton_;
-    QAction *searchIcon_;
     std::optional<CommitLog> log_;
     QString error_; // why there is no log_
     std::optional<CommitDetails> details_;
     // Reading runs on pool_, in order (see ChangesView); generation_
-    // changes with the folder and the path filter.
+    // changes with the folder, the path filter and the content search.
     QThreadPool pool_;
     int generation_ = 0;
+    std::stop_source stopReading_;
+    // The content search of the log read; the query's, once typed.
+    std::optional<ContentSearch> contents_;
+    bool searchingContents_ = false;
+    QTimer contentsTimer_;
     bool reading_ = false;
     bool refreshPending_ = false;
     int commitLimit_ = 0; // commits to read, see loadMoreIfAtEnd()
@@ -141,9 +158,9 @@ private:
     bool arranging_ = false; // splitterMoved, while the panes are placed
 
     QLabel *summary_;
-    QLineEdit *filter_;
+    HistorySearchField *filter_;
     QTreeWidget *commits_;
-    QSplitter *splitter_;     // the commits (and the commit when narrow), the commit, the diff
+    GripSplitter *splitter_;  // the commits (and the commit when narrow), the commit, the diff
     QSplitter *leftSplitter_; // the commits, the commit under them when narrow
     QWidget *commitPane_ = nullptr;
     QStackedWidget *commitPages_ = nullptr; // a hint, or the chosen commit

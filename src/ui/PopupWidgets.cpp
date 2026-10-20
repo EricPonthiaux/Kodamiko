@@ -204,15 +204,13 @@ QSize ThemeCard::minimumSizeHint() const
 
 void ThemeCard::enterEvent(QEnterEvent *event)
 {
-    hovered_ = true;
-    update();
+    hover_.setHovered(true);
     QAbstractButton::enterEvent(event);
 }
 
 void ThemeCard::leaveEvent(QEvent *event)
 {
-    hovered_ = false;
-    update();
+    hover_.setHovered(false);
     QAbstractButton::leaveEvent(event);
 }
 
@@ -259,8 +257,9 @@ void ThemeCard::paintEvent(QPaintEvent *)
     if (isChecked()) {
         border = accent;
         borderWidth = 2;
-    } else if (hovered_ || hasFocus()) {
-        border = mix(border, accent, 0.6);
+    } else {
+        const qreal highlight = hasFocus() ? 1.0 : hover_.progress();
+        border = mix(border, accent, 0.6 * highlight);
     }
     painter.setPen(QPen(border, borderWidth));
     painter.setBrush(Qt::NoBrush);

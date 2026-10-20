@@ -425,8 +425,8 @@ private slots:
                                                 "<script>alert(1)</script>\n",
                                                 &colorizer);
         // Headings: GitHub's anchors, numbered when repeated.
-        QVERIFY(html.contains("<h1 dir=\"auto\"><a id=\"title\" class=\"anchor\""));
-        QVERIFY(html.contains("<a id=\"title-1\" class=\"anchor\""));
+        QVERIFY(html.contains("<h1 dir=\"auto\" data-line=\"1\"><a id=\"title\" class=\"anchor\""));
+        QVERIFY(html.contains("<h2 dir=\"auto\" data-line=\"3\"><a id=\"title-1\" class=\"anchor\""));
         QVERIFY(html.contains("octicon-link"));
         // GFM extensions.
         QVERIFY(html.contains("<code>code</code>"));
@@ -449,11 +449,10 @@ private slots:
         // The tag filter: no script.
         QVERIFY(!html.contains("<script>"));
 
-        const QString dark = MarkdownHtml::page(html, true);
-        QVERIFY(dark.contains("color-scheme: dark"));
-        QVERIFY(dark.contains("<article class=\"markdown-body\">"));
-        QVERIFY(dark.contains("Content-Security-Policy"));
-        QVERIFY(MarkdownHtml::page(html, false).contains("color-scheme: light"));
+        const QString page = MarkdownHtml::page(html);
+        QVERIFY(page.contains("color-scheme: light"));
+        QVERIFY(page.contains("<article class=\"markdown-body\">"));
+        QVERIFY(page.contains("Content-Security-Policy"));
         QCOMPARE(MarkdownHtml::prettyLightsClass("function.method", "cpp"), QString("pl-en"));
         QCOMPARE(MarkdownHtml::prettyLightsClass("property", "json"), QString("pl-ent"));
         QCOMPARE(MarkdownHtml::prettyLightsClass("punctuation", "cpp"), QString());

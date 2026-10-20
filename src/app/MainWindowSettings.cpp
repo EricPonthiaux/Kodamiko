@@ -26,6 +26,7 @@
 #include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/DetachablePage.h"
+#include "ui/Motion.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -127,6 +128,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
 {
     const Preferences previous = Preferences::load();
     preferences.save();
+    Motion::policy().setEnabled(preferences.animations);
     FontSettings::apply(preferences, previous, this);
     if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont() ||
         preferences.codeLineHeight != previous.codeLineHeight || preferences.ligatures != previous.ligatures)

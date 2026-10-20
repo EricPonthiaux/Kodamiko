@@ -342,7 +342,15 @@ QWidget *PreferencesPopup::createAppearancePage()
     addGroup(layout, tr("Window"), windowCard);
 #endif
 
-    return page(tr("Appearance"), tr("Colors and window frame."), content);
+    auto *motionCard = new SettingsCard;
+    animations_ = new QCheckBox;
+    animations_->setObjectName(QStringLiteral("interfaceAnimations"));
+    motionCard->addRow(tr("Interface animations"),
+                       tr("Animate menus, popups, hover feedback and diagram transitions. "
+                          "Turn off for immediate changes without motion."),
+                       animations_);
+    addGroup(layout, tr("Motion"), motionCard);
+    return page(tr("Appearance"), tr("Colors, window frame and motion."), content);
 }
 
 QWidget *PreferencesPopup::createFontsPage()
@@ -720,6 +728,7 @@ void PreferencesPopup::load(const Preferences &preferences,
     interfaceFontSize_->setValue(preferences.interfaceFontSize);
     setFontSizeValue(treeFontSize_, preferences.treeFontSize);
     systemTitleBar_->setChecked(preferences.systemTitleBar);
+    animations_->setChecked(preferences.animations);
     codeFolding_->setChecked(preferences.editor.codeFolding);
     wrapLines_->setChecked(preferences.editor.wrapLines);
     showWhitespace_->setChecked(preferences.editor.showWhitespace);
@@ -779,6 +788,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.interfaceFontSize = interfaceFontSize_->value();
     preferences.treeFontSize = fontSizeValue(treeFontSize_);
     preferences.systemTitleBar = systemTitleBar_->isChecked();
+    preferences.animations = animations_->isChecked();
     preferences.editor.codeFolding = codeFolding_->isChecked();
     preferences.editor.wrapLines = wrapLines_->isChecked();
     preferences.editor.showWhitespace = showWhitespace_->isChecked();

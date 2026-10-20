@@ -5,6 +5,7 @@
 #include "Document.h"
 #include "Family.h"
 #include "Graphviz.h"
+#include "ui/Motion.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -120,6 +121,10 @@ Canvas::Canvas(Board *board, QWidget *parent)
 
     animationTimer_->setInterval(16);
     connect(animationTimer_, &QTimer::timeout, this, &Canvas::stepAnimation);
+    connect(&Motion::policy(), &Motion::Policy::enabledChanged, this, [this](bool enabled) {
+        if (!enabled)
+            finishMotion();
+    });
     clock_.start();
     routeTimer_->setSingleShot(true);
     routeTimer_->setInterval(0);
@@ -136,6 +141,8 @@ Canvas::Canvas(Board *board, QWidget *parent)
             routeLinksSoon();
     });
     connect(board_, &Board::elementsCreated, this, [this](const QStringList &shapes, const QStringList &) {
+        if (!Motion::policy().isEnabled())
+            return;
         for (const QString &id : shapes)
             appearing_.insert(id, {qreal(clock_.elapsed()), motion::appearMs});
         startAnimation();
@@ -160,7 +167,7 @@ void Canvas::onEditorTextChanged()
 
 void Canvas::fadeOutRemoved(const QList<const Shape *> &shapes, const QList<const Link *> &links)
 {
-    if (!isVisible() || board_->shapes().size() >= 200)
+    if (!Motion::policy().isEnabled() || !isVisible() || board_->shapes().size() >= 200)
         return;
     const qreal now = clock_.elapsed();
     for (const Shape *s : shapes) {
@@ -263,6 +270,10 @@ void Canvas::animateCamera(const Camera &to)
 
 void Canvas::startAnimation()
 {
+    if (!Motion::policy().isEnabled()) {
+        finishMotion();
+        return;
+    }
     if (!animationTimer_->isActive())
         animationTimer_->start();
 }
@@ -321,6 +332,10 @@ void Canvas::finishMotion()
     geometryFrom_.clear();
     geometryTo_.clear();
     splinesFrom_.clear();
+    appearing_.clear();
+    ghosts_.clear();
+    animationTimer_->stop();
+    syncEditor();
     update();
 }
 

@@ -7,12 +7,14 @@
 #include <QStringList>
 
 #include <optional>
+#include <stop_token>
 
 // Commit as shown in the history list.
 struct CommitSummary {
     QString id;      // full identifier
     QString shortId; // first 7 characters
     QString summary; // first line of the message
+    QString message; // the whole message, summary included
     QString author;
     QString email;
     QDateTime date;        // author date
@@ -34,12 +36,43 @@ enum class LogScope {
     AllBranches
 };
 
+// How a content search reads the changes of a commit.
+enum class ContentMatch {
+    // The text occurs a different number of times before and after the
+    // commit, as "git log -S" finds it: the commits that add or remove it.
+    Occurrences,
+    // A changed line (added or removed) matches the regular expression, as
+    // "git log -G" finds it.
+    ChangedLine
+};
+
+// Commits whose changes involve `pattern`, case sensitive as in git.
+struct ContentSearch {
+    ContentMatch match = ContentMatch::Occurrences;
+    QString pattern;
+
+    bool operator==(const ContentSearch &) const = default;
+};
+
+// Which commits CommitLog::read keeps.
+struct LogOptions {
+    int limit = 2000;
+    // A file or folder relative to the open folder: only the commits that
+    // modify it. Empty: every commit of the open folder.
+    QString path;
+    LogScope scope = LogScope::Head;
+    // Only the commits whose changes (against their first parent) involve a
+    // text; merges are left out, as by git log.
+    std::optional<ContentSearch> contents;
+    // Requested: the walk stops, the log is left incomplete.
+    std::stop_token stop;
+};
+
 // Commits of HEAD (or of every branch), newest first, a commit before its
 // parents. If the open folder is a subfolder of the
-// repository, only the commits that modify it are kept; with `path` (relative
-// to the open folder), only those that modify that file or folder. A file is
-// followed across its renames within the open folder, like "git log
-// --follow".
+// repository, only the commits that modify it are kept; with a path, only
+// those that modify that file or folder. A file is followed across its
+// renames within the open folder, like "git log --follow".
 struct CommitLog {
     RepositoryInfo info;
     QList<CommitSummary> commits;
@@ -47,11 +80,9 @@ struct CommitLog {
 
     bool operator==(const CommitLog &) const = default;
 
-    // Returns nullopt outside a git repository. Throws GitError on failure.
-    static std::optional<CommitLog> read(const QString &folder,
-                                         int limit = 2000,
-                                         const QString &path = {},
-                                         LogScope scope = LogScope::Head);
+    // Returns nullopt outside a git repository. Throws GitError on failure,
+    // and for a content search with an invalid regular expression.
+    static std::optional<CommitLog> read(const QString &folder, const LogOptions &options = {});
 };
 
 // Contents of a commit: full message and changes relative to its first

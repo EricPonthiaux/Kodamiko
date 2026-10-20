@@ -9,6 +9,7 @@
 #include <QToolButton>
 
 #include <algorithm>
+#include <initializer_list>
 #include <tuple>
 
 DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
@@ -49,6 +50,14 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     whitespace_->setFocusPolicy(Qt::NoFocus);
     whitespace_->setToolTip(tr("Hide whitespace changes"));
     connect(whitespace_, &QToolButton::toggled, this, [this] { emit whitespaceChanged(whitespace()); });
+
+    // Hidden without a file, they keep their room: the bar keeps its height,
+    // and its rule stays in line with those next to it.
+    for (QWidget *widget : std::initializer_list<QWidget *>{stats_, sideBySide_, whitespace_, previous_, next_}) {
+        QSizePolicy policy = widget->sizePolicy();
+        policy.setRetainSizeWhenHidden(true);
+        widget->setSizePolicy(policy);
+    }
 
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 4, 6, 4);

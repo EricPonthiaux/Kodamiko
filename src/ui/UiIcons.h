@@ -6,7 +6,7 @@
 // the theme's colors: "search", "find-in-files", "palette", "branch",
 // "plus", "minus", "discard", "refresh", "terminal", "code", "diff",
 // "history", "files", "outline", "claude", "locate", "appearance",
-// "keyboard", "settings", "collapse-all", "more", "run", "stop", "build",
+// "keyboard", "settings", "collapse-all", "filter", "more", "run", "stop", "build",
 // "debug", "test", "problems", "check", "document", "split", "preview", "arrange",
 // "fit", "export", "grid", "side-panel".
 namespace UiIcons {

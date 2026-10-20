@@ -1,5 +1,6 @@
 #include "OverlayPopup.h"
 
+#include "Motion.h"
 #include "WindowFrame.h"
 
 #include <QApplication>
@@ -49,6 +50,7 @@ OverlayPopup::OverlayPopup(const QString &settingsKey, const QSizeF &share, cons
     applyMargins();
     setMouseTracking(true); // the cursor over the edges
     hide();
+    Motion::watchPopup(this);
 }
 
 void OverlayPopup::applyMargins()

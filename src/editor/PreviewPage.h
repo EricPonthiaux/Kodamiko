@@ -17,7 +17,7 @@ class QSplitter;
 class QToolButton;
 
 // Markdown rendered exactly as on GitHub: GitHub's parser (cmark-gfm),
-// GitHub's markup and style sheet (github-markdown-css, dark or light after
+// GitHub's markup and style sheet (github-markdown-css, always light, whatever
 // the editor theme), in a web view. Code blocks are highlighted with
 // GitHub's classes, from the editor's highlighters. Page scripts never run.
 // Relative images are found next to the file; links to files are opened in
@@ -27,15 +27,17 @@ class MarkdownPreview : public QWebEngineView {
     Q_OBJECT
 
 public:
-    explicit MarkdownPreview(const Theme &theme, QWidget *parent = nullptr);
+    explicit MarkdownPreview(QWidget *parent = nullptr);
     ~MarkdownPreview() override;
 
     // Renders `text`, keeping the scroll position. `folder`: where relative
     // links and images lead.
     void render(const QString &text, const QString &folder);
-    void applyTheme(const Theme &theme);
     // Scrolls to the share `ratio` (0 to 1) of the page.
     void scrollToRatio(double ratio);
+    // Scrolls to the heading of the source `line` (0-based): the last one
+    // at or above it; to the top before the first heading.
+    void scrollToLine(int line);
 
     // HTML of the rendered body, as last set.
     QString bodyHtml() const { return body_; }
@@ -55,7 +57,6 @@ private:
     void loadPage();
     void showBody();
 
-    bool dark_ = true;
     QString folder_;
     QString body_;
     bool loaded_ = false;
@@ -144,6 +145,9 @@ public:
     // The editor hidden by the Preview mode becomes visible (Split): to show
     // a position or a search in it.
     void revealEditor();
+    // In Preview mode, a Markdown preview scrolls to the heading of the
+    // editor's caret, which is hidden: to show a symbol of the outline.
+    void scrollPreviewToCaret();
     void applyTheme(const Theme &theme);
 
     // A Markdown or HTML file: opened with its preview.

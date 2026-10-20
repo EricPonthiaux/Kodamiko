@@ -277,4 +277,4 @@ Configured in `.clang-format`, `.clang-tidy` and `cmake/CodeQuality.cmake`:
   unprompted) existing code that violates them.
 - Favor small, readable changes; explain any choice that departs from this
   document.
-- Respond in French.
+- Respond in English.

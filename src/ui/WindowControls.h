@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HoverProgress.h"
 #include "Theme.h"
 
 #include <QAbstractButton>
@@ -29,7 +30,7 @@ protected:
 private:
     Kind kind_;
     Theme theme_;
-    bool hovered_ = false;
+    HoverProgress hover_{this};
 };
 
 // The controls of a frameless window, in the manner of the system's:

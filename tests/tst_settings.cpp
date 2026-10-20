@@ -7,6 +7,7 @@
 #include "ui/Theme.h"
 
 #include <QAction>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
 #include <QListWidget>
@@ -46,6 +47,7 @@ private slots:
         preferences.codeFontWeight = QFont::Light;
         preferences.codeLineHeight = 1.6;
         preferences.ligatures = true;
+        preferences.animations = false;
         preferences.editor.wrapLines = true;
         preferences.editor.codeFolding = false;
         preferences.claudeNotifications = false;
@@ -254,10 +256,17 @@ private slots:
         preferences.codeFontWeight = QFont::Medium;
         preferences.codeLineHeight = 1.75;
         preferences.ligatures = true;
+        preferences.animations = false;
         QWidget window;
         PreferencesPopup popup(Theme::dark(), &window);
         popup.load(preferences, {}, {});
         QCOMPARE(popup.preferences(), preferences);
+        auto *animations = popup.findChild<QCheckBox *>("interfaceAnimations");
+        QVERIFY(animations);
+        QVERIFY(!animations->isChecked());
+        animations->setChecked(true);
+        QVERIFY(popup.preferences().animations);
+        preferences.animations = true;
         preferences.theme = "light";
         popup.load(preferences, {}, {}); // reopened with other settings
         QCOMPARE(popup.preferences(), preferences);

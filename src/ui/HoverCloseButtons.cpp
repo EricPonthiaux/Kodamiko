@@ -1,21 +1,47 @@
 #include "HoverCloseButtons.h"
 
+#include "Motion.h"
+
 #include <QEvent>
 #include <QGraphicsOpacityEffect>
 #include <QHoverEvent>
+#include <QPropertyAnimation>
 #include <QStyle>
 #include <QTabBar>
 
 namespace {
 
+// A new button takes its state at once; a known one eases into it.
 void setShown(QWidget *button, bool shown)
 {
+    const qreal opacity = shown ? 1.0 : 0.0;
     auto *effect = qobject_cast<QGraphicsOpacityEffect *>(button->graphicsEffect());
     if (!effect) {
         effect = new QGraphicsOpacityEffect(button);
+        effect->setOpacity(opacity);
         button->setGraphicsEffect(effect); // which owns it
+        return;
     }
-    effect->setOpacity(shown ? 1.0 : 0.0);
+    auto *fade = effect->findChild<QPropertyAnimation *>();
+    const bool isHeadingThere = fade ? fade->endValue().toReal() == opacity : effect->opacity() == opacity;
+    if (!Motion::policy().isEnabled()) {
+        if (fade)
+            fade->stop();
+        effect->setOpacity(opacity);
+        return;
+    }
+    if (isHeadingThere)
+        return;
+    if (!fade) {
+        fade = new QPropertyAnimation(effect, "opacity", effect);
+        fade->setDuration(int(Motion::hoverDuration.count()));
+        fade->setEasingCurve(Motion::standardCurve());
+        Motion::track(fade);
+    }
+    fade->stop();
+    fade->setStartValue(effect->opacity());
+    fade->setEndValue(opacity);
+    fade->start();
 }
 
 } // namespace

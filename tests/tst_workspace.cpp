@@ -289,6 +289,26 @@ private slots:
         QVERIFY(!QSettings().contains("overlays/transientOffset"));
     }
 
+    void popupFadesInAndHidesAtOnceBehindAFadingPicture()
+    {
+        QWidget window;
+        window.resize(1000, 700);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        OverlayPopup popup("fading", QSizeF(0.5, 0.5), QSize(300, 200), &window);
+
+        popup.showCentered();
+        QVERIFY(qobject_cast<QGraphicsOpacityEffect *>(popup.graphicsEffect()));
+        QTRY_VERIFY(!popup.graphicsEffect());
+
+        popup.dismiss();
+        QVERIFY(!popup.isVisible());
+        const auto pictures = [&window] { return window.findChildren<QLabel *>(Qt::FindDirectChildrenOnly); };
+        QCOMPARE(pictures().size(), 1);
+        QVERIFY(pictures().first()->testAttribute(Qt::WA_TransparentForMouseEvents));
+        QTRY_VERIFY(pictures().isEmpty());
+    }
+
     void shadowMarginsSurviveAThemeChange()
     {
         // A style sheet resets the margins of the widgets it polishes: the
@@ -1095,13 +1115,13 @@ private slots:
         const QPointF overThree = bar->tabRect(2).center();
         QHoverEvent move(QEvent::HoverMove, overThree, bar->mapToGlobal(overThree), overThree);
         QApplication::sendEvent(bar, &move);
-        QVERIFY(isShown(2));
+        QTRY_VERIFY(isShown(2));
         QHoverEvent leave(QEvent::HoverLeave, QPointF(-1, -1), QPointF(-1, -1), overThree);
         QApplication::sendEvent(bar, &leave);
-        QVERIFY(!isShown(2));
+        QTRY_VERIFY(!isShown(2));
 
         tabs.setCurrentIndex(1);
-        QVERIFY(isShown(1) && !isShown(0));
+        QTRY_VERIFY(isShown(1) && !isShown(0));
         tabs.addTab(new QWidget, "four"); // a new tab's button too
         QTRY_VERIFY(!isShown(3));
     }

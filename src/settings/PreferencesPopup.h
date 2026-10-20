@@ -105,6 +105,7 @@ private:
     QSpinBox *interfaceFontSize_ = nullptr;
     QSpinBox *treeFontSize_ = nullptr;
     QCheckBox *systemTitleBar_ = nullptr;
+    QCheckBox *animations_ = nullptr;
     QCheckBox *codeFolding_ = nullptr;
     QCheckBox *wrapLines_ = nullptr;
     QCheckBox *showWhitespace_ = nullptr;

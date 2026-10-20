@@ -329,6 +329,19 @@ const QHash<QString, Painter> &painters()
              p.drawRoundedRect(QRectF(1.5, 2.5, 13, 11), 1.5, 1.5);
              p.drawLine(QPointF(10, 2.5), QPointF(10, 13.5));
          }},
+        // A funnel.
+        {QStringLiteral("filter"),
+         [](QPainter &p) {
+             QPainterPath funnel;
+             funnel.moveTo(2, 3);
+             funnel.lineTo(14, 3);
+             funnel.lineTo(9.5, 8.5);
+             funnel.lineTo(9.5, 13.5);
+             funnel.lineTo(6.5, 12);
+             funnel.lineTo(6.5, 8.5);
+             funnel.closeSubpath();
+             p.drawPath(funnel);
+         }},
         // Three dots, one above the other.
         {QStringLiteral("more"),
          [](QPainter &p) {

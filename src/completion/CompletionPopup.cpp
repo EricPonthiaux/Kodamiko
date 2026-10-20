@@ -1,6 +1,7 @@
 #include "CompletionPopup.h"
 
 #include "FuzzyMatch.h"
+#include "ui/Motion.h"
 
 #include <QAbstractListModel>
 #include <QAccessible>
@@ -302,6 +303,7 @@ CompletionPopup::CompletionPopup(QWidget *parent)
     , model_(new CompletionListModel(this))
 {
     setObjectName(QStringLiteral("completionPopup"));
+    Motion::watchPopup(this);
     setFocusPolicy(Qt::NoFocus);
     view_->setFocusPolicy(Qt::NoFocus);
     view_->setModel(model_);
@@ -328,6 +330,7 @@ CompletionPopup::CompletionPopup(QWidget *parent)
 
     documentation_ = new QFrame(parent);
     documentation_->setObjectName(QStringLiteral("completionDocumentation"));
+    Motion::watchPopup(documentation_);
     documentation_->setFocusPolicy(Qt::NoFocus);
     documentation_->setAccessibleName(tr("Documentation"));
     documentationTitle_ = new QLabel(documentation_);

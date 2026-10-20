@@ -120,14 +120,13 @@ QString scriptString(const QString &text)
 
 } // namespace
 
-MarkdownPreview::MarkdownPreview(const Theme &theme, QWidget *parent)
+MarkdownPreview::MarkdownPreview(QWidget *parent)
     : QWebEngineView(parent)
-    , dark_(theme.isDark)
     , colorizer_(std::make_unique<CodeColorizer>())
 {
     setPage(new LinkRoutingPage(this, [this](const QString &path) { emit openFileRequested(path); }));
     // The page's color before it is loaded, not the view's default white.
-    page()->setBackgroundColor(QColor(MarkdownHtml::pageColor(dark_)));
+    page()->setBackgroundColor(MarkdownHtml::pageColor());
     connect(page(), &QWebEnginePage::loadFinished, this, [this] {
         pageLoading_ = false;
         loaded_ = true;
@@ -157,7 +156,7 @@ void MarkdownPreview::loadPage()
 {
     loaded_ = false;
     pageLoading_ = true;
-    setHtml(MarkdownHtml::page(body_, dark_), QUrl::fromLocalFile(folder_ + QStringLiteral("/")));
+    setHtml(MarkdownHtml::page(body_), QUrl::fromLocalFile(folder_ + QStringLiteral("/")));
 }
 
 // The body replaced in place: the page keeps its scroll position.
@@ -173,6 +172,22 @@ void MarkdownPreview::showBody()
     page()->runJavaScript(script, QWebEngineScript::ApplicationWorld, [this](const QVariant &) { emit rendered(); });
 }
 
+void MarkdownPreview::scrollToLine(int line)
+{
+    if (!loaded_)
+        return;
+    const QString script = QStringLiteral("(() => {"
+                                          "  const above = [...document.querySelectorAll('article [data-line]')]"
+                                          "      .filter(heading => Number(heading.dataset.line) <= %1);"
+                                          "  if (above.length)"
+                                          "    above[above.length - 1].scrollIntoView();"
+                                          "  else"
+                                          "    window.scrollTo(0, 0);"
+                                          "})();")
+                               .arg(line + 1);
+    page()->runJavaScript(script, QWebEngineScript::ApplicationWorld);
+}
+
 void MarkdownPreview::scrollToRatio(double ratio)
 {
     if (!loaded_) {
@@ -182,23 +197,6 @@ void MarkdownPreview::scrollToRatio(double ratio)
     page()->runJavaScript(scrollToScript(ratio), QWebEngineScript::ApplicationWorld);
 }
 
-void MarkdownPreview::applyTheme(const Theme &theme)
-{
-    if (theme.isDark == dark_)
-        return;
-    dark_ = theme.isDark;
-    page()->setBackgroundColor(QColor(MarkdownHtml::pageColor(dark_)));
-    if (folder_.isEmpty() && body_.isEmpty())
-        return;
-    // Another style sheet: the page is reloaded, at the same place.
-    page()->runJavaScript(QString::fromLatin1(scrollRatioScript), QWebEngineScript::ApplicationWorld,
-                          [this](const QVariant &ratio) {
-                              pendingRatio_ = ratio.toDouble();
-                              loadPage();
-                          });
-}
-
-// Copying, without the browser's navigation entries.
 void MarkdownPreview::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu menu(this);
@@ -451,7 +449,7 @@ void PreviewPage::ensurePreview()
         connect(html_, &HtmlPreview::openFileRequested, this, &PreviewPage::openFileRequested);
         connect(html_, &HtmlPreview::rendered, this, &PreviewPage::revealPreview, Qt::SingleShotConnection);
     } else {
-        markdown_ = new MarkdownPreview(theme_, this);
+        markdown_ = new MarkdownPreview(this);
         connect(markdown_, &MarkdownPreview::openFileRequested, this, &PreviewPage::openFileRequested);
         connect(markdown_, &MarkdownPreview::rendered, this, &PreviewPage::revealPreview, Qt::SingleShotConnection);
     }
@@ -477,6 +475,16 @@ void PreviewPage::revealEditor()
 {
     if (mode_ == Mode::Preview)
         setMode(Mode::Split);
+}
+
+void PreviewPage::scrollPreviewToCaret()
+{
+    if (mode_ != Mode::Preview || !markdown_)
+        return;
+    int line = 0;
+    int index = 0;
+    editor_->getCursorPosition(&line, &index);
+    markdown_->scrollToLine(line);
 }
 
 void PreviewPage::updatePreview()
@@ -511,9 +519,8 @@ void PreviewPage::applyTheme(const Theme &theme)
     theme_ = theme;
     updateToolbarIcons();
     editor_->applyTheme(theme);
-    // An HTML page has its own colors.
-    if (markdown_)
-        markdown_->applyTheme(theme);
+    // The previews keep their own colors: GitHub's for Markdown, the
+    // page's for HTML.
 }
 
 bool PreviewPage::hasPreview(const QString &path)

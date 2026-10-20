@@ -179,7 +179,7 @@ void getGitStatus(const DuetToolContext &context, const QJsonObject &arguments, 
 
 McpResult fileHistory(const QString &folder, const QString &path, int limit)
 {
-    const std::optional<CommitLog> log = CommitLog::read(folder, limit, path);
+    const std::optional<CommitLog> log = CommitLog::read(folder, {.limit = limit, .path = path});
     if (!log)
         return McpResult::error(QStringLiteral("The project is not in a git repository"));
     QJsonArray commits;

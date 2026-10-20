@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HoverProgress.h"
 #include "Theme.h"
 
 #include <QAbstractButton>
@@ -38,6 +39,7 @@ protected:
     void changeEvent(QEvent *event) override;
 
 private:
+    void updateAnimation();
     void paintBackground(QPainter &painter, const QColor &color) const;
     void paintStar(QPainter &painter, const QRectF &box, const QColor &color) const;
     qreal branchOpacity(int branch) const;
@@ -45,7 +47,7 @@ private:
 
     Status status_ = Status::Ready;
     Theme theme_;
-    bool hovered_ = false;
+    HoverProgress hover_{this};
     int frame_ = 0; // the animation's step since the state changed
     QTimer animationTimer_;
 };

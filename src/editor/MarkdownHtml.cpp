@@ -108,7 +108,8 @@ QString codeBlockHtml(cmark_node *node, CodeColorizer *colorizer)
         .arg(name.toHtmlEscaped(), highlightedCode(code, languageId, colorizer));
 }
 
-// Headings with the anchor GitHub puts in them (shown on hover).
+// Headings with the anchor GitHub puts in them (shown on hover), and their
+// line in the source, which the preview scrolls to.
 QString headingHtml(cmark_node *node, cmark_llist *extensions, QHash<QString, int> &anchors)
 {
     QString anchor = MarkdownHtml::headingAnchor(plainText(node));
@@ -119,10 +120,11 @@ QString headingHtml(cmark_node *node, cmark_llist *extensions, QHash<QString, in
         anchor += QStringLiteral("-%1").arg(seen);
     QString html = render(node, extensions);
     static const QRegularExpression opening(QStringLiteral("^<h([1-6])>"));
-    html.replace(opening,
-                 QStringLiteral("<h\\1 dir=\"auto\"><a id=\"%1\" class=\"anchor\" aria-hidden=\"true\" tabindex=\"-1\" "
-                                "href=\"#%1\">%2</a>")
-                     .arg(anchor.toHtmlEscaped(), octicon(QStringLiteral("link"), {})));
+    html.replace(opening, QStringLiteral(
+                              "<h\\1 dir=\"auto\" data-line=\"%3\"><a id=\"%1\" class=\"anchor\" aria-hidden=\"true\" "
+                              "tabindex=\"-1\" href=\"#%1\">%2</a>")
+                              .arg(anchor.toHtmlEscaped(), octicon(QStringLiteral("link"), {}),
+                                   QString::number(cmark_node_get_start_line(node))));
     return html;
 }
 
@@ -300,22 +302,21 @@ QString body(const QString &markdown, CodeColorizer *colorizer)
     return html;
 }
 
-QString pageColor(bool dark)
+QColor pageColor()
 {
-    return dark ? QStringLiteral("#0d1117") : QStringLiteral("#ffffff");
+    return {0xff, 0xff, 0xff};
 }
 
-QString page(const QString &body, bool dark)
+QString page(const QString &body)
 {
-    const QString css = resource(dark ? QStringLiteral(":/markdown/github-markdown-css/github-markdown-dark.css")
-                                      : QStringLiteral(":/markdown/github-markdown-css/github-markdown-light.css"));
+    const QString css = resource(QStringLiteral(":/markdown/github-markdown-css/github-markdown-light.css"));
     // The layout github-markdown-css recommends, on GitHub's page color.
     const QString layout =
         QStringLiteral("html, body { margin: 0; background-color: %1; }\n"
                        ".markdown-body { box-sizing: border-box; min-width: 200px; max-width: 980px; "
                        "margin: 0 auto; padding: 45px; }\n"
                        "@media (max-width: 767px) { .markdown-body { padding: 15px; } }\n")
-            .arg(pageColor(dark));
+            .arg(pageColor().name());
     return QStringLiteral("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\">\n"
                           "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; "
                           "img-src file: data: https: http:; style-src 'unsafe-inline'; font-src file: data:\">\n"

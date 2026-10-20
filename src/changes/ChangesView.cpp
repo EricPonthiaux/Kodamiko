@@ -111,9 +111,9 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     header->addWidget(refreshButton);
 
     // The selected files' actions, right above the list.
-    auto *fileActions = new QFrame(this);
-    fileActions->setObjectName(QStringLiteral("fileActions"));
-    auto *fileActionsLayout = new QHBoxLayout(fileActions);
+    fileActions_ = new QFrame(this);
+    fileActions_->setObjectName(QStringLiteral("fileActions"));
+    auto *fileActionsLayout = new QHBoxLayout(fileActions_);
     fileActionsLayout->setContentsMargins(4, 4, 4, 4);
     fileActionsLayout->setSpacing(2);
     fileActionsLayout->addWidget(stageButton_);
@@ -139,10 +139,13 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     operationLayout->addWidget(abortButton_);
     operationLayout->addWidget(skipButton_);
     operationLayout->addWidget(continueButton_);
-    operationBar_->hide();
-    auto *operationRow = new QHBoxLayout;
+    // Its margins hide with it: without an operation, the columns start
+    // right under the title bar, and the handle's line meets its rule.
+    operationArea_ = new QWidget(this);
+    auto *operationRow = new QHBoxLayout(operationArea_);
     operationRow->setContentsMargins(8, 0, 8, 8);
     operationRow->addWidget(operationBar_);
+    operationArea_->hide();
 
     // List: two sections, "Unstaged" then "Staged", the one nearer the
     // commit area; their files in their folders.
@@ -188,7 +191,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     auto *leftLayout = new QVBoxLayout(left);
     leftLayout->setContentsMargins(0, 0, 0, 0);
     leftLayout->setSpacing(0);
-    leftLayout->addWidget(fileActions);
+    leftLayout->addWidget(fileActions_);
     leftLayout->addWidget(list_, 1);
     leftLayout->addWidget(commitPanel_);
 
@@ -227,7 +230,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(titleBar);
-    layout->addLayout(operationRow);
+    layout->addWidget(operationArea_);
     layout->addWidget(splitter_);
 
     connect(commands_, &GitCommands::busyChanged, this, [this](bool busy) {
@@ -571,7 +574,7 @@ void ChangesView::updateActions()
 void ChangesView::showOperation()
 {
     const bool hasOperation = status_ && !status_->info.operation.isEmpty();
-    operationBar_->setVisible(hasOperation);
+    operationArea_->setVisible(hasOperation);
     if (!hasOperation)
         return;
     const QString operation = status_->info.operation;
@@ -729,4 +732,14 @@ void ChangesView::applyTheme(const Theme &theme)
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
     commitPanel_->applyTheme(theme);
     diffHeader_->applyTheme(theme);
+    alignBars(theme);
+}
+
+void ChangesView::alignBars(const Theme &theme)
+{
+    const int height = std::max(fileActions_->sizeHint().height(), diffHeader_->sizeHint().height());
+    fileActions_->setFixedHeight(height);
+    diffHeader_->setFixedHeight(height);
+    // Their bottom borders, see ThemeStyle: the bars are at the top of their column.
+    splitter_->setHandleRule(1, {height - 1, Qt::LeftEdge | Qt::RightEdge, theme.line});
 }

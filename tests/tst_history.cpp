@@ -5,6 +5,7 @@
 #include "git/GitProcess.h"
 #include "history/CommitDelegate.h"
 #include "history/CommitGraph.h"
+#include "history/CommitQuery.h"
 #include "history/HistoryView.h"
 
 #include <QLabel>
@@ -44,7 +45,7 @@ void commit(const QTemporaryDir &dir, const QString &message, const QHash<QStrin
 
 CommitLog readLog(const QString &folder, int limit = 2000)
 {
-    const std::optional<CommitLog> log = CommitLog::read(folder, limit);
+    const std::optional<CommitLog> log = CommitLog::read(folder, {.limit = limit});
     if (!log)
         qFatal("no git repository");
     return *log;
@@ -162,6 +163,7 @@ private slots:
         QCOMPARE(newest.shortId, newest.id.left(7));
         QCOMPARE(newest.refs, QStringList({"main"}));
         QCOMPARE(log.commits[1].refs, QStringList({"v1"}));
+        QCOMPARE(log.commits[1].message, QStringLiteral("second\n\nmessage body"));
         QVERIFY(log.commits[2].parentIds.isEmpty());
         QCOMPARE(log.commits[1].parentIds, QStringList({log.commits[2].id}));
     }
@@ -211,7 +213,7 @@ private slots:
         commit(dir, "on main", {{"c.txt", "c\n"}});
 
         QCOMPARE(summaries(*CommitLog::read(dir.path())), QStringList({"on main", "base"}));
-        QCOMPARE(CommitLog::read(dir.path(), 2000, {}, LogScope::AllBranches)->commits.size(), 3);
+        QCOMPARE(CommitLog::read(dir.path(), {.scope = LogScope::AllBranches})->commits.size(), 3);
     }
 
     void logMarksADetachedHead()
@@ -260,9 +262,11 @@ private slots:
         commit(dir, "b created", {{"src/b.cpp", "b\n"}});
         commit(dir, "a modified", {{"src/a.cpp", "aa\n"}});
 
-        QCOMPARE(summaries(*CommitLog::read(dir.path(), 100, "src/a.cpp")), QStringList({"a modified", "a created"}));
-        QCOMPARE(summaries(*CommitLog::read(dir.filePath("src"), 100, "b.cpp")), QStringList({"b created"}));
-        QCOMPARE(summaries(*CommitLog::read(dir.path(), 100, "src")).size(), 3);
+        QCOMPARE(summaries(*CommitLog::read(dir.path(), {.limit = 100, .path = "src/a.cpp"})),
+                 QStringList({"a modified", "a created"}));
+        QCOMPARE(summaries(*CommitLog::read(dir.filePath("src"), {.limit = 100, .path = "b.cpp"})),
+                 QStringList({"b created"}));
+        QCOMPARE(summaries(*CommitLog::read(dir.path(), {.limit = 100, .path = "src"})).size(), 3);
     }
 
     void fileHistoryFollowsRenames()
@@ -276,12 +280,12 @@ private slots:
         commit(dir, "unrelated", {{"other.txt", "p\n"}});
         commit(dir, "after", {{"new.txt", longText("4")}});
 
-        const std::optional<CommitLog> log = CommitLog::read(dir.path(), 2000, "new.txt");
+        const std::optional<CommitLog> log = CommitLog::read(dir.path(), {.path = "new.txt"});
 
         QVERIFY(log);
         QCOMPARE(summaries(*log), QStringList({"after", "rename", "edit", "create"}));
         QCOMPARE(pathsOf(*log), QStringList({"new.txt", "new.txt", "old.txt", "old.txt"}));
-        QCOMPARE(pathsOf(*CommitLog::read(dir.path(), 2000)), QStringList(5, QString())); // no file followed
+        QCOMPARE(pathsOf(*CommitLog::read(dir.path())), QStringList(5, QString())); // no file followed
     }
 
     void fileHistoryStopsAtARenameFromOutsideTheFolder()
@@ -292,7 +296,7 @@ private slots:
         QVERIFY(QFile::remove(dir.filePath("a.txt")));
         commit(dir, "move in", {{"src/a.txt", longText("1")}});
 
-        const std::optional<CommitLog> log = CommitLog::read(dir.filePath("src"), 2000, "a.txt");
+        const std::optional<CommitLog> log = CommitLog::read(dir.filePath("src"), {.path = "a.txt"});
 
         QVERIFY(log);
         QCOMPARE(summaries(*log), QStringList({"move in"})); // added, as far as src sees
@@ -484,6 +488,123 @@ private slots:
 
         QTRY_COMPARE(commits->topLevelItemCount(), 1200);
         QVERIFY(!commits->topLevelItem(1199)->isHidden()); // the oldest, found
+    }
+
+    void queryReadsWordsAndTerms()
+    {
+        const QDate today(2024, 6, 30);
+
+        const CommitQuery query = CommitQuery::parse(
+            R"(fix author:ada message:"null check" after:2024-03-01 before:2w contents:"a b" http://x)", today);
+
+        QCOMPARE(query.words, QStringList({"fix", "http://x"}));
+        QCOMPARE(query.authors, QStringList({"ada"}));
+        QCOMPARE(query.messageTexts, QStringList({"null check"}));
+        QCOMPARE(query.after, QDate(2024, 3, 1));
+        QCOMPARE(query.before, QDate(2024, 6, 16));
+        QCOMPARE(query.contents, (ContentSearch{ContentMatch::Occurrences, "a b"}));
+        QVERIFY(query.error.isEmpty());
+    }
+
+    void queryIgnoresATermWhoseValueIsBeingTyped()
+    {
+        const CommitQuery query = CommitQuery::parse("fix author:");
+
+        QCOMPARE(query.words, QStringList({"fix"}));
+        QVERIFY(query.authors.isEmpty());
+        QVERIFY(query.error.isEmpty());
+    }
+
+    void queryExplainsAnUnknownDateAndAnInvalidRegex()
+    {
+        QVERIFY(CommitQuery::parse("after:yesterday").error.contains("yesterday"));
+        const CommitQuery query = CommitQuery::parse("diff:(unclosed");
+        QVERIFY(!query.contents);
+        QVERIFY(query.error.contains("(unclosed"));
+    }
+
+    void queryMatchesTheMessageBodyTheAuthorAndTheDays()
+    {
+        CommitSummary commit;
+        commit.summary = "Fix the parser";
+        commit.message = "Fix the parser\n\nAdds a null check.";
+        commit.author = "Ada";
+        commit.email = "ada@example.org";
+        commit.date = QDateTime(QDate(2024, 3, 15), QTime(12, 0));
+
+        QVERIFY(CommitQuery::parse("null check").matches(commit));
+        QVERIFY(CommitQuery::parse("message:\"null check\" author:example.org").matches(commit));
+        QVERIFY(CommitQuery::parse("after:2024-03-15 before:2024-03-15").matches(commit));
+        QVERIFY(!CommitQuery::parse("after:2024-03-16").matches(commit));
+        QVERIFY(!CommitQuery::parse("parser author:bob").matches(commit));
+    }
+
+    void contentSearchFindsTheCommitsAddingOrRemovingTheText()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "add", {{"a.txt", "x\nneedle\n"}});
+        commit(dir, "edit around", {{"a.txt", "y\nneedle\n"}});
+        commit(dir, "edit the line", {{"a.txt", "y\nneedle here\n"}});
+        commit(dir, "remove", {{"a.txt", "y\n"}});
+
+        const std::optional<CommitLog> log =
+            CommitLog::read(dir.path(), {.contents = ContentSearch{ContentMatch::Occurrences, "needle"}});
+
+        QCOMPARE(summaries(*log), QStringList({"remove", "add"}));
+    }
+
+    void contentSearchByRegexFindsTheChangedLines()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "add", {{"a.txt", "needle\n"}});
+        commit(dir, "edit around", {{"a.txt", "x\nneedle\n"}});
+        commit(dir, "edit the line", {{"a.txt", "x\nneedle here\n"}});
+
+        const std::optional<CommitLog> log =
+            CommitLog::read(dir.path(), {.contents = ContentSearch{ContentMatch::ChangedLine, "^nee+dle"}});
+
+        // The line edited still holds the text once: found by its change.
+        QCOMPARE(summaries(*log), QStringList({"edit the line", "add"}));
+    }
+
+    void contentSearchStaysInTheFilteredFile()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "in a", {{"a.txt", "needle\n"}});
+        commit(dir, "in b", {{"b.txt", "needle\n"}});
+
+        const std::optional<CommitLog> log = CommitLog::read(
+            dir.path(), {.path = "a.txt", .contents = ContentSearch{ContentMatch::Occurrences, "needle"}});
+
+        QCOMPARE(summaries(*log), QStringList({"in a"}));
+    }
+
+    void viewFiltersByAuthorAndSearchesTheChanges()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "add", {{"a.txt", "needle\n"}});
+        commit(dir, "other", {{"b.txt", "hay\n"}});
+        git(dir, {"commit", "-q", "--allow-empty", "-m", "by bob", "--author", "Bob <bob@example.org>"});
+        HistoryView view(Theme::dark());
+        view.resize(900, 600);
+        view.show();
+        view.setFolder(dir.path());
+        view.refresh();
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QTRY_COMPARE(commits->topLevelItemCount(), 3);
+        auto *field = view.findChild<QLineEdit *>();
+
+        field->setText("author:bob");
+        QVERIFY(!commits->topLevelItem(0)->isHidden());
+        QVERIFY(commits->topLevelItem(1)->isHidden());
+
+        field->setText("contents:needle");
+        QTRY_COMPARE(commits->topLevelItemCount(), 1);
+        QCOMPARE(commits->topLevelItem(0)->text(0), QStringLiteral("add"));
     }
 
     void historyDrawsTheGraphOfEveryBranch()

@@ -461,6 +461,7 @@ void MainWindow::createProblemsAndOutline()
     connect(problemsView_, &ProblemsView::countsChanged, this, &MainWindow::updateTabIcons);
     connect(editorTabs_, &QTabWidget::currentChanged, this,
             [this] { outlineView_->setEditor(editorTabs_->currentEditor()); });
+    connect(outlineView_, &OutlineView::symbolActivated, editorTabs_, &EditorTabs::scrollPreviewToCaret);
     connect(editorTabs_, &QTabWidget::currentChanged, this, &MainWindow::onCurrentTabChanged);
 }
 

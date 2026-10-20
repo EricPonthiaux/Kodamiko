@@ -5,6 +5,7 @@
 #include "settings/Preferences.h"
 #include "ui/BrandMark.h"
 #include "ui/ClickableCursors.h"
+#include "ui/Motion.h"
 #include "welcome/WelcomeWindow.h"
 
 #include <QApplication>
@@ -28,6 +29,16 @@ constexpr int closeButtonWidth = 20 + 8;
 class AppStyle : public QProxyStyle {
 public:
     using QProxyStyle::QProxyStyle;
+
+    int styleHint(StyleHint hint,
+                  const QStyleOption *option,
+                  const QWidget *widget,
+                  QStyleHintReturn *data) const override
+    {
+        if (hint == SH_Widget_Animation_Duration && !Motion::policy().isEnabled())
+            return 0;
+        return QProxyStyle::styleHint(hint, option, widget, data);
+    }
 
     void polish(QWidget *widget) override
     {
@@ -161,6 +172,8 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("Duet"));
     QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
     adoptLegacySettings();
+    Motion::policy().setEnabled(Preferences::load().animations);
+    Motion::install();
     // Fusion follows the application palette on every system, which
     // enables the dark theme everywhere.
     // The application owns the style it is given; the analyzer, which does
