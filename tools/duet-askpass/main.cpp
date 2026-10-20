@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // duet-askpass: asks the editor's user for what git or ssh needs.
 //
 // git (GIT_ASKPASS) and ssh (SSH_ASKPASS) run this program with a prompt

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // duet-mcp: the editor's MCP server, as Claude Code starts it.
 //
 // Claude Code runs this program for the "duet" MCP server declared with

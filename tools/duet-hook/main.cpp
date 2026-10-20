@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // duet-hook: relay between Claude Code and the editor.
 //
 // Claude Code runs this program for every event declared in the hooks

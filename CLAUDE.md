@@ -199,6 +199,8 @@ One strategy per layer:
 - **One file = one concept.** A `.cpp` beyond ~400 lines probably holds two;
   beyond 800, split it.
 - `.h` headers, `.cpp` sources, `#pragma once`.
+- Every source starts with `// SPDX-License-Identifier: GPL-3.0-only` and a
+  blank line (the Graphviz permission is in `README.md`).
 - **Directory = feature package** (`src/editor`, `src/git`, `src/claude/mcp`…);
   no `using namespace` in a header.
 - **Include paths** relative to `src/` (`"editor/EditorWidget.h"`), or bare

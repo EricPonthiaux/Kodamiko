@@ -125,6 +125,8 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   settings Claude reads only when it starts.
 - **Usage in the status bar**: context window used and plan limits (5 hours,
   7 days), with model, session cost and reset times in the tooltip.
+- **Claude's activity at the bottom left**: the animated star in the status
+  bar shows the session's state; clicking it opens the Claude session.
 - **Command palette** (Ctrl+Shift+P): every menu command, found by typing a
   few letters, with its shortcut.
 - **File tree in the manner of IntelliJ's Project view**: names colored by
@@ -238,8 +240,8 @@ changes, staging by file, by hunk or by line, and commits. It runs on Linux, Win
   number is brighter than the others, and the indentation guide of the
   block holding the caret lights up.
 - **Duet's own window**, in the manner of IntelliJ: one bar at the top
-  holds the menus, the project (with the recent folders), Claude's state (a
-  click shows the session), Go to File, Find in Files and the command
+  holds the menus, the project (with the recent folders), Go to File,
+  Find in Files and the command
   palette, and the window controls (the git branch stays in the status bar,
   where a click opens the Git menu); rounded corners
   and a soft shadow in the theme's colors. The system still moves and resizes
@@ -534,17 +536,38 @@ outline is obtained by implementing `IOutlineProvider` (see
 ## License
 
 Duet is distributed under the **GNU GPL v3** (see `LICENSE`), the license required
-by QScintilla. Third-party components:
+by QScintilla, with the additional permission below for Graphviz.
 
-| Component | License |
-|---|---|
-| Qt 6 | LGPL v3 |
-| QScintilla | GPL v3 |
-| tree-sitter and grammars | MIT |
-| libvterm | MIT |
-| libgit2 | GPL v2 with linking exception |
-| cmark-gfm | BSD 2-Clause |
-| github-markdown-css, Octicons (in `third_party/`) | MIT |
-| Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | Ubuntu Font Licence 1.0 |
-| JetBrains Mono (in `third_party/fonts/`) | SIL Open Font License 1.1 |
-| One Dark Pro, Dracula, GitHub, Tokyo Night and Catppuccin theme colors (notices in `third_party/vscode-themes/`) | MIT |
+**Additional permission under GNU GPL version 3 section 7.** If you modify
+this Program, or any covered work, by linking or combining it with Graphviz
+(or a modified version of that library), containing parts covered by the
+terms of the Eclipse Public License 1.0, the licensors of this Program grant
+you additional permission to convey the resulting work. Corresponding Source
+for a non-source form of such a combination shall include the source code
+for the parts of Graphviz used as well as that of the covered work.
+
+The permission is needed because the EPL 1.0 is not compatible with the GPL,
+and the diagram editor links Graphviz's library. It covers Duet's own code
+only; the other components keep their licenses.
+
+Third-party components:
+
+| Component | Distributed | License |
+|---|---|---|
+| Qt 6 | linked dynamically | LGPL v3 |
+| QScintilla | built and linked statically | GPL v3 |
+| tree-sitter and grammars | built and linked statically | MIT |
+| libvterm | built and linked statically | MIT |
+| libgit2 | built and linked statically | GPL v2 with linking exception |
+| cmark-gfm | built and linked statically | BSD 2-Clause |
+| Graphviz (optional, diagram editor) | linked from the system | Eclipse Public License 1.0 |
+| github-markdown-css, Octicons (in `third_party/`) | embedded | MIT |
+| KDE's editor themes (in `third_party/ksyntaxhighlighting-themes/`) | embedded | MIT |
+| SchemaStore's Claude Code settings schema (in `third_party/schemastore/`) | embedded | Apache 2.0 |
+| Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | embedded | Ubuntu Font Licence 1.0 |
+| JetBrains Mono (in `third_party/fonts/`) | embedded | SIL Open Font License 1.1 |
+| One Dark Pro, Dracula, GitHub, Tokyo Night and Catppuccin theme colors (notices in `third_party/vscode-themes/`) | reproduced | MIT |
+
+The versions of the downloaded components are pinned in
+`cmake/Dependencies.cmake`; those of the embedded files in
+`third_party/README.md`.
