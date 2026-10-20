@@ -121,12 +121,28 @@ QWidget *exitOwner(const QWidget *widget)
     return window->isVisible() && window->rect().contains(area) ? owner->window() : nullptr;
 }
 
+// grab() paints the window's color under any widget: around a child panel,
+// the room of its shadow would come out as an opaque frame that does not
+// shrink with the panel. Only a window keeps a background of its own.
+QPixmap snapshotOf(QWidget *widget)
+{
+    const bool hasOwnBackground = widget->isWindow() && !widget->testAttribute(Qt::WA_TranslucentBackground);
+    if (hasOwnBackground)
+        return widget->grab();
+    const qreal ratio = widget->devicePixelRatioF();
+    QPixmap snapshot(widget->size() * ratio);
+    snapshot.setDevicePixelRatio(ratio);
+    snapshot.fill(Qt::transparent);
+    widget->render(&snapshot, QPoint(), QRegion(), QWidget::DrawChildren);
+    return snapshot;
+}
+
 void exitPopup(QWidget *widget)
 {
     QWidget *owner = exitOwner(widget);
     if (!owner || !Motion::policy().isEnabled() || !Motion::canAnimate(widget))
         return;
-    const QPixmap snapshot = widget->grab();
+    const QPixmap snapshot = snapshotOf(widget);
     if (snapshot.isNull())
         return;
     auto *picture = new QLabel(owner);

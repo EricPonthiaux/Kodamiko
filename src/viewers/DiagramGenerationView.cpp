@@ -3,8 +3,8 @@
 #include "DiagramGenerationView.h"
 
 #include "DiagramCheck.h"
-#include "claude/ClaudeLauncher.h"
-#include "claude/DiagramRequest.h"
+#include "agent/AgentProvider.h"
+#include "agent/DiagramRequest.h"
 #include "ui/AppFonts.h"
 #include "ui/Motion.h"
 
@@ -23,7 +23,7 @@
 
 namespace {
 
-// Claude may read a good part of the project first.
+// The agent may read a good part of the project first.
 constexpr int timeoutMs = 10 * 60 * 1000;
 constexpr int shownSteps = 6;
 constexpr int contentWidth = 520;
@@ -85,17 +85,17 @@ QString errorColor(const QPalette &palette)
     return palette.color(QPalette::Window).lightness() < 128 ? QStringLiteral("#e06c75") : QStringLiteral("#e45649");
 }
 
-// Why the diagram is missing: Claude's failure, its last answer, or its
+// Why the diagram is missing: the agent's failure, its last answer, or its
 // error output, the most telling first.
-QString failureMessage(const QString &answer, bool answerFailed, const QString &errorOutput)
+QString failureMessage(const QString &agentName, const QString &answer, bool answerFailed, const QString &errorOutput)
 {
     if (answerFailed && !answer.isEmpty())
         return answer;
     if (!answer.isEmpty())
-        return DiagramGenerationView::tr("Claude did not write the diagram: %1").arg(answer);
+        return DiagramGenerationView::tr("%1 did not write the diagram: %2").arg(agentName, answer);
     if (!errorOutput.isEmpty())
         return errorOutput;
-    return DiagramGenerationView::tr("Claude did not write the diagram.");
+    return DiagramGenerationView::tr("%1 did not write the diagram.").arg(agentName);
 }
 
 } // namespace
@@ -106,6 +106,7 @@ DiagramGenerationView::DiagramGenerationView(Request drawing, QWidget *parent)
     , path_(std::move(drawing.path))
     , kindTitle_(std::move(drawing.kindTitle))
     , description_(std::move(drawing.description))
+    , agent_(drawing.agent)
     , clock_(new QTimer(this))
     , spinner_(new Spinner(this))
     , title_(new QLabel(this))
@@ -148,6 +149,8 @@ DiagramGenerationView::DiagramGenerationView(Request drawing, QWidget *parent)
     connect(retry_, &QPushButton::clicked, this, &DiagramGenerationView::start);
     connect(clock_, &QTimer::timeout, this, &DiagramGenerationView::updateElapsed);
     clock_->setInterval(1000);
+    Q_ASSERT(agent_);
+    hookServer_.setProvider(agent_);
     connect(&hookServer_, &HookServer::hookReceived, this, &DiagramGenerationView::onHookReceived,
             Qt::DirectConnection);
 
@@ -191,33 +194,31 @@ void DiagramGenerationView::start()
     answer_.clear();
     answerFailed_ = false;
     pending_.clear();
-    title_->setText(tr("Claude is drawing %1").arg(QDir::toNativeSeparators(QDir(workDir_).relativeFilePath(path_))));
+    title_->setText(
+        tr("%1 is drawing %2").arg(agent_->name(), QDir::toNativeSeparators(QDir(workDir_).relativeFilePath(path_))));
     error_->hide();
     retry_->hide();
     close_->hide();
     cancel_->show();
     static_cast<Spinner *>(spinner_)->setSpinning(true);
-    addSteps({tr("Starting Claude")});
+    addSteps({tr("Starting %1").arg(agent_->name())});
 
-    // duet-hook reaches this view's own server: Claude gets the diagram's
+    // duet-hook reaches this view's own server: the agent gets the diagram's
     // problems right after writing it.
     if (hookServer_.serverName().isEmpty())
         hookServer_.listen();
-    const QString hook = hookServer_.serverName().isEmpty() ? QString() : ClaudeLauncher::hookCommand();
-
     const QString relative = QDir(workDir_).relativeFilePath(path_);
     QString launchError;
-    std::optional<ProcessSpec> spec = ClaudeLauncher::printProcess(
-        workDir_,
-        DiagramRequest::arguments(DiagramRequest::prompt(kindTitle_, relative, description_), relative,
-                                  ClaudeLauncher::pluginPath(), hook),
-        &launchError);
+    const std::optional<ProcessSpec> spec =
+        agent_->fileRunProcess({.workingDirectory = workDir_,
+                                .prompt = DiagramRequest::prompt(kindTitle_, relative, description_),
+                                .relativePath = relative,
+                                .hookServerName = hookServer_.serverName()},
+                               &launchError);
     if (!spec) {
         fail(launchError);
         return;
     }
-    if (!hook.isEmpty())
-        spec->environment.insert(QStringLiteral("DUET_SOCKET"), hookServer_.serverName());
 
     process_ = new QProcess(this);
     process_->setProgram(spec->program);
@@ -228,14 +229,15 @@ void DiagramGenerationView::start()
     connect(process_, &QProcess::finished, this, &DiagramGenerationView::onProcessFinished);
     connect(process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError processError) {
         if (processError == QProcess::FailedToStart)
-            fail(tr("Could not start Claude: %1").arg(process_->errorString()));
+            fail(tr("Could not start %1: %2").arg(agent_->name(), process_->errorString()));
     });
     process_->start();
     process_->closeWriteChannel();
     elapsed_.start();
     updateElapsed();
     clock_->start();
-    QTimer::singleShot(timeoutMs, process_, [this] { fail(tr("Claude took too long to draw the diagram.")); });
+    QTimer::singleShot(timeoutMs, process_,
+                       [this] { fail(tr("%1 took too long to draw the diagram.").arg(agent_->name())); });
 }
 
 void DiagramGenerationView::stop()
@@ -257,10 +259,10 @@ void DiagramGenerationView::readOutput()
     while ((newline = pending_.indexOf('\n')) >= 0) {
         const QByteArray line = pending_.left(newline);
         pending_.remove(0, newline + 1);
-        const DiagramRequest::Event event = DiagramRequest::parseLine(line, workDir_);
-        if (event.kind == DiagramRequest::Event::Kind::Steps) {
+        const AgentRunEvent event = agent_->parseRunOutput(line, workDir_);
+        if (event.kind == AgentRunEvent::Kind::Steps) {
             addSteps(event.steps);
-        } else if (event.kind == DiagramRequest::Event::Kind::Finished) {
+        } else if (event.kind == AgentRunEvent::Kind::Finished) {
             answer_ = event.text;
             answerFailed_ = event.failed;
         }
@@ -278,7 +280,7 @@ void DiagramGenerationView::onProcessFinished()
         emit finished(path_, answer_);
         return;
     }
-    fail(failureMessage(answer_, answerFailed_, errorOutput));
+    fail(failureMessage(agent_->name(), answer_, answerFailed_, errorOutput));
 }
 
 void DiagramGenerationView::onHookReceived(const HookEvent &event)
@@ -293,7 +295,8 @@ void DiagramGenerationView::onHookReceived(const HookEvent &event)
             continue;
         const QStringList problems = DiagramCheck::problems(path, file.readAll());
         if (!problems.isEmpty()) {
-            hookServer_.respond(DiagramCheck::feedbackOutput(QDir(workDir_).relativeFilePath(path), problems));
+            hookServer_.respond(
+                agent_->blockReply(DiagramCheck::feedback(QDir(workDir_).relativeFilePath(path), problems)));
             addSteps({tr("Fixing what the diagram editor could not read")});
         }
     }
@@ -318,7 +321,7 @@ void DiagramGenerationView::fail(const QString &error)
 {
     stop();
     static_cast<Spinner *>(spinner_)->setSpinning(false);
-    title_->setText(tr("Claude could not draw the diagram"));
+    title_->setText(tr("%1 could not draw the diagram").arg(agent_->name()));
     error_->setText(error);
     error_->show();
     cancel_->hide();

@@ -3,18 +3,19 @@
 #pragma once
 
 #include <QByteArray>
-#include <QJsonObject>
+#include <QString>
 #include <QStringList>
 
-// Checks a diagram file the way the diagram editor reads it, for Claude: what
-// it could not read, or had to leave out. Claude gets the problems right
+// Checks a diagram file the way the diagram editor reads it, for the agent: what
+// it could not read, or had to leave out. The agent gets the problems right
 // after writing the file (PostToolUse hook) and fixes them.
 namespace DiagramCheck {
 
 // The problems of a diagram file's content; empty if it reads as written.
 QStringList problems(const QString &path, const QByteArray &content);
 
-// The PostToolUse hook's output reporting `problems` of `file` to Claude.
-QJsonObject feedbackOutput(const QString &file, const QStringList &problems);
+// What the agent is told about the `problems` of `file`, to fix them
+// (AgentProvider::blockReply).
+QString feedback(const QString &file, const QStringList &problems);
 
 } // namespace DiagramCheck

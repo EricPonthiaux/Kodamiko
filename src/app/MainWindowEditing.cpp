@@ -4,8 +4,8 @@
 // language servers).
 
 #include "MainWindow.h"
-#include "claude/EditorContext.h"
-#include "claude/mcp/DuetTools.h"
+#include "agent/EditorContext.h"
+#include "agent/mcp/DuetTools.h"
 #include "diagnostics/ProblemStore.h"
 #include "editor/ChangeGutter.h"
 #include "editor/EditorStatus.h"

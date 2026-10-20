@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "claude/ClaudeLauncher.h"
-#include "claude/HookServer.h"
-#include "claude/mcp/McpRegistry.h"
-#include "claude/mcp/McpSession.h"
+#include "agent/HookServer.h"
+#include "agent/mcp/McpRegistry.h"
+#include "agent/mcp/McpSession.h"
+#include "agent/vendor/claude/ClaudeCodeProvider.h"
+#include "agent/vendor/claude/ClaudeLauncher.h"
 
 #include <QElapsedTimer>
 #include <QJsonArray>
@@ -310,7 +311,9 @@ private slots:
     {
         McpRegistry registry;
         fill(registry);
+        const ClaudeCodeProvider claude;
         HookServer server;
+        server.setProvider(&claude);
         QVERIFY(server.listen());
         server.setMcpRegistry(&registry);
 

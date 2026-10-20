@@ -2,7 +2,7 @@
 
 #include "NewProjectForm.h"
 
-#include "claude/ClaudeTrust.h"
+#include "agent/vendor/claude/ClaudeTrust.h"
 #include "git/GitOperations.h"
 #include "projects/ProjectStore.h"
 #include "projects/ProjectTemplates.h"
@@ -11,6 +11,7 @@
 
 #include <QCheckBox>
 #include <QDir>
+#include <QEvent>
 #include <QFileDialog>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -69,6 +70,8 @@ QWidget *NewProjectForm::createBody()
     auto *browse = new QPushButton(tr("Browse…"), body);
     connect(browse, &QPushButton::clicked, this, &NewProjectForm::browse);
 
+    templates_->setObjectName(QStringLiteral("projectTemplates"));
+    templates_->installEventFilter(this);
     const QString lastTemplate = QSettings().value(QLatin1String(templateKey)).toString();
     for (const ProjectTemplate &projectTemplate : ProjectTemplates::all()) {
         auto *item = new QListWidgetItem(projectTemplate.title, templates_);
@@ -138,6 +141,17 @@ void NewProjectForm::reset()
 void NewProjectForm::applyTheme(const Theme &theme)
 {
     header_->applyTheme(theme);
+}
+
+bool NewProjectForm::eventFilter(QObject *watched, QEvent *event)
+{
+    // The list keeps the item positions of its last layout: after a style
+    // sheet change (the padding of its items), the items would be painted
+    // at their new height over one another. Queued: the list hears the
+    // change before the new rules reach its items' size.
+    if (watched == templates_ && event->type() == QEvent::StyleChange)
+        QMetaObject::invokeMethod(templates_, &QListWidget::doItemsLayout, Qt::QueuedConnection);
+    return QWidget::eventFilter(watched, event);
 }
 
 void NewProjectForm::browse()

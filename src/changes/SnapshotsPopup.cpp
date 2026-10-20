@@ -125,7 +125,7 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
 {
     // The header says what snapshots are.
     header_->setSubtitle(tr("Duet keeps a copy of your files before discarding changes, and of the whole working "
-                            "directory before each Claude prompt."));
+                            "directory before each prompt to the agent."));
     connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
     // The list and the selected snapshot, side by side.
@@ -290,7 +290,7 @@ void SnapshotsPopup::load(const QString &folder)
         emptyTitle_->setText(error.isEmpty() ? tr("No snapshots yet") : tr("Snapshots are unavailable"));
         emptyText_->setText(error.isEmpty()
                                 ? tr("They appear here when you discard changes in Diff mode, and before each "
-                                     "prompt you send to Claude.")
+                                     "prompt you send to the agent.")
                                 : error);
         return;
     }

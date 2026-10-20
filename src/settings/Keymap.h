@@ -25,6 +25,11 @@ struct Command {
 // Shortcuts by command id; an empty list removes the command's shortcut.
 using Overrides = QHash<QString, QList<QKeySequence>>;
 
+// Names `action` (a command, or a menu's action) in command ids with `name`
+// instead of its text: for a text that changes, such as the agent's name,
+// its id and the user's shortcut stay.
+void setStableName(QAction *action, const QString &name);
+
 // Commands of the menus of `menuBar`, submenus included, in menu order. The
 // first call records each command's current shortcuts as its defaults.
 QList<Command> commands(const QMenuBar *menuBar);

@@ -162,6 +162,21 @@ private slots:
         QCOMPARE(menus.fold->shortcut(), QKeySequence("Ctrl+-"));
     }
 
+    void keymapKeepsTheIdOfACommandRenamedAfterTheAgent()
+    {
+        QMenuBar bar;
+        QMenu *agent = bar.addMenu("&Codex");
+        Keymap::setStableName(agent->menuAction(), "&Claude");
+        QAction *session = agent->addAction("&Codex Session…");
+        Keymap::setStableName(session, "&Claude Session…");
+
+        const QList<Keymap::Command> commands = Keymap::commands(&bar);
+
+        QCOMPARE(commands.size(), 1);
+        QCOMPARE(commands[0].id, QString("Claude/Claude Session"));
+        QCOMPARE(commands[0].title, QString("Codex ▸ Codex Session"));
+    }
+
     void keymapOverridesAreSaved()
     {
         const Keymap::Overrides overrides = {{"Edit/Find", {QKeySequence("Ctrl+K, Ctrl+F")}}, {"Edit/Replace", {}}};

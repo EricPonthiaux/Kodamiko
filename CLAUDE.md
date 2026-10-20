@@ -201,7 +201,7 @@ One strategy per layer:
 - `.h` headers, `.cpp` sources, `#pragma once`.
 - Every source starts with `// SPDX-License-Identifier: GPL-3.0-only` and a
   blank line (the Graphviz permission is in `README.md`).
-- **Directory = feature package** (`src/editor`, `src/git`, `src/claude/mcp`…);
+- **Directory = feature package** (`src/editor`, `src/git`, `src/agent/mcp`…);
   no `using namespace` in a header.
 - **Include paths** relative to `src/` (`"editor/EditorWidget.h"`), or bare
   for a header of the same directory (`"EditorWidget.h"`); never `../`.

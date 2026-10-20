@@ -167,6 +167,23 @@ private slots:
         QTRY_VERIFY(window.findChildren<QLabel *>("motionExit").isEmpty());
     }
 
+    void anOverlayPanelExitsWithoutTheWindowBackgroundAroundIt()
+    {
+        QWidget window;
+        window.resize(1000, 700);
+        window.show();
+        OverlayPopup popup("exitBackground", QSizeF(0.5, 0.5), QSize(300, 200), &window);
+        popup.showCentered();
+        QTRY_VERIFY(!popup.graphicsEffect());
+
+        popup.dismiss();
+
+        const QLabel *ghost = window.findChild<QLabel *>("motionExit");
+        QVERIFY(ghost);
+        // The corner is in the shadow's room, out of the shadow itself.
+        QCOMPARE(ghost->pixmap().toImage().pixelColor(0, 0).alpha(), 0);
+    }
+
     void reopeningCancelsThePreviousExit()
     {
         QWidget window;

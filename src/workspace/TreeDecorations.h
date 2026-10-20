@@ -51,6 +51,9 @@ public:
 
     void setTouched(const QSet<QString> &paths) { touched_ = paths; }
 
+    // Who edited the touched files, in their tooltip.
+    void setAgentName(const QString &name) { agentName_ = name; }
+
     void setOpenFiles(const QSet<QString> &paths) { openFiles_ = paths; }
 
     // Shown in the tooltip, once known; forgotten with the statuses.
@@ -97,6 +100,7 @@ private:
     ProblemCounts problems_;
     ProblemCounts folderProblems_; // the sums of the files each folder holds
     QSet<QString> touched_;
+    QString agentName_;
     QSet<QString> openFiles_;
     QHash<QString, QString> lastCommits_;
     std::optional<QSet<QString>> scopeFiles_;

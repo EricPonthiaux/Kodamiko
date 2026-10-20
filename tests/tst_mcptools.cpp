@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "claude/mcp/DuetTools.h"
-#include "claude/mcp/McpRegistry.h"
-#include "claude/mcp/McpSession.h"
+#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/McpRegistry.h"
+#include "agent/mcp/McpSession.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/GitProcess.h"

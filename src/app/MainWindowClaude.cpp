@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// MainWindow: the Claude session, its hooks, the editor's MCP tools, and
-// the requests sent to Claude from the editor.
+// MainWindow: the agent's session, its hooks, the editor's MCP tools, and
+// the requests sent to the agent from the editor.
 
 #include "MainWindow.h"
+#include "agent/AgentIndicator.h"
+#include "agent/DiagramRequestPopup.h"
+#include "agent/EditorContext.h"
+#include "agent/mcp/DuetTools.h"
+#include "agent/vendor/claude/ClaudeConfigView.h"
+#include "agent/vendor/claude/ClaudeUsage.h"
+#include "agent/vendor/claude/EffectiveSettings.h"
+#include "agent/vendor/claude/UnsavedEditGuard.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
-#include "claude/ClaudeConfigView.h"
-#include "claude/ClaudeLauncher.h"
-#include "claude/ClaudeUsage.h"
-#include "claude/DiagramRequestPopup.h"
-#include "claude/EditorContext.h"
-#include "claude/EffectiveSettings.h"
-#include "claude/UnsavedEditGuard.h"
-#include "claude/mcp/DuetTools.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/FileStatuses.h"
@@ -21,7 +21,6 @@
 #include "git/Snapshots.h"
 #include "navigation/SymbolIndex.h"
 #include "terminal/TerminalWidget.h"
-#include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/TitleBar.h"
@@ -51,7 +50,7 @@
 
 namespace {
 
-// Between a prompt pasted in Claude's terminal and the Enter that sends it.
+// Between a prompt pasted in the agent's terminal and the Enter that sends it.
 constexpr int submitDelayMs = 150;
 
 constexpr int notificationMs = 10000;
@@ -59,28 +58,28 @@ constexpr int notificationMs = 10000;
 constexpr qsizetype snapshotPromptLength = 60;
 
 // The indicator's state for the activity's.
-ClaudeIndicator::Status indicatorStatus(ClaudeActivity::State state)
+AgentStatus indicatorStatus(AgentActivity::State state)
 {
     switch (state) {
-    case ClaudeActivity::State::Idle:
-        return ClaudeIndicator::Status::Ready;
-    case ClaudeActivity::State::Working:
-        return ClaudeIndicator::Status::Working;
-    case ClaudeActivity::State::NeedsInput:
-        return ClaudeIndicator::Status::NeedsYou;
-    case ClaudeActivity::State::Done:
-        return ClaudeIndicator::Status::Done;
+    case AgentActivity::State::Idle:
+        return AgentStatus::Ready;
+    case AgentActivity::State::Working:
+        return AgentStatus::Working;
+    case AgentActivity::State::NeedsInput:
+        return AgentStatus::NeedsYou;
+    case AgentActivity::State::Done:
+        return AgentStatus::Done;
     }
-    return ClaudeIndicator::Status::Ready;
+    return AgentStatus::Ready;
 }
 
-// Dot drawn in front of the Claude tabs while Claude works, waits or has
+// Dot drawn in front of the agents' tabs while the agent works, waits or has
 // finished, in the status bar indicator's color.
-QIcon activityIcon(ClaudeActivity::State state, const Theme &theme)
+QIcon activityIcon(AgentActivity::State state, const Theme &theme)
 {
-    if (state == ClaudeActivity::State::Idle)
+    if (state == AgentActivity::State::Idle)
         return {};
-    const QColor color = claudeStatusColor(indicatorStatus(state), theme);
+    const QColor color = agentStatusColor(indicatorStatus(state), theme);
     QIcon icon;
     for (const qreal ratio : {1.0, 2.0}) {
         QPixmap pixmap(QSize(16, 16) * ratio);
@@ -108,9 +107,9 @@ const char *usageWarningColor(double highestPercent, bool dark)
 
 } // namespace
 
-// The Claude session lives in the first terminal tab, which cannot be
+// The agent's session lives in the first terminal tab, which cannot be
 // closed. Opening a folder starts it there, replacing the previous one.
-bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArguments)
+bool MainWindow::startClaudeSession(QString *error, SessionStart start)
 {
     if (claudeTerminal_) {
         terminalTabs_->removeTab(terminalTabs_->indexOf(claudeTerminal_));
@@ -118,15 +117,15 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
         claudeTerminal_ = nullptr;
     }
     QString launchError;
-    ClaudeLauncher::SessionOptions options;
-    options.extraArguments = extraArguments;
+    AgentSessionOptions options;
+    options.start = start;
     options.name = QFileInfo(folder_).fileName(); // the agents' sessions address it by the project's name
     if (exposeTools_->isChecked())
         options.mcpReadOnlyTools = mcpRegistry_.readOnlyToolPermissions(QStringLiteral("duet"));
     const std::optional<ProcessSpec> spec =
-        ClaudeLauncher::claudeProcess(folder_, hookServer_.serverName(), &launchError, options);
+        agentProvider_->sessionProcess(folder_, hookServer_.serverName(), options, &launchError);
     if (!spec) {
-        statusBar()->showMessage(tr("Claude session unavailable: %1").arg(launchError));
+        statusBar()->showMessage(tr("%1 session unavailable: %2").arg(agentProvider_->name(), launchError));
         if (error)
             *error = std::move(launchError);
         updateTerminalPage();
@@ -135,14 +134,14 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     claudeTerminal_ = new TerminalWidget(terminalTabs_);
     claudeTerminal_->applyTheme(theme_);
     claudeTerminal_->installEventFilter(this); // Escape interrupts the response, Ctrl+C too
-    connect(claudeTerminal_, &TerminalWidget::finished, &claudeActivity_, &ClaudeActivity::reset);
-    // The indicator leaves the status bar with the session, even when Claude
-    // was already idle.
-    connect(claudeTerminal_, &TerminalWidget::finished, this, &MainWindow::updateClaudeIndicator);
-    claudeActivity_.reset();
+    connect(claudeTerminal_, &TerminalWidget::finished, &agentActivity_, &AgentActivity::reset);
+    // The indicator leaves the status bar with the session, even when the
+    // agent was already idle.
+    connect(claudeTerminal_, &TerminalWidget::finished, this, &MainWindow::updateAgentIndicator);
+    agentActivity_.reset();
     claudeStatus_ = {};
     updateUsage();
-    terminalTabs_->insertTab(0, claudeTerminal_, QStringLiteral("Claude"));
+    terminalTabs_->insertTab(0, claudeTerminal_, agentProvider_->name());
     const auto closeSide = static_cast<QTabBar::ButtonPosition>(
         terminalTabs_->style()->styleHint(QStyle::SH_TabBar_CloseButtonPosition, nullptr, terminalTabs_->tabBar()));
     terminalTabs_->tabBar()->setTabButton(0, closeSide, nullptr);
@@ -151,18 +150,22 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     claudeTerminal_->start(*spec);
     if (mode_ == Mode::Terminal || terminalWindow_->isDetached())
         claudeTerminal_->setFocus();
-    updateClaudeIndicator();
+    updateAgentIndicator();
     updateClaudeWatched();
     return true;
 }
 
-// Ctrl+Shift+L: back to the Claude session, restarted if it has exited.
+// Ctrl+Shift+L: back to the agent's session, restarted if it has exited.
 void MainWindow::showClaudeSession()
 {
     if (!claudeTerminal_ || !claudeTerminal_->isRunning()) {
         QString error;
         if (!startClaudeSession(&error)) {
-            showNotice({.title = tr("Claude Session"), .location = {}, .message = error, .details = {}}, this);
+            showNotice({.title = tr("%1 Session").arg(agentProvider_->name()),
+                        .location = {},
+                        .message = error,
+                        .details = {}},
+                       this);
             return;
         }
     }
@@ -170,17 +173,18 @@ void MainWindow::showClaudeSession()
     showTerminals();
 }
 
-// Claude reads part of its configuration only when it starts: a new
+// The agent reads part of its configuration only when it starts: a new
 // session, which goes on with the last conversation.
 void MainWindow::restartClaudeSession()
 {
-    if (claudeActivity_.state() != ClaudeActivity::State::Working) {
+    if (agentActivity_.state() != AgentActivity::State::Working) {
         continueClaudeSession();
         return;
     }
-    auto *popup = new ChoicePopup({.title = tr("Restart Claude Session"),
+    const QString agent = agentProvider_->name();
+    auto *popup = new ChoicePopup({.title = tr("Restart %1 Session").arg(agent),
                                    .location = {},
-                                   .message = tr("Claude is working. Stop it and restart the session?"),
+                                   .message = tr("%1 is working. Stop it and restart the session?").arg(agent),
                                    .details = {}},
                                   {{tr("Restart"), [this] { continueClaudeSession(); }}}, this);
     popup->popup();
@@ -189,8 +193,10 @@ void MainWindow::restartClaudeSession()
 void MainWindow::continueClaudeSession()
 {
     QString error;
-    if (!startClaudeSession(&error, {QStringLiteral("--continue")})) {
-        showNotice({.title = tr("Claude Session"), .location = {}, .message = error, .details = {}}, this);
+    if (!startClaudeSession(&error, SessionStart::Continue)) {
+        showNotice(
+            {.title = tr("%1 Session").arg(agentProvider_->name()), .location = {}, .message = error, .details = {}},
+            this);
         return;
     }
     showTerminals();
@@ -217,7 +223,7 @@ void MainWindow::onHookReceived(const HookEvent &event)
     // An agent edits its worktree, not the checkout the editor shows.
     if (handleAgentHook(event))
         return;
-    claudeActivity_.handle(event);
+    agentActivity_.handle(event);
     switch (event.kind) {
     case HookEvent::Kind::PromptSubmitted:
         shareEditorContext();
@@ -251,7 +257,8 @@ void MainWindow::onHookReceived(const HookEvent &event)
     }
     case HookEvent::Kind::ResponseFinished:
         onRepositoryChanged();
-        showStatus(event.failed ? tr("Claude stopped on an error") : tr("Claude response finished"));
+        showStatus(
+            (event.failed ? tr("%1 stopped on an error") : tr("%1 response finished")).arg(agentProvider_->name()));
         break;
     case HookEvent::Kind::StatusUpdated:
         claudeStatus_ = event.status;
@@ -263,39 +270,41 @@ void MainWindow::onHookReceived(const HookEvent &event)
     }
 }
 
-void MainWindow::updateClaudeIndicator()
+void MainWindow::updateAgentIndicator()
 {
-    const ClaudeActivity::State state = claudeActivity_.state();
+    const AgentActivity::State state = agentActivity_.state();
     const QIcon icon = activityIcon(state, theme_);
-    const QString description = claudeActivity_.description();
-    // The activity dot replaces the tab's icon while Claude works, waits or
-    // has finished.
-    const bool idle = state == ClaudeActivity::State::Idle;
+    const QString description = agentActivity_.description();
+    // The activity dot replaces the tab's icon while the agent works, waits
+    // or has finished.
+    const bool idle = state == AgentActivity::State::Idle;
     if (claudeTerminal_) {
         const int index = terminalTabs_->indexOf(claudeTerminal_);
-        terminalTabs_->setTabIcon(index, idle ? UiIcons::icon(QStringLiteral("claude"), QColor("#d97757")) : icon);
+        terminalTabs_->setTabIcon(index, idle ? UiIcons::icon(agentProvider_->iconName(), agentProvider_->brandColor())
+                                              : icon);
         terminalTabs_->setTabToolTip(index, description);
     }
     modeTabs_->setTabIcon(0, idle ? UiIcons::icon(QStringLiteral("terminal"), theme_.mutedText) : icon);
     modeTabs_->updateGeometry(); // see updateTabIcons()
     const bool hasSession = claudeTerminal_ && claudeTerminal_->isRunning();
     // Activity updates must not uncover the indicator over a status message.
-    claudeIndicator_->setVisible(hasSession && statusBar()->currentMessage().isEmpty());
+    agentIndicator_->setVisible(hasSession && statusBar()->currentMessage().isEmpty());
     if (hasSession)
-        claudeIndicator_->setStatus(indicatorStatus(state));
-    claudeIndicator_->setToolTip(description + QLatin1Char('\n') + tr("Show the Claude session (Ctrl+Shift+L)"));
+        agentIndicator_->setStatus(indicatorStatus(state));
+    agentIndicator_->setToolTip(description + QLatin1Char('\n') +
+                                tr("Show the %1 session (Ctrl+Shift+L)").arg(agentProvider_->name()));
     const QString modeHint = tr("Full-screen terminals (Ctrl+1)");
-    modeTabs_->setTabToolTip(0, state == ClaudeActivity::State::Idle ? modeHint
-                                                                     : description + QLatin1Char('\n') + modeHint);
+    modeTabs_->setTabToolTip(0, state == AgentActivity::State::Idle ? modeHint
+                                                                    : description + QLatin1Char('\n') + modeHint);
 }
 
-void MainWindow::updateAgentTab(QWidget *terminal, ClaudeActivity::State state)
+void MainWindow::updateAgentTab(QWidget *terminal, AgentActivity::State state)
 {
     const int index = terminalTabs_->indexOf(terminal);
     if (index < 0)
         return;
-    const bool idle = state == ClaudeActivity::State::Idle;
-    terminalTabs_->setTabIcon(index, idle ? UiIcons::icon(QStringLiteral("claude"), QColor("#d97757"))
+    const bool idle = state == AgentActivity::State::Idle;
+    terminalTabs_->setTabIcon(index, idle ? UiIcons::icon(agentProvider_->iconName(), agentProvider_->brandColor())
                                           : activityIcon(state, theme_));
 }
 
@@ -303,8 +312,8 @@ void MainWindow::updateClaudeWatched()
 {
     // In the main window or in the terminals' own: the window it is in.
     const bool terminalsShown = mode_ == Mode::Terminal || terminalWindow_->isDetached();
-    claudeActivity_.setWatched(claudeTerminal_ && claudeTerminal_->isActiveWindow() && terminalsShown &&
-                               terminalTabs_->currentWidget() == claudeTerminal_);
+    agentActivity_.setWatched(claudeTerminal_ && claudeTerminal_->isActiveWindow() && terminalsShown &&
+                              terminalTabs_->currentWidget() == claudeTerminal_);
     const QWidget *current = terminalTabs_->currentWidget();
     agentSessions_.setWatchedTerminal(current && current->isActiveWindow() && terminalsShown ? current : nullptr);
 }
@@ -379,7 +388,7 @@ void MainWindow::registerMcpTools()
     DuetTools::registerDiagramTools(mcpRegistry_, context);
 #endif
     mcpRegistry_.setConfirmer([this](const QString &tool, const QString &what, std::function<void(bool)> answer) {
-        toolRequests_.append({tr("Claude asks to %1 (%2).").arg(what, tool), std::move(answer)});
+        toolRequests_.append({tr("%1 asks to %2 (%3).").arg(agentProvider_->name(), what, tool), std::move(answer)});
         if (toolRequests_.size() == 1)
             showToolRequest();
     });
@@ -416,7 +425,7 @@ void MainWindow::shareEditorContext()
     const EditorContext context = EditorContext::of(*editorTabs_, folder_);
     const QString description = context.describe();
     if (!description.isEmpty())
-        hookServer_.respond(EditorContext::promptHookOutput(description));
+        hookServer_.respond(agentProvider_->promptContextReply(description));
 }
 
 void MainWindow::guardUnsavedEdits(const QStringList &paths)
@@ -430,13 +439,14 @@ void MainWindow::guardUnsavedEdits(const QStringList &paths)
     }
     if (unsaved.isEmpty())
         return;
-    hookServer_.respond(UnsavedEditGuard::denyOutput(UnsavedEditGuard::reason(unsaved)));
+    hookServer_.respond(agentProvider_->denyEditReply(UnsavedEditGuard::reason(unsaved)));
     const QString files = unsaved.join(QStringLiteral(", "));
+    const QString agent = agentProvider_->name();
     unsavedEditNotice_->showNotice(
-        tr("Claude did not edit %1: it has unsaved changes here. Save or discard them, then ask Claude again.")
-            .arg(files),
+        tr("%1 did not edit %2: it has unsaved changes here. Save or discard them, then ask %1 again.")
+            .arg(agent, files),
         tr("Save All"));
-    showStatus(tr("Edit by Claude refused, unsaved changes in %1").arg(files));
+    showStatus(tr("Edit by %1 refused, unsaved changes in %2").arg(agent, files));
 }
 
 void MainWindow::followDiagramEdits(const QStringList &paths)
@@ -451,10 +461,10 @@ void MainWindow::followDiagramEdits(const QStringList &paths)
         const QStringList problems = DiagramCheck::problems(path, file.readAll());
         if (!problems.isEmpty()) {
             const QString relative = QDir(folder_).relativeFilePath(path);
-            hookServer_.respond(DiagramCheck::feedbackOutput(relative, problems));
+            hookServer_.respond(agentProvider_->blockReply(DiagramCheck::feedback(relative, problems)));
             return;
         }
-        // A diagram Claude has just drawn shows up, laid out.
+        // A diagram the agent has just drawn shows up, laid out.
         if (!editorTabs_->diagramViewFor(path))
             editorTabs_->openFile(path);
     }
@@ -466,7 +476,7 @@ void MainWindow::followDiagramEdits(const QStringList &paths)
 void MainWindow::generateDiagram(const QString &folder)
 {
     const QList<DiagramKind> kinds = DiagramKinds::available();
-    if (kinds.isEmpty() || folder.isEmpty())
+    if (kinds.isEmpty() || folder.isEmpty() || !agentProvider_->features().hasFileRuns)
         return;
     const QString relative = QDir(folder_).relativeFilePath(folder);
     // At the root, diagrams go with the documentation.
@@ -493,12 +503,13 @@ void MainWindow::drawDiagram(const QString &path, const QString &kindTitle, cons
 {
 #ifdef DUET_WITH_DIAGRAMS
     setMode(Mode::Edit);
-    auto *view = new DiagramGenerationView({folder_, path, kindTitle, description});
-    editorTabs_->showPage(view, QFileInfo(path).fileName(), QStringLiteral("claude"));
+    auto *view = new DiagramGenerationView({folder_, path, kindTitle, description, agentProvider_});
+    editorTabs_->showPage(view, QFileInfo(path).fileName(), agentProvider_->iconName());
     connect(view, &DiagramGenerationView::closeRequested, this, [this, view] { editorTabs_->closePage(view); });
     connect(view, &DiagramGenerationView::finished, this, [this, view](const QString &drawn, const QString &summary) {
         editorTabs_->replacePage(view, drawn);
-        showStatus(summary.isEmpty() ? tr("Diagram drawn by Claude") : summary.section(QLatin1Char('\n'), 0, 0));
+        showStatus(summary.isEmpty() ? tr("Diagram drawn by %1").arg(agentProvider_->name())
+                                     : summary.section(QLatin1Char('\n'), 0, 0));
     });
     view->start();
 #else
@@ -515,10 +526,11 @@ void MainWindow::snapshotBeforePrompt(const QString &prompt)
     QString summary = prompt.section(QLatin1Char('\n'), 0, 0).simplified();
     if (summary.size() > snapshotPromptLength)
         summary = summary.left(snapshotPromptLength - 1) + QStringLiteral("…");
-    const QString reason =
-        summary.isEmpty() ? tr("Before a Claude prompt") : tr("Before the Claude prompt \u201c%1\u201d").arg(summary);
+    const QString agent = agentProvider_->name();
+    const QString reason = summary.isEmpty() ? tr("Before a %1 prompt").arg(agent)
+                                             : tr("Before the %1 prompt \u201c%2\u201d").arg(agent, summary);
     // A dozen git commands in a large repository: they run off the UI
-    // thread, and Claude waits for the snapshot before touching any file.
+    // thread, and the agent waits for the snapshot before touching any file.
     gitCommands_->runQuietly(
         [folder = folder_, reason, taken = tr("Snapshot taken before the prompt")] {
             const std::optional<RepositoryInfo> info = RepositoryInfo::read(folder);
@@ -580,7 +592,8 @@ void MainWindow::createCodeRequestActions(QMenu *claude)
     add(tr("&Explain This Code"), {}, [this] { askClaude(CodeRequest::Kind::Explain); });
     add(tr("Re&view This Code"), {}, [this] { askClaude(CodeRequest::Kind::Review); });
     add(tr("Write T&ests for This Code"), {}, [this] { askClaude(CodeRequest::Kind::WriteTests); });
-    add(tr("&Add to Claude's Prompt"), QKeySequence(tr("Ctrl+Alt+K")), [this] { addCodeToClaudePrompt(); });
+    add(tr("&Add to %1's Prompt"), QKeySequence(tr("Ctrl+Alt+K")), [this] { addCodeToClaudePrompt(); });
+    nameAfterAgent(codeRequestActions_.last(), tr("&Add to %1's Prompt"));
 }
 
 void MainWindow::askClaude(CodeRequest::Kind kind)
@@ -600,7 +613,7 @@ std::optional<CodeRequest::Target> MainWindow::currentCodeTarget()
     const EditorWidget *editor = editorTabs_->currentEditor();
     std::optional<CodeRequest::Target> target = editor ? CodeRequest::targetIn(*editor, folder_) : std::nullopt;
     if (!target)
-        showStatus(tr("Open a file to ask Claude about its code"));
+        showStatus(tr("Open a file to ask %1 about its code").arg(agentProvider_->name()));
     return target;
 }
 
@@ -609,7 +622,11 @@ void MainWindow::typeInClaudePrompt(const QString &text, PromptEntry entry)
     if (!claudeTerminal_ || !claudeTerminal_->isRunning()) {
         QString error;
         if (!startClaudeSession(&error)) {
-            showNotice({.title = tr("Claude Session"), .location = {}, .message = error, .details = {}}, this);
+            showNotice({.title = tr("%1 Session").arg(agentProvider_->name()),
+                        .location = {},
+                        .message = error,
+                        .details = {}},
+                       this);
             return;
         }
     }

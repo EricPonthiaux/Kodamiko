@@ -746,6 +746,11 @@ void ChangesView::showCommitMessage(const QString &message)
     commitPanel_->showGeneratedMessage(message);
 }
 
+void ChangesView::setAgent(const QString &name, const QString &iconName)
+{
+    commitPanel_->setAgent(name, iconName);
+}
+
 void ChangesView::applyTheme(const Theme &theme)
 {
     diff_->applyTheme(theme);

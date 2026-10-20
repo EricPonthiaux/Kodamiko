@@ -4,15 +4,15 @@
 // branch shown in the status bar.
 
 #include "MainWindow.h"
+#include "agent/EditorContext.h"
+#include "agent/mcp/DuetTools.h"
+#include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
 #include "changes/GitActions.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
-#include "claude/ClaudeConfigView.h"
-#include "claude/EditorContext.h"
-#include "claude/mcp/DuetTools.h"
 #include "editor/EditorTabs.h"
 #include "git/Askpass.h"
 #include "git/Branches.h"
@@ -285,8 +285,9 @@ void MainWindow::createBranch(const QString &name, bool switchTo)
 void MainWindow::askClaudeForCommitMessage(const QString &request)
 {
     if (!exposeTools_->isChecked()) {
-        showStatus(tr("Claude hands the commit message back through Duet's tools: turn on Claude ▸ Expose Duet's "
-                      "Tools to Claude, then restart the session"));
+        showStatus(tr("%1 hands the commit message back through Duet's tools: turn on %1 ▸ Expose Duet's "
+                      "Tools to %1, then restart the session")
+                       .arg(agentProvider_->name()));
         return;
     }
     typeInClaudePrompt(request, PromptEntry::Submitted);

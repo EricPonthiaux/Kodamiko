@@ -61,6 +61,8 @@ public:
     void showCommitMessage(const QString &message);
 
     void applyTheme(const Theme &theme);
+    // The agent that writes commit messages (see CommitPanel::setAgent()).
+    void setAgent(const QString &name, const QString &iconName);
 
     QSplitter *splitter() const { return splitter_; }
 

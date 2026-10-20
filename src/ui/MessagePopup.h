@@ -28,6 +28,8 @@ public:
     // popup() without showing, for tests.
     void load(const QString &title, const QString &text);
     void applyTheme(const Theme &theme);
+    // Shown from the next applyTheme().
+    void setIconName(const QString &iconName);
 
     // The message shown, empty when there is none.
     QString text() const;

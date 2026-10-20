@@ -2,7 +2,7 @@
 
 #include "CommitPanel.h"
 
-#include "claude/CommitMessage.h"
+#include "agent/CommitMessage.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
 #include "ui/UiIcons.h"
@@ -36,8 +36,6 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
     message_->setPlaceholderText(tr("Commit message (Ctrl+Enter to commit)"));
     amend_->setToolTip(tr("Replace the last commit with the staged changes and this message"));
     generateButton_->setText(tr("Generate"));
-    generateButton_->setToolTip(tr("Have the Claude session in the terminal write the commit message from the "
-                                   "changes to commit (Ctrl+Alt+G)"));
     commitButton_->setDefault(true);
     commitButton_->setToolTip(tr("Commit the staged changes (Ctrl+Enter)"));
     for (const int key : {Qt::Key_Return, Qt::Key_Enter}) {
@@ -117,7 +115,7 @@ void CommitPanel::generateMessage()
     else if (stagesEverything)
         scope = CommitMessage::Scope::Everything;
     emit messageRequested(CommitMessage::request(scope, pathspec_));
-    emit statusMessage(tr("Claude is writing the commit message in its session…"));
+    emit statusMessage(tr("%1 is writing the commit message in its session…").arg(agentName_));
 }
 
 void CommitPanel::showGeneratedMessage(const QString &message)
@@ -128,7 +126,7 @@ void CommitPanel::showGeneratedMessage(const QString &message)
     cursor.insertText(message);
     message_->setTextCursor(cursor);
     message_->setFocus();
-    emit statusMessage(tr("Commit message written by Claude: review it, then commit (Ctrl+Enter)"));
+    emit statusMessage(tr("Commit message written by %1: review it, then commit (Ctrl+Enter)").arg(agentName_));
 }
 
 void CommitPanel::commit()
@@ -180,7 +178,16 @@ void CommitPanel::runCommit(const QString &message, bool amend, bool stageEveryt
         });
 }
 
+void CommitPanel::setAgent(const QString &name, const QString &iconName)
+{
+    agentName_ = name;
+    agentIconName_ = iconName;
+    generateButton_->setToolTip(
+        tr("Have the %1 session in the terminal write the commit message from the changes to commit (Ctrl+Alt+G)")
+            .arg(name));
+}
+
 void CommitPanel::applyTheme(const Theme &theme)
 {
-    generateButton_->setIcon(UiIcons::icon(QStringLiteral("claude"), theme.foreground));
+    generateButton_->setIcon(UiIcons::icon(agentIconName_, theme.foreground));
 }

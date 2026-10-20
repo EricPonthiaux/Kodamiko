@@ -317,7 +317,7 @@ QString TreeDecorations::toolTipOf(const QString &path, bool isDir) const
     }
     lines += problemLines(path, isDir);
     if (touched_.contains(path))
-        lines.append(FileTreeView::tr("just edited by Claude"));
+        lines.append(FileTreeView::tr("just edited by %1").arg(agentName_));
     if (const auto it = lastCommits_.constFind(path); it != lastCommits_.cend() && !it->isEmpty())
         lines.append(FileTreeView::tr("Last commit: %1").arg(*it));
     return lines.join(QLatin1Char('\n'));

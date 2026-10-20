@@ -90,6 +90,11 @@ void MessagePopup::showFirst()
     close_->setText(waiting > 0 ? tr("Next") : tr("Close"));
 }
 
+void MessagePopup::setIconName(const QString &iconName)
+{
+    header_->setIconName(iconName);
+}
+
 void MessagePopup::applyTheme(const Theme &theme)
 {
     setStyleSheet(popupStyleSheet(theme));

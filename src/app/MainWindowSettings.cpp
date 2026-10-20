@@ -3,17 +3,18 @@
 // MainWindow: themes and preferences, applied to every part of the window.
 
 #include "MainWindow.h"
+#include "agent/AgentCheckPopup.h"
+#include "agent/AgentIndicator.h"
+#include "agent/DiagramRequestPopup.h"
+#include "agent/EditorContext.h"
+#include "agent/NewAgentPopup.h"
+#include "agent/mcp/DuetTools.h"
+#include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
-#include "claude/AgentCheckPopup.h"
-#include "claude/ClaudeConfigView.h"
-#include "claude/DiagramRequestPopup.h"
-#include "claude/EditorContext.h"
-#include "claude/NewAgentPopup.h"
-#include "claude/mcp/DuetTools.h"
 #include "completion/CompletionController.h"
 #include "completion/CompletionService.h"
 #include "completion/FullLine.h"
@@ -30,7 +31,6 @@
 #include "settings/PreferencesPopup.h"
 #include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
-#include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/MessagePopup.h"
 #include "ui/Motion.h"
@@ -62,7 +62,7 @@ void MainWindow::setTheme(const QString &name)
         action->setChecked(action->data().toString() == theme_.name);
     ThemeStyle::apply(theme_);
     titleBar_->applyTheme(theme_);
-    claudeIndicator_->applyTheme(theme_);
+    agentIndicator_->applyTheme(theme_);
     frame_->applyTheme(theme_);
     terminalWindow_->applyTheme(theme_);
     branchButton_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme_.mutedText));
@@ -107,7 +107,7 @@ void MainWindow::setTheme(const QString &name)
         prerequisitesPopup_->applyTheme(theme_);
     if (modeTabs_) {
         updateTabIcons();
-        updateClaudeIndicator();
+        updateAgentIndicator();
         updateUsage();
     }
     QSettings().setValue(QStringLiteral("theme"), theme_.name);

@@ -1,6 +1,39 @@
 # Library containing the whole editor except main(): the executable and the
 # tests link against it.
 add_library(duet_core STATIC
+    agent/AgentActivity.cpp
+    agent/AgentCheckPopup.cpp
+    agent/AgentIndicator.cpp
+    agent/AgentMergeQueue.cpp
+    agent/AgentProviders.cpp
+    agent/AgentSessions.cpp
+    agent/CloseAgentPopup.cpp
+    agent/CommitMessage.cpp
+    agent/DiagramRequest.cpp
+    agent/DiagramRequestPopup.cpp
+    agent/EditorContext.cpp
+    agent/HookServer.cpp
+    agent/mcp/CodeTools.cpp
+    agent/mcp/EditorTools.cpp
+    agent/mcp/GitTools.cpp
+    agent/mcp/McpRegistry.cpp
+    agent/mcp/McpSession.cpp
+    agent/mcp/TerminalTools.cpp
+    agent/mcp/WorkspaceTools.cpp
+    agent/NewAgentPopup.cpp
+    agent/vendor/claude/ClaudeCodeProvider.cpp
+    agent/vendor/claude/ClaudeConfig.cpp
+    agent/vendor/claude/ClaudeConfigView.cpp
+    agent/vendor/claude/ClaudeFileRun.cpp
+    agent/vendor/claude/ClaudeLauncher.cpp
+    agent/vendor/claude/ClaudeLint.cpp
+    agent/vendor/claude/ClaudeLinter.cpp
+    agent/vendor/claude/ClaudeMark.cpp
+    agent/vendor/claude/ClaudeTrust.cpp
+    agent/vendor/claude/ClaudeUsage.cpp
+    agent/vendor/claude/CodeRequest.cpp
+    agent/vendor/claude/EffectiveSettings.cpp
+    agent/vendor/claude/UnsavedEditGuard.cpp
     changes/BranchesPopup.cpp
     changes/ChangeTree.cpp
     changes/ChangesView.cpp
@@ -24,35 +57,6 @@ add_library(duet_core STATIC
     changes/StashChangesPopup.cpp
     changes/StashesPopup.cpp
     changes/WordDiff.cpp
-    claude/AgentCheckPopup.cpp
-    claude/AgentMergeQueue.cpp
-    claude/AgentSessions.cpp
-    claude/ClaudeActivity.cpp
-    claude/ClaudeConfig.cpp
-    claude/ClaudeConfigView.cpp
-    claude/ClaudeLint.cpp
-    claude/ClaudeLinter.cpp
-    claude/ClaudeLauncher.cpp
-    claude/ClaudeTrust.cpp
-    claude/ClaudeUsage.cpp
-    claude/CloseAgentPopup.cpp
-    claude/CodeRequest.cpp
-    claude/CommitMessage.cpp
-    claude/DiagramRequest.cpp
-    claude/DiagramRequestPopup.cpp
-    claude/EditorContext.cpp
-    claude/EffectiveSettings.cpp
-    claude/HookEvent.cpp
-    claude/HookServer.cpp
-    claude/NewAgentPopup.cpp
-    claude/mcp/CodeTools.cpp
-    claude/mcp/EditorTools.cpp
-    claude/mcp/GitTools.cpp
-    claude/mcp/McpRegistry.cpp
-    claude/mcp/McpSession.cpp
-    claude/mcp/TerminalTools.cpp
-    claude/mcp/WorkspaceTools.cpp
-    claude/UnsavedEditGuard.cpp
     completion/CodeGeneration.cpp
     completion/CodeScan.cpp
     completion/CompletionController.cpp
@@ -166,7 +170,6 @@ add_library(duet_core STATIC
     ui/AppFonts.cpp
     ui/BrandMark.cpp
     ui/ClickableCursors.cpp
-    ui/ClaudeIndicator.cpp
     ui/DetachablePage.cpp
     ui/FileIcons.cpp
     ui/GripSplitter.cpp
@@ -296,7 +299,7 @@ if(GRAPHVIZ_FOUND)
     file(GLOB_RECURSE diagram_sources CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewers/diagram/*.cpp)
     target_sources(duet_core PRIVATE
-        claude/mcp/DiagramTools.cpp
+        agent/mcp/DiagramTools.cpp
         viewers/DiagramCheck.cpp
         viewers/DiagramGenerationView.cpp
         viewers/DiagramView.cpp
@@ -318,6 +321,7 @@ duet_enable_warnings(duet_core)
 qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/main.cpp
     app/MainWindow.cpp
+    app/MainWindowAgentProvider.cpp
     app/MainWindowAgents.cpp
     app/MainWindowClaude.cpp
     app/MainWindowEditing.cpp

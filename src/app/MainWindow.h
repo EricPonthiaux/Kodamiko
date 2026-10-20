@@ -2,13 +2,14 @@
 
 #pragma once
 
-#include "claude/AgentMergeQueue.h"
-#include "claude/AgentSessions.h"
-#include "claude/ClaudeActivity.h"
-#include "claude/CloseAgentPopup.h"
-#include "claude/CodeRequest.h"
-#include "claude/HookServer.h"
-#include "claude/mcp/McpRegistry.h"
+#include "agent/AgentActivity.h"
+#include "agent/AgentMergeQueue.h"
+#include "agent/AgentProvider.h"
+#include "agent/AgentSessions.h"
+#include "agent/CloseAgentPopup.h"
+#include "agent/HookServer.h"
+#include "agent/mcp/McpRegistry.h"
+#include "agent/vendor/claude/CodeRequest.h"
 #include "navigation/RecentFiles.h"
 #include "projects/ProjectConfig.h"
 #include "settings/Keymap.h"
@@ -26,7 +27,7 @@ class AskpassServer;
 class BranchesPopup;
 class ChangesView;
 class ClaudeConfigView;
-class ClaudeIndicator;
+class AgentIndicator;
 class CodeIntelligence;
 class CodeNavigator;
 class CommandPalette;
@@ -61,6 +62,7 @@ class ProjectSettingsPopup;
 class QAction;
 class QActionGroup;
 class QLabel;
+class QSettings;
 class QSplitter;
 class QStackedWidget;
 class QSystemTrayIcon;
@@ -163,6 +165,13 @@ private:
     };
 
     QAction *addSettingToggle(QMenu *menu, const SettingToggle &toggle);
+    // A setting toggle whose text or tooltip names the agent (%1).
+    QAction *addAgentSettingToggle(QMenu *menu, const SettingToggle &toggle);
+    // Gives `action` `text` and `toolTip` with the agent's name for their %1,
+    // now and whenever the project's agent changes. Returns `action`.
+    QAction *nameAfterAgent(QAction *action, const QString &text, const QString &toolTip = {});
+    // Agent ▸ Agent: the providers to choose from; hidden with only one.
+    void createAgentProviderMenu(QMenu *agent);
     void createGitMenu();
     void createEditMenu();
     void createFoldingMenu(QMenu *edit);
@@ -172,8 +181,24 @@ private:
     void createRunMenu();
     void createHelpMenu();
     void restoreSettings();
+    // Before the window first shows: the frame changes the native window.
+    void restoreTitleBarFrame(const QSettings &settings);
 
     void openFolder(const QString &folder);
+    // What follows the opening of a project in this window.
+    enum class AfterOpening {
+        Nothing,
+        ShowSettings
+    };
+    // Asks whether `folder` opens in a new Duet process or in this window,
+    // in place of the current project and its Claude session; nothing if
+    // the user cancels. While agents work in worktrees, only a new process.
+    void askToOpenProject(const QString &folder, AfterOpening after);
+    void openProjectHere(const QString &folder, AfterOpening after);
+    // Starts another Duet process on `folder`; tells the user if it fails.
+    void openProjectInNewWindow(const QString &folder);
+    // What opening another project in this window would stop; may be empty.
+    QString projectSwitchCost(bool hasAgentWork) const;
     // Open files and expanded tree, remembered per working folder.
     void saveSession();
     void restoreSession();
@@ -190,7 +215,16 @@ private:
     void closeProject();
     // Says when the project lacks tools Duet can download.
     void updateToolsNotice();
-    bool startClaudeSession(QString *error = nullptr, const QStringList &extraArguments = {});
+    // The project's agent: the one its session names, else the default of
+    // the preferences.
+    const AgentProvider &projectAgentProvider() const;
+    // Agent ▸ Agent: `provider` for this project, its session started anew;
+    // refused while sessions work in worktrees.
+    void chooseAgentProvider(const AgentProvider &provider);
+    // Shows `provider` everywhere the agent is named or drawn, and decodes
+    // its hooks; the session is not restarted.
+    void setAgentProvider(const AgentProvider &provider);
+    bool startClaudeSession(QString *error = nullptr, SessionStart start = SessionStart::New);
     void restartClaudeSession();
     // Starts the session again, on with its last conversation.
     void continueClaudeSession();
@@ -282,16 +316,16 @@ private:
 
     void onHookReceived(const HookEvent &event);
     // Dot on the Claude tab and on the Terminal mode tab.
-    void updateClaudeIndicator();
+    void updateAgentIndicator();
     // Dot on an agent's tab.
-    void updateAgentTab(QWidget *terminal, ClaudeActivity::State state);
+    void updateAgentTab(QWidget *terminal, AgentActivity::State state);
     void updateTabIcons();
     // Duet's frame and title bar, or the system's (View ▸ Use System
     // Title Bar). On macOS, the system's traffic lights over Duet's bar.
     void setSystemTitleBar(bool system);
     // Projects menu of the title bar, recent folders first.
     void updateProjectMenu();
-    // Tells ClaudeActivity whether the user is looking at the session.
+    // Tells AgentActivity whether the user is looking at the session.
     void updateClaudeWatched();
     // Taskbar alert and, when the window is inactive, desktop notification.
     void notify(const QString &title, const QString &message);
@@ -381,10 +415,12 @@ private:
 
     Theme theme_;
     QString folder_;
+    // The project's agent, never null. Not owned (see AgentProviders).
+    const AgentProvider *agentProvider_ = nullptr;
     HookServer hookServer_;
     // What the editor's MCP server offers Claude (see DuetTools).
     McpRegistry mcpRegistry_;
-    ClaudeActivity claudeActivity_;
+    AgentActivity agentActivity_;
     // The sessions besides the main one, each in its worktree.
     AgentSessions agentSessions_;
     QJsonObject claudeStatus_; // last status line data
@@ -448,12 +484,12 @@ private:
     AskpassServer *askpass_ = nullptr;
     RepositoryWatcher *repositoryWatcher_ = nullptr;
     TitleBar *titleBar_ = nullptr;
-    ClaudeIndicator *claudeIndicator_ = nullptr; // status bar: Claude's activity, opens the session
-    QToolButton *branchButton_ = nullptr;        // status bar: branch, Branches popup
-    QToolButton *syncButton_ = nullptr;          // status bar: fetch, pull, push
-    QToolButton *cancelGitButton_ = nullptr;     // status bar: stops a fetch, push…
-    QString gitProgress_;                        // the status bar message of a fetch, push… in progress
-    QAction *continueAction_ = nullptr;          // Git menu: the operation in progress
+    AgentIndicator *agentIndicator_ = nullptr; // status bar: Claude's activity, opens the session
+    QToolButton *branchButton_ = nullptr;      // status bar: branch, Branches popup
+    QToolButton *syncButton_ = nullptr;        // status bar: fetch, pull, push
+    QToolButton *cancelGitButton_ = nullptr;   // status bar: stops a fetch, push…
+    QString gitProgress_;                      // the status bar message of a fetch, push… in progress
+    QAction *continueAction_ = nullptr;        // Git menu: the operation in progress
     QAction *skipAction_ = nullptr;
     QAction *abortAction_ = nullptr;
     WindowFrame *frame_ = nullptr;
@@ -490,6 +526,18 @@ private:
     QList<QAction *> codeRequestActions_; // also in the editor's context menu
     QAction *exposeTools_ = nullptr;
     QAction *claudeNotifications_ = nullptr;
+
+    // Actions whose text names the agent (nameAfterAgent()).
+    struct AgentNamedAction {
+        QAction *action; // owned by its menu
+        QString text;
+        QString toolTip;
+    };
+
+    QList<AgentNamedAction> agentNamedActions_;
+    QActionGroup *agentProviderActions_ = nullptr;
+    // Shown when the agent runs without a session (AgentFeatures::hasFileRuns).
+    QList<QAction *> drawDiagramActions_;
     QSplitter *editSplitter_ = nullptr;
 
     QStackedWidget *modes_ = nullptr;

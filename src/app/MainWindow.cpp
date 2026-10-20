@@ -2,18 +2,20 @@
 
 #include "MainWindow.h"
 
+#include "agent/AgentCheckPopup.h"
+#include "agent/AgentIndicator.h"
+#include "agent/AgentProviders.h"
+#include "agent/DiagramRequestPopup.h"
+#include "agent/NewAgentPopup.h"
+#include "agent/mcp/DuetTools.h"
+#include "agent/vendor/claude/ClaudeConfigView.h"
+#include "agent/vendor/claude/ClaudeLinter.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
 #include "changes/GitActions.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
-#include "claude/AgentCheckPopup.h"
-#include "claude/ClaudeConfigView.h"
-#include "claude/ClaudeLinter.h"
-#include "claude/DiagramRequestPopup.h"
-#include "claude/NewAgentPopup.h"
-#include "claude/mcp/DuetTools.h"
 #include "completion/CodeGeneration.h"
 #include "completion/CompletionController.h"
 #include "completion/CompletionService.h"
@@ -46,7 +48,6 @@
 #include "setup/Prerequisites.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
-#include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/GripSplitter.h"
 #include "ui/HoverCloseButtons.h"
@@ -88,20 +89,17 @@
 
 namespace {
 
-// Between the status bar's groups: four times the space within a group, so
-// that the eye reads groups first.
 constexpr int statusGroupSpacing = 16;
 
-QColor problemsIconColor(int errorCount, int warningCount, const QColor &noProblemColor)
+QColor problemsIconColor(int errorCount, int warningCount, const Theme &theme)
 {
     if (errorCount > 0)
-        return {"#e5534b"};
+        return theme.error;
     if (warningCount > 0)
-        return {"#d4a72c"};
-    return noProblemColor;
+        return theme.warning;
+    return theme.mutedText;
 }
 
-// Every command of `menu`'s menus and submenus.
 QList<QAction *> menuCommands(const QWidget *menu)
 {
     QList<QAction *> commands;
@@ -119,45 +117,43 @@ QList<QAction *> menuCommands(const QWidget *menu)
 MainWindow::MainWindow(const QString &folder, QWidget *parent)
     : QMainWindow(parent)
     , theme_(Theme::named(savedThemeName()))
+    , agentProvider_(&AgentProviders::find(Preferences::load().defaultAgentProvider))
 {
-    // The saved theme from the start: the widgets are styled as they are
-    // created, rather than all restyled when restoreSettings() applies it.
     Preferences::load().applyTypography(theme_);
     ThemeStyle::apply(theme_);
     createWidgets();
     createMenus();
     applyKeymap(Keymap::loadOverrides());
-    // The menus' shortcuts work from the terminals' window too.
+
     terminalWindow_->setWindowActions(menuCommands(titleBar_->menuBar()));
     restoreSettings();
     connect(&hookServer_, &HookServer::hookReceived, this, &MainWindow::onHookReceived);
     registerMcpTools();
-    connect(&claudeActivity_, &ClaudeActivity::stateChanged, this, &MainWindow::updateClaudeIndicator);
-    connect(&claudeActivity_, &ClaudeActivity::attentionRequested, this, &MainWindow::notify);
+    connect(&agentActivity_, &AgentActivity::stateChanged, this, &MainWindow::updateAgentIndicator);
+    connect(&agentActivity_, &AgentActivity::attentionRequested, this, &MainWindow::notify);
     connect(&agentSessions_, &AgentSessions::activityChanged, this, &MainWindow::updateAgentTab);
     connect(&agentSessions_, &AgentSessions::attentionRequested, this, &MainWindow::notify);
-    // Queued: never closes the window from a destroyed terminal's signal.
+
     connect(&agentSessions_, &AgentSessions::sessionForgotten, this, &MainWindow::closeWindowOnceAgentsClosed,
             Qt::QueuedConnection);
     if (!hookServer_.listen())
-        statusBar()->showMessage(tr("Claude tracking unavailable: %1").arg(hookServer_.errorString()));
+        statusBar()->showMessage(
+            tr("%1 tracking unavailable: %2").arg(agentProvider_->name(), hookServer_.errorString()));
     openFolder(ProjectStore::startFolder(folder));
     setMode(static_cast<Mode>(
         std::clamp(QSettings().value(QStringLiteral("viewMode"), static_cast<int>(Mode::Edit)).toInt(), 0, 3)));
-    // New installation: say what is missing rather than failing later.
+
     if (!Prerequisites::allFound())
         QTimer::singleShot(0, this, &MainWindow::showPrerequisites);
 }
 
 MainWindow::~MainWindow()
 {
-    // Its downloads use the toolchains, destroyed before the children.
     delete projectSettings_;
 }
 
 void MainWindow::createWidgets()
 {
-    // Duet's title bar in place of the menu bar: it holds the menus.
     titleBar_ = new TitleBar(this);
     setMenuWidget(titleBar_);
     frame_ = new WindowFrame(this);
@@ -173,21 +169,16 @@ void MainWindow::createWidgets()
     createCentralWidget();
 }
 
-// Symbols, language servers, problems, runs, completion and navigation.
 void MainWindow::createCodeServices()
 {
-    // Symbol index for "go to definition": reread after every
-    // save, and when returning to the application (files modified elsewhere).
     symbolIndex_ = new SymbolIndex(this);
     connect(editorTabs_, &EditorTabs::fileSaved, symbolIndex_, &SymbolIndex::refresh);
 
-    // Completion: the language server, project symbols, keywords, words
-    // of the file.
     toolchains_ = std::make_unique<Toolchains>();
     languageServers_ = new LanguageServers(this);
     languageServers_->setEnabled(Preferences::load().languageServers);
     connect(languageServers_, &LanguageServers::statusMessage, this, &MainWindow::showStatus);
-    // Problems: the servers', and those read in the output of the runs.
+
     problemStore_ = new ProblemStore(languageServers_, this);
     runner_ = new Runner(problemStore_, this);
     connect(runner_, &Runner::selectionChanged, this, &MainWindow::updateRunWidgets);
@@ -213,13 +204,14 @@ void MainWindow::createCodeServices()
     applyFullLine(Preferences::load());
     connect(editorTabs_, &EditorTabs::editorOpened, this, [this](EditorWidget *editor) {
         editor->setFileActions(codeRequestActions_);
+
         const auto *controller = new CompletionController(editor, completion_);
-        // The parameters of the function just chosen.
+
         connect(controller, &CompletionController::callInserted, this, [this, editor] {
             if (intelligence_)
                 intelligence_->requestParameterInfo(editor);
         });
-        // Once the file is loaded and the tab shown.
+
         QTimer::singleShot(0, editor, [this, editor] { warmUpLanguageServer(editor); });
     });
     connect(editorTabs_, &EditorTabs::fileSaved, this, [this] { fileStatuses_->refresh(); });
@@ -230,8 +222,7 @@ void MainWindow::createCodeServices()
         }
     });
     navigator_ = new CodeNavigator(editorTabs_, symbolIndex_, this);
-    // The language server first (documentation, usages, rename...), the
-    // project's index when there is none.
+
     intelligence_ = new CodeIntelligence({editorTabs_, languageServers_, navigator_, problemStore_}, this);
     connect(editorTabs_, &EditorTabs::editorOpened, intelligence_, &CodeIntelligence::attach);
     connect(editorTabs_, &EditorTabs::definitionRequested, intelligence_, &CodeIntelligence::goToDefinition);
@@ -239,7 +230,6 @@ void MainWindow::createCodeServices()
     connect(navigator_, &CodeNavigator::statusMessage, this, &MainWindow::showStatus);
 }
 
-// The Diff and History modes.
 void MainWindow::createGitViews()
 {
     changesView_ = new ChangesView(theme_, gitCommands_, this);
@@ -261,27 +251,29 @@ void MainWindow::createGitViews()
     });
 }
 
-// The four modes, under the bar where Claude asks to run sensitive tools.
 void MainWindow::createCentralWidget()
 {
-    // Same order as the Mode enum.
     modes_ = new QStackedWidget(this);
     modes_->addWidget(createTerminalPage());
     modes_->addWidget(createEditPage());
     modes_->addWidget(changesView_);
     modes_->addWidget(historyView_);
+
     terminalWindow_ = new DetachablePage(
         modes_, terminalPage_, QStringLiteral("terminalWindow"),
         {tr("Terminals — Duet"), tr("The terminals are in a window of their own."), tr("Bring the Terminals Back")});
+
     connect(terminalWindow_, &DetachablePage::detachedChanged, this, [this](bool detached) {
         updateTerminalWindowControls();
-        // Away in their own window, the terminals have no mode tab here.
+
         modeTabs_->setTabVisible(static_cast<int>(Mode::Terminal), !detached);
         if (detached && mode_ == Mode::Terminal)
             setMode(modeBeforeTerminal_);
         updateClaudeWatched();
     });
+
     connect(terminalWindow_, &DetachablePage::windowActivationChanged, this, &MainWindow::updateClaudeWatched);
+
     auto *central = new QWidget(this);
     auto *centralLayout = new QVBoxLayout(central);
     centralLayout->setContentsMargins(0, 0, 0, 0);
@@ -586,7 +578,7 @@ QWidget *MainWindow::createTerminalPage()
     trailing->setEndButton(detachTerminalsButton_);
 
     auto *hint = new QLabel(tr("No terminal open\n\n"
-                               "Ctrl+Shift+L: start the Claude session"),
+                               "Ctrl+Shift+L: start the agent's session"),
                             this);
     hint->setAlignment(Qt::AlignCenter);
     hint->setEnabled(false);
@@ -612,7 +604,6 @@ QWidget *MainWindow::createTerminalPage()
     return terminalPage_;
 }
 
-// Terminal | Edit | Diff | History tabs at the bottom right, in the status bar.
 void MainWindow::createModeTabs()
 {
     modeTabs_ = new QTabBar(this);
@@ -622,8 +613,7 @@ void MainWindow::createModeTabs()
     modeTabs_->setExpanding(false);
     modeTabs_->setFocusPolicy(Qt::NoFocus);
     modeTabs_->setShape(QTabBar::RoundedSouth);
-    // The status bar always gives the tabs their full width: no scroll
-    // arrows, no elided titles.
+
     modeTabs_->setUsesScrollButtons(false);
     modeTabs_->setElideMode(Qt::ElideNone);
     modeTabs_->addTab(tr("Terminal"));
@@ -638,28 +628,21 @@ void MainWindow::createModeTabs()
     createStatusBar();
 }
 
-// The bottom bar, built from the right edge leftwards, in groups set apart:
-// the mode tabs; git (Sync, the branch, stop of the git operation);
-// Claude's usage; the position in the file (cursor, line ending, encoding
-// and indentation). On a narrow window the widgets furthest left give up
-// their place first, whole. Claude's activity stays at the far left,
-// temporarily replaced by status messages.
 void MainWindow::createStatusBar()
 {
-    claudeIndicator_ = new ClaudeIndicator(this);
-    claudeIndicator_->applyTheme(theme_);
-    statusBar()->addWidget(claudeIndicator_);
-    claudeIndicator_->hide();
-    connect(claudeIndicator_, &ClaudeIndicator::clicked, this, &MainWindow::showClaudeSession);
-    connect(statusBar(), &QStatusBar::messageChanged, this, &MainWindow::updateClaudeIndicator);
+    agentIndicator_ = new AgentIndicator(this);
+    agentIndicator_->applyTheme(theme_);
+    statusBar()->addWidget(agentIndicator_);
+    agentIndicator_->hide();
+    connect(agentIndicator_, &AgentIndicator::clicked, this, &MainWindow::showClaudeSession);
+    connect(statusBar(), &QStatusBar::messageChanged, this, &MainWindow::updateAgentIndicator);
 
     syncButton_ = new QToolButton(this);
     syncButton_->setAutoRaise(true);
     syncButton_->setFocusPolicy(Qt::NoFocus);
     syncButton_->hide();
     connect(syncButton_, &QToolButton::clicked, gitActions_, &GitActions::sync);
-    // The branch and how far it is from its upstream; a click opens the
-    // Branches popup.
+
     branchButton_ = new QToolButton(this);
     branchButton_->setObjectName(QStringLiteral("chip"));
     branchButton_->setAutoRaise(true);
@@ -667,7 +650,7 @@ void MainWindow::createStatusBar()
     branchButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     branchButton_->hide();
     connect(branchButton_, &QToolButton::clicked, this, &MainWindow::showBranches);
-    // Stops the fetch, pull or push that is running.
+
     cancelGitButton_ = new QToolButton(this);
     cancelGitButton_->setAutoRaise(true);
     cancelGitButton_->setFocusPolicy(Qt::NoFocus);
@@ -701,13 +684,7 @@ void MainWindow::createStatusBar()
 void MainWindow::restoreSettings()
 {
     const QSettings settings;
-    // Before the window first shows: the frame changes the native window.
-    {
-        const bool system = settings.value(QStringLiteral("systemTitleBar"), false).toBool();
-        const QSignalBlocker blocker(systemTitleBar_);
-        systemTitleBar_->setChecked(system);
-        setSystemTitleBar(system);
-    }
+    restoreTitleBarFrame(settings);
     restoreGeometry(settings.value(QStringLiteral("geometry")).toByteArray());
     terminalWindow_->restore();
     editSplitter_->restoreState(settings.value(QStringLiteral("editSplitter")).toByteArray());
@@ -719,6 +696,15 @@ void MainWindow::restoreSettings()
     setTheme(savedThemeName());
 }
 
+void MainWindow::restoreTitleBarFrame(const QSettings &settings)
+{
+    const bool system = settings.value(QStringLiteral("systemTitleBar"), false).toBool();
+
+    const QSignalBlocker blocker(systemTitleBar_);
+    systemTitleBar_->setChecked(system);
+    setSystemTitleBar(system);
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     const bool hasAgentWork = !agentSessions_.isEmpty() || agentMerges_->isMerging();
@@ -727,7 +713,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
         closeAgentsThenWindow();
         return;
     }
-    saveSession(); // before closeAll, which empties the tabs
+    saveSession();
     if (!editorTabs_->closeAll()) {
         event->ignore();
         return;
@@ -742,8 +728,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     settings.setValue(QStringLiteral("sidebarTab"), sidebar_->tabBar()->currentIndex());
     settings.setValue(QStringLiteral("viewMode"), static_cast<int>(mode_));
     settings.setValue(QStringLiteral("lastFolder"), folder_);
-    // The welcome window shows before this one closes: the application
-    // goes on.
+
     if (closingProject_)
         emit projectClosed();
     event->accept();
@@ -751,8 +736,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::setMode(Mode mode)
 {
-    // Terminals in their own window: it comes to the front instead, and
-    // the main window keeps (or gets) another mode.
     if (mode == Mode::Terminal && terminalWindow_->isDetached()) {
         if (modes_->currentIndex() == static_cast<int>(Mode::Terminal))
             setMode(modeBeforeTerminal_);
@@ -879,7 +862,7 @@ void MainWindow::updateTabIcons()
     sidebar_->setViewIcon(claudeConfigView_, UiIcons::icon(QStringLiteral("claude"), color));
     sidebar_->setViewIcon(problemsView_, UiIcons::icon(QStringLiteral("problems"),
                                                        problemsIconColor(problemsView_->errorCount(),
-                                                                         problemsView_->warningCount(), color)));
+                                                                         problemsView_->warningCount(), theme_)));
     newTerminalButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));
     syncButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), color));
     cancelGitButton_->setIcon(UiIcons::icon(QStringLiteral("stop"), color));
@@ -930,7 +913,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             return true;
         }
         if (key->key() == Qt::Key_Escape)
-            claudeActivity_.interrupt();
+            agentActivity_.interrupt();
     }
     return QMainWindow::eventFilter(watched, event);
 }

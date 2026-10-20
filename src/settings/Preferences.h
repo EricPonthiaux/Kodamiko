@@ -46,7 +46,10 @@ struct Preferences {
     // Files
     bool alwaysSelectOpenedFile = false;
 
-    // Claude
+    // Agent
+    // The agent of the projects that have not chosen one (see
+    // AgentProviders::key()).
+    QString defaultAgentProvider = QStringLiteral("claude-code");
     bool snapshotBeforePrompt = true;
     bool shareEditorContext = true;
     // The editor's MCP server (tools, resources, prompts) in its sessions.

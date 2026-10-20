@@ -1,23 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "claude/AgentCheckPopup.h"
-#include "claude/AgentSessions.h"
-#include "claude/ClaudeActivity.h"
-#include "claude/ClaudeConfig.h"
-#include "claude/ClaudeConfigView.h"
-#include "claude/ClaudeLauncher.h"
-#include "claude/ClaudeLint.h"
-#include "claude/ClaudeUsage.h"
-#include "claude/CloseAgentPopup.h"
-#include "claude/CodeRequest.h"
-#include "claude/CommitMessage.h"
-#include "claude/DiagramRequest.h"
-#include "claude/EditorContext.h"
-#include "claude/EffectiveSettings.h"
-#include "claude/HookEvent.h"
-#include "claude/HookServer.h"
-#include "claude/NewAgentPopup.h"
-#include "claude/UnsavedEditGuard.h"
+#include "agent/AgentActivity.h"
+#include "agent/AgentCheckPopup.h"
+#include "agent/AgentSessions.h"
+#include "agent/CloseAgentPopup.h"
+#include "agent/CommitMessage.h"
+#include "agent/DiagramRequest.h"
+#include "agent/EditorContext.h"
+#include "agent/HookEvent.h"
+#include "agent/HookServer.h"
+#include "agent/NewAgentPopup.h"
+#include "agent/vendor/claude/ClaudeCodeProvider.h"
+#include "agent/vendor/claude/ClaudeConfig.h"
+#include "agent/vendor/claude/ClaudeConfigView.h"
+#include "agent/vendor/claude/ClaudeFileRun.h"
+#include "agent/vendor/claude/ClaudeLauncher.h"
+#include "agent/vendor/claude/ClaudeLint.h"
+#include "agent/vendor/claude/ClaudeUsage.h"
+#include "agent/vendor/claude/CodeRequest.h"
+#include "agent/vendor/claude/EffectiveSettings.h"
+#include "agent/vendor/claude/UnsavedEditGuard.h"
 #include "editor/EditorWidget.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/MessagePopup.h"
@@ -38,11 +40,13 @@
 class TestClaude : public QObject {
     Q_OBJECT
 
+    const ClaudeCodeProvider claude_;
+
 private slots:
 
     void parsesEditedFiles()
     {
-        const auto event = HookEvent::fromJson(
+        const auto event = claude_.parseHook(
             R"({"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"/p/a.cpp"}})");
         QVERIFY(event);
         QCOMPARE(event->kind, HookEvent::Kind::FilesEdited);
@@ -51,7 +55,7 @@ private slots:
 
     void parsesStop()
     {
-        const auto event = HookEvent::fromJson(R"({"hook_event_name":"Stop","session_id":"s1"})");
+        const auto event = claude_.parseHook(R"({"hook_event_name":"Stop","session_id":"s1"})");
         QVERIFY(event);
         QCOMPARE(event->kind, HookEvent::Kind::ResponseFinished);
         QCOMPARE(event->sessionId, QStringLiteral("s1"));
@@ -59,7 +63,7 @@ private slots:
 
     void parsesStopFailure()
     {
-        const auto event = HookEvent::fromJson(R"({"hook_event_name":"StopFailure","error":"overloaded"})");
+        const auto event = claude_.parseHook(R"({"hook_event_name":"StopFailure","error":"overloaded"})");
         QVERIFY(event);
         QCOMPARE(event->kind, HookEvent::Kind::ResponseFinished);
         QVERIFY(event->failed);
@@ -68,17 +72,17 @@ private slots:
 
     void parsesPromptPermissionAndCommand()
     {
-        const auto prompt = HookEvent::fromJson(R"({"hook_event_name":"UserPromptSubmit","prompt":"fix it"})");
+        const auto prompt = claude_.parseHook(R"({"hook_event_name":"UserPromptSubmit","prompt":"fix it"})");
         QVERIFY(prompt);
         QCOMPARE(prompt->kind, HookEvent::Kind::PromptSubmitted);
         QCOMPARE(prompt->prompt, QStringLiteral("fix it"));
 
-        const auto permission = HookEvent::fromJson(R"({"hook_event_name":"PermissionRequest","tool_name":"Bash"})");
+        const auto permission = claude_.parseHook(R"({"hook_event_name":"PermissionRequest","tool_name":"Bash"})");
         QVERIFY(permission);
         QCOMPARE(permission->kind, HookEvent::Kind::PermissionRequested);
         QCOMPARE(permission->message, QStringLiteral("Bash"));
 
-        const auto command = HookEvent::fromJson(
+        const auto command = claude_.parseHook(
             R"({"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"make"}})");
         QVERIFY(command);
         QCOMPARE(command->kind, HookEvent::Kind::CommandFinished);
@@ -86,24 +90,24 @@ private slots:
 
     void keepsOnlyNotificationsThatWaitForTheUser()
     {
-        const auto permission = HookEvent::fromJson(
+        const auto permission = claude_.parseHook(
             R"({"hook_event_name":"Notification","notification_type":"permission_prompt","message":"Allow?"})");
         QVERIFY(permission);
         QCOMPARE(permission->kind, HookEvent::Kind::NeedsAttention);
         QCOMPARE(permission->message, QStringLiteral("Allow?"));
-        QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"Notification","notification_type":"idle_prompt"})"));
-        QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"Notification"})"));
+        QVERIFY(!claude_.parseHook(R"({"hook_event_name":"Notification","notification_type":"idle_prompt"})"));
+        QVERIFY(!claude_.parseHook(R"({"hook_event_name":"Notification"})"));
     }
 
     void parsesEditRequests()
     {
-        const auto edit = HookEvent::fromJson(
+        const auto edit = claude_.parseHook(
             R"({"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/p/a.cpp"}})");
         QVERIFY(edit);
         QCOMPARE(edit->kind, HookEvent::Kind::EditRequested);
         QCOMPARE(edit->message, QStringLiteral("Write"));
         QCOMPARE(edit->filePaths, QStringList{"/p/a.cpp"});
-        QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}})"));
+        QVERIFY(!claude_.parseHook(R"({"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}})"));
     }
 
     void refusesEditsOverUnsavedChanges()
@@ -111,7 +115,7 @@ private slots:
         const QString reason = UnsavedEditGuard::reason({"src/a.cpp", "src/b.h"});
         QVERIFY(reason.startsWith(QStringLiteral("src/a.cpp, src/b.h have unsaved changes")));
         QVERIFY(UnsavedEditGuard::reason({"a.cpp"}).startsWith(QStringLiteral("a.cpp has unsaved changes")));
-        const QJsonObject output = UnsavedEditGuard::denyOutput(reason)["hookSpecificOutput"].toObject();
+        const QJsonObject output = claude_.denyEditReply(reason)["hookSpecificOutput"].toObject();
         QCOMPARE(output["hookEventName"].toString(), QStringLiteral("PreToolUse"));
         QCOMPARE(output["permissionDecision"].toString(), QStringLiteral("deny"));
         QCOMPARE(output["permissionDecisionReason"].toString(), reason);
@@ -126,8 +130,8 @@ private slots:
                                                  "Flowchart.\n")));
         QVERIFY(prompt.contains(QStringLiteral("<request>\nHow returns work\n</request>")));
 
-        const QStringList arguments = DiagramRequest::arguments(prompt, "docs/diagrams/returns.mmd",
-                                                                "/opt/duet/claude-plugin", "\"/opt/duet-hook\"");
+        const QStringList arguments = ClaudeFileRun::arguments(prompt, "docs/diagrams/returns.mmd",
+                                                               "/opt/duet/claude-plugin", "\"/opt/duet-hook\"");
         QCOMPARE(arguments.first(), prompt); // before the variadic --allowedTools
         QCOMPARE(arguments.at(arguments.indexOf("--output-format") + 1), QStringLiteral("stream-json"));
         QVERIFY(arguments.contains("--verbose"));
@@ -143,15 +147,15 @@ private slots:
         QCOMPARE(check["hooks"].toArray().first().toObject()["command"].toString(),
                  QStringLiteral("\"/opt/duet-hook\""));
 
-        const QStringList bare = DiagramRequest::arguments(prompt, "a.flow", {}, {});
+        const QStringList bare = ClaudeFileRun::arguments(prompt, "a.flow", {}, {});
         QVERIFY(!bare.contains("--plugin-dir"));
         QVERIFY(!bare.contains("--settings"));
     }
 
     void followsClaudeDrawing()
     {
-        using Kind = DiagramRequest::Event::Kind;
-        const auto steps = DiagramRequest::parseLine(
+        using Kind = AgentRunEvent::Kind;
+        const auto steps = ClaudeFileRun::parseLine(
             R"({"type":"assistant","message":{"content":[{"type":"text","text":"Let me look."},)"
             R"({"type":"tool_use","name":"Read","input":{"file_path":"/p/src/a.cpp"}},)"
             R"({"type":"tool_use","name":"Grep","input":{"pattern":"order"}},)"
@@ -161,27 +165,26 @@ private slots:
         QCOMPARE(steps.steps, (QStringList{QDir::toNativeSeparators("Reading src/a.cpp"),
                                            QStringLiteral("Searching for \u201corder\u201d"),
                                            QDir::toNativeSeparators("Drawing docs/a.flow")}));
-        QCOMPARE(
-            DiagramRequest::parseLine(R"({"type":"assistant","message":{"content":[{"type":"text"}]}})", "/p").kind,
-            Kind::None);
-        QCOMPARE(DiagramRequest::parseLine(R"({"type":"system","subtype":"init"})", "/p").kind, Kind::None);
+        QCOMPARE(ClaudeFileRun::parseLine(R"({"type":"assistant","message":{"content":[{"type":"text"}]}})", "/p").kind,
+                 Kind::None);
+        QCOMPARE(ClaudeFileRun::parseLine(R"({"type":"system","subtype":"init"})", "/p").kind, Kind::None);
 
-        const auto done = DiagramRequest::parseLine(
+        const auto done = ClaudeFileRun::parseLine(
             R"({"type":"result","subtype":"success","is_error":false,"result":" The diagram shows returns. "})", "/p");
         QCOMPARE(done.kind, Kind::Finished);
         QVERIFY(!done.failed);
         QCOMPARE(done.text, QStringLiteral("The diagram shows returns."));
         const auto limit =
-            DiagramRequest::parseLine(R"({"type":"result","subtype":"error_max_turns","is_error":true})", "/p");
+            ClaudeFileRun::parseLine(R"({"type":"result","subtype":"error_max_turns","is_error":true})", "/p");
         QVERIFY(limit.failed);
         QCOMPARE(limit.text, QStringLiteral("error_max_turns"));
     }
 
     void ignoresUnknownOrInvalidEvents()
     {
-        QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"SessionStart"})"));
-        QVERIFY(!HookEvent::fromJson("not json"));
-        QVERIFY(!HookEvent::fromJson(R"({"hook_event_name":"PostToolUse","tool_input":{}})"));
+        QVERIFY(!claude_.parseHook(R"({"hook_event_name":"SessionStart"})"));
+        QVERIFY(!claude_.parseHook("not json"));
+        QVERIFY(!claude_.parseHook(R"({"hook_event_name":"PostToolUse","tool_input":{}})"));
     }
 
     void settingsDeclareHooksAndStatusLine()
@@ -221,7 +224,7 @@ private slots:
 
         QVERIFY(agents.owns(agentPrompt));
         QVERIFY(!agents.owns(mainPrompt));
-        QCOMPARE(agents.find(&terminal)->activity->state(), ClaudeActivity::State::Working);
+        QCOMPARE(agents.find(&terminal)->activity->state(), AgentActivity::State::Working);
     }
 
     void followsAnAgentWhoseSessionWasRenewedByItsDirectory()
@@ -238,7 +241,7 @@ private slots:
         agents.handle(afterClear);
 
         QCOMPARE(agents.find(&terminal)->sessionId, QStringLiteral("cleared-session"));
-        QCOMPARE(agents.find(&terminal)->activity->state(), ClaudeActivity::State::Working);
+        QCOMPARE(agents.find(&terminal)->activity->state(), AgentActivity::State::Working);
         QVERIFY(!agents.owns({.kind = HookEvent::Kind::PromptSubmitted,
                               .sessionId = "main-session",
                               .workingDirectory = QDir(worktree.path()).filePath("..")}));
@@ -247,7 +250,7 @@ private slots:
     void hookEventsNameTheirDirectory()
     {
         const std::optional<HookEvent> event =
-            HookEvent::fromJson(R"({"hook_event_name":"Stop","session_id":"s1","cwd":"/work/agent-1"})");
+            claude_.parseHook(R"({"hook_event_name":"Stop","session_id":"s1","cwd":"/work/agent-1"})");
 
         QVERIFY(event);
         QCOMPARE(event->workingDirectory, QStringLiteral("/work/agent-1"));
@@ -255,7 +258,7 @@ private slots:
 
     void statusLineEventNamesItsSession()
     {
-        const std::optional<HookEvent> event = HookEvent::fromJson(
+        const std::optional<HookEvent> event = claude_.parseHook(
             R"({"hook_event_name":"DuetStatusLine","status":{"session_id":"agent-session","model":{}}})");
 
         QVERIFY(event);
@@ -417,49 +420,49 @@ private slots:
 
     void activityFollowsTheResponse()
     {
-        ClaudeActivity activity;
-        const QSignalSpy attention(&activity, &ClaudeActivity::attentionRequested);
+        AgentActivity activity;
+        const QSignalSpy attention(&activity, &AgentActivity::attentionRequested);
         HookEvent event{};
 
         event.kind = HookEvent::Kind::PromptSubmitted;
         activity.handle(event);
-        QCOMPARE(activity.state(), ClaudeActivity::State::Working);
+        QCOMPARE(activity.state(), AgentActivity::State::Working);
 
         event.kind = HookEvent::Kind::PermissionRequested;
         event.message = "Bash";
         activity.handle(event);
-        QCOMPARE(activity.state(), ClaudeActivity::State::NeedsInput);
+        QCOMPARE(activity.state(), AgentActivity::State::NeedsInput);
         event.kind = HookEvent::Kind::NeedsAttention; // same wait, reported again
         activity.handle(event);
         QCOMPARE(attention.size(), 1);
 
         event.kind = HookEvent::Kind::CommandFinished; // permission granted
         activity.handle(event);
-        QCOMPARE(activity.state(), ClaudeActivity::State::Working);
+        QCOMPARE(activity.state(), AgentActivity::State::Working);
 
         event.kind = HookEvent::Kind::ResponseFinished;
         activity.handle(event);
-        QCOMPARE(activity.state(), ClaudeActivity::State::Done);
+        QCOMPARE(activity.state(), AgentActivity::State::Done);
         QCOMPARE(attention.size(), 2);
 
         activity.setWatched(true); // the user looks: acknowledged
-        QCOMPARE(activity.state(), ClaudeActivity::State::Idle);
+        QCOMPARE(activity.state(), AgentActivity::State::Idle);
     }
 
     void watchedActivityDoesNotAlert()
     {
-        ClaudeActivity activity;
-        const QSignalSpy attention(&activity, &ClaudeActivity::attentionRequested);
+        AgentActivity activity;
+        const QSignalSpy attention(&activity, &AgentActivity::attentionRequested);
         activity.setWatched(true);
         HookEvent event{};
         event.kind = HookEvent::Kind::PromptSubmitted;
         activity.handle(event);
         activity.interrupt();
-        QCOMPARE(activity.state(), ClaudeActivity::State::Idle);
+        QCOMPARE(activity.state(), AgentActivity::State::Idle);
         activity.handle(event);
         event.kind = HookEvent::Kind::ResponseFinished;
         activity.handle(event);
-        QCOMPARE(activity.state(), ClaudeActivity::State::Idle);
+        QCOMPARE(activity.state(), AgentActivity::State::Idle);
         QCOMPARE(attention.size(), 0);
     }
 
@@ -468,6 +471,7 @@ private slots:
     void hookProgramRelaysEventsToTheServer()
     {
         HookServer server;
+        server.setProvider(&claude_);
         QVERIFY(server.listen());
         QSignalSpy received(&server, &HookServer::hookReceived);
 
@@ -492,6 +496,7 @@ private slots:
     void hookWaitsForADeferredReply()
     {
         HookServer server;
+        server.setProvider(&claude_);
         QVERIFY(server.listen());
         std::function<void()> reply;
         connect(&server, &HookServer::hookReceived, this, [&] { reply = server.deferReply(); });
@@ -517,11 +522,12 @@ private slots:
     void hookPrintsTheEditorsAnswer()
     {
         HookServer server;
+        server.setProvider(&claude_);
         QVERIFY(server.listen());
         std::function<void()> reply;
         connect(&server, &HookServer::hookReceived, this, [&] {
             reply = server.deferReply();
-            server.respond(EditorContext::promptHookOutput(QStringLiteral("Open file: a.cpp")));
+            server.respond(claude_.promptContextReply(QStringLiteral("Open file: a.cpp")));
         });
 
         QProcess hook;
@@ -647,6 +653,7 @@ private slots:
     void statusLineIsForwardedAndPrinted()
     {
         HookServer server;
+        server.setProvider(&claude_);
         QVERIFY(server.listen());
         QSignalSpy received(&server, &HookServer::hookReceived);
 

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// The Claude sessions besides the main one: each works in a worktree of its
+// The agent sessions besides the main one: each works in a worktree of its
 // own (see Worktrees), in a terminal tab of its own.
 
 #include "MainWindow.h"
-#include "claude/AgentCheckPopup.h"
-#include "claude/ClaudeLauncher.h"
-#include "claude/NewAgentPopup.h"
+#include "agent/AgentCheckPopup.h"
+#include "agent/NewAgentPopup.h"
 #include "editor/EditorTabs.h"
 #include "git/FileChange.h"
 #include "git/FileStatuses.h"
@@ -29,18 +28,22 @@ namespace {
 // A commit message's first line, cut beyond this.
 constexpr int subjectLength = 72;
 
-// What an agent is told when it starts, besides Claude Code's own prompt.
-QString agentInstructions(const Worktree &worktree, const QString &mainSession)
+// What an agent is told when it starts, besides the agent's own prompt.
+// Written for the agent, not for the user: not translated.
+QString agentInstructions(const Worktree &worktree, const QString &mainSession, const AgentProvider &provider)
 {
-    return QObject::tr(
-               "You are %1, one of several Claude Code sessions working on this project at the same time. You work "
-               "in a git worktree of your own, on the branch %2; the user's checkout is elsewhere, and its session "
-               "is named %3. When a task is finished and verified, commit it with a clear message: at the end of "
-               "your turn, Duet merges your new commits into the user's current branch, after replaying them on it "
-               "and running the project's check. Never commit unfinished work. If Duet tells you that your commits "
-               "conflict or fail the check, fix that and commit again. To coordinate with the other sessions, use "
-               "ListAgents and SendMessage.")
-        .arg(worktree.name, worktree.branch, mainSession);
+    QString instructions =
+        QStringLiteral(
+            "You are %1, one of several %2 sessions working on this project at the same time. You work in a git "
+            "worktree of your own, on the branch %3; the user's checkout is elsewhere, and its session is named %4. "
+            "When a task is finished and verified, commit it with a clear message: at the end of your turn, Duet "
+            "merges your new commits into the user's current branch, after replaying them on it and running the "
+            "project's check. Never commit unfinished work. If Duet tells you that your commits conflict or fail "
+            "the check, fix that and commit again.")
+            .arg(worktree.name, provider.name(), worktree.branch, mainSession);
+    if (provider.features().hasAgentMessaging)
+        instructions += QStringLiteral(" To coordinate with the other sessions, use ListAgents and SendMessage.");
+    return instructions;
 }
 
 // The message of the commit Duet makes of an agent's remaining changes.
@@ -69,9 +72,11 @@ void MainWindow::newAgentSession()
         return;
     }
     if (!repository || repository->unborn) {
-        agentMessage_->popup(tr("New Claude Session in Worktree"),
-                             tr("A Claude session besides the main one works in a git worktree: open a folder of a "
-                                "git repository that has at least one commit."));
+        const QString agent = agentProvider_->name();
+        agentMessage_->popup(tr("New %1 Session in Worktree").arg(agent),
+                             tr("A %1 session besides the main one works in a git worktree: open a folder of a "
+                                "git repository that has at least one commit.")
+                                 .arg(agent));
         return;
     }
     // The statuses also list the ignored folders, for the tree to dim them.
@@ -105,21 +110,22 @@ void MainWindow::startAgentSession(const Worktree &worktree)
     // not on the session's worktree. No ClaudeTrust call either: Claude Code
     // files a worktree's trust under its main repository, so a trusted
     // project's worktrees start without asking.
-    ClaudeLauncher::SessionOptions options;
+    AgentSessionOptions options;
     options.name = worktree.name;
     options.sessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    options.extraArguments = {QStringLiteral("--append-system-prompt"),
-                              agentInstructions(worktree, QFileInfo(folder_).fileName())};
+    options.instructions = agentInstructions(worktree, QFileInfo(folder_).fileName(), *agentProvider_);
     QString error;
     const std::optional<ProcessSpec> spec =
-        ClaudeLauncher::claudeProcess(worktree.path, hookServer_.serverName(), &error, options);
+        agentProvider_->sessionProcess(worktree.path, hookServer_.serverName(), options, &error);
+    const QString agent = agentProvider_->name();
     if (!spec) {
-        agentMessage_->popup(tr("Claude Session"), tr("%1\n\nThe worktree stays in %2.").arg(error, worktree.path));
+        agentMessage_->popup(tr("%1 Session").arg(agent),
+                             tr("%1\n\nThe worktree stays in %2.").arg(error, worktree.path));
         return;
     }
-    TerminalWidget *terminal = addTerminal(tr("Claude · %1").arg(worktree.name), *spec);
+    TerminalWidget *terminal = addTerminal(tr("%1 · %2").arg(agent, worktree.name), *spec);
     agentSessions_.add(worktree, options.sessionId, terminal);
-    updateAgentTab(terminal, ClaudeActivity::State::Idle);
+    updateAgentTab(terminal, AgentActivity::State::Idle);
 }
 
 void MainWindow::closeAgentSession(TerminalWidget *terminal)
@@ -232,7 +238,7 @@ void MainWindow::mergeCurrentAgent()
 {
     const AgentSessions::Agent *agent = agentSessions_.find(terminalTabs_->currentWidget());
     if (!agent) {
-        showStatus(tr("Show the tab of a Claude session in a worktree to merge its work"));
+        showStatus(tr("Show the tab of a %1 session in a worktree to merge its work").arg(agentProvider_->name()));
         return;
     }
     mergeAgentWork(agent->worktree, agent->lastPrompt, AgentMergeQueue::AfterMerge::KeepWorktree);
@@ -328,8 +334,8 @@ void MainWindow::onAgentMergeFailed(const Worktree &worktree, const QString &mes
     notify(tr("Agent work not merged"), message);
     agentMessage_->popup(tr("Merge %1").arg(worktree.name),
                          tr("%1's work was not merged into the current branch.\n\n%2\n\nIts worktree stays in %3, "
-                            "on the branch %4: use Claude ▸ Merge Agent's Work once the problem is solved.")
-                             .arg(worktree.name, message, worktree.path, worktree.branch));
+                            "on the branch %4: use %5 ▸ Merge Agent's Work once the problem is solved.")
+                             .arg(worktree.name, message, worktree.path, worktree.branch, agentProvider_->name()));
 }
 
 void MainWindow::closeAgentsThenWindow()
@@ -337,7 +343,7 @@ void MainWindow::closeAgentsThenWindow()
     if (isClosingAgents_)
         return; // asked again while the sessions close
     isClosingAgents_ = true;
-    showStatus(tr("Closing the Claude sessions in worktrees first"));
+    showStatus(tr("Closing the %1 sessions in worktrees first").arg(agentProvider_->name()));
     for (TerminalWidget *terminal : agentSessions_.terminals())
         closeAgentSession(terminal);
     closeWindowOnceAgentsClosed(); // only merges left, maybe

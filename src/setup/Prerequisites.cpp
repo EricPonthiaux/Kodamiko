@@ -2,7 +2,7 @@
 
 #include "Prerequisites.h"
 
-#include "claude/ClaudeLauncher.h"
+#include "agent/vendor/claude/ClaudeLauncher.h"
 
 #include <QCoreApplication>
 #include <QFile>

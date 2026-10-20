@@ -21,13 +21,8 @@
 
 namespace {
 
-// The tab close button: Fusion's 20 px square, plus the right margin the
-// style sheet keeps between it and the edge of the tab (ThemeStyle).
 constexpr int closeButtonWidth = 20 + 8;
 
-// Fusion with roomier menus (taller items, wider menu bar entries and a
-// margin around the item list of each popup menu) and filled tabs on
-// every tab bar.
 class AppStyle : public QProxyStyle {
 public:
     using QProxyStyle::QProxyStyle;
@@ -45,8 +40,7 @@ public:
     void polish(QWidget *widget) override
     {
         QProxyStyle::polish(widget);
-        // The style sheet rounds the menus: without a transparent window
-        // behind them, its square corners show around the rounded border.
+
         if (qobject_cast<QMenu *>(widget)) {
             widget->setAttribute(Qt::WA_TranslucentBackground);
             widget->setWindowFlag(Qt::FramelessWindowHint);
@@ -102,8 +96,6 @@ public:
                      QPainter *painter,
                      const QWidget *widget) const override
     {
-        // Fusion only fills the tabs of a QTabWidget; a standalone tab bar
-        // (the mode tabs) would otherwise get hollow tabs.
         if (element == CE_TabBarTabShape) {
             if (const auto *tab = qstyleoption_cast<const QStyleOptionTab *>(option);
                 tab && !(tab->features & QStyleOptionTab::HasFrame)) {
@@ -117,15 +109,13 @@ public:
     }
 };
 
-// The settings saved when the editor was called Enlumine, taken over once
-// under its new name; those already chosen under the new name stay.
 void adoptLegacySettings()
 {
-    const QString adopted = QStringLiteral("adoptedEnlumineSettings");
+    const QString adopted = QStringLiteral("adoptedDuetSettings");
     QSettings settings;
     if (settings.value(adopted).toBool())
         return;
-    const QSettings legacy(QStringLiteral("Enlumine"), QStringLiteral("Enlumine"));
+    const QSettings legacy(QStringLiteral("Duet"), QStringLiteral("Duet"));
     const QStringList keys = legacy.allKeys();
     for (const QString &key : keys) {
         if (!settings.contains(key))
@@ -166,9 +156,7 @@ int main(int argc, char *argv[])
     PreviewSite::registerScheme();
     const QApplication app(argc, argv);
     ClickableCursors::install();
-    // libgit2 stays initialized for the whole run: each read (change marks
-    // while typing, file statuses) would otherwise set up and tear down its
-    // global state.
+
     const libgit2::Session git;
     QApplication::setApplicationName(QStringLiteral("Duet"));
     QApplication::setOrganizationName(QStringLiteral("Duet"));
@@ -176,17 +164,11 @@ int main(int argc, char *argv[])
     adoptLegacySettings();
     Motion::policy().setEnabled(Preferences::load().animations);
     Motion::install();
-    // Fusion follows the application palette on every system, which
-    // enables the dark theme everywhere.
-    // The application owns the style it is given; the analyzer, which does
-    // not know it, reports the leak at the next statement.
-    // NOLINTBEGIN(clang-analyzer-cplusplus.NewDeleteLeaks)
+
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
-    // Ubuntu Sans for the whole interface (embedded), at 11 pt unless
-    // Preferences ▸ Fonts sets one.
+
     QApplication::setFont(Preferences::load().interfaceFont());
-    // NOLINTEND(clang-analyzer-cplusplus.NewDeleteLeaks)
-    // Every window's icon; on Wayland, the desktop file's icon.
+
     QApplication::setWindowIcon(BrandMark::windowIcon());
     QGuiApplication::setDesktopFileName(QStringLiteral("duet"));
 
@@ -197,7 +179,6 @@ int main(int argc, char *argv[])
     parser.addPositionalArgument(QStringLiteral("folder"), QStringLiteral("Project folder to open"));
     parser.process(app);
 
-    // A folder given: straight to it, set up from its files if it is new.
     const QStringList arguments = parser.positionalArguments();
     if (arguments.isEmpty())
         showWelcome();

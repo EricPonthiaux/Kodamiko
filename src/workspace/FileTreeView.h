@@ -21,7 +21,7 @@ class QLabel;
 // preview tab, a double-click opens it.
 // The context menu creates files and folders in the clicked folder, renames
 // (F2, Shift+F6) and deletes (Delete) the selected entries, copies their
-// path, sends them to Claude, opens a terminal there, and runs git commands
+// path, sends them to the agent, opens a terminal there, and runs git commands
 // on them. Several entries are selected with Ctrl and Shift, as in a file
 // manager. Ctrl+Z undoes the last file operation (see FileUndoStack).
 // The folder itself is the first row, expanded on opening.
@@ -31,7 +31,7 @@ class QLabel;
 // As in IntelliJ's Project view: names are colored by their git state
 // (folders too, from the files they contain), typing a few letters starts a
 // speed search, and a scope restricts the tree to the changed files or to
-// those edited by Claude. A dot on the icon marks the files Claude has
+// those edited by the agent. A dot on the icon marks the files the agent has
 // just written.
 //
 // As in VS Code: the files with errors or warnings, and the folders holding
@@ -109,13 +109,19 @@ public:
 
     FileStatusMap statuses() const { return statuses_; }
 
-    // Files Claude has just written: a dot on their icon.
+    // The agent's name in the menus and tooltips ("Send to Claude").
+    void setAgentName(const QString &name);
+
+    // Whether the agent draws diagrams: "Drawn by …" in the context menu.
+    void setCanDrawDiagrams(bool canDraw) { canDrawDiagrams_ = canDraw; }
+
+    // Files the agent has just written: a dot on their icon.
     void setClaudeTouched(const QSet<QString> &paths);
     // Errors and warnings of the files (absolute paths).
     void setProblems(const ProblemCounts &problems);
     // Files open in the editor: a dot left of them.
     void setOpenFiles(const QSet<QString> &paths);
-    // Files of the Edited by Claude scope.
+    // Files of the Edited by the agent scope.
     void setClaudeEdited(const QStringList &paths);
 
     void setScope(Scope scope);
@@ -180,6 +186,8 @@ protected:
 private:
     ProjectTreeModel *model_;
     TreeDecorations *proxy_;
+    QString agentName_;
+    bool canDrawDiagrams_ = false;
     LastCommits *lastCommits_;
     FileUndoStack undoStack_;
     QStringList pendingExpansions_;
@@ -277,7 +285,7 @@ private:
     // Asks for the last commit of the file under the mouse, for its tooltip.
     void requestLastCommit(const QPoint &position);
     void showLastCommit(const QString &path, const QString &description);
-    // Tree shortcuts that copy a path or send it to Claude.
+    // Tree shortcuts that copy a path or send it to the agent.
     bool handlePathKey(QKeyEvent *event);
     // Shortcuts acting on the current entry: clipboard, duplicate, delete, rename.
     bool handleEntryKey(QKeyEvent *event);

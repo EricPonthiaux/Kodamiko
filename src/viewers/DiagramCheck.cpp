@@ -13,13 +13,13 @@ QStringList problems(const QString &path, const QByteArray &content)
     return diagram::document::problems(path, content);
 }
 
-QJsonObject feedbackOutput(const QString &file, const QStringList &problems)
+QString feedback(const QString &file, const QStringList &problems)
 {
     QString reason = QStringLiteral("Duet's diagram editor read %1 with problems:").arg(file);
     for (const QString &problem : problems)
         reason += QStringLiteral("\n- ") + problem;
     reason += QStringLiteral("\nFix the file so that it reads as you meant it.");
-    return QJsonObject{{QLatin1String("decision"), QLatin1String("block")}, {QLatin1String("reason"), reason}};
+    return reason;
 }
 
 } // namespace DiagramCheck

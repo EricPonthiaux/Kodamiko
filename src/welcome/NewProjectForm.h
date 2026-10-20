@@ -45,6 +45,9 @@ signals:
     void created(const QString &folder);
     void cancelled();
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     QWidget *createBody();
     QWidget *createFooter();

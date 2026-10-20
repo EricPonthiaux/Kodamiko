@@ -3,9 +3,9 @@
 // MainWindow: the menu bar and the shortcuts of its commands.
 
 #include "MainWindow.h"
+#include "agent/mcp/DuetTools.h"
+#include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/ChangesView.h"
-#include "claude/ClaudeConfigView.h"
-#include "claude/mcp/DuetTools.h"
 #include "completion/CompletionController.h"
 #include "diagnostics/ProblemsView.h"
 #include "editor/EditorStatus.h"
@@ -73,7 +73,8 @@ void MainWindow::createFileMenu()
             });
         }
         diagram->addSeparator();
-        diagram->addAction(tr("Drawn by &Claude…"), this, [this] { fileTree_->generateDiagram(); });
+        drawDiagramActions_.append(nameAfterAgent(
+            diagram->addAction(QString(), this, [this] { fileTree_->generateDiagram(); }), tr("Drawn by &%1…")));
     }
     file->addAction(tr("Open &Folder…"), QKeySequence(tr("Ctrl+K, Ctrl+O")), this, &MainWindow::chooseFolder);
     file->addAction(tr("&Open File…"), QKeySequence::Open, this, &MainWindow::chooseFile);
@@ -94,29 +95,41 @@ void MainWindow::createFileMenu()
 
 void MainWindow::createClaudeMenu()
 {
-    QMenu *claude = titleBar_->menuBar()->addMenu(tr("&Claude"));
-    claude->addAction(tr("&Claude Session"), QKeySequence(tr("Ctrl+Shift+L")), this, &MainWindow::showClaudeSession);
-    claude->addAction(tr("New Claude Session in &Worktree…"), this, &MainWindow::newAgentSession);
+    // Named after the project's agent: "Claude", "Claude Session"…
+    QMenu *claude = titleBar_->menuBar()->addMenu(QString());
+    nameAfterAgent(claude->menuAction(), tr("&%1"));
+    nameAfterAgent(claude->addAction(QString(), QKeySequence(tr("Ctrl+Shift+L")), this, &MainWindow::showClaudeSession),
+                   tr("&%1 Session"));
+    nameAfterAgent(claude->addAction(QString(), this, &MainWindow::newAgentSession),
+                   tr("New %1 Session in &Worktree…"));
     claude->addAction(tr("&Merge Agent's Work"), this, &MainWindow::mergeCurrentAgent);
     claude->addAction(tr("Chec&k Before Merging Agents…"), this, &MainWindow::editAgentCheckCommand);
     if (!DiagramKinds::available().isEmpty())
-        claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); });
+        drawDiagramActions_.append(
+            claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); }));
     claude->addSeparator();
     createCodeRequestActions(claude);
     claude->addSeparator();
     claude->addAction(tr("Restore the State Before a &Prompt…"), this, &MainWindow::showSnapshots);
-    snapshotBeforePrompt_ = addSettingToggle(
+    snapshotBeforePrompt_ = addAgentSettingToggle(
         claude, {tr("&Snapshot Before Each Prompt"), QStringLiteral("snapshotBeforePrompt"),
-                 tr("Keep a copy of the working directory before Claude works on a prompt, to undo its changes")});
-    shareEditorContext_ = addSettingToggle(
+                 tr("Keep a copy of the working directory before %1 works on a prompt, to undo its changes")});
+    shareEditorContext_ = addAgentSettingToggle(
         claude, {tr("Share &Editor Context With Each Prompt"), QStringLiteral("shareEditorContext"),
-                 tr("Tell Claude the open file, the cursor, the selection, the problems shown and the unsaved files")});
-    exposeTools_ = addSettingToggle(
-        claude, {tr("E&xpose Duet's Tools to Claude"), QStringLiteral("exposeTools"),
-                 tr("Let Claude read and act in the editor through Duet's MCP server (next session)")});
+                 tr("Tell %1 the open file, the cursor, the selection, the problems shown and the unsaved files")});
+    exposeTools_ = addAgentSettingToggle(
+        claude, {tr("E&xpose Duet's Tools to %1"), QStringLiteral("exposeTools"),
+                 tr("Let %1 read and act in the editor through Duet's MCP server (next session)")});
     claudeNotifications_ =
-        addSettingToggle(claude, {tr("&Notifications"), QStringLiteral("claudeNotifications"),
-                                  tr("Alert when Claude needs you or has finished while you are elsewhere")});
+        addAgentSettingToggle(claude, {tr("&Notifications"), QStringLiteral("claudeNotifications"),
+                                       tr("Alert when %1 needs you or has finished while you are elsewhere")});
+    claude->addSeparator();
+    createAgentProviderMenu(claude);
+}
+
+QAction *MainWindow::addAgentSettingToggle(QMenu *menu, const SettingToggle &toggle)
+{
+    return nameAfterAgent(addSettingToggle(menu, toggle), toggle.text, toggle.toolTip);
 }
 
 QAction *MainWindow::addSettingToggle(QMenu *menu, const SettingToggle &toggle)
@@ -350,8 +363,8 @@ void MainWindow::updateProjectMenu()
         if (project.path == folder_ || !QFileInfo(project.path).isDir() || listed == 10)
             continue;
         const QString folder = project.path;
-        QAction *action =
-            projectMenu_->addAction(QFileInfo(folder).fileName(), this, [this, folder] { openFolder(folder); });
+        QAction *action = projectMenu_->addAction(QFileInfo(folder).fileName(), this,
+                                                  [this, folder] { askToOpenProject(folder, AfterOpening::Nothing); });
         action->setToolTip(QDir::toNativeSeparators(folder));
         ++listed;
     }

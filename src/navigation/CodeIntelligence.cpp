@@ -3,7 +3,7 @@
 #include "CodeIntelligence.h"
 
 #include "CodeNavigator.h"
-#include "claude/ClaudeLint.h"
+#include "agent/vendor/claude/ClaudeLint.h"
 #include "diagnostics/ProblemStore.h"
 #include "editor/CodeColorizer.h"
 #include "editor/EditorTabs.h"

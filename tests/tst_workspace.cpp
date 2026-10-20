@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "agent/AgentIndicator.h"
 #include "diagnostics/ProblemStore.h"
 #include "diagnostics/ProblemsView.h"
 #include "editor/EditorTabs.h"
@@ -7,7 +8,6 @@
 #include "git/GitProcess.h"
 #include "lsp/LanguageServers.h"
 #include "ui/AppFonts.h"
-#include "ui/ClaudeIndicator.h"
 #include "ui/ClickableCursors.h"
 #include "ui/DetachablePage.h"
 #include "ui/FileIcons.h"
@@ -458,25 +458,25 @@ private slots:
         QTRY_VERIFY(extension->isVisible());
     }
 
-    void claudeIndicatorKeepsItsSizeAcrossStates()
+    void agentIndicatorKeepsItsSizeAcrossStates()
     {
-        ClaudeIndicator indicator;
+        AgentIndicator indicator;
         const QSize readySize = indicator.sizeHint();
 
-        indicator.setStatus(ClaudeIndicator::Status::NeedsYou);
+        indicator.setStatus(AgentStatus::NeedsYou);
 
         QCOMPARE(indicator.sizeHint(), readySize);
     }
 
-    void claudeIndicatorTakesItsColorsFromTheTheme()
+    void agentIndicatorTakesItsColorsFromTheTheme()
     {
         for (const Theme &theme : {Theme::duet(), Theme::purple(), Theme::light()}) {
-            QCOMPARE(claudeStatusColor(ClaudeIndicator::Status::Working, theme), theme.warning);
-            QCOMPARE(claudeStatusColor(ClaudeIndicator::Status::NeedsYou, theme), theme.accent);
-            QCOMPARE(claudeStatusColor(ClaudeIndicator::Status::Ready, theme), theme.mutedText);
+            QCOMPARE(agentStatusColor(AgentStatus::Working, theme), theme.warning);
+            QCOMPARE(agentStatusColor(AgentStatus::NeedsYou, theme), theme.accent);
+            QCOMPARE(agentStatusColor(AgentStatus::Ready, theme), theme.mutedText);
         }
-        QVERIFY(claudeStatusColor(ClaudeIndicator::Status::Done, Theme::light()) !=
-                claudeStatusColor(ClaudeIndicator::Status::Done, Theme::dark()));
+        QVERIFY(agentStatusColor(AgentStatus::Done, Theme::light()) !=
+                agentStatusColor(AgentStatus::Done, Theme::dark()));
     }
 
     void frameAndTitleBarFollowTheWindow()
@@ -503,7 +503,7 @@ private slots:
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
         QVERIFY(texts.contains(" duet  ▾"));
-        QVERIFY(!titleBar->findChild<ClaudeIndicator *>());
+        QVERIFY(!titleBar->findChild<AgentIndicator *>());
 
         QAction action("Go to File");
         int triggered = 0;
@@ -763,6 +763,7 @@ private slots:
         FileTreeView tree;
         tree.setRootPath(root);
         tree.setStatuses({{root + "/src/a.cpp", FileStatus::Modified}, {root + "/b.txt", FileStatus::Untracked}}, true);
+        tree.setAgentName(QStringLiteral("Claude"));
         tree.setClaudeTouched({root + "/b.txt"});
         tree.show();
         QVERIFY(tree.select(root + "/src/a.cpp"));

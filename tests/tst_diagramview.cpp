@@ -322,9 +322,7 @@ private slots:
         const QStringList garbage = DiagramCheck::problems(mmd, "flowchart TB\n  A --> B\n  this is not mermaid\n");
         QCOMPARE(garbage, QStringList{QStringLiteral("Not understood: this is not mermaid")});
 
-        const QJsonObject output = DiagramCheck::feedbackOutput(QStringLiteral("docs/a.mmd"), garbage);
-        QCOMPARE(output["decision"].toString(), QStringLiteral("block"));
-        QCOMPARE(output["reason"].toString(),
+        QCOMPARE(DiagramCheck::feedback(QStringLiteral("docs/a.mmd"), garbage),
                  QStringLiteral("Duet's diagram editor read docs/a.mmd with problems:\n- %1\n"
                                 "Fix the file so that it reads as you meant it.")
                      .arg(garbage.first()));

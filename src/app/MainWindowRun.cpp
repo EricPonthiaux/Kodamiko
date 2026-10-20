@@ -4,7 +4,7 @@
 // they report.
 
 #include "MainWindow.h"
-#include "claude/mcp/DuetTools.h"
+#include "agent/mcp/DuetTools.h"
 #include "diagnostics/ProblemsView.h" // IWYU pragma: keep (ProblemsView * -> QWidget * needs the full type)
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"

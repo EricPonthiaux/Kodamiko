@@ -392,8 +392,11 @@ void FileTreeView::showContextMenu(const QPoint &position)
         for (const DiagramKind &kind : kinds)
             diagram->addAction(kind.title + QStringLiteral("…"), this,
                                [this, folder, id = kind.id] { createDiagramIn(folder, id); });
-        diagram->addSeparator();
-        diagram->addAction(tr("Drawn by &Claude…"), this, [this, folder] { emit generateDiagramRequested(folder); });
+        if (canDrawDiagrams_) {
+            diagram->addSeparator();
+            diagram->addAction(tr("Drawn by &%1…").arg(agentName_), this,
+                               [this, folder] { emit generateDiagramRequested(folder); });
+        }
     }
     menu.addSeparator();
     addEntryActions(&menu, index);
@@ -406,7 +409,7 @@ void FileTreeView::showContextMenu(const QPoint &position)
                     [this, clicked] { copyPath(clicked, true); });
     copy->addAction(tr("File &Name"), this,
                     [clicked] { QApplication::clipboard()->setText(QFileInfo(clicked).fileName()); });
-    menu.addAction(tr("Send to &Claude"), QKeySequence(tr("Ctrl+Alt+K")), this, [this, targets] {
+    menu.addAction(tr("Send to &%1").arg(agentName_), QKeySequence(tr("Ctrl+Alt+K")), this, [this, targets] {
         for (const QString &target : targets)
             emit sendToClaudeRequested(target);
     });
@@ -831,6 +834,12 @@ void FileTreeView::setStatuses(const FileStatusMap &statuses, bool inRepository)
     if (scope_ == Scope::ChangedFiles)
         updateScopeFiles();
     viewport()->update();
+}
+
+void FileTreeView::setAgentName(const QString &name)
+{
+    agentName_ = name;
+    proxy_->setAgentName(name);
 }
 
 void FileTreeView::setClaudeTouched(const QSet<QString> &paths)

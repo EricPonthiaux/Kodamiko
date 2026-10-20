@@ -36,7 +36,7 @@ FilesPanel::FilesPanel(QWidget *parent)
     scopes_->setExclusive(true);
     for (const auto &[name, scope] : {std::pair{tr("Project"), FileTreeView::Scope::Project},
                                       std::pair{tr("Changed Files"), FileTreeView::Scope::ChangedFiles},
-                                      std::pair{tr("Edited by Claude"), FileTreeView::Scope::EditedByClaude}}) {
+                                      std::pair{QString(), FileTreeView::Scope::EditedByClaude}}) {
         QAction *action = scopeMenu->addAction(name);
         action->setCheckable(true);
         action->setData(static_cast<int>(scope));
@@ -170,6 +170,16 @@ void FilesPanel::setScopeIndex(int index)
     action->setChecked(true);
     updateScopeText();
     tree_->setScope(static_cast<FileTreeView::Scope>(action->data().toInt()));
+}
+
+void FilesPanel::setAgentName(const QString &name)
+{
+    tree_->setAgentName(name);
+    for (QAction *action : scopes_->actions()) {
+        if (static_cast<FileTreeView::Scope>(action->data().toInt()) == FileTreeView::Scope::EditedByClaude)
+            action->setText(tr("Edited by %1").arg(name));
+    }
+    updateScopeText();
 }
 
 void FilesPanel::updateScopeText()

@@ -213,6 +213,9 @@ QTreeView, QTreeWidget, QListView { background: @base; border: none; outline: 0;
 QTreeView::item:selected, QTreeWidget::item:selected { background: @selection; color: @text; }
 QTreeView::item:selected:active, QTreeWidget::item:selected:active { color: @text; background: @slate; }
 QTreeView::item:hover { background: @hover; }
+QListWidget#projectTemplates::item { padding: 10px 14px; margin: 3px 0; border-radius: 2px; }
+QListWidget#projectTemplates::item:hover { background: @hover; }
+QListWidget#projectTemplates::item:selected { background: @slate; color: @text; }
 QFrame#card { background: @panel; border: 1px solid @line; border-radius: 4px; }
 QFrame#viewTitleBar { border: none; border-bottom: 1px solid @line; }
 QFrame#fileActions { border: none; border-bottom: 1px solid @line; }

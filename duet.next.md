@@ -27,7 +27,7 @@ Code* and *Write Tests for This Code* are submitted to the session at once;
 *Add to Claude's Prompt* (Ctrl+Alt+K in the editor) types `@file#L10-24`
 without sending it. They name the selected lines, or the cursor's line and
 the word under it, and warn Claude when the file has unsaved changes
-(`src/claude/CodeRequest`). The same actions are in the *Claude* menu, so
+(`src/agent/vendor/claude/CodeRequest`). The same actions are in the *Claude* menu, so
 the command palette offers them too.
 
 ## A. Ask Claude from the editor

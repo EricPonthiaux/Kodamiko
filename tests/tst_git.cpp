@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "claude/AgentMergeQueue.h"
+#include "agent/AgentMergeQueue.h"
 #include "git/Branches.h"
 #include "git/FilePatch.h"
 #include "git/FileStatuses.h"
@@ -186,7 +186,7 @@ private slots:
     {
         const QTemporaryDir project;
         initRepository(project, {{"data.csv", "a\n"}});
-        const QByteArray large(2 * 1024 * 1024, 'x');
+        const QByteArray large(qsizetype(2) * 1024 * 1024, 'x');
         write(project, "data.csv", large);
         write(project, "dump.log", large);
         write(project, "small.txt", "s\n");

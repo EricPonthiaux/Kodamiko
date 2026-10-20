@@ -66,6 +66,8 @@ Preferences Preferences::load()
 
     preferences.snapshotBeforePrompt = settings.value(QStringLiteral("snapshotBeforePrompt"), true).toBool();
     preferences.shareEditorContext = settings.value(QStringLiteral("shareEditorContext"), true).toBool();
+    preferences.defaultAgentProvider =
+        settings.value(QStringLiteral("defaultAgentProvider"), preferences.defaultAgentProvider).toString();
     preferences.exposeTools = settings.value(QStringLiteral("exposeTools"), true).toBool();
     preferences.claudeNotifications = settings.value(QStringLiteral("claudeNotifications"), true).toBool();
     return preferences;
@@ -101,6 +103,7 @@ void Preferences::save() const
 
     settings.setValue(QStringLiteral("snapshotBeforePrompt"), snapshotBeforePrompt);
     settings.setValue(QStringLiteral("shareEditorContext"), shareEditorContext);
+    settings.setValue(QStringLiteral("defaultAgentProvider"), defaultAgentProvider);
     settings.setValue(QStringLiteral("exposeTools"), exposeTools);
     settings.setValue(QStringLiteral("claudeNotifications"), claudeNotifications);
 }

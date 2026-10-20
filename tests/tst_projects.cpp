@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "claude/ClaudeTrust.h"
+#include "agent/vendor/claude/ClaudeTrust.h"
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
 #include "projects/ProjectStore.h"
@@ -10,7 +10,10 @@
 #include "toolchains/Installer.h"
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
+#include "ui/Theme.h"
+#include "ui/ThemeStyle.h"
 #include "welcome/NewProjectForm.h"
+#include "welcome/NewProjectPopup.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "welcome/ProjectSetupForm.h"
 #include "welcome/ProjectSetupPanel.h"
@@ -664,6 +667,20 @@ private slots:
         QVERIFY(form.createButton()->isEnabled());
         form.nameEdit()->setText("a/b");
         QVERIFY(!form.createButton()->isEnabled());
+    }
+
+    void newProjectTemplatesKeepApartWhenTheStyleSheetChanges()
+    {
+        QWidget host;
+        host.resize(1200, 900);
+        host.show();
+        auto *popup = new NewProjectPopup(Theme::dark(), &host);
+        ThemeStyle::apply(Theme::dark()); // pads the templates once they are laid out
+
+        popup->popup();
+
+        const QListWidget *list = popup->findChild<QListWidget *>();
+        QTRY_COMPARE(list->visualItemRect(list->item(1)).top(), list->visualItemRect(list->item(0)).bottom() + 1);
     }
 
     void newProjectGoesOnToItsSetup()

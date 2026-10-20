@@ -4,10 +4,10 @@
 // the tools it needs; terminals.
 
 #include "MainWindow.h"
+#include "agent/EditorContext.h"
+#include "agent/mcp/DuetTools.h"
+#include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/ChangesView.h"
-#include "claude/ClaudeConfigView.h"
-#include "claude/EditorContext.h"
-#include "claude/mcp/DuetTools.h"
 #include "completion/CompletionController.h"
 #include "completion/CompletionHistory.h"
 #include "completion/CompletionService.h"
@@ -31,11 +31,14 @@
 #include "welcome/NewProjectPopup.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "welcome/ProjectSetupForm.h"
+#include "workspace/ChoicePopup.h"
 #include "workspace/FileTreeView.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QProcess>
 #include <QSettings>
 
 #include <algorithm>
@@ -49,6 +52,7 @@ void MainWindow::openFolder(const QString &folder)
     }
     const QString previousFolder = folder_;
     folder_ = QDir(folder).absolutePath();
+    setAgentProvider(projectAgentProvider());
     fileTree_->setRootPath(folder_);
     editorTabs_->setProjectFolder(folder_);
     claudeConfigView_->setProjectFolder(folder_);
@@ -134,10 +138,72 @@ void MainWindow::chooseFolder()
         return;
     const std::optional<ProjectConfig> known = ProjectStore::find(folder);
     const bool imported = !known || !known->configured;
-    openFolder(folder);
     // A new project: its detected setup, to check.
-    if (imported && folder_ == QDir(folder).absolutePath())
+    askToOpenProject(folder, imported ? AfterOpening::ShowSettings : AfterOpening::Nothing);
+}
+
+void MainWindow::askToOpenProject(const QString &folder, AfterOpening after)
+{
+    if (folder_.isEmpty() || QDir(folder).absolutePath() == folder_) {
+        openProjectHere(folder, after);
+        return;
+    }
+    const QString name = QFileInfo(folder).fileName();
+    // The agents' worktrees belong to the current project: it stays open
+    // until they are closed and merged (Close Project).
+    const bool hasAgentWork = !agentSessions_.isEmpty() || agentMerges_->isMerging();
+    QList<ChoicePopup::Choice> choices{{tr("New Window"), [this, folder] { openProjectInNewWindow(folder); }}};
+    if (!hasAgentWork)
+        choices.append({tr("This Window"), [this, folder, after] { openProjectHere(folder, after); }});
+    const QString message =
+        hasAgentWork
+            ? tr("Open %1 in a new Duet window?").arg(name)
+            : tr("Open %1 in a new Duet window, or here in place of %2?").arg(name, QFileInfo(folder_).fileName());
+    auto *popup = new ChoicePopup({.title = tr("Open Project"),
+                                   .location = QDir::toNativeSeparators(folder),
+                                   .message = message,
+                                   .details = projectSwitchCost(hasAgentWork)},
+                                  choices, this);
+    popup->popup();
+}
+
+QString MainWindow::projectSwitchCost(bool hasAgentWork) const
+{
+    const QString agent = agentProvider_->name();
+    if (hasAgentWork)
+        return tr("%1 sessions are running in this project's worktrees: close them first to open another "
+                  "project in this window.")
+            .arg(agent);
+    if (!claudeTerminal_ || !claudeTerminal_->isRunning())
+        return {};
+    if (agentActivity_.state() == AgentActivity::State::Working)
+        return tr("%1 is working: opening the project here stops it and ends this window's %1 session.").arg(agent);
+    return tr("Opening the project here ends this window's %1 session.").arg(agent);
+}
+
+void MainWindow::openProjectHere(const QString &folder, AfterOpening after)
+{
+    openFolder(folder);
+    const bool isOpen = folder_ == QDir(folder).absolutePath();
+    if (isOpen && after == AfterOpening::ShowSettings)
         showProjectSettings();
+}
+
+void MainWindow::openProjectInNewWindow(const QString &folder)
+{
+    // In an AppImage, the executable lives in a mount that goes away with
+    // this process: the new one starts from the image itself.
+    const QString appImage = qEnvironmentVariable("APPIMAGE");
+    const QString program = appImage.isEmpty() ? QCoreApplication::applicationFilePath() : appImage;
+    if (QProcess::startDetached(program, {QDir(folder).absolutePath()})) {
+        showStatus(tr("Opening %1 in a new window").arg(QFileInfo(folder).fileName()));
+        return;
+    }
+    showNotice({.title = tr("Open Project"),
+                .location = QDir::toNativeSeparators(folder),
+                .message = tr("Duet could not start a new window: %1 did not run.").arg(program),
+                .details = {}},
+               this);
 }
 
 void MainWindow::showNewProject()
@@ -151,10 +217,8 @@ void MainWindow::showNewProject()
 
 void MainWindow::openNewProject(const QString &folder)
 {
-    openFolder(folder);
     // Its setup, detected from the template's files, to check.
-    if (folder_ == QDir(folder).absolutePath())
-        showProjectSettings();
+    askToOpenProject(folder, AfterOpening::ShowSettings);
 }
 
 void MainWindow::showProjectSettings()

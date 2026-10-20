@@ -23,7 +23,7 @@ public:
 
     FileTreeView *tree() const { return tree_; }
 
-    // The view shown: 0 Project, 1 Changed Files, 2 Edited by Claude.
+    // The view shown: 0 Project, 1 Changed Files, 2 Edited by the agent.
     int scopeIndex() const;
     void setScopeIndex(int index);
 
@@ -37,6 +37,8 @@ public:
     void setTreeOptions(const ProjectTreeModel::Options &options);
     // Color of the toolbar's line icons, from the theme.
     void setIconColor(const QColor &color);
+    // The agent's name in the scopes ("Edited by Claude"); applied to the tree.
+    void setAgentName(const QString &name);
 
 signals:
     // Select Opened File: the window knows which file is open.
