@@ -2,6 +2,7 @@
 
 #include "AppFonts.h"
 #include "KdeThemes.h"
+#include "VsCodeThemes.h"
 
 namespace {
 
@@ -223,6 +224,7 @@ Theme Theme::light()
 QList<Theme> Theme::all()
 {
     QList<Theme> themes{duet(), dark(), purple(), light()};
+    themes += VsCodeThemes::all();
     themes += KdeThemes::all();
     return themes;
 }

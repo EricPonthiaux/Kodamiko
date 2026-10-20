@@ -181,6 +181,7 @@ add_library(duet_core STATIC
     ui/UiIcons.cpp
     ui/UiMetrics.cpp
     ui/ViewHeader.cpp
+    ui/VsCodeThemes.cpp
     ui/WindowControls.cpp
     ui/WindowFrame.cpp
     ui/WindowTitleBar.cpp

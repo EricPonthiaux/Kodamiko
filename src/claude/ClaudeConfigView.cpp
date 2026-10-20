@@ -7,6 +7,7 @@
 #include "workspace/EntryPopups.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
@@ -16,7 +17,6 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QLabel>
 #include <QMenu>
 #include <QScrollBar>
 #include <QToolButton>
@@ -25,6 +25,7 @@
 #include <QVBoxLayout>
 
 #include <array>
+#include <utility>
 
 using ClaudeConfig::Category;
 using ClaudeConfig::Entry;
@@ -44,6 +45,23 @@ const QString effectiveKey = QStringLiteral("#effective");
 
 constexpr std::array allCategories{Category::Memory,   Category::Rules,        Category::Skills,   Category::Agents,
                                    Category::Commands, Category::OutputStyles, Category::Settings, Category::Mcp};
+
+ClaudeConfigView::Level levelOf(Scope scope)
+{
+    switch (scope) {
+    case Scope::Managed:
+    case Scope::User:
+        return ClaudeConfigView::Level::User;
+    case Scope::Parent:
+    case Scope::Auto:
+    case Scope::Project:
+    case Scope::Subfolder:
+    case Scope::Local:
+    case Scope::Session:
+        return ClaudeConfigView::Level::Project;
+    }
+    return ClaudeConfigView::Level::Project;
+}
 
 bool isEffectiveItem(const QTreeWidgetItem *item)
 {
@@ -96,8 +114,31 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     : QWidget(parent)
     , tree_(new QTreeWidget(this))
 {
-    auto *title = new QLabel(tr("Claude Configuration"), this);
-    AppFonts::setInterfaceFont(title, 1);
+    // The level selector: its name and a chevron, as the Files pane's view
+    // selector.
+    levelSelector_ = new QToolButton(this);
+    levelSelector_->setObjectName(QStringLiteral("viewSelector"));
+    levelSelector_->setAutoRaise(true);
+    levelSelector_->setToolTip(tr("Claude configuration shown in the tree"));
+    levelSelector_->setFocusPolicy(Qt::NoFocus);
+    levelSelector_->setPopupMode(QToolButton::InstantPopup);
+    levelSelector_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    AppFonts::setInterfaceFont(levelSelector_, 1);
+    auto *levelMenu = new QMenu(levelSelector_);
+    levels_ = new QActionGroup(this);
+    levels_->setExclusive(true);
+    for (const auto &[name, level] :
+         {std::pair{tr("Project Configuration"), Level::Project}, std::pair{tr("User Configuration"), Level::User}}) {
+        QAction *action = levelMenu->addAction(name);
+        action->setCheckable(true);
+        action->setChecked(level == level_);
+        action->setData(static_cast<int>(level));
+        levels_->addAction(action);
+    }
+    connect(levels_, &QActionGroup::triggered, this,
+            [this](const QAction *action) { setLevel(static_cast<Level>(action->data().toInt())); });
+    levelSelector_->setMenu(levelMenu);
+    updateLevelText();
 
     // Icons only, all the same size (see setIconColor), as in the Files pane.
     const auto addButton = [this](const QString &toolTip) {
@@ -140,7 +181,7 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     auto *toolbar = new QHBoxLayout(header);
     toolbar->setContentsMargins(10, 0, 6, 0);
     toolbar->setSpacing(2);
-    toolbar->addWidget(title);
+    toolbar->addWidget(levelSelector_);
     toolbar->addStretch(1);
     toolbar->addWidget(new_);
     toolbar->addWidget(reload_);
@@ -182,6 +223,24 @@ void ClaudeConfigView::setProjectFolder(const QString &folder)
 {
     folder_ = folder;
     refresh();
+}
+
+void ClaudeConfigView::setLevel(Level level)
+{
+    for (QAction *action : levels_->actions()) {
+        if (static_cast<Level>(action->data().toInt()) == level)
+            action->setChecked(true);
+    }
+    if (level == level_)
+        return;
+    level_ = level;
+    updateLevelText();
+    populate();
+}
+
+void ClaudeConfigView::updateLevelText()
+{
+    levelSelector_->setText(levels_->checkedAction()->text() + QStringLiteral("  ▾"));
 }
 
 void ClaudeConfigView::setClaudeTouched(const QSet<QString> &paths)
@@ -251,12 +310,14 @@ void ClaudeConfigView::populate()
 
     const QHash<int, QTreeWidgetItem *> categories = addCategoryItems();
     QTreeWidgetItem *currentItem = nullptr;
-    if (!folder_.isEmpty()) {
+    if (!folder_.isEmpty() && level_ == Level::Project) {
         QTreeWidgetItem *effective = addEffectiveItem(categories.value(static_cast<int>(Category::Settings)));
         if (current == effectiveKey)
             currentItem = effective;
     }
     for (qsizetype i = 0; i < entries_.size(); ++i) {
+        if (levelOf(entries_[i].scope) != level_)
+            continue;
         QTreeWidgetItem *item = addEntryItem(i, categories.value(static_cast<int>(entries_[i].category)));
         if (entries_[i].path == current)
             currentItem = item;
@@ -386,6 +447,7 @@ QString ClaudeConfigView::createNamed(Category category, Scope scope, const QStr
     if (!createFile(path, ClaudeConfig::templateFor(entry), &error))
         return error;
     collapsed_.remove(static_cast<int>(category));
+    setLevel(levelOf(scope)); // shows the new item
     refresh();
     emit fileRequested(path, false);
     return {};

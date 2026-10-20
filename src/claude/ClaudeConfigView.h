@@ -9,6 +9,7 @@
 
 #include <functional>
 
+class QActionGroup;
 class QMenu;
 class QToolButton;
 class QTreeWidget;
@@ -17,6 +18,8 @@ class QTreeWidgetItem;
 // Claude pane of the side panel: everything Claude Code reads for the
 // project (memory, rules, skills, agents, commands, settings, MCP servers),
 // grouped by category, each file with its scope (User, Project, Local...).
+// A selector in the header shows either the project's files (the default)
+// or the user's, for every project (User, Managed).
 // A double-click opens the file in the editor; a usual file not created
 // yet (CLAUDE.local.md...) is created first. New makes a skill, an agent, a
 // command or a rule, in the project or for every project; Delete moves an
@@ -31,7 +34,17 @@ class ClaudeConfigView : public QWidget {
     Q_OBJECT
 
 public:
+    // The files the tree shows.
+    enum class Level {
+        Project, // the project's, its parent folders' and Claude's memory of it
+        User,    // ~/.claude and the administrator's, for every project
+    };
+
     explicit ClaudeConfigView(QWidget *parent = nullptr);
+
+    Level level() const { return level_; }
+
+    void setLevel(Level level);
 
     void setProjectFolder(const QString &folder);
     // Files Claude wrote during the last prompt: an orange dot.
@@ -80,6 +93,7 @@ protected:
 
 private:
     void populate();
+    void updateLevelText();
     void setRightText(QTreeWidgetItem *item, const QString &text) const;
     QHash<int, QTreeWidgetItem *> addCategoryItems();
     QTreeWidgetItem *addEffectiveItem(QTreeWidgetItem *settings);
@@ -90,6 +104,7 @@ private:
     void askName(ClaudeConfig::Category category, ClaudeConfig::Scope scope);
 
     QString folder_;
+    Level level_ = Level::Project;
     QSet<QString> touched_;
     bool darkIcons_ = true;
     QList<ClaudeConfig::Entry> entries_;
@@ -100,6 +115,8 @@ private:
     std::function<bool(const QString &)> hasUnsavedChanges_;
 
     QTreeWidget *tree_;
+    QToolButton *levelSelector_;
+    QActionGroup *levels_;
     QToolButton *new_;
     QToolButton *reload_;
     QToolButton *options_;

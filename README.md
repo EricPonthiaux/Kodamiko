@@ -547,3 +547,4 @@ by QScintilla. Third-party components:
 | github-markdown-css, Octicons (in `third_party/`) | MIT |
 | Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | Ubuntu Font Licence 1.0 |
 | JetBrains Mono (in `third_party/fonts/`) | SIL Open Font License 1.1 |
+| One Dark Pro, Dracula, GitHub, Tokyo Night and Catppuccin theme colors (notices in `third_party/vscode-themes/`) | MIT |

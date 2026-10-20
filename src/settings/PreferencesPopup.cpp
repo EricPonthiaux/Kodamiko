@@ -27,6 +27,8 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace {
 
 constexpr int commandIndexRole = Qt::UserRole;
@@ -316,21 +318,20 @@ QWidget *PreferencesPopup::createAppearancePage()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    // Theme: one miniature per theme, Duet's then KDE's, four in a row.
+    // Theme: one miniature per theme, Duet's and KDE's by name, four in a row.
     themes_ = new QButtonGroup(this);
     themes_->setExclusive(true);
     connect(themes_, &QButtonGroup::buttonToggled, this, [this](QAbstractButton *, bool checked) {
         if (checked)
             updateFontPreview();
     });
-    QList<Theme> duetThemes;
-    QList<Theme> kdeThemes;
-    for (const Theme &theme : Theme::all())
-        (theme.isKde() ? kdeThemes : duetThemes).append(theme);
-    addGroup(layout, tr("Theme"), themeGrid(duetThemes));
-    addGroup(layout, tr("KDE themes"), themeGrid(kdeThemes));
-    layout->addWidget(mutedLabel(tr("The editor themes of Kate and KDevelop; the panels around the editor take "
-                                    "their colors.")));
+    QList<Theme> sortedThemes = Theme::all();
+    std::ranges::sort(sortedThemes, [](const Theme &a, const Theme &b) {
+        return QString::compare(a.title, b.title, Qt::CaseInsensitive) < 0;
+    });
+    addGroup(layout, tr("Theme"), themeGrid(sortedThemes));
+    layout->addWidget(mutedLabel(tr("Besides Duet's own, the editor themes of Kate and KDevelop; the panels around "
+                                    "the editor take their colors.")));
 
     systemTitleBar_ = new QCheckBox(content);
 #ifdef Q_OS_MACOS

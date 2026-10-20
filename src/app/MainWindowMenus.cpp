@@ -30,6 +30,8 @@
 #include <QSettings>
 #include <QTreeWidget>
 
+#include <algorithm>
+
 void MainWindow::createMenus()
 {
     createFileMenu();
@@ -133,14 +135,13 @@ void MainWindow::createViewMenu()
     QMenu *themes = view->addMenu(tr("T&heme"));
     auto *themeGroup = new QActionGroup(themes);
     themeActions_ = themeGroup;
-    // Duet's own, then KDE's in a menu of their own: they are many.
-    QMenu *kdeThemes = nullptr;
-    for (const Theme &theme : Theme::all()) {
-        if (theme.isKde() && !kdeThemes) {
-            themes->addSeparator();
-            kdeThemes = themes->addMenu(tr("&KDE Themes"));
-        }
-        QAction *action = (theme.isKde() ? kdeThemes : themes)->addAction(theme.title);
+    // Duet's and KDE's in one list, by name.
+    QList<Theme> sortedThemes = Theme::all();
+    std::ranges::sort(sortedThemes, [](const Theme &a, const Theme &b) {
+        return QString::compare(a.title, b.title, Qt::CaseInsensitive) < 0;
+    });
+    for (const Theme &theme : sortedThemes) {
+        QAction *action = themes->addAction(theme.title);
         action->setCheckable(true);
         action->setChecked(theme.name == savedThemeName());
         action->setData(theme.name);

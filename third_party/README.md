@@ -9,6 +9,7 @@ Copied as published, without changes (Inter's file renamed):
 | `schemastore/claude-code-settings.json` | [SchemaStore/schemastore](https://github.com/SchemaStore/schemastore) (`https://json.schemastore.org/claude-code-settings.json`) | 2026-10-17 | Apache 2.0 |
 | `fonts/Inter-Variable.ttf` | [rsms/inter](https://github.com/rsms/inter) (`docs/font-files/InterVariable.ttf`) | 4.1 | SIL OFL 1.1 |
 | `ksyntaxhighlighting-themes/` | [KDE's syntax-highlighting](https://invent.kde.org/frameworks/syntax-highlighting) (`data/themes/`), the editor themes of Kate and KDevelop; each file names its authors | master 03107845 (2026-10-17) | MIT |
+| `vscode-themes/LICENSE.md` | The notices of the five VS Code themes whose colors `src/ui/VsCodeThemes.cpp` reproduces (One Dark Pro, Dracula, GitHub Dark, Tokyo Night, Catppuccin Mocha); versions and sources in the file | see the file | MIT |
 | `fonts/JetBrainsMonoNL-*.ttf` | [JetBrains/JetBrainsMono](https://github.com/JetBrains/JetBrainsMono) (`fonts/ttf/`, the "NL" version without ligatures) | 2.304 | SIL OFL 1.1 |
 
 The Markdown preview renders with GitHub's style sheet and icons. The

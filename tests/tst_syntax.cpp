@@ -52,9 +52,10 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        // Duet's first, then KDE's.
-        QCOMPARE(names.mid(0, 4), QStringList({"duet", "dark", "purple", "light"}));
-        QVERIFY(std::ranges::all_of(names.mid(4), [](const QString &name) { return name.startsWith("kde-"); }));
+        // Duet's first, then those from VS Code, then KDE's.
+        QCOMPARE(names.mid(0, 9), QStringList({"duet", "dark", "purple", "light", "one-dark-pro", "dracula",
+                                               "github-dark", "tokyo-night", "catppuccin-mocha"}));
+        QVERIFY(std::ranges::all_of(names.mid(9), [](const QString &name) { return name.startsWith("kde-"); }));
         const Theme purple = Theme::named("purple");
         QVERIFY(purple.isDark);
         QVERIFY(purple.accent.isValid() && purple.window.isValid() && purple.findHighlight.isValid());
@@ -68,6 +69,20 @@ private slots:
                 QVERIFY2(color.isValid(), qPrintable(theme.name));
         }
         QCOMPARE(Theme::named("unknown").name, QString("duet"));
+    }
+
+    void vsCodeThemesTakeTheirOwnInterfaceColors()
+    {
+        const Theme dracula = Theme::named("dracula");
+        QCOMPARE(dracula.title, QString("Dracula"));
+        QVERIFY(dracula.isDark && !dracula.isKde());
+        QCOMPARE(dracula.background, QColor("#282a36"));
+        // The workbench's own colors, not shades of the editor's.
+        QCOMPARE(dracula.window, QColor("#21222c"));
+        QCOMPARE(dracula.accent, QColor("#ff79c6"));
+        const TextStyle &parameter = dracula.syntaxStyles.at(dracula.syntaxStyleIndex(u"variable.parameter")).second;
+        QCOMPARE(parameter.foreground, QColor("#ffb86c"));
+        QVERIFY(parameter.italic);
     }
 
     void kdeThemesTakeKateColors()

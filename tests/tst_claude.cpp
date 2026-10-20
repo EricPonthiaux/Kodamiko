@@ -661,6 +661,38 @@ private slots:
         qunsetenv("CLAUDE_CONFIG_DIR");
     }
 
+    void viewShowsProjectOrUserConfiguration()
+    {
+        const QTemporaryDir user;
+        const QTemporaryDir project;
+        QVERIFY(user.isValid() && project.isValid());
+        qputenv("CLAUDE_CONFIG_DIR", user.path().toUtf8());
+        ClaudeConfigView view;
+        view.show();
+        view.setProjectFolder(project.path());
+        const auto shownScopes = [&view] {
+            QSet<ClaudeConfig::Scope> scopes;
+            for (QTreeWidgetItemIterator it(view.tree()); *it; ++it) {
+                if (const ClaudeConfig::Entry *entry = view.entryOf(*it))
+                    scopes.insert(entry->scope);
+            }
+            return scopes;
+        };
+
+        QCOMPARE(view.level(), ClaudeConfigView::Level::Project);
+        QVERIFY(shownScopes().contains(ClaudeConfig::Scope::Project));
+        QVERIFY(!shownScopes().contains(ClaudeConfig::Scope::User));
+
+        view.setLevel(ClaudeConfigView::Level::User);
+        QVERIFY(shownScopes().contains(ClaudeConfig::Scope::User));
+        QVERIFY(!shownScopes().contains(ClaudeConfig::Scope::Project));
+
+        // A new item in the other level switches to it.
+        QCOMPARE(view.createNamed(ClaudeConfig::Category::Agents, ClaudeConfig::Scope::Project, "reviewer"), QString());
+        QCOMPARE(view.level(), ClaudeConfigView::Level::Project);
+        qunsetenv("CLAUDE_CONFIG_DIR");
+    }
+
     void mergesSettingsByPrecedence()
     {
         const QTemporaryDir user;
