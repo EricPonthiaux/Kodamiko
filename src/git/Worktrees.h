@@ -7,6 +7,8 @@
 #include <QString>
 #include <QStringList>
 
+#include <optional>
+
 // A worktree Duet created for a Claude session besides the main one: a
 // second working directory of the same repository, on a branch of its own,
 // so that the session's edits never touch the user's checkout.
@@ -79,7 +81,16 @@ QStringList blockingFiles(const RepositoryInfo &repository, const QString &merge
 // The identifier of the worktree's last commit.
 QString head(const Worktree &worktree);
 
-// Deletes the worktree, its changes and its branch.
+// The folder of the worktree that has `branch` checked out, the
+// repository's own checkout aside; nothing when none has.
+std::optional<QString> folderHolding(const RepositoryInfo &repository, const QString &branch);
+
+// Deletes the worktree in `folder` and its changes, even locked; its branch
+// stays. Nothing when git no longer knows it and the folder is gone.
+void removeFolder(const RepositoryInfo &repository, const QString &folder);
+
+// Deletes the worktree, its changes and its branch; what is already gone is
+// skipped.
 void remove(const RepositoryInfo &repository, const Worktree &worktree);
 
 } // namespace Worktrees

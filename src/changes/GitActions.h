@@ -83,6 +83,10 @@ private:
     bool onSwitchFailed(const GitError &error, const QString &name, bool remote);
     bool onPushFailed(const GitError &error);
     bool onPullFailed(const GitError &error);
+    bool onDeleteBranchFailed(const GitError &error, const QString &name);
+    // Deletes the worktree that has the branch `name` checked out, then the
+    // branch.
+    void deleteBranchAndWorktree(const QString &name);
 
     GitCommands *commands_;
     QWidget *window_;

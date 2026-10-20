@@ -336,6 +336,22 @@ private slots:
         QVERIFY(!popup.asked());
     }
 
+    void closeAgentPopupReportsTheCancelledWorktreeOnly()
+    {
+        QWidget window;
+        CloseAgentPopup popup(Theme::dark(), &window);
+        QStringList cancelled;
+        connect(&popup, &CloseAgentPopup::cancelled, this,
+                [&](const Worktree &worktree) { cancelled.append(worktree.name); });
+        popup.load({.name = "agent-1"});
+        popup.load({.name = "agent-2"});
+
+        popup.keepButton()->click();
+        popup.next();
+
+        QCOMPARE(cancelled, QStringList{"agent-2"});
+    }
+
     void messagePopupShowsTheWaitingMessagesInTurn()
     {
         QWidget window;

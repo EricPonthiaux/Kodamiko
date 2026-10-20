@@ -192,7 +192,8 @@ void MainWindow::applyProject(const ProjectConfig &project)
 void MainWindow::closeProject()
 {
     closingProject_ = true;
-    if (!close())
+    // The agents' sessions closing first, it closes later.
+    if (!close() && !isClosingAgents_)
         closingProject_ = false;
 }
 

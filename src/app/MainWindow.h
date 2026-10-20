@@ -234,6 +234,14 @@ private:
     // The user's changes to `files` keep the agent's work out for now.
     void onAgentMergeWaiting(const Worktree &worktree, const QStringList &files);
     void onAgentMergeFailed(const Worktree &worktree, const QString &message);
+    // Closing the window or the project: the agents' tabs close first, each
+    // asked what becomes of its worktree, then the window, once the merges
+    // and deletions they asked for are done.
+    void closeAgentsThenWindow();
+    void closeWindowOnceAgentsClosed();
+    // Something needs the user (a cancelled question, a failed merge…): the
+    // window stays open; `reason` says why.
+    void stopClosingAgents(const QString &reason);
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);
     // Runs `configuration` in its terminal tab (the one of its last run,
@@ -398,6 +406,7 @@ private:
     NewProjectPopup *newProjectPopup_ = nullptr; // built on first use
     NoticeBar *toolsNotice_ = nullptr;
     bool closingProject_ = false;
+    bool isClosingAgents_ = false; // see closeAgentsThenWindow()
     NoticeBar *serverNotice_ = nullptr;
     QSet<QString> dismissedServerNotices_;   // closed by the user, by message
     NoticeBar *unsavedEditNotice_ = nullptr; // an edit by Claude refused

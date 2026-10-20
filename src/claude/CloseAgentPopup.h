@@ -38,7 +38,7 @@ public:
     qsizetype waitingCount() const;
 
     // Cancels: leaves the worktree asked for as it is, its tab open. The next
-    // question takes its place, or the popup hides.
+    // question takes its place, or the popup hides. Emits cancelled().
     void next();
 
     QPushButton *mergeButton() const { return merge_; }
@@ -50,12 +50,17 @@ public:
 signals:
     // The tab closes; `worktree` is the one asked for.
     void fateChosen(const Worktree &worktree, CloseAgentPopup::WorktreeFate fate);
+    // The tab of `worktree` stays open.
+    void cancelled(const Worktree &worktree);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
     void choose(WorktreeFate fate);
+    // Drops the question asked: the next one takes its place, or the popup
+    // hides.
+    void askNext();
     void showFirst();
 
     // The first is asked for, the others wait.

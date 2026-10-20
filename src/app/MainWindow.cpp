@@ -136,6 +136,9 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
     connect(&claudeActivity_, &ClaudeActivity::attentionRequested, this, &MainWindow::notify);
     connect(&agentSessions_, &AgentSessions::activityChanged, this, &MainWindow::updateAgentTab);
     connect(&agentSessions_, &AgentSessions::attentionRequested, this, &MainWindow::notify);
+    // Queued: never closes the window from a destroyed terminal's signal.
+    connect(&agentSessions_, &AgentSessions::sessionForgotten, this, &MainWindow::closeWindowOnceAgentsClosed,
+            Qt::QueuedConnection);
     if (!hookServer_.listen())
         statusBar()->showMessage(tr("Claude tracking unavailable: %1").arg(hookServer_.errorString()));
     openFolder(ProjectStore::startFolder(folder));
@@ -333,6 +336,8 @@ void MainWindow::createPopups()
     connect(newAgentPopup_, &NewAgentPopup::startRequested, this, &MainWindow::createAgentWorktree);
     closeAgentPopup_ = new CloseAgentPopup(theme_, this);
     connect(closeAgentPopup_, &CloseAgentPopup::fateChosen, this, &MainWindow::closeAgentTab);
+    connect(closeAgentPopup_, &CloseAgentPopup::cancelled, this,
+            [this](const Worktree &worktree) { stopClosingAgents(tr("%1 stays open").arg(worktree.name)); });
     agentCheckPopup_ = new AgentCheckPopup(theme_, this);
     connect(agentCheckPopup_, &AgentCheckPopup::saved, this, &MainWindow::setAgentCheckCommand);
     diagramRequestPopup_ = new DiagramRequestPopup(theme_, this);
@@ -716,6 +721,12 @@ void MainWindow::restoreSettings()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    const bool hasAgentWork = !agentSessions_.isEmpty() || agentMerges_->isMerging();
+    if (isClosingAgents_ || hasAgentWork) {
+        event->ignore();
+        closeAgentsThenWindow();
+        return;
+    }
     saveSession(); // before closeAll, which empties the tabs
     if (!editorTabs_->closeAll()) {
         event->ignore();

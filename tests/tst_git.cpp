@@ -889,6 +889,63 @@ private slots:
         QVERIFY(!Branches::local(project.path()).contains("duet/agent-1"));
     }
 
+    void removesALockedWorktreeAndItsBranch()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        const Worktree worktree = Worktrees::add(info, "agent-1");
+        git(project, {"worktree", "lock", worktree.path});
+
+        Worktrees::remove(info, worktree);
+
+        QVERIFY(!QFileInfo::exists(worktree.path));
+        QVERIFY(!Branches::local(project.path()).contains("duet/agent-1"));
+    }
+
+    void removesTheBranchOfAWorktreeWhoseFolderIsGone()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        const Worktree worktree = Worktrees::add(info, "agent-1");
+        QVERIFY(QDir(worktree.path).removeRecursively());
+
+        Worktrees::remove(info, worktree);
+
+        QVERIFY(!Branches::local(project.path()).contains("duet/agent-1"));
+    }
+
+    void findsTheWorktreeThatHasABranchCheckedOut()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        const Worktree worktree = Worktrees::add(info, "agent-1");
+
+        const std::optional<QString> folder = Worktrees::folderHolding(info, "duet/agent-1");
+
+        QVERIFY(folder);
+        QCOMPARE(QFileInfo(*folder).canonicalFilePath(), QFileInfo(worktree.path).canonicalFilePath());
+        QVERIFY(!Worktrees::folderHolding(info, info.branch)); // the checkout's own
+    }
+
+    void refusesToDeleteABranchAWorktreeHasCheckedOut()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        Worktrees::add(info, "agent-1");
+
+        try {
+            Branches::remove(info, "duet/agent-1", false);
+            QFAIL("the branch was deleted");
+        } catch (const GitError &error) {
+            QCOMPARE(error.kind(), GitError::Kind::InWorktree);
+            QVERIFY(error.message().contains(".claude/worktrees/agent-1"));
+        }
+    }
+
     void refusesAWorktreeNameGitCannotUse()
     {
         const QTemporaryDir project;

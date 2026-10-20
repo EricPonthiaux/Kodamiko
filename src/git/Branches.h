@@ -69,7 +69,9 @@ void detach(const RepositoryInfo &repository, const QString &id);
 void rename(const RepositoryInfo &repository, const QString &name, const QString &newName);
 
 // Deletes the local branch `name`. Unless `force`, fails with
-// GitError::Kind::Unmerged when its commits are in no other branch.
+// GitError::Kind::Unmerged when its commits are in no other branch. Fails
+// with GitError::Kind::InWorktree when a worktree has it checked out (see
+// Worktrees::removeFolder).
 void remove(const RepositoryInfo &repository, const QString &name, bool force);
 
 // Deletes the branch `name` ("origin/x") on its remote.

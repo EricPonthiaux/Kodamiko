@@ -218,6 +218,12 @@ void remove(const RepositoryInfo &repository, const QString &name, bool force)
             throw GitError(QObject::tr("The branch %1 has commits that are in no other branch").arg(name),
                            GitError::Kind::Unmerged);
         }
+        // "used by worktree at '<folder>'"; "checked out at" before git 2.42.
+        static const QRegularExpression inWorktree(QStringLiteral("(?:used by worktree|checked out) at '(.+)'"));
+        if (const QRegularExpressionMatch match = inWorktree.match(error.message()); match.hasMatch()) {
+            throw GitError(QObject::tr("The branch %1 is checked out in the worktree %2").arg(name, match.captured(1)),
+                           GitError::Kind::InWorktree);
+        }
         throw;
     }
 }

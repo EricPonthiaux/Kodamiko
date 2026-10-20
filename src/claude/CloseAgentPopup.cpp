@@ -115,6 +115,16 @@ void CloseAgentPopup::showFirst()
 
 void CloseAgentPopup::next()
 {
+    if (queue_.isEmpty())
+        return;
+    // Copied: askNext() drops it from the queue.
+    const Worktree worktree = queue_.first();
+    askNext();
+    emit cancelled(worktree);
+}
+
+void CloseAgentPopup::askNext()
+{
     if (!queue_.isEmpty())
         queue_.removeFirst();
     if (queue_.isEmpty()) {
@@ -134,9 +144,9 @@ void CloseAgentPopup::choose(WorktreeFate fate)
 {
     if (queue_.isEmpty())
         return;
-    // Copied: next() drops it from the queue.
+    // Copied: askNext() drops it from the queue.
     const Worktree worktree = queue_.first();
-    next();
+    askNext();
     emit fateChosen(worktree, fate);
 }
 

@@ -157,8 +157,19 @@ void AgentSessions::deliverPendingReport(const QWidget *terminal)
     QTimer::singleShot(submitDelayMs, agent->terminal, &TerminalWidget::pressEnter);
 }
 
+QList<TerminalWidget *> AgentSessions::terminals() const
+{
+    QList<TerminalWidget *> terminals;
+    for (const Agent &agent : agents_) {
+        if (agent.terminal)
+            terminals.append(agent.terminal.data());
+    }
+    return terminals;
+}
+
 void AgentSessions::forget(const QObject *terminal)
 {
     // A widget emits destroyed() before the QPointers to it are cleared.
-    std::erase_if(agents_, [terminal](const Agent &agent) { return agent.terminal.data() == terminal; });
+    if (std::erase_if(agents_, [terminal](const Agent &agent) { return agent.terminal.data() == terminal; }) > 0)
+        emit sessionForgotten();
 }

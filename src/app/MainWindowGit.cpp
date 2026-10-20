@@ -33,6 +33,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QStatusBar>
+#include <QTimer>
 #include <QToolButton>
 
 namespace {
@@ -85,6 +86,7 @@ void MainWindow::createGitServices()
     connect(gitCommands_, &GitCommands::failed, this, [this](const QString &title, const QString &error) {
         showNotice({.title = tr("%1: failed").arg(title), .location = {}, .message = error, .details = {}}, this);
         updateRepositoryInfo();
+        stopClosingAgents(tr("%1 failed").arg(title));
     });
     // A fetch, pull or push: its progress in the status bar, with a button
     // to stop it, until the queue is done.
@@ -101,6 +103,7 @@ void MainWindow::createGitServices()
         if (!gitProgress_.isEmpty() && statusBar()->currentMessage() == gitProgress_)
             statusBar()->clearMessage();
         gitProgress_.clear();
+        QTimer::singleShot(0, this, &MainWindow::closeWindowOnceAgentsClosed);
     });
     // git and ssh ask for credentials through duet-askpass.
     askpass_ = new AskpassServer([this](const QString &prompt) { return askCredentials(prompt); }, this);

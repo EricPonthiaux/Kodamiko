@@ -11,6 +11,8 @@
 #include <QFileInfo>
 #include <QObject>
 
+#include <algorithm>
+
 namespace Worktrees {
 namespace {
 
@@ -18,6 +20,15 @@ const QString branchPrefix = QStringLiteral("duet/");
 const QString namePrefix = QStringLiteral("agent-");
 // The exclusion line, relative to the repository root.
 const QByteArray excludeLine = QByteArrayLiteral("/.claude/worktrees/");
+// The lines of `git worktree list --porcelain` read here.
+const QByteArray folderAttribute = QByteArrayLiteral("worktree ");
+const QByteArray branchAttribute = QByteArrayLiteral("branch refs/heads/");
+
+// A worktree as `git worktree list` describes it.
+struct ListedWorktree {
+    QString folder;
+    QString branch; // "duet/agent-1"; empty when detached
+};
 
 // Adds the worktrees' folder to .git/info/exclude unless it is there already.
 void excludeFolder(const RepositoryInfo &repository)
@@ -51,6 +62,34 @@ QStringList conflictedFiles(const Worktree &worktree)
 {
     return Git::splitNul(Git::run(worktree.path, {QStringLiteral("diff"), QStringLiteral("--name-only"),
                                                   QStringLiteral("--diff-filter=U"), QStringLiteral("-z")}));
+}
+
+// The repository's worktrees, its own checkout first.
+QList<ListedWorktree> listed(const RepositoryInfo &repository)
+{
+    // An attribute per line, ended by a NUL with -z.
+    const QByteArray output = Git::run(repository.workDir, {QStringLiteral("worktree"), QStringLiteral("list"),
+                                                            QStringLiteral("--porcelain"), QStringLiteral("-z")});
+    QList<ListedWorktree> worktrees;
+    for (const QByteArray &line : output.split('\0')) {
+        if (line.startsWith(folderAttribute))
+            worktrees.append({.folder = QString::fromUtf8(line.mid(folderAttribute.size()))});
+        else if (line.startsWith(branchAttribute) && !worktrees.isEmpty())
+            worktrees.last().branch = QString::fromUtf8(line.mid(branchAttribute.size()));
+    }
+    return worktrees;
+}
+
+bool isSameFolder(const QString &folder, const QString &other)
+{
+    return QDir::cleanPath(folder) == QDir::cleanPath(other);
+}
+
+bool isListed(const RepositoryInfo &repository, const QString &folder)
+{
+    return std::ranges::any_of(listed(repository), [&folder](const ListedWorktree &worktree) {
+        return isSameFolder(worktree.folder, folder);
+    });
 }
 
 } // namespace
@@ -162,11 +201,36 @@ QString head(const Worktree &worktree)
     return QString::fromUtf8(Git::run(worktree.path, {QStringLiteral("rev-parse"), QStringLiteral("HEAD")}).trimmed());
 }
 
+std::optional<QString> folderHolding(const RepositoryInfo &repository, const QString &branch)
+{
+    for (const ListedWorktree &worktree : listed(repository)) {
+        const bool isOther = !isSameFolder(worktree.folder, repository.workDir);
+        if (isOther && worktree.branch == branch)
+            return worktree.folder;
+    }
+    return std::nullopt;
+}
+
+void removeFolder(const RepositoryInfo &repository, const QString &folder)
+{
+    // Forgets the worktrees whose folder was deleted by hand.
+    Git::run(repository.workDir, {QStringLiteral("worktree"), QStringLiteral("prune")});
+    if (!QFileInfo::exists(folder) && !isListed(repository, folder))
+        return;
+    // Forced twice: uncommitted changes and a lock do not keep it.
+    Git::run(repository.workDir, {QStringLiteral("worktree"), QStringLiteral("remove"), QStringLiteral("--force"),
+                                  QStringLiteral("--force"), folder});
+    // Its branch cannot go while git still lists it: say so, rather than
+    // git's "cannot delete branch used by worktree".
+    if (isListed(repository, folder))
+        throw GitError(QObject::tr("git did not remove the worktree %1").arg(folder));
+}
+
 void remove(const RepositoryInfo &repository, const Worktree &worktree)
 {
-    Git::run(repository.workDir,
-             {QStringLiteral("worktree"), QStringLiteral("remove"), QStringLiteral("--force"), worktree.path});
-    Branches::remove(repository, worktree.branch, true);
+    removeFolder(repository, worktree.path);
+    if (Branches::local(repository.workDir).contains(worktree.branch))
+        Branches::remove(repository, worktree.branch, true);
 }
 
 } // namespace Worktrees

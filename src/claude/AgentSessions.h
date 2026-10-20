@@ -6,6 +6,7 @@
 #include "HookEvent.h"
 #include "git/Worktrees.h"
 
+#include <QList>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -61,6 +62,11 @@ public:
     // Whether the hook event comes from one of these sessions.
     bool owns(const HookEvent &event) const;
 
+    bool isEmpty() const { return agents_.empty(); }
+
+    // The sessions' terminals, those still open.
+    QList<TerminalWidget *> terminals() const;
+
     // The agent's commits up to `commit` are merged: work to merge starts
     // after it.
     void setBaseCommit(const QString &agentName, const QString &commit);
@@ -82,6 +88,8 @@ signals:
     void activityChanged(QWidget *terminal, ClaudeActivity::State state);
     // An agent needs the user, or finished, while they were elsewhere.
     void attentionRequested(const QString &title, const QString &message);
+    // A session is no longer followed: its terminal was destroyed.
+    void sessionForgotten();
 
 private:
     std::optional<std::size_t> indexOf(const HookEvent &event) const;

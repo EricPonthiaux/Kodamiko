@@ -310,6 +310,7 @@ void MainWindow::onAgentSentBack(const Worktree &worktree, const QString &report
 
 void MainWindow::onAgentMergeWaiting(const Worktree &worktree, const QStringList &files)
 {
+    stopClosingAgents(tr("%1's work waits to be merged").arg(worktree.name));
     const QString list = files.join(QStringLiteral(", "));
     showStatus(tr("%1's work waits for your changes to %2").arg(worktree.name, list));
     notify(tr("Agent work waiting"), tr("%1's work changes files you are modifying: %2").arg(worktree.name, list));
@@ -322,10 +323,40 @@ void MainWindow::onAgentMergeWaiting(const Worktree &worktree, const QStringList
 
 void MainWindow::onAgentMergeFailed(const Worktree &worktree, const QString &message)
 {
+    stopClosingAgents(tr("%1's work was not merged").arg(worktree.name));
     showStatus(tr("%1's work was not merged; its worktree stays in %2").arg(worktree.name, worktree.path));
     notify(tr("Agent work not merged"), message);
     agentMessage_->popup(tr("Merge %1").arg(worktree.name),
                          tr("%1's work was not merged into the current branch.\n\n%2\n\nIts worktree stays in %3, "
                             "on the branch %4: use Claude ▸ Merge Agent's Work once the problem is solved.")
                              .arg(worktree.name, message, worktree.path, worktree.branch));
+}
+
+void MainWindow::closeAgentsThenWindow()
+{
+    if (isClosingAgents_)
+        return; // asked again while the sessions close
+    isClosingAgents_ = true;
+    showStatus(tr("Closing the Claude sessions in worktrees first"));
+    for (TerminalWidget *terminal : agentSessions_.terminals())
+        closeAgentSession(terminal);
+    closeWindowOnceAgentsClosed(); // only merges left, maybe
+}
+
+void MainWindow::closeWindowOnceAgentsClosed()
+{
+    const bool isAgentWorkDone = agentSessions_.isEmpty() && !agentMerges_->isMerging() && !gitCommands_->isBusy();
+    if (!isClosingAgents_ || !isAgentWorkDone)
+        return;
+    isClosingAgents_ = false;
+    close();
+}
+
+void MainWindow::stopClosingAgents(const QString &reason)
+{
+    if (!isClosingAgents_)
+        return;
+    isClosingAgents_ = false;
+    closingProject_ = false;
+    showStatus(tr("The window stays open: %1").arg(reason));
 }

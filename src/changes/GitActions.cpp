@@ -8,6 +8,7 @@
 #include "git/Integration.h"
 #include "git/Remotes.h"
 #include "git/Stashes.h"
+#include "git/Worktrees.h"
 #include "workspace/ChoicePopup.h"
 #include "workspace/EntryPopups.h"
 
@@ -272,11 +273,13 @@ void GitActions::deleteBranch(const QString &name, bool remote)
             Branches::remove(repository, name, false);
             return QObject::tr("Branch %1 deleted").arg(name);
         },
-        [this, name](const GitError &error) {
-            if (error.kind() != GitError::Kind::Unmerged)
-                return false;
-            confirm(
-                tr("Delete Branch"),
+        [this, name](const GitError &error) { return onDeleteBranchFailed(error, name); });
+}
+
+bool GitActions::onDeleteBranchFailed(const GitError &error, const QString &name)
+{
+    if (error.kind() == GitError::Kind::Unmerged) {
+        confirm(tr("Delete Branch"),
                 tr("%1. Delete it anyway? Its commits will only be reachable from the reflog.").arg(error.message()),
                 tr("Delete"), [this, name] {
                     run(tr("Delete branch"), [name](const RepositoryInfo &repository) {
@@ -284,8 +287,31 @@ void GitActions::deleteBranch(const QString &name, bool remote)
                         return QObject::tr("Branch %1 deleted").arg(name);
                     });
                 });
-            return true;
-        });
+        return true;
+    }
+    if (error.kind() == GitError::Kind::InWorktree) {
+        confirm(tr("Delete Branch"),
+                tr("%1. Delete the worktree too? Its uncommitted changes are lost, and a Claude session working "
+                   "there loses its folder.")
+                    .arg(error.message()),
+                tr("Delete Both"), [this, name] { deleteBranchAndWorktree(name); });
+        return true;
+    }
+    return false;
+}
+
+void GitActions::deleteBranchAndWorktree(const QString &name)
+{
+    run(
+        tr("Delete branch"),
+        [name](const RepositoryInfo &repository) {
+            if (const std::optional<QString> folder = Worktrees::folderHolding(repository, name))
+                Worktrees::removeFolder(repository, *folder);
+            Branches::remove(repository, name, false);
+            return QObject::tr("Branch %1 and its worktree deleted").arg(name);
+        },
+        // The branch may still hold unmerged commits: asked as above.
+        [this, name](const GitError &error) { return onDeleteBranchFailed(error, name); });
 }
 
 void GitActions::trackBranch(const QString &remoteBranch)

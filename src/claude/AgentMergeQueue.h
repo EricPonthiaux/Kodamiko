@@ -49,6 +49,9 @@ public:
     // The worktrees whose work waits for the user's files.
     QList<Worktree> waitingWorktrees() const;
 
+    // Whether work is queued or being merged.
+    bool isMerging() const { return !queue_.isEmpty(); }
+
 signals:
     // A step of the agent's merge started ("Checking agent-1's commits").
     void progress(const QString &message);
