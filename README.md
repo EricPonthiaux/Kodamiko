@@ -35,7 +35,7 @@ Windows and macOS.
 
 ## Getting started
 
-Requirements: **Qt 6.6+** (Widgets, Network, PrintSupport, Test, WebEngine),
+Requirements: **Qt 6.10+** (Widgets, Network, PrintSupport, Test, WebEngine),
 CMake 3.24+, Ninja and a C++20 compiler (GCC 11+, Clang 14+ or MSVC 2022).
 The other dependencies (QScintilla, tree-sitter, libvterm, libgit2,
 cmark-gfm) are downloaded and built automatically on the first

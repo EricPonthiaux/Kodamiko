@@ -18,7 +18,7 @@ endif()
 # their sources: only Qt 6 needs to be installed on the machine.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-find_package(Qt6 6.6 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Test WebEngineWidgets)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Test WebEngineWidgets)
 qt_standard_project_setup()
 
 # Link-time optimization across the application and the statically built

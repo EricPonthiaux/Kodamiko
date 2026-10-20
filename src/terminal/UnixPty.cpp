@@ -87,7 +87,8 @@ bool UnixPty::start(const ProcessSpec &spec, QSize cells)
     CStringArray envp(spec.environment.toStringList());
     const QByteArray programPath = program.toLocal8Bit();
     const QByteArray workingDirectory = spec.workingDirectory.toLocal8Bit();
-    const winsize size = windowSize(cells);
+    // Not const: macOS declares forkpty() with a non-const winsize pointer.
+    winsize size = windowSize(cells);
 
     const pid_t pid = ::forkpty(&masterFd_, nullptr, nullptr, &size);
     if (pid < 0) {
