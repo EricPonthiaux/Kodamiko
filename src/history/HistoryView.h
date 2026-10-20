@@ -3,6 +3,7 @@
 #include "git/CommitLog.h"
 #include "ui/Theme.h"
 
+#include <QColor>
 #include <QThreadPool>
 #include <QTimer>
 #include <QWidget>
@@ -67,6 +68,7 @@ protected:
 private:
     QWidget *createCommitPane();
     QWidget *createDiffPane();
+    void alignDiffHeaderRule();
     // The log being read is outdated: its walk stops, its result is dropped.
     void abandonReading();
     // The history read again from its newest commits.
@@ -176,4 +178,5 @@ private:
     QTreeWidget *files_ = nullptr;
     DiffHeaderBar *diffHeader_ = nullptr;
     DiffView *diff_ = nullptr;
+    QColor ruleColor_;
 };

@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QProcess>
 #include <QScrollBar>
+#include <QSplitter>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
@@ -737,6 +738,49 @@ private slots:
 
         view.resize(900, 700);
         QTRY_VERIFY(!view.isWide());
+    }
+
+    void emptyDiffHintUsesThePaneWidthAndWraps_data()
+    {
+        QTest::addColumn<int>("paneWidth");
+        QTest::addColumn<int>("fontSize");
+        QTest::newRow("normal") << 420 << 11;
+        QTest::newRow("narrow") << 220 << 11;
+        QTest::newRow("large-font") << 420 << 18;
+        QTest::newRow("narrow-large-font") << 220 << 18;
+    }
+
+    void emptyDiffHintUsesThePaneWidthAndWraps()
+    {
+        QFETCH(const int, paneWidth);
+        QFETCH(const int, fontSize);
+        HistoryView view(Theme::dark());
+        QFont font = view.font();
+        font.setPointSize(fontSize);
+        view.setFont(font);
+        view.resize(1100, 600);
+        view.show();
+        auto *header = view.findChild<DiffHeaderBar *>();
+        auto *splitter = qobject_cast<QSplitter *>(header->parentWidget()->parentWidget());
+        QVERIFY(splitter);
+        header->setPlaceholder("Choose a file of the commit");
+        splitter->setSizes({1100 - paneWidth, paneWidth});
+        const auto *hint = header->findChild<QLabel *>("historyMuted");
+        QVERIFY(hint);
+
+        // Invisible file controls must leave their width to the whole hint.
+        QTRY_VERIFY(hint->width() >= header->width() - 32);
+        QTRY_VERIFY(hint->height() >= hint->heightForWidth(hint->width()));
+        QVERIFY(hint->wordWrap());
+        QVERIFY(header->rect().contains(hint->geometry()));
+
+        // A real file, then an empty selection again: no stale counts or tooltip.
+        auto *diff = view.findChild<DiffView *>();
+        diff->setFiles({{"src/a.cpp", "modified", FilePatch::parse("@@ -1 +1 @@\n-a\n+b\n")}});
+        diff->showMessage({});
+        QTRY_VERIFY(hint->width() >= header->width() - 32);
+        QTRY_VERIFY(hint->height() >= hint->heightForWidth(hint->width()));
+        QCOMPARE(hint->toolTip(), hint->text());
     }
 
 private:

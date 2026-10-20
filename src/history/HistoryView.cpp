@@ -156,6 +156,7 @@ QWidget *HistoryView::createDiffPane()
     diff_->setToolTip({});
     diffHeader_ = new DiffHeaderBar(diff_, pane);
     connect(diffHeader_, &DiffHeaderBar::whitespaceChanged, this, &HistoryView::rereadCommit);
+    connect(diffHeader_, &DiffHeaderBar::heightChanged, this, &HistoryView::alignDiffHeaderRule);
 
     auto *layout = new QVBoxLayout(pane);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -434,6 +435,7 @@ void HistoryView::focusFilter()
 
 void HistoryView::applyTheme(const Theme &theme)
 {
+    ruleColor_ = theme.line;
     diff_->applyTheme(theme);
     diffHeader_->applyTheme(theme);
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
@@ -441,12 +443,14 @@ void HistoryView::applyTheme(const Theme &theme)
     filter_->applyTheme(theme);
     copyId_->setIcon(UiIcons::icon(QStringLiteral("copy"), theme.mutedText));
     commitId_->setFont(AppFonts::codeFont(font().pointSizeF() * 0.95));
-    // The diff header's bottom border reaches the handle's line; nothing at
-    // its left to join.
-    const int headerHeight = diffHeader_->sizeHint().height();
-    diffHeader_->setFixedHeight(headerHeight);
+    alignDiffHeaderRule();
+}
+
+void HistoryView::alignDiffHeaderRule()
+{
+    // The hint can wrap as the pane narrows; its rule follows the header.
     splitter_->setHandleRule(splitter_->indexOf(diffHeader_->parentWidget()),
-                             {headerHeight - 1, Qt::RightEdge, theme.line});
+                             {diffHeader_->height() - 1, Qt::RightEdge, ruleColor_});
 }
 
 void HistoryView::resizeEvent(QResizeEvent *event)
@@ -469,6 +473,7 @@ void HistoryView::arrangePanes()
         leftSplitter_->insertWidget(1, commitPane_);
     commitPane_->setVisible(!filtersOnFile_);
     applyShares();
+    alignDiffHeaderRule();
     arranging_ = false;
 }
 

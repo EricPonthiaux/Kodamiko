@@ -27,12 +27,21 @@ public:
     // Whitespace::Ignore while the whitespace button is checked; Compare at first.
     Whitespace whitespace() const;
 
+    QSize sizeHint() const override;
+    int heightForWidth(int width) const override;
+
 signals:
     // The whitespace button was toggled: the diff is to be read again.
     void whitespaceChanged(Whitespace whitespace);
+    // Keeps the neighboring splitter rule aligned when a hint wraps.
+    void heightChanged(int height);
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     void follow();
+    int controlsHeight() const;
 
     DiffView *diff_;
     QString placeholder_;

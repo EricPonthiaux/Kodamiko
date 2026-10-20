@@ -6,10 +6,10 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QResizeEvent>
 #include <QToolButton>
 
 #include <algorithm>
-#include <initializer_list>
 #include <tuple>
 
 DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
@@ -24,6 +24,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     , next_(new QToolButton(this))
 {
     setObjectName(QStringLiteral("diffHeader"));
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     AppFonts::setInterfaceFont(name_, 1, QFont::DemiBold);
     name_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     details_->setObjectName(QStringLiteral("historyMuted"));
@@ -50,14 +51,6 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     whitespace_->setFocusPolicy(Qt::NoFocus);
     whitespace_->setToolTip(tr("Hide whitespace changes"));
     connect(whitespace_, &QToolButton::toggled, this, [this] { emit whitespaceChanged(whitespace()); });
-
-    // Hidden without a file, they keep their room: the bar keeps its height,
-    // and its rule stays in line with those next to it.
-    for (QWidget *widget : std::initializer_list<QWidget *>{stats_, sideBySide_, whitespace_, previous_, next_}) {
-        QSizePolicy policy = widget->sizePolicy();
-        policy.setRetainSizeWhenHidden(true);
-        widget->setSizePolicy(policy);
-    }
 
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 4, 6, 4);
@@ -98,10 +91,39 @@ void DiffHeaderBar::applyTheme(const Theme &theme)
     follow();
 }
 
+int DiffHeaderBar::controlsHeight() const
+{
+    const QMargins margins = contentsMargins() + layout()->contentsMargins();
+    const int buttons = std::max({sideBySide_->sizeHint().height(), whitespace_->sizeHint().height(),
+                                  previous_->sizeHint().height(), next_->sizeHint().height()});
+    return buttons + margins.top() + margins.bottom();
+}
+
+QSize DiffHeaderBar::sizeHint() const
+{
+    const QSize hint = QFrame::sizeHint();
+    // Keep the toolbar's height without reserving hidden controls' width.
+    return {hint.width(), std::max(hint.height(), controlsHeight())};
+}
+
+int DiffHeaderBar::heightForWidth(int width) const
+{
+    return std::max(QFrame::heightForWidth(width), controlsHeight());
+}
+
+void DiffHeaderBar::resizeEvent(QResizeEvent *event)
+{
+    QFrame::resizeEvent(event);
+    if (event->size().height() != event->oldSize().height())
+        emit heightChanged(event->size().height());
+}
+
 void DiffHeaderBar::follow()
 {
     const QList<DiffView::FileSummary> &files = diff_->fileSummaries();
     const bool hasFile = !files.isEmpty();
+    name_->setVisible(hasFile);
+    details_->setWordWrap(!hasFile);
     for (QWidget *widget :
          {static_cast<QWidget *>(stats_), static_cast<QWidget *>(previous_), static_cast<QWidget *>(next_)})
         widget->setVisible(hasFile);
@@ -111,6 +133,7 @@ void DiffHeaderBar::follow()
     if (!hasFile) {
         name_->clear();
         details_->setText(placeholder_);
+        details_->setToolTip(placeholder_);
         return;
     }
     const int file = std::max(0, diff_->locate(diff_->firstVisibleLine()).file);
