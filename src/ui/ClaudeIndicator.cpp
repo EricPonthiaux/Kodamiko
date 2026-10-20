@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "ClaudeIndicator.h"
 
 #include "Motion.h"
@@ -121,7 +123,7 @@ void ClaudeIndicator::applyTheme(const Theme &theme)
 
 QSize ClaudeIndicator::sizeHint() const
 {
-    // As tall as the title bar's text, square whatever the state: the bar
+    // As tall as the status bar's text, square whatever the state: the bar
     // keeps its layout as the state changes.
     const int side = std::max(iconPx, fontMetrics().height()) + 2 * paddingPx;
     return {side, side};

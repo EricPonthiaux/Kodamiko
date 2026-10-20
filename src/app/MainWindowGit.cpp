@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MainWindow: git services, the Git menu, branches, stashes, snapshots and the
 // branch shown in the status bar.
 
@@ -71,6 +73,11 @@ void MainWindow::createGitServices()
     // Git operations: result in the status bar, errors (hook output
     // included) in a dialog box.
     gitCommands_ = new GitCommands(this);
+    agentMerges_ = new AgentMergeQueue(gitCommands_, this);
+    connect(agentMerges_, &AgentMergeQueue::progress, this, &MainWindow::showStatus);
+    connect(agentMerges_, &AgentMergeQueue::merged, this, &MainWindow::onAgentMerged);
+    connect(agentMerges_, &AgentMergeQueue::sentBack, this, &MainWindow::onAgentSentBack);
+    connect(agentMerges_, &AgentMergeQueue::failed, this, &MainWindow::onAgentMergeFailed);
     connect(gitCommands_, &GitCommands::succeeded, this, [this](const QString &, const QString &message) {
         if (!message.isEmpty())
             showStatus(message);

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "MainWindow.h"
 
 #include "changes/BranchesPopup.h"
@@ -41,6 +43,7 @@
 #include "setup/Prerequisites.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
+#include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/GripSplitter.h"
 #include "ui/HoverCloseButtons.h"
@@ -127,6 +130,8 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
     registerMcpTools();
     connect(&claudeActivity_, &ClaudeActivity::stateChanged, this, &MainWindow::updateClaudeIndicator);
     connect(&claudeActivity_, &ClaudeActivity::attentionRequested, this, &MainWindow::notify);
+    connect(&agentSessions_, &AgentSessions::activityChanged, this, &MainWindow::updateAgentTab);
+    connect(&agentSessions_, &AgentSessions::attentionRequested, this, &MainWindow::notify);
     if (!hookServer_.listen())
         statusBar()->showMessage(tr("Claude tracking unavailable: %1").arg(hookServer_.errorString()));
     openFolder(ProjectStore::startFolder(folder));
@@ -148,7 +153,6 @@ void MainWindow::createWidgets()
     // Duet's title bar in place of the menu bar: it holds the menus.
     titleBar_ = new TitleBar(this);
     setMenuWidget(titleBar_);
-    connect(titleBar_, &TitleBar::claudeClicked, this, &MainWindow::showClaudeSession);
     frame_ = new WindowFrame(this);
     projectMenu_ = new QMenu(this);
 
@@ -539,6 +543,10 @@ QWidget *MainWindow::createTerminalPage()
         QWidget *terminal = terminalTabs_->widget(index);
         if (terminal == claudeTerminal_)
             return; // the Claude session stays for the lifetime of the folder
+        if (const AgentSessions::Agent *agent = agentSessions_.find(terminal)) {
+            closeAgentSession(agent->terminal);
+            return;
+        }
         terminalTabs_->removeTab(index);
         terminal->deleteLater();
         updateTerminalPage();
@@ -616,10 +624,17 @@ void MainWindow::createModeTabs()
 // the mode tabs; git (Sync, the branch, stop of the git operation);
 // Claude's usage; the position in the file (cursor, line ending, encoding
 // and indentation). On a narrow window the widgets furthest left give up
-// their place first, whole; the status messages take what is left on the
-// left.
+// their place first, whole. Claude's activity stays at the far left,
+// temporarily replaced by status messages.
 void MainWindow::createStatusBar()
 {
+    claudeIndicator_ = new ClaudeIndicator(this);
+    claudeIndicator_->applyTheme(theme_);
+    statusBar()->addWidget(claudeIndicator_);
+    claudeIndicator_->hide();
+    connect(claudeIndicator_, &ClaudeIndicator::clicked, this, &MainWindow::showClaudeSession);
+    connect(statusBar(), &QStatusBar::messageChanged, this, &MainWindow::updateClaudeIndicator);
+
     syncButton_ = new QToolButton(this);
     syncButton_->setAutoRaise(true);
     syncButton_->setFocusPolicy(Qt::NoFocus);
@@ -848,6 +863,10 @@ void MainWindow::updateTabIcons()
         const QWidget *terminal = terminalTabs_->widget(i);
         if (terminal == claudeTerminal_)
             continue; // its icon shows Claude's state
+        if (const AgentSessions::Agent *agent = agentSessions_.find(terminal)) {
+            updateAgentTab(agent->terminal, agent->activity->state());
+            continue;
+        }
         // A run's: its kind, colored by its outcome.
         const QString runIcon = terminal->property("runIcon").toString();
         const auto runColor = terminal->property("runColor").value<QColor>();

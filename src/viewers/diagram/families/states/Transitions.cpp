@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The transitions of a state diagram: their routes (parallel transitions
 // fan out, a self-transition loops), and the placement of their labels away
 // from the states and from each other.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MCP tools for files and tabs.
 
 #include "DuetTools.h"

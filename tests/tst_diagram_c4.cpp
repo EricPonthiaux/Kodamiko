@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The C4 architecture family (sidecar's c4-diagram.js and fence/mermaid-c4.js):
 // its presets, measures, Mermaid codec, layout and drawing.
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MainWindow: themes and preferences, applied to every part of the window.
 
 #include "MainWindow.h"
@@ -25,6 +27,7 @@
 #include "settings/PreferencesPopup.h"
 #include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/Motion.h"
 #include "ui/NoticeBar.h"
@@ -55,6 +58,7 @@ void MainWindow::setTheme(const QString &name)
         action->setChecked(action->data().toString() == theme_.name);
     ThemeStyle::apply(theme_);
     titleBar_->applyTheme(theme_);
+    claudeIndicator_->applyTheme(theme_);
     frame_->applyTheme(theme_);
     terminalWindow_->applyTheme(theme_);
     branchButton_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme_.mutedText));

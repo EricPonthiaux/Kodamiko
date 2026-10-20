@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Mermaid and PlantUML state diagrams (sidecar's fence/state-core.js,
 // fence/mermaid-state.js and fence/plantuml-state.js). The two notations
 // descend from the same one: `[*] --> A`, `A --> B : event`,

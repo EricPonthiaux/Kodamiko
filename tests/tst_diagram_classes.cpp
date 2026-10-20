@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // UML class diagrams: the classifier box, the relations, and the Mermaid and
 // PlantUML codecs (ported from sidecar's class-diagram.test.js).
 

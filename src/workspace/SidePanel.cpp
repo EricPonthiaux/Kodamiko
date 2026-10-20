@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "SidePanel.h"
 
 #include "ui/Motion.h"

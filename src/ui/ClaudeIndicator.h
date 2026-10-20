@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
 #include "HoverProgress.h"
@@ -6,7 +8,7 @@
 #include <QAbstractButton>
 #include <QTimer>
 
-// Claude's state in the title bar: Claude's star alone, in a square tinted
+// Claude's state in the status bar: Claude's star alone, in a square tinted
 // like the run block in the color of the state. Its animation says the state
 // without the color: the branches light up in turn while Claude works, the
 // star breathes when Claude needs the user, it twinkles when a response

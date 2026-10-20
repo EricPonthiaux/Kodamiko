@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "MainWindow.h"
 #include "editor/PreviewSite.h"
 #include "git/LibGit2.h"

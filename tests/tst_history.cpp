@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "changes/ChangeTree.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"

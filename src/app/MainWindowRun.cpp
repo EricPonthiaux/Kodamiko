@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MainWindow: run configurations, their terminals, builds and the problems
 // they report.
 

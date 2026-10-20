@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "DiagramKinds.h"
 
 #ifdef DUET_WITH_DIAGRAMS

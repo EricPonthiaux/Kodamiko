@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "TitleBar.h"
 
 #include "AppFonts.h"
@@ -93,11 +95,6 @@ TitleBar::TitleBar(QWidget *parent)
     project_->setObjectName(QStringLiteral("projectChip"));
     AppFonts::setInterfaceFont(project_, 1);
     layout_->addStretch(1);
-    claude_ = new ClaudeIndicator(this);
-    layout_->addWidget(claude_);
-    connect(claude_, &ClaudeIndicator::clicked, this, &TitleBar::claudeClicked);
-    claude_->hide();
-    layout_->addStretch(1);
     layout_->addWidget(createRunBlock());
     layout_->addSpacing(groupSpacing);
     actions_ = new QHBoxLayout;
@@ -174,14 +171,6 @@ void TitleBar::setProject(const QString &name, const QString &toolTip, QMenu *me
     project_->setMenu(menu);
 }
 
-void TitleBar::setClaudeState(std::optional<ClaudeIndicator::Status> status, const QString &toolTip)
-{
-    claude_->setVisible(status.has_value());
-    if (status)
-        claude_->setStatus(*status);
-    claude_->setToolTip(toolTip);
-}
-
 QToolButton *TitleBar::actionButton(QAction *action, const QString &iconName, const QColor &color)
 {
     auto *button = new QToolButton(this);
@@ -247,7 +236,6 @@ void TitleBar::applyMetrics()
     setFixedHeight(UiMetrics::scaled(UiMetrics::titleBarHeight));
     const int control = controlHeight();
     project_->setFixedHeight(control);
-    claude_->setFixedHeight(control);
     const int folderSize = UiMetrics::scaled(UiMetrics::chipIconSize);
     project_->setIconSize(QSize(folderSize, folderSize));
     runBlock_->setFixedHeight(control);
@@ -285,7 +273,6 @@ void TitleBar::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     project_->setIcon(FileIcons::folder(theme.isDark)); // the files tree's
-    claude_->applyTheme(theme);
     controls_->applyTheme(theme);
     for (const ActionButton &entry : std::as_const(actionButtons_))
         entry.button->setIcon(UiIcons::icon(entry.iconName, entry.color.isValid() ? entry.color : theme.foreground));

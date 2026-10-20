@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "Explainer.h"
 
 #include "Presentation.h"

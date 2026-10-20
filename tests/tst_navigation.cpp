@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "git/GitProcess.h"
 #include "navigation/Definitions.h"
 #include "navigation/GoToPopup.h"

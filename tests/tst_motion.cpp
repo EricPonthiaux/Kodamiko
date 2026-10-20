@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "ui/HoverProgress.h"
 #include "ui/Motion.h"
 #include "ui/OverlayPopup.h"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "FindInFiles.h"
 
 #include "editor/TextFile.h"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "diagnostics/ProblemStore.h"
 #include "run/BuildOutputParser.h"
 #include "run/RunConfiguration.h"

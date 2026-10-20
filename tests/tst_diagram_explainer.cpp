@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The explainer board family (sidecar's free-board.js) and its JSON scene
 // (fence/sciilo-board.js), with the tests of sidecar's free-board.test.js
 // that make sense outside a browser.

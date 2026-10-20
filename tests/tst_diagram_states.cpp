@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The state diagram family (sidecar's state-diagram.js and its Mermaid and
 // PlantUML fences): parsing, serialization round trips, measures, label
 // resolution, containment and layout.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The mind map and product vision families, ported from sidecar
 // (mindmap-diagram.js, product-vision-diagram.js and their fences), with the
 // tests of sidecar's product-vision.test.js and the mind map parts of its

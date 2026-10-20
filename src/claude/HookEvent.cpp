@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "HookEvent.h"
 
 #include <QJsonDocument>
@@ -95,6 +97,8 @@ std::optional<HookEvent> HookEvent::fromJson(const QByteArray &json)
     if (eventName == QLatin1String("DuetStatusLine")) { // sent by `duet-hook statusline`
         event.kind = Kind::StatusUpdated;
         event.status = object.value(QLatin1String("status")).toObject();
+        // The session is named in the status Claude Code passed, not beside it.
+        event.sessionId = event.status.value(QLatin1String("session_id")).toString();
         return event;
     }
     if (eventName == QLatin1String("PostToolUse"))

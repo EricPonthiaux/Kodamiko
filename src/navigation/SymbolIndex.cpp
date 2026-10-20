@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "SymbolIndex.h"
 
 #include "outline/OutlineProviders.h"

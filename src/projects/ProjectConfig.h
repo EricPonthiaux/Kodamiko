@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
 #include <QDateTime>
@@ -35,6 +37,9 @@ struct ProjectConfig {
     // it was opened without the welcome window).
     bool configured = false;
     QList<LanguageSetup> languages;
+    // Shell command run in an agent's worktree before its commits are
+    // merged (see AgentMergeQueue); empty: none.
+    QString agentCheckCommand;
 
     // The setup of `family`, if the project has one.
     const LanguageSetup *language(const QString &family) const;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "claude/ClaudeLauncher.h"
 #include "claude/HookServer.h"
 #include "claude/mcp/McpRegistry.h"

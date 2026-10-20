@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "changes/BranchesPopup.h"
 #include "changes/ChangeTree.h"
 #include "changes/ChangesView.h"

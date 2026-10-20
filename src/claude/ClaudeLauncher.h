@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
 #include "terminal/ProcessSpec.h"
@@ -19,9 +21,10 @@ namespace ClaudeLauncher {
 // the events the editor follows (prompt, file edits, permission requests,
 // notifications, end of the response), and a status line that runs
 // `hookCommand statusline`. `allowedTools` are allowed without asking (the
-// editor's read-only MCP tools).
+// editor's read-only MCP tools). Messages from the other local Claude
+// sessions are accepted, so that the sessions of a project coordinate.
 QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowedTools = {});
-// Where the --settings file is written.
+// Where the --settings file of the sessions with Duet's tools is written.
 QString sessionSettingsPath();
 
 // Status line command configured by the user for `projectDir` (user,
@@ -52,6 +55,12 @@ struct SessionOptions {
     // With them, the session gets the editor's MCP server (duet-mcp), these
     // of its tools allowed without asking.
     std::optional<QStringList> mcpReadOnlyTools;
+    // The name other Claude sessions address it by (--name); without one,
+    // Claude Code names it after its folder.
+    QString name;
+    // Its identifier (--session-id, a UUID), which its hooks carry: tells
+    // its events from the other sessions'. Without one, Claude Code picks it.
+    QString sessionId;
 };
 
 // Process to launch, or nullopt (with `error` set) if `claude` or

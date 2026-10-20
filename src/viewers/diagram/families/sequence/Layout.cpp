@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The sequence's own layout: message lanes, the room fragments reserve,
 // the participants' spacing, and the fragments drawn under the messages.
 

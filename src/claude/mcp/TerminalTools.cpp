@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MCP tools for terminals: what they show, and commands run in a tab the
 // user sees (unlike Claude's own shell, which runs hidden).
 

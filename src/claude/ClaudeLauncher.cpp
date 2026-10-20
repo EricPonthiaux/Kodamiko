@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "ClaudeLauncher.h"
 
 #include "ClaudeConfig.h"
@@ -45,7 +47,37 @@ QJsonArray commandHook(const QString &command, const QString &matcher = {}, int 
     return QJsonArray{entry};
 }
 
-std::optional<QString> writeSettingsFile(const QByteArray &settings, const QString &path = sessionSettingsPath())
+// Variables a Claude Code session sets for the programs it runs. Inherited by
+// `claude` (the editor launched from a Claude session), they make it a child
+// of that session: hidden from the other sessions, and its transcript not
+// kept. The user's own CLAUDE_CODE_* settings stay.
+const QStringList inheritedSessionVariables{
+    QStringLiteral("CLAUDECODE"),
+    QStringLiteral("CLAUDE_PID"),
+    QStringLiteral("CLAUDE_CODE_ENTRYPOINT"),
+    QStringLiteral("CLAUDE_CODE_EXECPATH"),
+    QStringLiteral("CLAUDE_CODE_CHILD_SESSION"),
+    QStringLiteral("CLAUDE_CODE_SESSION_ID"),
+    QStringLiteral("CLAUDE_CODE_SESSION_ATTENDED"),
+    QStringLiteral("CLAUDE_CODE_MESSAGING_SOCKET"),
+    QStringLiteral("CLAUDE_CODE_MESSAGING_TOKEN"),
+};
+
+void removeInheritedSessionVariables(QProcessEnvironment &environment)
+{
+    for (const QString &variable : inheritedSessionVariables)
+        environment.remove(variable);
+}
+
+// The sessions without Duet's tools get a file of their own: starting one
+// must not rewrite the settings of a running session that has them.
+QString settingsPathWithoutTools()
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+        .filePath(QStringLiteral("claude-hooks-without-tools.json"));
+}
+
+std::optional<QString> writeSettingsFile(const QByteArray &settings, const QString &path)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());
     QSaveFile file(path);
@@ -99,7 +131,9 @@ QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowe
         {QLatin1String("command"), hookCommand + QLatin1String(" statusline")},
         {QLatin1String("padding"), 0},
     };
-    QJsonObject settings{{QLatin1String("hooks"), hooks}, {QLatin1String("statusLine"), statusLine}};
+    QJsonObject settings{{QLatin1String("hooks"), hooks},
+                         {QLatin1String("statusLine"), statusLine},
+                         {QLatin1String("crossSessionInbound"), QLatin1String("accept")}};
     if (!allowedTools.isEmpty())
         settings.insert(QLatin1String("permissions"),
                         QJsonObject{{QLatin1String("allow"), QJsonArray::fromStringList(allowedTools)}});
@@ -211,7 +245,9 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
         mcpFile = writeSettingsFile(mcpConfig(mcpServer), mcpConfigPath());
 
     const std::optional<QString> settingsFile =
-        writeSettingsFile(sessionSettings(hook, mcpFile ? mcpReadOnlyTools.value_or(QStringList()) : QStringList()));
+        mcpFile
+            ? writeSettingsFile(sessionSettings(hook, mcpReadOnlyTools.value_or(QStringList())), sessionSettingsPath())
+            : writeSettingsFile(sessionSettings(hook), settingsPathWithoutTools());
     if (!settingsFile) {
         *error = QCoreApplication::translate("ClaudeLauncher", "Could not write the hooks configuration.");
         return std::nullopt;
@@ -224,6 +260,10 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
         spec.arguments << QStringLiteral("--plugin-dir") << QDir::toNativeSeparators(plugin);
     if (mcpFile)
         spec.arguments << QStringLiteral("--mcp-config") << *mcpFile;
+    if (!options.name.isEmpty())
+        spec.arguments << QStringLiteral("--name") << options.name;
+    if (!options.sessionId.isEmpty())
+        spec.arguments << QStringLiteral("--session-id") << options.sessionId;
     spec.arguments += options.extraArguments;
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
@@ -233,9 +273,7 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
     const QString userStatusLine = userStatusLineCommand(workingDirectory);
     if (!userStatusLine.isEmpty())
         spec.environment.insert(QStringLiteral("DUET_STATUSLINE_COMMAND"), userStatusLine);
-    // If the editor was itself launched from Claude Code, this variable
-    // would make `claude` believe it is nested in another session.
-    spec.environment.remove(QStringLiteral("CLAUDECODE"));
+    removeInheritedSessionVariables(spec.environment);
 
     launchThroughCmd(spec);
     return spec;
@@ -255,7 +293,7 @@ std::optional<ProcessSpec> printProcess(const QString &workingDirectory, const Q
     spec.arguments = QStringList{QStringLiteral("--print")} + arguments;
     spec.workingDirectory = workingDirectory;
     spec.environment = QProcessEnvironment::systemEnvironment();
-    spec.environment.remove(QStringLiteral("CLAUDECODE"));
+    removeInheritedSessionVariables(spec.environment);
     launchThroughCmd(spec);
     return spec;
 }

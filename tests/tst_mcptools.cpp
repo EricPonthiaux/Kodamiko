@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "claude/mcp/DuetTools.h"
 #include "claude/mcp/McpRegistry.h"
 #include "claude/mcp/McpSession.h"

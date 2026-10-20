@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The painting of the canvas: the scene, its animations and its decorations.
 #include "Board.h"
 #include "Canvas.h"

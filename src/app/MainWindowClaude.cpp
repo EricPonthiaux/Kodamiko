@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MainWindow: the Claude session, its hooks, the editor's MCP tools, and
 // the requests sent to Claude from the editor.
 
@@ -19,6 +21,7 @@
 #include "git/Snapshots.h"
 #include "navigation/SymbolIndex.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/ClaudeIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/TitleBar.h"
@@ -71,7 +74,7 @@ ClaudeIndicator::Status indicatorStatus(ClaudeActivity::State state)
 }
 
 // Dot drawn in front of the Claude tabs while Claude works, waits or has
-// finished, in the title bar indicator's color.
+// finished, in the status bar indicator's color.
 QIcon activityIcon(ClaudeActivity::State state, const Theme &theme)
 {
     if (state == ClaudeActivity::State::Idle)
@@ -116,6 +119,7 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     QString launchError;
     ClaudeLauncher::SessionOptions options;
     options.extraArguments = extraArguments;
+    options.name = QFileInfo(folder_).fileName(); // the agents' sessions address it by the project's name
     if (exposeTools_->isChecked())
         options.mcpReadOnlyTools = mcpRegistry_.readOnlyToolPermissions(QStringLiteral("duet"));
     const std::optional<ProcessSpec> spec =
@@ -131,7 +135,7 @@ bool MainWindow::startClaudeSession(QString *error, const QStringList &extraArgu
     claudeTerminal_->applyTheme(theme_);
     claudeTerminal_->installEventFilter(this); // Escape interrupts the response, Ctrl+C too
     connect(claudeTerminal_, &TerminalWidget::finished, &claudeActivity_, &ClaudeActivity::reset);
-    // The indicator leaves the title bar with the session, even when Claude
+    // The indicator leaves the status bar with the session, even when Claude
     // was already idle.
     connect(claudeTerminal_, &TerminalWidget::finished, this, &MainWindow::updateClaudeIndicator);
     claudeActivity_.reset();
@@ -199,6 +203,9 @@ void MainWindow::showEffectiveSettings(bool open)
 
 void MainWindow::onHookReceived(const HookEvent &event)
 {
+    // An agent edits its worktree, not the checkout the editor shows.
+    if (handleAgentHook(event))
+        return;
     claudeActivity_.handle(event);
     switch (event.kind) {
     case HookEvent::Kind::PromptSubmitted:
@@ -261,11 +268,24 @@ void MainWindow::updateClaudeIndicator()
     modeTabs_->setTabIcon(0, idle ? UiIcons::icon(QStringLiteral("terminal"), theme_.mutedText) : icon);
     modeTabs_->updateGeometry(); // see updateTabIcons()
     const bool hasSession = claudeTerminal_ && claudeTerminal_->isRunning();
-    titleBar_->setClaudeState(hasSession ? std::optional(indicatorStatus(state)) : std::nullopt,
-                              description + QLatin1Char('\n') + tr("Show the Claude session (Ctrl+Shift+L)"));
+    // Activity updates must not uncover the indicator over a status message.
+    claudeIndicator_->setVisible(hasSession && statusBar()->currentMessage().isEmpty());
+    if (hasSession)
+        claudeIndicator_->setStatus(indicatorStatus(state));
+    claudeIndicator_->setToolTip(description + QLatin1Char('\n') + tr("Show the Claude session (Ctrl+Shift+L)"));
     const QString modeHint = tr("Full-screen terminals (Ctrl+1)");
     modeTabs_->setTabToolTip(0, state == ClaudeActivity::State::Idle ? modeHint
                                                                      : description + QLatin1Char('\n') + modeHint);
+}
+
+void MainWindow::updateAgentTab(QWidget *terminal, ClaudeActivity::State state)
+{
+    const int index = terminalTabs_->indexOf(terminal);
+    if (index < 0)
+        return;
+    const bool idle = state == ClaudeActivity::State::Idle;
+    terminalTabs_->setTabIcon(index, idle ? UiIcons::icon(QStringLiteral("claude"), QColor("#d97757"))
+                                          : activityIcon(state, theme_));
 }
 
 void MainWindow::updateClaudeWatched()
@@ -274,6 +294,8 @@ void MainWindow::updateClaudeWatched()
     const bool terminalsShown = mode_ == Mode::Terminal || terminalWindow_->isDetached();
     claudeActivity_.setWatched(claudeTerminal_ && claudeTerminal_->isActiveWindow() && terminalsShown &&
                                terminalTabs_->currentWidget() == claudeTerminal_);
+    const QWidget *current = terminalTabs_->currentWidget();
+    agentSessions_.setWatchedTerminal(current && current->isActiveWindow() && terminalsShown ? current : nullptr);
 }
 
 void MainWindow::notify(const QString &title, const QString &message)

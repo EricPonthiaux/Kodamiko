@@ -1,14 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
-#include "ClaudeIndicator.h"
 #include "Theme.h"
 #include "WindowControls.h"
 
 #include <QIcon>
 #include <QPointer>
 #include <QWidget>
-
-#include <optional>
 
 class QFrame;
 class QHBoxLayout;
@@ -19,7 +18,7 @@ class QTabBar;
 class QToolButton;
 
 // Duet's own title bar, in the manner of IntelliJ's main toolbar: the
-// menu, the project (with the recent folders), Claude's state,
+// menu, the project (with the recent folders),
 // the run block (the configuration and its Run or Stop button, on a tinted
 // background), the search actions, and the window controls, in groups set
 // apart. Its controls share one height. Dragging its empty parts moves the
@@ -36,8 +35,6 @@ public:
     // the layout or interface font changes.
     void alignLogoWith(QTabBar *column);
     void setProject(const QString &name, const QString &toolTip, QMenu *menu);
-    // Claude's state; hidden while there is no session (`status` empty).
-    void setClaudeState(std::optional<ClaudeIndicator::Status> status, const QString &toolTip);
     // Buttons at the right, before the window controls, with one of the
     // UiIcons (drawn in the theme's colors).
     void addActionButton(QAction *action, const QString &iconName);
@@ -65,9 +62,6 @@ public:
     WindowButton *windowButton(WindowButton::Kind kind) const;
 
     bool eventFilter(QObject *watched, QEvent *event) override;
-
-signals:
-    void claudeClicked();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -98,7 +92,6 @@ private:
     QPointer<QTabBar> logoColumn_;
     QMenuBar *menuBar_;
     QToolButton *project_;
-    ClaudeIndicator *claude_;
     QFrame *runBlock_ = nullptr;
     QToolButton *run_ = nullptr;
     QFrame *runDivider_ = nullptr;

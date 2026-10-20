@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MCP tools backed by the language servers Duet runs: problems,
 // definitions, usages, documentation, rename, quick fixes, formatting.
 // Positions are 1-based lines and columns; the files' unsaved text is what

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "C4.h"
 
 #include "viewers/diagram/Board.h"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MainWindow: the menu bar and the shortcuts of its commands.
 
 #include "MainWindow.h"
@@ -94,6 +96,9 @@ void MainWindow::createClaudeMenu()
 {
     QMenu *claude = titleBar_->menuBar()->addMenu(tr("&Claude"));
     claude->addAction(tr("&Claude Session"), QKeySequence(tr("Ctrl+Shift+L")), this, &MainWindow::showClaudeSession);
+    claude->addAction(tr("New Claude Session in &Worktree…"), this, &MainWindow::newAgentSession);
+    claude->addAction(tr("&Merge Agent's Work"), this, &MainWindow::mergeCurrentAgent);
+    claude->addAction(tr("Chec&k Before Merging Agents…"), this, &MainWindow::editAgentCheckCommand);
     claude->addAction(tr("New &Terminal"), QKeySequence(tr("Ctrl+Shift+T")), this, &MainWindow::newShell);
     if (!DiagramKinds::available().isEmpty())
         claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); });

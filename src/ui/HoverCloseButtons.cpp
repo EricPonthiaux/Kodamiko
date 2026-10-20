@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "HoverCloseButtons.h"
 
 #include "Motion.h"

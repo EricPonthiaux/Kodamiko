@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+#include "claude/AgentSessions.h"
 #include "claude/ClaudeActivity.h"
 #include "claude/ClaudeConfig.h"
 #include "claude/ClaudeConfigView.h"
@@ -13,6 +16,7 @@
 #include "claude/HookServer.h"
 #include "claude/UnsavedEditGuard.h"
 #include "editor/EditorWidget.h"
+#include "terminal/TerminalWidget.h"
 #include "ui/Theme.h"
 
 #include <QJsonArray>
@@ -189,6 +193,48 @@ private slots:
         QCOMPARE(command["command"].toString(), QStringLiteral("\"/opt/duet-hook\""));
         QCOMPARE(settings["statusLine"].toObject()["command"].toString(),
                  QStringLiteral("\"/opt/duet-hook\" statusline"));
+    }
+
+    void settingsAcceptMessagesFromOtherSessions()
+    {
+        const QJsonObject settings =
+            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"")).object();
+        QCOMPARE(settings["crossSessionInbound"].toString(), QStringLiteral("accept"));
+    }
+
+    void agentHooksDriveTheAgentsActivityOnly()
+    {
+        AgentSessions agents;
+        TerminalWidget terminal;
+        agents.add({.name = "agent-1"}, "agent-session", &terminal);
+        const HookEvent agentPrompt{.kind = HookEvent::Kind::PromptSubmitted, .sessionId = "agent-session"};
+        const HookEvent mainPrompt{.kind = HookEvent::Kind::PromptSubmitted, .sessionId = "main-session"};
+
+        agents.handle(agentPrompt);
+
+        QVERIFY(agents.owns(agentPrompt));
+        QVERIFY(!agents.owns(mainPrompt));
+        QCOMPARE(agents.find(&terminal)->activity->state(), ClaudeActivity::State::Working);
+    }
+
+    void statusLineEventNamesItsSession()
+    {
+        const std::optional<HookEvent> event = HookEvent::fromJson(
+            R"({"hook_event_name":"DuetStatusLine","status":{"session_id":"agent-session","model":{}}})");
+
+        QVERIFY(event);
+        QCOMPARE(event->sessionId, QStringLiteral("agent-session"));
+    }
+
+    void forgetsAnAgentWhenItsTerminalIsDestroyed()
+    {
+        AgentSessions agents;
+        auto terminal = std::make_unique<TerminalWidget>();
+        agents.add({.name = "agent-1"}, "agent-session", terminal.get());
+
+        terminal.reset();
+
+        QVERIFY(!agents.owns({.kind = HookEvent::Kind::PromptSubmitted, .sessionId = "agent-session"}));
     }
 
     void findsTheUserStatusLine()

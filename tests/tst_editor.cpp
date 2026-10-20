@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "editor/ChangeGutter.h"
 #include "editor/ClangFormatStyle.h"
 #include "editor/CodeColorizer.h"

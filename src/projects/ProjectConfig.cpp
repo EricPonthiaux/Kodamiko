@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "ProjectConfig.h"
 
 #include <QFileInfo>
@@ -53,6 +55,7 @@ QVariantMap ProjectConfig::toVariant() const
         {QStringLiteral("lastOpened"), lastOpened},
         {QStringLiteral("configured"), configured},
         {QStringLiteral("languages"), list},
+        {QStringLiteral("agentCheckCommand"), agentCheckCommand},
     };
 }
 
@@ -65,6 +68,7 @@ ProjectConfig ProjectConfig::fromVariant(const QString &path, const QVariantMap 
     config.configured = map.value(QStringLiteral("configured")).toBool();
     for (const QVariant &setup : map.value(QStringLiteral("languages")).toList())
         config.languages.append(LanguageSetup::fromVariant(setup.toMap()));
+    config.agentCheckCommand = map.value(QStringLiteral("agentCheckCommand")).toString();
     return config;
 }
 

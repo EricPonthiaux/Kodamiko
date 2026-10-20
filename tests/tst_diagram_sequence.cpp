@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The sequence diagram family, ported from sidecar's sequence-diagram.js and
 // its Mermaid and PlantUML fences (test/sequence-diagram.test.js).
 

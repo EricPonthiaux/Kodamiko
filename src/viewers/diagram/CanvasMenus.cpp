@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The canvas's menus: the context menu, its style and property submenus,
 // and the choice of the element or the relation to create.
 #include "Board.h"

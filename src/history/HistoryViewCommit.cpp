@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // HistoryView: the chosen commit's pane (its message, counts and files), the
 // reading of its details, and the diff of its chosen file.
 

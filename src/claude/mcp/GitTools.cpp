@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MCP tools for git and Duet's snapshots.
 
 #include "DuetTools.h"

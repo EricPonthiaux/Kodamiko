@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Reading an explainer scene: every rule of sidecar's contract is checked,
 // and the first one broken refuses the whole scene with sidecar's message.
 

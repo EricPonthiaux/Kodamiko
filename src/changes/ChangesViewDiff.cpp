@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // ChangesView: the diff pane, where the lines or blocks shown are staged,
 // unstaged or discarded from the keyboard, the block buttons or the menu.
 

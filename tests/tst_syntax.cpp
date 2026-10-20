@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "syntax/HighlighterFactory.h"
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"

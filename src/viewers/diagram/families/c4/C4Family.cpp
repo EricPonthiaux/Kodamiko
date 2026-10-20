@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The C4 family: its shapes and links, and the presets of the palette.
 
 #include "C4.h"

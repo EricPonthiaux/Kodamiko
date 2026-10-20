@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MainWindow: opening and closing a project, its session, its settings and
 // the tools it needs; terminals.
 
@@ -71,6 +73,8 @@ void MainWindow::openFolder(const QString &folder)
     problemStore_->clearBuildProblems();
     problemsView_->setProjectFolder(folder_);
     runner_->setProject(project_, toolchains_.get());
+    agentMerges_->setFolder(folder_);
+    agentMerges_->setCheckCommand(project_.agentCheckCommand);
     goToPopup_->setFolder(folder_);
     fileStatuses_->setFolder(folder_);
     findInFiles_->setFolder(folder_);
@@ -176,6 +180,7 @@ void MainWindow::applyProject(const ProjectConfig &project)
     project_ = project;
     languageServers_->setProject(project_, toolchains_.get());
     runner_->setProject(project_, toolchains_.get());
+    agentMerges_->setCheckCommand(project_.agentCheckCommand);
     warmUpLanguageServers();
     if (preferencesPopup_)
         preferencesPopup_->setInstalledServers(languageServers_->installed());

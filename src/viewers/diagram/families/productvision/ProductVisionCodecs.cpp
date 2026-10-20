@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Product visions (sidecar's fence/sciilo-product-vision.js). A product
 // vision stays ordinary Mermaid mindmap source for Claude: a marker comment
 // and stable node keys let Duet show that tree as the product vision's cards

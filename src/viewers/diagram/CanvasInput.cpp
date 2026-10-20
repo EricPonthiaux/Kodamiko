@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The pointer and keyboard interaction of the canvas: hit tests, gestures
 // (pan, move, resize, connect, rubber band, trace) and shortcuts.
 #include "Board.h"

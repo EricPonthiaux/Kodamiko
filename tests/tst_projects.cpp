@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "claude/ClaudeTrust.h"
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // DiffView: the two modes, and the pane of the old version side by side.
 
 #include "DiffView.h"

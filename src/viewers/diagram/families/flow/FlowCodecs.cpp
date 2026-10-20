@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Mermaid flowcharts (sidecar's fence/mermaid-flow.js) and Flowboard's .flow
 // files.
 

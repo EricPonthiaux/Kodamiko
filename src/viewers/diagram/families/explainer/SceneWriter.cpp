@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Writing an explainer scene: JSON.stringify(document, null, 2), keys in
 // sidecar's order, so that a board saved by either app reads (and diffs)
 // the same.

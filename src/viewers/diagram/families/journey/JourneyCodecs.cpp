@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Mermaid user journeys (sidecar's fence/mermaid-journey.js): a title,
 // sections and scored tasks with their actors. The steps are chained in
 // the order they are written.

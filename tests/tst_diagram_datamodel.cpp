@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The data model family (sidecar's erd-diagram.js and fence/mermaid-er.js):
 // the Mermaid erDiagram codec, the tables and their columns, the relations
 // joining FK and PK columns, the layout and the drawing.

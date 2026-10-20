@@ -1,5 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
+#include "claude/AgentMergeQueue.h"
+#include "claude/AgentSessions.h"
 #include "claude/ClaudeActivity.h"
 #include "claude/CodeRequest.h"
 #include "claude/HookServer.h"
@@ -20,6 +24,7 @@ class AskpassServer;
 class BranchesPopup;
 class ChangesView;
 class ClaudeConfigView;
+class ClaudeIndicator;
 class CodeIntelligence;
 class CodeNavigator;
 class CommandPalette;
@@ -185,6 +190,33 @@ private:
     // The Effective Settings tab, opened, or updated if it is open.
     void showEffectiveSettings(bool open);
     void showClaudeSession();
+    // Claude ▸ New Claude Session in Worktree: any session besides the main
+    // one works in a worktree of its own, never in the user's checkout.
+    void newAgentSession();
+    void startAgentSession(const Worktree &worktree);
+    // Closing an agent's tab: its worktree goes when it holds no work; else
+    // the user keeps it or deletes it.
+    void closeAgentSession(TerminalWidget *terminal);
+    void endAgentSession(TerminalWidget *terminal, const Worktree &worktree, bool hasWork);
+    void removeAgentWorktree(const Worktree &worktree);
+    // An agent's hook: its activity, and its new commits to the merge queue
+    // when it finished a response. False for a hook of the main session.
+    bool handleAgentHook(const HookEvent &event);
+    void queueAgentCommits(const Worktree &worktree);
+    // Claude ▸ Merge Agent's Work, for the agent whose tab is shown.
+    void mergeCurrentAgent();
+    // Commits the agent's remaining changes, its last prompt as the message,
+    // then queues its work.
+    void mergeAgentWork(const Worktree &worktree, const QString &lastPrompt, AgentMergeQueue::AfterMerge afterMerge);
+    // Claude ▸ Check Before Merging Agents: the project's check command.
+    void editAgentCheckCommand();
+    void onAgentMerged(const Worktree &worktree,
+                       const QString &branch,
+                       const QString &head,
+                       AgentMergeQueue::AfterMerge afterMerge);
+    // Conflicts or a failing check: typed in the agent's prompt for it to fix.
+    void onAgentSentBack(const Worktree &worktree, const QString &report);
+    void onAgentMergeFailed(const Worktree &worktree, const QString &message);
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);
     // Runs `configuration` in its terminal tab (the one of its last run,
@@ -226,6 +258,8 @@ private:
     void onHookReceived(const HookEvent &event);
     // Dot on the Claude tab and on the Terminal mode tab.
     void updateClaudeIndicator();
+    // Dot on an agent's tab.
+    void updateAgentTab(QWidget *terminal, ClaudeActivity::State state);
     void updateTabIcons();
     // Duet's frame and title bar, or the system's (View ▸ Use System
     // Title Bar). On macOS, the system's traffic lights over Duet's bar.
@@ -326,6 +360,8 @@ private:
     // What the editor's MCP server offers Claude (see DuetTools).
     McpRegistry mcpRegistry_;
     ClaudeActivity claudeActivity_;
+    // The sessions besides the main one, each in its worktree.
+    AgentSessions agentSessions_;
     QJsonObject claudeStatus_; // last status line data
 
     EditorTabs *editorTabs_ = nullptr;
@@ -381,15 +417,17 @@ private:
     ChangesView *changesView_ = nullptr;
     HistoryView *historyView_ = nullptr;
     GitCommands *gitCommands_ = nullptr;
+    AgentMergeQueue *agentMerges_ = nullptr;
     GitActions *gitActions_ = nullptr;
     AskpassServer *askpass_ = nullptr;
     RepositoryWatcher *repositoryWatcher_ = nullptr;
     TitleBar *titleBar_ = nullptr;
-    QToolButton *branchButton_ = nullptr;    // status bar: branch, Branches popup
-    QToolButton *syncButton_ = nullptr;      // status bar: fetch, pull, push
-    QToolButton *cancelGitButton_ = nullptr; // status bar: stops a fetch, push…
-    QString gitProgress_;                    // the status bar message of a fetch, push… in progress
-    QAction *continueAction_ = nullptr;      // Git menu: the operation in progress
+    ClaudeIndicator *claudeIndicator_ = nullptr; // status bar: Claude's activity, opens the session
+    QToolButton *branchButton_ = nullptr;        // status bar: branch, Branches popup
+    QToolButton *syncButton_ = nullptr;          // status bar: fetch, pull, push
+    QToolButton *cancelGitButton_ = nullptr;     // status bar: stops a fetch, push…
+    QString gitProgress_;                        // the status bar message of a fetch, push… in progress
+    QAction *continueAction_ = nullptr;          // Git menu: the operation in progress
     QAction *skipAction_ = nullptr;
     QAction *abortAction_ = nullptr;
     WindowFrame *frame_ = nullptr;

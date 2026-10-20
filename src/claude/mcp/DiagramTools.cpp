@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MCP tools for diagrams: what the user sees and selects in a diagram, and
 // changes made in the open diagram (its source applied, its layout, its
 // selection, an export).

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "lsp/LspCompletionProvider.h"

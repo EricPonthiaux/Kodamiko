@@ -22,6 +22,8 @@ add_library(duet_core STATIC
     changes/SnapshotsPopup.cpp
     changes/StashesPopup.cpp
     changes/WordDiff.cpp
+    claude/AgentMergeQueue.cpp
+    claude/AgentSessions.cpp
     claude/ClaudeActivity.cpp
     claude/ClaudeConfig.cpp
     claude/ClaudeConfigView.cpp
@@ -99,6 +101,7 @@ add_library(duet_core STATIC
     git/RepositoryWatcher.cpp
     git/Snapshots.cpp
     git/Stashes.cpp
+    git/Worktrees.cpp
     history/CommitDelegate.cpp
     history/CommitGraph.cpp
     history/CommitQuery.cpp
@@ -308,6 +311,7 @@ duet_enable_warnings(duet_core)
 qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/main.cpp
     app/MainWindow.cpp
+    app/MainWindowAgents.cpp
     app/MainWindowClaude.cpp
     app/MainWindowEditing.cpp
     app/MainWindowGit.cpp

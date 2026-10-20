@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Mermaid C4 (sidecar's fence/mermaid-c4.js): the core official vocabulary —
 // people, systems, containers, components, databases, queues, relations and
 // nested enterprise / system / container / deployment boundaries.

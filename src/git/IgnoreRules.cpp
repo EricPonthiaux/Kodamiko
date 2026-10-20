@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "IgnoreRules.h"
 
 #include "LibGit2.h"

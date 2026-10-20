@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+#include "claude/AgentMergeQueue.h"
 #include "git/Branches.h"
 #include "git/FilePatch.h"
 #include "git/FileStatuses.h"
@@ -7,6 +10,7 @@
 #include "git/LineChanges.h"
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
+#include "git/Worktrees.h"
 
 #include <QSignalSpy>
 #include <QStandardPaths>
@@ -813,6 +817,219 @@ private slots:
         QVERIFY(info.unborn);
         Branches::create(info, "start", true);
         QCOMPARE(RepositoryInfo::read(project.path())->branch, QString("start"));
+    }
+
+    void createsAWorktreeOnItsOwnBranchHiddenFromTheCheckout()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+
+        const Worktree worktree = Worktrees::add(info, "agent-1");
+
+        QCOMPARE(worktree.branch, QString("duet/agent-1"));
+        QCOMPARE(worktree.path, project.filePath(".claude/worktrees/agent-1"));
+        QCOMPARE(read(project, ".claude/worktrees/agent-1/a.txt"), QByteArray("a\n"));
+        QVERIFY(Branches::local(project.path()).contains("duet/agent-1"));
+        QVERIFY(git(project, {"status", "--porcelain"}).isEmpty());
+    }
+
+    void excludesTheWorktreesFolderOnlyOnce()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+
+        Worktrees::add(info, "agent-1");
+        Worktrees::add(info, "agent-2");
+
+        QCOMPARE(read(project, ".git/info/exclude").count("/.claude/worktrees/"), 1);
+        QVERIFY(read(project, ".gitignore").isEmpty());
+    }
+
+    void suggestsTheFirstUnusedAgentName()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        QCOMPARE(Worktrees::unusedName(info), QString("agent-1"));
+
+        Worktrees::add(info, "agent-1");
+        git(project, {"branch", "duet/agent-2"});
+
+        QCOMPARE(Worktrees::unusedName(info), QString("agent-3"));
+    }
+
+    void aWorktreeHoldsWorkOnceChangedOrCommitted()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        QVERIFY(!Worktrees::hasWork(worktree));
+
+        write(project, ".claude/worktrees/agent-1/a.txt", "changed\n");
+        QVERIFY(Worktrees::hasWork(worktree));
+
+        Git::run(worktree.path, {"commit", "-qam", "change"});
+        QVERIFY(Worktrees::hasWork(worktree));
+    }
+
+    void removesTheWorktreeAndItsBranch()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        const Worktree worktree = Worktrees::add(info, "agent-1");
+        write(project, ".claude/worktrees/agent-1/new.txt", "unsaved work\n");
+
+        Worktrees::remove(info, worktree);
+
+        QVERIFY(!QFileInfo::exists(worktree.path));
+        QVERIFY(!Branches::local(project.path()).contains("duet/agent-1"));
+    }
+
+    void refusesAWorktreeNameGitCannotUse()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        QVERIFY_THROWS_EXCEPTION(GitError, Worktrees::add(*RepositoryInfo::read(project.path()), "two words"));
+    }
+
+    void commitsAWorktreesChangesOnlyWhenItHasSome()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+
+        Worktrees::commitChanges(worktree, "nothing");
+        QVERIFY(!Worktrees::hasCommitsToMerge(worktree));
+
+        write(project, ".claude/worktrees/agent-1/new.txt", "new\n");
+        Worktrees::commitChanges(worktree, "agent-1: add new.txt");
+
+        QVERIFY(Worktrees::hasCommitsToMerge(worktree));
+        QCOMPARE(Git::run(worktree.path, {"log", "-1", "--format=%s"}).trimmed(), QByteArray("agent-1: add new.txt"));
+    }
+
+    void undoesAConflictingRebaseAndNamesTheFiles()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/a.txt", "agent\n");
+        Git::run(worktree.path, {"commit", "-qam", "agent"});
+        write(project, "a.txt", "user\n");
+        git(project, {"commit", "-qam", "user"});
+
+        const RebaseResult result = Worktrees::rebase(worktree, "main");
+
+        QCOMPARE(result.conflicts, QStringList{"a.txt"});
+        QCOMPARE(read(project, ".claude/worktrees/agent-1/a.txt"), QByteArray("agent\n"));
+        QVERIFY(!QFileInfo::exists(Git::run(worktree.path, {"rev-parse", "--git-path", "rebase-merge"}).trimmed()));
+    }
+
+    void mergesAnAgentsCommitsIntoTheCurrentBranch()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/agent.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        write(project, "user.txt", "user\n");
+        git(project, {"add", "user.txt"});
+        git(project, {"commit", "-qm", "user work"});
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        QSignalSpy merged(&queue, &AgentMergeQueue::merged);
+
+        queue.enqueue(worktree);
+
+        QVERIFY(merged.wait());
+        QCOMPARE(read(project, "agent.txt"), QByteArray("agent\n"));
+        QCOMPARE(git(project, {"log", "--format=%s"}), QByteArray("agent work\nuser work\ninit\n"));
+        QCOMPARE(merged.first().at(1).toString(), QString("main"));
+    }
+
+    void sendsConflictingCommitsBackToTheAgent()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/a.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        write(project, "a.txt", "user\n");
+        git(project, {"commit", "-qam", "user work"});
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        QSignalSpy sentBack(&queue, &AgentMergeQueue::sentBack);
+
+        queue.enqueue(worktree);
+
+        QVERIFY(sentBack.wait());
+        QVERIFY(sentBack.first().at(1).toString().contains("a.txt"));
+        QCOMPARE(read(project, "a.txt"), QByteArray("user\n"));
+    }
+
+    void sendsCommitsThatFailTheCheckBackWithItsOutput()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/agent.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        queue.setCheckCommand("echo tests broken; exit 3");
+        QSignalSpy sentBack(&queue, &AgentMergeQueue::sentBack);
+
+        queue.enqueue(worktree);
+
+        QVERIFY(sentBack.wait());
+        const QString report = sentBack.first().at(1).toString();
+        QVERIFY(report.contains("tests broken"));
+        QVERIFY(report.contains("exit code 3"));
+        QVERIFY(!QFileInfo::exists(project.filePath("agent.txt")));
+    }
+
+    void mergesCommitsThatPassTheCheck()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/agent.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        queue.setCheckCommand("test -f agent.txt");
+        QSignalSpy merged(&queue, &AgentMergeQueue::merged);
+
+        queue.enqueue(worktree);
+
+        QVERIFY(merged.wait());
+        QCOMPARE(read(project, "agent.txt"), QByteArray("agent\n"));
+    }
+
+    void leavesTheUsersChangesAloneWhenTheyAreInTheWay()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        const Worktree worktree = Worktrees::add(*RepositoryInfo::read(project.path()), "agent-1");
+        write(project, ".claude/worktrees/agent-1/a.txt", "agent\n");
+        Worktrees::commitChanges(worktree, "agent work");
+        write(project, "a.txt", "unsaved user change\n");
+        GitCommands commands;
+        AgentMergeQueue queue(&commands);
+        queue.setFolder(project.path());
+        QSignalSpy failed(&queue, &AgentMergeQueue::failed);
+
+        queue.enqueue(worktree);
+
+        QVERIFY(failed.wait());
+        QCOMPARE(read(project, "a.txt"), QByteArray("unsaved user change\n"));
     }
 
 private:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "FilesPanel.h"
 
 #include "ui/AppFonts.h"

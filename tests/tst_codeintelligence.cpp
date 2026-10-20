@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "diagnostics/ProblemStore.h"
 #include "editor/CodeColorizer.h"
 #include "editor/EditorTabs.h"

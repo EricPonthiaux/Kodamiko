@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "settings/FontSettings.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"

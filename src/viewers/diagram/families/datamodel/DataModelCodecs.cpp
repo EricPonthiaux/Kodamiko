@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Mermaid erDiagram (sidecar's fence/mermaid-er.js): entities, their column
 // blocks and the cardinality relations between them.
 

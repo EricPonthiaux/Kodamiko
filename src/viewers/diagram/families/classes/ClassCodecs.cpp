@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Mermaid and PlantUML class diagrams (sidecar's fence/mermaid-class.js and
 // fence/plantuml-class.js).
 //

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "completion/CodeGeneration.h"
 #include "completion/CodeScan.h"
 #include "completion/CompletionController.h"

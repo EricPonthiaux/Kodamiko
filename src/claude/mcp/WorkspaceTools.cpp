@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MCP tools for the project as a whole: search, files, symbols, the
 // editor's commands, the project's setup.
 

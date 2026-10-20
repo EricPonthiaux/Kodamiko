@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"

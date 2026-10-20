@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "diagnostics/ProblemStore.h"
 #include "diagnostics/ProblemsView.h"
 #include "editor/EditorTabs.h"
@@ -495,18 +497,12 @@ private slots:
         auto *project = new QMenu(&window);
         project->addAction("other");
         titleBar->setProject("duet", "/p/duet", project);
-        titleBar->setClaudeState(ClaudeIndicator::Status::Working, "details");
         QStringList texts;
         for (const QToolButton *button : titleBar->findChildren<QToolButton *>())
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
         QVERIFY(texts.contains(" duet  ▾"));
-        auto *indicator = titleBar->findChild<ClaudeIndicator *>();
-        QVERIFY(indicator->isVisibleTo(titleBar));
-        QCOMPARE(indicator->status(), ClaudeIndicator::Status::Working);
-        QCOMPARE(indicator->toolTip(), "details");
-        titleBar->setClaudeState(std::nullopt, {});
-        QVERIFY(!indicator->isVisibleTo(titleBar));
+        QVERIFY(!titleBar->findChild<ClaudeIndicator *>());
 
         QAction action("Go to File");
         int triggered = 0;

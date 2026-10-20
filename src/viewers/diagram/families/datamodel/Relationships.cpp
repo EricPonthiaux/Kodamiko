@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The relations of a data model: which FK column joins which referenced
 // column, and the orthogonal path drawn between their rows.
 

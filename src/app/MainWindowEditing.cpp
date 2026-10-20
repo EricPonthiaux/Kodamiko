@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // MainWindow: what follows the current editor (find, go to, change marks,
 // language servers).
 

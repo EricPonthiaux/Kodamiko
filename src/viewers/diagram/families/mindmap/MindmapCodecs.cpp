@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Mermaid mindmaps (sidecar's fence/mermaid-mindmap.js), drawn with the mind
 // map family. Grammar checked against Mermaid's mindmap.jison: the hierarchy
 // is the leading-space count of each line; node shapes are id((text)),

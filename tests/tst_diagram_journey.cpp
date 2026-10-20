@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The user journey family (sidecar's journey-diagram.js and
 // fence/mermaid-journey.js): the Mermaid journey codec, the task cards and
 // their measures, the layout and the drawing.

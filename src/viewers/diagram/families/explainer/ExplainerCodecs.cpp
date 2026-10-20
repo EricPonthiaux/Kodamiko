@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Explainer boards as a JSON scene (sidecar's fence/sciilo-board.js and its
 // contract, sciilo-board-v1.schema.json): a compact, versioned scene, easy
 // for an LLM to produce and safe to render. Unlike a Mermaid diagram, its

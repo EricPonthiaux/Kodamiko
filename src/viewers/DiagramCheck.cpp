@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "DiagramCheck.h"
 
 #include "viewers/diagram/Document.h"

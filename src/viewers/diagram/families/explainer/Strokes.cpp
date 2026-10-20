@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // The explainer's free strokes (lines and arrows drawn by hand) and its
 // edges between elements.
 

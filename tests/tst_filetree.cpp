@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "ui/FileIcons.h"
