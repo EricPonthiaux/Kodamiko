@@ -17,6 +17,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -115,9 +116,9 @@ EntryTarget resolveRename(const QString &path, const QString &name)
     return {renamed, {}};
 }
 
-EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, const QString &location, QWidget *parent)
+EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, QString location, QWidget *parent)
     : OverlayPopup(settingsKey, QSizeF(popupWindowShare, 0), QSize(minimumPopupWidth, 0), parent)
-    , location_(location)
+    , location_(std::move(location))
     , header_(new PopupHeader(QStringLiteral("document"), title, this))
     , content_(new QVBoxLayout)
     , error_(new QLabel(this))
@@ -158,7 +159,8 @@ EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, const Q
     layout->addWidget(footer);
 
     const Theme &theme = ThemeStyle::applied();
-    setStyleSheet(popupStyleSheet(theme, QStringLiteral("QLabel#entryError { color: %1; }").arg(errorColor(palette()))));
+    setStyleSheet(
+        popupStyleSheet(theme, QStringLiteral("QLabel#entryError { color: %1; }").arg(errorColor(palette()))));
     header_->applyTheme(theme);
 }
 

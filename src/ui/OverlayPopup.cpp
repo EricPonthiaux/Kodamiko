@@ -135,7 +135,8 @@ void OverlayPopup::showCentered()
 
 void OverlayPopup::dismiss()
 {
-    if (!isVisible())
+    // Shown, even in a window not shown (a test).
+    if (isHidden())
         return;
     parentWidget()->removeEventFilter(watcher_);
     if (parentWidget()->windowHandle())

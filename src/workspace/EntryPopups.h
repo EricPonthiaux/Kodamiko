@@ -54,7 +54,7 @@ public:
 
 protected:
     // `settingsKey` keeps the width the user gives this kind of popup.
-    EntryPopup(const QString &settingsKey, const QString &title, const QString &location, QWidget *parent);
+    EntryPopup(const QString &settingsKey, const QString &title, QString location, QWidget *parent);
 
     void keyPressEvent(QKeyEvent *event) override;
     virtual void accept() = 0;

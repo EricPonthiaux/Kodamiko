@@ -81,8 +81,10 @@ public:
     PopupHeader(QString iconName, const QString &title, QWidget *parent);
 
     void setTitle(const QString &title);
+
     // Shown from the next applyTheme().
     void setIconName(const QString &iconName) { iconName_ = iconName; }
+
     // Shown under the title; hidden while empty.
     void setSubtitle(const QString &text);
     // Before the close button, in the order added.
