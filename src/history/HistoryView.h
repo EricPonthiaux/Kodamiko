@@ -76,6 +76,11 @@ private:
     void onDetailsRead(const DetailsRequest &request,
                        const std::optional<CommitDetails> &details,
                        const QString &error);
+    // Reads twice as many commits when the end of the list is in view: the
+    // list scrolled to its end, or rows hidden by the filter.
+    void loadMoreIfAtEnd();
+    // The last row the filter leaves is in the viewport.
+    bool isEndInView() const;
     // The chosen commit again, as the header's whitespace button says; its
     // chosen file stays chosen.
     void rereadCommit();
@@ -120,6 +125,7 @@ private:
     int generation_ = 0;
     bool reading_ = false;
     bool refreshPending_ = false;
+    int commitLimit_ = 0;   // commits to read, see loadMoreIfAtEnd()
     QString detailsWanted_; // commit whose details are being read
     QString fileToKeep_;    // chosen again once the commit is read again
 

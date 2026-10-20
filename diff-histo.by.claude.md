@@ -48,9 +48,11 @@ Magit.
    chaque commit, et l'historique montre le diff sous ce nom. Le suivi
    s'arrête à un renommage venu de l'extérieur du dossier ouvert. L'outil
    MCP `get_file_history` donne aussi ce `path`.
-5. **Le filtre ne voit que les 2000 commits chargés** et seulement le résumé.
-   Un commit plus ancien, ou un mot présent uniquement dans le corps du
-   message, reste introuvable sans que l'interface le signale.
+5. ½ **En partie corrigé.** ~~**Le filtre ne voit que les 2000 commits
+   chargés**~~ : quand le filtre cache presque tout, la fin de la liste est
+   visible et l'historique continue de se charger, jusqu'à remplir la vue
+   ou atteindre le premier commit. Reste : le filtre ne cherche que dans le
+   résumé, pas dans le corps du message.
 6. `FilePatch::parse` est appelé deux fois par fichier, dans `rebuildList`
    puis dans `showSection`. Le coût est faible, mais il s'ajoute au point 2.
 
@@ -98,8 +100,11 @@ Magit.
 1. **Graphe des branches** et choix de la branche ou de toutes les refs.
    Seul HEAD est parcouru. C'est l'élément central chez Fork, GitKraken,
    Sublime Merge et JetBrains.
-2. **Pagination ou défilement infini** au lieu de la limite fixe de 2000
-   commits.
+2. ✅ **Fait.** ~~**Pagination ou défilement infini**~~ : 500 commits
+   d'abord, puis deux fois plus chaque fois que la fin de la liste devient
+   visible. Chaque lecture reprend au début, mais le doublement garde un
+   coût total linéaire. La position de défilement et le commit choisi
+   restent en place.
 3. **Recherche plus riche** : corps du message, auteur, plage de dates,
    contenu (`-S`/`-G`), comme JetBrains et Sublime Merge.
 4. **Actions sur un commit** : revert, cherry-pick, reset, créer une branche
@@ -128,6 +133,10 @@ Magit.
 - **Booléens qui changent le comportement** :
   `applyDiffSelection(line, bool discard)` (§2) ; il faudrait un
   `enum class`. `DiffView::goToChange` prend maintenant un `Direction`.
+- **Taille de `HistoryView.cpp`** : 780 lignes, à la limite des 800 de
+  §8. Le volet du commit (`createCommitPane`, `showDetails`,
+  `messageHtml`) pourrait aller dans son propre fichier, comme
+  `ChangesViewDiff.cpp`.
 - **Fonctions trop longues** : le constructeur de `ChangesView`
   (~170 lignes), `HistoryView::createCommitPane` et `showDetails` dépassent
   largement l'objectif de 40 lignes.
@@ -152,7 +161,7 @@ Dans l'ordre, pour le meilleur rapport valeur/effort :
    du diff.~~ Fait.
 3. ✅ ~~Ajouter « afficher plus de contexte » et « ignorer les espaces ».~~
    Fait.
-4. ✅ ~~Ajouter le suivi des renommages dans l'historique d'un fichier~~
-   (fait), puis la pagination.
+4. ✅ ~~Ajouter le suivi des renommages dans l'historique d'un fichier,
+   puis la pagination.~~ Fait.
 5. Les deux gros chantiers : le diff côte à côte, puis le graphe des
    branches.

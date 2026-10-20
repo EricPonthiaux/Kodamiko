@@ -5,6 +5,9 @@
 #include "history/HistoryView.h"
 
 #include <QLabel>
+#include <QLineEdit>
+#include <QProcess>
+#include <QScrollBar>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
@@ -56,6 +59,31 @@ QStringList pathsOf(const CommitLog &log)
 QByteArray longText(const QByteArray &lastLine)
 {
     return QByteArray("line\n").repeated(20) + lastLine + "\n";
+}
+
+// `count` commits on main, "c0001" the oldest, each changing f.txt; at once,
+// through fast-import.
+void importCommits(const QTemporaryDir &dir, int count)
+{
+    QByteArray stream;
+    for (int i = 1; i <= count; ++i) {
+        const QByteArray number = QByteArray::number(i);
+        const QByteArray message = "c" + number.rightJustified(4, '0');
+        stream += "commit refs/heads/main\nmark :" + number + "\ncommitter t <t@t> " +
+                  QByteArray::number(1700000000 + i) + " +0000\ndata " + QByteArray::number(message.size()) + "\n" +
+                  message + "\n";
+        if (i > 1)
+            stream += "from :" + QByteArray::number(i - 1) + "\n";
+        stream += "M 644 inline f.txt\ndata " + QByteArray::number(number.size()) + "\n" + number + "\n";
+    }
+    QProcess process;
+    process.setWorkingDirectory(dir.path());
+    process.start("git", {"fast-import", "--quiet"});
+    process.write(stream);
+    process.closeWriteChannel();
+    QVERIFY(process.waitForFinished(30000));
+    QCOMPARE(process.exitCode(), 0);
+    git(dir, {"reset", "-q", "--hard", "main"});
 }
 
 QStringList summaries(const CommitLog &log)
@@ -355,6 +383,46 @@ private slots:
         commits->setCurrentItem(commits->topLevelItem(1)); // "create"
 
         QTRY_VERIFY(diff->text().contains("old.txt"));
+    }
+
+    void scrollingToTheEndLoadsMoreCommits()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        importCommits(dir, 1200);
+        HistoryView view(Theme::dark());
+        view.resize(900, 600);
+        view.show();
+        view.setFolder(dir.path());
+        view.refresh();
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QTRY_COMPARE(commits->topLevelItemCount(), 500);
+        QCOMPARE(commits->verticalScrollBar()->value(), 0); // nothing more until scrolled
+
+        commits->scrollToBottom();
+        QTRY_COMPARE(commits->topLevelItemCount(), 1000);
+        QVERIFY(commits->verticalScrollBar()->value() > 0); // where it was, not back at the top
+        commits->scrollToBottom();
+        QTRY_COMPARE(commits->topLevelItemCount(), 1200); // all of them: no more reads
+    }
+
+    void filteringLooksBeyondTheLoadedCommits()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        importCommits(dir, 1200);
+        HistoryView view(Theme::dark());
+        view.resize(900, 600);
+        view.show();
+        view.setFolder(dir.path());
+        view.refresh();
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QTRY_COMPARE(commits->topLevelItemCount(), 500);
+
+        view.findChild<QLineEdit *>()->setText("c0001");
+
+        QTRY_COMPARE(commits->topLevelItemCount(), 1200);
+        QVERIFY(!commits->topLevelItem(1199)->isHidden()); // the oldest, found
     }
 
     void folderHistoryListsOnlyTheFolderFiles()

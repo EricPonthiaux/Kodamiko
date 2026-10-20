@@ -21,6 +21,8 @@
 #include <QLocale>
 #include <QMenu>
 #include <QPainter>
+#include <QScopeGuard>
+#include <QScrollBar>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStyledItemDelegate>
@@ -44,6 +46,9 @@ constexpr int wideLayoutWidth = 1180;
 // The message shows this many lines until expanded.
 constexpr int collapsedMessageLines = 5;
 constexpr int avatarSize = 18;
+// Commits read at first; twice as many each time the end of the list comes
+// into view, so that the walk, restarted each time, stays linear overall.
+constexpr int firstCommitLimit = 500;
 
 QString formatDate(const QDateTime &date)
 {
@@ -141,6 +146,9 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     // when it takes focus, without the user having chosen anything.
     connect(commits_, &QTreeWidget::itemSelectionChanged, this, &HistoryView::onCommitSelectionChanged);
     connect(commits_, &QTreeWidget::customContextMenuRequested, this, &HistoryView::showCommitMenu);
+    // Scrolled down, or rows hidden by the filter: the end may come into view.
+    connect(commits_->verticalScrollBar(), &QScrollBar::valueChanged, this, &HistoryView::loadMoreIfAtEnd);
+    connect(commits_->verticalScrollBar(), &QScrollBar::rangeChanged, this, &HistoryView::loadMoreIfAtEnd);
 
     commitPane_ = createCommitPane();
     leftSplitter_->addWidget(commits_);
@@ -278,6 +286,7 @@ void HistoryView::setFolder(const QString &folder)
 {
     folder_ = folder;
     ++generation_;
+    commitLimit_ = firstCommitLimit;
     setPathFilterShown({});
     log_.reset();
     error_.clear();
@@ -295,6 +304,7 @@ void HistoryView::setPathFilter(const QString &relativePath)
 {
     setPathFilterShown(relativePath);
     ++generation_;
+    commitLimit_ = firstCommitLimit;
     refresh();
 }
 
@@ -321,11 +331,11 @@ void HistoryView::refresh()
     reading_ = true;
     refreshPending_ = false;
     // A path filter walks the whole history: off the UI thread.
-    pool_.start([this, folder = folder_, path = pathFilter_, generation = generation_] {
+    pool_.start([this, folder = folder_, path = pathFilter_, limit = commitLimit_, generation = generation_] {
         QString error;
         std::optional<CommitLog> log;
         try {
-            log = CommitLog::read(folder, 2000, path);
+            log = CommitLog::read(folder, limit, path);
             if (!log)
                 error = tr("This folder is not in a git repository.");
         } catch (const GitError &exception) {
@@ -348,6 +358,31 @@ void HistoryView::onLogRead(const std::optional<CommitLog> &log, const QString &
     if (log != log_ || error != error_)
         showLog(log, error);
     emit refreshed();
+    loadMoreIfAtEnd(); // reached while reading
+}
+
+void HistoryView::loadMoreIfAtEnd()
+{
+    if (!log_ || !log_->truncated || reading_ || !commits_->isVisible())
+        return;
+    // While the list is rebuilt, its scroll bar says nothing of its end.
+    if (commits_->topLevelItemCount() != log_->commits.size())
+        return;
+    if (!isEndInView())
+        return;
+    commitLimit_ *= 2;
+    refresh();
+}
+
+bool HistoryView::isEndInView() const
+{
+    // The rows' geometry rather than the scroll bar's range, updated later.
+    for (int i = commits_->topLevelItemCount() - 1; i >= 0; --i) {
+        const QTreeWidgetItem *item = commits_->topLevelItem(i);
+        if (!item->isHidden())
+            return commits_->visualItemRect(item).top() < commits_->viewport()->height();
+    }
+    return true; // every row filtered out
 }
 
 void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
@@ -355,6 +390,9 @@ void HistoryView::showLog(std::optional<CommitLog> log, const QString &error)
     error_ = error;
     const QList<QTreeWidgetItem *> selected = commits_->selectedItems();
     const QString current = selected.isEmpty() ? QString() : selected.first()->data(0, idRole).toString();
+    // More commits read: the list grows under the eyes, it does not jump.
+    const int scrolled = commits_->verticalScrollBar()->value();
+    const QScopeGuard keepScroll([this, scrolled] { commits_->verticalScrollBar()->setValue(scrolled); });
     log_ = std::move(log);
     rebuildList();
 
