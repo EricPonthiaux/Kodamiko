@@ -71,6 +71,11 @@ RebaseResult rebase(const Worktree &worktree, const QString &onto);
 // without a current branch (detached HEAD).
 void fastForward(const RepositoryInfo &repository, const QString &branch);
 
+// The checkout's files that stopped fastForward() with
+// GitError::Kind::LocalChanges, from its message: absolute paths, changed or
+// untracked files git would have overwritten.
+QStringList blockingFiles(const RepositoryInfo &repository, const QString &mergeError);
+
 // The identifier of the worktree's last commit.
 QString head(const Worktree &worktree);
 

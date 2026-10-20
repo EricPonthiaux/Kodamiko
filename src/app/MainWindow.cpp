@@ -413,6 +413,7 @@ void MainWindow::createFilesPanel()
     fileStatuses_ = new FileStatusReader(this);
     connect(fileStatuses_, &FileStatusReader::statusesChanged, this,
             [this] { fileTree_->setStatuses(fileStatuses_->statuses(), inRepository_); });
+    agentMerges_->watch(fileStatuses_);
     fileTree_->setUnsavedChangesCheck(
         [this](const QString &path) { return editorTabs_->hasUnsavedChangesUnder(path); });
     connect(fileTree_, &FileTreeView::entryRenamed, this, [this](const QString &oldPath, const QString &newPath) {

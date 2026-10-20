@@ -75,6 +75,7 @@ void MainWindow::createGitServices()
     connect(agentMerges_, &AgentMergeQueue::progress, this, &MainWindow::showStatus);
     connect(agentMerges_, &AgentMergeQueue::merged, this, &MainWindow::onAgentMerged);
     connect(agentMerges_, &AgentMergeQueue::sentBack, this, &MainWindow::onAgentSentBack);
+    connect(agentMerges_, &AgentMergeQueue::waiting, this, &MainWindow::onAgentMergeWaiting);
     connect(agentMerges_, &AgentMergeQueue::failed, this, &MainWindow::onAgentMergeFailed);
     connect(gitCommands_, &GitCommands::succeeded, this, [this](const QString &, const QString &message) {
         if (!message.isEmpty())

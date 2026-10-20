@@ -6,6 +6,8 @@
 #include "git/GitCommands.h"
 #include "git/RepositoryStatus.h"
 
+#include <QDir>
+#include <QFileInfo>
 #include <QProcess>
 
 #include <algorithm>
@@ -18,6 +20,11 @@ constexpr int maxAttempts = 3;
 // Lines of a failing check's output sent to the agent.
 constexpr int reportedOutputLines = 60;
 
+struct FastForwardOutcome {
+    QString head;              // the worktree's last commit, now the branch's
+    QStringList blockingFiles; // the user's files in the way, if any
+};
+
 struct RebaseOutcome {
     RebaseResult result;
     QString branch; // the checkout's current branch, replayed on
@@ -28,6 +35,19 @@ QString lastLines(const QString &output, int count)
 {
     const QStringList lines = output.trimmed().split(QLatin1Char('\n'));
     return lines.mid(std::max<qsizetype>(0, lines.size() - count)).join(QLatin1Char('\n'));
+}
+
+// `paths`, absolute in the repository's canonical directory, as the file
+// states name them: from the open folder, which may go through a symbolic
+// link.
+QStringList asSeenFrom(const QString &folder, const QStringList &paths)
+{
+    const QDir canonicalFolder(QFileInfo(folder).canonicalFilePath());
+    const QDir openFolder(QDir::cleanPath(QFileInfo(folder).absoluteFilePath()));
+    QStringList seen;
+    for (const QString &path : paths)
+        seen.append(QDir::cleanPath(openFolder.filePath(canonicalFolder.relativeFilePath(path))));
+    return seen;
 }
 
 // The checkout's current branch, which receives the work.
@@ -49,8 +69,17 @@ AgentMergeQueue::AgentMergeQueue(GitCommands *git, QObject *parent)
 {
 }
 
+void AgentMergeQueue::setFolder(const QString &folder)
+{
+    if (folder != folder_)
+        waiting_.clear();
+    folder_ = folder;
+}
+
 void AgentMergeQueue::enqueue(const Worktree &worktree, AfterMerge afterMerge)
 {
+    // Waiting or not, the request goes through the queue again.
+    forget(worktree);
     const auto queued = std::ranges::find_if(
         queue_, [&worktree](const Request &request) { return request.worktree.path == worktree.path; });
     if (queued != queue_.end()) {
@@ -62,6 +91,40 @@ void AgentMergeQueue::enqueue(const Worktree &worktree, AfterMerge afterMerge)
     queue_.append({.worktree = worktree, .afterMerge = afterMerge});
     if (queue_.size() == 1)
         rebase();
+}
+
+void AgentMergeQueue::retryWaiting(const FileStatusMap &statuses)
+{
+    const auto isClean = [&statuses](const QString &path) {
+        const auto status = statuses.constFind(path);
+        return status == statuses.constEnd() || *status == FileStatus::Ignored;
+    };
+    // A worktree deleted meanwhile has nothing left to merge.
+    waiting_.removeIf([](const Request &request) { return !QFileInfo::exists(request.worktree.path); });
+    const QList<Request> waiting = waiting_;
+    for (const Request &request : waiting) {
+        if (std::ranges::all_of(request.blockingFiles, isClean))
+            enqueue(request.worktree, request.afterMerge);
+    }
+}
+
+void AgentMergeQueue::watch(const FileStatusReader *statuses)
+{
+    connect(statuses, &FileStatusReader::statusesChanged, this,
+            [this, statuses] { retryWaiting(statuses->statuses()); });
+}
+
+void AgentMergeQueue::forget(const Worktree &worktree)
+{
+    waiting_.removeIf([&worktree](const Request &request) { return request.worktree.path == worktree.path; });
+}
+
+QList<Worktree> AgentMergeQueue::waitingWorktrees() const
+{
+    QList<Worktree> worktrees;
+    for (const Request &request : waiting_)
+        worktrees.append(request.worktree);
+    return worktrees;
 }
 
 void AgentMergeQueue::finishCurrent()
@@ -154,35 +217,62 @@ void AgentMergeQueue::fastForward(const QString &branch)
 {
     emit progress(tr("Merging %1's commits into %2").arg(current().worktree.name, branch));
     // Filled by the job, off the UI thread, then read on it: shared by the two.
-    const auto head = std::make_shared<QString>();
+    const auto outcome = std::make_shared<FastForwardOutcome>();
     git_->run(
         tr("Merge %1 into %2").arg(current().worktree.name, branch),
-        [folder = folder_, worktree = current().worktree, head] {
+        [folder = folder_, worktree = current().worktree, outcome] {
             const std::optional<RepositoryInfo> repository = RepositoryInfo::read(folder);
             if (!repository)
                 throw GitError(QObject::tr("The folder is not in a git repository"));
-            Worktrees::fastForward(*repository, worktree.branch);
-            *head = Worktrees::head(worktree);
+            try {
+                Worktrees::fastForward(*repository, worktree.branch);
+            } catch (const GitError &error) {
+                if (error.kind() == GitError::Kind::LocalChanges)
+                    outcome->blockingFiles = asSeenFrom(folder, Worktrees::blockingFiles(*repository, error.message()));
+                throw;
+            }
+            outcome->head = Worktrees::head(worktree);
             return QObject::tr("%1's commits merged into %2").arg(worktree.name, repository->branch);
         },
-        [this, branch, head] {
+        [this, branch, outcome] {
             const Request request = current();
-            emit merged(request.worktree, branch, *head, request.afterMerge);
+            emit merged(request.worktree, branch, outcome->head, request.afterMerge);
             finishCurrent();
         },
-        [this](const GitError &error) {
-            const bool branchMoved = error.kind() == GitError::Kind::Diverged && current().attempts < maxAttempts;
-            if (branchMoved)
-                rebase(); // new commits on the branch since the replay: replay again
-            else
-                fail(error.message());
+        [this, outcome](const GitError &error) {
+            onFastForwardFailed(error, outcome->blockingFiles);
             return true;
         });
+}
+
+void AgentMergeQueue::onFastForwardFailed(const GitError &error, const QStringList &blockingFiles)
+{
+    if (error.kind() == GitError::Kind::Diverged && current().attempts < maxAttempts) {
+        rebase(); // new commits on the branch since the replay: replay again
+        return;
+    }
+    if (error.kind() == GitError::Kind::LocalChanges && !blockingFiles.isEmpty()) {
+        wait(blockingFiles);
+        return;
+    }
+    fail(error.message());
 }
 
 void AgentMergeQueue::fail(const QString &message)
 {
     emit failed(current().worktree, message);
+    finishCurrent();
+}
+
+void AgentMergeQueue::wait(const QStringList &files)
+{
+    Request request = current();
+    request.blockingFiles = files;
+    waiting_.append(request);
+    QStringList relative;
+    for (const QString &file : files)
+        relative.append(QDir(folder_).relativeFilePath(file));
+    emit waiting(request.worktree, relative);
     finishCurrent();
 }
 

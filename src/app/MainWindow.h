@@ -231,6 +231,8 @@ private:
     // Conflicts or a failing check of its commits up to `head`: typed in the
     // agent's prompt for it to fix.
     void onAgentSentBack(const Worktree &worktree, const QString &report, const QString &head);
+    // The user's changes to `files` keep the agent's work out for now.
+    void onAgentMergeWaiting(const Worktree &worktree, const QStringList &files);
     void onAgentMergeFailed(const Worktree &worktree, const QString &message);
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);

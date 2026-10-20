@@ -143,6 +143,20 @@ void fastForward(const RepositoryInfo &repository, const QString &branch)
     }
 }
 
+QStringList blockingFiles(const RepositoryInfo &repository, const QString &mergeError)
+{
+    // git lists them one per line, indented by a tab, under "Your local
+    // changes to the following files would be overwritten by merge:" or
+    // "The following untracked working tree files would be overwritten…".
+    QStringList files;
+    const QDir root(repository.workDir);
+    for (const QString &line : mergeError.split(QLatin1Char('\n'))) {
+        if (line.startsWith(QLatin1Char('\t')))
+            files.append(root.filePath(line.trimmed()));
+    }
+    return files;
+}
+
 QString head(const Worktree &worktree)
 {
     return QString::fromUtf8(Git::run(worktree.path, {QStringLiteral("rev-parse"), QStringLiteral("HEAD")}).trimmed());

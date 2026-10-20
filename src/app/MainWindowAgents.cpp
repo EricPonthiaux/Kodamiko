@@ -301,6 +301,18 @@ void MainWindow::onAgentSentBack(const Worktree &worktree, const QString &report
     showStatus(tr("%1's commits were not merged: it is told why").arg(worktree.name));
 }
 
+void MainWindow::onAgentMergeWaiting(const Worktree &worktree, const QStringList &files)
+{
+    const QString list = files.join(QStringLiteral(", "));
+    showStatus(tr("%1's work waits for your changes to %2").arg(worktree.name, list));
+    notify(tr("Agent work waiting"), tr("%1's work changes files you are modifying: %2").arg(worktree.name, list));
+    agentMessage_->popup(tr("Merge %1").arg(worktree.name),
+                         tr("%1's work is ready, but it changes files you are modifying:\n\n%2\n\nNothing to do: "
+                            "Duet merges it by itself as soon as you commit, stash or discard your changes to these "
+                            "files.")
+                             .arg(worktree.name, files.join(QLatin1Char('\n'))));
+}
+
 void MainWindow::onAgentMergeFailed(const Worktree &worktree, const QString &message)
 {
     showStatus(tr("%1's work was not merged; its worktree stays in %2").arg(worktree.name, worktree.path));
