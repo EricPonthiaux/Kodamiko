@@ -6,10 +6,10 @@
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
 #include "ui/UiIcons.h"
+#include "workspace/ChoicePopup.h"
 
 #include <QCheckBox>
 #include <QHBoxLayout>
-#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QShortcut>
@@ -150,12 +150,15 @@ void CommitPanel::commit()
         emit statusMessage(tr("Nothing to commit"));
         return;
     }
-    const auto answer =
-        QMessageBox::question(this, tr("Commit"),
-                              tr("No changes are staged. Stage all changes (%n file(s)) and commit them?", nullptr,
-                                 static_cast<int>(status_->unstaged.size())));
-    if (answer == QMessageBox::Yes)
-        runCommit(message, false, true);
+    auto *popup =
+        new ChoicePopup({.title = tr("Commit"),
+                         .location = {},
+                         .message = tr("No changes are staged. Stage all changes (%n file(s)) and commit "
+                                       "them?",
+                                       nullptr, static_cast<int>(status_->unstaged.size())),
+                         .details = {}},
+                        {{tr("Stage All and Commit"), [this, message] { runCommit(message, false, true); }}}, this);
+    popup->popup();
 }
 
 void CommitPanel::runCommit(const QString &message, bool amend, bool stageEverything)

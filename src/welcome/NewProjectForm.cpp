@@ -7,6 +7,7 @@
 #include "projects/ProjectStore.h"
 #include "projects/ProjectTemplates.h"
 #include "ui/PopupWidgets.h"
+#include "workspace/ChoicePopup.h"
 
 #include <QCheckBox>
 #include <QDir>
@@ -16,7 +17,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
 #include <QVBoxLayout>
@@ -207,9 +207,12 @@ void NewProjectForm::trustForClaude(const QString &folder)
     // need not ask whether to trust them.
     QString error;
     if (!ClaudeTrust::trust(folder, &error))
-        QMessageBox::warning(this, tr("Folder not trusted by Claude"),
-                             tr("The project was created in %1, but Claude Code will ask whether to trust it: %2")
-                                 .arg(QDir::toNativeSeparators(folder), error));
+        showNotice({.title = tr("Folder not trusted by Claude"),
+                    .location = {},
+                    .message = tr("The project was created in %1, but Claude Code will ask whether to trust it: %2")
+                                   .arg(QDir::toNativeSeparators(folder), error),
+                    .details = {}},
+                   this);
 }
 
 void NewProjectForm::initRepository(const QString &folder)
@@ -220,8 +223,11 @@ void NewProjectForm::initRepository(const QString &folder)
         GitOperations::init(folder);
     } catch (const GitError &error) {
         // The project is there all the same: it opens without a repository.
-        QMessageBox::warning(this, tr("Git repository not created"),
-                             tr("The project was created in %1, but \"git init\" failed: %2")
-                                 .arg(QDir::toNativeSeparators(folder), error.message()));
+        showNotice({.title = tr("Git repository not created"),
+                    .location = {},
+                    .message = tr("The project was created in %1, but \"git init\" failed: %2")
+                                   .arg(QDir::toNativeSeparators(folder), error.message()),
+                    .details = {}},
+                   this);
     }
 }

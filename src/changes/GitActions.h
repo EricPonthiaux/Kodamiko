@@ -67,8 +67,18 @@ private:
     void runRemote(const QString &title,
                    std::function<QString(const RepositoryInfo &, const Git::Feedback &)> operation,
                    std::function<bool(const GitError &)> onFailure = {});
-    // Dialog asking to confirm `question`; `action` names the button.
-    bool confirm(const QString &title, const QString &question, const QString &action);
+    // The open folder's name, under the popups' titles.
+    QString location() const;
+    // Popup asking to confirm `question`; `action` names the button. Runs
+    // `onConfirmed` once the user confirms, nothing if they cancel.
+    void confirm(const QString &title,
+                 const QString &question,
+                 const QString &action,
+                 std::function<void()> onConfirmed);
+    void checkoutCommitNow(const QString &id);
+    // Renames the branch `name` to the name the user typed; an error
+    // message when git cannot use it.
+    QString renameBranchTo(const QString &name, const QString &typed);
 
     bool onSwitchFailed(const GitError &error, const QString &name, bool remote);
     bool onPushFailed(const GitError &error);

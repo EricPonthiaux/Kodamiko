@@ -15,11 +15,11 @@
 #include "editor/ScrollBarMarks.h"
 #include "editor/SymbolOccurrences.h"
 #include "git/GitProcess.h"
+#include "workspace/ChoicePopup.h"
 
 #include <QApplication>
 #include <QContextMenuEvent>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QSettings>
@@ -788,9 +788,9 @@ private slots:
         // (deleted on disk), then the user discards b.txt's changes.
         QTimer::singleShot(0, &tabs, [&tabs, &dir] {
             tabs.closeFilesUnder(dir.filePath("a.txt"));
-            auto *question = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            auto *question = tabs.findChild<ChoicePopup *>();
             QVERIFY(question);
-            question->button(QMessageBox::Discard)->click();
+            question->choiceButtons().at(1)->click(); // Discard
         });
         tabs.closeCurrent();
 

@@ -24,16 +24,14 @@
 #include "history/HistoryView.h"
 #include "navigation/SymbolIndex.h"
 #include "ui/TitleBar.h"
+#include "workspace/ChoicePopup.h"
 #include "workspace/EntryPopups.h"
 #include "workspace/FileTreeView.h"
 
 #include <QDir>
-#include <QInputDialog>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
-#include <QMessageBox>
-#include <QPushButton>
 #include <QStatusBar>
 #include <QToolButton>
 
@@ -84,7 +82,7 @@ void MainWindow::createGitServices()
         updateRepositoryInfo();
     });
     connect(gitCommands_, &GitCommands::failed, this, [this](const QString &title, const QString &error) {
-        QMessageBox::warning(this, tr("%1: failed").arg(title), error);
+        showNotice({.title = tr("%1: failed").arg(title), .location = {}, .message = error, .details = {}}, this);
         updateRepositoryInfo();
     });
     // A fetch, pull or push: its progress in the status bar, with a button
@@ -160,7 +158,8 @@ void MainWindow::runGitOnTree(const QString &title, const QString &path, bool ro
     try {
         info = RepositoryInfo::read(folder_);
     } catch (const GitError &error) {
-        QMessageBox::warning(this, tr("%1: failed").arg(title), QString::fromStdString(error.what()));
+        showNotice({.title = tr("%1: failed").arg(title), .location = {}, .message = error.message(), .details = {}},
+                   this);
         return;
     }
     if (!info)
@@ -304,19 +303,27 @@ std::optional<QString> MainWindow::askCredentials(const QString &prompt)
     // ssh's unknown host: "Are you sure you want to continue connecting
     // (yes/no/[fingerprint])?", after the key's fingerprint.
     if (AskpassServer::isConfirmation(prompt)) {
-        QMessageBox box(QMessageBox::Question, tr("Unknown Host"), prompt.trimmed(), QMessageBox::Cancel, this);
-        const QPushButton *trust = box.addButton(tr("Trust and Connect"), QMessageBox::AcceptRole);
-        box.setDefaultButton(QMessageBox::Cancel);
-        box.exec();
-        return box.clickedButton() == trust ? QStringLiteral("yes") : QStringLiteral("no");
+        bool trusted = false;
+        auto *popup =
+            new ChoicePopup({.title = tr("Unknown Host"), .location = {}, .message = prompt.trimmed(), .details = {}},
+                            {{tr("Trust and Connect"), [&trusted] { trusted = true; }}}, this);
+        popup->focusCancel();
+        popup->exec();
+        return trusted ? QStringLiteral("yes") : QStringLiteral("no");
     }
+    std::optional<QString> answer;
+    auto *popup = new NamePopup(
+        tr("Git Credentials"), prompt.trimmed(),
+        [&answer](const QString &typed) {
+            answer = typed;
+            return QString();
+        },
+        this);
+    popup->field()->setPlaceholderText({});
     // A user name is shown as typed; passwords and passphrases are not.
     const bool secret = !prompt.startsWith(QLatin1String("Username"), Qt::CaseInsensitive);
-    bool accepted = false;
-    QString answer = QInputDialog::getText(this, tr("Git Credentials"), prompt.trimmed(),
-                                           secret ? QLineEdit::Password : QLineEdit::Normal, {}, &accepted);
-    if (!accepted)
-        return std::nullopt;
+    popup->field()->setEchoMode(secret ? QLineEdit::Password : QLineEdit::Normal);
+    popup->exec();
     return answer;
 }
 

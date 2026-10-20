@@ -10,6 +10,7 @@
 #include "changes/StashesPopup.h"
 #include "claude/AgentCheckPopup.h"
 #include "claude/ClaudeConfigView.h"
+#include "claude/DiagramRequestPopup.h"
 #include "claude/EditorContext.h"
 #include "claude/NewAgentPopup.h"
 #include "claude/mcp/DuetTools.h"
@@ -100,6 +101,7 @@ void MainWindow::setTheme(const QString &name)
     newAgentPopup_->applyTheme(theme_);
     closeAgentPopup_->applyTheme(theme_);
     agentCheckPopup_->applyTheme(theme_);
+    diagramRequestPopup_->applyTheme(theme_);
     agentMessage_->applyTheme(theme_);
     if (prerequisitesPopup_)
         prerequisitesPopup_->applyTheme(theme_);

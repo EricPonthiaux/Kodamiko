@@ -86,6 +86,13 @@ void setStyleSheetKeepingFonts(const QString &sheet)
         widget->setFont(font);
 }
 
+// The theme apply() set last.
+Theme &appliedTheme()
+{
+    static Theme theme = Theme::duet();
+    return theme;
+}
+
 } // namespace
 
 namespace ThemeStyle {
@@ -334,6 +341,7 @@ QColor selectionColor(const Theme &theme)
 
 void apply(const Theme &theme)
 {
+    appliedTheme() = theme;
     // Setting either one restyles every widget of the application, even
     // when nothing changes (a window opening on the current theme).
     const QPalette colors = palette(theme);
@@ -342,6 +350,11 @@ void apply(const Theme &theme)
     const QString sheet = styleSheet(theme);
     if (qApp->styleSheet() != sheet)
         setStyleSheetKeepingFonts(sheet);
+}
+
+const Theme &applied()
+{
+    return appliedTheme();
 }
 
 void applyFont(const QFont &font)

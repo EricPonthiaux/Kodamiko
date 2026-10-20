@@ -143,6 +143,14 @@ void OverlayPopup::dismiss()
     hide();
     if (previousFocus_ && previousFocus_->isVisible())
         previousFocus_->setFocus();
+    emit dismissed();
+}
+
+void OverlayPopup::setMinimumPanelSize(const QSize &minimum)
+{
+    minimum_ = minimum;
+    if (isVisible())
+        place();
 }
 
 void OverlayPopup::resetSize()

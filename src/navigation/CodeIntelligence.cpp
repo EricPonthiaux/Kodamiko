@@ -13,11 +13,12 @@
 #include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
+#include "workspace/EntryPopups.h"
 
 #include <QDir>
 #include <QFileInfo>
-#include <QInputDialog>
 #include <QJsonArray>
+#include <QLineEdit>
 #include <QMenu>
 #include <QPointer>
 #include <QTimer>
@@ -538,17 +539,31 @@ void CodeIntelligence::rename()
         emit statusMessage(tr("Place the cursor on a name to rename it"));
         return;
     }
+    if (!serverFor(editor))
+        return;
+    const QPointer<EditorWidget> target = editor;
+    auto *popup = new NamePopup(
+        tr("Rename “%1”").arg(word), QFileInfo(editor->filePath()).fileName(),
+        [this, target, start, word](const QString &newName) -> QString {
+            if (newName.isEmpty())
+                return tr("Specify a new name");
+            if (target && newName != word)
+                renameAt(target, start, word, newName);
+            return {};
+        },
+        editor);
+    popup->field()->setText(word);
+    popup->field()->selectAll();
+    popup->popup();
+}
+
+void CodeIntelligence::renameAt(EditorWidget *editor, int bytePosition, const QString &word, const QString &newName)
+{
     LspClient *client = serverFor(editor);
     if (!client)
         return;
-    bool accepted = false;
-    const QString newName =
-        QInputDialog::getText(editor, tr("Rename"), tr("Rename “%1” to:").arg(word), QLineEdit::Normal, word, &accepted)
-            .trimmed();
-    if (!accepted || newName.isEmpty() || newName == word)
-        return;
     syncOpenEditors(client, editor->languageId());
-    QJsonObject params = positionParams(editor, start);
+    QJsonObject params = positionParams(editor, bytePosition);
     params.insert("newName", newName);
     client->request(QStringLiteral("textDocument/rename"), params,
                     [this, word, newName](const QJsonValue &result, const QString &error) {

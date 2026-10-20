@@ -39,6 +39,7 @@ class FileStatusReader;
 class FileTreeView;
 class FilesPanel;
 class FindBar;
+class DiagramRequestPopup;
 class FindInFilesPopup;
 class GitActions;
 class GitCommands;
@@ -191,6 +192,8 @@ private:
     void updateToolsNotice();
     bool startClaudeSession(QString *error = nullptr, const QStringList &extraArguments = {});
     void restartClaudeSession();
+    // Starts the session again, on with its last conversation.
+    void continueClaudeSession();
     // The Effective Settings tab, opened, or updated if it is open.
     void showEffectiveSettings(bool open);
     void showClaudeSession();
@@ -464,6 +467,7 @@ private:
     NewAgentPopup *newAgentPopup_ = nullptr;
     CloseAgentPopup *closeAgentPopup_ = nullptr;
     AgentCheckPopup *agentCheckPopup_ = nullptr;
+    DiagramRequestPopup *diagramRequestPopup_ = nullptr;
     // What the agents' sessions and merges have to tell the user, one
     // message after the other.
     MessagePopup *agentMessage_ = nullptr;

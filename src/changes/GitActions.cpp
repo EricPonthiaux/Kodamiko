@@ -2,21 +2,17 @@
 
 #include "GitActions.h"
 
+#include "StashChangesPopup.h"
 #include "git/Branches.h"
 #include "git/GitCommands.h"
 #include "git/Integration.h"
 #include "git/Remotes.h"
 #include "git/Stashes.h"
+#include "workspace/ChoicePopup.h"
+#include "workspace/EntryPopups.h"
 
-#include <QCheckBox>
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QInputDialog>
-#include <QLabel>
+#include <QFileInfo>
 #include <QLineEdit>
-#include <QMessageBox>
-#include <QPushButton>
-#include <QVBoxLayout>
 
 namespace {
 
@@ -86,13 +82,24 @@ void GitActions::runRemote(const QString &title,
         });
 }
 
-bool GitActions::confirm(const QString &title, const QString &question, const QString &action)
+QString GitActions::location() const
 {
-    QMessageBox box(QMessageBox::Question, title, question, QMessageBox::Cancel, window_);
-    const QPushButton *accept = box.addButton(action, QMessageBox::AcceptRole);
-    box.setDefaultButton(QMessageBox::Cancel);
-    box.exec();
-    return box.clickedButton() == accept;
+    return QFileInfo(folder_()).fileName();
+}
+
+void GitActions::confirm(const QString &title,
+                         const QString &question,
+                         const QString &action,
+                         std::function<void()> onConfirmed)
+{
+    auto *popup = new ConfirmPopup(
+        {title, location(), question, action},
+        [onConfirmed = std::move(onConfirmed)](ConfirmPopup *) {
+            onConfirmed();
+            return true;
+        },
+        window_);
+    popup->popup();
 }
 
 void GitActions::fetch()
@@ -128,17 +135,16 @@ bool GitActions::onPullFailed(const GitError &error)
     const std::optional<RepositoryInfo> current = repository();
     if (!current || current->upstream.isEmpty())
         return false;
-    QMessageBox box(QMessageBox::Question, tr("Pull"), error.message(), QMessageBox::Cancel, window_);
-    box.setInformativeText(tr("Rebase replays your own commits on top of %1; merge joins both with a merge commit.")
-                               .arg(current->upstream));
-    QPushButton *rebaseButton = box.addButton(tr("Rebase"), QMessageBox::AcceptRole);
-    const QPushButton *mergeButton = box.addButton(tr("Merge"), QMessageBox::AcceptRole);
-    box.setDefaultButton(rebaseButton);
-    box.exec();
-    if (box.clickedButton() == rebaseButton)
-        rebase(current->upstream);
-    else if (box.clickedButton() == mergeButton)
-        merge(current->upstream);
+    const QString upstream = current->upstream;
+    auto *popup = new ChoicePopup(
+        {.title = tr("Pull"),
+         .location = location(),
+         .message = error.message(),
+         .details =
+             tr("Rebase replays your own commits on top of %1; merge joins both with a merge commit.").arg(upstream)},
+        {{tr("Rebase"), [this, upstream] { rebase(upstream); }}, {tr("Merge"), [this, upstream] { merge(upstream); }}},
+        window_);
+    popup->popup();
     return true;
 }
 
@@ -146,20 +152,18 @@ bool GitActions::onPushFailed(const GitError &error)
 {
     if (error.kind() != GitError::Kind::Rejected)
         return false;
-    QMessageBox box(QMessageBox::Warning, tr("Push"), error.message(), QMessageBox::Cancel, window_);
-    box.setInformativeText(tr("Pull brings their commits in first. Overwriting deletes them from the remote, "
-                              "unless someone pushed others since the last fetch."));
-    QPushButton *pullButton = box.addButton(tr("Pull"), QMessageBox::AcceptRole);
-    const QPushButton *forceButton = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole);
-    box.setDefaultButton(pullButton);
-    box.exec();
-    if (box.clickedButton() == pullButton) {
-        pull();
-    } else if (box.clickedButton() == forceButton) {
+    const auto overwrite = [this] {
         runRemote(tr("Push"), [](const RepositoryInfo &repository, const Git::Feedback &feedback) {
             return Remotes::push(repository, feedback, true);
         });
-    }
+    };
+    auto *popup = new ChoicePopup({.title = tr("Push"),
+                                   .location = location(),
+                                   .message = error.message(),
+                                   .details = tr("Pull brings their commits in first. Overwriting deletes them from "
+                                                 "the remote, unless someone pushed others since the last fetch.")},
+                                  {{tr("Pull"), [this] { pull(); }}, {tr("Overwrite"), overwrite}}, window_);
+    popup->popup();
     return true;
 }
 
@@ -178,31 +182,33 @@ bool GitActions::onSwitchFailed(const GitError &error, const QString &name, bool
 {
     if (error.kind() != GitError::Kind::LocalChanges)
         return false;
-    QMessageBox box(QMessageBox::Question, tr("Switch branch"), tr("Your changes conflict with %1.").arg(name),
-                    QMessageBox::Cancel, window_);
-    box.setInformativeText(tr("They can be put aside in a stash, then brought back on %1: the conflicts are "
-                              "then left for you to resolve.")
-                               .arg(name));
-    box.setDetailedText(error.message());
-    QPushButton *stashButton = box.addButton(tr("Stash and Switch"), QMessageBox::AcceptRole);
-    box.setDefaultButton(stashButton);
-    box.exec();
-    if (box.clickedButton() == stashButton) {
+    const auto stashAndSwitch = [this, name, remote] {
         run(tr("Switch branch"), [name, remote](const RepositoryInfo &repository) {
             Branches::stashAndSwitch(repository, name, remote);
             return QObject::tr("Switched to %1 with your changes").arg(remote ? Branches::nameOnRemote(name) : name);
         });
-    }
+    };
+    auto *popup = new ChoicePopup({.title = tr("Switch branch"),
+                                   .location = location(),
+                                   .message = tr("Your changes conflict with %1. They can be put aside in a stash, "
+                                                 "then brought back on %1: the conflicts are then left for you to "
+                                                 "resolve.")
+                                                  .arg(name),
+                                   .details = error.message()},
+                                  {{tr("Stash and Switch"), stashAndSwitch}}, window_);
+    popup->popup();
     return true;
 }
 
 void GitActions::checkoutCommit(const QString &id)
 {
-    if (!confirm(
-            tr("Check Out Commit"),
+    confirm(tr("Check Out Commit"),
             tr("Check out %1 without a branch? Commits made there belong to no branch until you create one.").arg(id),
-            tr("Check Out")))
-        return;
+            tr("Check Out"), [this, id] { checkoutCommitNow(id); });
+}
+
+void GitActions::checkoutCommitNow(const QString &id)
+{
     run(
         tr("Check out"),
         [id](const RepositoryInfo &repository) {
@@ -212,45 +218,52 @@ void GitActions::checkoutCommit(const QString &id)
         [this, id](const GitError &error) {
             if (error.kind() != GitError::Kind::LocalChanges)
                 return false;
-            QMessageBox::warning(
-                window_, tr("Check out"),
-                tr("Your changes conflict with %1: commit or stash them first.\n\n%2").arg(id, error.message()));
+            showNotice({.title = tr("Check out"),
+                        .location = location(),
+                        .message = tr("Your changes conflict with %1: commit or stash them first.").arg(id),
+                        .details = error.message()},
+                       window_);
             return true;
         });
 }
 
 void GitActions::renameBranch(const QString &name)
 {
-    bool accepted = false;
-    QString newName = QInputDialog::getText(window_, tr("Rename Branch"), tr("New name of %1:").arg(name),
-                                            QLineEdit::Normal, name, &accepted);
-    if (!accepted)
-        return;
-    newName = Branches::sanitizedName(newName.trimmed());
+    auto *popup = new NamePopup(
+        tr("Rename Branch %1").arg(name), location(),
+        [this, name](const QString &typed) { return renameBranchTo(name, typed); }, window_);
+    popup->field()->setText(name);
+    popup->field()->selectAll();
+    popup->popup();
+}
+
+QString GitActions::renameBranchTo(const QString &name, const QString &typed)
+{
+    const QString newName = Branches::sanitizedName(typed);
     if (newName == name)
-        return;
-    if (const QString problem = Branches::nameError(newName); !problem.isEmpty()) {
-        QMessageBox::warning(window_, tr("Rename Branch"), problem);
-        return;
-    }
+        return {};
+    if (QString problem = Branches::nameError(newName); !problem.isEmpty())
+        return problem;
     run(tr("Rename branch"), [name, newName](const RepositoryInfo &repository) {
         Branches::rename(repository, name, newName);
         return QObject::tr("Branch %1 renamed %2").arg(name, newName);
     });
+    return {};
 }
 
 void GitActions::deleteBranch(const QString &name, bool remote)
 {
     if (remote) {
-        if (!confirm(tr("Delete Remote Branch"),
-                     tr("Delete %1 from %2? Everyone working with this remote loses the branch.")
-                         .arg(Branches::nameOnRemote(name), Branches::remoteOf(name)),
-                     tr("Delete")))
-            return;
-        runRemote(tr("Delete remote branch"), [name](const RepositoryInfo &repository, const Git::Feedback &feedback) {
-            Branches::removeRemote(repository, name, feedback);
-            return QObject::tr("Branch %1 deleted").arg(name);
-        });
+        confirm(tr("Delete Remote Branch"),
+                tr("Delete %1 from %2? Everyone working with this remote loses the branch.")
+                    .arg(Branches::nameOnRemote(name), Branches::remoteOf(name)),
+                tr("Delete"), [this, name] {
+                    runRemote(tr("Delete remote branch"),
+                              [name](const RepositoryInfo &repository, const Git::Feedback &feedback) {
+                                  Branches::removeRemote(repository, name, feedback);
+                                  return QObject::tr("Branch %1 deleted").arg(name);
+                              });
+                });
         return;
     }
     run(
@@ -262,15 +275,15 @@ void GitActions::deleteBranch(const QString &name, bool remote)
         [this, name](const GitError &error) {
             if (error.kind() != GitError::Kind::Unmerged)
                 return false;
-            if (confirm(tr("Delete Branch"),
-                        tr("%1. Delete it anyway? Its commits will only be reachable from the reflog.")
-                            .arg(error.message()),
-                        tr("Delete"))) {
-                run(tr("Delete branch"), [name](const RepositoryInfo &repository) {
-                    Branches::remove(repository, name, true);
-                    return QObject::tr("Branch %1 deleted").arg(name);
+            confirm(
+                tr("Delete Branch"),
+                tr("%1. Delete it anyway? Its commits will only be reachable from the reflog.").arg(error.message()),
+                tr("Delete"), [this, name] {
+                    run(tr("Delete branch"), [name](const RepositoryInfo &repository) {
+                        Branches::remove(repository, name, true);
+                        return QObject::tr("Branch %1 deleted").arg(name);
+                    });
                 });
-            }
             return true;
         });
 }
@@ -314,15 +327,15 @@ void GitActions::abortOperation()
     const std::optional<RepositoryInfo> current = repository();
     if (!current || current->operation.isEmpty())
         return;
-    if (!confirm(tr("Abort"),
-                 tr("Abort the %1? The branch and the files go back to how they were before it started.")
-                     .arg(current->operation),
-                 tr("Abort %1").arg(current->operation)))
-        return;
-    run(tr("Abort"), [](const RepositoryInfo &repository) {
-        Integration::abortOperation(repository);
-        return QObject::tr("The %1 was aborted").arg(repository.operation);
-    });
+    confirm(tr("Abort"),
+            tr("Abort the %1? The branch and the files go back to how they were before it started.")
+                .arg(current->operation),
+            tr("Abort %1").arg(current->operation), [this] {
+                run(tr("Abort"), [](const RepositoryInfo &repository) {
+                    Integration::abortOperation(repository);
+                    return QObject::tr("The %1 was aborted").arg(repository.operation);
+                });
+            });
 }
 
 void GitActions::skipCommit()
@@ -335,33 +348,16 @@ void GitActions::skipCommit()
 
 void GitActions::stashChanges()
 {
-    QDialog dialog(window_);
-    dialog.setWindowTitle(tr("Stash Changes"));
-    auto *explanation = new QLabel(tr("Put your changes aside: the files go back to the last commit, and the "
-                                      "changes can be brought back later, on this branch or another."),
-                                   &dialog);
-    explanation->setWordWrap(true);
-    auto *message = new QLineEdit(&dialog);
-    message->setPlaceholderText(tr("Message (optional)"));
-    auto *untracked = new QCheckBox(tr("Include new files"), &dialog);
-    untracked->setChecked(true);
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, &dialog);
-    buttons->addButton(tr("Stash"), QDialogButtonBox::AcceptRole)->setDefault(true);
-    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    auto *layout = new QVBoxLayout(&dialog);
-    layout->addWidget(explanation);
-    layout->addWidget(message);
-    layout->addWidget(untracked);
-    layout->addWidget(buttons);
-    dialog.resize(440, dialog.sizeHint().height());
-    if (dialog.exec() != QDialog::Accepted)
-        return;
-    run(tr("Stash"), [text = message->text().trimmed(),
-                      includeUntracked = untracked->isChecked()](const RepositoryInfo &repository) {
-        Stashes::push(repository, text, includeUntracked);
-        return QObject::tr("Changes stashed");
-    });
+    auto *popup = new StashChangesPopup(
+        location(),
+        [this](const QString &message, bool includeUntracked) {
+            run(tr("Stash"), [message, includeUntracked](const RepositoryInfo &repository) {
+                Stashes::push(repository, message, includeUntracked);
+                return QObject::tr("Changes stashed");
+            });
+        },
+        window_);
+    popup->popup();
 }
 
 void GitActions::applyStash(int index, bool drop)
@@ -378,19 +374,21 @@ void GitActions::applyStash(int index, bool drop)
         [this](const GitError &error) {
             if (error.kind() != GitError::Kind::LocalChanges)
                 return false;
-            QMessageBox::warning(
-                window_, tr("Stash"),
-                tr("Your changes conflict with the stash: commit or stash them first.\n\n%1").arg(error.message()));
+            showNotice({.title = tr("Stash"),
+                        .location = location(),
+                        .message = tr("Your changes conflict with the stash: commit or stash them first."),
+                        .details = error.message()},
+                       window_);
             return true;
         });
 }
 
 void GitActions::dropStash(int index, const QString &message)
 {
-    if (!confirm(tr("Drop Stash"), tr("Drop \"%1\"? Its changes are lost.").arg(message), tr("Drop")))
-        return;
-    run(tr("Drop stash"), [index](const RepositoryInfo &repository) {
-        Stashes::drop(repository, index);
-        return QObject::tr("Stash dropped");
+    confirm(tr("Drop Stash"), tr("Drop \"%1\"? Its changes are lost.").arg(message), tr("Drop"), [this, index] {
+        run(tr("Drop stash"), [index](const RepositoryInfo &repository) {
+            Stashes::drop(repository, index);
+            return QObject::tr("Stash dropped");
+        });
     });
 }

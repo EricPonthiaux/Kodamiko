@@ -11,6 +11,7 @@
 #include "claude/AgentCheckPopup.h"
 #include "claude/ClaudeConfigView.h"
 #include "claude/ClaudeLinter.h"
+#include "claude/DiagramRequestPopup.h"
 #include "claude/NewAgentPopup.h"
 #include "claude/mcp/DuetTools.h"
 #include "completion/CodeGeneration.h"
@@ -334,6 +335,7 @@ void MainWindow::createPopups()
     connect(closeAgentPopup_, &CloseAgentPopup::fateChosen, this, &MainWindow::closeAgentTab);
     agentCheckPopup_ = new AgentCheckPopup(theme_, this);
     connect(agentCheckPopup_, &AgentCheckPopup::saved, this, &MainWindow::setAgentCheckCommand);
+    diagramRequestPopup_ = new DiagramRequestPopup(theme_, this);
     agentMessage_ = new MessagePopup(QStringLiteral("claude"), QStringLiteral("agentMessage"), theme_, this);
     findInFiles_ = new FindInFilesPopup(theme_, this);
     findInFiles_->setBufferProvider([this] { return editorTabs_->unsavedTexts(); });

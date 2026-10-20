@@ -49,7 +49,15 @@ public:
     // Forgets the size and the place chosen by the user.
     void resetSize();
 
+signals:
+    // dismiss() hid it.
+    void dismissed();
+
 protected:
+    // Raises the smallest size (shadow excluded); placed again if shown.
+    // For a panel whose height follows its content.
+    void setMinimumPanelSize(const QSize &minimum);
+
     bool event(QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;

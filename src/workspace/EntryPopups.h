@@ -2,10 +2,12 @@
 
 #pragma once
 
-#include <QFrame>
+#include "ui/OverlayPopup.h"
 
 #include <functional>
 
+class PopupHeader;
+class QHBoxLayout;
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -27,28 +29,43 @@ EntryTarget resolveNewEntry(const QString &root, const QString &folder, const QS
 // name gives `path` back; a change of case only is accepted.
 EntryTarget resolveRename(const QString &path, const QString &name);
 
-// Compact popup for an operation on a file or folder: a bold title with
-// the location below, then the content. Its width follows the parent window
-// and interface font. Enter applies, Escape or a click outside cancels.
-// Errors appear in red at the bottom. It deletes itself when closed.
-class EntryPopup : public QFrame {
+// Small popup over the window for an operation on a file, a folder, a
+// branch…, built like the other popups (OverlayPopup): a header with an
+// icon, the title and the location, then the content, the errors in red,
+// and a footer with a hint and the buttons. It follows the theme applied
+// (ThemeStyle::applied()); its height follows its content. Enter applies,
+// Escape, Cancel or the header's close button cancels. It deletes itself
+// once dismissed.
+class EntryPopup : public OverlayPopup {
     Q_OBJECT
 
 public:
     // Shows the popup centered in the parent's window.
     void popup();
+    // Shows the popup and returns once it closed, its answer applied and
+    // the popup deleted: for a caller that needs the answer before going on.
+    // Events are processed meanwhile.
+    void exec();
+    // One of UiIcons', in the header.
+    void setIconName(const QString &iconName);
 
     QString error() const;
     void showError(const QString &message);
 
 protected:
-    EntryPopup(const QString &title, const QString &location, QWidget *parent);
+    // `settingsKey` keeps the width the user gives this kind of popup.
+    EntryPopup(const QString &settingsKey, const QString &title, const QString &location, QWidget *parent);
 
     void keyPressEvent(QKeyEvent *event) override;
     virtual void accept() = 0;
     virtual void focusContent() = 0;
 
     QVBoxLayout *content() const { return content_; }
+
+    // A button of the footer, right of those added before.
+    void addFooterButton(QPushButton *button);
+    // The hint left of the footer's buttons.
+    void setFooterHint(const QString &hint);
 
     // Recomputes the height at the current width, including wrapped text.
     void resizeToContent();
@@ -57,9 +74,12 @@ protected:
     virtual void errorChanged(bool shown) { Q_UNUSED(shown); }
 
 private:
+    QString location_;
+    PopupHeader *header_;
     QVBoxLayout *content_;
-    QLabel *location_;
     QLabel *error_;
+    QLabel *hint_;
+    QHBoxLayout *footerButtons_;
 };
 
 // Asks for a name: a single field, outlined in red while an error is

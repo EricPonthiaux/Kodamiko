@@ -2,11 +2,12 @@
 
 #include "EntryPopups.h"
 
-#include "ui/AppFonts.h"
-#include "ui/UiMetrics.h"
+#include "ui/PopupWidgets.h"
+#include "ui/ThemeStyle.h"
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QEventLoop>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -20,9 +21,9 @@
 namespace {
 
 constexpr int minimumPopupWidth = 480;
-constexpr int maximumPopupWidth = 640;
-constexpr qreal popupWindowShare = 0.4;
-constexpr int windowMargin = 20;
+constexpr qreal popupWindowShare = 0.36;
+// The header's margins and close button, beside the location.
+constexpr int headerReservePx = 64;
 
 QString translate(const char *text)
 {
@@ -114,62 +115,72 @@ EntryTarget resolveRename(const QString &path, const QString &name)
     return {renamed, {}};
 }
 
-EntryPopup::EntryPopup(const QString &title, const QString &location, QWidget *parent)
-    : QFrame(parent, Qt::Popup)
+EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, const QString &location, QWidget *parent)
+    : OverlayPopup(settingsKey, QSizeF(popupWindowShare, 0), QSize(minimumPopupWidth, 0), parent)
+    , location_(location)
+    , header_(new PopupHeader(QStringLiteral("document"), title, this))
     , content_(new QVBoxLayout)
-    , location_(new QLabel(this))
     , error_(new QLabel(this))
+    , hint_(new QLabel(this))
+    , footerButtons_(new QHBoxLayout)
 {
-    setAttribute(Qt::WA_DeleteOnClose);
-    setFrameShape(QFrame::StyledPanel);
+    connect(this, &OverlayPopup::dismissed, this, &QObject::deleteLater);
+    connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
-    auto *titleLabel = new QLabel(title, this);
-    titleLabel->setTextFormat(Qt::PlainText);
-    titleLabel->setWordWrap(true);
-    AppFonts::setInterfaceFont(titleLabel, 1);
-    location_->setTextFormat(Qt::PlainText);
-    location_->setForegroundRole(QPalette::PlaceholderText);
-    location_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    location_->setToolTip(location);
-    location_->setVisible(!location.isEmpty());
-
+    error_->setObjectName(QStringLiteral("entryError"));
     error_->setTextFormat(Qt::PlainText);
     error_->setWordWrap(true);
-    error_->setStyleSheet(QStringLiteral("color: %1;").arg(errorColor(palette())));
     error_->hide();
+    content_->setSpacing(10);
+    auto *body = new QVBoxLayout;
+    body->setContentsMargins(16, 14, 16, 14);
+    body->setSpacing(10);
+    body->addLayout(content_);
+    body->addWidget(error_);
 
-    auto *header = new QVBoxLayout;
-    header->setSpacing(UiMetrics::scaled(4));
-    header->addWidget(titleLabel);
-    header->addWidget(location_);
+    auto *footer = new QFrame(this);
+    footer->setObjectName(QStringLiteral("popupFooter"));
+    hint_->setParent(footer);
+    hint_->setObjectName(QStringLiteral("footerHint"));
+    hint_->setText(tr("Enter to apply · Esc to cancel"));
+    footerButtons_->setSpacing(8);
+    auto *footerLayout = new QHBoxLayout(footer);
+    footerLayout->setContentsMargins(16, 10, 16, 10);
+    footerLayout->setSpacing(8);
+    footerLayout->addWidget(hint_, 1);
+    footerLayout->addLayout(footerButtons_);
 
-    content_->setSpacing(UiMetrics::scaled(12));
     auto *layout = new QVBoxLayout(this);
-    const int horizontalPadding = UiMetrics::scaled(20);
-    const int verticalPadding = UiMetrics::scaled(16);
-    layout->setContentsMargins(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
-    layout->setSpacing(UiMetrics::scaled(12));
-    layout->addLayout(header);
-    layout->addLayout(content_);
-    layout->addWidget(error_);
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(0);
+    layout->addWidget(header_);
+    layout->addLayout(body);
+    layout->addWidget(footer);
+
+    const Theme &theme = ThemeStyle::applied();
+    setStyleSheet(popupStyleSheet(theme, QStringLiteral("QLabel#entryError { color: %1; }").arg(errorColor(palette()))));
+    header_->applyTheme(theme);
+}
+
+void EntryPopup::setIconName(const QString &iconName)
+{
+    header_->setIconName(iconName);
+    header_->applyTheme(ThemeStyle::applied());
 }
 
 void EntryPopup::popup()
 {
-    const QWidget *window = parentWidget()->window();
-    const QRect available = window->contentsRect();
-    const int preferredWidth = std::clamp(qRound(available.width() * popupWindowShare),
-                                          UiMetrics::scaled(minimumPopupWidth), UiMetrics::scaled(maximumPopupWidth));
-    const int width = std::min(preferredWidth, std::max(1, available.width() - 2 * UiMetrics::scaled(windowMargin)));
-    setFixedWidth(width);
-    const QMargins padding = layout()->contentsMargins();
-    const int locationWidth = std::max(0, contentsRect().width() - padding.left() - padding.right());
-    location_->setText(location_->fontMetrics().elidedText(location_->toolTip(), Qt::ElideMiddle, locationWidth));
+    showCentered();
     resizeToContent();
-    const QPoint offset((available.width() - width) / 2, std::max(0, (available.height() - height()) / 3));
-    move(window->mapToGlobal(available.topLeft() + offset));
-    show();
     focusContent();
+}
+
+void EntryPopup::exec()
+{
+    QEventLoop loop;
+    connect(this, &QObject::destroyed, &loop, &QEventLoop::quit);
+    popup();
+    loop.exec();
 }
 
 QString EntryPopup::error() const
@@ -187,35 +198,58 @@ void EntryPopup::showError(const QString &message)
     resizeToContent();
 }
 
+void EntryPopup::addFooterButton(QPushButton *button)
+{
+    button->setMinimumWidth(84);
+    footerButtons_->addWidget(button);
+}
+
+void EntryPopup::setFooterHint(const QString &hint)
+{
+    hint_->setText(hint);
+}
+
 void EntryPopup::resizeToContent()
 {
+    if (!isVisible())
+        return;
     ensurePolished();
-    const int contentHeight = layout()->totalHeightForWidth(width());
-    resize(width(), contentHeight >= 0 ? contentHeight : sizeHint().height());
+    // The location on one line, cut in the middle: the end of a path matters.
+    const int locationWidth = std::max(0, width() - 2 * shadowWidth - headerReservePx);
+    header_->setSubtitle(fontMetrics().elidedText(location_, Qt::ElideMiddle, locationWidth));
+    const int panelHeight = layout()->totalHeightForWidth(width()) - 2 * shadowWidth;
+    setMinimumPanelSize(QSize(minimumPopupWidth, std::max(panelHeight, 0)));
 }
 
 void EntryPopup::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
-        close();
+        dismiss();
         return;
     }
-    QFrame::keyPressEvent(event);
+    OverlayPopup::keyPressEvent(event);
 }
 
 NamePopup::NamePopup(const QString &title,
                      const QString &location,
                      std::function<QString(const QString &)> apply,
                      QWidget *parent)
-    : EntryPopup(title, location, parent)
+    : EntryPopup(QStringLiteral("namePopup"), title, location, parent)
     , apply_(std::move(apply))
     , field_(new QLineEdit(this))
 {
     field_->setPlaceholderText(tr("Name, with “/” to create subfolders"));
-    field_->setMinimumHeight(UiMetrics::scaled(36));
     connect(field_, &QLineEdit::returnPressed, this, &NamePopup::accept);
     connect(field_, &QLineEdit::textEdited, this, [this] { showError({}); });
     content()->addWidget(field_);
+
+    auto *cancel = new QPushButton(tr("Cancel"), this);
+    auto *ok = new QPushButton(tr("OK"), this);
+    ok->setDefault(true);
+    connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
+    connect(ok, &QPushButton::clicked, this, &NamePopup::accept);
+    addFooterButton(cancel);
+    addFooterButton(ok);
 }
 
 void NamePopup::setName(const QString &name, bool isFolder)
@@ -230,7 +264,7 @@ void NamePopup::accept()
 {
     const QString message = apply_(field_->text().trimmed());
     if (message.isEmpty())
-        close();
+        dismiss();
     else
         showError(message);
 }
@@ -248,7 +282,7 @@ void NamePopup::errorChanged(bool shown)
 }
 
 ConfirmPopup::ConfirmPopup(const Question &question, std::function<bool(ConfirmPopup *)> apply, QWidget *parent)
-    : EntryPopup(question.title, question.location, parent)
+    : EntryPopup(QStringLiteral("confirmPopup"), question.title, question.location, parent)
     , apply_(std::move(apply))
     , message_(new QLabel(question.message, this))
     , cancel_(new QPushButton(tr("Cancel"), this))
@@ -256,15 +290,14 @@ ConfirmPopup::ConfirmPopup(const Question &question, std::function<bool(ConfirmP
 {
     message_->setWordWrap(true);
     message_->setTextFormat(Qt::PlainText);
-    connect(cancel_, &QPushButton::clicked, this, &QWidget::close);
+    setIconName(QStringLiteral("discard"));
+    setFooterHint(tr("Enter to confirm · Esc to cancel"));
+    connect(cancel_, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(action_, &QPushButton::clicked, this, &ConfirmPopup::accept);
-
-    auto *buttons = new QHBoxLayout;
-    buttons->addStretch();
-    buttons->addWidget(cancel_);
-    buttons->addWidget(action_);
+    action_->setDefault(true);
     content()->addWidget(message_);
-    content()->addLayout(buttons);
+    addFooterButton(cancel_);
+    addFooterButton(action_);
 }
 
 void ConfirmPopup::setMessage(const QString &message, const QString &actionText)
@@ -283,7 +316,7 @@ void ConfirmPopup::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
         if (focusWidget() == cancel_)
-            close();
+            dismiss();
         else
             accept();
         return;
@@ -294,7 +327,7 @@ void ConfirmPopup::keyPressEvent(QKeyEvent *event)
 void ConfirmPopup::accept()
 {
     if (apply_(this))
-        close();
+        dismiss();
 }
 
 void ConfirmPopup::focusContent()

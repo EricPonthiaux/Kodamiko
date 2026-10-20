@@ -156,6 +156,8 @@ private:
     void syncEditorWithDisk(EditorWidget *editor, const QString &path);
     // Asks whether to reload a file modified both in its tab and on disk.
     bool confirmReload(const QString &filePath, const QString &question);
+    // Tells that `filePath` could not be opened or saved, and why.
+    void showFileError(const QString &title, const QString &filePath, const QString &error);
     bool closeTab(int index, bool askToSave = true);
     // Path of the file shown in `page`, empty for a diff.
     QString filePathOf(QWidget *page) const;

@@ -2,19 +2,23 @@
 
 #pragma once
 
+#include "ui/OverlayPopup.h"
+#include "ui/Theme.h"
 #include "viewers/DiagramKinds.h"
-#include "workspace/EntryPopups.h"
 
 #include <functional>
 
+class PopupHeader;
 class QComboBox;
+class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
 class QPushButton;
 
-// Asks what Claude should draw: the kind of diagram, a description, and the
-// file to write. Ctrl+Enter (or Enter in the name) applies.
-class DiagramRequestPopup : public EntryPopup {
+// Claude ▸ Draw a Diagram, a popup over the window: the kind of diagram, a
+// description of what Claude should draw, and the file to write.
+// Ctrl+Enter (or Enter outside the description) draws.
+class DiagramRequestPopup : public OverlayPopup {
     Q_OBJECT
 
 public:
@@ -30,19 +34,30 @@ public:
         QString initialName;      // in the name field
     };
 
-    DiagramRequestPopup(const Form &form, Apply apply, QWidget *parent);
+    DiagramRequestPopup(const Theme &theme, QWidget *parent);
+
+    // Shows the popup for `form`, the description emptied; `apply` is called
+    // when the user draws.
+    void popup(const Form &form, Apply apply);
+    void applyTheme(const Theme &theme);
+
+    // Hands the fields to `apply_`: closes on success, shows its error
+    // otherwise.
+    void draw();
 
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
-    void accept() override;
-    void focusContent() override;
 
 private:
+    void showError(const QString &message);
+
     Apply apply_;
+    PopupHeader *header_;
     QComboBox *kind_;
     QPlainTextEdit *description_;
     QLineEdit *name_;
+    QLabel *error_;
     QPushButton *draw_;
 };

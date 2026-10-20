@@ -21,6 +21,7 @@
 #include "ui/TreeMetrics.h"
 #include "ui/ViewHeader.h"
 #include "ui/WindowFrame.h"
+#include "workspace/ChoicePopup.h"
 #include "workspace/CommandPalette.h"
 #include "workspace/EntryPopups.h"
 #include "workspace/FileOperations.h"
@@ -1018,6 +1019,69 @@ private slots:
         QTest::keyClick(popup->cancelButton(), Qt::Key_Return);
         QTRY_VERIFY(!popup);
         QVERIFY(!applied);
+    }
+
+    void choicePopupRunsTheFocusedChoiceOnEnter()
+    {
+        QWidget window;
+        window.resize(600, 400);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+        QString chosen;
+        const QPointer<ChoicePopup> popup = new ChoicePopup(
+            {.title = "Pull", .location = {}, .message = "Diverged", .details = "Rebase or merge"},
+            {{"Rebase", [&chosen] { chosen = "rebase"; }}, {"Merge", [&chosen] { chosen = "merge"; }}}, &window);
+        popup->popup();
+        QVERIFY(QTest::qWaitForWindowExposed(popup));
+        QCOMPARE(popup->focusWidget(), popup->choiceButtons().first());
+
+        popup->choiceButtons().at(1)->setFocus();
+        QTest::keyClick(popup->choiceButtons().at(1), Qt::Key_Return);
+
+        QCOMPARE(chosen, QString("merge"));
+        QTRY_VERIFY(!popup);
+    }
+
+    void choicePopupWaitsForTheAnswerAndCancelsOnEscape()
+    {
+        QWidget window;
+        window.resize(600, 400);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+        bool discarded = false;
+        auto *popup =
+            new ChoicePopup({.title = "Discard Changes", .location = {}, .message = "Discard?", .details = {}},
+                            {{"Discard", [&discarded] { discarded = true; }}}, &window);
+        popup->focusCancel();
+        QTimer::singleShot(0, &window, [&window] {
+            auto *shown = window.findChild<ChoicePopup *>();
+            QVERIFY(shown);
+            QCOMPARE(shown->focusWidget(), shown->cancelButton());
+            QTest::keyClick(shown, Qt::Key_Escape);
+        });
+        popup->exec();
+
+        QVERIFY(!discarded);
+        QVERIFY(!window.findChild<ChoicePopup *>());
+    }
+
+    void noticeOnlyOffersToCloseIt()
+    {
+        QWidget window;
+        window.resize(600, 400);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+        showNotice({.title = "Cannot Save File", .location = "a.txt", .message = "Disk full", .details = {}}, &window);
+
+        const QPointer<ChoicePopup> notice = window.findChild<ChoicePopup *>();
+        QVERIFY(notice);
+        QVERIFY(notice->choiceButtons().isEmpty());
+        QCOMPARE(notice->cancelButton()->text(), QString("Close"));
+        QTest::keyClick(notice->cancelButton(), Qt::Key_Return);
+        QTRY_VERIFY(!notice);
     }
 
     void tabsFollowARenamedFolder()

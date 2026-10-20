@@ -2,8 +2,7 @@
 
 #include "DiscardConfirmation.h"
 
-#include <QMessageBox>
-#include <QPushButton>
+#include "workspace/ChoicePopup.h"
 
 namespace DiscardConfirmation {
 
@@ -15,12 +14,16 @@ QString hint()
 // "Discard" rather than "Cancel", which would be confused with the Cancel button.
 bool ask(QWidget *parent, const QString &question, const QString &details)
 {
-    QMessageBox box(QMessageBox::Warning, QObject::tr("Discard Changes"), question, QMessageBox::NoButton, parent);
-    box.setInformativeText(details.isEmpty() ? hint() : details + QLatin1Char(' ') + hint());
-    const QPushButton *discard = box.addButton(QObject::tr("Discard"), QMessageBox::DestructiveRole);
-    box.setDefaultButton(box.addButton(QObject::tr("Keep"), QMessageBox::RejectRole));
-    box.exec();
-    return box.clickedButton() == discard;
+    bool discarded = false;
+    auto *popup = new ChoicePopup({.title = QObject::tr("Discard Changes"),
+                                   .location = {},
+                                   .message = question,
+                                   .details = details.isEmpty() ? hint() : details + QLatin1Char(' ') + hint()},
+                                  {{QObject::tr("Discard"), [&discarded] { discarded = true; }}}, parent);
+    popup->setCancelText(QObject::tr("Keep"));
+    popup->focusCancel();
+    popup->exec();
+    return discarded;
 }
 
 } // namespace DiscardConfirmation

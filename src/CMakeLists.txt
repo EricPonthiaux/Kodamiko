@@ -20,6 +20,7 @@ add_library(duet_core STATIC
     changes/NewBranchPopup.cpp
     changes/ScratchEditors.cpp
     changes/SnapshotsPopup.cpp
+    changes/StashChangesPopup.cpp
     changes/StashesPopup.cpp
     changes/WordDiff.cpp
     claude/AgentCheckPopup.cpp
@@ -203,6 +204,7 @@ add_library(duet_core STATIC
     welcome/ProvisioningView.cpp
     welcome/WelcomeWindow.cpp
     workspace/CommandPalette.cpp
+    workspace/ChoicePopup.cpp
     workspace/EntryPopups.cpp
     workspace/FileOperations.cpp
     workspace/FilesPanel.cpp

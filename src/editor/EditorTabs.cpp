@@ -13,6 +13,7 @@
 #include "ui/TabBarBaseLine.h"
 #include "ui/UiIcons.h"
 #include "viewers/ImageView.h"
+#include "workspace/ChoicePopup.h"
 #ifdef DUET_WITH_DIAGRAMS
 #include "viewers/DiagramView.h"
 #endif
@@ -21,7 +22,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QMenu>
-#include <QMessageBox>
 #include <QPainter>
 #include <QPointer>
 #include <QTabBar>
@@ -43,12 +43,29 @@ constexpr qreal emptyMarkOpacity = 0.35;
 // Returns false if the user cancels, or if the requested save fails.
 bool confirmClose(QWidget *parent, const QString &filePath, const std::function<bool()> &save)
 {
-    const auto answer = QMessageBox::question(parent, EditorTabs::tr("Unsaved Changes"),
-                                              EditorTabs::tr("Save changes to %1?").arg(QFileInfo(filePath).fileName()),
-                                              QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-    if (answer == QMessageBox::Cancel)
+    enum class Answer {
+        Cancel,
+        Save,
+        Discard
+    };
+    Answer answer = Answer::Cancel;
+    auto *popup = new ChoicePopup({.title = EditorTabs::tr("Unsaved Changes"),
+                                   .location = QDir::toNativeSeparators(filePath),
+                                   .message = EditorTabs::tr("Save changes to %1?").arg(QFileInfo(filePath).fileName()),
+                                   .details = {}},
+                                  {{EditorTabs::tr("Save"), [&answer] { answer = Answer::Save; }},
+                                   {EditorTabs::tr("Discard"), [&answer] { answer = Answer::Discard; }}},
+                                  parent);
+    popup->exec();
+    switch (answer) {
+    case Answer::Cancel:
         return false;
-    return answer != QMessageBox::Save || save();
+    case Answer::Save:
+        return save();
+    case Answer::Discard:
+        return true;
+    }
+    return false;
 }
 
 } // namespace
@@ -177,7 +194,7 @@ QWidget *EditorTabs::openFile(const QString &path)
     QString error;
     if (!editor->load(absolutePath, &error)) {
         delete editor;
-        QMessageBox::warning(this, tr("Cannot Open File"), tr("Could not open %1:\n%2").arg(absolutePath, error));
+        showFileError(tr("Cannot Open File"), absolutePath, error);
         return nullptr;
     }
     applyFormatterStyle(editor);
@@ -209,7 +226,7 @@ QWidget *EditorTabs::openImage(const QString &absolutePath)
     QString error;
     if (!view->load(absolutePath, &error)) {
         delete view;
-        QMessageBox::warning(this, tr("Cannot Open File"), tr("Could not open %1:\n%2").arg(absolutePath, error));
+        showFileError(tr("Cannot Open File"), absolutePath, error);
         return nullptr;
     }
 
@@ -668,7 +685,7 @@ bool EditorTabs::writeEditor(EditorWidget *editor)
 {
     QString error;
     if (!editor->save(&error)) {
-        QMessageBox::warning(this, tr("Cannot Save File"), tr("Could not save %1:\n%2").arg(editor->filePath(), error));
+        showFileError(tr("Cannot Save File"), editor->filePath(), error);
         return false;
     }
     const QString fileName = QFileInfo(editor->filePath()).fileName();
@@ -688,7 +705,7 @@ bool EditorTabs::saveDiagram(DiagramView *view)
 #ifdef DUET_WITH_DIAGRAMS
     QString error;
     if (!view->save(&error)) {
-        QMessageBox::warning(this, tr("Cannot Save File"), tr("Could not save %1:\n%2").arg(view->filePath(), error));
+        showFileError(tr("Cannot Save File"), view->filePath(), error);
         return false;
     }
     emit statusMessage(tr("%1 saved").arg(QFileInfo(view->filePath()).fileName()));
@@ -858,15 +875,27 @@ void EditorTabs::syncDiagramWithDisk(DiagramView *diagram, const QString &path)
 }
 #endif
 
+void EditorTabs::showFileError(const QString &title, const QString &filePath, const QString &error)
+{
+    showNotice({.title = title, .location = QDir::toNativeSeparators(filePath), .message = error, .details = {}}, this);
+}
+
 bool EditorTabs::confirmReload(const QString &filePath, const QString &question)
 {
     // The question's event loop can bring the same change again: no second
     // question meanwhile.
     pathsBeingResolved_.insert(filePath);
-    const auto answer =
-        QMessageBox::question(this, tr("File Modified on Disk"), question, QMessageBox::Yes | QMessageBox::No);
+    bool reload = false;
+    auto *popup = new ChoicePopup({.title = tr("File Modified on Disk"),
+                                   .location = QDir::toNativeSeparators(filePath),
+                                   .message = question,
+                                   .details = {}},
+                                  {{tr("Reload"), [&reload] { reload = true; }}}, this);
+    popup->setCancelText(tr("Keep My Changes"));
+    popup->focusCancel();
+    popup->exec();
     pathsBeingResolved_.remove(filePath);
-    return answer == QMessageBox::Yes;
+    return reload;
 }
 
 void EditorTabs::reloadChangeBases() const

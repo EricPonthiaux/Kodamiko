@@ -16,6 +16,7 @@
 #include "ui/DetachablePage.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
+#include "workspace/ChoicePopup.h"
 #include "workspace/SidePanel.h"
 
 #include <QApplication>
@@ -23,7 +24,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMenuBar>
-#include <QMessageBox>
 #include <QStatusBar>
 #include <QTimer>
 #include <QWidgetAction>
@@ -335,8 +335,11 @@ void MainWindow::editRunConfigurations()
         QDir().mkpath(QFileInfo(path).absolutePath());
         QFile file(path);
         if (!file.open(QIODevice::WriteOnly)) {
-            QMessageBox::warning(this, tr("Edit Configurations"),
-                                 tr("Cannot create %1: %2").arg(QDir::toNativeSeparators(path), file.errorString()));
+            showNotice({.title = tr("Edit Configurations"),
+                        .location = {},
+                        .message = tr("Cannot create %1: %2").arg(QDir::toNativeSeparators(path), file.errorString()),
+                        .details = {}},
+                       this);
             return;
         }
         file.write(RunConfigurations::serialize({example}));

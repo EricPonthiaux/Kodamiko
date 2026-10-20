@@ -83,6 +83,9 @@ private:
     // rename or a search for usages covers them, unsaved changes included,
     // even before the server has indexed the project.
     void syncOpenEditors(LspClient *client, const QString &languageId);
+    // Asks the server to rename `word`, at `bytePosition` in `editor`, to
+    // `newName`, and applies its edit.
+    void renameAt(EditorWidget *editor, int bytePosition, const QString &word, const QString &newName);
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
     // Shows the server's signature help `help` as a call tip.
     void showSignatureHelp(const EditorWidget *editor, const QJsonObject &help, bool explicitRequest);

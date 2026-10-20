@@ -27,6 +27,8 @@
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
 #include "viewers/DiagramKinds.h"
+#include "workspace/ChoicePopup.h"
+#include "workspace/EntryPopups.h"
 #include "workspace/FileTreeView.h"
 #ifdef DUET_WITH_DIAGRAMS
 #include "viewers/DiagramCheck.h"
@@ -39,7 +41,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLabel>
-#include <QMessageBox>
 #include <QPainter>
 #include <QStatusBar>
 #include <QStyle>
@@ -161,7 +162,7 @@ void MainWindow::showClaudeSession()
     if (!claudeTerminal_ || !claudeTerminal_->isRunning()) {
         QString error;
         if (!startClaudeSession(&error)) {
-            QMessageBox::warning(this, tr("Claude Session"), error);
+            showNotice({.title = tr("Claude Session"), .location = {}, .message = error, .details = {}}, this);
             return;
         }
     }
@@ -173,13 +174,23 @@ void MainWindow::showClaudeSession()
 // session, which goes on with the last conversation.
 void MainWindow::restartClaudeSession()
 {
-    if (claudeActivity_.state() == ClaudeActivity::State::Working &&
-        QMessageBox::question(this, tr("Restart Claude Session"),
-                              tr("Claude is working. Stop it and restart the session?")) != QMessageBox::Yes)
+    if (claudeActivity_.state() != ClaudeActivity::State::Working) {
+        continueClaudeSession();
         return;
+    }
+    auto *popup = new ChoicePopup({.title = tr("Restart Claude Session"),
+                                   .location = {},
+                                   .message = tr("Claude is working. Stop it and restart the session?"),
+                                   .details = {}},
+                                  {{tr("Restart"), [this] { continueClaudeSession(); }}}, this);
+    popup->popup();
+}
+
+void MainWindow::continueClaudeSession()
+{
     QString error;
     if (!startClaudeSession(&error, {QStringLiteral("--continue")})) {
-        QMessageBox::warning(this, tr("Claude Session"), error);
+        showNotice({.title = tr("Claude Session"), .location = {}, .message = error, .details = {}}, this);
         return;
     }
     showTerminals();
@@ -462,7 +473,7 @@ void MainWindow::generateDiagram(const QString &folder)
     const QString initialName = relative == QLatin1String(".") ? QStringLiteral("docs/diagrams/") : QString();
     const QString location = relative == QLatin1String(".") ? QFileInfo(folder_).fileName() + QLatin1Char('/')
                                                             : QDir::toNativeSeparators(relative + QLatin1Char('/'));
-    auto *popup = new DiagramRequestPopup(
+    diagramRequestPopup_->popup(
         {location, kinds, initialName},
         [this, folder](const QString &kindId, const QString &name, const QString &description) {
             const DiagramKind kind = DiagramKinds::find(kindId);
@@ -475,9 +486,7 @@ void MainWindow::generateDiagram(const QString &folder)
                 return target.error;
             drawDiagram(target.path, kind.title, description);
             return QString();
-        },
-        this);
-    popup->popup();
+        });
 }
 
 void MainWindow::drawDiagram(const QString &path, const QString &kindTitle, const QString &description)
@@ -600,7 +609,7 @@ void MainWindow::typeInClaudePrompt(const QString &text, PromptEntry entry)
     if (!claudeTerminal_ || !claudeTerminal_->isRunning()) {
         QString error;
         if (!startClaudeSession(&error)) {
-            QMessageBox::warning(this, tr("Claude Session"), error);
+            showNotice({.title = tr("Claude Session"), .location = {}, .message = error, .details = {}}, this);
             return;
         }
     }
