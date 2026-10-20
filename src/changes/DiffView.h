@@ -15,7 +15,9 @@
 // margin their numbers before and after. The arrows of a separator reveal
 // the unchanged lines it hides, 20 at a time. Read only; the text can be
 // selected and copied. F7 and Shift+F7 go to the next and previous block,
-// Alt+Down and Alt+Up to the next and previous file.
+// Alt+Down and Alt+Up to the next and previous file. Side by side, the old
+// version shows in a pane at the left, row for row with the new one: the
+// view's lines, numbers and locations are then those of the new side.
 class DiffView : public QsciScintilla {
     Q_OBJECT
 
@@ -33,6 +35,11 @@ public:
         Next
     };
 
+    enum class Mode {
+        Unified,
+        SideBySide
+    };
+
     explicit DiffView(const Theme &theme, QWidget *parent = nullptr);
 
     // Shows `files`, with the unchanged lines revealed in files of the same
@@ -45,8 +52,15 @@ public:
     void revealLines(int line, Reveal reveal);
     // Nothing to show but a message in gray (or nothing).
     void showMessage(const QString &message);
+    // Unified at first.
+    void setMode(Mode mode);
+
+    Mode mode() const { return mode_; }
 
     DiffLocation locate(int line) const;
+    // What displayed line `line` stands for: its location, and side by side
+    // that of the old side's line in the same row.
+    QList<DiffLocation> locations(int line) const;
     // Line of a file's title bar.
     int fileStart(int file) const;
 
@@ -77,10 +91,26 @@ signals:
     // setFiles() or showMessage() changed what is shown.
     void contentChanged();
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
+    // Which line numbers the margin shows.
+    enum class NumberColumns {
+        Both,
+        OldOnly,
+        NewOnly
+    };
+
     void addShortcuts();
-    // The lines of the files, with those revealed.
+    // The lines of the files, with those revealed, in one column or two.
     void layOut();
+    void showLines(QList<DiffLine> lines);
+    // The pane of the old side, created when first needed.
+    void createOldSide();
+    // The old side over the left half of the view, while side by side
+    // with files to show; hidden otherwise.
+    void placeOldSide();
     // A click on a separator's arrow, at `position` in the text.
     void onArrowClicked(int position);
     // The first displayed line of `kind` after (or before) the cursor or the
@@ -96,6 +126,8 @@ private:
     void styleStats(const DiffLine &title, long start, long length);
     // A line number right-justified for the margin; blank when `value` is 0.
     QString marginNumber(int value) const;
+    // "12 40 +": the numbers of `line` that the margin shows, then `sign`.
+    QString marginText(const DiffLine &line, QChar sign) const;
 
     Theme theme_;
     QList<DiffFile> files_;
@@ -104,4 +136,7 @@ private:
     QList<int> fileStarts_;
     QList<FileSummary> summaries_;
     int numberWidth_ = 3; // digits of the largest line number
+    Mode mode_ = Mode::Unified;
+    NumberColumns numbers_ = NumberColumns::Both;
+    DiffView *oldSide_ = nullptr; // side by side, at the left; a child of the view
 };

@@ -35,8 +35,10 @@ constexpr int addedStrip = 4;
 constexpr int removedStrip = 5;
 constexpr int fileHeaderStrip = 6;
 constexpr int hunkHeaderStrip = 7;
+constexpr int fillerBackground = 8;
 
-// Indicators: the words that changed within a line.
+// Indicators (numbered apart from the markers): the words that changed
+// within a line.
 constexpr int addedWords = 8;
 constexpr int removedWords = 9;
 

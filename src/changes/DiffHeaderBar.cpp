@@ -17,6 +17,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     , name_(new QLabel(this))
     , details_(new QLabel(this))
     , stats_(new QLabel(this))
+    , sideBySide_(new QToolButton(this))
     , whitespace_(new QToolButton(this))
     , previous_(new QToolButton(this))
     , next_(new QToolButton(this))
@@ -37,6 +38,12 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
         connect(button, &QToolButton::clicked, this, [this, direction] { diff_->goToChange(direction); });
     }
 
+    sideBySide_->setCheckable(true);
+    sideBySide_->setAutoRaise(true);
+    sideBySide_->setFocusPolicy(Qt::NoFocus);
+    sideBySide_->setToolTip(tr("Show the old and new versions side by side"));
+    connect(sideBySide_, &QToolButton::toggled, this,
+            [this](bool checked) { diff_->setMode(checked ? DiffView::Mode::SideBySide : DiffView::Mode::Unified); });
     whitespace_->setCheckable(true);
     whitespace_->setAutoRaise(true);
     whitespace_->setFocusPolicy(Qt::NoFocus);
@@ -50,6 +57,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     layout->addWidget(details_, 1);
     layout->addWidget(stats_);
     layout->addSpacing(4);
+    layout->addWidget(sideBySide_);
     layout->addWidget(whitespace_);
     layout->addWidget(previous_);
     layout->addWidget(next_);
@@ -74,6 +82,7 @@ Whitespace DiffHeaderBar::whitespace() const
 void DiffHeaderBar::applyTheme(const Theme &theme)
 {
     dark_ = theme.isDark;
+    sideBySide_->setIcon(UiIcons::icon(QStringLiteral("split"), theme.foreground));
     whitespace_->setIcon(UiIcons::icon(QStringLiteral("whitespace"), theme.foreground));
     previous_->setIcon(UiIcons::icon(QStringLiteral("up"), theme.foreground));
     next_->setIcon(UiIcons::icon(QStringLiteral("down"), theme.foreground));
@@ -89,6 +98,7 @@ void DiffHeaderBar::follow()
         widget->setVisible(hasFile);
     // Checked, it stays: what it hides may be all there was.
     whitespace_->setVisible(hasFile || whitespace_->isChecked());
+    sideBySide_->setVisible(hasFile);
     if (!hasFile) {
         name_->clear();
         details_->setText(placeholder_);

@@ -11,8 +11,8 @@ class QToolButton;
 
 // The bar above a DiffView, out of its scrolled text: the file at the top
 // of the view as it scrolls (its name, its folder and state, its counts),
-// the button that hides whitespace changes, and those that go to the
-// previous or next block of changes.
+// the buttons that show the two versions side by side and hide whitespace
+// changes, and those that go to the previous or next block of changes.
 class DiffHeaderBar : public QFrame {
     Q_OBJECT
 
@@ -39,6 +39,7 @@ private:
     QLabel *name_;
     QLabel *details_;
     QLabel *stats_;
+    QToolButton *sideBySide_;
     QToolButton *whitespace_;
     QToolButton *previous_;
     QToolButton *next_;

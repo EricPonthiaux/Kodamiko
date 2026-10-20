@@ -121,6 +121,8 @@ private:
     // Lines selected in the displayed diff, per file: the selection, or the
     // hunk under `line` without a selection. `lines` tells which of the two.
     QHash<int, PatchSelection> diffSelection(int line, bool *lines) const;
+    // The changed lines among the selected ones, per file; empty without a selection.
+    QHash<int, PatchSelection> selectedChanges() const;
     // Lines and blocks can be applied: their patch matches the files, which
     // a diff that ignores whitespace does not.
     bool canApplyDiffLines() const;

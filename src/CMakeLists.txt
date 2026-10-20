@@ -7,9 +7,11 @@ add_library(duet_core STATIC
     changes/CommitPanel.cpp
     changes/DiffHeaderBar.cpp
     changes/DiffLayout.cpp
+    changes/SideBySide.cpp
     changes/DiffStyles.cpp
     changes/DiffSyntaxHighlighter.cpp
     changes/DiffView.cpp
+    changes/DiffViewSideBySide.cpp
     changes/DiscardConfirmation.cpp
     changes/FileChangeDelegate.cpp
     changes/GitActions.cpp

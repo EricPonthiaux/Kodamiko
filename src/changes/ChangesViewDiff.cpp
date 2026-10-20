@@ -11,40 +11,37 @@
 #include <QMenu>
 #include <QShortcut>
 
-#include <tuple>
-
-QHash<int, PatchSelection> ChangesView::diffSelection(int line, bool *lines) const
+QHash<int, PatchSelection> ChangesView::selectedChanges() const
 {
-    // Displayed file that contains a diff line, and the position in its patch.
-    const auto locate = [this](int diffLine) -> std::tuple<int, int, int> {
-        const DiffLocation location = diff_->locate(diffLine);
-        return {location.file, location.hunk, location.line};
-    };
-
     QHash<int, PatchSelection> result;
-    *lines = false;
-    if (diff_->hasSelectedText()) {
-        int lineFrom = 0;
-        int indexFrom = 0;
-        int lineTo = 0;
-        int indexTo = 0;
-        diff_->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
-        if (indexTo == 0 && lineTo > lineFrom)
-            --lineTo; // selection that ends at the start of a line
-        for (int l = lineFrom; l <= lineTo; ++l) {
-            const auto [file, hunk, hunkLine] = locate(l);
+    if (!diff_->hasSelectedText())
+        return result;
+    int lineFrom = 0;
+    int indexFrom = 0;
+    int lineTo = 0;
+    int indexTo = 0;
+    diff_->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
+    if (indexTo == 0 && lineTo > lineFrom)
+        --lineTo; // selection that ends at the start of a line
+    for (int l = lineFrom; l <= lineTo; ++l) {
+        // Side by side, a row holds a line of each side.
+        for (const auto &[file, hunk, hunkLine] : diff_->locations(l)) {
             if (file >= 0 && hunk >= 0 && hunkLine >= 0 && shownPatches_[file].hunks[hunk].isChange(hunkLine))
                 result[file][hunk].insert(hunkLine);
         }
-        if (!result.isEmpty()) {
-            *lines = true;
-            return result;
-        }
     }
-    const auto [file, hunk, hunkLine] = locate(line);
-    Q_UNUSED(hunkLine);
-    if (file >= 0 && hunk >= 0)
-        result[file] = shownPatches_[file].selectHunk(hunk);
+    return result;
+}
+
+QHash<int, PatchSelection> ChangesView::diffSelection(int line, bool *lines) const
+{
+    QHash<int, PatchSelection> result = selectedChanges();
+    *lines = !result.isEmpty();
+    if (*lines)
+        return result;
+    const DiffLocation location = diff_->locate(line);
+    if (location.file >= 0 && location.hunk >= 0)
+        result[location.file] = shownPatches_[location.file].selectHunk(location.hunk);
     return result;
 }
 

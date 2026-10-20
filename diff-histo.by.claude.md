@@ -60,8 +60,17 @@ Magit.
 
 ### Diff (par ordre de priorité)
 
-1. **Affichage côte à côte.** Tous les grands outils proposent unifié et côte
-   à côte. C'est le plus gros manque.
+1. ✅ **Fait.** ~~**Affichage côte à côte.**~~ Le bouton ◫ de l'en-tête
+   bascule `DiffView` en deux colonnes : l'ancienne version dans un volet
+   à gauche (`DiffViewSideBySide.cpp`), la nouvelle à droite, ligne pour
+   ligne (`SideBySide::columns`), avec des lignes de remplissage en face
+   des lignes sans équivalent. Le défilement est synchronisé. Les vues
+   continuent de parler au seul `DiffView` : F7, les boutons de bloc,
+   Espace, Suppr et F4 marchent sans changement, et une ligne sélectionnée
+   stage ses deux côtés (`DiffView::locations`). Restent : le staging
+   depuis une sélection faite dans le volet de gauche, le choix du mode
+   gardé d'une session à l'autre, et le défilement horizontal, réglé sur
+   la largeur du côté droit.
 2. ✅ **Fait.** ~~**Afficher plus de contexte**~~ : les flèches du
    séparateur `⋯` révèlent les lignes inchangées par 20 (↑ au-dessus du
    bloc, ↓ sous le bloc précédent, ↕ tout d'un coup quand il en reste 20 au
@@ -163,5 +172,5 @@ Dans l'ordre, pour le meilleur rapport valeur/effort :
    Fait.
 4. ✅ ~~Ajouter le suivi des renommages dans l'historique d'un fichier,
    puis la pagination.~~ Fait.
-5. Les deux gros chantiers : le diff côte à côte, puis le graphe des
-   branches.
+5. Les deux gros chantiers : ✅ ~~le diff côte à côte~~ (fait), puis le
+   graphe des branches.

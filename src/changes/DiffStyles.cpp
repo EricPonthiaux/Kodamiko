@@ -15,6 +15,7 @@ struct DiffColors {
     QColor removedStrong;
     QColor fileHeader;
     QColor hunkHeader;
+    QColor filler;
     QColor muted;
 };
 
@@ -51,6 +52,7 @@ DiffColors colorsFor(const Theme &theme)
             red,
             mix(theme.background, theme.foreground, theme.isDark ? 0.07 : 0.05),
             mix(theme.background, theme.foreground, theme.isDark ? 0.035 : 0.03),
+            mix(theme.background, theme.foreground, theme.isDark ? 0.02 : 0.025),
             theme.mutedText};
 }
 
@@ -119,6 +121,7 @@ void defineMarkers(QsciScintilla &view, const DiffColors &colors)
     defineMarker(view, QsciScintilla::Background, removedBackground, colors.removed);
     defineMarker(view, QsciScintilla::Background, fileHeaderBackground, colors.fileHeader);
     defineMarker(view, QsciScintilla::Background, hunkHeaderBackground, colors.hunkHeader);
+    defineMarker(view, QsciScintilla::Background, fillerBackground, colors.filler);
     defineMarker(view, QsciScintilla::FullRectangle, addedStrip, colors.addedStrong);
     defineMarker(view, QsciScintilla::FullRectangle, removedStrip, colors.removedStrong);
     defineMarker(view, QsciScintilla::FullRectangle, fileHeaderStrip, colors.fileHeader);

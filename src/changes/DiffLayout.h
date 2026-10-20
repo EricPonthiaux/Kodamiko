@@ -31,7 +31,9 @@ enum class DiffLineKind {
     Context,
     Added,
     Removed,
-    Note
+    Note,
+    // Side by side: the blank facing a line the other side does not have.
+    Filler
 };
 
 // What a displayed line stands for in the files' patches. `hunk` is -1 on a

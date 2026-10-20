@@ -5,6 +5,7 @@
 #include "syntax/ScintillaStyles.h"
 
 #include <QFontMetrics>
+#include <QPalette>
 #include <QShortcut>
 
 #include <algorithm>
@@ -105,9 +106,9 @@ void DiffView::onArrowClicked(int position)
     }
 }
 
-void DiffView::layOut()
+void DiffView::showLines(QList<DiffLine> lines)
 {
-    lines_ = DiffLayout::lines(files_, revealed_);
+    lines_ = std::move(lines);
     fileStarts_.clear();
     int largest = 0;
     for (int i = 0; i < lines_.size(); ++i) {
@@ -117,7 +118,6 @@ void DiffView::layOut()
     }
     numberWidth_ = std::max(3, static_cast<int>(QString::number(largest).size()));
     render();
-    emit contentChanged();
 }
 
 void DiffView::showMessage(const QString &message)
@@ -133,6 +133,7 @@ void DiffView::showMessage(const QString &message)
         lines_.append(note);
     }
     render();
+    placeOldSide();
     emit contentChanged();
 }
 
@@ -242,8 +243,9 @@ void DiffView::render()
     const bool numbered = std::any_of(lines_.begin(), lines_.end(),
                                       [](const DiffLine &line) { return line.oldNumber > 0 || line.newNumber > 0; });
     const QFontMetrics metrics(theme_.font);
-    setMarginWidth(numberMargin,
-                   numbered ? metrics.horizontalAdvance(QString(2 * numberWidth_ + 5, QLatin1Char('9'))) : 8);
+    const int columns = numbers_ == NumberColumns::Both ? 2 : 1;
+    const int digits = columns * numberWidth_ + 2 * columns + 1; // the spaces, the sign, a little air
+    setMarginWidth(numberMargin, numbered ? metrics.horizontalAdvance(QString(digits, QLatin1Char('9'))) : 8);
 }
 
 QString DiffView::marginNumber(int value) const
@@ -257,7 +259,6 @@ int DiffView::decorateLine(int line)
 {
     // Margin: "old new" numbers, and a sign the colors repeat.
     const DiffLine &shown = lines_[line];
-    const QString blank = marginNumber(0);
     switch (shown.kind) {
     case DiffLineKind::Spacer:
         return plainStyle;
@@ -274,22 +275,37 @@ int DiffView::decorateLine(int line)
         return hunkHeaderStyle;
     case DiffLineKind::Note:
         return noteStyle;
+    case DiffLineKind::Filler:
+        markerAdd(line, fillerBackground);
+        return plainStyle;
     case DiffLineKind::Added:
         markerAdd(line, addedBackground);
         markerAdd(line, addedStrip);
-        setMarginText(line, QStringLiteral("%1 %2 +").arg(blank, marginNumber(shown.newNumber)), addedNumberStyle);
+        setMarginText(line, marginText(shown, QLatin1Char('+')), addedNumberStyle);
         return plainStyle;
     case DiffLineKind::Removed:
         markerAdd(line, removedBackground);
         markerAdd(line, removedStrip);
-        setMarginText(line, QStringLiteral("%1 %2 −").arg(marginNumber(shown.oldNumber), blank), removedNumberStyle);
+        setMarginText(line, marginText(shown, QChar(0x2212)), removedNumberStyle);
         return plainStyle;
     case DiffLineKind::Context:
-        setMarginText(line, QStringLiteral("%1 %2  ").arg(marginNumber(shown.oldNumber), marginNumber(shown.newNumber)),
-                      numberStyle);
+        setMarginText(line, marginText(shown, QLatin1Char(' ')), numberStyle);
         return plainStyle;
     }
     return plainStyle;
+}
+
+QString DiffView::marginText(const DiffLine &line, QChar sign) const
+{
+    switch (numbers_) {
+    case NumberColumns::Both:
+        return QStringLiteral("%1 %2 %3").arg(marginNumber(line.oldNumber), marginNumber(line.newNumber), sign);
+    case NumberColumns::OldOnly:
+        return QStringLiteral("%1 %2").arg(marginNumber(line.oldNumber), sign);
+    case NumberColumns::NewOnly:
+        return QStringLiteral("%1 %2").arg(marginNumber(line.newNumber), sign);
+    }
+    return {};
 }
 
 void DiffView::styleLine(int line, int style)
@@ -348,4 +364,11 @@ void DiffView::applyTheme(const Theme &theme)
     ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     DiffStyles::define(*this, theme);
     render(); // the styles of the text are set line by line
+    if (oldSide_)
+        oldSide_->applyTheme(theme);
+    // Side by side, the view's background shows between the two sides.
+    QPalette rule = palette();
+    rule.setColor(QPalette::Window, theme.line);
+    setPalette(rule);
+    setAutoFillBackground(true);
 }

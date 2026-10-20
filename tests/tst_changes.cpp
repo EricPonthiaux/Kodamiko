@@ -6,6 +6,7 @@
 #include "changes/GitActions.h"
 #include "changes/HunkActions.h"
 #include "changes/NewBranchPopup.h"
+#include "changes/SideBySide.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
 #include "git/GitCommands.h"
@@ -245,6 +246,46 @@ private slots:
         view.hideUnchangedLines();
         view.setFiles({file});
         QCOMPARE(view.displayedLines().size(), hiddenCount);
+    }
+
+    void sideBySideFacesRemovedLinesWithAddedOnes()
+    {
+        const FilePatch patch = FilePatch::parse("@@ -10,4 +10,3 @@\n keep\n-a\n-b\n+A\n end\n");
+
+        const DiffColumns columns = SideBySide::columns(DiffLayout::lines({{"x.cpp", "", patch}}));
+
+        QCOMPARE(textsOf(columns.oldSide).mid(2), QStringList({"⋯ lines 10–12", "keep", "a", "b", "end"}));
+        QCOMPARE(textsOf(columns.newSide).mid(2), QStringList({"⋯ lines 10–12", "keep", "A", "", "end"}));
+        QCOMPARE(columns.newSide[5].kind, DiffLineKind::Filler);
+        // The filler leads to the line it faces, for staging.
+        QCOMPARE(columns.newSide[5].location.line, columns.oldSide[5].location.line);
+        QCOMPARE(columns.oldSide[4].oldNumber, 11);
+        QCOMPARE(columns.newSide[4].newNumber, 11);
+    }
+
+    void sideBySideScrollsBothSidesTogether()
+    {
+        DiffView view(Theme::dark());
+        view.resize(800, 300);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        const DiffFile file{"x.txt", "modified", FilePatch::parse(oneAddedLine), false, numberedLines(50)};
+        view.setFiles({file});
+
+        view.setMode(DiffView::Mode::SideBySide);
+        auto *oldSide = view.findChild<DiffView *>();
+        QVERIFY(oldSide && oldSide->isVisible());
+        QCOMPARE(oldSide->displayedLines().size(), view.displayedLines().size());
+        QVERIFY(oldSide->width() < view.width() / 2 + 1);
+        view.revealLines(2, Reveal::LastLines);
+        view.setFirstVisibleLine(12);
+
+        QTRY_COMPARE(oldSide->firstVisibleLine(), 12);
+        oldSide->setFirstVisibleLine(4);
+        QTRY_COMPARE(view.firstVisibleLine(), 4);
+
+        view.setMode(DiffView::Mode::Unified);
+        QVERIFY(!oldSide->isVisible());
     }
 
     void diffSaysAFileIsTooLargeToShow()
@@ -615,6 +656,40 @@ private slots:
         whitespace->click();
         QTRY_COMPARE(refreshed.size(), 3);
         QVERIFY(removed("a b"));
+    }
+
+    void sideBySideStagesBothSidesOfASelectedRow()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "1\n2\n3\nfour\n5\n6\n7\n8\n9\nten\n");
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 600);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *diff = view.findChild<DiffView *>();
+        diff->setMode(DiffView::Mode::SideBySide);
+        const QList<DiffLine> &rows = diff->displayedLines();
+        const auto four =
+            std::find_if(rows.begin(), rows.end(), [](const DiffLine &row) { return row.text == "four"; });
+        QVERIFY(four != rows.end());
+        const int row = int(four - rows.begin());
+
+        diff->setSelection(row, 0, row + 1, 0);
+        diff->setFocus();
+        QTest::keyClick(diff, Qt::Key_Space);
+
+        QTRY_COMPARE(sectionTitles(view.findChild<QTreeWidget *>()), QStringList({"Unstaged (1)", "Staged (1)"}));
+        const QByteArray staged = Git::run(project.path(), {"diff", "--cached"});
+        QVERIFY(staged.contains("-4\n+four"));
+        QVERIFY(!staged.contains("+ten"));
     }
 
     void snapshotsPopupListsAndRestores()
