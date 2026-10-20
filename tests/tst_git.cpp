@@ -142,6 +142,41 @@ private slots:
         QVERIFY(find(result.unstaged, "src/new.js")->patch.contains("+let x;"));
     }
 
+    void statusKeepsTheNewVersionOfModifiedFiles()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"both.txt", "1\n"}, {"gone.txt", "bye\n"}});
+        write(project, "both.txt", "2\n");
+        git(project, {"add", "both.txt"});
+        write(project, "both.txt", "3\n");
+        QFile::remove(project.filePath("gone.txt"));
+        write(project, "new.txt", "hi\n");
+
+        const RepositoryStatus result = status(project);
+
+        QCOMPARE(find(result.staged, "both.txt")->newText, QByteArray("2\n"));   // the index's
+        QCOMPARE(find(result.unstaged, "both.txt")->newText, QByteArray("3\n")); // the disk's
+        // Their patch shows them whole.
+        QVERIFY(find(result.unstaged, "gone.txt")->newText.isEmpty());
+        QVERIFY(find(result.unstaged, "new.txt")->newText.isEmpty());
+    }
+
+    void statusCanIgnoreWhitespace()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a b\nc\n"}});
+        write(project, "a.txt", "a   b\nd\n");
+
+        const auto ignoring = RepositoryStatus::read(project.path(), Whitespace::Ignore);
+        const auto comparing = RepositoryStatus::read(project.path(), Whitespace::Compare);
+
+        QVERIFY(ignoring && comparing);
+        const QByteArray ignored = find(ignoring->unstaged, "a.txt")->patch;
+        QVERIFY(ignored.contains("-c\n+d\n"));
+        QVERIFY(!ignored.contains("-a b"));
+        QVERIFY(find(comparing->unstaged, "a.txt")->patch.contains("-a b\n"));
+    }
+
     void statusListsFilesOverOneMebibyteWithoutTheirDiff()
     {
         const QTemporaryDir project;

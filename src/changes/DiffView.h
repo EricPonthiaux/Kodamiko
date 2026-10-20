@@ -12,9 +12,10 @@
 // 40–48 · function"), the lines themselves without "+" or "-", colored as in
 // the editor, added ones on a green background and removed ones on a red
 // one, the words that changed within a line brighter still, and in the
-// margin their numbers before and after. Read only; the text can be selected
-// and copied. F7 and Shift+F7 go to the next and previous block, Alt+Down
-// and Alt+Up to the next and previous file.
+// margin their numbers before and after. The arrows of a separator reveal
+// the unchanged lines it hides, 20 at a time. Read only; the text can be
+// selected and copied. F7 and Shift+F7 go to the next and previous block,
+// Alt+Down and Alt+Up to the next and previous file.
 class DiffView : public QsciScintilla {
     Q_OBJECT
 
@@ -34,7 +35,14 @@ public:
 
     explicit DiffView(const Theme &theme, QWidget *parent = nullptr);
 
+    // Shows `files`, with the unchanged lines revealed in files of the same
+    // path until hideUnchangedLines().
     void setFiles(const QList<DiffFile> &files);
+    // Back to the blocks alone, for files that are no longer the same.
+    void hideUnchangedLines();
+    // Shows lines that the separator at displayed line `line` hides; the
+    // view keeps its place.
+    void revealLines(int line, Reveal reveal);
     // Nothing to show but a message in gray (or nothing).
     void showMessage(const QString &message);
 
@@ -71,6 +79,10 @@ signals:
 
 private:
     void addShortcuts();
+    // The lines of the files, with those revealed.
+    void layOut();
+    // A click on a separator's arrow, at `position` in the text.
+    void onArrowClicked(int position);
     // The first displayed line of `kind` after (or before) the cursor or the
     // top of the view, see goToChange().
     std::optional<int> nextLineOfKind(DiffLineKind kind, Direction direction) const;
@@ -86,9 +98,10 @@ private:
     QString marginNumber(int value) const;
 
     Theme theme_;
+    QList<DiffFile> files_;
+    DiffLayout::RevealedLines revealed_;
     QList<DiffLine> lines_;
     QList<int> fileStarts_;
-    QStringList paths_;
     QList<FileSummary> summaries_;
     int numberWidth_ = 3; // digits of the largest line number
 };

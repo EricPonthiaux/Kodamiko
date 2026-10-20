@@ -39,16 +39,21 @@ bool isCodeLine(const DiffLine &line)
     return line.kind == DiffLineKind::Context || line.kind == DiffLineKind::Added || line.kind == DiffLineKind::Removed;
 }
 
+bool isSeparator(const DiffLine &line)
+{
+    return line.kind == DiffLineKind::FileHeader || line.kind == DiffLineKind::HunkHeader ||
+           line.kind == DiffLineKind::HiddenLines;
+}
+
+// The code of both sides, a blank line where lines are left out.
 BothSides collectSides(const QList<DiffLine> &lines, int fileStart, int file)
 {
     BothSides sides;
-    int hunk = -1;
-    for (int i = fileStart; i < lines.size() && lines[i].location.file == file; ++i) {
+    for (int i = fileStart + 1; i < lines.size() && lines[i].location.file == file; ++i) {
         const DiffLine &line = lines[i];
         if (!isCodeLine(line))
             continue;
-        if (line.location.hunk != hunk) {
-            hunk = line.location.hunk;
+        if (isSeparator(lines[i - 1])) {
             sides.code[oldSide] += '\n';
             sides.code[newSide] += '\n';
         }

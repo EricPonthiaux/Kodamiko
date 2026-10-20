@@ -223,6 +223,11 @@ const QHash<QString, Painter> &painters()
         {QStringLiteral("check"),
          [](QPainter &p) { p.drawPolyline(QPolygonF({QPointF(3.5, 8.5), QPointF(6.5, 11.5), QPointF(12.5, 4.5)})); }},
         {QStringLiteral("minus"), [](QPainter &p) { p.drawLine(QPointF(3, 8), QPointF(13, 8)); }},
+        // Whitespace: the open box of a visible space, "␣".
+        {QStringLiteral("whitespace"),
+         [](QPainter &p) {
+             p.drawPolyline(QPolygonF({QPointF(3, 7.5), QPointF(3, 11.5), QPointF(13, 11.5), QPointF(13, 7.5)}));
+         }},
         // An arrow turning back.
         {QStringLiteral("discard"),
          [](QPainter &p) {

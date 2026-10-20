@@ -40,6 +40,9 @@ DiffView::DiffView(const Theme &theme, QWidget *parent)
         setMarginWidth(margin, 0);
     applyTheme(theme);
     addShortcuts();
+    // Queued: the arrow's lines replace the text Scintilla is handling the
+    // click in.
+    connect(this, &QsciScintillaBase::SCN_HOTSPOTRELEASECLICK, this, &DiffView::onArrowClicked, Qt::QueuedConnection);
 }
 
 void DiffView::addShortcuts()
@@ -56,13 +59,55 @@ void DiffView::addShortcuts()
 
 void DiffView::setFiles(const QList<DiffFile> &files)
 {
-    lines_ = DiffLayout::lines(files);
-    paths_.clear();
+    files_ = files;
     summaries_.clear();
-    for (const DiffFile &file : files) {
-        paths_.append(file.path);
+    for (const DiffFile &file : files)
         summaries_.append({file.path, file.status, file.patch.addedLines(), file.patch.removedLines()});
+    layOut();
+}
+
+void DiffView::hideUnchangedLines()
+{
+    revealed_.clear();
+}
+
+void DiffView::revealLines(int line, Reveal reveal)
+{
+    if (line < 0 || line >= lines_.size())
+        return;
+    const DiffLine &separator = lines_[line];
+    const LineRange part = DiffLayout::revealedPart(separator.hidden, reveal);
+    if (part.count() == 0 || separator.location.file < 0)
+        return;
+    QSet<int> &revealed = revealed_[files_[separator.location.file].path];
+    for (int number = part.first; number <= part.last; ++number)
+        revealed.insert(number);
+    const int top = firstVisibleLine();
+    layOut();
+    setCursorPosition(std::min(line, int(lines_.size()) - 1), 0); // scrolls to the cursor: first
+    setFirstVisibleLine(top);
+}
+
+void DiffView::onArrowClicked(int position)
+{
+    const int line = int(SendScintilla(SCI_LINEFROMPOSITION, position));
+    if (line < 0 || line >= lines_.size())
+        return;
+    const DiffLine &separator = lines_[line];
+    const long column = position - SendScintilla(SCI_POSITIONFROMLINE, line);
+    for (const RevealArrow &arrow : separator.arrows) {
+        const bool isOnArrow = column >= utf8Length(separator.text, arrow.position) &&
+                               column < utf8Length(separator.text, arrow.position + 1);
+        if (isOnArrow) {
+            revealLines(line, arrow.reveal);
+            return;
+        }
     }
+}
+
+void DiffView::layOut()
+{
+    lines_ = DiffLayout::lines(files_, revealed_);
     fileStarts_.clear();
     int largest = 0;
     for (int i = 0; i < lines_.size(); ++i) {
@@ -79,7 +124,7 @@ void DiffView::showMessage(const QString &message)
 {
     lines_.clear();
     fileStarts_.clear();
-    paths_.clear();
+    files_.clear();
     summaries_.clear();
     if (!message.isEmpty()) {
         DiffLine note;
@@ -191,7 +236,7 @@ void DiffView::render()
         styleLine(i, decorateLine(i));
     DiffSyntaxHighlighter highlighter(*this, theme_, lines_);
     for (int file = 0; file < fileStarts_.size(); ++file)
-        highlighter.highlightFile(fileStarts_[file], paths_.value(file));
+        highlighter.highlightFile(fileStarts_[file], files_.value(file).path);
 
     // No numbers to show (a message): no margin.
     const bool numbered = std::any_of(lines_.begin(), lines_.end(),
@@ -222,6 +267,7 @@ int DiffView::decorateLine(int line)
         setMarginText(line, QStringLiteral(" "), fileMarginStyle);
         return fileHeaderStyle;
     case DiffLineKind::HunkHeader:
+    case DiffLineKind::HiddenLines:
         markerAdd(line, hunkHeaderBackground);
         markerAdd(line, hunkHeaderStrip);
         setMarginText(line, QStringLiteral(" "), hunkMarginStyle);
@@ -259,6 +305,11 @@ void DiffView::styleLine(int line, int style)
     }
     if (shown.statsStart >= 0)
         styleStats(shown, start, length);
+    for (const RevealArrow &arrow : shown.arrows) {
+        const long from = start + utf8Length(shown.text, arrow.position);
+        SendScintilla(SCI_STARTSTYLING, from);
+        SendScintilla(SCI_SETSTYLING, start + utf8Length(shown.text, arrow.position + 1) - from, revealStyle);
+    }
     if (shown.changes.isEmpty())
         return;
     SendScintilla(SCI_SETINDICATORCURRENT, shown.kind == DiffLineKind::Added ? addedWords : removedWords);

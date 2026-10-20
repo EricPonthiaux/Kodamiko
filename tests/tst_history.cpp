@@ -1,3 +1,4 @@
+#include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "git/CommitLog.h"
 #include "git/GitProcess.h"
@@ -7,6 +8,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QtTest>
 
@@ -40,6 +42,20 @@ CommitLog readLog(const QString &folder, int limit = 2000)
     if (!log)
         qFatal("no git repository");
     return *log;
+}
+
+QStringList pathsOf(const CommitLog &log)
+{
+    QStringList result;
+    for (const CommitSummary &commit : log.commits)
+        result.append(commit.path);
+    return result;
+}
+
+// Content similar enough across small edits for git to see a rename.
+QByteArray longText(const QByteArray &lastLine)
+{
+    return QByteArray("line\n").repeated(20) + lastLine + "\n";
 }
 
 QStringList summaries(const CommitLog &log)
@@ -160,6 +176,39 @@ private slots:
         QCOMPARE(summaries(*CommitLog::read(dir.path(), 100, "src")).size(), 3);
     }
 
+    void fileHistoryFollowsRenames()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "create", {{"old.txt", longText("1")}});
+        commit(dir, "edit", {{"old.txt", longText("2")}, {"other.txt", "o\n"}});
+        QVERIFY(QFile::remove(dir.filePath("old.txt")));
+        commit(dir, "rename", {{"new.txt", longText("3")}});
+        commit(dir, "unrelated", {{"other.txt", "p\n"}});
+        commit(dir, "after", {{"new.txt", longText("4")}});
+
+        const std::optional<CommitLog> log = CommitLog::read(dir.path(), 2000, "new.txt");
+
+        QVERIFY(log);
+        QCOMPARE(summaries(*log), QStringList({"after", "rename", "edit", "create"}));
+        QCOMPARE(pathsOf(*log), QStringList({"new.txt", "new.txt", "old.txt", "old.txt"}));
+        QCOMPARE(pathsOf(*CommitLog::read(dir.path(), 2000)), QStringList(5, QString())); // no file followed
+    }
+
+    void fileHistoryStopsAtARenameFromOutsideTheFolder()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "create", {{"a.txt", longText("1")}});
+        QVERIFY(QFile::remove(dir.filePath("a.txt")));
+        commit(dir, "move in", {{"src/a.txt", longText("1")}});
+
+        const std::optional<CommitLog> log = CommitLog::read(dir.filePath("src"), 2000, "a.txt");
+
+        QVERIFY(log);
+        QCOMPARE(summaries(*log), QStringList({"move in"})); // added, as far as src sees
+    }
+
     void detailsOfACommit()
     {
         const QTemporaryDir dir;
@@ -177,6 +226,7 @@ private slots:
         QCOMPARE(details.files.size(), 2);
         QCOMPARE(details.files[0].change, (FileChange{ChangeKind::Modified, "a.txt", {}}));
         QVERIFY(details.files[0].patch.contains("-one\n+two\n"));
+        QCOMPARE(details.files[0].newText, QByteArray("two\n")); // the commit's version
         QCOMPARE(details.files[1].change, (FileChange{ChangeKind::Renamed, "new.txt", "old.txt"}));
 
         // First commit: compared with an empty tree.
@@ -184,6 +234,22 @@ private slots:
         QVERIFY(first.parentIds.isEmpty());
         QCOMPARE(first.files.size(), 2);
         QCOMPARE(first.files[0].change.kind, ChangeKind::Added);
+    }
+
+    void detailsCanIgnoreWhitespace()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "first", {{"a.txt", "a b\n"}});
+        commit(dir, "reindent", {{"a.txt", "  a b\n"}});
+        const QString id = readLog(dir.path()).commits.first().id;
+
+        const CommitDetails ignoring = CommitDetails::read(dir.path(), id, Whitespace::Ignore);
+        const CommitDetails comparing = CommitDetails::read(dir.path(), id);
+
+        QCOMPARE(ignoring.files.size(), 1); // still listed, without blocks
+        QVERIFY(!ignoring.files[0].patch.contains("@@"));
+        QVERIFY(comparing.files[0].patch.contains("+  a b"));
     }
 
     void detailsOfASubfolderAreRelative()
@@ -237,6 +303,58 @@ private slots:
         QVERIFY(!diff->text().contains("b.txt"));
         QCOMPARE(files->topLevelItemCount(), 1);
         QVERIFY(!files->isVisibleTo(&view)); // the commit pane: no list to look through
+    }
+
+    void hidingWhitespaceKeepsTheChosenFile()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "first", {{"a.txt", "a\n"}, {"b.txt", "b c\n"}});
+        commit(dir, "second", {{"a.txt", "z\n"}, {"b.txt", "b   c\n"}});
+        HistoryView view(Theme::dark());
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        auto *files = view.findChild<QTreeWidget *>("files");
+        const auto *diff = view.findChild<DiffView *>();
+        commits->setCurrentItem(commits->topLevelItem(0));
+        QTRY_COMPARE(files->topLevelItemCount(), 2);
+        files->setCurrentItem(files->topLevelItem(1));
+        QTRY_VERIFY(diff->text().contains("b   c"));
+        QToolButton *whitespace = nullptr;
+        for (QToolButton *button : view.findChild<DiffHeaderBar *>()->findChildren<QToolButton *>()) {
+            if (button->toolTip() == QLatin1String("Hide whitespace changes"))
+                whitespace = button;
+        }
+        QVERIFY(whitespace);
+
+        whitespace->click();
+
+        QTRY_VERIFY(diff->text().contains("No changes to the text"));
+        QVERIFY(diff->text().contains("b.txt"));
+    }
+
+    void fileHistoryShowsTheDiffUnderTheOldName()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "create", {{"old.txt", longText("1")}});
+        QVERIFY(QFile::remove(dir.filePath("old.txt")));
+        commit(dir, "rename", {{"new.txt", longText("1")}});
+        HistoryView view(Theme::dark());
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.setPathFilter("new.txt");
+        QTRY_VERIFY(!refreshed.isEmpty());
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QCOMPARE(commits->topLevelItemCount(), 2);
+        const auto *diff = view.findChild<DiffView *>();
+
+        commits->setCurrentItem(commits->topLevelItem(1)); // "create"
+
+        QTRY_VERIFY(diff->text().contains("old.txt"));
     }
 
     void folderHistoryListsOnlyTheFolderFiles()

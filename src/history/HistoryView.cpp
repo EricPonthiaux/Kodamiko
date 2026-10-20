@@ -31,7 +31,9 @@
 #include <QVBoxLayout>
 #include <QtMath>
 
+#include <algorithm>
 #include <numeric>
+#include <utility>
 
 namespace {
 
@@ -262,6 +264,7 @@ QWidget *HistoryView::createDiffPane()
     diff_ = new DiffView(Theme::dark(), pane);
     diff_->setToolTip({});
     diffHeader_ = new DiffHeaderBar(diff_, pane);
+    connect(diffHeader_, &DiffHeaderBar::whitespaceChanged, this, &HistoryView::rereadCommit);
 
     auto *layout = new QVBoxLayout(pane);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -429,7 +432,31 @@ void HistoryView::onFileSelectionChanged()
         return;
     }
     const FileDiff &file = details_->files.at(selected.first()->data(0, fileIndexRole).toInt());
-    diff_->setFiles({{file.change.path, changeStatusText(file.change), FilePatch::parse(file.patch), file.isTooLarge}});
+    diff_->setFiles({{file.change.path, changeStatusText(file.change), FilePatch::parse(file.patch), file.isTooLarge,
+                      file.newText}});
+}
+
+QString HistoryView::filterOf(const QString &commitId) const
+{
+    if (!log_)
+        return pathFilter_;
+    const auto commit = std::ranges::find_if(log_->commits, [&commitId](const CommitSummary &summary) {
+        return summary.id == commitId && !summary.path.isEmpty();
+    });
+    return commit != log_->commits.end() ? commit->path : pathFilter_;
+}
+
+void HistoryView::chooseFile(const QString &path)
+{
+    if (!details_)
+        return;
+    for (int i = 0; i < files_->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *item = files_->topLevelItem(i);
+        if (details_->files.at(item->data(0, fileIndexRole).toInt()).change.path == path) {
+            files_->setCurrentItem(item);
+            return;
+        }
+    }
 }
 
 // What to choose for a diff to show; nothing before a commit is chosen,
@@ -454,23 +481,39 @@ void HistoryView::showCommit(const QString &id)
     if ((details_ && details_->summary.id == id) || detailsWanted_ == id)
         return;
     detailsWanted_ = id;
-    pool_.start([this, folder = folder_, id] {
+    pool_.start([this, folder = folder_, id, whitespace = diffHeader_->whitespace()] {
         std::optional<CommitDetails> details;
         QString error;
         try {
-            details = CommitDetails::read(folder, id);
+            details = CommitDetails::read(folder, id, whitespace);
         } catch (const GitError &exception) {
             error = QString::fromStdString(exception.what());
         }
         QMetaObject::invokeMethod(
-            this, [this, id, details, error] { onDetailsRead(id, details, error); }, Qt::QueuedConnection);
+            this, [this, id, whitespace, details, error] { onDetailsRead({id, whitespace}, details, error); },
+            Qt::QueuedConnection);
     });
 }
 
-void HistoryView::onDetailsRead(const QString &id, const std::optional<CommitDetails> &details, const QString &error)
+void HistoryView::rereadCommit()
 {
-    if (id != detailsWanted_)
-        return; // another commit was chosen meanwhile
+    const QString id = details_ ? details_->summary.id : detailsWanted_;
+    if (id.isEmpty())
+        return;
+    if (const QTreeWidgetItem *item = files_->currentItem(); item && details_)
+        fileToKeep_ = details_->files.at(item->data(0, fileIndexRole).toInt()).change.path;
+    details_.reset();
+    detailsWanted_.clear();
+    showCommit(id);
+}
+
+void HistoryView::onDetailsRead(const DetailsRequest &request,
+                                const std::optional<CommitDetails> &details,
+                                const QString &error)
+{
+    // Another commit was chosen meanwhile, or whitespace toggled.
+    if (request.id != detailsWanted_ || request.whitespace != diffHeader_->whitespace())
+        return;
     detailsWanted_.clear();
     details_ = details;
     showDetails();
@@ -482,6 +525,7 @@ void HistoryView::onDetailsRead(const QString &id, const std::optional<CommitDet
 
 void HistoryView::showDetails()
 {
+    diff_->hideUnchangedLines(); // those of the previous commit
     files_->clear();
     onFileSelectionChanged(); // nothing chosen in the new list
     auto *hint = static_cast<QLabel *>(commitPages_->widget(0));
@@ -521,9 +565,10 @@ void HistoryView::showDetails()
                  dark ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37"), QString::number(added),
                  dark ? QStringLiteral("#f85149") : QStringLiteral("#cf222e"), QString::number(removed)));
     // Only the filtered file or folder: no need to look for it.
+    const QString filter = filterOf(commit.id);
     for (int i = 0; i < details.files.size(); ++i) {
         const FileDiff &file = details.files[i];
-        if (!isFiltered(file.change, pathFilter_))
+        if (!isFiltered(file.change, filter))
             continue;
         auto *item = new QTreeWidgetItem(files_);
         FileChangeDelegate::setChange(item, file.change);
@@ -532,6 +577,8 @@ void HistoryView::showDetails()
     }
     if (!pathFilter_.isEmpty() && files_->topLevelItemCount() == 1)
         files_->setCurrentItem(files_->topLevelItem(0)); // the filtered file's diff right away
+    if (!fileToKeep_.isEmpty())
+        chooseFile(std::exchange(fileToKeep_, {}));
     commitPages_->setCurrentIndex(1);
     // Once the pane is laid out.
     QTimer::singleShot(0, this, &HistoryView::fitMessage);

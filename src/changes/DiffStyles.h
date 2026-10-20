@@ -21,6 +21,7 @@ constexpr int addedStatsStyle = 47;
 constexpr int removedStatsStyle = 48;
 constexpr int fileMarginStyle = 49;
 constexpr int hunkMarginStyle = 50;
+constexpr int revealStyle = 51; // a separator's arrows, clickable
 
 constexpr int firstSyntaxStyle = 64;
 constexpr int lastSyntaxStyle = 255;

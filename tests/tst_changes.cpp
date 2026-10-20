@@ -58,6 +58,26 @@ QStringList sectionTitles(const QTreeWidget *list)
     return titles;
 }
 
+// "n1\nn2\n…": line n says its number.
+QByteArray numberedLines(int count)
+{
+    QByteArray text;
+    for (int n = 1; n <= count; ++n)
+        text += "n" + QByteArray::number(n) + "\n";
+    return text;
+}
+
+QStringList textsOf(const QList<DiffLine> &lines)
+{
+    QStringList texts;
+    for (const DiffLine &line : lines)
+        texts.append(line.text);
+    return texts;
+}
+
+// A line added after line 29 of 49: line 30 of 50.
+const QByteArray oneAddedLine = "@@ -27,6 +27,7 @@\n n27\n n28\n n29\n+n30\n n31\n n32\n n33\n";
+
 } // namespace
 
 class TestChanges : public QObject {
@@ -126,6 +146,105 @@ private slots:
         QCOMPARE(view.locate(5).line, 2);
         QVERIFY(view.text().contains("Binary file"));
         QVERIFY(!view.text().contains("@@"));
+    }
+
+    void separatorsHoldTheUnchangedLinesAroundTheBlocks()
+    {
+        const DiffFile file{"x.cpp", "modified", FilePatch::parse(oneAddedLine), false, numberedLines(50)};
+
+        const QList<DiffLine> lines = DiffLayout::lines({file});
+
+        QCOMPARE(textsOf(lines).mid(2), QStringList({"⋯ ↑  lines 27–33", "n27", "n28", "n29", "n30", "n31", "n32",
+                                                     "n33", "⋯ ↓  17 more lines"}));
+        QCOMPARE(lines[2].hidden, (LineRange{1, 26}));
+        QCOMPARE(lines[2].arrows.size(), 1);
+        QCOMPARE(lines[2].arrows[0].reveal, Reveal::LastLines);
+        QCOMPARE(lines[2].arrows[0].position, 2);
+        QCOMPARE(lines.last().kind, DiffLineKind::HiddenLines);
+        QCOMPARE(lines.last().hidden, (LineRange{34, 50}));
+    }
+
+    void revealedLinesKeepTheirNumbersOnBothSides()
+    {
+        const DiffFile file{"x.cpp", "modified", FilePatch::parse(oneAddedLine), false, numberedLines(50)};
+        const QList<DiffLine> hidden = DiffLayout::lines({file});
+        QSet<int> revealed;
+        for (const auto &[separator, reveal] :
+             {std::pair{hidden[2], Reveal::LastLines}, std::pair{hidden.last(), Reveal::FirstLines}}) {
+            const LineRange part = DiffLayout::revealedPart(separator.hidden, reveal);
+            for (int n = part.first; n <= part.last; ++n)
+                revealed.insert(n);
+        }
+
+        const QList<DiffLine> lines = DiffLayout::lines({file}, {{"x.cpp", revealed}});
+
+        QCOMPARE(lines[2].text, QString("⋯ ↑  lines 27–33")); // 1 to 6 still hidden
+        QCOMPARE(lines[2].hidden, (LineRange{1, 6}));
+        QCOMPARE(lines[3].text, QString("n7"));
+        QCOMPARE(lines[3].oldNumber, 7);
+        QCOMPARE(lines[3].newNumber, 7);
+        // Part of the block for its buttons, out of its patch for staging.
+        QCOMPARE(lines[3].location.hunk, 0);
+        QCOMPARE(lines[3].location.line, -1);
+        QCOMPARE(lines[23].text, QString("n27"));
+        QCOMPARE(lines[30].text, QString("n34")); // the old version has one line less
+        QCOMPARE(lines[30].oldNumber, 33);
+        QCOMPARE(lines[30].newNumber, 34);
+        QCOMPARE(lines.last().text, QString("n50"));
+        QCOMPARE(lines.size(), 47);
+    }
+
+    void aShortGapBetweenBlocksIsRevealedAtOnce()
+    {
+        const QByteArray patch = "@@ -1,3 +1,3 @@\n-x\n+n1\n n2\n n3\n"
+                                 "@@ -15,3 +15,3 @@\n n15\n-y\n+n16\n n17\n"
+                                 "@@ -40,3 +40,3 @@\n n40\n-z\n+n41\n n42\n";
+        const DiffFile file{"x.txt", "modified", FilePatch::parse(patch), false, numberedLines(42)};
+        const QList<DiffLine> hidden = DiffLayout::lines({file});
+        QStringList separators;
+        for (const DiffLine &line : hidden) {
+            if (line.kind == DiffLineKind::HunkHeader)
+                separators.append(line.text);
+        }
+        QCOMPARE(separators, QStringList({"⋯ lines 1–3", "⋯ ↕  lines 15–17", "⋯ ↑ ↓  lines 40–42"}));
+        QCOMPARE(hidden.last().text, QString("n42")); // nothing after the last block
+
+        const LineRange part = DiffLayout::revealedPart(hidden[7].hidden, Reveal::AllLines);
+        QSet<int> revealed;
+        for (int n = part.first; n <= part.last; ++n)
+            revealed.insert(n);
+        const QList<DiffLine> lines = DiffLayout::lines({file}, {{"x.txt", revealed}});
+
+        QCOMPARE(lines[7].text, QString("n4"));
+        QCOMPARE(lines[17].text, QString("n14"));
+        QCOMPARE(lines[18].text, QString("⋯ lines 15–17"));
+        QVERIFY(lines[18].arrows.isEmpty());
+    }
+
+    void clickingAnArrowRevealsLinesInPlace()
+    {
+        DiffView view(Theme::dark());
+        view.resize(700, 400);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        const DiffFile file{"x.txt", "modified", FilePatch::parse(oneAddedLine), false, numberedLines(50)};
+        view.setFiles({file});
+        const qsizetype hiddenCount = view.displayedLines().size();
+
+        // The ↑ after "⋯ " on the separator, line 2.
+        const long position =
+            view.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, 2) + long(QStringLiteral("⋯ ").toUtf8().size());
+        const QPoint arrow(int(view.SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0UL, position)) + 2,
+                           view.lineTop(2) + view.lineHeight() / 2);
+        QTest::mouseClick(view.viewport(), Qt::LeftButton, {}, arrow);
+
+        QTRY_COMPARE(view.displayedLines().value(3).text, QString("n7"));
+        QCOMPARE(view.displayedLines()[2].kind, DiffLineKind::HunkHeader);
+        QCOMPARE(view.firstVisibleLine(), 0);
+
+        view.hideUnchangedLines();
+        view.setFiles({file});
+        QCOMPARE(view.displayedLines().size(), hiddenCount);
     }
 
     void diffSaysAFileIsTooLargeToShow()
@@ -449,6 +568,53 @@ private slots:
         const QByteArray staged = Git::run(project.path(), {"diff", "--cached"});
         QVERIFY(staged.contains("+ten"));
         QVERIFY(!staged.contains("+one"));
+    }
+
+    void hidingWhitespaceRereadsTheDiffAndBlocksLineStaging()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "a b\nc\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "a   b\nd\n");
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 600);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *diff = view.findChild<DiffView *>();
+        QToolButton *whitespace = nullptr;
+        for (QToolButton *button : view.findChild<DiffHeaderBar *>()->findChildren<QToolButton *>()) {
+            if (button->toolTip() == QLatin1String("Hide whitespace changes"))
+                whitespace = button;
+        }
+        QVERIFY(whitespace);
+
+        whitespace->click();
+
+        QTRY_COMPARE(refreshed.size(), 2);
+        const QList<DiffLine> &lines = diff->displayedLines();
+        const auto removed = [&lines](const QString &text) {
+            return std::any_of(lines.begin(), lines.end(), [&text](const DiffLine &line) {
+                return line.kind == DiffLineKind::Removed && line.text == text;
+            });
+        };
+        QVERIFY(!removed("a b")); // now a line of context
+        QVERIFY(removed("c"));
+        const QSignalSpy messages(&view, &ChangesView::statusMessage);
+        diff->setFocus();
+        QTest::keyClick(diff, Qt::Key_F7); // the block "-c +d"
+        QTest::keyClick(diff, Qt::Key_Space);
+        QCOMPARE(messages.size(), 1); // why nothing was staged
+        QVERIFY(Git::run(project.path(), {"diff", "--cached"}).isEmpty());
+
+        whitespace->click();
+        QTRY_COMPARE(refreshed.size(), 3);
+        QVERIFY(removed("a b"));
     }
 
     void snapshotsPopupListsAndRestores()

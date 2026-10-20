@@ -113,6 +113,50 @@ bool touchesPath(const git_commit *commit, const QString &path)
     return !git_oid_equal(&own, &before);
 }
 
+// The path `commit` renamed into `path`; empty if it created `path` or
+// only changed it.
+QString renamedFrom(git_repository *repository, const git_commit *commit, const QString &path)
+{
+    if (git_commit_parentcount(commit) == 0)
+        return {};
+    git_commit *parent = nullptr;
+    check(git_commit_parent(&parent, commit, 0), "Reading a parent commit");
+    const Ptr<git_commit> parentGuard(parent);
+    // Only a commit that creates `path` can have renamed it: the others need
+    // no diff.
+    if (const git_oid before = entryId(parent, path); !git_oid_is_zero(&before))
+        return {};
+    git_tree *tree = nullptr;
+    check(git_commit_tree(&tree, commit), "Reading a commit");
+    const Ptr<git_tree> treeGuard(tree);
+    git_tree *parentTree = nullptr;
+    check(git_commit_tree(&parentTree, parent), "Reading a parent commit");
+    const Ptr<git_tree> parentTreeGuard(parentTree);
+
+    git_diff *diff = nullptr;
+    check(git_diff_tree_to_tree(&diff, repository, parentTree, tree, nullptr), "Following a rename");
+    const Ptr<git_diff> diffGuard(diff);
+    git_diff_find_options findOptions;
+    git_diff_find_options_init(&findOptions, GIT_DIFF_FIND_OPTIONS_VERSION);
+    findOptions.flags = GIT_DIFF_FIND_RENAMES;
+    check(git_diff_find_similar(diff, &findOptions), "Following a rename");
+    const QByteArray target = path.toUtf8();
+    for (size_t i = 0; i < git_diff_num_deltas(diff); ++i) {
+        const git_diff_delta *delta = git_diff_get_delta(diff, i);
+        if (delta->status == GIT_DELTA_RENAMED && target == delta->new_file.path)
+            return QString::fromUtf8(delta->old_file.path);
+    }
+    return {};
+}
+
+// The path to look for in the commits before `commit`: `path`, or the one it
+// had before `commit` renamed it from within the open folder (`prefix`).
+QString pathBefore(git_repository *repository, const git_commit *commit, const QString &path, const QString &prefix)
+{
+    const QString renamed = renamedFrom(repository, commit, path);
+    return renamed.isEmpty() || !renamed.startsWith(prefix) ? path : renamed;
+}
+
 } // namespace
 
 std::optional<CommitLog> CommitLog::read(const QString &folder, int limit, const QString &path)
@@ -152,11 +196,15 @@ std::optional<CommitLog> CommitLog::read(const QString &folder, int limit, const
             break;
         }
         log.commits.append(summaryOf(commit, refs));
+        if (path.isEmpty())
+            continue;
+        log.commits.last().path = filter.mid(info->prefix.size());
+        filter = pathBefore(repository.get(), commit, filter, info->prefix);
     }
     return log;
 }
 
-CommitDetails CommitDetails::read(const QString &folder, const QString &commitId)
+CommitDetails CommitDetails::read(const QString &folder, const QString &commitId, Whitespace whitespace)
 {
     const std::optional<RepositoryInfo> info = RepositoryInfo::read(folder);
     if (!info)
@@ -204,6 +252,8 @@ CommitDetails CommitDetails::read(const QString &folder, const QString &commitId
         options.pathspec.strings = &pathspec;
         options.pathspec.count = 1;
     }
+    if (whitespace == Whitespace::Ignore)
+        options.flags |= GIT_DIFF_IGNORE_WHITESPACE;
     git_diff *diff = nullptr;
     check(git_diff_tree_to_tree(&diff, repository.get(), parentTree.get(), tree, &options), "Computing the diff");
     const Ptr<git_diff> diffGuard(diff);

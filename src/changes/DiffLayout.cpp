@@ -8,9 +8,36 @@
 
 namespace {
 
+// Unchanged lines a click reveals at one end of those hidden.
+constexpr int revealStep = 20;
+
 struct LineNumbers {
     int oldNumber = 0;
     int newNumber = 0;
+};
+
+// The new version of a file, for its unchanged lines; no lines when it is
+// unknown.
+struct NewVersion {
+    int lineCount = 0;
+    QList<QByteArray> lines; // split only when some are revealed
+};
+
+// The unchanged lines before a block (or after the last one), and the
+// blocks around them.
+struct Gap {
+    LineRange lines;
+    int oldOffset = 0; // a line's old number minus its new one
+    int hunkAbove = -1;
+    int hunkBelow = -1;
+};
+
+// A gap as shown: the lines revealed from its top, those still hidden, and
+// those revealed from its bottom.
+struct GapParts {
+    LineRange top;
+    LineRange hidden;
+    LineRange bottom;
 };
 
 QString translate(const char *text)
@@ -72,17 +99,63 @@ DiffLine noTextNote(const DiffFile &file, int fileIndex)
     return note;
 }
 
-DiffLine hunkSeparator(const DiffHunk &hunk, DiffLocation location, bool withHeading)
+QChar arrowGlyph(Reveal reveal)
+{
+    switch (reveal) {
+    case Reveal::FirstLines:
+        return QChar(0x2193); // ↓
+    case Reveal::LastLines:
+        return QChar(0x2191); // ↑
+    case Reveal::AllLines:
+        return QChar(0x2195); // ↕
+    }
+    return QChar(0x2195);
+}
+
+// Up from the block below, down from the block above, or both at once when
+// a single step shows them all.
+QList<Reveal> arrowsFor(const Gap &gap, LineRange hidden)
+{
+    if (hidden.count() == 0)
+        return {};
+    const bool canRevealFirst = gap.hunkAbove >= 0;
+    const bool canRevealLast = gap.hunkBelow >= 0;
+    const bool canRevealAll = canRevealFirst && canRevealLast && hidden.count() <= revealStep;
+    if (canRevealAll)
+        return {Reveal::AllLines};
+    QList<Reveal> arrows;
+    if (canRevealLast)
+        arrows.append(Reveal::LastLines);
+    if (canRevealFirst)
+        arrows.append(Reveal::FirstLines);
+    return arrows;
+}
+
+// "⋯ ↑ ↓  label", or "⋯ label" without arrows.
+DiffLine separatorLine(DiffLineKind kind, const QString &label, const Gap &gap, LineRange hidden)
 {
     DiffLine separator;
-    separator.kind = DiffLineKind::HunkHeader;
-    const QString lines =
-        hunk.newCount > 0 ? linesLabel(hunk.newStart, hunk.newCount) : linesLabel(hunk.oldStart, hunk.oldCount);
-    separator.text = QStringLiteral("⋯ ") + lines;
-    if (const QString heading = QString::fromUtf8(hunk.heading).trimmed(); withHeading && !heading.isEmpty())
-        separator.text += QStringLiteral("  ·  ") + heading;
-    separator.location = location;
+    separator.kind = kind;
+    separator.hidden = hidden;
+    separator.text = QStringLiteral("⋯ ");
+    const QList<Reveal> arrows = arrowsFor(gap, hidden);
+    for (const Reveal reveal : arrows) {
+        separator.arrows.append({int(separator.text.size()), reveal});
+        separator.text += arrowGlyph(reveal) + QStringLiteral(" ");
+    }
+    if (!arrows.isEmpty())
+        separator.text += QLatin1Char(' ');
+    separator.text += label;
     return separator;
+}
+
+DiffLine hunkSeparator(const DiffHunk &hunk, const Gap &gap, LineRange hidden, bool withHeading)
+{
+    QString label =
+        hunk.newCount > 0 ? linesLabel(hunk.newStart, hunk.newCount) : linesLabel(hunk.oldStart, hunk.oldCount);
+    if (const QString heading = QString::fromUtf8(hunk.heading).trimmed(); withHeading && !heading.isEmpty())
+        label += QStringLiteral("  ·  ") + heading;
+    return separatorLine(DiffLineKind::HunkHeader, label, gap, hidden);
 }
 
 DiffLine patchLine(const QByteArray &raw, DiffLocation location, LineNumbers &numbers)
@@ -132,9 +205,8 @@ void markChangedWords(QList<DiffLine> &lines, qsizetype first)
     }
 }
 
-void appendHunk(QList<DiffLine> &lines, const DiffHunk &hunk, DiffLocation location, bool withHeading)
+void appendHunkLines(QList<DiffLine> &lines, const DiffHunk &hunk, DiffLocation location)
 {
-    lines.append(hunkSeparator(hunk, location, withHeading));
     const qsizetype first = lines.size();
     LineNumbers numbers{hunk.oldStart, hunk.newStart};
     for (int l = 0; l < hunk.lines.size(); ++l)
@@ -142,11 +214,127 @@ void appendHunk(QList<DiffLine> &lines, const DiffHunk &hunk, DiffLocation locat
     markChangedWords(lines, first);
 }
 
+// The new-version line a block starts at, and the one after it. A side
+// without lines ("+4,0") sits after its start line.
+int firstNewLine(const DiffHunk &hunk)
+{
+    return hunk.newCount > 0 ? hunk.newStart : hunk.newStart + 1;
+}
+
+int nextNewLine(const DiffHunk &hunk)
+{
+    return hunk.newCount > 0 ? hunk.newStart + hunk.newCount : hunk.newStart + 1;
+}
+
+int nextOldLine(const DiffHunk &hunk)
+{
+    return hunk.oldCount > 0 ? hunk.oldStart + hunk.oldCount : hunk.oldStart + 1;
+}
+
+NewVersion newVersionOf(const DiffFile &file, const QSet<int> &revealed)
+{
+    NewVersion version;
+    const QByteArray &text = file.newText;
+    if (text.isEmpty())
+        return version;
+    version.lineCount = int(text.count('\n')) + (text.endsWith('\n') ? 0 : 1);
+    if (!revealed.isEmpty())
+        version.lines = text.split('\n');
+    return version;
+}
+
+// The gap before block `hunk`; after the last block for `hunk` == their
+// count. Empty without the new version: its lines could not be shown.
+Gap gapBefore(const FilePatch &patch, int hunk, const NewVersion &version)
+{
+    Gap gap;
+    if (version.lineCount == 0)
+        return gap;
+    const int hunkCount = int(patch.hunks.size());
+    gap.hunkAbove = hunk - 1;
+    gap.hunkBelow = hunk < hunkCount ? hunk : -1;
+    if (hunk > 0) {
+        const DiffHunk &above = patch.hunks[hunk - 1];
+        gap.lines.first = nextNewLine(above);
+        gap.oldOffset = nextOldLine(above) - gap.lines.first;
+    } else {
+        gap.lines.first = 1;
+    }
+    gap.lines.last = hunk < hunkCount ? firstNewLine(patch.hunks[hunk]) - 1 : version.lineCount;
+    return gap;
+}
+
+GapParts splitGap(LineRange gap, const QSet<int> &revealed)
+{
+    int top = gap.first;
+    while (top <= gap.last && revealed.contains(top))
+        ++top;
+    int bottom = gap.last;
+    while (bottom >= top && revealed.contains(bottom))
+        --bottom;
+    return {{gap.first, top - 1}, {top, bottom}, {bottom + 1, gap.last}};
+}
+
+QList<DiffLine> unchangedLines(const NewVersion &version, LineRange range, int oldOffset, DiffLocation location)
+{
+    QList<DiffLine> lines;
+    for (int number = range.first; number <= range.last; ++number) {
+        DiffLine line;
+        line.location = location;
+        line.text = QString::fromUtf8(version.lines.value(number - 1));
+        if (line.text.endsWith(QLatin1Char('\r')))
+            line.text.chop(1);
+        line.newNumber = number;
+        line.oldNumber = number + oldOffset;
+        lines.append(line);
+    }
+    return lines;
+}
+
+// "⋯ ↓  17 more lines", after the last block.
+DiffLine trailingSeparator(const Gap &gap, LineRange hidden, DiffLocation location)
+{
+    const QString label = QCoreApplication::translate("DiffLayout", "%n more lines", nullptr, hidden.count());
+    DiffLine separator = separatorLine(DiffLineKind::HiddenLines, label, gap, hidden);
+    separator.location = location;
+    return separator;
+}
+
+// The blocks of `file` and the unchanged lines between them: those
+// revealed, and a separator where some remain hidden.
+void appendFileBody(QList<DiffLine> &lines, const DiffFile &file, int fileIndex, const QSet<int> &revealed)
+{
+    const FilePatch &patch = file.patch;
+    // Git takes the heading of a block from the last line starting with
+    // a letter: in prose, a sentence cut short.
+    const QString language = LanguageRegistry::languageForFile(file.path);
+    const bool headings = language != LanguageRegistry::plainText && language != QLatin1String("markdown");
+    const NewVersion version = newVersionOf(file, revealed);
+    const int hunkCount = int(patch.hunks.size());
+    for (int h = 0; h <= hunkCount; ++h) {
+        const Gap gap = gapBefore(patch, h, version);
+        const GapParts parts = splitGap(gap.lines, revealed);
+        const DiffLocation above{fileIndex, gap.hunkAbove, -1};
+        lines += unchangedLines(version, parts.top, gap.oldOffset, above);
+        if (h == hunkCount) {
+            if (parts.hidden.count() > 0)
+                lines.append(trailingSeparator(gap, parts.hidden, above));
+            lines += unchangedLines(version, parts.bottom, gap.oldOffset, above);
+            return;
+        }
+        const DiffLocation block{fileIndex, h, -1};
+        lines.append(hunkSeparator(patch.hunks[h], gap, parts.hidden, headings));
+        lines.last().location = block;
+        lines += unchangedLines(version, parts.bottom, gap.oldOffset, block);
+        appendHunkLines(lines, patch.hunks[h], block);
+    }
+}
+
 } // namespace
 
 namespace DiffLayout {
 
-QList<DiffLine> lines(const QList<DiffFile> &files)
+QList<DiffLine> lines(const QList<DiffFile> &files, const RevealedLines &revealed)
 {
     QList<DiffLine> lines;
     for (int f = 0; f < files.size(); ++f) {
@@ -157,19 +345,25 @@ QList<DiffLine> lines(const QList<DiffFile> &files)
         lines.append(spacer);
         lines.append(fileTitle(file, f));
 
-        const FilePatch &patch = file.patch;
-        if (patch.hunks.isEmpty()) {
+        if (file.patch.hunks.isEmpty())
             lines.append(noTextNote(file, f));
-            continue;
-        }
-        // Git takes the heading of a block from the last line starting with
-        // a letter: in prose, a sentence cut short.
-        const QString language = LanguageRegistry::languageForFile(file.path);
-        const bool headings = language != LanguageRegistry::plainText && language != QLatin1String("markdown");
-        for (int h = 0; h < patch.hunks.size(); ++h)
-            appendHunk(lines, patch.hunks[h], {f, h, -1}, headings);
+        else
+            appendFileBody(lines, file, f, revealed.value(file.path));
     }
     return lines;
+}
+
+LineRange revealedPart(LineRange hidden, Reveal reveal)
+{
+    switch (reveal) {
+    case Reveal::FirstLines:
+        return {hidden.first, std::min(hidden.last, hidden.first + revealStep - 1)};
+    case Reveal::LastLines:
+        return {std::max(hidden.first, hidden.last - revealStep + 1), hidden.last};
+    case Reveal::AllLines:
+        return hidden;
+    }
+    return hidden;
 }
 
 } // namespace DiffLayout

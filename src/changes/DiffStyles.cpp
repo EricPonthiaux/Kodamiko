@@ -99,6 +99,10 @@ void defineTextStyles(const QsciScintilla &view, const Theme &theme, const DiffC
     defineStyle(view, removedStatsStyle, {colors.removedStrong, colors.fileHeader, fonts.stats});
     defineStyle(view, fileMarginStyle, {colors.muted, colors.fileHeader, theme.font});
     defineStyle(view, hunkMarginStyle, {colors.muted, colors.hunkHeader, theme.font});
+    defineStyle(view, revealStyle, {theme.accent, colors.hunkHeader, fonts.name});
+    view.SendScintilla(QsciScintillaBase::SCI_STYLESETHOTSPOT, revealStyle, 1L);
+    view.SendScintilla(QsciScintillaBase::SCI_SETHOTSPOTACTIVEFORE, 1L, theme.foreground);
+    view.SendScintilla(QsciScintillaBase::SCI_SETHOTSPOTACTIVEUNDERLINE, 0L);
     defineStyle(view, QsciScintillaBase::STYLE_LINENUMBER,
                 {theme.marginForeground, theme.marginBackground, theme.font});
 }

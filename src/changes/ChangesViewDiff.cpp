@@ -2,6 +2,7 @@
 // unstaged or discarded from the keyboard, the block buttons or the menu.
 
 #include "ChangesView.h"
+#include "DiffHeaderBar.h"
 #include "DiffView.h"
 #include "DiscardConfirmation.h"
 #include "git/GitCommands.h"
@@ -47,10 +48,19 @@ QHash<int, PatchSelection> ChangesView::diffSelection(int line, bool *lines) con
     return result;
 }
 
+bool ChangesView::canApplyDiffLines() const
+{
+    return diffHeader_->whitespace() == Whitespace::Compare;
+}
+
 void ChangesView::applyDiffSelection(int line, bool discard)
 {
     if (!status_)
         return;
+    if (!canApplyDiffLines()) {
+        emit statusMessage(tr("Show the whitespace changes to stage, unstage or discard lines."));
+        return;
+    }
     bool lines = false;
     const QHash<int, PatchSelection> selection = diffSelection(line, &lines);
     if (selection.isEmpty())
@@ -141,7 +151,7 @@ void ChangesView::showDiffMenu(const QPoint &position)
         menu->insertAction(first, action);
         return action;
     };
-    const bool canApply = hasSelection && !busy;
+    const bool canApply = hasSelection && !busy && canApplyDiffLines();
     if (shownSection_ == Section::Unstaged) {
         addAction(lines ? tr("Stage Selected Lines") : tr("Stage This Hunk"), QKeySequence(Qt::Key_Space),
                   [this, line] { applyDiffSelection(line, false); })

@@ -3,6 +3,7 @@
 #include "LibGit2.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QObject>
 
@@ -135,6 +136,29 @@ bool isTooLargeToDiff(const git_diff_delta *delta)
     return delta->old_file.size > maxDiffedFileBytes || delta->new_file.size > maxDiffedFileBytes;
 }
 
+// A text file both sides have: its patch leaves unchanged lines out.
+bool hasUnchangedLines(const git_diff_delta *delta)
+{
+    const bool isBinary = (delta->flags & GIT_DIFF_FLAG_BINARY) != 0;
+    return !isBinary && (delta->status == GIT_DELTA_MODIFIED || delta->status == GIT_DELTA_RENAMED);
+}
+
+// The new version of `delta`'s file: a blob when the new side is in the
+// repository (the index, a commit), otherwise the file on disk. Empty if it
+// cannot be read.
+QByteArray newTextOf(git_repository *repository, const git_diff_delta *delta)
+{
+    git_blob *blob = nullptr;
+    if (git_blob_lookup(&blob, repository, &delta->new_file.id) == 0) {
+        const Ptr<git_blob> blobGuard(blob);
+        return {static_cast<const char *>(git_blob_rawcontent(blob)), qsizetype(git_blob_rawsize(blob))};
+    }
+    QFile file(QString::fromUtf8(git_repository_workdir(repository)) + QString::fromUtf8(delta->new_file.path));
+    if (!file.open(QIODevice::ReadOnly))
+        return {};
+    return file.readAll();
+}
+
 } // namespace
 
 namespace libgit2 {
@@ -175,7 +199,11 @@ QList<FileDiff> fileDiffs(git_diff *diff, const QString &prefix)
         check(git_patch_to_buf(&buffer, patch), "Formatting the diff");
         const QByteArray text(buffer.ptr, static_cast<qsizetype>(buffer.size));
         git_buf_dispose(&buffer);
-        result.append({fileChangeOf(delta, prefix), text});
+        // The patch knows whether the file is binary: its content is read.
+        const git_diff_delta *patched = git_patch_get_delta(patch);
+        const QByteArray newText =
+            hasUnchangedLines(patched) ? newTextOf(git_patch_owner(patch), patched) : QByteArray();
+        result.append({fileChangeOf(delta, prefix), text, false, newText});
     }
     return result;
 }
@@ -191,7 +219,7 @@ std::optional<RepositoryInfo> RepositoryInfo::read(const QString &folder)
     return readInfo(repository.get(), folder);
 }
 
-std::optional<RepositoryStatus> RepositoryStatus::read(const QString &folder)
+std::optional<RepositoryStatus> RepositoryStatus::read(const QString &folder, Whitespace whitespace)
 {
     const libgit2::Session session;
     const Ptr<git_repository> repository = openRepository(folder);
@@ -221,6 +249,8 @@ std::optional<RepositoryStatus> RepositoryStatus::read(const QString &folder)
         options.pathspec.strings = &pathspec;
         options.pathspec.count = 1;
     }
+    const uint32_t whitespaceFlags = whitespace == Whitespace::Ignore ? GIT_DIFF_IGNORE_WHITESPACE : 0;
+    options.flags = whitespaceFlags;
 
     git_diff *staged = nullptr;
     check(git_diff_tree_to_index(&staged, repository.get(), headTree.get(), index, &options),
@@ -234,7 +264,8 @@ std::optional<RepositoryStatus> RepositoryStatus::read(const QString &folder)
 
     // Like "git status": no rename detection on the disk side, a moved file
     // shows up as deleted on one side and untracked on the other.
-    options.flags = GIT_DIFF_INCLUDE_UNTRACKED | GIT_DIFF_RECURSE_UNTRACKED_DIRS | GIT_DIFF_SHOW_UNTRACKED_CONTENT;
+    options.flags = whitespaceFlags | GIT_DIFF_INCLUDE_UNTRACKED | GIT_DIFF_RECURSE_UNTRACKED_DIRS |
+                    GIT_DIFF_SHOW_UNTRACKED_CONTENT;
     git_diff *unstaged = nullptr;
     check(git_diff_index_to_workdir(&unstaged, repository.get(), index, &options),
           "Comparing the files with the index");

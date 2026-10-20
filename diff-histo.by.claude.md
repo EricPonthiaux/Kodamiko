@@ -40,10 +40,14 @@ Magit.
    512 Ko de messages. Il fait maintenant un seul `SCI_GETSTYLEDTEXT` par côté
    (`SCI_GETSTYLEDTEXTFULL` n'existe pas dans QScintilla 2.14.1). Test de
    non-régression : `diffColorsTheCodeAsTheEditor`.
-4. **L'historique d'un fichier s'arrête au renommage.** `touchesPath` compare
-   l'entrée de l'arbre au même chemin (`CommitLog.cpp`). Rien n'équivaut à
-   `--follow`, donc la partie avant un renommage disparaît. Tous les clients
-   du marché suivent les renommages.
+4. ✅ **Corrigé.** ~~**L'historique d'un fichier s'arrête au
+   renommage.**~~ `CommitLog::read` suit le fichier comme `git log
+   --follow` : au commit qui crée le chemin, une détection des renommages
+   (seulement à ce commit-là) donne l'ancien nom, cherché ensuite dans les
+   commits plus anciens. `CommitSummary::path` donne le nom du fichier à
+   chaque commit, et l'historique montre le diff sous ce nom. Le suivi
+   s'arrête à un renommage venu de l'extérieur du dossier ouvert. L'outil
+   MCP `get_file_history` donne aussi ce `path`.
 5. **Le filtre ne voit que les 2000 commits chargés** et seulement le résumé.
    Un commit plus ancien, ou un mot présent uniquement dans le corps du
    message, reste introuvable sans que l'interface le signale.
@@ -56,9 +60,20 @@ Magit.
 
 1. **Affichage côte à côte.** Tous les grands outils proposent unifié et côte
    à côte. C'est le plus gros manque.
-2. **Afficher plus de contexte** (↑/↓ sur le séparateur `⋯`), comme GitHub,
-   VS Code et JetBrains.
-3. **Ignorer les espaces** et choisir le nombre de lignes de contexte.
+2. ✅ **Fait.** ~~**Afficher plus de contexte**~~ : les flèches du
+   séparateur `⋯` révèlent les lignes inchangées par 20 (↑ au-dessus du
+   bloc, ↓ sous le bloc précédent, ↕ tout d'un coup quand il en reste 20 au
+   plus), et un dernier séparateur « ⋯ ↓ 17 more lines » mène à la fin du
+   fichier. La nouvelle version est lue avec le diff (`FileDiff::newText` :
+   index, disque ou commit), et les lignes révélées restent hors du patch,
+   donc le staging ne change pas. Diff et historique.
+3. ✅ **Fait.** ~~**Ignorer les espaces**~~ : le bouton ␣ de l'en-tête du
+   diff relit le diff avec `-w` (`Whitespace::Ignore`), dans la vue Diff et
+   dans l'historique, où le fichier choisi reste choisi. Le patch ne
+   correspond alors plus aux fichiers : Stage, Unstage et Discard par bloc
+   ou par ligne sont désactivés, et Espace ou Suppr expliquent pourquoi dans
+   la barre d'état. Le staging de fichiers entiers reste possible. Le
+   nombre de lignes de contexte n'est plus utile depuis le dépliage.
 4. ✅ **Fait.** ~~**Ouvrir le fichier à la ligne du diff.**~~ F4 ou le menu
    « Open in Editor » ouvrent le fichier à la ligne sous le curseur
    (`DiffView::newFileLine` ; une ligne supprimée mène à la ligne suivante
@@ -135,8 +150,9 @@ Dans l'ordre, pour le meilleur rapport valeur/effort :
 1. ✅ ~~Corriger les bugs 1 et 3, qui sont petits et sans risque.~~ Fait.
 2. ✅ ~~Ajouter les raccourcis clavier et l'ouverture du fichier à la ligne
    du diff.~~ Fait.
-3. Ajouter « afficher plus de contexte » et « ignorer les espaces ».
-4. Ajouter le suivi des renommages dans l'historique d'un fichier, puis la
-   pagination.
+3. ✅ ~~Ajouter « afficher plus de contexte » et « ignorer les espaces ».~~
+   Fait.
+4. ✅ ~~Ajouter le suivi des renommages dans l'historique d'un fichier~~
+   (fait), puis la pagination.
 5. Les deux gros chantiers : le diff côte à côte, puis le graphe des
    branches.

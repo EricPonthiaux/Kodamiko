@@ -183,8 +183,12 @@ McpResult fileHistory(const QString &folder, const QString &path, int limit)
     if (!log)
         return McpResult::error(QStringLiteral("The project is not in a git repository"));
     QJsonArray commits;
-    for (const CommitSummary &commit : log->commits)
-        commits.append(commitJson(commit));
+    for (const CommitSummary &commit : log->commits) {
+        QJsonObject json = commitJson(commit);
+        if (commit.path != path)
+            json.insert(QStringLiteral("path"), commit.path); // its name before a rename
+        commits.append(json);
+    }
     return McpResult::json(
         QJsonObject{{QStringLiteral("commits"), commits}, {QStringLiteral("truncated"), log->truncated}});
 }
@@ -620,7 +624,8 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("get_file_history"),
          .title = QStringLiteral("History"),
          .description = QStringLiteral("The commits of the project, or of one file or folder, newest first, as "
-                                       "Duet's History mode shows them."),
+                                       "Duet's History mode shows them. A file is followed across its renames: "
+                                       "a commit made before one gives the file's \"path\" at that time."),
          .inputSchema =
              object({{QStringLiteral("path"), string(QStringLiteral("File or folder (optional): its commits only"))},
                      {QStringLiteral("limit"), integer(QStringLiteral("Most commits (default 30)"))}})},

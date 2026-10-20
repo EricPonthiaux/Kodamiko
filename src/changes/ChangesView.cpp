@@ -188,6 +188,10 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
         diff_->selectAll(false);
         applyDiffSelection(line, true);
     });
+    connect(diffHeader_, &DiffHeaderBar::whitespaceChanged, this, [this] {
+        updateActions();
+        refresh();
+    });
 
     // The diff under its header, which follows the file at the top.
     auto *right = new QWidget(this);
@@ -264,11 +268,11 @@ void ChangesView::refresh()
     refreshPending_ = false;
     // Every diff of the working tree, untracked files included: long in a
     // large repository, so off the UI thread.
-    pool_.start([this, folder = folder_, generation = generation_] {
+    pool_.start([this, folder = folder_, generation = generation_, whitespace = diffHeader_->whitespace()] {
         QString error;
         std::optional<RepositoryStatus> status;
         try {
-            status = RepositoryStatus::read(folder);
+            status = RepositoryStatus::read(folder, whitespace);
             if (!status)
                 error = tr("This folder is not in a git repository.");
         } catch (const GitError &exception) {
@@ -417,6 +421,9 @@ void ChangesView::rebuildList()
 
 void ChangesView::showSection(Section section)
 {
+    // The other section has other versions of the files.
+    if (section != shownSection_)
+        diff_->hideUnchangedLines();
     shownSection_ = section;
     hunkActions_->setStaged(section == Section::Staged);
     shownPatches_.clear();
@@ -424,7 +431,8 @@ void ChangesView::showSection(Section section)
     if (status_) {
         for (const FileDiff &diff : files(section)) {
             shownPatches_.append(FilePatch::parse(diff.patch));
-            shown.append({diff.change.path, changeStatusText(diff.change), shownPatches_.last(), diff.isTooLarge});
+            shown.append(
+                {diff.change.path, changeStatusText(diff.change), shownPatches_.last(), diff.isTooLarge, diff.newText});
         }
     }
     if (!shown.isEmpty()) {
@@ -509,7 +517,7 @@ void ChangesView::updateActions()
     stageButton_->setEnabled(!busy && any(Section::Unstaged));
     unstageButton_->setEnabled(!busy && any(Section::Staged));
     discardButton_->setEnabled(!busy && any(Section::Unstaged));
-    hunkActions_->setEnabled(!busy);
+    hunkActions_->setEnabled(!busy && canApplyDiffLines());
     commitPanel_->setStatus(status_ ? &*status_ : nullptr, folderPathspec());
 }
 

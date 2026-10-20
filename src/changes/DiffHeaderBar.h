@@ -1,5 +1,6 @@
 #pragma once
 
+#include "git/RepositoryStatus.h"
 #include "ui/Theme.h"
 
 #include <QFrame>
@@ -10,7 +11,8 @@ class QToolButton;
 
 // The bar above a DiffView, out of its scrolled text: the file at the top
 // of the view as it scrolls (its name, its folder and state, its counts),
-// and the buttons that go to the previous or next block of changes.
+// the button that hides whitespace changes, and those that go to the
+// previous or next block of changes.
 class DiffHeaderBar : public QFrame {
     Q_OBJECT
 
@@ -22,6 +24,13 @@ public:
     void setPlaceholder(const QString &text);
     void applyTheme(const Theme &theme);
 
+    // Whitespace::Ignore while the whitespace button is checked; Compare at first.
+    Whitespace whitespace() const;
+
+signals:
+    // The whitespace button was toggled: the diff is to be read again.
+    void whitespaceChanged(Whitespace whitespace);
+
 private:
     void follow();
 
@@ -30,6 +39,7 @@ private:
     QLabel *name_;
     QLabel *details_;
     QLabel *stats_;
+    QToolButton *whitespace_;
     QToolButton *previous_;
     QToolButton *next_;
     bool dark_ = true;

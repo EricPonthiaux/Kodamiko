@@ -26,7 +26,8 @@ class QTreeWidgetItem;
 // (ready to commit) and the rest. Here you stage or unstage files, hunks or
 // lines, discard changes and commit. Operations go through GitCommands. In
 // the diff, Space stages (or unstages) the selected lines or the block at
-// the cursor, Delete discards them, F4 opens the file at the cursor's line.
+// the cursor and Delete discards them, unless the diff hides whitespace
+// changes; F4 opens the file at the cursor's line.
 class ChangesView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(ChangesView)
@@ -120,6 +121,9 @@ private:
     // Lines selected in the displayed diff, per file: the selection, or the
     // hunk under `line` without a selection. `lines` tells which of the two.
     QHash<int, PatchSelection> diffSelection(int line, bool *lines) const;
+    // Lines and blocks can be applied: their patch matches the files, which
+    // a diff that ignores whitespace does not.
+    bool canApplyDiffLines() const;
     void applyDiffSelection(int line, bool discard);
     void addDiffShortcuts();
     int diffCursorLine() const;

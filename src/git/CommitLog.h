@@ -20,13 +20,18 @@ struct CommitSummary {
     // Branches and tags pointing to this commit ("main", "origin/main",
     // "v1.0"), with HEAD first if it points to it.
     QStringList refs;
+    // In a file's history: its path in this commit, relative to the open
+    // folder; an older one before a rename. Empty in other logs.
+    QString path;
 
     bool operator==(const CommitSummary &) const = default;
 };
 
 // Commits of HEAD, newest first. If the open folder is a subfolder of the
 // repository, only the commits that modify it are kept; with `path` (relative
-// to the open folder), only those that modify that file or folder.
+// to the open folder), only those that modify that file or folder. A file is
+// followed across its renames within the open folder, like "git log
+// --follow".
 struct CommitLog {
     RepositoryInfo info;
     QList<CommitSummary> commits;
@@ -50,5 +55,7 @@ struct CommitDetails {
     QList<FileDiff> files;
 
     // Throws GitError on failure (no repository, unknown commit…).
-    static CommitDetails read(const QString &folder, const QString &commitId);
+    static CommitDetails read(const QString &folder,
+                              const QString &commitId,
+                              Whitespace whitespace = Whitespace::Compare);
 };

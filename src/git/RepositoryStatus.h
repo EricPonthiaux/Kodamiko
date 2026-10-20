@@ -38,6 +38,14 @@ struct RepositoryInfo {
     static std::optional<RepositoryInfo> read(const QString &folder);
 };
 
+// How diffs treat whitespace: compared as any other text, or ignored, as
+// "git diff -w" does. An ignoring patch no longer matches the files: it
+// shows the changes but cannot be applied.
+enum class Whitespace {
+    Compare,
+    Ignore
+};
+
 // Changed file and its diff.
 struct FileDiff {
     FileChange change;
@@ -48,6 +56,10 @@ struct FileDiff {
     // A file too large to be compared line by line (over 1 MiB on either
     // side): only listed.
     bool isTooLarge = false;
+    // The new version's bytes, for the unchanged lines a view can show
+    // around the blocks: only for a text file modified or renamed, where the
+    // diff holds a part of it.
+    QByteArray newText;
 
     bool operator==(const FileDiff &) const = default;
 };
@@ -63,5 +75,5 @@ struct RepositoryStatus {
     bool operator==(const RepositoryStatus &) const = default;
 
     // Returns nullopt outside a git repository. Throws GitError on failure.
-    static std::optional<RepositoryStatus> read(const QString &folder);
+    static std::optional<RepositoryStatus> read(const QString &folder, Whitespace whitespace = Whitespace::Compare);
 };

@@ -17,6 +17,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     , name_(new QLabel(this))
     , details_(new QLabel(this))
     , stats_(new QLabel(this))
+    , whitespace_(new QToolButton(this))
     , previous_(new QToolButton(this))
     , next_(new QToolButton(this))
 {
@@ -36,6 +37,12 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
         connect(button, &QToolButton::clicked, this, [this, direction] { diff_->goToChange(direction); });
     }
 
+    whitespace_->setCheckable(true);
+    whitespace_->setAutoRaise(true);
+    whitespace_->setFocusPolicy(Qt::NoFocus);
+    whitespace_->setToolTip(tr("Hide whitespace changes"));
+    connect(whitespace_, &QToolButton::toggled, this, [this] { emit whitespaceChanged(whitespace()); });
+
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 4, 6, 4);
     layout->setSpacing(8);
@@ -43,6 +50,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     layout->addWidget(details_, 1);
     layout->addWidget(stats_);
     layout->addSpacing(4);
+    layout->addWidget(whitespace_);
     layout->addWidget(previous_);
     layout->addWidget(next_);
 
@@ -58,9 +66,15 @@ void DiffHeaderBar::setPlaceholder(const QString &text)
     follow();
 }
 
+Whitespace DiffHeaderBar::whitespace() const
+{
+    return whitespace_->isChecked() ? Whitespace::Ignore : Whitespace::Compare;
+}
+
 void DiffHeaderBar::applyTheme(const Theme &theme)
 {
     dark_ = theme.isDark;
+    whitespace_->setIcon(UiIcons::icon(QStringLiteral("whitespace"), theme.foreground));
     previous_->setIcon(UiIcons::icon(QStringLiteral("up"), theme.foreground));
     next_->setIcon(UiIcons::icon(QStringLiteral("down"), theme.foreground));
     follow();
@@ -73,6 +87,8 @@ void DiffHeaderBar::follow()
     for (QWidget *widget :
          {static_cast<QWidget *>(stats_), static_cast<QWidget *>(previous_), static_cast<QWidget *>(next_)})
         widget->setVisible(hasFile);
+    // Checked, it stays: what it hides may be all there was.
+    whitespace_->setVisible(hasFile || whitespace_->isChecked());
     if (!hasFile) {
         name_->clear();
         details_->setText(placeholder_);

@@ -66,7 +66,24 @@ private:
     QWidget *createDiffPane();
     void onLogRead(const std::optional<CommitLog> &log, const QString &error, int generation);
     void showLog(std::optional<CommitLog> log, const QString &error);
-    void onDetailsRead(const QString &id, const std::optional<CommitDetails> &details, const QString &error);
+
+    // The details of commit `id`, as read with `whitespace`.
+    struct DetailsRequest {
+        QString id;
+        Whitespace whitespace;
+    };
+
+    void onDetailsRead(const DetailsRequest &request,
+                       const std::optional<CommitDetails> &details,
+                       const QString &error);
+    // The chosen commit again, as the header's whitespace button says; its
+    // chosen file stays chosen.
+    void rereadCommit();
+    // The file or folder whose changes commit `commitId` shows: the path
+    // filter, or the name the filtered file had before a rename.
+    QString filterOf(const QString &commitId) const;
+    // Shows the diff of the commit's file at `path`, if listed.
+    void chooseFile(const QString &path);
     void rebuildList();
     void applyFilter();
     void onCommitSelectionChanged();
@@ -104,6 +121,7 @@ private:
     bool reading_ = false;
     bool refreshPending_ = false;
     QString detailsWanted_; // commit whose details are being read
+    QString fileToKeep_;    // chosen again once the commit is read again
 
     // The commit pane's share of the commits and the commit, the diff's of
     // the whole: the same in both arrangements.
