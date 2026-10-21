@@ -128,11 +128,11 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     auto *fileActionsLayout = new QHBoxLayout(fileActions_);
     fileActionsLayout->setContentsMargins(4, 4, 4, 4);
     fileActionsLayout->setSpacing(2);
-    fileActionsLayout->addWidget(foldButton_);
     fileActionsLayout->addWidget(stageButton_);
     fileActionsLayout->addWidget(unstageButton_);
     fileActionsLayout->addStretch();
     fileActionsLayout->addWidget(discardButton_);
+    fileActionsLayout->addWidget(foldButton_);
 
     // A merge or rebase stopped on conflicts: what to do, and the way on.
     operationBar_ = new QFrame(this);
