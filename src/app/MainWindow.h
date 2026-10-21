@@ -178,6 +178,8 @@ private:
     // The current editor in Edit mode, null otherwise.
     EditorWidget *editorInEditMode() const;
     void createNavigateMenu();
+    // editorContextActions_, from the menus' actions.
+    void createEditorContextActions();
     void createRunMenu();
     void createHelpMenu();
     void restoreSettings();
@@ -525,6 +527,11 @@ private:
     QAction *snapshotBeforePrompt_ = nullptr;
     QAction *shareEditorContext_ = nullptr;
     QList<QAction *> codeRequestActions_; // also in the editor's context menu
+    QList<QAction *> refactoringActions_; // also in the editor's context menu
+    QList<QAction *> navigationActions_;  // also in the editor's context menu
+    // On top of the editor's context menu: the refactorings, the
+    // navigation, then the agent's submenu.
+    QList<QAction *> editorContextActions_;
     QAction *exposeTools_ = nullptr;
     QAction *claudeNotifications_ = nullptr;
 

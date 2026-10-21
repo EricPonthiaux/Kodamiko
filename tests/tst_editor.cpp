@@ -267,6 +267,26 @@ private slots:
         QCOMPARE(editor.createContextMenu()->actions().value(0), &explain);
     }
 
+    void contextMenuLeavesUndoAndRedoToTheirShortcuts()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("a.txt"), "one\n");
+        QAction rename(QStringLiteral("Rename…"));
+        EditorWidget editor(Theme::dark());
+        editor.setFileActions({&rename});
+        QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
+
+        const std::unique_ptr<QMenu> menu = editor.createContextMenu();
+
+        QStringList texts;
+        for (const QAction *action : menu->actions())
+            texts.append(action->text());
+        QVERIFY2(!texts.contains("&Undo") && !texts.contains("&Redo"), qPrintable(texts.join(", ")));
+        QCOMPARE(texts.value(0), QString("Rename…"));
+        QVERIFY(menu->actions().value(1)->isSeparator());
+        QCOMPARE(texts.value(2), QString("Cu&t"));
+    }
+
     void contextMenuSuspendsTheToolTipsWhileOpen()
     {
         EditorWidget editor(Theme::dark());

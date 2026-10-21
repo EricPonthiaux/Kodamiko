@@ -102,10 +102,12 @@ public:
     void setOptions(const EditorOptions &options);
 
     // Actions at the top of the context menu when the editor shows a file
-    // (Claude's requests about the code). Not owned.
+    // (refactorings, navigation, the agent's submenu), separators
+    // included. Not owned.
     void setFileActions(const QList<QAction *> &actions) { fileActions_ = actions; }
 
-    // The context menu: QScintilla's, with the file actions on top.
+    // The context menu: QScintilla's without Undo and Redo, with the file
+    // actions on top.
     std::unique_ptr<QMenu> createContextMenu();
 
     const EditorOptions &options() const { return options_; }
@@ -158,6 +160,7 @@ signals:
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
+    static void removeUndoRedo(QMenu &menu);
     void mouseMoveEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;

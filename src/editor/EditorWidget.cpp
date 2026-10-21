@@ -405,12 +405,27 @@ void EditorWidget::contextMenuEvent(QContextMenuEvent *event)
 std::unique_ptr<QMenu> EditorWidget::createContextMenu()
 {
     std::unique_ptr<QMenu> menu(createStandardContextMenu());
+    removeUndoRedo(*menu);
     if (!filePath_.isEmpty() && !fileActions_.isEmpty()) {
         QAction *first = menu->actions().value(0);
         menu->insertActions(first, fileActions_);
         menu->insertSeparator(first);
     }
     return menu;
+}
+
+void EditorWidget::removeUndoRedo(QMenu &menu)
+{
+    // Ctrl+Z and Ctrl+Shift+Z do it; QScintilla puts them first, with a
+    // separator after them.
+    for (QAction *action : menu.actions()) {
+        const QString text = QString(action->text()).remove(QLatin1Char('&'));
+        if (text == QLatin1String("Undo") || text == QLatin1String("Redo"))
+            menu.removeAction(action);
+    }
+    const QList<QAction *> actions = menu.actions();
+    if (!actions.isEmpty() && actions.first()->isSeparator())
+        menu.removeAction(actions.first());
 }
 
 void EditorWidget::mouseMoveEvent(QMouseEvent *event)

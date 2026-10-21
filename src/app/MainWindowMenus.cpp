@@ -45,12 +45,30 @@ void MainWindow::createMenus()
     createGitMenu();
     createViewMenu();
     createHelpMenu();
+    createEditorContextActions();
 
     // Actions at the right of the title bar.
     titleBar_->setRunActions(runAction_, stopAction_);
     titleBar_->addActionButton(goToFileAction_, QStringLiteral("find-file"));
     titleBar_->addActionButton(findInFilesAction_, QStringLiteral("find-in-folder"));
     titleBar_->addActionButton(paletteAction_, QStringLiteral("command"));
+}
+
+void MainWindow::createEditorContextActions()
+{
+    const auto separator = [this] {
+        auto *action = new QAction(this);
+        action->setSeparator(true);
+        return action;
+    };
+    // The requests to the agent in a submenu named after it.
+    auto *agent = new QMenu(this);
+    agent->addActions(codeRequestActions_);
+    nameAfterAgent(agent->menuAction(), tr("%1"));
+    editorContextActions_ = refactoringActions_;
+    editorContextActions_ << separator();
+    editorContextActions_ << navigationActions_;
+    editorContextActions_ << separator() << agent->menuAction();
 }
 
 void MainWindow::createFileMenu()
@@ -255,9 +273,10 @@ void MainWindow::createEditMenu()
                     inCode(&CodeIntelligence::showParameterInfo));
     edit->addAction(tr("&Quick Documentation"), QKeySequence(tr("Ctrl+Q")), this,
                     inCode(&CodeIntelligence::showDocumentation));
-    edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
-                    inCode(&CodeIntelligence::showQuickFixes));
-    edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename));
+    refactoringActions_.append(
+        edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename)));
+    refactoringActions_.append(edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
+                                               inCode(&CodeIntelligence::showQuickFixes)));
     // In every file the refactoring changed, open or not.
     QAction *undoRefactoring = edit->addAction(tr("&Undo Refactoring"), QKeySequence(tr("Ctrl+Alt+Shift+Z")), this,
                                                inCode(&CodeIntelligence::undoRefactoring));
@@ -269,6 +288,7 @@ void MainWindow::createEditMenu()
     };
     connect(intelligence_->history(), &RefactoringHistory::changed, this, updateUndoRefactoring);
     updateUndoRefactoring();
+    refactoringActions_.append(undoRefactoring);
     edit->addAction(tr("F&ormat Document"), QKeySequence(tr("Ctrl+Alt+L")), this, [this] {
         if (mode_ == Mode::Edit)
             editorTabs_->formatCurrent();
@@ -330,23 +350,25 @@ void MainWindow::createNavigateMenu()
         }
     });
     navigate->addSeparator();
-    navigate->addAction(tr("Go to &Definition"), QKeySequence(tr("Ctrl+B")), this, [this] {
+    navigationActions_.append(navigate->addAction(tr("Go to &Definition"), QKeySequence(tr("Ctrl+B")), this, [this] {
         if (mode_ == Mode::Edit)
             intelligence_->goToDefinition();
-    });
+    }));
     // Ctrl+Alt+B, IntelliJ's, opens the branches.
-    navigate->addAction(tr("Go to &Implementation"), QKeySequence(tr("Ctrl+Alt+Shift+B")), this, [this] {
-        if (mode_ == Mode::Edit)
-            intelligence_->goToImplementation();
-    });
-    navigate->addAction(tr("Go to T&ype Declaration"), QKeySequence(tr("Ctrl+Shift+B")), this, [this] {
-        if (mode_ == Mode::Edit)
-            intelligence_->goToTypeDeclaration();
-    });
-    navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this, [this] {
+    navigationActions_.append(
+        navigate->addAction(tr("Go to &Implementation"), QKeySequence(tr("Ctrl+Alt+Shift+B")), this, [this] {
+            if (mode_ == Mode::Edit)
+                intelligence_->goToImplementation();
+        }));
+    navigationActions_.append(
+        navigate->addAction(tr("Go to T&ype Declaration"), QKeySequence(tr("Ctrl+Shift+B")), this, [this] {
+            if (mode_ == Mode::Edit)
+                intelligence_->goToTypeDeclaration();
+        }));
+    navigationActions_.append(navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this, [this] {
         if (mode_ == Mode::Edit)
             intelligence_->findUsages();
-    });
+    }));
     navigate->addAction(tr("Switch &Header/Source"), QKeySequence(tr("Ctrl+Alt+Home")), this, [this] {
         if (mode_ == Mode::Edit)
             intelligence_->switchHeaderSource();

@@ -204,7 +204,7 @@ void MainWindow::createCodeServices()
     connect(fullLineModel_, &LocalFullLineModel::failed, this, &MainWindow::showStatus);
     applyFullLine(Preferences::load());
     connect(editorTabs_, &EditorTabs::editorOpened, this, [this](EditorWidget *editor) {
-        editor->setFileActions(codeRequestActions_);
+        editor->setFileActions(editorContextActions_);
 
         const auto *controller = new CompletionController(editor, completion_);
 
