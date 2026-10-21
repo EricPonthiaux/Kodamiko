@@ -132,6 +132,69 @@ private slots:
         QCOMPARE(items[1].replaceStart, -1); // the prefix itself
     }
 
+    void answersRequestsOfTheFakeServer()
+    {
+        LspClient client(FAKE_LSP_SERVER_PATH, {}, QDir::tempPath());
+        client.start();
+        QJsonValue echoed;
+
+        client.request("test/echo", QJsonObject{{"word", "total"}},
+                       [&](const QJsonValue &result, const QString &) { echoed = result; });
+
+        QTRY_COMPARE(echoed.toObject().value("word").toString(), QString("total"));
+    }
+
+    void cancelledRequestTellsTheServerAndSkipsItsHandler()
+    {
+        LspClient client(FAKE_LSP_SERVER_PATH, {}, QDir::tempPath());
+        QSignalSpy ready(&client, &LspClient::ready);
+        client.start();
+        QVERIFY(ready.wait());
+        QSignalSpy notifications(&client, &LspClient::notificationReceived);
+        bool handled = false;
+        const LspClient::RequestId id =
+            client.request("test/silent", {}, [&](const QJsonValue &, const QString &) { handled = true; });
+
+        client.cancel(id);
+
+        QTRY_COMPARE(notifications.size(), 1);
+        QCOMPARE(notifications[0][0].toString(), QString("test/cancelled"));
+        QCOMPARE(notifications[0][1].toJsonValue().toObject().value("id").toInt(), id.value);
+        QVERIFY(!handled);
+    }
+
+    void requestCancelledBeforeInitializationIsNeverSent()
+    {
+        LspClient client(FAKE_LSP_SERVER_PATH, {}, QDir::tempPath());
+        const QSignalSpy notifications(&client, &LspClient::notificationReceived);
+        const LspClient::RequestId id = client.request("test/silent", {}, [](const QJsonValue &, const QString &) { });
+        client.cancel(id);
+        QJsonValue echoed;
+
+        client.start();
+        client.request("test/echo", QJsonObject{{"n", 1}},
+                       [&](const QJsonValue &result, const QString &) { echoed = result; });
+
+        QTRY_VERIFY(echoed.isObject());
+        QVERIFY(notifications.isEmpty()); // no "$/cancelRequest" either
+    }
+
+    void unansweredRequestFailsAfterItsTimeout()
+    {
+        LspClient client(FAKE_LSP_SERVER_PATH, {}, QDir::tempPath());
+        client.start();
+        const QSignalSpy notifications(&client, &LspClient::notificationReceived);
+        QString failure;
+
+        client.request(
+            "test/silent", {}, [&](const QJsonValue &, const QString &error) { failure = error; },
+            std::chrono::milliseconds(50));
+
+        QTRY_VERIFY(!failure.isEmpty());
+        QVERIFY2(failure.contains("No answer"), qPrintable(failure));
+        QTRY_COMPARE(notifications.size(), 1); // and the server was told
+    }
+
     void usesTheProjectsServer()
     {
         const QTemporaryDir dir;

@@ -10,7 +10,9 @@
 #include <QProcess>
 #include <QStringList>
 
+#include <chrono>
 #include <functional>
+#include <optional>
 
 // A language server (clangd, jdtls...) run as a process, spoken to in the
 // Language Server Protocol: JSON-RPC messages with a Content-Length header
@@ -24,6 +26,11 @@ public:
     using ResponseHandler = std::function<void(const QJsonValue &result, const QString &error)>;
     // Answers a request from the server ("workspace/applyEdit"...).
     using RequestHandler = std::function<QJsonValue(const QJsonValue &params)>;
+
+    // Identifies a request sent with request(), to cancel it.
+    struct RequestId {
+        int value = 0;
+    };
 
     // `program` and `arguments` start the server; `rootFolder` is the
     // workspace it works on.
@@ -60,8 +67,17 @@ public:
     // The server's capabilities, from its answer to "initialize".
     QJsonObject capabilities() const { return capabilities_; }
 
-    // Sends a request; `handler` gets its result, or an error message.
-    void request(const QString &method, const QJsonObject &params, ResponseHandler handler);
+    // Sends a request; `handler` gets its result, or an error message. With
+    // a `timeout`, a request still unanswered by then is cancelled and its
+    // handler gets an error.
+    RequestId request(const QString &method,
+                      const QJsonObject &params,
+                      ResponseHandler handler,
+                      std::optional<std::chrono::milliseconds> timeout = std::nullopt);
+    // Tells the server the answer to `id` is no longer wanted
+    // ("$/cancelRequest"); its handler is not called. Nothing happens if
+    // the answer already came.
+    void cancel(RequestId id);
     void notify(const QString &method, const QJsonObject &params);
 
     // Splits the complete messages off the front of `buffer`, leaving an
@@ -83,6 +99,8 @@ private:
     void send(const QJsonObject &message);
     void onOutput();
     void handle(const QJsonObject &message);
+    // Fails request `id` if it is still unanswered.
+    void expire(int id, std::chrono::milliseconds timeout);
 
     QString program_;
     QStringList arguments_;

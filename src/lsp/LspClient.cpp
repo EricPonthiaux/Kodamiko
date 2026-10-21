@@ -206,19 +206,46 @@ bool LspClient::isRunning() const
     return process_->state() != QProcess::NotRunning;
 }
 
-void LspClient::request(const QString &method, const QJsonObject &params, ResponseHandler handler)
+LspClient::RequestId LspClient::request(const QString &method,
+                                        const QJsonObject &params,
+                                        ResponseHandler handler,
+                                        std::optional<std::chrono::milliseconds> timeout)
 {
+    const int id = nextId_++;
     if (failed_) {
         handler({}, tr("The language server is not running"));
-        return;
+        return {id};
     }
-    const int id = nextId_++;
     pending_.insert(id, std::move(handler));
     const QJsonObject message{{"jsonrpc", "2.0"}, {"id", id}, {"method", method}, {"params", params}};
     if (ready_)
         send(message);
     else
         waiting_.append(message);
+    if (timeout)
+        QTimer::singleShot(*timeout, this, [this, id, timeout] { expire(id, *timeout); });
+    return {id};
+}
+
+void LspClient::cancel(RequestId id)
+{
+    if (!pending_.remove(id.value))
+        return;
+    const auto isTheRequest = [&](const QJsonObject &message) { return message.value("id").toInt() == id.value; };
+    // Not sent yet: it never will be.
+    if (waiting_.removeIf(isTheRequest) > 0)
+        return;
+    send(QJsonObject{{"jsonrpc", "2.0"}, {"method", "$/cancelRequest"}, {"params", QJsonObject{{"id", id.value}}}});
+}
+
+void LspClient::expire(int id, std::chrono::milliseconds timeout)
+{
+    const ResponseHandler handler = pending_.value(id);
+    if (!handler)
+        return;
+    cancel({id});
+    const auto seconds = std::chrono::duration_cast<std::chrono::duration<double>>(timeout).count();
+    handler({}, tr("No answer from %1 after %2 s").arg(QFileInfo(program_).fileName()).arg(seconds));
 }
 
 void LspClient::notify(const QString &method, const QJsonObject &params)
