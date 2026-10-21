@@ -37,8 +37,10 @@ QString revertEntry(const EditJournal::Creation &creation, const EditTargets &ta
     const QFileInfo info(creation.path);
     if (!info.exists())
         return {};
-    // Empty again once its texts are reverted: nothing to keep in the trash.
-    if (info.isFile() && info.size() == 0)
+    // Empty again once its texts are reverted, in its editor or on disk:
+    // nothing in it to keep in the trash.
+    const bool isEmptyAgain = info.isFile() && WorkspaceFiles::textOf(creation.path, targets) == QString();
+    if (isEmptyAgain)
         return WorkspaceFiles::remove(creation.path, targets);
     QString pathInTrash;
     return WorkspaceFiles::trash(creation.path, targets, &pathInTrash);

@@ -510,18 +510,6 @@ void getCodeActions(const DuetToolContext &context, const QJsonObject &arguments
                        });
 }
 
-// The command an action carries out: its "command" object, or the action
-// itself when it is a bare command; empty when it has none.
-QJsonObject commandOf(const QJsonObject &action)
-{
-    const QJsonValue command = action.value(QStringLiteral("command"));
-    if (command.isObject())
-        return command.toObject();
-    if (command.isString())
-        return action;
-    return {};
-}
-
 // Applies a code action's edit, then has the server carry out its command,
 // which sends the edit back.
 void applyAction(const DuetToolContext &context, LspClient *server, const QJsonObject &action, const McpReply &reply)

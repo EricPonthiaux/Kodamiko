@@ -119,6 +119,10 @@ QList<TextEdit> applicationOrder(QList<TextEdit> edits);
 // `text` with `edits` applied; they must not overlap.
 QString applyEdits(const QString &text, QList<TextEdit> edits);
 
+// The Command of a code action: the action itself when it is a Command,
+// else its "command"; empty if there is none.
+QJsonObject commandOf(const QJsonObject &action);
+
 // An element of a call or type hierarchy: a function, a method, a type.
 // `raw` is the server's object, which the next requests send back.
 struct HierarchyItem {

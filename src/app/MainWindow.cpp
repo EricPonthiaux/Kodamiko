@@ -493,6 +493,10 @@ void MainWindow::createProblemsAndOutline()
         setMode(Mode::Edit);
         navigator_->goToLine(path, line, column);
     });
+    connect(intelligence_, &CodeIntelligence::renameFileRequested, this, [this](const QString &path) {
+        setMode(Mode::Edit);
+        fileTree_->renameEntry(path);
+    });
     connect(intelligence_, &CodeIntelligence::hierarchyFound, this, [this](const Hierarchy &hierarchy) {
         hierarchyView_->showHierarchy(hierarchy);
         sidebar_->showView(hierarchyView_);

@@ -7,6 +7,7 @@
 #include "WorkspaceEditing.h"
 #include "lsp/LspProtocol.h"
 #include "refactor/EditTargets.h"
+#include "refactor/MoveClass.h"
 #include "refactor/RenameAnalysis.h"
 #include "refactor/RenameSymbolPopup.h"
 
@@ -78,6 +79,13 @@ public:
     void showTypeHierarchy();
     void rename();
     void showQuickFixes();
+    // Refactor This, as in IntelliJ: a menu of the refactorings at the
+    // cursor, Duet's (rename, rename the file, move the class to its own
+    // file) and the server's ("refactor" code actions), each shown first.
+    void refactorThis();
+    // The class at the cursor (C++, Java) in a file of its own, its
+    // members' definitions too, after a preview.
+    void moveClassToOwnFile();
     void switchHeaderSource();
     // Documentation of the name at the cursor (Ctrl+Q).
     void showDocumentation();
@@ -113,6 +121,8 @@ signals:
     void statusMessage(const QString &message);
     void usagesFound(const UsageResults &results);
     void hierarchyFound(const Hierarchy &hierarchy);
+    // Refactor This ▸ Rename File: for the file tree.
+    void renameFileRequested(const QString &path);
 
 private:
     // The server of `editor`'s language, with the editor's text sent to it;
@@ -158,6 +168,17 @@ private:
                                 const RenameAnalysis::Result &analysis,
                                 const Rename &rename);
     void completeRename(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
+    // The Refactor This menu, with the server's `actions` (none without
+    // `server`).
+    void chooseRefactoring(EditorWidget *editor, LspClient *server, const QList<QJsonObject> &actions);
+    // A server's refactoring: its edit after a preview, then its command.
+    void applyRefactoring(LspClient *server, const QJsonObject &action);
+    // What Move Class needs from `editor`, and from its source.
+    MoveClass::Input moveClassInput(EditorWidget *editor) const;
+    // `edit` in the preview popup; `apply` gets what is kept.
+    void showRefactoringPreview(const QString &title,
+                                const LspProtocol::WorkspaceEdit &edit,
+                                const std::function<void(const LspProtocol::WorkspaceEdit &)> &apply);
     void completeReferenceUpdate(const LspProtocol::WorkspaceEdit &edit, const QString &name);
     // The changes in the preview popup, made once confirmed.
     void showPreview(const LspProtocol::WorkspaceEdit &edit,
@@ -189,6 +210,8 @@ private:
     // The occurrences of the symbol at `bytePosition`, from a server that
     // already runs, highlighted in place of the text's whole words.
     void requestOccurrences(EditorWidget *editor, int bytePosition);
+    // Below the cursor of `editor`, in global coordinates.
+    static QPoint belowCaret(const EditorWidget *editor);
     // Menu under the cursor of `editor`; returns the chosen entry or -1.
     int chooseFrom(EditorWidget *editor, const QStringList &entries) const;
     // Documentation in `markdown` as a tooltip, in the theme of `editor`.

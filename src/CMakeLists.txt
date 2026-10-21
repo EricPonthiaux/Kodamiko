@@ -135,6 +135,7 @@ add_library(duet_core STATIC
     navigation/CodeIntelligence.cpp
     navigation/CodeIntelligenceHierarchy.cpp
     navigation/CodeIntelligenceRefactoring.cpp
+    navigation/CodeIntelligenceRefactorThis.cpp
     navigation/CodeIntelligenceUsages.cpp
     navigation/CodeNavigator.cpp
     navigation/Definitions.cpp
@@ -150,6 +151,7 @@ add_library(duet_core STATIC
     refactor/EditPreview.cpp
     refactor/EditSimulation.cpp
     refactor/FileReferences.cpp
+    refactor/MoveClass.cpp
     refactor/RefactoringPreviewPopup.cpp
     refactor/RenameAnalysis.cpp
     refactor/RenameSymbolPopup.cpp

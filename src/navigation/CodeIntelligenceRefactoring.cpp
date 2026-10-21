@@ -26,17 +26,6 @@ namespace {
 
 constexpr std::chrono::seconds prepareRenameTimeout{10};
 
-// A Command, or a CodeAction carrying one; empty if there is none.
-QJsonObject commandOf(const QJsonObject &action)
-{
-    const QJsonValue command = action.value("command");
-    if (command.isObject())
-        return command.toObject();
-    if (command.isString())
-        return action;
-    return {};
-}
-
 } // namespace
 
 void CodeIntelligence::rename()

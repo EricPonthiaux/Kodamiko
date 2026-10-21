@@ -191,6 +191,15 @@ std::optional<HierarchyItem> hierarchyItemFrom(const QJsonObject &object)
 
 } // namespace
 
+QJsonObject commandOf(const QJsonObject &action)
+{
+    if (action.value("command").isObject())
+        return action.value("command").toObject();
+    if (action.value("command").isString())
+        return action;
+    return {};
+}
+
 QList<HierarchyItem> parseHierarchyItems(const QJsonValue &result)
 {
     QList<HierarchyItem> items;

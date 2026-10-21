@@ -88,6 +88,8 @@ public:
     // selected ones (never the working folder itself). Deleting moves to the
     // trash when possible.
     void renameCurrent();
+    // Asks for the new name of `path` (a file or folder of the tree).
+    void renameEntry(const QString &path);
     void deleteSelection();
 
     // Clipboard, as in a file manager: Ctrl+X, Ctrl+C, Ctrl+V, on the
@@ -239,7 +241,6 @@ private:
     QString editablePath(const QModelIndex &index) const;
     // selectedPaths() but the working folder.
     QStringList editableSelection() const;
-    void renameEntry(const QString &path);
     QString renameEntryTo(const QString &path, const QString &name);
     void deleteEntry(const QString &path);
     void deleteEntries(const QStringList &paths);

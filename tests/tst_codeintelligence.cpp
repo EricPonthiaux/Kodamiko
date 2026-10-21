@@ -23,6 +23,7 @@
 #include <QJsonArray>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -553,6 +554,51 @@ private slots:
         QCOMPARE(project.intelligence.history()->lastDescription(), QString("Update the references to “total.h”"));
         project.intelligence.undoRefactoring();
         QCOMPARE(read(project.dir.filePath("main.cpp")), QByteArray("#include \"total.h\"\n"));
+    }
+
+    void movesAClassToItsOwnFileAfterAPreview()
+    {
+        ClangdProject project;
+        const QString header = project.dir.filePath("shapes.h");
+        write(header, "#pragma once\n\nclass Square {};\n\nclass Circle {};\n");
+        const auto *editor = EditorTabs::editorIn(project.tabs.openFile(header));
+        QVERIFY(editor);
+        placeCaretIn(editor, "Circle {}");
+
+        project.intelligence.moveClassToOwnFile();
+        auto *preview = project.tabs.window()->findChild<RefactoringPreviewPopup *>();
+        QVERIFY(preview);
+        preview->accept();
+
+        QCOMPARE(read(project.dir.filePath("Circle.h")), QByteArray("#pragma once\n\nclass Circle {};\n"));
+        QCOMPARE(editor->text(), QString("#pragma once\n#include \"Circle.h\"\n\nclass Square {};\n\n"));
+        QCOMPARE(project.tabs.currentFilePath(), project.dir.filePath("Circle.h")); // opened
+        project.intelligence.undoRefactoring();
+        QVERIFY2(!QFileInfo::exists(project.dir.filePath("Circle.h")), qPrintable(project.messages.join('\n')));
+        QCOMPARE(editor->text(), QString("#pragma once\n\nclass Square {};\n\nclass Circle {};\n"));
+    }
+
+    void refactorThisOffersDuetsRefactoringsWithoutAServer()
+    {
+        ClangdProject project;
+        const QString path = project.dir.filePath("notes.cpp");
+        write(path, "class A {};\n");
+        QVERIFY(project.tabs.openFile(path));
+        QStringList entries;
+        QTimer::singleShot(0, this, [&entries] {
+            auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+            QVERIFY(menu);
+            for (const QAction *action : menu->actions()) {
+                if (!action->isSeparator())
+                    entries.append(action->text());
+            }
+            menu->close();
+        });
+
+        project.servers.setEnabled(false); // no server: Duet's alone
+        project.intelligence.refactorThis();
+
+        QCOMPARE(entries, (QStringList{"Rename…", "Rename File…", "Move Class to Its Own File"}));
     }
 
     void highlightsTheSymbolsOccurrencesWithClangd()

@@ -9,6 +9,7 @@
 #include "refactor/EditJournal.h"
 #include "refactor/EditPreview.h"
 #include "refactor/FileReferences.h"
+#include "refactor/MoveClass.h"
 #include "refactor/RefactoringHistory.h"
 #include "refactor/RefactoringPreviewPopup.h"
 #include "refactor/RenameAnalysis.h"
@@ -492,6 +493,126 @@ private slots:
 
         QCOMPARE(moves, (QList<FileReferences::Move>{{project.path("from/a.h"), project.path("to/a.h")},
                                                      {project.path("from/deep/b.h"), project.path("to/deep/b.h")}}));
+    }
+
+    void movesACppClassAndItsMembersToTheirOwnFiles()
+    {
+        Project project;
+        const QByteArray header = "// SPDX-License-Identifier: GPL-3.0-only\n"
+                                  "\n"
+                                  "#pragma once\n"
+                                  "\n"
+                                  "#include <QString>\n"
+                                  "\n"
+                                  "namespace app {\n"
+                                  "\n"
+                                  "// A square.\n"
+                                  "class Square {\n"
+                                  "public:\n"
+                                  "    int side() const;\n"
+                                  "};\n"
+                                  "\n"
+                                  "class Circle {\n"
+                                  "};\n"
+                                  "\n"
+                                  "} // namespace app\n";
+        const QByteArray source = "// SPDX-License-Identifier: GPL-3.0-only\n"
+                                  "\n"
+                                  "#include \"shapes.h\"\n"
+                                  "\n"
+                                  "namespace app {\n"
+                                  "\n"
+                                  "int Square::side() const\n"
+                                  "{\n"
+                                  "    return 1;\n"
+                                  "}\n"
+                                  "\n"
+                                  "int other() { return 2; }\n"
+                                  "\n"
+                                  "} // namespace app\n";
+        write(project.path("shapes.h"), header);
+        write(project.path("shapes.cpp"), source);
+
+        const MoveClass::Result result = MoveClass::plan({.path = project.path("shapes.h"),
+                                                          .languageId = "cpp",
+                                                          .text = header,
+                                                          .cursor = {10, 4},
+                                                          .sourcePath = project.path("shapes.cpp"),
+                                                          .sourceText = source});
+        QVERIFY2(result.error.isEmpty(), qPrintable(result.error));
+        const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(result.edit, project.targets());
+        QVERIFY2(outcome.errors.isEmpty(), qPrintable(outcome.errors.join('\n')));
+
+        QCOMPARE(result.className, QString("Square"));
+        QCOMPARE(result.newPath, project.path("Square.h"));
+        QCOMPARE(read(project.path("Square.h")), QByteArray("// SPDX-License-Identifier: GPL-3.0-only\n\n"
+                                                            "#pragma once\n\n"
+                                                            "#include <QString>\n\n"
+                                                            "namespace app {\n\n"
+                                                            "// A square.\n"
+                                                            "class Square {\n"
+                                                            "public:\n"
+                                                            "    int side() const;\n"
+                                                            "};\n\n"
+                                                            "} // namespace app\n"));
+        QCOMPARE(read(project.path("shapes.h")), QByteArray("// SPDX-License-Identifier: GPL-3.0-only\n\n"
+                                                            "#pragma once\n\n"
+                                                            "#include <QString>\n"
+                                                            "#include \"Square.h\"\n\n"
+                                                            "namespace app {\n\n"
+                                                            "class Circle {\n"
+                                                            "};\n\n"
+                                                            "} // namespace app\n"));
+        QCOMPARE(read(project.path("Square.cpp")), QByteArray("// SPDX-License-Identifier: GPL-3.0-only\n\n"
+                                                              "#include \"Square.h\"\n"
+                                                              "#include \"shapes.h\"\n\n"
+                                                              "namespace app {\n\n"
+                                                              "int Square::side() const\n"
+                                                              "{\n"
+                                                              "    return 1;\n"
+                                                              "}\n\n"
+                                                              "} // namespace app\n"));
+        QVERIFY(!read(project.path("shapes.cpp")).contains("Square"));
+    }
+
+    void movesAClassOfAGuardedHeader()
+    {
+        const QByteArray header = "#ifndef SHAPES_H\n#define SHAPES_H\n\nstruct A {};\n\nstruct B {};\n\n#endif\n";
+
+        const MoveClass::Result result =
+            MoveClass::plan({.path = "/p/shapes.h", .languageId = "cpp", .text = header, .cursor = {5, 8}});
+
+        QCOMPARE(result.className, QString("B"));
+        const auto &created = std::get<DocumentEdit>(result.edit.changes[1]);
+        QCOMPARE(created.edits.first().newText, QString("#ifndef B_H\n#define B_H\n\nstruct B {};\n\n#endif\n"));
+        const auto &original = std::get<DocumentEdit>(result.edit.changes[2]);
+        QCOMPARE(original.edits.first().newText, QString("#include \"B.h\"\n")); // after the #define
+        QCOMPARE(original.edits.first().range.start.line, 2);
+    }
+
+    void movesAJavaClassWithItsPackageAndImports()
+    {
+        const QByteArray text = "package p;\n\nimport java.util.List;\n\npublic class A {}\n\n"
+                                "/** Doc. */\n@Deprecated\nclass B extends A {}\n";
+
+        const MoveClass::Result result =
+            MoveClass::plan({.path = "/p/A.java", .languageId = "java", .text = text, .cursor = {8, 7}});
+
+        QCOMPARE(result.newPath, QString("/p/B.java"));
+        QCOMPARE(std::get<DocumentEdit>(result.edit.changes[1]).edits.first().newText,
+                 QString("package p;\nimport java.util.List;\n\n/** Doc. */\n@Deprecated\nclass B extends A {}\n"));
+        const MoveClass::Result publicOne =
+            MoveClass::plan({.path = "/p/A.java", .languageId = "java", .text = text, .cursor = {4, 15}});
+        QCOMPARE(publicOne.error, QString("“A” is the public class of its file"));
+    }
+
+    void leavesAClassAloneInItsFile()
+    {
+        const MoveClass::Result result =
+            MoveClass::plan({.path = "/p/a.h", .languageId = "cpp", .text = "class A {};\n", .cursor = {0, 7}});
+
+        QCOMPARE(result.error, QString("“A” is already alone in its file"));
+        QVERIFY(result.edit.isEmpty());
     }
 };
 

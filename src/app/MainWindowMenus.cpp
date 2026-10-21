@@ -286,8 +286,12 @@ void MainWindow::createEditMenu()
                     inCode(&CodeIntelligence::showParameterInfo));
     edit->addAction(tr("&Quick Documentation"), QKeySequence(tr("Ctrl+Q")), this,
                     inCode(&CodeIntelligence::showDocumentation));
+    refactoringActions_.append(edit->addAction(tr("Refactor &This…"), QKeySequence(tr("Ctrl+Alt+Shift+T")), this,
+                                               inCode(&CodeIntelligence::refactorThis)));
     refactoringActions_.append(
         edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename)));
+    refactoringActions_.append(edit->addAction(tr("Move C&lass to Its Own File"), QKeySequence(tr("F6")), this,
+                                               inCode(&CodeIntelligence::moveClassToOwnFile)));
     refactoringActions_.append(edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
                                                inCode(&CodeIntelligence::showQuickFixes)));
     // In every file the refactoring changed, open or not.

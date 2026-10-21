@@ -41,17 +41,6 @@ bool isCFamily(const QString &languageId)
     return languageId == QLatin1String("c") || languageId == QLatin1String("cpp");
 }
 
-// Below the cursor of `editor`, in global coordinates.
-QPoint belowCaret(const EditorWidget *editor)
-{
-    const long caret = editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS);
-    const long line = editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret);
-    const QPoint point(int(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
-                       int(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret) +
-                           editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
-    return editor->viewport()->mapToGlobal(point);
-}
-
 // Where the problem is underlined in `editor`, in bytes.
 std::pair<int, int> problemRange(EditorWidget *editor, const Problem &problem)
 {
@@ -508,6 +497,16 @@ int CodeIntelligence::chooseFrom(EditorWidget *editor, const QStringList &entrie
         menu.addAction(entries[i])->setData(i);
     const QAction *chosen = menu.exec(belowCaret(editor));
     return chosen ? chosen->data().toInt() : -1;
+}
+
+QPoint CodeIntelligence::belowCaret(const EditorWidget *editor)
+{
+    const long caret = editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS);
+    const long line = editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret);
+    const QPoint point(int(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
+                       int(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret) +
+                           editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
+    return editor->viewport()->mapToGlobal(point);
 }
 
 // Header and source
