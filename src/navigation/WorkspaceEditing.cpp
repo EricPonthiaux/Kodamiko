@@ -7,7 +7,7 @@
 #include "editor/EditorWidget.h"
 #include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
-#include "workspace/FileOperations.h"
+#include "refactor/WorkspaceFiles.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -46,30 +46,18 @@ QString withLineEnding(QString text, LineEnding lineEnding)
     return text;
 }
 
-// The text of `path` as Duet sends it to the servers: its editor's, or
-// else the file's; nullopt if it cannot be read.
-std::optional<QByteArray> currentText(const QString &path, const EditorTabs &tabs)
-{
-    if (const EditorWidget *editor = tabs.editorFor(path))
-        return editor->utf8Bytes().toByteArray();
-    QString error;
-    const std::optional<DecodedText> decoded = TextFile::load(path, &error);
-    if (!decoded)
-        return std::nullopt;
-    return decoded->text.toUtf8();
-}
-
 // The files whose text is no longer the one the server's edits are for.
-QStringList staleFiles(const WorkspaceEdit &edit, const Targets &targets)
+QStringList staleFiles(const WorkspaceEdit &edit, const EditTargets &targets)
 {
     QStringList stale;
     for (const DocumentChange &change : edit.changes) {
         const auto *documentEdit = std::get_if<DocumentEdit>(&change);
         if (!documentEdit || !documentEdit->version)
             continue;
-        const std::optional<QByteArray> text = currentText(documentEdit->filePath, *targets.tabs);
+        // As Duet sends it to the servers.
+        const std::optional<QString> text = WorkspaceFiles::textOf(documentEdit->filePath, targets);
         const bool isCurrent =
-            text && targets.servers->isCurrent(documentEdit->filePath, *documentEdit->version, *text);
+            text && targets.servers->isCurrent(documentEdit->filePath, *documentEdit->version, text->toUtf8());
         if (!isCurrent)
             stale.append(documentEdit->filePath);
     }
@@ -92,100 +80,84 @@ void editInEditor(EditorWidget *editor, const QList<TextEdit> &edits)
     editor->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
 }
 
-// Returns an error message, empty on success.
-QString editOnDisk(const QString &path, QList<TextEdit> edits)
+// Changes the text of `edit`'s file, recording it in `journal`.
+QString editText(const DocumentEdit &edit, const EditTargets &targets, EditJournal &journal)
 {
+    if (EditorWidget *editor = targets.tabs->editorFor(edit.filePath)) {
+        const QString before = editor->text();
+        editInEditor(editor, edit.edits);
+        journal.record(EditJournal::TextChange{edit.filePath, before, editor->text()});
+        return {};
+    }
     QString error;
-    const std::optional<DecodedText> decoded = TextFile::load(path, &error);
+    const std::optional<DecodedText> decoded = TextFile::load(edit.filePath, &error);
     if (!decoded)
-        return tr("Could not change %1: %2").arg(nameOf(path), error);
+        return tr("Could not change %1: %2").arg(nameOf(edit.filePath), error);
+    QList<TextEdit> edits = edit.edits;
     for (TextEdit &textEdit : edits)
         textEdit.newText = withLineEnding(textEdit.newText, decoded->format.lineEnding);
-    if (!TextFile::save(path, applyEdits(decoded->text, edits), decoded->format, &error))
-        return tr("Could not change %1: %2").arg(nameOf(path), error);
+    const QString after = applyEdits(decoded->text, edits);
+    if (!TextFile::save(edit.filePath, after, decoded->format, &error))
+        return tr("Could not change %1: %2").arg(nameOf(edit.filePath), error);
+    journal.record(EditJournal::TextChange{edit.filePath, decoded->text, after});
     return {};
 }
 
-bool isUnder(const QString &path, const QString &folder)
+// What is in the way of a file operation's target.
+enum class Room {
+    Made,     // nothing, or trashed (`overwrite`)
+    Occupied, // to keep: an error
+    Skip,     // to keep, without an error (`ignoreIfExists`)
+};
+
+Room makeRoom(const FileOperation &operation, const QString &target, const EditTargets &targets, EditJournal &journal)
 {
-    return path == folder || path.startsWith(folder + QLatin1Char('/'));
+    if (!QFileInfo::exists(target))
+        return Room::Made;
+    if (!operation.overwrite)
+        return operation.ignoreIfExists ? Room::Skip : Room::Occupied;
+    QString pathInTrash;
+    if (!WorkspaceFiles::trash(target, targets, &pathInTrash).isEmpty())
+        return Room::Occupied;
+    journal.record(EditJournal::Trashing{target, pathInTrash});
+    return Room::Made;
 }
 
-// The servers read what is under `folder` (or the file itself) from disk
-// again.
-void closeDocumentsUnder(const QString &folder, LanguageServers &servers)
+QString create(const FileOperation &operation, const EditTargets &targets, EditJournal &journal)
 {
-    for (const QString &document : servers.openDocuments()) {
-        if (isUnder(document, folder))
-            servers.closeDocument(document);
-    }
-}
-
-// Trashes `path` and closes its tabs; returns an error message, empty on
-// success.
-QString trash(const QString &path, const Targets &targets)
-{
-    targets.tabs->closeFilesUnder(path);
-    closeDocumentsUnder(path, *targets.servers);
-    if (!QFile::moveToTrash(path))
-        return tr("Could not move %1 to the trash").arg(nameOf(path));
-    return {};
-}
-
-QString create(const FileOperation &operation, const Targets &targets)
-{
-    if (QFileInfo::exists(operation.filePath)) {
-        if (operation.ignoreIfExists && !operation.overwrite)
-            return {};
-        if (!operation.overwrite)
-            return tr("Could not create %1: it already exists").arg(nameOf(operation.filePath));
-        if (const QString error = trash(operation.filePath, targets); !error.isEmpty())
-            return error;
-    }
-    QDir().mkpath(QFileInfo(operation.filePath).absolutePath());
-    QFile file(operation.filePath);
-    if (!file.open(QIODevice::WriteOnly))
-        return tr("Could not create %1: %2").arg(nameOf(operation.filePath), file.errorString());
-    return {};
-}
-
-// The editor of `path`'s unsaved changes go with it.
-QString saveBeforeMoving(const QString &path, const EditorTabs &tabs)
-{
-    if (!tabs.hasUnsavedChangesUnder(path))
+    switch (makeRoom(operation, operation.filePath, targets, journal)) {
+    case Room::Occupied:
+        return tr("Could not create %1: it already exists").arg(nameOf(operation.filePath));
+    case Room::Skip:
         return {};
-    EditorWidget *editor = tabs.editorFor(path);
-    if (!editor)
-        return tr("Could not rename %1: save the files it holds first").arg(nameOf(path));
-    QString error;
-    if (!editor->save(&error))
-        return tr("Could not save %1 before renaming it: %2").arg(nameOf(path), error);
+    case Room::Made:
+        break;
+    }
+    if (QString error = WorkspaceFiles::createEmpty(operation.filePath); !error.isEmpty())
+        return error;
+    journal.record(EditJournal::Creation{operation.filePath});
     return {};
 }
 
-QString rename(const FileOperation &operation, const Targets &targets)
+QString rename(const FileOperation &operation, const EditTargets &targets, EditJournal &journal)
 {
     if (!QFileInfo::exists(operation.filePath))
         return tr("Could not rename %1: it does not exist").arg(nameOf(operation.filePath));
-    if (QFileInfo::exists(operation.newPath)) {
-        if (operation.ignoreIfExists && !operation.overwrite)
-            return {};
-        if (!operation.overwrite)
-            return tr("Could not rename %1: %2 already exists").arg(nameOf(operation.filePath), operation.newPath);
-        if (const QString error = trash(operation.newPath, targets); !error.isEmpty())
-            return error;
+    switch (makeRoom(operation, operation.newPath, targets, journal)) {
+    case Room::Occupied:
+        return tr("Could not rename %1: %2 already exists").arg(nameOf(operation.filePath), operation.newPath);
+    case Room::Skip:
+        return {};
+    case Room::Made:
+        break;
     }
-    if (const QString error = saveBeforeMoving(operation.filePath, *targets.tabs); !error.isEmpty())
+    if (QString error = WorkspaceFiles::move(operation.filePath, operation.newPath, targets); !error.isEmpty())
         return error;
-    QDir().mkpath(QFileInfo(operation.newPath).absolutePath());
-    if (const QString error = FileOperations::move(operation.filePath, operation.newPath); !error.isEmpty())
-        return error;
-    closeDocumentsUnder(operation.filePath, *targets.servers);
-    targets.tabs->followRename(operation.filePath, operation.newPath);
+    journal.record(EditJournal::Move{operation.filePath, operation.newPath});
     return {};
 }
 
-QString remove(const FileOperation &operation, const Targets &targets)
+QString remove(const FileOperation &operation, const EditTargets &targets, EditJournal &journal)
 {
     const QFileInfo info(operation.filePath);
     if (!info.exists())
@@ -194,46 +166,52 @@ QString remove(const FileOperation &operation, const Targets &targets)
     const bool isNonEmptyFolder = info.isDir() && !QDir(operation.filePath).isEmpty();
     if (isNonEmptyFolder && !operation.recursive)
         return tr("Could not delete %1: the folder is not empty").arg(info.fileName());
-    return trash(operation.filePath, targets);
+    QString pathInTrash;
+    if (QString error = WorkspaceFiles::trash(operation.filePath, targets, &pathInTrash); !error.isEmpty())
+        return error;
+    journal.record(EditJournal::Trashing{operation.filePath, pathInTrash});
+    return {};
 }
 
-QString perform(const FileOperation &operation, const Targets &targets)
+QString perform(const DocumentChange &change, const EditTargets &targets, EditJournal &journal)
 {
+    if (const auto *documentEdit = std::get_if<DocumentEdit>(&change))
+        return editText(*documentEdit, targets, journal);
+    const auto &operation = std::get<FileOperation>(change);
     switch (operation.kind) {
     case FileOperation::Kind::Create:
-        return create(operation, targets);
+        return create(operation, targets, journal);
     case FileOperation::Kind::Rename:
-        return rename(operation, targets);
+        return rename(operation, targets, journal);
     case FileOperation::Kind::Delete:
-        return remove(operation, targets);
+        return remove(operation, targets, journal);
     }
     return {};
 }
 
-struct ChangeResult {
-    QString path; // what the change leaves changed
-    QString error;
-    QString formerPath = {}; // renamed: the same file as `path`
-};
-
-ChangeResult applyChange(const DocumentChange &change, const Targets &targets)
+// The files the changes of `journal` leave changed, a renamed one counted
+// once.
+int changedFileCount(const EditJournal &journal)
 {
-    if (const auto *documentEdit = std::get_if<DocumentEdit>(&change)) {
-        if (EditorWidget *editor = targets.tabs->editorFor(documentEdit->filePath)) {
-            editInEditor(editor, documentEdit->edits);
-            return {documentEdit->filePath, {}};
+    QSet<QString> changed;
+    for (const EditJournal::Entry &entry : journal.entries()) {
+        if (const auto *text = std::get_if<EditJournal::TextChange>(&entry)) {
+            changed.insert(text->path);
+        } else if (const auto *creation = std::get_if<EditJournal::Creation>(&entry)) {
+            changed.insert(creation->path);
+        } else if (const auto *move = std::get_if<EditJournal::Move>(&entry)) {
+            changed.remove(move->from);
+            changed.insert(move->to);
+        } else {
+            changed.insert(std::get<EditJournal::Trashing>(entry).path);
         }
-        return {documentEdit->filePath, editOnDisk(documentEdit->filePath, documentEdit->edits)};
     }
-    const auto &operation = std::get<FileOperation>(change);
-    if (operation.kind == FileOperation::Kind::Rename)
-        return {operation.newPath, perform(operation, targets), operation.filePath};
-    return {operation.filePath, perform(operation, targets)};
+    return int(changed.size());
 }
 
 } // namespace
 
-Outcome apply(const WorkspaceEdit &edit, const Targets &targets)
+Outcome apply(const WorkspaceEdit &edit, const EditTargets &targets)
 {
     Outcome outcome;
     if (const QStringList stale = staleFiles(edit, targets); !stale.isEmpty()) {
@@ -241,17 +219,20 @@ Outcome apply(const WorkspaceEdit &edit, const Targets &targets)
             outcome.errors.append(tr("%1 changed meanwhile: nothing was changed, try again").arg(nameOf(path)));
         return outcome;
     }
-    QSet<QString> changed;
+    EditJournal journal;
     for (const DocumentChange &change : edit.changes) {
-        const ChangeResult result = applyChange(change, targets);
-        if (!result.error.isEmpty()) {
-            outcome.errors.append(result.error);
+        const QString error = perform(change, targets, journal);
+        if (error.isEmpty())
             continue;
-        }
-        changed.remove(result.formerPath);
-        changed.insert(result.path);
+        outcome.errors.append(error);
+        // All or nothing.
+        outcome.errors.append(journal.revert(targets));
+        if (!journal.isEmpty())
+            outcome.errors.append(tr("The changes already made were undone"));
+        return outcome;
     }
-    outcome.filesChanged = int(changed.size());
+    outcome.filesChanged = changedFileCount(journal);
+    outcome.journal = std::move(journal);
     return outcome;
 }
 

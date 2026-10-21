@@ -55,6 +55,17 @@ bool copyTree(const QString &source, const QString &destination, QString *error)
     });
 }
 
+// An entry taken back from a freedesktop.org trash ("…/Trash/files/name")
+// leaves its description ("…/Trash/info/name.trashinfo") behind.
+void removeTrashInfo(const QString &pathInTrash)
+{
+    const QFileInfo entry(pathInTrash);
+    QDir trash(entry.absolutePath());
+    if (trash.dirName() != QLatin1String("files") || !trash.cdUp())
+        return;
+    QFile::remove(trash.filePath(QStringLiteral("info/%1.trashinfo").arg(entry.fileName())));
+}
+
 } // namespace
 
 namespace FileOperations {
@@ -103,6 +114,14 @@ QString move(const QString &source, const QString &destination)
                                                                                      : QFile::remove(source);
     return removed ? QString()
                    : translate("“%1” was copied but could not be deleted").arg(QFileInfo(source).fileName());
+}
+
+QString takeBackFromTrash(const QString &pathInTrash, const QString &path)
+{
+    if (const QString error = move(pathInTrash, path); !error.isEmpty())
+        return error;
+    removeTrashInfo(pathInTrash);
+    return {};
 }
 
 QString copyName(const QString &folder, const QString &name)

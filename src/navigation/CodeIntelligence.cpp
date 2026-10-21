@@ -14,6 +14,7 @@
 #include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
+#include "refactor/RefactoringHistory.h"
 #include "workspace/EntryPopups.h"
 
 #include <QDir>
@@ -138,17 +139,18 @@ CodeIntelligence::CodeIntelligence(const Services &services, QObject *parent)
     , servers_(services.servers)
     , navigator_(services.navigator)
     , problems_(services.problems)
+    , history_(new RefactoringHistory(this))
 {
     // A quick fix or a refactoring carried out by the server comes back as
     // an edit to apply.
     servers_->setRequestHandler(QStringLiteral("workspace/applyEdit"), [this](const QJsonValue &params) {
-        const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(
-            parseWorkspaceEdit(params.toObject().value("edit").toObject()), {.tabs = tabs_, .servers = servers_});
+        const QJsonObject request = params.toObject();
+        const QString label = request.value("label").toString();
+        const WorkspaceEditing::Outcome outcome =
+            applyEdit(parseWorkspaceEdit(request.value("edit").toObject()), label.isEmpty() ? tr("Quick Fix") : label);
         if (outcome.errors.isEmpty())
             return QJsonValue(QJsonObject{{"applied", true}});
-        const QString reason = outcome.errors.join(QLatin1Char(' '));
-        emit statusMessage(reason);
-        return QJsonValue(QJsonObject{{"applied", false}, {"failureReason", reason}});
+        return QJsonValue(QJsonObject{{"applied", false}, {"failureReason", outcome.errors.join(QLatin1Char(' '))}});
     });
     connect(tabs_, &EditorTabs::openFilesChanged, this, &CodeIntelligence::closeDocumentsOfClosedTabs);
     connect(problems_, &ProblemStore::changed, this, &CodeIntelligence::showProblems);
@@ -652,7 +654,7 @@ void CodeIntelligence::renameAt(EditorWidget *editor, int bytePosition, const QS
                             emit statusMessage(tr("Nothing to rename here"));
                             return;
                         }
-                        const int files = applyWorkspaceEdit(edit);
+                        const int files = applyWorkspaceEdit(edit, tr("Rename “%1” to “%2”").arg(word, newName));
                         emit statusMessage(files == 1
                                                ? tr("Renamed “%1” to “%2”").arg(word, newName)
                                                : tr("Renamed “%1” to “%2” in %3 files").arg(word, newName).arg(files));
@@ -705,7 +707,7 @@ void CodeIntelligence::chooseQuickFix(EditorWidget *editor, LspClient *server, c
         return;
     const QJsonObject action = actions.at(chosen);
     if (action.contains("edit"))
-        applyWorkspaceEdit(parseWorkspaceEdit(action.value("edit").toObject()));
+        applyWorkspaceEdit(parseWorkspaceEdit(action.value("edit").toObject()), action.value("title").toString());
     // The server carries the command out and sends back the edit
     // ("workspace/applyEdit").
     const QJsonObject command = commandOf(action);
@@ -720,12 +722,29 @@ void CodeIntelligence::chooseQuickFix(EditorWidget *editor, LspClient *server, c
         });
 }
 
-int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit)
+int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit, const QString &description)
 {
-    const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(edit, {.tabs = tabs_, .servers = servers_});
+    return applyEdit(edit, description).filesChanged;
+}
+
+WorkspaceEditing::Outcome CodeIntelligence::applyEdit(const WorkspaceEdit &edit, const QString &description)
+{
+    WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(edit, targets());
     if (!outcome.errors.isEmpty())
         emit statusMessage(outcome.errors.join(QLatin1Char(' ')));
-    return outcome.filesChanged;
+    history_->record(description, outcome.journal);
+    return outcome;
+}
+
+void CodeIntelligence::undoRefactoring()
+{
+    const QString description = history_->lastDescription();
+    if (description.isEmpty()) {
+        emit statusMessage(tr("No refactoring to undo"));
+        return;
+    }
+    const QStringList errors = history_->undoLast(targets());
+    emit statusMessage(errors.isEmpty() ? tr("Undid “%1”").arg(description) : errors.join(QLatin1Char(' ')));
 }
 
 // Header and source

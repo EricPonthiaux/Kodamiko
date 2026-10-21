@@ -158,34 +158,6 @@ private slots:
         QCOMPARE(parsed.textEditCount(), 1);
     }
 
-    void appliesTextEditsAndFileOperationsInOrder()
-    {
-        const QTemporaryDir dir;
-        const QString root = dir.path();
-        write(root + "/old.h", "int total;\n");
-        write(root + "/gone.h", "x\n");
-        EditorTabs tabs(Theme::dark());
-        LanguageServers servers;
-        QVERIFY(tabs.openFile(root + "/old.h"));
-        using Kind = FileOperation::Kind;
-        const WorkspaceEdit edit{{
-            DocumentEdit{root + "/old.h", {}, {{{{0, 4}, {0, 9}}, "sum"}}},
-            FileOperation{.kind = Kind::Rename, .filePath = root + "/old.h", .newPath = root + "/include/new.h"},
-            FileOperation{.kind = Kind::Create, .filePath = root + "/created.h"},
-            FileOperation{.kind = Kind::Delete, .filePath = root + "/gone.h"},
-        }};
-
-        const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(edit, {.tabs = &tabs, .servers = &servers});
-
-        QVERIFY2(outcome.errors.isEmpty(), qPrintable(outcome.errors.join('\n')));
-        QCOMPARE(outcome.filesChanged, 3);
-        QCOMPARE(read(root + "/include/new.h"), QByteArray("int sum;\n")); // saved before moving
-        QVERIFY(!QFileInfo::exists(root + "/old.h"));
-        QVERIFY(tabs.editorFor(root + "/include/new.h"));
-        QVERIFY(QFileInfo::exists(root + "/created.h"));
-        QVERIFY(!QFileInfo::exists(root + "/gone.h"));
-    }
-
     void refusesAnEditForAnotherVersionOfTheText()
     {
         const QTemporaryDir dir;
@@ -380,7 +352,7 @@ private slots:
         bool answered = false;
         client->request("textDocument/rename", params, [&](const QJsonValue &result, const QString &error) {
             QVERIFY2(error.isEmpty(), qPrintable(error));
-            QCOMPARE(intelligence.applyWorkspaceEdit(parseWorkspaceEdit(result.toObject())), 3);
+            QCOMPARE(intelligence.applyWorkspaceEdit(parseWorkspaceEdit(result.toObject()), "Rename"), 3);
             answered = true;
         });
         QTRY_VERIFY_WITH_TIMEOUT(answered, 30000);

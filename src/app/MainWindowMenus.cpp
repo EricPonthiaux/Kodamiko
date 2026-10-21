@@ -16,6 +16,7 @@
 #include "navigation/CodeNavigator.h"
 #include "navigation/GoToPopup.h"
 #include "projects/ProjectStore.h"
+#include "refactor/RefactoringHistory.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "terminal/TerminalWidget.h"
@@ -257,6 +258,17 @@ void MainWindow::createEditMenu()
     edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
                     inCode(&CodeIntelligence::showQuickFixes));
     edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename));
+    // In every file the refactoring changed, open or not.
+    QAction *undoRefactoring = edit->addAction(tr("&Undo Refactoring"), QKeySequence(tr("Ctrl+Alt+Shift+Z")), this,
+                                               inCode(&CodeIntelligence::undoRefactoring));
+    Keymap::setStableName(undoRefactoring, QStringLiteral("Undo Refactoring")); // its text names the refactoring
+    const auto updateUndoRefactoring = [this, undoRefactoring] {
+        const QString last = intelligence_->history()->lastDescription();
+        undoRefactoring->setEnabled(!last.isEmpty());
+        undoRefactoring->setText(last.isEmpty() ? tr("&Undo Refactoring") : tr("&Undo %1").arg(last));
+    };
+    connect(intelligence_->history(), &RefactoringHistory::changed, this, updateUndoRefactoring);
+    updateUndoRefactoring();
     edit->addAction(tr("F&ormat Document"), QKeySequence(tr("Ctrl+Alt+L")), this, [this] {
         if (mode_ == Mode::Edit)
             editorTabs_->formatCurrent();

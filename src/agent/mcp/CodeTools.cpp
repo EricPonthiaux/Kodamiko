@@ -455,12 +455,13 @@ void getSymbolInfo(const DuetToolContext &context, const QJsonObject &arguments,
                           reply);
 }
 
-McpResult renameResult(const DuetToolContext &context, const QJsonValue &result)
+McpResult renameResult(const DuetToolContext &context, const QJsonValue &result, const QString &newName)
 {
     const WorkspaceEdit edit = parseWorkspaceEdit(result.toObject());
     if (edit.isEmpty())
         return McpResult::error(QStringLiteral("Nothing to rename here"));
-    const int files = context.intelligence->applyWorkspaceEdit(edit);
+    const int files =
+        context.intelligence->applyWorkspaceEdit(edit, QStringLiteral("Rename to “%1” (Claude)").arg(newName));
     QJsonArray changed;
     for (const QString &path : edit.filePaths())
         changed.append(context.relative(path));
@@ -476,11 +477,12 @@ void renameSymbol(const DuetToolContext &context, const QJsonObject &arguments, 
         reply(McpResult::error(QStringLiteral("The new name is empty")));
         return;
     }
-    sendPositionalRequest(context, arguments,
-                          {.method = QStringLiteral("textDocument/rename"),
-                           .extraParams = {{QStringLiteral("newName"), newName}},
-                           .convert = [context](const QJsonValue &result) { return renameResult(context, result); }},
-                          reply);
+    sendPositionalRequest(
+        context, arguments,
+        {.method = QStringLiteral("textDocument/rename"),
+         .extraParams = {{QStringLiteral("newName"), newName}},
+         .convert = [context, newName](const QJsonValue &result) { return renameResult(context, result, newName); }},
+        reply);
 }
 
 QJsonObject actionSummary(const QJsonObject &action)
@@ -527,7 +529,8 @@ void applyAction(const DuetToolContext &context, LspClient *server, const QJsonO
     int files = 0;
     if (action.contains(QStringLiteral("edit")))
         files = context.intelligence->applyWorkspaceEdit(
-            parseWorkspaceEdit(action.value(QStringLiteral("edit")).toObject()));
+            parseWorkspaceEdit(action.value(QStringLiteral("edit")).toObject()),
+            QStringLiteral("%1 (Claude)").arg(action.value(QStringLiteral("title")).toString()));
     const QJsonObject command = commandOf(action);
     if (command.isEmpty() || !server) {
         reply(McpResult::json(QJsonObject{{QStringLiteral("applied"), action.value(QStringLiteral("title")).toString()},

@@ -2,7 +2,9 @@
 
 #pragma once
 
+#include "WorkspaceEditing.h"
 #include "lsp/LspProtocol.h"
+#include "refactor/EditTargets.h"
 
 #include <QHash>
 #include <QJsonObject>
@@ -19,6 +21,7 @@ class EditorWidget;
 class LanguageServers;
 class LspClient;
 class ProblemStore;
+class RefactoringHistory;
 class QJsonArray;
 class QPoint;
 
@@ -68,8 +71,15 @@ public:
     void requestParameterInfo(EditorWidget *editor);
 
     // Applies `edit` to the open editors (one undo step each) and to the
-    // files on disk. Returns the number of files changed.
-    int applyWorkspaceEdit(const LspProtocol::WorkspaceEdit &edit);
+    // files on disk, all of it or nothing (see WorkspaceEditing), and
+    // records it in history() as `description`. Returns the number of
+    // files changed.
+    int applyWorkspaceEdit(const LspProtocol::WorkspaceEdit &edit, const QString &description);
+    // Undoes the last refactoring in every file it changed.
+    void undoRefactoring();
+
+    // The refactorings made, for the Undo Refactoring command.
+    const RefactoringHistory *history() const { return history_; }
 
     // Byte position in `editor` of an LSP position, and back.
     static int positionOf(EditorWidget *editor, const LspProtocol::Position &position);
@@ -85,6 +95,11 @@ private:
     // The server of `editor`'s language, with the editor's text sent to it;
     // nullptr (with a message, unless `quiet`) when there is none.
     LspClient *serverFor(EditorWidget *editor, bool quiet = false);
+
+    EditTargets targets() const { return {.tabs = tabs_, .servers = servers_}; }
+
+    // applyWorkspaceEdit(), with its errors.
+    WorkspaceEditing::Outcome applyEdit(const LspProtocol::WorkspaceEdit &edit, const QString &description);
     QJsonObject positionParams(EditorWidget *editor, int bytePosition) const;
     // Goes to the `method` locations at the cursor, if the server has the
     // `capability` ("implementationProvider"); says `noneFound` if none.
@@ -133,6 +148,7 @@ private:
     LanguageServers *servers_;
     CodeNavigator *navigator_;
     ProblemStore *problems_;
+    RefactoringHistory *history_; // owned, as a child
     // Highlights the code of the documentation; built on first use (it
     // holds a hidden editor).
     std::unique_ptr<CodeColorizer> colorizer_;

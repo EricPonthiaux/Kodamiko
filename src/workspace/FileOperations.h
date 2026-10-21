@@ -15,6 +15,11 @@ QString copy(const QString &source, const QString &destination);
 // deletes. Returns an error message, empty on success.
 QString move(const QString &source, const QString &destination);
 
+// Brings back to `path` an entry moved to the trash, where it is
+// `pathInTrash` (what QFile::moveToTrash() said). Returns an error message,
+// empty on success.
+QString takeBackFromTrash(const QString &pathInTrash, const QString &path);
+
 // Whether `path` is `folder` or inside it: a folder cannot be moved or
 // copied into itself.
 bool isInside(const QString &path, const QString &folder);

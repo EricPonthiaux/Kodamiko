@@ -28,6 +28,7 @@ duet_add_test(tst_lsp)
 target_compile_definitions(tst_lsp PRIVATE FAKE_LSP_SERVER_PATH="$<TARGET_FILE:fake-lsp-server>")
 add_dependencies(tst_lsp fake-lsp-server)
 duet_add_test(tst_codeintelligence)
+duet_add_test(tst_refactor)
 duet_add_test(tst_projects)
 duet_add_test(tst_run)
 # The Markdown preview's web engine: no Chromium sandbox on CI machines.

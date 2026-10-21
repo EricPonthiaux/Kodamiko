@@ -5,7 +5,6 @@
 #include "FileOperations.h"
 #include "FileTreeView.h"
 
-#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 
@@ -13,25 +12,6 @@ namespace {
 
 // Older steps are forgotten: nobody undoes that far back.
 constexpr std::size_t maximumSteps = 100;
-
-// An entry taken back from a freedesktop.org trash ("…/Trash/files/name")
-// leaves its description ("…/Trash/info/name.trashinfo") behind.
-void removeTrashInfo(const QString &pathInTrash)
-{
-    const QFileInfo entry(pathInTrash);
-    QDir trash(entry.absolutePath());
-    if (trash.dirName() != QLatin1String("files") || !trash.cdUp())
-        return;
-    QFile::remove(trash.filePath(QStringLiteral("info/%1.trashinfo").arg(entry.fileName())));
-}
-
-QString takeBackFromTrash(const QString &pathInTrash, const QString &path)
-{
-    if (const QString error = FileOperations::move(pathInTrash, path); !error.isEmpty())
-        return error;
-    removeTrashInfo(pathInTrash);
-    return {};
-}
 
 QString moveToTrash(const QString &path)
 {
@@ -91,7 +71,7 @@ QString FileUndoStack::undo()
     case Step::Kind::Moved:
         return FileOperations::move(step.path, step.source);
     case Step::Kind::Trashed:
-        return takeBackFromTrash(step.source, step.path);
+        return FileOperations::takeBackFromTrash(step.source, step.path);
     }
     return {};
 }
