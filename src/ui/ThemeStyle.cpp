@@ -224,6 +224,12 @@ QLabel#historyMuted { color: @muted; }
 QToolButton#linkButton { padding: 0; color: @accent; }
 QToolButton#linkButton:hover { background: transparent; text-decoration: underline; }
 QFrame#diffHeader { border: none; border-bottom: 1px solid @line; background: @window; }
+QFrame#filePager { margin: 0 8px; background: @base; border: 1px solid @line; border-radius: 6px; }
+QFrame#filePager QToolButton { background: @button; border: 1px solid @border; border-radius: 4px; padding: 0 3px; }
+QFrame#filePager QToolButton:hover { background: @hover; border-color: @accent; }
+QFrame#filePager QToolButton:pressed { background: @selection; }
+QFrame#filePager QToolButton:disabled { background: transparent; border-color: transparent; }
+QFrame#filePager QLabel { color: @muted; background: transparent; }
 QFrame#card QPlainTextEdit { background: @base; }
 QStatusBar { background: transparent; border-top: 1px solid @line; color: @muted; }
 TitleBar QMenuBar { background: transparent; border: none; }

@@ -21,8 +21,8 @@ class WindowTitleBar;
 // put on another screen, and come back. While it is away, a placeholder
 // takes its place in the stack, with buttons to show the window or bring
 // the page back; closing the window brings it back too. The window is
-// independent (not kept above the main one); its geometry, and whether the
-// page is away, are remembered under a settings key.
+// independent (not kept above the main one); its geometry is remembered
+// under a settings key. The page always starts in the stack.
 class DetachablePage : public QObject {
     Q_OBJECT
 
@@ -45,8 +45,6 @@ public:
     void detach();
     // Brings the page back to its place in the stack.
     void attach();
-    // Detaches the page if it was away when the application last closed.
-    void restore();
     // Brings the window to the front, activated; nothing while attached.
     void raiseWindow();
     void setWindowTitle(const QString &title);

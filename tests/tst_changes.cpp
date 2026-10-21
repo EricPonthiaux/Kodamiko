@@ -279,7 +279,7 @@ private slots:
         QCOMPARE(columns.newSide[4].newNumber, 11);
     }
 
-    void foldingTheFileListShowsTheBarAndTheFileArrows()
+    void foldingTheFileListShowsTheBarAndKeepsTheFileArrows()
     {
         const QTemporaryDir project;
         write(project, "a.txt", "a\n");
@@ -303,7 +303,7 @@ private slots:
         QToolButton *nextFile = buttonWithToolTip(header, "Next file (Alt+Down)");
         QVERIFY(nextFile);
         QVERIFY(!bar->isVisible());
-        QVERIFY(!nextFile->isVisible());
+        QVERIFY(nextFile->isVisible());
 
         buttonWithToolTip(&view, "Hide the file list")->click();
 
@@ -444,7 +444,27 @@ private slots:
         QVERIFY(texts().contains("one.cpp"));
         diff.setFirstVisibleLine(diff.fileStart(1));
         QTRY_VERIFY(texts().contains("two.cpp")); // Scintilla tells once it has painted
-        QVERIFY(texts().join(' ').contains("file 2 of 2"));
+        QVERIFY(texts().contains("2 / 2"));
+    }
+
+    void filePagerShowsThePositionOutOfTheDetails()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        const QList<DiffFile> files = {{"src/one.cpp", "modified", FilePatch::parse(patch)},
+                                       {"src/two.cpp", "modified", FilePatch::parse(patch)}};
+        DiffView diff(Theme::dark());
+        DiffHeaderBar header(&diff);
+        const auto texts = [&header] {
+            QStringList all;
+            for (const QLabel *label : header.findChildren<QLabel *>())
+                all.append(label->text());
+            return all;
+        };
+
+        diff.setFiles(files);
+
+        QVERIFY(texts().contains("1 / 2"));
+        QVERIFY(!texts().join(' ').contains("of 2"));
     }
 
     void goToChangeScrollsBlockByBlock()

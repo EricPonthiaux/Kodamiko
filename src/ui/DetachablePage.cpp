@@ -107,7 +107,6 @@ void DetachablePage::attach()
     if (!window_)
         return;
     saveState();
-    QSettings().setValue(settingsKey_ + QStringLiteral("/detached"), false);
     const int index = stack_->indexOf(placeholder_);
     const bool wasCurrent = stack_->currentIndex() == index;
     stack_->removeWidget(placeholder_); // hidden, still a child of the stack
@@ -121,12 +120,6 @@ void DetachablePage::attach()
     titleBar_ = nullptr;
     window_.release()->deleteLater();
     emit detachedChanged(false);
-}
-
-void DetachablePage::restore()
-{
-    if (QSettings().value(settingsKey_ + QStringLiteral("/detached"), false).toBool())
-        detach();
 }
 
 void DetachablePage::raiseWindow()
@@ -192,12 +185,10 @@ bool DetachablePage::eventFilter(QObject *watched, QEvent *event)
     return QObject::eventFilter(watched, event);
 }
 
-// While detached: where the window is, and that the page is away.
+// While detached: where the window is, for the next detach.
 void DetachablePage::saveState() const
 {
     if (!window_)
         return;
-    QSettings settings;
-    settings.setValue(settingsKey_ + QStringLiteral("/geometry"), window_->saveGeometry());
-    settings.setValue(settingsKey_ + QStringLiteral("/detached"), true);
+    QSettings().setValue(settingsKey_ + QStringLiteral("/geometry"), window_->saveGeometry());
 }

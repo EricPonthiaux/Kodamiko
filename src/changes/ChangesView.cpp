@@ -17,6 +17,7 @@
 #include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -776,7 +777,6 @@ void ChangesView::setFileListVisible(bool visible)
 {
     fileColumn_->setVisible(visible);
     foldedList_->setVisible(!visible);
-    diffHeader_->setFileNavigationShown(!visible);
     if (!visible)
         return;
     // Folded by a drag, the column has no width left to come back with.
@@ -787,7 +787,9 @@ void ChangesView::setFileListVisible(bool visible)
 
 void ChangesView::alignBars(const Theme &theme)
 {
-    const int height = std::max(fileActions_->sizeHint().height(), diffHeader_->sizeHint().height());
+    // As high as a side panel's header, unless their controls need more.
+    const int height = std::max({UiMetrics::scaled(UiMetrics::panelHeaderHeight), fileActions_->sizeHint().height(),
+                                 diffHeader_->sizeHint().height()});
     fileActions_->setFixedHeight(height);
     diffHeader_->setFixedHeight(height);
     // Their bottom borders, see ThemeStyle: the bars are at the top of their column.

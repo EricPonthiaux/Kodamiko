@@ -686,7 +686,6 @@ void MainWindow::restoreSettings()
     const QSettings settings;
     restoreTitleBarFrame(settings);
     restoreGeometry(settings.value(QStringLiteral("geometry")).toByteArray());
-    terminalWindow_->restore();
     editSplitter_->restoreState(settings.value(QStringLiteral("editSplitter")).toByteArray());
     changesView_->splitter()->restoreState(settings.value(QStringLiteral("diffSplitter")).toByteArray());
     changesView_->setFileListVisible(settings.value(QStringLiteral("diffFileListVisible"), true).toBool());

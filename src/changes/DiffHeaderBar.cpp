@@ -26,6 +26,8 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     , next_(new QToolButton(this))
     , previousFile_(new QToolButton(this))
     , nextFile_(new QToolButton(this))
+    , filePager_(new QFrame(this))
+    , filePosition_(new QLabel(this))
 {
     setObjectName(QStringLiteral("diffHeader"));
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
@@ -68,12 +70,11 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 4, 6, 4);
     layout->setSpacing(8);
-    layout->addWidget(previousFile_);
-    layout->addWidget(nextFile_);
     layout->addWidget(name_);
     layout->addWidget(details_, 1);
     layout->addWidget(stats_);
     layout->addSpacing(4);
+    layout->addWidget(createFilePager());
     layout->addWidget(sideBySide_);
     layout->addWidget(whitespace_);
     layout->addWidget(previous_);
@@ -85,15 +86,27 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     follow();
 }
 
+// One framed control: previous file, "3 / 12", next file. Its buttons are
+// shorter by the frame (see ThemeStyle), so that it is as high as the others;
+// its margins set it apart, and go with it while it is hidden.
+QFrame *DiffHeaderBar::createFilePager()
+{
+    filePager_->setObjectName(QStringLiteral("filePager"));
+    filePager_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    filePosition_->setAlignment(Qt::AlignCenter);
+    auto *layout = new QHBoxLayout(filePager_);
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(4);
+    layout->addWidget(previousFile_);
+    layout->addWidget(filePosition_);
+    layout->addWidget(nextFile_);
+    filePager_->hide();
+    return filePager_;
+}
+
 void DiffHeaderBar::setPlaceholder(const QString &text)
 {
     placeholder_ = text;
-    follow();
-}
-
-void DiffHeaderBar::setFileNavigationShown(bool shown)
-{
-    isFileNavigationShown_ = shown;
     follow();
 }
 
@@ -119,7 +132,7 @@ int DiffHeaderBar::controlsHeight() const
     const QMargins margins = contentsMargins() + layout()->contentsMargins();
     const int buttons =
         std::max({sideBySide_->sizeHint().height(), whitespace_->sizeHint().height(), previous_->sizeHint().height(),
-                  next_->sizeHint().height(), previousFile_->sizeHint().height(), nextFile_->sizeHint().height()});
+                  next_->sizeHint().height(), filePager_->sizeHint().height()});
     return buttons + margins.top() + margins.bottom();
 }
 
@@ -155,14 +168,14 @@ void DiffHeaderBar::follow()
     whitespace_->setVisible(hasFile || whitespace_->isChecked());
     sideBySide_->setVisible(hasFile);
     if (!hasFile) {
-        updateFileButtons(0, 0);
+        updateFilePager(0, 0);
         name_->clear();
         details_->setText(placeholder_);
         details_->setToolTip(placeholder_);
         return;
     }
     const int file = std::max(0, diff_->locate(diff_->firstVisibleLine()).file);
-    updateFileButtons(file, int(files.size()));
+    updateFilePager(file, int(files.size()));
     const DiffView::FileSummary &shown = files.value(file, files.first());
     const qsizetype slash = shown.path.lastIndexOf(QLatin1Char('/'));
     name_->setText(shown.path.mid(slash + 1));
@@ -171,8 +184,6 @@ void DiffHeaderBar::follow()
         details.append(shown.path.left(slash));
     if (!shown.status.isEmpty())
         details.append(shown.status);
-    if (files.size() > 1)
-        details.append(tr("file %1 of %2").arg(file + 1).arg(files.size()));
     details_->setText(details.join(QStringLiteral("  ·  ")));
     details_->setToolTip(shown.path);
     const QString green = dark_ ? QStringLiteral("#3fb950") : QStringLiteral("#1a7f37");
@@ -185,11 +196,13 @@ void DiffHeaderBar::follow()
                         .arg(shown.removed));
 }
 
-void DiffHeaderBar::updateFileButtons(int file, int fileCount)
+void DiffHeaderBar::updateFilePager(int file, int fileCount)
 {
-    const bool isVisible = isFileNavigationShown_ && fileCount > 1;
-    previousFile_->setVisible(isVisible);
-    nextFile_->setVisible(isVisible);
+    filePager_->setVisible(fileCount > 1);
     previousFile_->setEnabled(file > 0);
     nextFile_->setEnabled(file < fileCount - 1);
+    filePosition_->setText(QStringLiteral("%1 / %2").arg(file + 1).arg(fileCount));
+    // As wide as the widest position: the arrows stay put while scrolling.
+    const QString widest = QStringLiteral("%1 / %1").arg(fileCount);
+    filePosition_->setMinimumWidth(filePosition_->fontMetrics().horizontalAdvance(widest) + 16);
 }

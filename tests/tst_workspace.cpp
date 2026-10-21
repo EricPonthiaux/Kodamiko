@@ -1355,7 +1355,6 @@ private slots:
         QVERIFY(page->window() != stack.window());
         QVERIFY(page->window()->isVisible());
         QCOMPARE(page->window()->windowTitle(), QString("Window"));
-        QVERIFY(QSettings().value("detachTest/detached").toBool());
 
         page->window()->close();
 
@@ -1363,7 +1362,6 @@ private slots:
         QCOMPARE(stack.indexOf(page), 1);
         QCOMPARE(stack.currentWidget(), page);
         QCOMPARE(changed.size(), 2);
-        QVERIFY(!QSettings().value("detachTest/detached").toBool());
         QSettings().remove("detachTest");
     }
 
@@ -1389,7 +1387,7 @@ private slots:
         QSettings().remove("detachTest");
     }
 
-    void detachedPageIsDetachedAgainWhereItWas()
+    void detachedPageStartsBackInTheStackAndDetachesWhereItWas()
     {
         QSettings().remove("detachTest");
         const QRect placed(120, 90, 500, 300);
@@ -1406,7 +1404,11 @@ private slots:
         auto *page = new QLabel("page", &stack);
         stack.addWidget(page);
         auto *detachable = new DetachablePage(&stack, page, "detachTest", {"Window", "Away", "Back"});
-        detachable->restore();
+
+        QVERIFY(!detachable->isDetached());
+        QCOMPARE(stack.indexOf(page), 0);
+
+        detachable->detach();
 
         QVERIFY(detachable->isDetached());
         QCOMPARE(page->window()->geometry().size(), placed.size());
