@@ -418,10 +418,13 @@ void PreviewPage::setMode(Mode mode)
     mode_ = mode;
     buttons_[static_cast<std::size_t>(mode)]->setChecked(true);
     updateToolbarIcons();
+    // Hidden before the web view is created: the first one of the window
+    // switches it to GPU composition, which repaints it at once, and the
+    // editor would show there for a moment.
+    editor_->setVisible(mode != Mode::Preview);
     if (mode != Mode::Editor && isVisible())
         ensurePreview();
     QWidget *shown = preview();
-    editor_->setVisible(mode != Mode::Preview || !shown);
     // Until its first page is drawn, a new web view shows an empty white
     // or black surface: the page's place stays empty meanwhile.
     if (shown)
