@@ -15,6 +15,7 @@
 #include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/GoToPopup.h"
+#include "navigation/UsagesView.h"
 #include "projects/ProjectStore.h"
 #include "refactor/RefactoringHistory.h"
 #include "settings/Keymap.h"
@@ -34,6 +35,7 @@
 #include <QTreeWidget>
 
 #include <algorithm>
+#include <functional>
 
 void MainWindow::createMenus()
 {
@@ -214,6 +216,11 @@ void MainWindow::createViewMenu()
         sidebar_->showView(problemsView_);
         problemsView_->tree()->setFocus();
     });
+    view->addAction(tr("&Usages"), QKeySequence(tr("Alt+3")), this, [this] {
+        setMode(Mode::Edit);
+        sidebar_->showView(usagesView_);
+        usagesView_->tree()->setFocus();
+    });
     view->addAction(tr("&Claude Configuration"), this, [this] {
         setMode(Mode::Edit);
         sidebar_->showView(claudeConfigView_);
@@ -335,6 +342,13 @@ EditorWidget *MainWindow::editorInEditMode() const
 void MainWindow::createNavigateMenu()
 {
     QMenu *navigate = titleBar_->menuBar()->addMenu(tr("&Navigate"));
+    // The code commands do nothing outside the Edit mode.
+    const auto inEditMode = [this](const std::function<void()> &command) {
+        return [this, command] {
+            if (mode_ == Mode::Edit)
+                command();
+        };
+    };
     goToFileAction_ = navigate->addAction(tr("Go to &File…"), QKeySequence(tr("Ctrl+Shift+N")), this,
                                           [this] { showGoTo(static_cast<int>(GoToPopup::Tab::Files)); });
     navigate->addAction(tr("Go to &Symbol…"), QKeySequence(tr("Ctrl+Alt+Shift+N")), this,
@@ -350,29 +364,21 @@ void MainWindow::createNavigateMenu()
         }
     });
     navigate->addSeparator();
-    navigationActions_.append(navigate->addAction(tr("Go to &Definition"), QKeySequence(tr("Ctrl+B")), this, [this] {
-        if (mode_ == Mode::Edit)
-            intelligence_->goToDefinition();
-    }));
+    navigationActions_.append(navigate->addAction(tr("Go to &Definition"), QKeySequence(tr("Ctrl+B")), this,
+                                                  inEditMode([this] { intelligence_->goToDefinition(); })));
     // Ctrl+Alt+B, IntelliJ's, opens the branches.
-    navigationActions_.append(
-        navigate->addAction(tr("Go to &Implementation"), QKeySequence(tr("Ctrl+Alt+Shift+B")), this, [this] {
-            if (mode_ == Mode::Edit)
-                intelligence_->goToImplementation();
-        }));
-    navigationActions_.append(
-        navigate->addAction(tr("Go to T&ype Declaration"), QKeySequence(tr("Ctrl+Shift+B")), this, [this] {
-            if (mode_ == Mode::Edit)
-                intelligence_->goToTypeDeclaration();
-        }));
-    navigationActions_.append(navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this, [this] {
-        if (mode_ == Mode::Edit)
-            intelligence_->findUsages();
-    }));
-    navigate->addAction(tr("Switch &Header/Source"), QKeySequence(tr("Ctrl+Alt+Home")), this, [this] {
-        if (mode_ == Mode::Edit)
-            intelligence_->switchHeaderSource();
-    });
+    navigationActions_.append(navigate->addAction(tr("Go to &Implementation"), QKeySequence(tr("Ctrl+Alt+Shift+B")),
+                                                  this, inEditMode([this] { intelligence_->goToImplementation(); })));
+    navigationActions_.append(navigate->addAction(tr("Go to T&ype Declaration"), QKeySequence(tr("Ctrl+Shift+B")), this,
+                                                  inEditMode([this] { intelligence_->goToTypeDeclaration(); })));
+    navigationActions_.append(navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this,
+                                                  inEditMode([this] { intelligence_->findUsages(); })));
+    navigate->addAction(tr("Ne&xt Usage"), QKeySequence(tr("Ctrl+Alt+Down")), this,
+                        inEditMode([this] { usagesView_->goToNext(); }));
+    navigate->addAction(tr("Pre&vious Usage"), QKeySequence(tr("Ctrl+Alt+Up")), this,
+                        inEditMode([this] { usagesView_->goToPrevious(); }));
+    navigate->addAction(tr("Switch &Header/Source"), QKeySequence(tr("Ctrl+Alt+Home")), this,
+                        inEditMode([this] { intelligence_->switchHeaderSource(); }));
     navigate->addAction(tr("&Back"), QKeySequence(tr("Alt+Left")), navigator_, &CodeNavigator::goBack);
     navigate->addAction(tr("&Forward"), QKeySequence(tr("Alt+Right")), navigator_, &CodeNavigator::goForward);
     navigate->addSeparator();

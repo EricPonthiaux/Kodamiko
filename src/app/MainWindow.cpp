@@ -39,6 +39,7 @@
 #include "navigation/CodeNavigator.h"
 #include "navigation/GoToPopup.h"
 #include "navigation/SymbolIndex.h"
+#include "navigation/UsagesView.h"
 #include "outline/OutlineView.h"
 #include "projects/ProjectStore.h"
 #include "run/RunConfiguration.h"
@@ -362,6 +363,7 @@ QWidget *MainWindow::createEditPage()
     sidebar_->addView(outlineView_, {}, tr("Outline"));
     sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
     sidebar_->addView(problemsView_, {}, tr("Problems"));
+    sidebar_->addView(usagesView_, {}, tr("Usages"));
     titleBar_->alignLogoWith(sidebar_->tabBar());
 
     editSplitter_ = new GripSplitter(Qt::Horizontal, this);
@@ -477,6 +479,16 @@ void MainWindow::createProblemsAndOutline()
         navigator_->goToLine(path, line, std::max(column, 0));
     });
     connect(problemsView_, &ProblemsView::countsChanged, this, &MainWindow::updateTabIcons);
+    usagesView_ = new UsagesView(this);
+    connect(usagesView_, &UsagesView::usageActivated, this, [this](const QString &path, int line, int column) {
+        setMode(Mode::Edit);
+        navigator_->goToLine(path, line, column);
+    });
+    connect(usagesView_, &UsagesView::rerunRequested, intelligence_, &CodeIntelligence::findUsagesOf);
+    connect(intelligence_, &CodeIntelligence::usagesFound, this, [this](const UsageResults &results) {
+        usagesView_->showResults(results);
+        sidebar_->showView(usagesView_);
+    });
     connect(editorTabs_, &QTabWidget::currentChanged, this,
             [this] { outlineView_->setEditor(editorTabs_->currentEditor()); });
     connect(outlineView_, &OutlineView::symbolActivated, editorTabs_, &EditorTabs::scrollPreviewToCaret);

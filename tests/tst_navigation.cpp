@@ -6,6 +6,8 @@
 #include "navigation/NavigationHistory.h"
 #include "navigation/RecentFiles.h"
 #include "navigation/SymbolIndex.h"
+#include "navigation/UsageFinder.h"
+#include "navigation/UsagesView.h"
 #include "outline/OutlineProviders.h"
 
 #include <QCheckBox>
@@ -14,6 +16,7 @@
 #include <QLineEdit>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QtTest>
 
@@ -300,6 +303,75 @@ private slots:
         QCOMPARE(history.forward(a), b);
         history.recordJump(b); // new jump: no more going forward
         QVERIFY(!history.canGoForward());
+    }
+
+    void classifiesTheServersLocationsByKind()
+    {
+        const QTemporaryDir dir;
+        const QString path = dir.filePath("a.cpp");
+        write(path, "int total(int n) { return n; }\nint x = total(1);\nint y = x;\n");
+        using LspProtocol::Location;
+        const QList<Location> locations{{path, {{1, 8}, {1, 13}}}, {path, {{0, 4}, {0, 9}}}};
+
+        const QList<Usage> usages = UsageFinder::classify(locations, {});
+
+        QCOMPARE(usages.size(), 2);
+        QCOMPARE(usages[0], (Usage{path, 0, 4, 5, "int total(int n) { return n; }", UsageKind::Declaration}));
+        QCOMPARE(usages[1].kind, UsageKind::Call);
+        QCOMPARE(usages[1].lineText, QString("int x = total(1);"));
+    }
+
+    void findsAWordInTheUnsavedTextsWithoutAServer()
+    {
+        const QString path = "/p/a.py";
+
+        const QList<Usage> usages =
+            UsageFinder::findWord("total", nullptr, {{path, "total = 1  # the total\nprint(total)\n"}});
+
+        QCOMPARE(usages.size(), 3);
+        QCOMPARE(usages[0].kind, UsageKind::Declaration);
+        QCOMPARE(usages[1].kind, UsageKind::Textual);
+        QCOMPARE(usages[2].line, 1);
+        QCOMPARE(usages[2].column, 6);
+    }
+
+    void usagesPaneFiltersAndGoesFromUsageToUsage()
+    {
+        UsagesView view;
+        const UsageResults results{{"total", "/p/a.cpp", {0, 4}},
+                                   {{"/p/a.cpp", 0, 4, 5, "int total;", UsageKind::Declaration},
+                                    {"/p/a.cpp", 3, 2, 5, "total = 2;", UsageKind::Write},
+                                    {"/p/b.cpp", 1, 0, 5, "total", UsageKind::Read}},
+                                   true};
+        QList<int> lines;
+        connect(&view, &UsagesView::usageActivated, this,
+                [&lines](const QString &, int line, int) { lines.append(line); });
+
+        view.showResults(results);
+        QCOMPARE(view.tree()->topLevelItemCount(), 2);
+        view.filterAction(UsageKind::Write)->setChecked(false);
+        view.goToNext();
+        view.goToNext();
+        view.goToNext(); // back to the first
+
+        QCOMPARE(lines, (QList<int>{0, 1, 0}));
+        QCOMPARE(view.tree()->topLevelItem(0)->childCount(), 1); // the write is left out
+    }
+
+    void usagesPaneKeepsTheEarlierSearchesAndRunsOneAgain()
+    {
+        UsagesView view;
+        QList<QString> rerun;
+        connect(&view, &UsagesView::rerunRequested, this,
+                [&rerun](const UsageSearch &search) { rerun.append(search.name); });
+
+        view.showResults({{"total", "/p/a.cpp", {0, 4}}, {}, true});
+        view.showResults({{"count", "/p/a.cpp", {1, 4}}, {}, false});
+        view.findChildren<QToolButton *>().first()->click(); // Rerun
+
+        QCOMPARE(view.history().size(), 2);
+        QCOMPARE(view.history().first().search.name, QString("count"));
+        QCOMPARE(rerun, QList<QString>{"count"});
     }
 };
 

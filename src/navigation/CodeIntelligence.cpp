@@ -35,7 +35,6 @@ constexpr int hoverDelayMs = 600;
 // After the last keystroke, the text goes to the server, which checks it.
 constexpr int problemsDelayMs = 700;
 constexpr int maxDocumentationLength = 3000;
-constexpr int maxUsagesShown = 300;
 
 bool isCFamily(const QString &languageId)
 {
@@ -470,54 +469,6 @@ void CodeIntelligence::goToLocations(EditorWidget *editor,
             if (const int chosen = chooseFrom(guard, entries); chosen >= 0)
                 jumpTo(locations.at(chosen));
         });
-}
-
-void CodeIntelligence::findUsages()
-{
-    EditorWidget *editor = tabs_->currentEditor();
-    LspClient *client = serverFor(editor);
-    if (!client)
-        return;
-    syncOpenEditors(client, editor->languageId());
-    const int caret = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const int start = int(editor->SendScintilla(QsciScintillaBase::SCI_WORDSTARTPOSITION, caret, true));
-    const int end = int(editor->SendScintilla(QsciScintillaBase::SCI_WORDENDPOSITION, caret, true));
-    const QString word = editor->text(start, end);
-    QJsonObject params = positionParams(editor, caret);
-    params.insert("context", QJsonObject{{"includeDeclaration", true}});
-    emit statusMessage(tr("Looking for the usages of “%1”…").arg(word));
-    client->request(
-        QStringLiteral("textDocument/references"), params,
-        [this, guard = QPointer<EditorWidget>(editor), word](const QJsonValue &result, const QString &error) {
-            if (!guard)
-                return;
-            if (!error.isEmpty()) {
-                emit statusMessage(tr("Find Usages failed: %1").arg(error));
-                return;
-            }
-            showUsages(guard, word, parseLocations(result));
-        });
-}
-
-void CodeIntelligence::showUsages(EditorWidget *editor, const QString &word, QList<Location> locations)
-{
-    std::sort(locations.begin(), locations.end(), [](const Location &a, const Location &b) {
-        return a.filePath != b.filePath ? a.filePath < b.filePath : a.range.start < b.range.start;
-    });
-    if (locations.isEmpty()) {
-        emit statusMessage(tr("No usages of “%1”").arg(word));
-        return;
-    }
-    emit statusMessage(locations.size() == 1 ? tr("1 usage of “%1”").arg(word)
-                                             : tr("%1 usages of “%2”").arg(locations.size()).arg(word));
-    if (locations.size() > maxUsagesShown)
-        locations.resize(maxUsagesShown);
-    QHash<QString, QStringList> lines;
-    QStringList entries;
-    for (const Location &location : std::as_const(locations))
-        entries.append(describe(location, lines));
-    if (const int chosen = chooseFrom(editor, entries); chosen >= 0)
-        jumpTo(locations.at(chosen));
 }
 
 void CodeIntelligence::jumpTo(const Location &location)

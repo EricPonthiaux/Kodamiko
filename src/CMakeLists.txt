@@ -134,12 +134,15 @@ add_library(duet_core STATIC
     lsp/ServerTasksLabel.cpp
     navigation/CodeIntelligence.cpp
     navigation/CodeIntelligenceRefactoring.cpp
+    navigation/CodeIntelligenceUsages.cpp
     navigation/CodeNavigator.cpp
     navigation/Definitions.cpp
     navigation/GoToPopup.cpp
     navigation/NavigationHistory.cpp
     navigation/RecentFiles.cpp
     navigation/SymbolIndex.cpp
+    navigation/UsageFinder.cpp
+    navigation/UsagesView.cpp
     navigation/WorkspaceEditing.cpp
     refactor/EditJournal.cpp
     refactor/EditPreview.cpp

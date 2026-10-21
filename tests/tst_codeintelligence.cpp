@@ -480,6 +480,28 @@ private slots:
         QCOMPARE(editor->text(), QString("// total of the calls\nint total = 0;\n"));
     }
 
+    void findsTheUsagesOfANameByKindWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        const EditorWidget *editor =
+            project.open("count.cpp", "int count = 0; // count\nint next() { count = 2; return count; }\n");
+        QVERIFY(editor);
+        placeCaretIn(editor, "count = 0");
+        const QSignalSpy found(&project.intelligence, &CodeIntelligence::usagesFound);
+
+        project.intelligence.findUsages();
+
+        QTRY_COMPARE_WITH_TIMEOUT(found.size(), 1, 30000);
+        const auto results = found[0][0].value<UsageResults>();
+        QVERIFY(results.isSemantic);
+        QList<UsageKind> kinds;
+        for (const Usage &usage : results.usages)
+            kinds.append(usage.kind);
+        QCOMPARE(kinds, (QList<UsageKind>{UsageKind::Declaration, UsageKind::Write, UsageKind::Read}));
+    }
+
     void highlightsTheSymbolsOccurrencesWithClangd()
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())

@@ -58,6 +58,7 @@ class PreferencesPopup;
 class PrerequisitesPopup;
 class ProblemStore;
 class ProblemsView;
+class UsagesView;
 class ProjectSettingsPopup;
 class QAction;
 class QActionGroup;
@@ -469,6 +470,7 @@ private:
     OutlineView *outlineView_ = nullptr;
     ProblemStore *problemStore_ = nullptr;
     ProblemsView *problemsView_ = nullptr;
+    UsagesView *usagesView_ = nullptr;
     Runner *runner_ = nullptr;
     QMenu *runChooser_ = nullptr; // the title bar chip's menu
     QAction *runAction_ = nullptr;

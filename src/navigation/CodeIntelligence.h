@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Usage.h"
 #include "WorkspaceEditing.h"
 #include "lsp/LspProtocol.h"
 #include "refactor/EditTargets.h"
@@ -64,7 +65,10 @@ public:
     // The declaration of the type of the variable or expression at the
     // cursor.
     void goToTypeDeclaration();
+    // The usages of the name at the cursor, for the Usages pane
+    // (usagesFound): the server's, else every occurrence of the word.
     void findUsages();
+    void findUsagesOf(const UsageSearch &search);
     void rename();
     void showQuickFixes();
     void switchHeaderSource();
@@ -96,6 +100,7 @@ public:
 
 signals:
     void statusMessage(const QString &message);
+    void usagesFound(const UsageResults &results);
 
 private:
     // The server of `editor`'s language, with the editor's text sent to it;
@@ -148,9 +153,15 @@ private:
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
     // Shows the server's signature help `help` as a call tip.
     void showSignatureHelp(const EditorWidget *editor, const QJsonObject &help, bool explicitRequest);
-    // Offers the usages `locations` of `word` in a menu, and goes to the
-    // chosen one.
-    void showUsages(EditorWidget *editor, const QString &word, QList<LspProtocol::Location> locations);
+    // The server of `path`'s language, with the open files sent to it;
+    // nullptr when there is none.
+    LspClient *usageServerFor(const QString &path);
+    // The kinds of the server's `locations`, then reportUsages(), off the
+    // UI thread.
+    void classifyUsages(const UsageSearch &search, const QList<LspProtocol::Location> &locations);
+    // Every occurrence of the word, from the index, then reportUsages().
+    void findWordUsages(const UsageSearch &search);
+    void reportUsages(const UsageResults &results);
     // Offers the server's `codeActions` in a menu, and carries out the
     // chosen one.
     void chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions);
