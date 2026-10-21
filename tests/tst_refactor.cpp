@@ -6,6 +6,8 @@
 #include "lsp/LanguageServers.h"
 #include "lsp/LspProtocol.h"
 #include "navigation/WorkspaceEditing.h"
+#include "refactor/ChangeSignature.h"
+#include "refactor/ChangeSignaturePopup.h"
 #include "refactor/EditJournal.h"
 #include "refactor/EditPreview.h"
 #include "refactor/FileReferences.h"
@@ -21,6 +23,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QRegularExpression>
+#include <QTableWidget>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -61,6 +65,34 @@ void emptyTrashOf(const EditJournal &journal)
         QFile::remove(inTrash.absolutePath() + "/../info/" + inTrash.fileName() + ".trashinfo");
     }
 }
+
+// The places of `name` in `text` (of `path`), each occurrence of the
+// whole word.
+QList<Location> placesOf(const QString &path, const QString &text, const QString &name)
+{
+    QList<Location> places;
+    const QRegularExpression word(QStringLiteral("\\b%1\\b").arg(name));
+    QRegularExpressionMatchIterator it = word.globalMatch(text);
+    while (it.hasNext()) {
+        const qsizetype at = it.next().capturedStart();
+        const int line = int(text.left(at).count('\n'));
+        const int column = int(at - (text.lastIndexOf('\n', at - 1) + 1));
+        places.append({path, {{line, column}, {line, column + int(name.size())}}});
+    }
+    return places;
+}
+
+// `texts` with `edit` applied, by path.
+QHash<QString, QString> applied(QHash<QString, QString> texts, const WorkspaceEdit &edit)
+{
+    for (const DocumentChange &change : edit.changes) {
+        const auto &documentEdit = std::get<DocumentEdit>(change);
+        texts[documentEdit.filePath] = applyEdits(texts.value(documentEdit.filePath), documentEdit.edits);
+    }
+    return texts;
+}
+
+using ChangeSignature::Parameter;
 
 // A project folder with its editors and (idle) language servers.
 struct Project {
@@ -613,6 +645,168 @@ private slots:
 
         QCOMPARE(result.error, QString("“A” is already alone in its file"));
         QVERIFY(result.edit.isEmpty());
+    }
+
+    void readsTheSignatureAtTheCursor_data()
+    {
+        QTest::addColumn<QString>("language");
+        QTest::addColumn<QString>("text");
+        QTest::addColumn<QStringList>("names");
+        QTest::newRow("cpp") << "cpp" << "int §total(int a, const char *b = \"x\");" << QStringList{"a", "b"};
+        QTest::newRow("c-definition") << "c" << "static int §f(void *p, size_t n) { return 0; }"
+                                      << QStringList{"p", "n"};
+        QTest::newRow("java") << "java" << "class A { int §f(int a, String b) { return a; } }" << QStringList{"a", "b"};
+        QTest::newRow("javascript") << "javascript" << "function §f(a, b = 2, ...rest) {}"
+                                    << QStringList{"a", "b", "rest"};
+        QTest::newRow("typescript") << "typescript" << "function §f(a: number, b?: string): void {}"
+                                    << QStringList{"a", "b"};
+        QTest::newRow("ts-method") << "typescript" << "class C { §m(x: number) {} }" << QStringList{"x"};
+        QTest::newRow("python-method") << "python" << "class C:\n    def §m(self, a, b=1, *args, **kw):\n        pass\n"
+                                       << QStringList{"a", "b", "args", "kw"};
+    }
+
+    void readsTheSignatureAtTheCursor()
+    {
+        QFETCH(const QString, language);
+        QFETCH(const QString, text);
+        QFETCH(const QStringList, names);
+        const qsizetype at = text.indexOf(QStringLiteral("§"));
+        const Position cursor{int(text.left(at).count('\n')), int(at - (text.lastIndexOf('\n', at - 1) + 1))};
+
+        const ChangeSignature::Signature signature =
+            ChangeSignature::read(language, QString(text).remove(QStringLiteral("§")), cursor);
+
+        QVERIFY2(signature.error.isEmpty(), qPrintable(signature.error));
+        QCOMPARE(signature.names, names);
+    }
+
+    void reordersAddsAndRemovesInDeclarationsAndCalls()
+    {
+        const QString header = "int total(int a, int b);\n";
+        const QString source = "int total(int a, int b) { return a + b; }\nint x = total(1, 2) + total(3, 4);\n";
+        const QHash<QString, QString> texts{{"/p/total.h", header}, {"/p/total.cpp", source}};
+        const ChangeSignature::Input input{
+            .parameters = {Parameter{.oldIndex = 1}, Parameter{.oldIndex = 0},
+                           Parameter{.declaration = "int scale", .name = "scale", .valueAtCalls = "10"}},
+            .oldNames = {"a", "b"},
+            .places = placesOf("/p/total.h", header, "total") + placesOf("/p/total.cpp", source, "total"),
+            .texts = texts};
+
+        const ChangeSignature::Result result = ChangeSignature::plan(input);
+
+        QVERIFY(result.conflicts.isEmpty());
+        const QHash<QString, QString> after = applied(texts, result.edit);
+        QCOMPARE(after.value("/p/total.h"), QString("int total(int b, int a, int scale);\n"));
+        QCOMPARE(after.value("/p/total.cpp"), QString("int total(int b, int a, int scale) { return a + b; }\n"
+                                                      "int x = total(2, 1, 10) + total(4, 3, 10);\n"));
+    }
+
+    void removesAParameterOfAScriptFunctionAndMethodCalls()
+    {
+        const QString text = "class C {\n  m(a, b) {}\n}\nnew C().m(1, 2);\nconst c = new C();\nc.m(f(3), [4, 5]);\n";
+        const ChangeSignature::Input input{.parameters = {Parameter{.oldIndex = 1}},
+                                           .oldNames = {"a", "b"},
+                                           .places = placesOf("/p/a.ts", text, "m"),
+                                           .texts = {{"/p/a.ts", text}}};
+
+        const ChangeSignature::Result result = ChangeSignature::plan(input);
+
+        QCOMPARE(applied(input.texts, result.edit).value("/p/a.ts"),
+                 QString("class C {\n  m(b) {}\n}\nnew C().m(2);\nconst c = new C();\nc.m([4, 5]);\n"));
+    }
+
+    void keepsPythonsSelfAndKeywordArguments()
+    {
+        const QString text = "class C:\n    def m(self, a, b=1):\n        pass\n\n"
+                             "C().m(1)\nC().m(1, 2)\nC().m(1, b=3)\nC().m(a=4)\n";
+        const ChangeSignature::Input input{
+            .parameters = {Parameter{.oldIndex = 1}, Parameter{.oldIndex = 0},
+                           Parameter{.declaration = "c=0", .name = "c", .valueAtCalls = "9"}},
+            .oldNames = {"a", "b"},
+            .places = placesOf("/p/c.py", text, "m"),
+            .texts = {{"/p/c.py", text}}};
+
+        const ChangeSignature::Result result = ChangeSignature::plan(input);
+
+        QCOMPARE(result.conflicts, QStringList{"c.py:2: “a” comes after a parameter with a default value"});
+        QCOMPARE(applied(input.texts, result.edit).value("/p/c.py"),
+                 QString("class C:\n    def m(self, b=1, a, c=0):\n        pass\n\n"
+                         "C().m(a=1, c=9)\nC().m(2, 1, 9)\nC().m(b=3, a=1, c=9)\nC().m(a=4, c=9)\n"));
+    }
+
+    void leavesTheCallsItCannotChange()
+    {
+        const QString text = "int f(int a, int b = 2) { return a; }\nint x = f(1);\nint (*p)(int, int) = f;\n"
+                             "int y = f(f(1, 2), 3);\n";
+        const ChangeSignature::Input input{.parameters = {Parameter{.oldIndex = 1}, Parameter{.oldIndex = 0}},
+                                           .oldNames = {"a", "b"},
+                                           .places = placesOf("/p/f.cpp", text, "f"),
+                                           .texts = {{"/p/f.cpp", text}}};
+
+        const ChangeSignature::Result result = ChangeSignature::plan(input);
+
+        QCOMPARE(result.conflicts,
+                 (QStringList{"f.cpp:1: “int a” comes after a parameter with a default value",
+                              "f.cpp:2: the call leaves out “b”, which now comes before an argument; left as it is",
+                              "f.cpp:3: the function is used without being called there; left as it is",
+                              "f.cpp:4: a call inside another's arguments; left as it is"}));
+        QCOMPARE(applied(input.texts, result.edit).value("/p/f.cpp"),
+                 QString("int f(int b = 2, int a) { return a; }\nint x = f(1);\nint (*p)(int, int) = f;\n"
+                         "int y = f(3, f(1, 2));\n"));
+    }
+
+    void changeSignaturePopupReordersAddsAndRemoves()
+    {
+        QWidget window;
+        window.show();
+        std::optional<QList<Parameter>> chosen;
+        auto *popup = new ChangeSignaturePopup(
+            "cpp", {"total", {"int a", "int b", "int c"}, {"a", "b", "c"}, {}},
+            [&chosen](const QList<Parameter> &parameters) { chosen = parameters; }, &window);
+        popup->popup();
+        QCOMPARE(popup->table()->rowCount(), 3);
+
+        popup->table()->selectRow(1);
+        popup->moveUp(); // b, a, c
+        popup->table()->selectRow(2);
+        popup->removeParameter(); // b, a
+        popup->addParameter();    // after a
+        popup->accept();
+        QVERIFY(!chosen);
+        QVERIFY(popup->error()->isVisibleTo(popup)); // the new one has no declaration
+        popup->table()->item(2, 0)->setText("int scale = 1");
+        popup->table()->item(2, 1)->setText("10");
+        popup->accept();
+
+        QVERIFY(chosen);
+        QCOMPARE(chosen->size(), 3);
+        QCOMPARE((*chosen)[0].oldIndex, std::optional<int>(1));
+        QCOMPARE((*chosen)[1].oldIndex, std::optional<int>(0));
+        QCOMPARE((*chosen)[2].declaration, QString("int scale = 1"));
+        QCOMPARE((*chosen)[2].name, QString("scale"));
+        QCOMPARE((*chosen)[2].valueAtCalls, QString("10"));
+    }
+
+    void namesTheParameterOfADeclaration_data()
+    {
+        QTest::addColumn<QString>("language");
+        QTest::addColumn<QString>("declaration");
+        QTest::addColumn<QString>("name");
+        QTest::newRow("cpp") << "cpp" << "const std::string &label = {}" << "label";
+        QTest::newRow("c") << "c" << "char *buffer" << "buffer";
+        QTest::newRow("java") << "java" << "List<String> items" << "items";
+        QTest::newRow("typescript") << "typescript" << "scale?: number" << "scale";
+        QTest::newRow("javascript") << "javascript" << "options = {}" << "options";
+        QTest::newRow("python") << "python" << "verbose: bool = False" << "verbose";
+    }
+
+    void namesTheParameterOfADeclaration()
+    {
+        QFETCH(const QString, language);
+        QFETCH(const QString, declaration);
+        QFETCH(const QString, name);
+
+        QCOMPARE(ChangeSignature::nameOf(language, declaration), name);
     }
 };
 

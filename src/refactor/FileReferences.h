@@ -17,7 +17,9 @@ class OccurrenceStore;
 // again from its new folder. Reads files: meant for a worker thread.
 namespace FileReferences {
 
-// A file that moved: `to` exists, `from` no longer does.
+// A file that moves: either already moved (`to` exists), or about to move
+// (`from` exists): the references are worked out the same, the texts read
+// where the files are.
 struct Move {
     QString from;
     QString to;
@@ -34,7 +36,7 @@ struct Input {
     QHash<QString, QString> unsavedTexts;
 };
 
-// The files of `folder`'s move to `to` (already moved): one Move each.
+// The files of `folder`'s move to `to`, made or to make: one Move each.
 QList<Move> filesOf(const QString &folder, const QString &to);
 
 LspProtocol::WorkspaceEdit update(const Input &input);

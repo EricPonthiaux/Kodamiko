@@ -41,7 +41,9 @@ QString instructions()
         "(open files with their unsaved changes, the selection, problems, diagrams, terminals, git) and act in "
         "the editor (open a file at a line, lay a diagram out…). Prefer them to reading files from disk when "
         "the user refers to what is in front of them (\"this\", \"the selection\", \"the diagram\"). Paths are "
-        "relative to the project unless absolute.");
+        "relative to the project unless absolute. To change the code's structure (rename a symbol or a file, "
+        "change a function's parameters), prefer the refactoring tools to editing files: they reach every usage "
+        "through the language server, and the user undoes them in one step with Undo Refactoring.");
 }
 
 namespace {

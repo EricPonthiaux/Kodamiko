@@ -3,12 +3,18 @@
 #include "agent/mcp/DuetTools.h"
 #include "agent/mcp/McpRegistry.h"
 #include "agent/mcp/McpSession.h"
+#include "diagnostics/ProblemStore.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
+#include "index/OccurrenceIndex.h"
+#include "lsp/LanguageServers.h"
+#include "lsp/LspClient.h"
+#include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/SymbolIndex.h"
+#include "refactor/RefactoringPreviewPopup.h"
 #include "terminal/ProcessSpec.h"
 #include "terminal/TerminalWidget.h"
 #ifdef DUET_WITH_DIAGRAMS
@@ -22,6 +28,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QtTest>
@@ -115,6 +122,93 @@ struct Editor {
             QTest::qWait(10);
         QObject::disconnect(connection);
         return result.value(QStringLiteral("result")).toObject();
+    }
+};
+
+// An editor with its language servers and code intelligence, for the
+// tools of the code and the refactorings.
+struct CodeEditor {
+    Q_DISABLE_COPY_MOVE(CodeEditor)
+    QTemporaryDir folder;
+    EditorTabs tabs{Theme::dark()};
+    SymbolIndex symbols;
+    CodeNavigator navigator{&tabs, &symbols};
+    LanguageServers servers;
+    ProblemStore problems{&servers};
+    OccurrenceIndex occurrences;
+    CodeIntelligence intelligence{{&tabs, &servers, &navigator, &problems, &occurrences.store()}};
+    McpRegistry registry;
+    McpSession session{nullptr, &registry};
+    // What the user does when a preview shows: accept it, or not.
+    bool acceptsPreviews = true;
+    QTimer user;
+
+    CodeEditor()
+    {
+        QStandardPaths::setTestModeEnabled(true); // the index's cache
+        servers.setFolder(folder.path());
+        tabs.show();
+        DuetToolContext context;
+        context.folder = [this] { return folder.path(); };
+        context.tabs = &tabs;
+        context.navigator = &navigator;
+        context.symbols = &symbols;
+        context.languageServers = &servers;
+        context.problems = &problems;
+        context.intelligence = &intelligence;
+        DuetTools::registerCodeTools(registry, context);
+        DuetTools::registerRefactoringTools(registry, context);
+        user.setInterval(20);
+        QObject::connect(&user, &QTimer::timeout, [this] {
+            auto *preview = tabs.window()->findChild<RefactoringPreviewPopup *>();
+            if (!preview || !preview->isVisible())
+                return;
+            if (acceptsPreviews)
+                preview->accept();
+            else
+                preview->dismiss();
+        });
+        user.start();
+    }
+
+    ~CodeEditor() { QFile::remove(OccurrenceIndex::cachePathFor(folder.path())); }
+
+    void index()
+    {
+        const QSignalSpy finished(&occurrences, &OccurrenceIndex::indexingFinished);
+        occurrences.setFolder(folder.path());
+        QTRY_VERIFY(!finished.isEmpty());
+    }
+
+    // The tool's JSON answer, parsed.
+    QJsonObject callJson(const QString &tool, const QJsonObject &arguments, int timeoutMs = 30000)
+    {
+        static int id = 1000;
+        const int requestId = ++id;
+        QJsonObject result;
+        const QMetaObject::Connection connection =
+            QObject::connect(&session, &McpSession::sent, [&result, requestId](const QJsonObject &sent) {
+                if (sent.value(QStringLiteral("id")).toInt() == requestId)
+                    result = sent;
+            });
+        session.handleMessage(
+            QJsonObject{{QStringLiteral("jsonrpc"), QStringLiteral("2.0")},
+                        {QStringLiteral("id"), requestId},
+                        {QStringLiteral("method"), QStringLiteral("tools/call")},
+                        {QStringLiteral("params"),
+                         QJsonObject{{QStringLiteral("name"), tool}, {QStringLiteral("arguments"), arguments}}}});
+        QElapsedTimer clock;
+        clock.start();
+        while (result.isEmpty() && clock.elapsed() < timeoutMs)
+            QTest::qWait(10);
+        QObject::disconnect(connection);
+        const QJsonObject answer = result.value(QStringLiteral("result")).toObject();
+        const QString text =
+            answer.value(QStringLiteral("content")).toArray().first().toObject().value("text").toString();
+        QJsonObject parsed = QJsonDocument::fromJson(text.toUtf8()).object();
+        if (answer.value(QStringLiteral("isError")).toBool())
+            parsed.insert(QStringLiteral("error"), text);
+        return parsed;
     }
 };
 
@@ -479,6 +573,103 @@ private slots:
                      .isEmpty());
     }
 #endif
+
+    void renamesAFileAndItsIncludes()
+    {
+        CodeEditor editor;
+        write(editor.folder, "main.cpp", "#include \"total.h\"\n");
+        write(editor.folder, "total.h", "#pragma once\n");
+        editor.index();
+
+        const QJsonObject result =
+            editor.callJson("rename_file", {{"path", "total.h"}, {"newPath", "include/total.h"}});
+
+        QCOMPARE(result.value("status").toString(), QString("applied"));
+        QCOMPARE(result.value("files").toArray().size(), 3); // the old path, the new one, main.cpp
+        QFile main(editor.folder.filePath("main.cpp"));
+        QVERIFY(main.open(QIODevice::ReadOnly));
+        QCOMPARE(main.readAll(), QByteArray("#include \"include/total.h\"\n"));
+    }
+
+    void answersOnceTheUserCancelledThePreview()
+    {
+        CodeEditor editor;
+        editor.acceptsPreviews = false;
+        write(editor.folder, "a.h", "#pragma once\n");
+
+        const QJsonObject result =
+            editor.callJson("rename_file", {{"path", "a.h"}, {"newPath", "b.h"}, {"preview", true}});
+
+        QCOMPARE(result.value("status").toString(), QString("cancelled by the user"));
+        QVERIFY(QFileInfo::exists(editor.folder.filePath("a.h")));
+    }
+
+    void findsTheUsagesOfAWordWithoutAServer()
+    {
+        CodeEditor editor;
+        write(editor.folder, "notes.md", "The total.\n\nA total again.\n");
+        editor.index();
+
+        const QJsonObject result =
+            editor.callJson("find_usages", {{"path", "notes.md"}, {"line", 1}, {"column", 5}, {"name", "total"}});
+
+        QVERIFY(!result.value("semantic").toBool());
+        const QJsonArray usages = result.value("usages").toArray();
+        QCOMPARE(usages.size(), 2);
+        QCOMPARE(usages[1].toObject().value("line").toInt(), 3);
+        QCOMPARE(usages[1].toObject().value("kind").toString(), QString("text"));
+    }
+
+    void changesASignatureWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        CodeEditor editor;
+        write(editor.folder, "compile_flags.txt", "-std=c++20\n");
+        write(editor.folder, "main.cpp",
+              "int total(int a, int b) { return a + b; }\nint main() { return total(1, 2); }\n");
+        const auto *file = EditorTabs::editorIn(editor.tabs.openFile(editor.folder.filePath("main.cpp")));
+        QVERIFY(file);
+        const LspClient *client = editor.servers.clientFor("cpp");
+        QVERIFY(client);
+        QTRY_VERIFY_WITH_TIMEOUT(client->isReady(), 30000);
+
+        const QJsonObject result = editor.callJson(
+            "change_signature", {{"path", "main.cpp"},
+                                 {"line", 1},
+                                 {"column", 5},
+                                 {"parameters", QJsonArray{QJsonObject{{"keep", 2}}, QJsonObject{{"keep", 1}},
+                                                           QJsonObject{{"declaration", "int c"}, {"value", "3"}}}}});
+
+        QVERIFY2(result.value("error").toString().isEmpty(), qPrintable(result.value("error").toString()));
+        QCOMPARE(result.value("status").toString(), QString("applied"));
+        QCOMPARE(file->text(),
+                 QString("int total(int b, int a, int c) { return a + b; }\nint main() { return total(2, 1, 3); }\n"));
+    }
+
+    void renamesASymbolAfterThePreviewWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        CodeEditor editor;
+        write(editor.folder, "compile_flags.txt", "-std=c++20\n");
+        write(editor.folder, "main.cpp", "int count = 0; // count\nint main() { return count; }\n");
+        editor.index();
+        const auto *file = EditorTabs::editorIn(editor.tabs.openFile(editor.folder.filePath("main.cpp")));
+        QVERIFY(file);
+        const LspClient *client = editor.servers.clientFor("cpp");
+        QTRY_VERIFY_WITH_TIMEOUT(client && client->isReady(), 30000);
+
+        const QJsonObject result = editor.callJson("rename_symbol", {{"path", "main.cpp"},
+                                                                     {"line", 1},
+                                                                     {"column", 5},
+                                                                     {"newName", "total"},
+                                                                     {"commentsAndStrings", true},
+                                                                     {"preview", true}});
+
+        QCOMPARE(result.value("status").toString(), QString("applied"));
+        QCOMPARE(file->text(), QString("int total = 0; // total\nint main() { return total; }\n"));
+    }
 };
 
 QTEST_MAIN(TestMcpTools)

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "McpRegistry.h"
+#include "refactor/RefactoringOutcome.h"
 
 #include <QList>
 #include <QString>
@@ -78,6 +79,10 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
 // The language servers: problems, definitions, usages, documentation,
 // rename, quick fixes, formatting.
 void registerCodeTools(McpRegistry &registry, const DuetToolContext &context);
+// The refactorings: usages by kind, Rename File, Change Signature.
+void registerRefactoringTools(McpRegistry &registry, const DuetToolContext &context);
+// A refactoring's outcome as a tool's answer.
+McpResult refactoringResult(const DuetToolContext &context, const RefactoringOutcome &outcome);
 // Terminals: reading them, running a command.
 void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context);
 // Git status, history, commits, snapshots; then the branch tools.

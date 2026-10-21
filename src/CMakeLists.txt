@@ -18,6 +18,7 @@ add_library(duet_core STATIC
     agent/mcp/GitTools.cpp
     agent/mcp/McpRegistry.cpp
     agent/mcp/McpSession.cpp
+    agent/mcp/RefactoringTools.cpp
     agent/mcp/TerminalTools.cpp
     agent/mcp/WorkspaceTools.cpp
     agent/NewAgentPopup.cpp
@@ -136,6 +137,7 @@ add_library(duet_core STATIC
     navigation/CodeIntelligenceHierarchy.cpp
     navigation/CodeIntelligenceRefactoring.cpp
     navigation/CodeIntelligenceRefactorThis.cpp
+    navigation/CodeIntelligenceSignature.cpp
     navigation/CodeIntelligenceUsages.cpp
     navigation/CodeNavigator.cpp
     navigation/Definitions.cpp
@@ -151,7 +153,10 @@ add_library(duet_core STATIC
     refactor/EditPreview.cpp
     refactor/EditSimulation.cpp
     refactor/FileReferences.cpp
+    refactor/ChangeSignature.cpp
+    refactor/ChangeSignaturePopup.cpp
     refactor/MoveClass.cpp
+    refactor/ParsedText.cpp
     refactor/RefactoringPreviewPopup.cpp
     refactor/RenameAnalysis.cpp
     refactor/RenameSymbolPopup.cpp

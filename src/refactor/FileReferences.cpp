@@ -378,7 +378,7 @@ QStringList candidatesOf(const Input &input, const Moves &moves)
     return sorted;
 }
 
-std::optional<QString> textOf(const QString &path, const QHash<QString, QString> &unsavedTexts)
+std::optional<QString> readText(const QString &path, const QHash<QString, QString> &unsavedTexts)
 {
     if (const auto unsaved = unsavedTexts.constFind(path); unsaved != unsavedTexts.cend())
         return *unsaved;
@@ -389,15 +389,27 @@ std::optional<QString> textOf(const QString &path, const QHash<QString, QString>
     return std::move(decoded->text);
 }
 
+// The text of the file at `path` once moved: read there, or where it still
+// is when the move is yet to be made.
+std::optional<QString> textOf(const QString &path, const QHash<QString, QString> &unsavedTexts, const Moves &moves)
+{
+    if (std::optional<QString> text = readText(path, unsavedTexts))
+        return text;
+    const QString origin = before(moves, path);
+    return origin == path ? std::nullopt : readText(origin, unsavedTexts);
+}
+
 } // namespace
 
 QList<Move> filesOf(const QString &folder, const QString &to)
 {
+    const bool hasMoved = QFileInfo(to).isDir();
+    const QString root = hasMoved ? to : folder;
     QList<Move> moves;
-    QDirIterator it(to, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
+    QDirIterator it(root, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
     while (it.hasNext()) {
-        const QString path = it.next();
-        moves.append({QDir::cleanPath(folder + path.mid(to.size())), path});
+        const QString relative = it.next().mid(root.size());
+        moves.append({QDir::cleanPath(folder + relative), QDir::cleanPath(to + relative)});
     }
     return moves;
 }
@@ -409,7 +421,7 @@ WorkspaceEdit update(const Input &input)
     for (const QString &path : candidatesOf(input, moves)) {
         if (familyOf(path) == Family::Other)
             continue;
-        const std::optional<QString> text = textOf(path, input.unsavedTexts);
+        const std::optional<QString> text = textOf(path, input.unsavedTexts, moves);
         if (!text)
             continue;
         const QList<TextEdit> edits = editsIn(path, *text, moves);

@@ -382,6 +382,7 @@ void MainWindow::registerMcpTools()
     DuetTools::registerEditorTools(mcpRegistry_, context);
     DuetTools::registerWorkspaceTools(mcpRegistry_, context);
     DuetTools::registerCodeTools(mcpRegistry_, context);
+    DuetTools::registerRefactoringTools(mcpRegistry_, context);
     DuetTools::registerTerminalTools(mcpRegistry_, context);
     DuetTools::registerGitTools(mcpRegistry_, context);
 #ifdef DUET_WITH_DIAGRAMS

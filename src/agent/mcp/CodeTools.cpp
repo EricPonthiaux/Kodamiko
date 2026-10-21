@@ -455,21 +455,6 @@ void getSymbolInfo(const DuetToolContext &context, const QJsonObject &arguments,
                           reply);
 }
 
-McpResult renameResult(const DuetToolContext &context, const QJsonValue &result, const QString &newName)
-{
-    const WorkspaceEdit edit = parseWorkspaceEdit(result.toObject());
-    if (edit.isEmpty())
-        return McpResult::error(QStringLiteral("Nothing to rename here"));
-    const int files =
-        context.intelligence->applyWorkspaceEdit(edit, QStringLiteral("Rename to “%1” (Claude)").arg(newName));
-    QJsonArray changed;
-    for (const QString &path : edit.filePaths())
-        changed.append(context.relative(path));
-    return McpResult::json(QJsonObject{{QStringLiteral("files"), changed},
-                                       {QStringLiteral("filesChanged"), files},
-                                       {QStringLiteral("edits"), edit.textEditCount()}});
-}
-
 void renameSymbol(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString newName = arguments.value(QStringLiteral("newName")).toString().trimmed();
@@ -477,12 +462,16 @@ void renameSymbol(const DuetToolContext &context, const QJsonObject &arguments, 
         reply(McpResult::error(QStringLiteral("The new name is empty")));
         return;
     }
-    sendPositionalRequest(
-        context, arguments,
-        {.method = QStringLiteral("textDocument/rename"),
-         .extraParams = {{QStringLiteral("newName"), newName}},
-         .convert = [context, newName](const QJsonValue &result) { return renameResult(context, result, newName); }},
-        reply);
+    const QJsonObject position = positionParams(arguments, {}).value(QStringLiteral("position")).toObject();
+    const CodeIntelligence::RenameRequest request{
+        .path = context.absolute(arguments.value(QStringLiteral("path")).toString()),
+        .position = positionFrom(position),
+        .newName = newName,
+        .inCommentsAndStrings = arguments.value(QStringLiteral("commentsAndStrings")).toBool(false),
+        .review = arguments.value(QStringLiteral("preview")).toBool(false) ? Review::Always : Review::WhenNeeded,
+    };
+    context.intelligence->renameSymbolAt(
+        request, [context, reply](const RefactoringOutcome &outcome) { reply(refactoringResult(context, outcome)); });
 }
 
 QJsonObject actionSummary(const QJsonObject &action)
@@ -510,15 +499,9 @@ void getCodeActions(const DuetToolContext &context, const QJsonObject &arguments
                        });
 }
 
-// Applies a code action's edit, then has the server carry out its command,
-// which sends the edit back.
-void applyAction(const DuetToolContext &context, LspClient *server, const QJsonObject &action, const McpReply &reply)
+// Has the server carry out the action's command, which sends its edit back.
+void runActionCommand(LspClient *server, const QJsonObject &action, int files, const McpReply &reply)
 {
-    int files = 0;
-    if (action.contains(QStringLiteral("edit")))
-        files = context.intelligence->applyWorkspaceEdit(
-            parseWorkspaceEdit(action.value(QStringLiteral("edit")).toObject()),
-            QStringLiteral("%1 (Claude)").arg(action.value(QStringLiteral("title")).toString()));
     const QJsonObject command = commandOf(action);
     if (command.isEmpty() || !server) {
         reply(McpResult::json(QJsonObject{{QStringLiteral("applied"), action.value(QStringLiteral("title")).toString()},
@@ -534,12 +517,41 @@ void applyAction(const DuetToolContext &context, LspClient *server, const QJsonO
                     });
 }
 
+// Applies a code action's edit, then has the server carry out its command,
+// which sends the edit back.
+// A code action, and the server that offered it.
+struct ServerAction {
+    LspClient *server;
+    QJsonObject action;
+};
+
+void applyAction(const DuetToolContext &context, const ServerAction &offered, Review review, const McpReply &reply)
+{
+    LspClient *server = offered.server;
+    const QJsonObject &action = offered.action;
+    if (!action.contains(QStringLiteral("edit"))) {
+        runActionCommand(server, action, 0, reply);
+        return;
+    }
+    const QString title = QStringLiteral("%1 (Claude)").arg(action.value(QStringLiteral("title")).toString());
+    const Proposal proposal{title, parseWorkspaceEdit(action.value(QStringLiteral("edit")).toObject()), {}, {}};
+    context.intelligence->propose(
+        proposal, review,
+        [context, server = QPointer<LspClient>(server), action, reply](const RefactoringOutcome &outcome) {
+            if (outcome.status != RefactoringOutcome::Status::Applied) {
+                reply(refactoringResult(context, outcome));
+                return;
+            }
+            runActionCommand(server, action, outcome.filesChanged, reply);
+        });
+}
+
 void applyCodeAction(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString title = arguments.value(QStringLiteral("title")).toString();
     requestCodeActions(
         context, arguments,
-        [context, reply, title](LspClient *server, const QList<QJsonObject> &actions, const QString &error) {
+        [context, reply, title, arguments](LspClient *server, const QList<QJsonObject> &actions, const QString &error) {
             if (!error.isEmpty()) {
                 reply(McpResult::error(error));
                 return;
@@ -551,7 +563,8 @@ void applyCodeAction(const DuetToolContext &context, const QJsonObject &argument
                 reply(McpResult::error(QStringLiteral("No action \"%1\" here (see get_code_actions)").arg(title)));
                 return;
             }
-            applyAction(context, server, *action, reply);
+            const bool preview = arguments.value(QStringLiteral("preview")).toBool(false);
+            applyAction(context, {server, *action}, preview ? Review::Always : Review::WhenNeeded, reply);
         });
 }
 
@@ -676,9 +689,16 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
          .title = QStringLiteral("Rename symbol"),
          .description = QStringLiteral(
              "Renames the symbol at a position everywhere it is used, through the language server (a real "
-             "refactoring, not a text replacement). Open files change in their editor (one step the user can undo, "
-             "unsaved), the others on disk."),
-         .inputSchema = positionSchema({{QStringLiteral("newName"), string(QStringLiteral("The new name"))}})},
+             "refactoring, not a text replacement). Open files change in their editor, unsaved, the others on disk: "
+             "one refactoring the user can undo with Undo Refactoring. The user sees the changes first when asked "
+             "(\"preview\"), or when the rename reaches comments and strings or has conflicts; the answer comes "
+             "once they chose."),
+         .inputSchema = positionSchema(
+             {{QStringLiteral("newName"), string(QStringLiteral("The new name"))},
+              {QStringLiteral("commentsAndStrings"),
+               boolean(QStringLiteral("Also rename the name in comments, strings and non-code files (default false)"))},
+              {QStringLiteral("preview"), boolean(QStringLiteral("Show the user the changes first (default false)"))}},
+             {QStringLiteral("commentsAndStrings"), QStringLiteral("preview")})},
         handledBy(context, renameSymbol)));
 
     registry.addTool(McpTool::reading(
@@ -694,8 +714,13 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("apply_code_action"),
          .title = QStringLiteral("Apply a quick fix"),
          .description = QStringLiteral("Applies the quick fix or refactoring of that title at a position (see "
-                                       "get_code_actions). Open files change in their editor, unsaved."),
-         .inputSchema = positionSchema({{QStringLiteral("title"), string(QStringLiteral("The action's title"))}})},
+                                       "get_code_actions). Open files change in their editor, unsaved. With "
+                                       "\"preview\", the user sees its changes first (not those its server makes "
+                                       "through a command)."),
+         .inputSchema = positionSchema(
+             {{QStringLiteral("title"), string(QStringLiteral("The action's title"))},
+              {QStringLiteral("preview"), boolean(QStringLiteral("Show the user the changes first (default false)"))}},
+             {QStringLiteral("preview")})},
         handledBy(context, applyCodeAction)));
 
     registry.addTool(McpTool::acting(

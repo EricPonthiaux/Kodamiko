@@ -44,13 +44,24 @@ RefactoredFile *EditSimulation::find(const QString &path)
     return found == files_.end() ? nullptr : &*found;
 }
 
+QString EditSimulation::originOf(const QString &path) const
+{
+    for (const RefactoredFile &file : files_) {
+        const bool isRenamedFolder = file.kind == RefactoredFile::Kind::Renamed && QFileInfo(file.originalPath).isDir();
+        if (isRenamedFolder && WorkspaceFiles::isUnder(path, file.path) && path != file.path)
+            return file.originalPath + path.mid(file.path.size());
+    }
+    return path;
+}
+
 RefactoredFile *EditSimulation::load(const QString &path)
 {
     if (RefactoredFile *file = find(path))
         return file;
-    RefactoredFile file{.kind = RefactoredFile::Kind::Modified, .path = path, .originalPath = path};
-    if (!QFileInfo(path).isDir()) {
-        const std::optional<DecodedText> document = WorkspaceFiles::documentOf(path, targets_);
+    const QString origin = originOf(path);
+    RefactoredFile file{.kind = RefactoredFile::Kind::Modified, .path = path, .originalPath = origin};
+    if (!QFileInfo(origin).isDir()) {
+        const std::optional<DecodedText> document = WorkspaceFiles::documentOf(origin, targets_);
         if (!document)
             return nullptr;
         file.before = document->text;

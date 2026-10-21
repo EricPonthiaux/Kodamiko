@@ -1,0 +1,13 @@
+{
+  "parameters": [
+    {
+      "keep": 2
+    },
+    {
+      "keep": 1
+    }
+  ],
+  "conflicts": [
+    "util.py:1: “value” comes after a parameter with a default value"
+  ]
+}

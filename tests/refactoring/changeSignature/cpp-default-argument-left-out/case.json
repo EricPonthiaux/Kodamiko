@@ -1,0 +1,11 @@
+{
+  "parameters": [
+    {
+      "keep": 1
+    },
+    {
+      "declaration": "int b = 0",
+      "value": ""
+    }
+  ]
+}

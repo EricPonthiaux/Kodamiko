@@ -25,6 +25,9 @@ public:
 private:
     // The file at `path` now, if changed so far and not deleted.
     RefactoredFile *find(const QString &path);
+    // Where the file at `path` is before the edit: under a folder the edit
+    // renamed, at its old path.
+    QString originOf(const QString &path) const;
     // The file at `path`, read on its first change; nullptr if unreadable.
     RefactoredFile *load(const QString &path);
     void editText(const LspProtocol::DocumentEdit &edit);

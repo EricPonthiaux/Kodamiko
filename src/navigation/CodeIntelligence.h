@@ -6,8 +6,10 @@
 #include "Usage.h"
 #include "WorkspaceEditing.h"
 #include "lsp/LspProtocol.h"
+#include "refactor/ChangeSignature.h"
 #include "refactor/EditTargets.h"
 #include "refactor/MoveClass.h"
+#include "refactor/RefactoringOutcome.h"
 #include "refactor/RenameAnalysis.h"
 #include "refactor/RenameSymbolPopup.h"
 
@@ -72,6 +74,10 @@ public:
     // (usagesFound): the server's, else every occurrence of the word.
     void findUsages();
     void findUsagesOf(const UsageSearch &search);
+    using UsagesDone = std::function<void(const UsageResults &results)>;
+    // The usages of `search`, for `done` (Claude's find_usages), without
+    // the Usages pane.
+    void collectUsages(const UsageSearch &search, const UsagesDone &done);
     // The callers and callees of the function at the cursor, or the
     // supertypes and subtypes of the type there, for the Hierarchy pane
     // (hierarchyFound).
@@ -106,6 +112,40 @@ public:
     void updateReferencesToMovedFile(const QString &from, const QString &to);
     // Undoes the last refactoring in every file it changed.
     void undoRefactoring();
+
+    // What Claude's rename_symbol asks.
+    struct RenameRequest {
+        QString path;
+        LspProtocol::Position position; // of the name
+        QString newName;
+        bool inCommentsAndStrings = false;
+        Review review = Review::WhenNeeded;
+    };
+
+    // Renames the symbol at `request.position`, as Rename does; `done`
+    // says how it ended (after the user's choice when it is previewed).
+    void renameSymbolAt(const RenameRequest &request, const RefactoringDone &done);
+    // Change Signature at the cursor: its popup, then the preview.
+    void changeSignature();
+
+    // What Change Signature is asked: the function named at `position` of
+    // `path` gets `parameters`.
+    struct SignatureRequest {
+        QString path;
+        LspProtocol::Position position;
+        QList<ChangeSignature::Parameter> parameters;
+        Review review = Review::Always;
+    };
+
+    // Changes the signature in the function's declarations and at its
+    // calls (from the server's references).
+    void changeSignatureAt(const SignatureRequest &request, const RefactoringDone &done);
+    // Renames or moves a file or folder with its includes and imports, as
+    // one refactoring.
+    void renameFile(const QString &from, const QString &to, Review review, const RefactoringDone &done);
+    // `proposal` made, after the preview when `review` asks or when it has
+    // textual edits or conflicts.
+    void propose(const Proposal &proposal, Review review, const RefactoringDone &done);
 
     // The refactorings made, for the Undo Refactoring command.
     const RefactoringHistory *history() const { return history_; }
@@ -150,24 +190,52 @@ private:
     void syncOpenEditors(LspClient *client, const QString &languageId);
 
     // A rename asked in the popup.
+    // A rename asked in the popup, or by Claude.
     struct Rename {
-        int bytePosition = 0; // where the name is in its editor
+        QString path;
+        LspProtocol::Position position; // of the name
         QString name;
         RenameSymbolPopup::Choice choice;
+        RefactoringDone done; // may be empty
     };
 
     // Asks for the new name of `name`, at `bytePosition` in `editor`.
     void showRenamePopup(EditorWidget *editor, int bytePosition, const QString &name);
-    // Asks the server for the edit of `rename` in `editor`, then makes it,
-    // or shows it first.
-    void renameAt(EditorWidget *editor, const Rename &rename);
+    // Asks the server for the edit of `rename`, then makes it, or shows it
+    // first.
+    void requestRename(const Rename &rename);
     // Looks for the name in comments and strings and for conflicts, in the
     // background, then completes the rename.
     void analyzeRename(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
     void completeAnalyzedRename(const LspProtocol::WorkspaceEdit &edit,
                                 const RenameAnalysis::Result &analysis,
                                 const Rename &rename);
-    void completeRename(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
+    // The servers still reading the project, as a conflict: they may not
+    // know every usage yet.
+    QStringList busyServers() const;
+    // Makes `edit` as one refactoring named `title`.
+    void complete(const QString &title, const LspProtocol::WorkspaceEdit &edit, const RefactoringDone &done);
+    // `proposal` in the preview popup, made once confirmed: what the user
+    // keeps, as one refactoring; cancelled if the popup closes otherwise.
+    void review(const Proposal &proposal, const RefactoringDone &done);
+    // Calls `done`, if any, with `outcome`.
+    static void finish(const RefactoringDone &done, const RefactoringOutcome &outcome);
+    // The identifier at `position` of `path` (its editor's text if open).
+    QString wordAt(const QString &path, const LspProtocol::Position &position) const;
+    // `path`'s text: its editor's if open, else the file's.
+    QString currentText(const QString &path) const;
+
+    // A signature change, with the places the server found.
+    struct SignatureChange {
+        ChangeSignature::Signature signature;
+        QList<ChangeSignature::Parameter> parameters;
+        QList<LspProtocol::Location> places;
+        Review review = Review::Always;
+        RefactoringDone done;
+    };
+
+    // Works the edit of `change` out off the UI thread, then proposes it.
+    void planSignatureChange(const SignatureChange &change);
     // The Refactor This menu, with the server's `actions` (none without
     // `server`).
     void chooseRefactoring(EditorWidget *editor, LspClient *server, const QList<QJsonObject> &actions);
@@ -175,26 +243,20 @@ private:
     void applyRefactoring(LspClient *server, const QJsonObject &action);
     // What Move Class needs from `editor`, and from its source.
     MoveClass::Input moveClassInput(EditorWidget *editor) const;
-    // `edit` in the preview popup; `apply` gets what is kept.
-    void showRefactoringPreview(const QString &title,
-                                const LspProtocol::WorkspaceEdit &edit,
-                                const std::function<void(const LspProtocol::WorkspaceEdit &)> &apply);
     void completeReferenceUpdate(const LspProtocol::WorkspaceEdit &edit, const QString &name);
-    // The changes in the preview popup, made once confirmed.
-    void showPreview(const LspProtocol::WorkspaceEdit &edit,
-                     const RenameAnalysis::Result &analysis,
-                     const Rename &rename);
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
     // Shows the server's signature help `help` as a call tip.
     void showSignatureHelp(const EditorWidget *editor, const QJsonObject &help, bool explicitRequest);
     // The server of `path`'s language, with the open files sent to it;
     // nullptr when there is none.
     LspClient *usageServerFor(const QString &path);
-    // The kinds of the server's `locations`, then reportUsages(), off the
+    // The kinds of the server's `locations`, for `done`, off the
     // UI thread.
-    void classifyUsages(const UsageSearch &search, const QList<LspProtocol::Location> &locations);
-    // Every occurrence of the word, from the index, then reportUsages().
-    void findWordUsages(const UsageSearch &search);
+    void classifyUsages(const UsageSearch &search,
+                        const QList<LspProtocol::Location> &locations,
+                        const UsagesDone &done);
+    // Every occurrence of the word, from the index, for `done`.
+    void findWordUsages(const UsageSearch &search, const UsagesDone &done);
     void reportUsages(const UsageResults &results);
     // `hierarchy`'s roots asked to the server, `title` completed with the
     // name at the cursor.

@@ -290,6 +290,8 @@ void MainWindow::createEditMenu()
                                                inCode(&CodeIntelligence::refactorThis)));
     refactoringActions_.append(
         edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename)));
+    refactoringActions_.append(edit->addAction(tr("Change Si&gnature…"), QKeySequence(tr("Ctrl+F6")), this,
+                                               inCode(&CodeIntelligence::changeSignature)));
     refactoringActions_.append(edit->addAction(tr("Move C&lass to Its Own File"), QKeySequence(tr("F6")), this,
                                                inCode(&CodeIntelligence::moveClassToOwnFile)));
     refactoringActions_.append(edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,

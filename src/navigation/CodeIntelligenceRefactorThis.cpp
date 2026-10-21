@@ -85,6 +85,7 @@ void CodeIntelligence::chooseRefactoring(EditorWidget *editor, LspClient *server
     menu.addSection(tr("Refactor This"));
     menu.addAction(tr("Rename…"), this, &CodeIntelligence::rename);
     menu.addAction(tr("Rename File…"), this, [this, path = editor->filePath()] { emit renameFileRequested(path); });
+    menu.addAction(tr("Change Signature…"), this, &CodeIntelligence::changeSignature);
     const bool canMoveClass = editor->languageId() == QLatin1String("cpp") ||
                               editor->languageId() == QLatin1String("c") ||
                               editor->languageId() == QLatin1String("java");
@@ -120,25 +121,11 @@ void CodeIntelligence::applyRefactoring(LspClient *server, const QJsonObject &ac
         runCommand();
         return;
     }
-    const WorkspaceEdit edit = parseWorkspaceEdit(action.value("edit").toObject());
-    showRefactoringPreview(title, edit, [this, title, runCommand](const WorkspaceEdit &kept) {
-        applyWorkspaceEdit(kept, title);
-        runCommand();
+    const Proposal proposal{title, parseWorkspaceEdit(action.value("edit").toObject()), {}, {}};
+    review(proposal, [runCommand](const RefactoringOutcome &outcome) {
+        if (outcome.status == RefactoringOutcome::Status::Applied)
+            runCommand();
     });
-}
-
-void CodeIntelligence::showRefactoringPreview(const QString &title,
-                                              const WorkspaceEdit &edit,
-                                              const std::function<void(const WorkspaceEdit &)> &apply)
-{
-    RefactoringPreviewPopup::Preview preview{
-        .title = title,
-        .root = servers_->folder(),
-        .edit = edit,
-        .files = EditPreview::simulate(edit, targets()),
-    };
-    auto *popup = new RefactoringPreviewPopup(std::move(preview), apply, tabs_->window());
-    popup->popup();
 }
 
 MoveClass::Input CodeIntelligence::moveClassInput(EditorWidget *editor) const
@@ -182,8 +169,8 @@ void CodeIntelligence::moveClassToOwnFile()
         return;
     }
     const QString title = tr("Move “%1” to %2").arg(result.className, QFileInfo(result.newPath).fileName());
-    showRefactoringPreview(title, result.edit, [this, title, newPath = result.newPath](const WorkspaceEdit &kept) {
-        if (applyWorkspaceEdit(kept, title) > 0)
+    review({title, result.edit, {}, {}}, [this, newPath = result.newPath](const RefactoringOutcome &outcome) {
+        if (outcome.status == RefactoringOutcome::Status::Applied)
             tabs_->openFile(newPath);
     });
 }

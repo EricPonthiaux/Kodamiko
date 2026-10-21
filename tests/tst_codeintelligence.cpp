@@ -116,6 +116,14 @@ struct ClangdProject {
     }
 };
 
+// The occurrence index of `project`, once built.
+void indexProject(ClangdProject &project)
+{
+    const QSignalSpy indexed(&project.occurrences, &OccurrenceIndex::indexingFinished);
+    project.occurrences.setFolder(project.dir.path());
+    QTRY_VERIFY(!indexed.isEmpty());
+}
+
 } // namespace
 
 class TestCodeIntelligence : public QObject {
@@ -598,7 +606,45 @@ private slots:
         project.servers.setEnabled(false); // no server: Duet's alone
         project.intelligence.refactorThis();
 
-        QCOMPARE(entries, (QStringList{"Rename…", "Rename File…", "Move Class to Its Own File"}));
+        QCOMPARE(entries, (QStringList{"Rename…", "Rename File…", "Change Signature…", "Move Class to Its Own File"}));
+    }
+
+    void renamesAFileWithItsIncludesAsOneRefactoring()
+    {
+        ClangdProject project;
+        write(project.dir.filePath("main.cpp"), "#include \"total.h\"\n");
+        write(project.dir.filePath("total.h"), "#pragma once\n");
+        indexProject(project);
+        std::optional<RefactoringOutcome> outcome;
+
+        project.intelligence.renameFile(project.dir.filePath("total.h"), project.dir.filePath("inc/sum.h"),
+                                        Review::WhenNeeded,
+                                        [&outcome](const RefactoringOutcome &result) { outcome = result; });
+
+        QTRY_VERIFY(outcome);
+        QCOMPARE(outcome->status, RefactoringOutcome::Status::Applied);
+        QCOMPARE(read(project.dir.filePath("main.cpp")), QByteArray("#include \"inc/sum.h\"\n"));
+        QVERIFY(QFileInfo::exists(project.dir.filePath("inc/sum.h")));
+        QCOMPARE(project.intelligence.history()->lastDescription(), QString("Move “total.h” to inc/sum.h"));
+        project.intelligence.undoRefactoring(); // the move and the include, together
+        QVERIFY(QFileInfo::exists(project.dir.filePath("total.h")));
+        QCOMPARE(read(project.dir.filePath("main.cpp")), QByteArray("#include \"total.h\"\n"));
+    }
+
+    void reportsARefactoringCancelledInItsPreview()
+    {
+        ClangdProject project;
+        write(project.dir.filePath("a.h"), "#pragma once\n");
+        std::optional<RefactoringOutcome> outcome;
+
+        project.intelligence.renameFile(project.dir.filePath("a.h"), project.dir.filePath("b.h"), Review::Always,
+                                        [&outcome](const RefactoringOutcome &result) { outcome = result; });
+        QTRY_VERIFY(project.tabs.window()->findChild<RefactoringPreviewPopup *>());
+        project.tabs.window()->findChild<RefactoringPreviewPopup *>()->dismiss();
+
+        QTRY_VERIFY(outcome);
+        QCOMPARE(outcome->status, RefactoringOutcome::Status::Cancelled);
+        QVERIFY(QFileInfo::exists(project.dir.filePath("a.h")));
     }
 
     void highlightsTheSymbolsOccurrencesWithClangd()

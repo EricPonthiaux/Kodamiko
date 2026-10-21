@@ -1,0 +1,14 @@
+{
+  "parameters": [
+    {
+      "keep": 1
+    },
+    {
+      "declaration": "int y",
+      "value": "0"
+    }
+  ],
+  "conflicts": [
+    "main.cpp:3: the function is used without being called there; left as it is"
+  ]
+}

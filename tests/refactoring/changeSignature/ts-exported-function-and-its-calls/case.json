@@ -1,0 +1,14 @@
+{
+  "parameters": [
+    {
+      "keep": 2
+    },
+    {
+      "keep": 1
+    },
+    {
+      "declaration": "scale: number",
+      "value": "10"
+    }
+  ]
+}

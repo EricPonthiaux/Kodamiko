@@ -1,0 +1,14 @@
+{
+  "parameters": [
+    {
+      "keep": 2
+    },
+    {
+      "keep": 1
+    },
+    {
+      "declaration": "int scale",
+      "value": "10"
+    }
+  ]
+}

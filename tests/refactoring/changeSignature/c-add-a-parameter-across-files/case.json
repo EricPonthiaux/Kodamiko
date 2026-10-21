@@ -1,0 +1,14 @@
+{
+  "parameters": [
+    {
+      "keep": 1
+    },
+    {
+      "keep": 2
+    },
+    {
+      "declaration": "int c",
+      "value": "0"
+    }
+  ]
+}

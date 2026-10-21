@@ -5,6 +5,7 @@
 #include "CodeIntelligence.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "refactor/EditPreview.h"
@@ -18,7 +19,9 @@
 #include <QPointer>
 #include <QThreadPool>
 
+#include <algorithm>
 #include <chrono>
+#include <memory>
 
 using namespace LspProtocol;
 
@@ -80,34 +83,53 @@ void CodeIntelligence::showRenamePopup(EditorWidget *editor, int bytePosition, c
             if (choice.newName.isEmpty())
                 return tr("Specify a new name");
             if (target && choice.newName != name)
-                renameAt(target, {bytePosition, name, choice});
+                requestRename({target->filePath(), lspPosition(target, bytePosition), name, choice, {}});
             return {};
         },
         editor);
     popup->popup();
 }
 
-void CodeIntelligence::renameAt(EditorWidget *editor, const Rename &rename)
+void CodeIntelligence::renameSymbolAt(const RenameRequest &request, const RefactoringDone &done)
 {
-    LspClient *client = serverFor(editor);
-    if (!client)
+    const QString name = wordAt(request.path, request.position);
+    if (name.isEmpty()) {
+        finish(done, {.messages = {tr("No name at %1:%2").arg(request.path).arg(request.position.line + 1)}});
         return;
-    syncOpenEditors(client, editor->languageId());
-    QJsonObject params = positionParams(editor, rename.bytePosition);
-    params.insert("newName", rename.choice.newName);
-    client->request(QStringLiteral("textDocument/rename"), params,
-                    [this, rename](const QJsonValue &result, const QString &error) {
-                        if (!error.isEmpty()) {
-                            emit statusMessage(tr("Cannot rename “%1”: %2").arg(rename.name, error));
-                            return;
-                        }
-                        const WorkspaceEdit edit = parseWorkspaceEdit(result.toObject());
-                        if (edit.isEmpty()) {
-                            emit statusMessage(tr("Nothing to rename here"));
-                            return;
-                        }
-                        analyzeRename(edit, rename);
-                    });
+    }
+    const RenameSymbolPopup::Choice choice{request.newName,
+                                           request.review == Review::Always ? RenameSymbolPopup::Mode::Preview
+                                                                            : RenameSymbolPopup::Mode::Refactor,
+                                           request.inCommentsAndStrings};
+    requestRename({request.path, request.position, name, choice, done});
+}
+
+void CodeIntelligence::requestRename(const Rename &rename)
+{
+    LspClient *client = usageServerFor(rename.path);
+    if (!client) {
+        const QString message = tr("No language server to rename “%1”").arg(rename.name);
+        emit statusMessage(message);
+        finish(rename.done, {.messages = {message}});
+        return;
+    }
+    const QJsonObject params{
+        {"textDocument", QJsonObject{{"uri", uriOf(rename.path)}}},
+        {"position", toJson(rename.position)},
+        {"newName", rename.choice.newName},
+    };
+    client->request(
+        QStringLiteral("textDocument/rename"), params, [this, rename](const QJsonValue &result, const QString &error) {
+            const WorkspaceEdit edit = parseWorkspaceEdit(result.toObject());
+            if (!error.isEmpty() || edit.isEmpty()) {
+                const QString message = error.isEmpty() ? tr("Nothing to rename here")
+                                                        : tr("Cannot rename “%1”: %2").arg(rename.name, error);
+                emit statusMessage(message);
+                finish(rename.done, {.messages = {message}});
+                return;
+            }
+            analyzeRename(edit, rename);
+        });
 }
 
 void CodeIntelligence::analyzeRename(const WorkspaceEdit &edit, const Rename &rename)
@@ -139,51 +161,106 @@ void CodeIntelligence::completeAnalyzedRename(const WorkspaceEdit &edit,
                                               const RenameAnalysis::Result &analysis,
                                               const Rename &rename)
 {
-    RenameAnalysis::Result checked = analysis;
+    const QString &newName = rename.choice.newName;
+    const Proposal proposal{tr("Rename “%1” to “%2”").arg(rename.name, newName), edit, analysis.textualEdit,
+                            analysis.conflicts + busyServers()};
+    const RefactoringDone report = [this, rename](const RefactoringOutcome &outcome) {
+        if (outcome.status == RefactoringOutcome::Status::Applied) {
+            const QString &to = rename.choice.newName;
+            emit statusMessage(
+                outcome.filesChanged == 1
+                    ? tr("Renamed “%1” to “%2”").arg(rename.name, to)
+                    : tr("Renamed “%1” to “%2” in %3 files").arg(rename.name, to).arg(outcome.filesChanged));
+        }
+        finish(rename.done, outcome);
+    };
+    // As IntelliJ: what is not plain code is shown before it is changed.
+    const bool needsReview = rename.choice.mode == RenameSymbolPopup::Mode::Preview ||
+                             !proposal.textualEdit.isEmpty() || !proposal.conflicts.isEmpty();
+    if (needsReview)
+        review(proposal, report);
+    else
+        complete(proposal.title, proposal.edit, report);
+}
+
+QStringList CodeIntelligence::busyServers() const
+{
     // A server still reading the project may not know every usage yet.
     QStringList busy;
     for (const LanguageServers::Task &task : servers_->tasks())
         busy.append(task.server);
     busy.removeDuplicates();
-    if (!busy.isEmpty())
-        checked.conflicts.append(
-            tr("%1 still reading the project: some usages may be missing").arg(busy.join(QStringLiteral(", "))));
-    // As IntelliJ: what is not plain code is shown before it is changed.
-    const bool needsReview = rename.choice.mode == RenameSymbolPopup::Mode::Preview || !checked.textualEdit.isEmpty() ||
-                             !checked.conflicts.isEmpty();
-    if (needsReview)
-        showPreview(edit, checked, rename);
-    else
-        completeRename(edit, rename);
+    if (busy.isEmpty())
+        return {};
+    return {tr("%1 still reading the project: some usages may be missing").arg(busy.join(QStringLiteral(", ")))};
 }
 
-void CodeIntelligence::completeRename(const WorkspaceEdit &edit, const Rename &rename)
+void CodeIntelligence::complete(const QString &title, const WorkspaceEdit &edit, const RefactoringDone &done)
 {
-    const QString &newName = rename.choice.newName;
-    const int files = applyWorkspaceEdit(edit, tr("Rename “%1” to “%2”").arg(rename.name, newName));
-    if (files == 0)
-        return; // the errors were said
-    emit statusMessage(files == 1 ? tr("Renamed “%1” to “%2”").arg(rename.name, newName)
-                                  : tr("Renamed “%1” to “%2” in %3 files").arg(rename.name, newName).arg(files));
+    const WorkspaceEditing::Outcome outcome = applyEdit(edit, title);
+    const bool isApplied = outcome.errors.isEmpty() && outcome.filesChanged > 0;
+    finish(done, {isApplied ? RefactoringOutcome::Status::Applied : RefactoringOutcome::Status::Failed, edit,
+                  outcome.filesChanged, outcome.errors});
 }
 
-void CodeIntelligence::showPreview(const WorkspaceEdit &edit,
-                                   const RenameAnalysis::Result &analysis,
-                                   const Rename &rename)
+void CodeIntelligence::review(const Proposal &proposal, const RefactoringDone &done)
 {
     RefactoringPreviewPopup::Preview preview{
-        .title = tr("Rename “%1” to “%2”").arg(rename.name, rename.choice.newName),
+        .title = proposal.title,
         .root = servers_->folder(),
-        .edit = edit,
-        .files = EditPreview::simulate(edit, targets()),
-        .textualEdit = analysis.textualEdit,
-        .textualFiles = EditPreview::simulate(analysis.textualEdit, targets()),
-        .conflicts = analysis.conflicts,
+        .edit = proposal.edit,
+        .files = EditPreview::simulate(proposal.edit, targets()),
+        .textualEdit = proposal.textualEdit,
+        .textualFiles = EditPreview::simulate(proposal.textualEdit, targets()),
+        .conflicts = proposal.conflicts,
     };
+    // Cancelled when the popup goes without Do Refactor.
+    const auto decided = std::make_shared<bool>(false);
     auto *popup = new RefactoringPreviewPopup(
-        std::move(preview), [this, rename](const WorkspaceEdit &kept) { completeRename(kept, rename); },
+        std::move(preview),
+        [this, decided, title = proposal.title, conflicts = proposal.conflicts, done](const WorkspaceEdit &kept) {
+            *decided = true;
+            // The conflicts the user went on with are said too.
+            complete(title, kept, [conflicts, done](const RefactoringOutcome &outcome) {
+                RefactoringOutcome reported = outcome;
+                reported.messages = conflicts + outcome.messages;
+                finish(done, reported);
+            });
+        },
         tabs_->window());
+    connect(popup, &QObject::destroyed, this, [decided, done, conflicts = proposal.conflicts] {
+        if (!*decided)
+            finish(done, {RefactoringOutcome::Status::Cancelled, {}, 0, conflicts});
+    });
     popup->popup();
+}
+
+void CodeIntelligence::finish(const RefactoringDone &done, const RefactoringOutcome &outcome)
+{
+    if (done)
+        done(outcome);
+}
+
+QString CodeIntelligence::currentText(const QString &path) const
+{
+    if (const EditorWidget *editor = tabs_->editorFor(path))
+        return editor->text();
+    QString error;
+    const std::optional<DecodedText> decoded = TextFile::load(path, &error);
+    return decoded ? decoded->text : QString();
+}
+
+QString CodeIntelligence::wordAt(const QString &path, const Position &position) const
+{
+    const QString line = currentText(path).split(QLatin1Char('\n')).value(position.line);
+    const auto isWordCharacter = [](QChar c) { return c.isLetterOrNumber() || c == QLatin1Char('_'); };
+    qsizetype start = std::clamp<qsizetype>(position.character, 0, line.size());
+    qsizetype end = start;
+    while (start > 0 && isWordCharacter(line[start - 1]))
+        --start;
+    while (end < line.size() && isWordCharacter(line[end]))
+        ++end;
+    return line.mid(start, end - start);
 }
 
 void CodeIntelligence::updateReferencesToMovedFile(const QString &from, const QString &to)

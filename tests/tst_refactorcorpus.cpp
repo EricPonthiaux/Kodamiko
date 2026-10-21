@@ -18,6 +18,10 @@
 //   skipped when the language's server is not installed in Duet's
 //   toolchains.
 //   case.json: {"newName": "…", "commentsAndStrings": true}
+// - changeSignature/: Change Signature through the language server at the
+//   cursor, accepted in its preview; skipped as rename/ is.
+//   case.json: {"parameters": [{"keep": 2}, {"declaration": "…",
+//   "value": "…"}], "conflicts": ["…"] (optional)}
 // - usages/: Find Usages through the language server at the cursor; the
 //   case's usages.txt lists them, one "file:line:column kind" a line (from
 //   1), as the Usages pane has them; skipped as rename/ is.
@@ -33,9 +37,11 @@
 #include "navigation/SymbolIndex.h"
 #include "navigation/WorkspaceEditing.h"
 #include "projects/ProjectConfig.h"
+#include "refactor/ChangeSignature.h"
 #include "refactor/FileReferences.h"
 #include "refactor/MoveClass.h"
 #include "refactor/RefactoringHistory.h"
+#include "refactor/RefactoringOutcome.h"
 #include "refactor/RefactoringPreviewPopup.h"
 #include "refactor/RenameAnalysis.h"
 #include "refactor/RenameSymbolPopup.h"
@@ -309,6 +315,24 @@ QString kindName(UsageKind kind)
     return {};
 }
 
+// A case's new parameters: {"keep": n}, from 1, or {"declaration", "value"}.
+QList<ChangeSignature::Parameter> parametersOf(const QJsonArray &array, const QString &language)
+{
+    QList<ChangeSignature::Parameter> parameters;
+    for (const QJsonValue &value : array) {
+        const QJsonObject item = value.toObject();
+        if (item.contains("keep")) {
+            parameters.append({.oldIndex = item.value("keep").toInt() - 1});
+            continue;
+        }
+        const QString declaration = item.value("declaration").toString();
+        parameters.append({.declaration = declaration,
+                           .name = ChangeSignature::nameOf(language, declaration),
+                           .valueAtCalls = item.value("value").toString()});
+    }
+    return parameters;
+}
+
 // Copies `folder`'s before/ into `project`, starts the server of the
 // cursor's file, and opens that file with the cursor placed. nullptr when
 // the server is not installed (the test then skipped) or a check failed.
@@ -492,6 +516,46 @@ private slots:
         QFile expected(folder + QStringLiteral("/usages.txt"));
         QVERIFY(expected.open(QIODevice::ReadOnly));
         QCOMPARE(lines.join(QLatin1Char('\n')), QString::fromUtf8(expected.readAll()).trimmed());
+    }
+
+    void changeSignatureGoesThroughTheServer_data() { addCases(QStringLiteral("changeSignature")); }
+
+    void changeSignatureGoesThroughTheServer()
+    {
+        QFETCH(const QString, folder);
+        const Tree before = readTree(folder + QStringLiteral("/before"));
+        const QJsonObject description = caseOf(folder);
+        ServerProject project;
+        EditorWidget *editor = openWithServer(project, folder);
+        if (!editor)
+            return; // skipped or failed
+        const Position cursor =
+            CodeIntelligence::lspPosition(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)));
+        const QString language = LanguageRegistry::languageForFile(editor->filePath());
+        std::optional<RefactoringOutcome> outcome;
+
+        project.intelligence.changeSignatureAt({editor->filePath(), cursor,
+                                                parametersOf(description.value("parameters").toArray(), language),
+                                                Review::Always},
+                                               [&outcome](const RefactoringOutcome &result) { outcome = result; });
+        QVERIFY(QTest::qWaitFor(
+            [&project, &outcome] {
+                if (auto *preview = project.tabs.window()->findChild<RefactoringPreviewPopup *>();
+                    preview && preview->isVisible())
+                    preview->accept();
+                return outcome.has_value();
+            },
+            serverTimeoutMs));
+
+        QCOMPARE(outcome->status, RefactoringOutcome::Status::Applied);
+        QCOMPARE(outcome->messages, description.value("conflicts").toVariant().toStringList());
+        QString difference;
+        QVERIFY2(sameTrees(currentTree(project.dir.path(), project.tabs), readTree(folder + QStringLiteral("/after")),
+                           difference),
+                 qPrintable(difference));
+        project.intelligence.undoRefactoring();
+        QVERIFY2(sameTrees(currentTree(project.dir.path(), project.tabs), withoutMarker(before), difference),
+                 qPrintable(difference));
     }
 
     void renameGoesThroughTheServer_data() { addCases(QStringLiteral("rename")); }
