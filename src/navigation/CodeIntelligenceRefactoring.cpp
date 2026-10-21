@@ -8,6 +8,7 @@
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "refactor/EditPreview.h"
+#include "refactor/FileReferences.h"
 #include "refactor/RefactoringHistory.h"
 #include "refactor/RefactoringPreviewPopup.h"
 
@@ -185,6 +186,40 @@ void CodeIntelligence::showPreview(const WorkspaceEdit &edit,
         std::move(preview), [this, rename](const WorkspaceEdit &kept) { completeRename(kept, rename); },
         tabs_->window());
     popup->popup();
+}
+
+void CodeIntelligence::updateReferencesToMovedFile(const QString &from, const QString &to)
+{
+    QList<FileReferences::Move> moves;
+    if (QFileInfo(to).isDir())
+        moves = FileReferences::filesOf(from, to);
+    else
+        moves.append({from, to});
+    if (moves.isEmpty())
+        return;
+    FileReferences::Input input{moves, servers_->folder(), index_, tabs_->unsavedTexts()};
+    const QString name = QFileInfo(to).fileName();
+    QThreadPool::globalInstance()->start([guard = QPointer<CodeIntelligence>(this), input = std::move(input), name] {
+        LspProtocol::WorkspaceEdit edit = FileReferences::update(input);
+        QMetaObject::invokeMethod(
+            qApp,
+            [guard, edit = std::move(edit), name] {
+                if (guard)
+                    guard->completeReferenceUpdate(edit, name);
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void CodeIntelligence::completeReferenceUpdate(const WorkspaceEdit &edit, const QString &name)
+{
+    if (edit.isEmpty())
+        return;
+    if (applyWorkspaceEdit(edit, tr("Update the references to “%1”").arg(name)) == 0)
+        return; // the errors were said
+    emit statusMessage(
+        tr("%n reference(s) to “%1” updated; Edit ▸ Undo Refactoring reverts them", nullptr, edit.textEditCount())
+            .arg(name));
 }
 
 void CodeIntelligence::showQuickFixes()

@@ -92,6 +92,10 @@ public:
     // records it in history() as `description`. Returns the number of
     // files changed.
     int applyWorkspaceEdit(const LspProtocol::WorkspaceEdit &edit, const QString &description);
+    // `from` was renamed or moved to `to` (a file or a folder): the
+    // includes and imports that pointed to it are updated, in the
+    // background, as one refactoring.
+    void updateReferencesToMovedFile(const QString &from, const QString &to);
     // Undoes the last refactoring in every file it changed.
     void undoRefactoring();
 
@@ -154,6 +158,7 @@ private:
                                 const RenameAnalysis::Result &analysis,
                                 const Rename &rename);
     void completeRename(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
+    void completeReferenceUpdate(const LspProtocol::WorkspaceEdit &edit, const QString &name);
     // The changes in the preview popup, made once confirmed.
     void showPreview(const LspProtocol::WorkspaceEdit &edit,
                      const RenameAnalysis::Result &analysis,

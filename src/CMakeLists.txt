@@ -149,6 +149,7 @@ add_library(duet_core STATIC
     refactor/EditJournal.cpp
     refactor/EditPreview.cpp
     refactor/EditSimulation.cpp
+    refactor/FileReferences.cpp
     refactor/RefactoringPreviewPopup.cpp
     refactor/RenameAnalysis.cpp
     refactor/RenameSymbolPopup.cpp

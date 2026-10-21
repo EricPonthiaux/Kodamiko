@@ -424,6 +424,7 @@ void MainWindow::createFilesPanel()
     connect(fileTree_, &FileTreeView::entryRenamed, this, [this](const QString &oldPath, const QString &newPath) {
         editorTabs_->followRename(oldPath, newPath);
         recentFiles_.rename(oldPath, newPath);
+        intelligence_->updateReferencesToMovedFile(oldPath, newPath);
         afterFilesChanged();
     });
     connect(fileTree_, &FileTreeView::entryDeleted, this, &MainWindow::forgetDeletedFiles);

@@ -508,9 +508,9 @@ private slots:
             QSKIP("clangd is not installed");
         ClangdProject project;
         const EditorWidget *editor = project.open("calls.cpp", "struct Shape { virtual ~Shape() = default; };\n"
-                                                         "struct Square : Shape {};\n"
-                                                         "int total() { return 1; }\n"
-                                                         "int sum() { return total() + total(); }\n");
+                                                               "struct Square : Shape {};\n"
+                                                               "int total() { return 1; }\n"
+                                                               "int sum() { return total() + total(); }\n");
         QVERIFY(editor);
         QSignalSpy found(&project.intelligence, &CodeIntelligence::hierarchyFound);
         placeCaretIn(editor, "total() { return 1");
@@ -533,6 +533,26 @@ private slots:
                                [&subtypes](const QList<LspProtocol::HierarchyItem> &items) { subtypes = items; });
         QTRY_COMPARE_WITH_TIMEOUT(subtypes.size(), 1, 30000);
         QCOMPARE(subtypes[0].name, QString("Square"));
+    }
+
+    void updatesTheIncludesOfAMovedFileAsOneRefactoring()
+    {
+        ClangdProject project;
+        write(project.dir.filePath("main.cpp"), "#include \"total.h\"\n");
+        write(project.dir.filePath("total.h"), "#pragma once\n");
+        const QSignalSpy indexed(&project.occurrences, &OccurrenceIndex::indexingFinished);
+        project.occurrences.setFolder(project.dir.path());
+        QTRY_VERIFY(!indexed.isEmpty());
+        QDir().mkpath(project.dir.filePath("include"));
+        QVERIFY(QFile::rename(project.dir.filePath("total.h"), project.dir.filePath("include/total.h")));
+
+        project.intelligence.updateReferencesToMovedFile(project.dir.filePath("total.h"),
+                                                         project.dir.filePath("include/total.h"));
+
+        QTRY_COMPARE(read(project.dir.filePath("main.cpp")), QByteArray("#include \"include/total.h\"\n"));
+        QCOMPARE(project.intelligence.history()->lastDescription(), QString("Update the references to “total.h”"));
+        project.intelligence.undoRefactoring();
+        QCOMPARE(read(project.dir.filePath("main.cpp")), QByteArray("#include \"total.h\"\n"));
     }
 
     void highlightsTheSymbolsOccurrencesWithClangd()

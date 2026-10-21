@@ -8,6 +8,7 @@
 #include "navigation/WorkspaceEditing.h"
 #include "refactor/EditJournal.h"
 #include "refactor/EditPreview.h"
+#include "refactor/FileReferences.h"
 #include "refactor/RefactoringHistory.h"
 #include "refactor/RefactoringPreviewPopup.h"
 #include "refactor/RenameAnalysis.h"
@@ -412,6 +413,85 @@ private slots:
         QVERIFY(applied);
         QCOMPARE(applied->changes.size(), 1);
         QCOMPARE(std::get<DocumentEdit>(applied->changes[0]).edits.size(), 2); // one edit of the file
+    }
+
+    void updatesTheIncludesOfAMovedHeader()
+    {
+        const Project project;
+        write(project.path("src/main.cpp"), "#include \"util/total.h\"\n#include <vector>\n");
+        write(project.path("src/util/total.cpp"), "#include \"total.h\"\n#include \"helper.h\"\n");
+        write(project.path("src/util/helper.h"), "#pragma once\n");
+        write(project.path("src/math/total.h"), "#pragma once\n#include \"helper.h\"\n"); // moved from util/
+        OccurrenceStore index;
+        index.setFiles({{project.path("src/main.cpp"), {1, 1}, {{"total", 10, 0, OccurrenceRole::Import}}},
+                        {project.path("src/util/total.cpp"), {1, 1}, {{"total", 10, 0, OccurrenceRole::Import}}}});
+
+        const WorkspaceEdit edit =
+            FileReferences::update({.moves = {{project.path("src/util/total.h"), project.path("src/math/total.h")}},
+                                    .projectFolder = project.dir.path(),
+                                    .index = &index,
+                                    .unsavedTexts = {}});
+
+        QCOMPARE(edit.changes.size(), 3);
+        const auto editOf = [&edit](const QString &path) {
+            for (const DocumentChange &change : edit.changes) {
+                if (std::get<DocumentEdit>(change).filePath == path)
+                    return std::get<DocumentEdit>(change).edits;
+            }
+            return QList<TextEdit>();
+        };
+        QCOMPARE(editOf(project.path("src/main.cpp")), (QList<TextEdit>{replacing(0, 10, 22, "math/total.h")}));
+        QCOMPARE(editOf(project.path("src/util/total.cpp")),
+                 (QList<TextEdit>{replacing(0, 10, 17, "../math/total.h")}));
+        // The header's own include, from its new folder.
+        QCOMPARE(editOf(project.path("src/math/total.h")), (QList<TextEdit>{replacing(1, 10, 18, "../util/helper.h")}));
+    }
+
+    void updatesTheRelativeImportsOfAMovedScript()
+    {
+        const Project project;
+        write(project.path("lib/total.ts"), "export const total = 1;\n"); // moved from the root
+        const QString importer = project.path("main.ts");
+
+        const WorkspaceEdit edit = FileReferences::update(
+            {.moves = {{project.path("total.ts"), project.path("lib/total.ts")}},
+             .projectFolder = project.dir.path(),
+             .index = nullptr,
+             .unsavedTexts = {{importer, "import { total } from './total';\nconst t = require(\"./total.ts\");\n"}}});
+
+        QCOMPARE(edit.changes.size(), 1);
+        QCOMPARE(std::get<DocumentEdit>(edit.changes[0]).edits,
+                 (QList<TextEdit>{replacing(0, 23, 30, "./lib/total"), replacing(1, 19, 29, "./lib/total.ts")}));
+    }
+
+    void updatesThePythonImportsOfAMovedModule()
+    {
+        const Project project;
+        write(project.path("pkg/sub/mod.py"), "def f(): pass\n"); // moved from pkg/
+        const QString importer = project.path("app.py");
+
+        const WorkspaceEdit edit =
+            FileReferences::update({.moves = {{project.path("pkg/mod.py"), project.path("pkg/sub/mod.py")}},
+                                    .projectFolder = project.dir.path(),
+                                    .index = nullptr,
+                                    .unsavedTexts = {{importer, "from pkg.mod import f\nimport os, pkg.mod as m\n"}}});
+
+        QCOMPARE(edit.changes.size(), 1);
+        QCOMPARE(std::get<DocumentEdit>(edit.changes[0]).edits,
+                 (QList<TextEdit>{replacing(0, 5, 12, "pkg.sub.mod"), replacing(1, 11, 18, "pkg.sub.mod")}));
+    }
+
+    void listsTheFilesOfAMovedFolder()
+    {
+        const Project project;
+        write(project.path("to/a.h"), "");
+        write(project.path("to/deep/b.h"), "");
+
+        QList<FileReferences::Move> moves = FileReferences::filesOf(project.path("from"), project.path("to"));
+        std::ranges::sort(moves, [](const auto &a, const auto &b) { return a.to < b.to; });
+
+        QCOMPARE(moves, (QList<FileReferences::Move>{{project.path("from/a.h"), project.path("to/a.h")},
+                                                     {project.path("from/deep/b.h"), project.path("to/deep/b.h")}}));
     }
 };
 
