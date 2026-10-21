@@ -38,6 +38,9 @@ TextFileFormat formatFor(const QString &text, TextFileFormat format);
 // The bytes of `text` in `formatFor(text, format)`.
 QByteArray encode(const QString &text, const TextFileFormat &format);
 
+// `text` (from a language server, which writes "\n") with `lineEnding`.
+QString withLineEnding(QString text, LineEnding lineEnding);
+
 // nullopt (with `error`) if the file is unreadable or binary.
 std::optional<DecodedText> load(const QString &path, QString *error);
 bool save(const QString &path, const QString &text, const TextFileFormat &format, QString *error);

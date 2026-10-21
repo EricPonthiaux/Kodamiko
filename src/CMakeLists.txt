@@ -57,6 +57,7 @@ add_library(duet_core STATIC
     changes/SnapshotsPopup.cpp
     changes/StashChangesPopup.cpp
     changes/StashesPopup.cpp
+    changes/TextPatch.cpp
     changes/WordDiff.cpp
     completion/CodeGeneration.cpp
     completion/CodeScan.cpp
@@ -134,6 +135,10 @@ add_library(duet_core STATIC
     navigation/SymbolIndex.cpp
     navigation/WorkspaceEditing.cpp
     refactor/EditJournal.cpp
+    refactor/EditPreview.cpp
+    refactor/EditSimulation.cpp
+    refactor/RefactoringPreviewPopup.cpp
+    refactor/RenameSymbolPopup.cpp
     refactor/RefactoringHistory.cpp
     refactor/WorkspaceFiles.cpp
     outline/OutlineProviders.cpp

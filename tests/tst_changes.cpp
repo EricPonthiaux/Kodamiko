@@ -14,6 +14,7 @@
 #include "changes/SideBySideDivider.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
+#include "changes/TextPatch.h"
 #include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
@@ -118,6 +119,35 @@ class TestChanges : public QObject {
     Q_OBJECT
 
 private slots:
+
+    void patchesTwoTextsAsGitWould()
+    {
+        const QByteArray before = "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n";
+        const QByteArray after = "1\nTWO\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n";
+
+        const FilePatch patch = TextPatch::between(before, after, 2);
+
+        QCOMPARE(patch.hunks.size(), 2); // the changes are 9 lines apart
+        const DiffHunk &first = patch.hunks[0];
+        QCOMPARE(first.oldStart, 1);
+        QCOMPARE(first.oldCount, 4);
+        QCOMPARE(first.newStart, 1);
+        QCOMPARE(first.newCount, 4);
+        QCOMPARE(first.lines, (QList<QByteArray>{" 1", "-2", "+TWO", " 3", " 4"}));
+        const DiffHunk &second = patch.hunks[1];
+        QCOMPARE(second.oldStart, 11);
+        QCOMPARE(second.lines, (QList<QByteArray>{" 11", " 12", "+13"}));
+        QCOMPARE(patch.addedLines(), 2);
+        QCOMPARE(patch.removedLines(), 1);
+    }
+
+    void patchesNearbyChangesInOneHunkWithoutCarriageReturns()
+    {
+        const FilePatch patch = TextPatch::between("a\r\nb\r\nc\r\nd\r\n", "A\r\nb\r\nC\r\nd\r\n");
+
+        QCOMPARE(patch.hunks.size(), 1);
+        QCOMPARE(patch.hunks[0].lines, (QList<QByteArray>{"-a", "+A", " b", "-c", "+C", " d"}));
+    }
 
     void initTestCase()
     {

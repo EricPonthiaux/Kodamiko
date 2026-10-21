@@ -14,8 +14,9 @@
 #include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
+#include "refactor/EditPreview.h"
 #include "refactor/RefactoringHistory.h"
-#include "workspace/EntryPopups.h"
+#include "refactor/RefactoringPreviewPopup.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -620,33 +621,31 @@ void CodeIntelligence::rename()
 void CodeIntelligence::showRenamePopup(EditorWidget *editor, int bytePosition, const QString &name)
 {
     const QPointer<EditorWidget> target = editor;
-    auto *popup = new NamePopup(
-        tr("Rename “%1”").arg(name), QFileInfo(editor->filePath()).fileName(),
-        [this, target, bytePosition, name](const QString &newName) -> QString {
+    auto *popup = new RenameSymbolPopup(
+        name, QFileInfo(editor->filePath()).fileName(),
+        [this, target, bytePosition, name](const QString &newName, RenameSymbolPopup::Mode mode) -> QString {
             if (newName.isEmpty())
                 return tr("Specify a new name");
             if (target && newName != name)
-                renameAt(target, bytePosition, name, newName);
+                renameAt(target, {bytePosition, name, newName, mode});
             return {};
         },
         editor);
-    popup->field()->setText(name);
-    popup->field()->selectAll();
     popup->popup();
 }
 
-void CodeIntelligence::renameAt(EditorWidget *editor, int bytePosition, const QString &word, const QString &newName)
+void CodeIntelligence::renameAt(EditorWidget *editor, const Rename &rename)
 {
     LspClient *client = serverFor(editor);
     if (!client)
         return;
     syncOpenEditors(client, editor->languageId());
-    QJsonObject params = positionParams(editor, bytePosition);
-    params.insert("newName", newName);
+    QJsonObject params = positionParams(editor, rename.bytePosition);
+    params.insert("newName", rename.newName);
     client->request(QStringLiteral("textDocument/rename"), params,
-                    [this, word, newName](const QJsonValue &result, const QString &error) {
+                    [this, rename](const QJsonValue &result, const QString &error) {
                         if (!error.isEmpty()) {
-                            emit statusMessage(tr("Cannot rename “%1”: %2").arg(word, error));
+                            emit statusMessage(tr("Cannot rename “%1”: %2").arg(rename.name, error));
                             return;
                         }
                         const WorkspaceEdit edit = parseWorkspaceEdit(result.toObject());
@@ -654,11 +653,34 @@ void CodeIntelligence::renameAt(EditorWidget *editor, int bytePosition, const QS
                             emit statusMessage(tr("Nothing to rename here"));
                             return;
                         }
-                        const int files = applyWorkspaceEdit(edit, tr("Rename “%1” to “%2”").arg(word, newName));
-                        emit statusMessage(files == 1
-                                               ? tr("Renamed “%1” to “%2”").arg(word, newName)
-                                               : tr("Renamed “%1” to “%2” in %3 files").arg(word, newName).arg(files));
+                        if (rename.mode == RenameSymbolPopup::Mode::Preview)
+                            showPreview(edit, rename);
+                        else
+                            completeRename(edit, rename);
                     });
+}
+
+void CodeIntelligence::completeRename(const WorkspaceEdit &edit, const Rename &rename)
+{
+    const int files = applyWorkspaceEdit(edit, tr("Rename “%1” to “%2”").arg(rename.name, rename.newName));
+    if (files == 0)
+        return; // the errors were said
+    emit statusMessage(files == 1 ? tr("Renamed “%1” to “%2”").arg(rename.name, rename.newName)
+                                  : tr("Renamed “%1” to “%2” in %3 files").arg(rename.name, rename.newName).arg(files));
+}
+
+void CodeIntelligence::showPreview(const WorkspaceEdit &edit, const Rename &rename)
+{
+    RefactoringPreviewPopup::Preview preview{
+        .title = tr("Rename “%1” to “%2”").arg(rename.name, rename.newName),
+        .root = servers_->folder(),
+        .edit = edit,
+        .files = EditPreview::simulate(edit, targets()),
+    };
+    auto *popup = new RefactoringPreviewPopup(
+        std::move(preview), [this, rename](const WorkspaceEdit &kept) { completeRename(kept, rename); },
+        tabs_->window());
+    popup->popup();
 }
 
 void CodeIntelligence::showQuickFixes()

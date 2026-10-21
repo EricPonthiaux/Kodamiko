@@ -13,9 +13,13 @@
 #include "navigation/CodeNavigator.h"
 #include "navigation/SymbolIndex.h"
 #include "navigation/WorkspaceEditing.h"
+#include "refactor/RefactoringHistory.h"
+#include "refactor/RefactoringPreviewPopup.h"
+#include "refactor/RenameSymbolPopup.h"
 #include "ui/Theme.h"
 
 #include <QJsonArray>
+#include <QLineEdit>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -61,8 +65,6 @@ int caretLine(EditorWidget *editor)
     return CodeIntelligence::lspPosition(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))).line;
 }
 
-// A C++ project in a temporary folder, read by clangd, with the editor's
-// code intelligence; what it says is kept in `messages`.
 struct ClangdProject {
     QTemporaryDir dir;
     EditorTabs tabs{Theme::dark()};
@@ -414,6 +416,31 @@ private slots:
 
         QTRY_VERIFY_WITH_TIMEOUT(!project.messages.filter("rename").isEmpty(), 30000);
         QVERIFY(!QApplication::activePopupWidget()); // no name asked
+    }
+
+    void renamesThroughThePreviewThenUndoesWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        const EditorWidget *editor = project.open("count.cpp", "int count = 0;\nint next() { return ++count; }\n");
+        QVERIFY(editor);
+        placeCaretIn(editor, "count = 0");
+
+        project.intelligence.rename();
+        QTRY_VERIFY_WITH_TIMEOUT(project.tabs.window()->findChild<RenameSymbolPopup *>(), 30000);
+        auto *rename = project.tabs.window()->findChild<RenameSymbolPopup *>();
+        rename->field()->setText("total");
+        rename->preview();
+        QTRY_VERIFY_WITH_TIMEOUT(project.tabs.window()->findChild<RefactoringPreviewPopup *>(), 30000);
+        auto *preview = project.tabs.window()->findChild<RefactoringPreviewPopup *>();
+        QCOMPARE(editor->text(), QString("int count = 0;\nint next() { return ++count; }\n")); // not yet
+        preview->accept();
+
+        QCOMPARE(editor->text(), QString("int total = 0;\nint next() { return ++total; }\n"));
+        QCOMPARE(project.intelligence.history()->lastDescription(), QString("Rename “count” to “total”"));
+        project.intelligence.undoRefactoring();
+        QCOMPARE(editor->text(), QString("int count = 0;\nint next() { return ++count; }\n"));
     }
 
     void highlightsTheSymbolsOccurrencesWithClangd()

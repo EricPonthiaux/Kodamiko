@@ -6,10 +6,15 @@
 #include "lsp/LspProtocol.h"
 #include "navigation/WorkspaceEditing.h"
 #include "refactor/EditJournal.h"
+#include "refactor/EditPreview.h"
 #include "refactor/RefactoringHistory.h"
+#include "refactor/RefactoringPreviewPopup.h"
+#include "refactor/RenameSymbolPopup.h"
 #include "ui/Theme.h"
 
 #include <QFile>
+#include <QLineEdit>
+#include <QListWidget>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -192,6 +197,91 @@ private slots:
         QVERIFY2(errors.first().contains("b.h"), qPrintable(errors.first()));
         QCOMPARE(read(project.path("a.h")), QByteArray("int sum;\n")); // nothing undone
         QCOMPARE(history.lastDescription(), QString("Rename"));        // still undoable once fixed
+    }
+
+    void previewsTheEditInMemoryFollowingRenamedFiles()
+    {
+        Project project;
+        write(project.path("open.h"), "int total;\n");
+        write(project.path("old.h"), "int total;\r\n");
+        auto *editor = EditorTabs::editorIn(project.tabs.openFile(project.path("open.h")));
+        QVERIFY(editor);
+        editor->setText("int total; // unsaved\n");
+        const WorkspaceEdit edit{{
+            DocumentEdit{project.path("open.h"), {}, {replacing(0, 4, 9, "sum")}},
+            FileOperation{.kind = Kind::Rename, .filePath = project.path("old.h"), .newPath = project.path("new.h")},
+            DocumentEdit{project.path("new.h"), {}, {{{{0, 10}, {0, 10}}, "\nint more;"}}},
+        }};
+
+        const QList<RefactoredFile> files = EditPreview::simulate(edit, project.targets());
+
+        QCOMPARE(files.size(), 2);
+        QCOMPARE(files[0].after, QString("int sum; // unsaved\n"));
+        QVERIFY(files[0].hasTextEditsOnly);
+        QCOMPARE(files[1].kind, RefactoredFile::Kind::Renamed);
+        QCOMPARE(files[1].originalPath, project.path("old.h"));
+        QCOMPARE(files[1].after, QString("int total;\r\nint more;\r\n")); // its line ending
+        QVERIFY(!files[1].hasTextEditsOnly);
+        const QList<DiffFile> diffs = EditPreview::diffFiles(files, project.dir.path());
+        QCOMPARE(diffs[1].path, QString("new.h"));
+        QCOMPARE(diffs[1].status, QString("renamed from old.h"));
+        QCOMPARE(diffs[1].patch.addedLines(), 1);
+        QCOMPARE(read(project.path("old.h")), QByteArray("int total;\r\n")); // nothing changed
+    }
+
+    void previewLeavesTheUncheckedFilesOut()
+    {
+        Project project;
+        write(project.path("a.h"), "int total;\n");
+        write(project.path("b.h"), "int total;\n");
+        write(project.path("c.h"), "c\n");
+        const WorkspaceEdit edit{{
+            DocumentEdit{project.path("a.h"), {}, {replacing(0, 4, 9, "sum")}},
+            DocumentEdit{project.path("b.h"), {}, {replacing(0, 4, 9, "sum")}},
+            FileOperation{.kind = Kind::Rename, .filePath = project.path("c.h"), .newPath = project.path("d.h")},
+        }};
+        std::optional<WorkspaceEdit> applied;
+        QWidget window;
+        auto *popup = new RefactoringPreviewPopup(
+            {"Rename", project.dir.path(), edit, EditPreview::simulate(edit, project.targets())},
+            [&applied](const WorkspaceEdit &kept) { applied = kept; }, &window);
+        window.show();
+        popup->popup();
+        QCOMPARE(popup->files()->count(), 3);
+        QVERIFY(!(popup->files()->item(2)->flags() & Qt::ItemIsUserCheckable)); // renamed: kept
+
+        popup->files()->item(1)->setCheckState(Qt::Unchecked);
+        popup->accept();
+
+        QVERIFY(applied);
+        QCOMPARE(applied->changes.size(), 2);
+        QCOMPARE(std::get<DocumentEdit>(applied->changes[0]).filePath, project.path("a.h"));
+        QVERIFY(std::holds_alternative<FileOperation>(applied->changes[1]));
+    }
+
+    void renamePopupAsksForAPreviewOrARefactoring()
+    {
+        QWidget window;
+        window.show();
+        QList<RenameSymbolPopup::Mode> modes;
+        auto *popup = new RenameSymbolPopup(
+            "total", "a.cpp",
+            [&modes](const QString &newName, RenameSymbolPopup::Mode mode) {
+                if (newName == "total")
+                    return QString("Same name");
+                modes.append(mode);
+                return QString();
+            },
+            &window);
+        popup->popup();
+        QCOMPARE(popup->field()->text(), QString("total"));
+
+        popup->preview();
+        QCOMPARE(popup->error(), QString("Same name")); // still open
+        popup->field()->setText("sum");
+        popup->preview();
+
+        QCOMPARE(modes, QList<RenameSymbolPopup::Mode>{RenameSymbolPopup::Mode::Preview});
     }
 };
 

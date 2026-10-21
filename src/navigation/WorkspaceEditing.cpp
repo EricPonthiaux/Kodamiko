@@ -25,6 +25,13 @@ namespace WorkspaceEditing {
 
 namespace {
 
+// What is in the way of a file operation's target.
+enum class Room {
+    Made,     // nothing, or trashed (`overwrite`)
+    Occupied, // to keep: an error
+    Skip,     // to keep, without an error (`ignoreIfExists`)
+};
+
 QString tr(const char *text)
 {
     return QCoreApplication::translate("WorkspaceEditing", text);
@@ -33,17 +40,6 @@ QString tr(const char *text)
 QString nameOf(const QString &path)
 {
     return QFileInfo(path).fileName();
-}
-
-// The server writes "\n"; files with other line endings keep theirs.
-QString withLineEnding(QString text, LineEnding lineEnding)
-{
-    text.replace(QLatin1String("\r\n"), QLatin1String("\n"));
-    if (lineEnding == LineEnding::CrLf)
-        text.replace(QLatin1Char('\n'), QLatin1String("\r\n"));
-    else if (lineEnding == LineEnding::Cr)
-        text.replace(QLatin1Char('\n'), QLatin1Char('\r'));
-    return text;
 }
 
 // The files whose text is no longer the one the server's edits are for.
@@ -72,7 +68,7 @@ void editInEditor(EditorWidget *editor, const QList<TextEdit> &edits)
     for (const TextEdit &textEdit : applicationOrder(edits)) {
         const int start = CodeIntelligence::positionOf(editor, textEdit.range.start);
         const int end = std::max(start, CodeIntelligence::positionOf(editor, textEdit.range.end));
-        const QByteArray bytes = withLineEnding(textEdit.newText, editor->format().lineEnding).toUtf8();
+        const QByteArray bytes = TextFile::withLineEnding(textEdit.newText, editor->format().lineEnding).toUtf8();
         editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start), long(end));
         editor->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<uintptr_t>(bytes.size()),
                               bytes.constData());
@@ -95,20 +91,13 @@ QString editText(const DocumentEdit &edit, const EditTargets &targets, EditJourn
         return tr("Could not change %1: %2").arg(nameOf(edit.filePath), error);
     QList<TextEdit> edits = edit.edits;
     for (TextEdit &textEdit : edits)
-        textEdit.newText = withLineEnding(textEdit.newText, decoded->format.lineEnding);
+        textEdit.newText = TextFile::withLineEnding(textEdit.newText, decoded->format.lineEnding);
     const QString after = applyEdits(decoded->text, edits);
     if (!TextFile::save(edit.filePath, after, decoded->format, &error))
         return tr("Could not change %1: %2").arg(nameOf(edit.filePath), error);
     journal.record(EditJournal::TextChange{edit.filePath, decoded->text, after});
     return {};
 }
-
-// What is in the way of a file operation's target.
-enum class Room {
-    Made,     // nothing, or trashed (`overwrite`)
-    Occupied, // to keep: an error
-    Skip,     // to keep, without an error (`ignoreIfExists`)
-};
 
 Room makeRoom(const FileOperation &operation, const QString &target, const EditTargets &targets, EditJournal &journal)
 {

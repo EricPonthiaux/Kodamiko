@@ -102,4 +102,14 @@ bool save(const QString &path, const QString &text, const TextFileFormat &format
     return true;
 }
 
+QString withLineEnding(QString text, LineEnding lineEnding)
+{
+    text.replace(QLatin1String("\r\n"), QLatin1String("\n"));
+    if (lineEnding == LineEnding::CrLf)
+        text.replace(QLatin1Char('\n'), QLatin1String("\r\n"));
+    else if (lineEnding == LineEnding::Cr)
+        text.replace(QLatin1Char('\n'), QLatin1Char('\r'));
+    return text;
+}
+
 } // namespace TextFile

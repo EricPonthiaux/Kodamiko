@@ -5,6 +5,7 @@
 #include "WorkspaceEditing.h"
 #include "lsp/LspProtocol.h"
 #include "refactor/EditTargets.h"
+#include "refactor/RenameSymbolPopup.h"
 
 #include <QHash>
 #include <QJsonObject>
@@ -115,11 +116,23 @@ private:
     // rename or a search for usages covers them, unsaved changes included,
     // even before the server has indexed the project.
     void syncOpenEditors(LspClient *client, const QString &languageId);
+
+    // A rename asked in the popup.
+    struct Rename {
+        int bytePosition = 0; // where the name is in its editor
+        QString name;
+        QString newName;
+        RenameSymbolPopup::Mode mode = RenameSymbolPopup::Mode::Refactor;
+    };
+
     // Asks for the new name of `name`, at `bytePosition` in `editor`.
     void showRenamePopup(EditorWidget *editor, int bytePosition, const QString &name);
-    // Asks the server to rename `word`, at `bytePosition` in `editor`, to
-    // `newName`, and applies its edit.
-    void renameAt(EditorWidget *editor, int bytePosition, const QString &word, const QString &newName);
+    // Asks the server for the edit of `rename` in `editor`, then makes it,
+    // or shows it first.
+    void renameAt(EditorWidget *editor, const Rename &rename);
+    void completeRename(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
+    // The changes of `edit` in the preview popup, made once confirmed.
+    void showPreview(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
     // Shows the server's signature help `help` as a call tip.
     void showSignatureHelp(const EditorWidget *editor, const QJsonObject &help, bool explicitRequest);

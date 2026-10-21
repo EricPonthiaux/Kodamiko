@@ -4,7 +4,6 @@
 
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
-#include "editor/TextFile.h"
 #include "lsp/LanguageServers.h"
 #include "workspace/FileOperations.h"
 
@@ -71,15 +70,20 @@ bool isUnder(const QString &path, const QString &folder)
     return path == folder || path.startsWith(folder + QLatin1Char('/'));
 }
 
-std::optional<QString> textOf(const QString &path, const EditTargets &targets)
+std::optional<DecodedText> documentOf(const QString &path, const EditTargets &targets)
 {
     if (const EditorWidget *editor = targets.tabs->editorFor(path))
-        return editor->text();
+        return DecodedText{editor->text(), editor->format()};
     QString error;
-    std::optional<DecodedText> decoded = TextFile::load(path, &error);
-    if (!decoded)
+    return TextFile::load(path, &error);
+}
+
+std::optional<QString> textOf(const QString &path, const EditTargets &targets)
+{
+    std::optional<DecodedText> document = documentOf(path, targets);
+    if (!document)
         return std::nullopt;
-    return std::move(decoded->text);
+    return std::move(document->text);
 }
 
 QString setText(const QString &path, const QString &text, const EditTargets &targets)

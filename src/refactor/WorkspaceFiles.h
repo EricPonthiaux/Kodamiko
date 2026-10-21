@@ -3,6 +3,7 @@
 #pragma once
 
 #include "EditTargets.h"
+#include "editor/TextFile.h"
 
 #include <QString>
 
@@ -14,7 +15,9 @@
 // success.
 namespace WorkspaceFiles {
 
-// nullopt if the file cannot be read.
+// The text and format of `path`; nullopt if the file cannot be read.
+std::optional<DecodedText> documentOf(const QString &path, const EditTargets &targets);
+// Its text alone.
 std::optional<QString> textOf(const QString &path, const EditTargets &targets);
 // In its editor, as one undo step, left unsaved; else on disk, in the
 // file's encoding and line endings.
