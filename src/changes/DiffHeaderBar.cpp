@@ -28,6 +28,8 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     , nextFile_(new QToolButton(this))
     , filePager_(new QFrame(this))
     , filePosition_(new QLabel(this))
+    , layout_(new QHBoxLayout(this))
+    , buttonsSide_(new QWidget(this))
 {
     setObjectName(QStringLiteral("diffHeader"));
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
@@ -67,18 +69,29 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     whitespace_->setToolTip(tr("Hide whitespace changes"));
     connect(whitespace_, &QToolButton::toggled, this, [this] { emit whitespaceChanged(whitespace()); });
 
-    auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(12, 4, 6, 4);
-    layout->setSpacing(8);
-    layout->addWidget(name_);
-    layout->addWidget(details_, 1);
-    layout->addWidget(stats_);
-    layout->addSpacing(4);
-    layout->addWidget(createFilePager());
-    layout->addWidget(sideBySide_);
-    layout->addWidget(whitespace_);
-    layout->addWidget(previous_);
-    layout->addWidget(next_);
+    // Two sides sized by their stretch alone, so that they can be as wide.
+    auto *fileSide = new QWidget(this);
+    fileSide->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    auto *file = new QHBoxLayout(fileSide);
+    file->setContentsMargins(0, 0, 0, 0);
+    file->setSpacing(8);
+    file->addWidget(name_);
+    file->addWidget(details_, 1);
+    file->addWidget(stats_);
+    buttonsSide_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    auto *buttons = new QHBoxLayout(buttonsSide_);
+    buttons->setContentsMargins(0, 0, 0, 0);
+    buttons->setSpacing(8);
+    buttons->addStretch();
+    buttons->addWidget(sideBySide_);
+    buttons->addWidget(whitespace_);
+    buttons->addWidget(previous_);
+    buttons->addWidget(next_);
+    layout_->setContentsMargins(12, 4, 6, 4);
+    layout_->setSpacing(8);
+    layout_->addWidget(fileSide, 1);
+    layout_->addWidget(createFilePager());
+    layout_->addWidget(buttonsSide_);
 
     connect(diff_, &DiffView::contentChanged, this, &DiffHeaderBar::follow);
     // Scintilla scrolls without the scroll bar telling: its own notice.
@@ -198,7 +211,11 @@ void DiffHeaderBar::follow()
 
 void DiffHeaderBar::updateFilePager(int file, int fileCount)
 {
-    filePager_->setVisible(fileCount > 1);
+    const bool hasPager = fileCount > 1;
+    filePager_->setVisible(hasPager);
+    // Both sides as wide: the pager in the middle. Without it, the file's
+    // side takes the whole bar (a wrapped hint).
+    layout_->setStretchFactor(buttonsSide_, hasPager ? 1 : 0);
     previousFile_->setEnabled(file > 0);
     nextFile_->setEnabled(file < fileCount - 1);
     filePosition_->setText(QStringLiteral("%1 / %2").arg(file + 1).arg(fileCount));

@@ -4,10 +4,26 @@
 
 #include "DiffView.h"
 #include "SideBySide.h"
+#include "SideBySideDivider.h"
 
 #include <QResizeEvent>
 
+#include <algorithm>
+
 namespace {
+
+// Neither side narrower, whatever the divider is dragged to.
+constexpr int minSideWidth = 80;
+constexpr int dividerWidth = 7;
+
+// The old side's width out of the view's `width`: `wanted`, leaving each
+// side its minimum; halves when the two minimums do not fit.
+int oldSideWidth(int wanted, int width)
+{
+    if (width < 2 * minSideWidth)
+        return width / 2;
+    return std::clamp(wanted, minSideWidth, width - minSideWidth);
+}
 
 // `follower` scrolled as `leader` is, vertically and horizontally.
 void alignScroll(DiffView &follower, const DiffView &leader)
@@ -69,20 +85,33 @@ void DiffView::createOldSide()
     // Whichever side scrolls, by the wheel or the keys, the other follows.
     connect(this, &QsciScintillaBase::SCN_UPDATEUI, oldSide_, [this] { alignScroll(*oldSide_, *this); });
     connect(oldSide_, &QsciScintillaBase::SCN_UPDATEUI, this, [this] { alignScroll(*this, *oldSide_); });
+    divider_ = new SideBySideDivider(this);
+    // Only reachable shares are kept: dragged past a minimum, the side
+    // still grows with the view.
+    connect(divider_, &SideBySideDivider::dragged, this, [this](int x) {
+        const QRect contents = contentsRect();
+        oldSideShare_ = qreal(oldSideWidth(x - contents.x(), contents.width())) / std::max(1, contents.width());
+        placeOldSide();
+    });
 }
 
 void DiffView::placeOldSide()
 {
     const bool isSplit = mode_ == Mode::SideBySide && !files_.isEmpty();
-    const int width = isSplit ? contentsRect().width() / 2 : 0;
+    const QRect contents = contentsRect();
+    const int width = isSplit ? oldSideWidth(int(contents.width() * oldSideShare_), contents.width()) : 0;
     if (viewportMargins().left() != width)
         setViewportMargins(width, 0, 0, 0);
     if (!oldSide_)
         return;
     oldSide_->setVisible(isSplit);
+    divider_->setVisible(isSplit);
     // A pixel short: the view's background between the two, as a rule.
-    const QRect contents = contentsRect();
     oldSide_->setGeometry(contents.x(), contents.y(), std::max(0, width - 1), viewport()->height());
+    // Centered on that rule, over the two sides.
+    divider_->setGeometry(contents.x() + width - 1 - dividerWidth / 2, contents.y(), dividerWidth,
+                          viewport()->height());
+    divider_->raise();
 }
 
 void DiffView::resizeEvent(QResizeEvent *event)

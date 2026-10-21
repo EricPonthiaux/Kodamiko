@@ -7,7 +7,6 @@
 #include "DiffHeaderBar.h"
 #include "DiffView.h"
 #include "DiscardConfirmation.h"
-#include "FileChangeDelegate.h"
 #include "FoldedFileList.h"
 #include "HunkActions.h"
 #include "git/ChangeKindStyle.h"
@@ -18,11 +17,10 @@
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
+#include "ui/ViewHeader.h"
 
 #include <QHBoxLayout>
-#include <QHeaderView>
 #include <QLabel>
-#include <QMenu>
 #include <QPushButton>
 #include <QSet>
 #include <QSplitter>
@@ -35,9 +33,6 @@
 
 namespace {
 
-constexpr int sectionRole = Qt::UserRole;
-constexpr int indexRole = Qt::UserRole + 1; // -1 on a section title or a folder
-constexpr int treeIndentation = 14;
 constexpr int fileColumnWidth = 320;
 
 // "2 staged · 3 unstaged · rebase in progress", or that nothing changed.
@@ -68,11 +63,15 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     : QWidget(parent)
     , commands_(commands)
     , summary_(new QLabel(this))
-    , list_(new QTreeWidget(this))
+    , unstagedHeader_(new ViewHeader(tr("Unstaged"), this))
+    , unstagedList_(new QTreeWidget(this))
+    , stagedHeader_(new ViewHeader(tr("Staged"), this))
+    , stagedList_(new QTreeWidget(this))
     , diff_(new DiffView(theme, this))
     , diffHeader_(new DiffHeaderBar(diff_, this))
     , hunkActions_(new HunkActions(diff_))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
+    , fileSplitter_(new GripSplitter(Qt::Vertical, this))
     , fileColumn_(new QFrame(this))
     , foldedList_(new FoldedFileList(this))
     , foldButton_(new QToolButton(this))
@@ -161,52 +160,28 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     operationRow->addWidget(operationBar_);
     operationArea_->hide();
 
-    // List: two sections, "Unstaged" then "Staged", the one nearer the
-    // commit area; their files in their folders.
-    list_->setHeaderHidden(true);
-    list_->setRootIsDecorated(false);
-    list_->setIndentation(treeIndentation);
-    list_->setItemDelegate(new FileChangeDelegate(list_));
-    list_->setFrameShape(QFrame::NoFrame);
-    list_->setMouseTracking(true); // hover
-    list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    list_->setContextMenuPolicy(Qt::CustomContextMenu);
-    list_->setToolTip(tr("Double-click: open the file in the editor\nRight-click: stage, unstage, discard"));
-    for (const Section section : {Section::Unstaged, Section::Staged}) {
-        auto *item = new QTreeWidgetItem(list_);
-        item->setData(0, sectionRole, static_cast<int>(section));
-        item->setData(0, indexRole, -1);
-        item->setExpanded(true);
-    }
-    connect(list_, &QTreeWidget::currentItemChanged, this, &ChangesView::onCurrentItemChanged);
-    connect(list_, &QTreeWidget::itemClicked, this, &ChangesView::onCurrentItemChanged);
-    connect(list_, &QTreeWidget::itemSelectionChanged, this, &ChangesView::updateActions);
-    connect(list_, &QTreeWidget::customContextMenuRequested, this, &ChangesView::showListMenu);
-    // A folder closed stays closed when the list is rebuilt.
-    connect(list_, &QTreeWidget::itemCollapsed, this,
-            [this](const QTreeWidgetItem *item) { collapsedFolders_.insert(keyOf(item)); });
-    connect(list_, &QTreeWidget::itemExpanded, this,
-            [this](const QTreeWidgetItem *item) { collapsedFolders_.remove(keyOf(item)); });
-    connect(list_, &QTreeWidget::itemActivated, this, [this](QTreeWidgetItem *item) {
-        const int index = item->data(0, indexRole).toInt();
-        if (index < 0 || !status_)
-            return;
-        const FileChange &change = files(static_cast<Section>(item->data(0, sectionRole).toInt())).at(index).change;
-        if (change.kind != ChangeKind::Deleted)
-            emit openFileRequested(change.path, 0);
-    });
+    // Two lists, "Unstaged" then "Staged", the one nearer the commit area;
+    // their files in their folders.
+    setUpList(Section::Unstaged);
+    setUpList(Section::Staged);
 
     connect(commitPanel_, &CommitPanel::statusMessage, this, &ChangesView::statusMessage);
     connect(commitPanel_, &CommitPanel::messageRequested, this, &ChangesView::commitMessageRequested);
 
-    // The column: the file actions, the list, the commit area fixed below.
+    // The column: the file actions, then each list under its bar and the
+    // commit area, which share its height as the user likes.
+    fileSplitter_->setChildrenCollapsible(false);
+    fileSplitter_->addWidget(listPane(Section::Unstaged));
+    fileSplitter_->addWidget(listPane(Section::Staged));
+    fileSplitter_->addWidget(commitPanel_);
+    fileSplitter_->setStretchFactor(0, 1);
+    fileSplitter_->setStretchFactor(1, 1);
     fileColumn_->setObjectName(QStringLiteral("changesColumn"));
     auto *leftLayout = new QVBoxLayout(fileColumn_);
     leftLayout->setContentsMargins(0, 0, 0, 0);
     leftLayout->setSpacing(0);
     leftLayout->addWidget(fileActions_);
-    leftLayout->addWidget(list_, 1);
-    leftLayout->addWidget(commitPanel_);
+    leftLayout->addWidget(fileSplitter_, 1);
 
     diff_->setContextMenuPolicy(Qt::CustomContextMenu);
     diff_->setToolTip({});
@@ -274,6 +249,17 @@ ChangesView::~ChangesView()
     pool_.waitForDone();
 }
 
+QWidget *ChangesView::listPane(Section section)
+{
+    auto *pane = new QWidget(this);
+    auto *layout = new QVBoxLayout(pane);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(listHeader(section));
+    layout->addWidget(list(section), 1);
+    return pane;
+}
+
 void ChangesView::setFolder(const QString &folder)
 {
     folder_ = folder;
@@ -295,11 +281,6 @@ const QList<FileDiff> &ChangesView::files(Section section) const
     if (!status_)
         return none;
     return section == Section::Staged ? status_->staged : status_->unstaged;
-}
-
-QTreeWidgetItem *ChangesView::sectionItem(Section section) const
-{
-    return list_->topLevelItem(section == Section::Unstaged ? 0 : 1);
 }
 
 void ChangesView::refresh()
@@ -351,30 +332,6 @@ void ChangesView::onStatusRead(const std::optional<RepositoryStatus> &status, co
     emit refreshed();
 }
 
-ChangesView::ItemKey ChangesView::keyOf(const QTreeWidgetItem *item) const
-{
-    const int index = item->data(0, indexRole).toInt();
-    const auto section = static_cast<Section>(item->data(0, sectionRole).toInt());
-    const bool isFile = index >= 0 && status_;
-    if (isFile)
-        return {static_cast<int>(section), files(section).at(index).change.path};
-    // A folder by its path and a "/", apart from a file of that name.
-    const QString folder = item->data(0, FileChangeDelegate::folderRole).toString();
-    return {static_cast<int>(section), folder.isEmpty() ? QString() : folder + QLatin1Char('/')};
-}
-
-void ChangesView::restoreSelection(const QList<ItemKey> &selected, const std::optional<ItemKey> &current)
-{
-    const QSignalBlocker blocker(list_);
-    for (QTreeWidgetItemIterator it(list_); *it; ++it) {
-        const ItemKey key = keyOf(*it);
-        if (selected.contains(key))
-            (*it)->setSelected(true);
-        if (current && key == *current)
-            list_->setCurrentItem(*it, 0, QItemSelectionModel::NoUpdate);
-    }
-}
-
 ChangesView::Section ChangesView::sectionToShow(Section preferred) const
 {
     const Section other = preferred == Section::Staged ? Section::Unstaged : Section::Staged;
@@ -387,12 +344,10 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
     error_ = error;
 
     // Selection to restore: section and path of each file.
-    QList<ItemKey> selected;
-    for (const QTreeWidgetItem *item : list_->selectedItems())
-        selected.append(keyOf(item));
-    const std::optional<ItemKey> current =
-        list_->currentItem() ? std::optional(keyOf(list_->currentItem())) : std::nullopt;
+    const QList<ItemKey> selected = selectedKeys();
     const Section previousSection = shownSection_;
+    const QTreeWidgetItem *currentItem = list(previousSection)->currentItem();
+    const std::optional<ItemKey> current = currentItem ? std::optional(keyOf(currentItem)) : std::nullopt;
     const int firstLine = diff_->firstVisibleLine();
     const int cursorLine = diffCursorLine();
 
@@ -427,76 +382,6 @@ void ChangesView::selectFile(const QString &relativePath)
     refresh();
 }
 
-void ChangesView::selectNow(const QString &relativePath)
-{
-    if (!status_)
-        return;
-    const auto matches = [&relativePath](const QString &path) {
-        return relativePath.isEmpty() || path == relativePath || path.startsWith(relativePath + QLatin1Char('/'));
-    };
-    for (const Section section : {Section::Unstaged, Section::Staged}) {
-        const QList<FileDiff> &diffs = files(section);
-        for (int i = 0; i < diffs.size(); ++i) {
-            if (!matches(diffs[i].change.path))
-                continue;
-            QTreeWidgetItem *item = fileRow(section, i);
-            list_->clearSelection();
-            list_->setCurrentItem(item);
-            list_->scrollToItem(item);
-            return;
-        }
-    }
-}
-
-void ChangesView::rebuildList()
-{
-    const QSignalBlocker blocker(list_);
-    list_->clearSelection();
-    for (const Section section : {Section::Staged, Section::Unstaged}) {
-        QTreeWidgetItem *root = sectionItem(section);
-        qDeleteAll(root->takeChildren());
-        root->setHidden(!status_);
-        if (!status_)
-            continue;
-        const QList<FileDiff> &diffs = files(section);
-        FileChangeDelegate::setSection(root, section == Section::Staged ? tr("Staged") : tr("Unstaged"),
-                                       static_cast<int>(diffs.size()));
-        QStringList paths;
-        for (const FileDiff &diff : diffs)
-            paths.append(diff.change.path);
-        const QList<QTreeWidgetItem *> rows = ChangeTree::addFiles(root, paths);
-        for (int i = 0; i < diffs.size(); ++i) {
-            FileChangeDelegate::setChange(rows[i], diffs[i].change);
-            FileChangeDelegate::setStats(rows[i], FilePatch::parse(diffs[i].patch));
-            rows[i]->setData(0, indexRole, i);
-        }
-        markFolders(root, section);
-    }
-}
-
-void ChangesView::markFolders(QTreeWidgetItem *parent, Section section)
-{
-    for (int i = 0; i < parent->childCount(); ++i) {
-        QTreeWidgetItem *row = parent->child(i);
-        row->setData(0, sectionRole, static_cast<int>(section));
-        if (!FileChangeDelegate::isFolder(row))
-            continue;
-        row->setData(0, indexRole, -1);
-        markFolders(row, section);
-        if (collapsedFolders_.contains(keyOf(row)))
-            row->setExpanded(false);
-    }
-}
-
-QTreeWidgetItem *ChangesView::fileRow(Section section, int index) const
-{
-    for (QTreeWidgetItem *row : ChangeTree::filesUnder(sectionItem(section))) {
-        if (row->data(0, indexRole).toInt() == index)
-            return row;
-    }
-    return nullptr;
-}
-
 void ChangesView::showSection(Section section)
 {
     // The other section has other versions of the files.
@@ -521,44 +406,6 @@ void ChangesView::showSection(Section section)
         diff_->showMessage(QString());
     else
         diff_->showMessage(section == Section::Staged ? tr("Nothing is staged") : tr("No changes"));
-}
-
-void ChangesView::onCurrentItemChanged()
-{
-    QTreeWidgetItem *item = list_->currentItem();
-    if (!item || !status_)
-        return;
-    const auto section = static_cast<Section>(item->data(0, sectionRole).toInt());
-    // The title of an empty section leaves the diff as it is.
-    if (section != shownSection_ && files(section).isEmpty())
-        return;
-    if (section != shownSection_)
-        showSection(section);
-    // A folder or a section: its first file.
-    const QList<QTreeWidgetItem *> rows = ChangeTree::filesUnder(item);
-    const int index = rows.isEmpty() ? -1 : rows.first()->data(0, indexRole).toInt();
-    diff_->setFirstVisibleLine(index >= 0 ? diff_->fileStart(index) : 0);
-}
-
-QList<ChangesView::FileRef> ChangesView::selectedFiles() const
-{
-    QList<FileRef> result;
-    if (!status_)
-        return result;
-    const auto add = [&result](Section section, int index) {
-        const bool known = std::any_of(result.begin(), result.end(), [&](const FileRef &ref) {
-            return ref.section == section && ref.index == index;
-        });
-        if (!known)
-            result.append({section, index});
-    };
-    // A folder or a section title stands for the files under it.
-    for (QTreeWidgetItem *item : list_->selectedItems()) {
-        const auto section = static_cast<Section>(item->data(0, sectionRole).toInt());
-        for (const QTreeWidgetItem *row : ChangeTree::filesUnder(item))
-            add(section, row->data(0, indexRole).toInt());
-    }
-    return result;
 }
 
 QStringList ChangesView::repoPaths(const QList<FileRef> &refs) const
@@ -702,34 +549,6 @@ void ChangesView::unstageAll()
         GitOperations::unstage(info, {path});
         return QString();
     });
-}
-
-void ChangesView::showListMenu(const QPoint &position)
-{
-    const QList<FileRef> selection = selectedFiles();
-    if (selection.isEmpty())
-        return;
-    const bool busy = commands_->isBusy();
-    const auto count = [&selection](Section section) {
-        return std::count_if(selection.begin(), selection.end(),
-                             [section](const FileRef &ref) { return ref.section == section; });
-    };
-
-    QMenu menu;
-    if (count(Section::Unstaged) > 0) {
-        menu.addAction(tr("Stage"), this, [this, selection] { stageFiles(selection); })->setEnabled(!busy);
-        menu.addAction(tr("Discard Changes…"), this, [this, selection] { discardFiles(selection); })->setEnabled(!busy);
-    }
-    if (count(Section::Staged) > 0)
-        menu.addAction(tr("Unstage"), this, [this, selection] { unstageFiles(selection); })->setEnabled(!busy);
-    if (selection.size() == 1) {
-        const FileChange &change = files(selection.first().section).at(selection.first().index).change;
-        if (change.kind != ChangeKind::Deleted) {
-            menu.addSeparator();
-            menu.addAction(tr("Open File"), this, [this, path = change.path] { emit openFileRequested(path, 0); });
-        }
-    }
-    menu.exec(list_->viewport()->mapToGlobal(position));
 }
 
 void ChangesView::focusCommitMessage()

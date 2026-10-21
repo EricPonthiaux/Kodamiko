@@ -12,8 +12,7 @@ struct FilePatch;
 // Rows of changed files, as in IntelliJ's commit window: the file's icon, its
 // name, its folder dimmed after it, and a colored badge for the change
 // (M, A, D, R, U) at the right, the lines added and removed before it.
-// Section titles ("Staged", "Unstaged") are small capitals with their
-// count. In a tree (see ChangeTree), folder rows show the folder's icon and
+// In a tree (see ChangeTree), folder rows show the folder's icon and
 // name, and the files under them leave their folder out. Rows are given
 // room to breathe.
 class FileChangeDelegate : public QStyledItemDelegate {
@@ -22,13 +21,12 @@ class FileChangeDelegate : public QStyledItemDelegate {
 public:
     // Item data roles; tests/tst_changes.cpp reads them too.
     // Item data roles of the file rows.
-    static constexpr int pathRole = Qt::UserRole + 50;    // path shown (relative), "/" separators
-    static constexpr int kindRole = pathRole + 1;         // ChangeKind
-    static constexpr int oldPathRole = pathRole + 2;      // renamed from
-    static constexpr int sectionCountRole = pathRole + 3; // on a section title: its number of files
-    static constexpr int addedRole = pathRole + 4;        // lines added, when known
-    static constexpr int removedRole = pathRole + 5;      // lines removed
-    static constexpr int folderRole = pathRole + 6;       // on a folder row: its path, "/" separators
+    static constexpr int pathRole = Qt::UserRole + 50; // path shown (relative), "/" separators
+    static constexpr int kindRole = pathRole + 1;      // ChangeKind
+    static constexpr int oldPathRole = pathRole + 2;   // renamed from
+    static constexpr int addedRole = pathRole + 4;     // lines added, when known
+    static constexpr int removedRole = pathRole + 5;   // lines removed
+    static constexpr int folderRole = pathRole + 6;    // on a folder row: its path, "/" separators
 
     explicit FileChangeDelegate(QObject *parent = nullptr);
 
@@ -36,8 +34,6 @@ public:
     static void setChange(QTreeWidgetItem *item, const FileChange &change);
     // Shows the lines `patch` adds and removes ("+12 −3").
     static void setStats(QTreeWidgetItem *item, const FilePatch &patch);
-    // Makes `item` a section title (still selectable: it stands for its files).
-    static void setSection(QTreeWidgetItem *item, const QString &title, int count);
     // Makes `item` the row of the folder at `path`, shown as `label` (the
     // part of the path below its parent row).
     static void setFolder(QTreeWidgetItem *item, const QString &label, const QString &path);

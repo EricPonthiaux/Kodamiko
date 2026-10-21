@@ -8,6 +8,7 @@
 #include <QFrame>
 
 class DiffView;
+class QHBoxLayout;
 class QLabel;
 class QToolButton;
 
@@ -61,5 +62,7 @@ private:
     QToolButton *nextFile_;
     QFrame *filePager_;
     QLabel *filePosition_;
+    QHBoxLayout *layout_;
+    QWidget *buttonsSide_;
     bool dark_ = true;
 };

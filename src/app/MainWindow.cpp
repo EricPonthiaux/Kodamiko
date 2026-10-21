@@ -688,6 +688,7 @@ void MainWindow::restoreSettings()
     restoreGeometry(settings.value(QStringLiteral("geometry")).toByteArray());
     editSplitter_->restoreState(settings.value(QStringLiteral("editSplitter")).toByteArray());
     changesView_->splitter()->restoreState(settings.value(QStringLiteral("diffSplitter")).toByteArray());
+    changesView_->fileSplitter()->restoreState(settings.value(QStringLiteral("diffFileSplitter")).toByteArray());
     changesView_->setFileListVisible(settings.value(QStringLiteral("diffFileListVisible"), true).toBool());
     historyView_->restoreState(settings.value(QStringLiteral("historySplitter")).toByteArray());
     sidebar_->tabBar()->setCurrentIndex(settings.value(QStringLiteral("sidebarTab"), 0).toInt());
@@ -721,6 +722,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     settings.setValue(QStringLiteral("geometry"), saveGeometry());
     settings.setValue(QStringLiteral("editSplitter"), editSplitter_->saveState());
     settings.setValue(QStringLiteral("diffSplitter"), changesView_->splitter()->saveState());
+    settings.setValue(QStringLiteral("diffFileSplitter"), changesView_->fileSplitter()->saveState());
     settings.setValue(QStringLiteral("diffFileListVisible"), changesView_->isFileListVisible());
     settings.setValue(QStringLiteral("historySplitter"), historyView_->saveState());
     settings.setValue(QStringLiteral("showSidebar"), sidebar_->isPanelVisible());

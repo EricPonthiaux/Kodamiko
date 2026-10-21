@@ -9,6 +9,8 @@
 
 #include <optional>
 
+class SideBySideDivider;
+
 // Diff without git's notation, for reading: a title bar per file with its
 // added and removed line counts, a separator per block of changes ("⋯ lines
 // 40–48 · function"), the lines themselves without "+" or "-", colored as in
@@ -19,7 +21,8 @@
 // selected and copied. F7 and Shift+F7 go to the next and previous block,
 // Alt+Down and Alt+Up to the next and previous file. Side by side, the old
 // version shows in a pane at the left, row for row with the new one: the
-// view's lines, numbers and locations are then those of the new side.
+// view's lines, numbers and locations are then those of the new side; the
+// line between the two drags to share the width otherwise.
 class DiffView : public QsciScintilla {
     Q_OBJECT
 
@@ -110,8 +113,9 @@ private:
     void showLines(QList<DiffLine> lines);
     // The pane of the old side, created when first needed.
     void createOldSide();
-    // The old side over the left half of the view, while side by side
-    // with files to show; hidden otherwise.
+    // The old side over the left of the view (half of it, unless the
+    // divider was dragged), while side by side with files to show; hidden
+    // otherwise.
     void placeOldSide();
     // A click on a separator's arrow, at `position` in the text.
     void onArrowClicked(int position);
@@ -140,5 +144,7 @@ private:
     int numberWidth_ = 3; // digits of the largest line number
     Mode mode_ = Mode::Unified;
     NumberColumns numbers_ = NumberColumns::Both;
-    DiffView *oldSide_ = nullptr; // side by side, at the left; a child of the view
+    DiffView *oldSide_ = nullptr;          // side by side, at the left; a child of the view
+    SideBySideDivider *divider_ = nullptr; // between the two sides; a child of the view
+    qreal oldSideShare_ = 0.5;             // of the view's width, one that leaves each side its minimum
 };

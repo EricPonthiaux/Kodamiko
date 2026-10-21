@@ -35,28 +35,6 @@ struct Row {
     QRect rect; // the row less its padding
 };
 
-// "Unstaged  2", in demibold, the count dimmed at the right; a hairline
-// above a section that follows another sets them apart.
-void paintSectionTitle(const Row &row, const QString &title, int count, bool isFirst)
-{
-    QPainter *painter = row.painter;
-    if (!isFirst) {
-        QColor line = row.option.palette.color(QPalette::Text);
-        line.setAlphaF(0.12);
-        painter->fillRect(QRect(row.option.rect.left(), row.option.rect.top() + 3, row.option.rect.width(), 1), line);
-    }
-    QFont font = row.option.font;
-    font.setWeight(QFont::DemiBold);
-    painter->setFont(font);
-    painter->setPen(row.option.palette.color(QPalette::Text));
-    const QFontMetrics metrics(font);
-    const QRect text(row.rect.left(), row.rect.bottom() - metrics.height() - 4, row.rect.width(), metrics.height());
-    painter->drawText(text, Qt::AlignLeft | Qt::AlignVCenter, title);
-    painter->setFont(row.option.font);
-    painter->setPen(muted(row.option));
-    painter->drawText(text, Qt::AlignRight | Qt::AlignVCenter, QString::number(count));
-}
-
 // The folder shown after the name; a renamed file adds where it was.
 QString folderLabel(const QString &path, ChangeKind kind, const QString &oldPath)
 {
@@ -188,19 +166,10 @@ bool FileChangeDelegate::isFolder(const QTreeWidgetItem *item)
     return item->data(0, folderRole).isValid();
 }
 
-void FileChangeDelegate::setSection(QTreeWidgetItem *item, const QString &title, int count)
-{
-    item->setText(0, title);
-    item->setData(0, sectionCountRole, count);
-}
-
 QSize FileChangeDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     const QFontMetrics metrics(option.font);
-    const bool section = index.data(sectionCountRole).isValid();
-    // Titles get room above them, separating the sections.
-    const int height = qRound(metrics.height() * (section ? 2.3 : rowRatio));
-    return {QStyledItemDelegate::sizeHint(option, index).width(), height};
+    return {QStyledItemDelegate::sizeHint(option, index).width(), qRound(metrics.height() * rowRatio)};
 }
 
 void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
@@ -209,23 +178,10 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     initStyleOption(&item, index);
     const QWidget *widget = option.widget;
     const QStyle *style = widget ? widget->style() : QApplication::style();
-    const bool selected = option.state & QStyle::State_Selected;
     const Row row{painter, option, option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0)};
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
-
-    if (index.data(sectionCountRole).isValid()) {
-        // Selected, a title stands for all its files: the selection shows.
-        if (selected) {
-            QStyleOptionViewItem background = item;
-            background.text.clear();
-            style->drawControl(QStyle::CE_ItemViewItem, &background, painter, widget);
-        }
-        paintSectionTitle(row, item.text, index.data(sectionCountRole).toInt(), index.row() == 0);
-        painter->restore();
-        return;
-    }
 
     // Background, selection and hover from the style.
     const QString label = item.text;

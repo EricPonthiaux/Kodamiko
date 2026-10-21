@@ -38,10 +38,12 @@ add_library(duet_core STATIC
     changes/ChangeTree.cpp
     changes/ChangesView.cpp
     changes/ChangesViewDiff.cpp
+    changes/ChangesViewList.cpp
     changes/CommitPanel.cpp
     changes/DiffHeaderBar.cpp
     changes/DiffLayout.cpp
     changes/SideBySide.cpp
+    changes/SideBySideDivider.cpp
     changes/DiffStyles.cpp
     changes/DiffSyntaxHighlighter.cpp
     changes/DiffView.cpp
