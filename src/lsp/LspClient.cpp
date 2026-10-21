@@ -56,7 +56,8 @@ QJsonObject clientCapabilities()
     };
     const QJsonObject workspace{
         {"applyEdit", true},
-        {"workspaceEdit", QJsonObject{{"documentChanges", true}}},
+        {"workspaceEdit",
+         QJsonObject{{"documentChanges", true}, {"resourceOperations", QJsonArray{"create", "rename", "delete"}}}},
         {"configuration", true},
     };
     return QJsonObject{

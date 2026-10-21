@@ -95,6 +95,8 @@ private:
     // Offers the server's `codeActions` in a menu, and carries out the
     // chosen one.
     void chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions);
+    // The servers read the files no longer open from disk again.
+    void closeDocumentsOfClosedTabs();
     // Shows the problems of `path` in its editor.
     void showProblems(const QString &path);
     void showHover(EditorWidget *editor, int bytePosition, const QPoint &where, bool explicitRequest);

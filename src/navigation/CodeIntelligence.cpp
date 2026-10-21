@@ -3,6 +3,7 @@
 #include "CodeIntelligence.h"
 
 #include "CodeNavigator.h"
+#include "WorkspaceEditing.h"
 #include "agent/vendor/claude/ClaudeLint.h"
 #include "diagnostics/ProblemStore.h"
 #include "editor/CodeColorizer.h"
@@ -39,17 +40,6 @@ constexpr int maxUsagesShown = 300;
 bool isCFamily(const QString &languageId)
 {
     return languageId == QLatin1String("c") || languageId == QLatin1String("cpp");
-}
-
-// The server writes "\n"; files with other line endings keep theirs.
-QString withLineEnding(QString text, LineEnding lineEnding)
-{
-    text.replace(QLatin1String("\r\n"), QLatin1String("\n"));
-    if (lineEnding == LineEnding::CrLf)
-        text.replace(QLatin1Char('\n'), QLatin1String("\r\n"));
-    else if (lineEnding == LineEnding::Cr)
-        text.replace(QLatin1Char('\n'), QLatin1Char('\r'));
-    return text;
 }
 
 // Below the cursor of `editor`, in global coordinates.
@@ -150,13 +140,28 @@ CodeIntelligence::CodeIntelligence(const Services &services, QObject *parent)
     // A quick fix or a refactoring carried out by the server comes back as
     // an edit to apply.
     servers_->setRequestHandler(QStringLiteral("workspace/applyEdit"), [this](const QJsonValue &params) {
-        applyWorkspaceEdit(parseWorkspaceEdit(params.toObject().value("edit").toObject()));
-        return QJsonValue(QJsonObject{{"applied", true}});
+        const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(
+            parseWorkspaceEdit(params.toObject().value("edit").toObject()), {.tabs = tabs_, .servers = servers_});
+        if (outcome.errors.isEmpty())
+            return QJsonValue(QJsonObject{{"applied", true}});
+        const QString reason = outcome.errors.join(QLatin1Char(' '));
+        emit statusMessage(reason);
+        return QJsonValue(QJsonObject{{"applied", false}, {"failureReason", reason}});
     });
+    connect(tabs_, &EditorTabs::openFilesChanged, this, &CodeIntelligence::closeDocumentsOfClosedTabs);
     connect(problems_, &ProblemStore::changed, this, &CodeIntelligence::showProblems);
 }
 
 CodeIntelligence::~CodeIntelligence() = default;
+
+void CodeIntelligence::closeDocumentsOfClosedTabs()
+{
+    const QStringList open = tabs_->openFilePaths();
+    for (const QString &document : servers_->openDocuments()) {
+        if (!open.contains(document))
+            servers_->closeDocument(document);
+    }
+}
 
 void CodeIntelligence::showProblems(const QString &path)
 {
@@ -646,43 +651,10 @@ void CodeIntelligence::chooseQuickFix(EditorWidget *editor, LspClient *server, c
 
 int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit)
 {
-    int changed = 0;
-    for (auto it = edit.cbegin(); it != edit.cend(); ++it) {
-        if (it.value().isEmpty())
-            continue;
-        if (EditorWidget *editor = tabs_->editorFor(it.key())) {
-            // In the editor, as one undo step; from the end, so that the
-            // positions still to change do not move.
-            editor->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
-            for (const TextEdit &textEdit : applicationOrder(it.value())) {
-                const int start = positionOf(editor, textEdit.range.start);
-                const int end = std::max(start, positionOf(editor, textEdit.range.end));
-                const QByteArray bytes = withLineEnding(textEdit.newText, editor->format().lineEnding).toUtf8();
-                editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start),
-                                      long(end));
-                editor->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<uintptr_t>(bytes.size()),
-                                      bytes.constData());
-            }
-            editor->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
-            ++changed;
-            continue;
-        }
-        // A file that is not open: changed on disk.
-        QString error;
-        const std::optional<DecodedText> decoded = TextFile::load(it.key(), &error);
-        if (!decoded) {
-            emit statusMessage(tr("Could not change %1: %2").arg(QFileInfo(it.key()).fileName(), error));
-            continue;
-        }
-        QList<TextEdit> edits = it.value();
-        for (TextEdit &textEdit : edits)
-            textEdit.newText = withLineEnding(textEdit.newText, decoded->format.lineEnding);
-        if (TextFile::save(it.key(), applyEdits(decoded->text, edits), decoded->format, &error))
-            ++changed;
-        else
-            emit statusMessage(tr("Could not change %1: %2").arg(QFileInfo(it.key()).fileName(), error));
-    }
-    return changed;
+    const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(edit, {.tabs = tabs_, .servers = servers_});
+    if (!outcome.errors.isEmpty())
+        emit statusMessage(outcome.errors.join(QLatin1Char(' ')));
+    return outcome.filesChanged;
 }
 
 // Header and source

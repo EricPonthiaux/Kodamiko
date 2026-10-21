@@ -646,6 +646,25 @@ bool LanguageServers::syncDocument(LspClient *client,
     return true;
 }
 
+bool LanguageServers::isCurrent(const QString &path, int version, const QByteArray &text) const
+{
+    const auto it = documents_.constFind(path);
+    if (it == documents_.cend())
+        return true;
+    return it.value().version == version && it.value().hash == qHash(text);
+}
+
+void LanguageServers::closeDocument(const QString &path)
+{
+    const auto it = documents_.constFind(path);
+    if (it == documents_.cend())
+        return;
+    if (LspClient *client = clients_.value(it.value().server))
+        client->notify(QStringLiteral("textDocument/didClose"),
+                       QJsonObject{{"textDocument", QJsonObject{{"uri", QUrl::fromLocalFile(path).toString()}}}});
+    documents_.erase(it);
+}
+
 QStringList LanguageServers::filesWithDiagnostics() const
 {
     QStringList files;

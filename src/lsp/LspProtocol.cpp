@@ -70,29 +70,112 @@ QList<Location> parseLocations(const QJsonValue &result)
     return locations;
 }
 
+QStringList WorkspaceEdit::filePaths() const
+{
+    QStringList paths;
+    const auto add = [&paths](const QString &path) {
+        if (!path.isEmpty() && !paths.contains(path))
+            paths.append(path);
+    };
+    for (const DocumentChange &change : changes) {
+        if (const auto *edit = std::get_if<DocumentEdit>(&change)) {
+            add(edit->filePath);
+            continue;
+        }
+        const auto &operation = std::get<FileOperation>(change);
+        add(operation.filePath);
+        add(operation.newPath);
+    }
+    return paths;
+}
+
+int WorkspaceEdit::textEditCount() const
+{
+    int count = 0;
+    for (const DocumentChange &change : changes) {
+        if (const auto *edit = std::get_if<DocumentEdit>(&change))
+            count += int(edit->edits.size());
+    }
+    return count;
+}
+
+namespace {
+
+QList<TextEdit> textEditsFrom(const QJsonArray &edits)
+{
+    QList<TextEdit> list;
+    list.reserve(edits.size());
+    for (const QJsonValue &item : edits) {
+        const QJsonObject object = item.toObject();
+        list.append({rangeFrom(object.value("range")), object.value("newText").toString()});
+    }
+    return list;
+}
+
+std::optional<FileOperation> fileOperationFrom(const QJsonObject &change)
+{
+    const QString kind = change.value("kind").toString();
+    const QJsonObject options = change.value("options").toObject();
+    FileOperation operation;
+    operation.overwrite = options.value("overwrite").toBool();
+    operation.ignoreIfExists = options.value("ignoreIfExists").toBool();
+    operation.recursive = options.value("recursive").toBool();
+    operation.ignoreIfNotExists = options.value("ignoreIfNotExists").toBool();
+    if (kind == QLatin1String("rename")) {
+        operation.kind = FileOperation::Kind::Rename;
+        operation.filePath = pathOf(change.value("oldUri").toString());
+        operation.newPath = pathOf(change.value("newUri").toString());
+        if (operation.newPath.isEmpty())
+            return std::nullopt;
+    } else {
+        operation.kind = kind == QLatin1String("create") ? FileOperation::Kind::Create : FileOperation::Kind::Delete;
+        operation.filePath = pathOf(change.value("uri").toString());
+    }
+    if (operation.filePath.isEmpty())
+        return std::nullopt;
+    return operation;
+}
+
+std::optional<DocumentEdit> documentEditFrom(const QJsonObject &change)
+{
+    const QJsonObject document = change.value("textDocument").toObject();
+    DocumentEdit edit{pathOf(document.value("uri").toString()), std::nullopt,
+                      textEditsFrom(change.value("edits").toArray())};
+    if (edit.filePath.isEmpty() || edit.edits.isEmpty())
+        return std::nullopt;
+    // null for a file that is not open in the server.
+    if (document.value("version").isDouble())
+        edit.version = document.value("version").toInt();
+    return edit;
+}
+
+} // namespace
+
 WorkspaceEdit parseWorkspaceEdit(const QJsonObject &edit)
 {
-    WorkspaceEdit files;
-    const auto addEdits = [&files](const QString &uri, const QJsonArray &edits) {
-        const QString path = pathOf(uri);
-        if (path.isEmpty())
-            return;
-        QList<TextEdit> &list = files[path];
-        for (const QJsonValue &item : edits) {
-            const QJsonObject object = item.toObject();
-            list.append({rangeFrom(object.value("range")), object.value("newText").toString()});
+    WorkspaceEdit result;
+    // Servers send "changes" only when the client cannot read
+    // "documentChanges"; with both, "documentChanges" wins.
+    if (edit.contains("documentChanges")) {
+        for (const QJsonValue &item : edit.value("documentChanges").toArray()) {
+            const QJsonObject change = item.toObject();
+            const bool isFileOperation = change.contains("kind");
+            if (isFileOperation) {
+                if (const std::optional<FileOperation> operation = fileOperationFrom(change))
+                    result.changes.append(*operation);
+            } else if (const std::optional<DocumentEdit> documentEdit = documentEditFrom(change)) {
+                result.changes.append(*documentEdit);
+            }
         }
-    };
-    const QJsonObject changes = edit.value("changes").toObject();
-    for (auto it = changes.begin(); it != changes.end(); ++it)
-        addEdits(it.key(), it.value().toArray());
-    for (const QJsonValue &item : edit.value("documentChanges").toArray()) {
-        const QJsonObject change = item.toObject();
-        if (change.contains("kind"))
-            continue; // create, rename or delete a file
-        addEdits(change.value("textDocument").toObject().value("uri").toString(), change.value("edits").toArray());
+        return result;
     }
-    return files;
+    const QJsonObject changes = edit.value("changes").toObject();
+    for (auto it = changes.begin(); it != changes.end(); ++it) {
+        DocumentEdit documentEdit{pathOf(it.key()), std::nullopt, textEditsFrom(it.value().toArray())};
+        if (!documentEdit.filePath.isEmpty() && !documentEdit.edits.isEmpty())
+            result.changes.append(std::move(documentEdit));
+    }
+    return result;
 }
 
 std::optional<Progress> parseProgress(const QJsonValue &params)

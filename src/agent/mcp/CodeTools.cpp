@@ -462,13 +462,11 @@ McpResult renameResult(const DuetToolContext &context, const QJsonValue &result)
         return McpResult::error(QStringLiteral("Nothing to rename here"));
     const int files = context.intelligence->applyWorkspaceEdit(edit);
     QJsonArray changed;
-    int edits = 0;
-    for (auto it = edit.cbegin(); it != edit.cend(); ++it) {
-        changed.append(context.relative(it.key()));
-        edits += int(it.value().size());
-    }
-    return McpResult::json(QJsonObject{
-        {QStringLiteral("files"), changed}, {QStringLiteral("filesChanged"), files}, {QStringLiteral("edits"), edits}});
+    for (const QString &path : edit.filePaths())
+        changed.append(context.relative(path));
+    return McpResult::json(QJsonObject{{QStringLiteral("files"), changed},
+                                       {QStringLiteral("filesChanged"), files},
+                                       {QStringLiteral("edits"), edit.textEditCount()}});
 }
 
 void renameSymbol(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)

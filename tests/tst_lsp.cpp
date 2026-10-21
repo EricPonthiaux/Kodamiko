@@ -264,6 +264,46 @@ private slots:
         QVERIFY(servers.tasks().isEmpty());
     }
 
+    void closesADocumentInItsServer()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        LanguageServers servers;
+        servers.setFolder(dir.path());
+        servers.setProject(projectRunningTheFakeServerAsClangd(dir.path(), toolchains), &toolchains);
+        LspClient *client = servers.clientFor("cpp");
+        QVERIFY(client);
+        const QString path = dir.filePath("a.cpp");
+        servers.syncDocument(client, path, "cpp", "int a;\n");
+        QSignalSpy notifications(client, &LspClient::notificationReceived);
+
+        servers.closeDocument(path);
+
+        QTRY_COMPARE(notifications.size(), 1);
+        QCOMPARE(notifications[0][0].toString(), QString("test/didClose"));
+        QVERIFY(servers.openDocuments().isEmpty());
+    }
+
+    void knowsWhetherATextIsTheVersionItsServerSaw()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        LanguageServers servers;
+        servers.setFolder(dir.path());
+        servers.setProject(projectRunningTheFakeServerAsClangd(dir.path(), toolchains), &toolchains);
+        LspClient *client = servers.clientFor("cpp");
+        QVERIFY(client);
+        const QString path = dir.filePath("a.cpp");
+
+        servers.syncDocument(client, path, "cpp", "int a;\n");
+        servers.syncDocument(client, path, "cpp", "int b;\n");
+
+        QVERIFY(servers.isCurrent(path, 2, "int b;\n"));
+        QVERIFY(!servers.isCurrent(path, 1, "int b;\n"));
+        QVERIFY(!servers.isCurrent(path, 2, "int c;\n"));
+        QVERIFY(servers.isCurrent(dir.filePath("never-sent.cpp"), 7, "x"));
+    }
+
     void describesAServerTask()
     {
         const LanguageServers::Task task{"clangd", "indexing", "3/9", 42};

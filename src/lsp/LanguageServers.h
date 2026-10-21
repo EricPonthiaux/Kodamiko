@@ -100,6 +100,17 @@ public:
     // time, didChange when it changed since.
     // Returns whether anything was sent (the text was new to the server).
     bool syncDocument(LspClient *client, const QString &path, const QString &languageId, const QByteArray &text);
+    // Whether `text` is what `version` of `path` was, as last sent to its
+    // server: whether an edit computed for that version fits `text`. True
+    // for a document never sent, which gives nothing to compare.
+    bool isCurrent(const QString &path, int version, const QByteArray &text) const;
+
+    // The documents the servers have open, by path.
+    QStringList openDocuments() const { return documents_.keys(); }
+
+    // Tells its server `path` is closed ("didClose"): the server reads it
+    // from disk again (it was closed in Duet, renamed or deleted).
+    void closeDocument(const QString &path);
 
     // The problems the servers last reported for `path` (LSP Diagnostic
     // objects), and the files they reported problems for.

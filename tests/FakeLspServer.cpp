@@ -8,6 +8,8 @@
 //   "values", with its "token";
 // - "$/cancelRequest": a "test/cancelled" notification with the id, so
 //   that a test sees the cancellation arrive;
+// - "textDocument/didClose": a "test/didClose" notification with its
+//   params;
 // - "exit": stops; any other request: null.
 
 #include <QByteArray>
@@ -74,6 +76,10 @@ int main()
             return 0;
         if (method == QLatin1String("$/cancelRequest")) {
             send(QJsonObject{{"jsonrpc", "2.0"}, {"method", "test/cancelled"}, {"params", message.value("params")}});
+            continue;
+        }
+        if (method == QLatin1String("textDocument/didClose")) {
+            send(QJsonObject{{"jsonrpc", "2.0"}, {"method", "test/didClose"}, {"params", message.value("params")}});
             continue;
         }
         const bool isRequest = message.contains("id");

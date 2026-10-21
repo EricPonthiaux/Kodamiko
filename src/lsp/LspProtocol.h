@@ -5,10 +5,11 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QList>
-#include <QMap>
 #include <QString>
+#include <QStringList>
 
 #include <optional>
+#include <variant>
 
 // The Language Server Protocol's data, as Duet uses it: positions in lines
 // and UTF-16 code units (the encoding Duet asks for), locations, and the
@@ -44,8 +45,52 @@ struct TextEdit {
     bool operator==(const TextEdit &) const = default;
 };
 
-// Edits by file path, as the server sends them for a rename.
-using WorkspaceEdit = QMap<QString, QList<TextEdit>>;
+// The text edits of one file. `version` is the version of the document the
+// server computed them for, when it says: they do not fit another text.
+struct DocumentEdit {
+    QString filePath;
+    std::optional<int> version;
+    QList<TextEdit> edits;
+
+    bool operator==(const DocumentEdit &) const = default;
+};
+
+// Creating, renaming or deleting a file or folder.
+struct FileOperation {
+    enum class Kind {
+        Create,
+        Rename,
+        Delete
+    };
+
+    Kind kind = Kind::Create;
+    QString filePath; // created, deleted, or renamed
+    QString newPath;  // Rename: the new path
+    // Create and Rename: whether an existing target is replaced, or else
+    // left as it is without an error.
+    bool overwrite = false;
+    bool ignoreIfExists = false;
+    // Delete: a folder with its content; no error if there is nothing.
+    bool recursive = false;
+    bool ignoreIfNotExists = false;
+
+    bool operator==(const FileOperation &) const = default;
+};
+
+using DocumentChange = std::variant<DocumentEdit, FileOperation>;
+
+// The changes of a rename or a quick fix, in the order to make them.
+struct WorkspaceEdit {
+    QList<DocumentChange> changes;
+
+    bool isEmpty() const { return changes.isEmpty(); }
+
+    // Every file the edit touches, renamed files under both paths, in the
+    // order of the changes, without duplicates.
+    QStringList filePaths() const;
+    // The number of text edits, file operations not included.
+    int textEditCount() const;
+};
 
 QString uriOf(const QString &filePath);
 QString pathOf(const QString &uri); // empty if not a file URI
@@ -59,8 +104,8 @@ Range rangeFrom(const QJsonValue &value);
 // a list of LocationLinks. Locations outside files are left out.
 QList<Location> parseLocations(const QJsonValue &result);
 
-// "changes" and "documentChanges" (text edits only: creating, renaming
-// and deleting files are not supported).
+// "documentChanges", with their file operations, or else "changes". Files
+// outside the file system are left out, and so are edits without changes.
 WorkspaceEdit parseWorkspaceEdit(const QJsonObject &edit);
 
 // UTF-16 offset of `position` in `text`, lines split at '\n' (a "\r"

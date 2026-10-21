@@ -132,6 +132,7 @@ add_library(duet_core STATIC
     navigation/NavigationHistory.cpp
     navigation/RecentFiles.cpp
     navigation/SymbolIndex.cpp
+    navigation/WorkspaceEditing.cpp
     outline/OutlineProviders.cpp
     outline/OutlineSymbol.cpp
     outline/OutlineView.cpp

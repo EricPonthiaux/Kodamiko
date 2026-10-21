@@ -12,6 +12,7 @@
 #include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/SymbolIndex.h"
+#include "navigation/WorkspaceEditing.h"
 #include "ui/Theme.h"
 
 #include <QJsonArray>
@@ -72,16 +73,91 @@ private slots:
         const QJsonObject changes{
             {"changes",
              QJsonObject{{uriOf("/p/a.cpp"), QJsonArray{QJsonObject{{"range", range(1, 0, 3)}, {"newText", "bar"}}}}}}};
-        QCOMPARE(parseWorkspaceEdit(changes).value("/p/a.cpp"), (QList<TextEdit>{{{{1, 0}, {1, 3}}, "bar"}}));
+        QCOMPARE(parseWorkspaceEdit(changes).changes,
+                 (QList<DocumentChange>{DocumentEdit{"/p/a.cpp", {}, {{{{1, 0}, {1, 3}}, "bar"}}}}));
+    }
 
-        const QJsonObject documentChanges{
+    void parsesDocumentChangesInOrderWithTheirFileOperations()
+    {
+        const QJsonObject edit{
             {"documentChanges",
              QJsonArray{QJsonObject{{"textDocument", QJsonObject{{"uri", uriOf("/p/b.h")}, {"version", 3}}},
                                     {"edits", QJsonArray{QJsonObject{{"range", range(0, 4, 7)}, {"newText", "x"}}}}},
-                        QJsonObject{{"kind", "create"}, {"uri", uriOf("/p/new.h")}}}}};
-        const WorkspaceEdit edit = parseWorkspaceEdit(documentChanges);
-        QCOMPARE(edit.keys(), QStringList{"/p/b.h"});
-        QCOMPARE(edit.value("/p/b.h").first().newText, QString("x"));
+                        QJsonObject{{"kind", "rename"},
+                                    {"oldUri", uriOf("/p/b.h")},
+                                    {"newUri", uriOf("/p/c.h")},
+                                    {"options", QJsonObject{{"overwrite", true}}}},
+                        QJsonObject{{"kind", "create"}, {"uri", uriOf("/p/new.h")}},
+                        QJsonObject{{"kind", "delete"},
+                                    {"uri", uriOf("/p/old")},
+                                    {"options", QJsonObject{{"recursive", true}}}}}},
+            // Ignored: "documentChanges" wins.
+            {"changes", QJsonObject{{uriOf("/p/z.cpp"), QJsonArray{}}}}};
+
+        const WorkspaceEdit parsed = parseWorkspaceEdit(edit);
+
+        using Kind = FileOperation::Kind;
+        QCOMPARE(parsed.changes,
+                 (QList<DocumentChange>{
+                     DocumentEdit{"/p/b.h", 3, {{{{0, 4}, {0, 7}}, "x"}}},
+                     FileOperation{.kind = Kind::Rename, .filePath = "/p/b.h", .newPath = "/p/c.h", .overwrite = true},
+                     FileOperation{.kind = Kind::Create, .filePath = "/p/new.h"},
+                     FileOperation{.kind = Kind::Delete, .filePath = "/p/old", .recursive = true}}));
+        QCOMPARE(parsed.filePaths(), (QStringList{"/p/b.h", "/p/c.h", "/p/new.h", "/p/old"}));
+        QCOMPARE(parsed.textEditCount(), 1);
+    }
+
+    void appliesTextEditsAndFileOperationsInOrder()
+    {
+        const QTemporaryDir dir;
+        const QString root = dir.path();
+        write(root + "/old.h", "int total;\n");
+        write(root + "/gone.h", "x\n");
+        EditorTabs tabs(Theme::dark());
+        LanguageServers servers;
+        QVERIFY(tabs.openFile(root + "/old.h"));
+        using Kind = FileOperation::Kind;
+        const WorkspaceEdit edit{{
+            DocumentEdit{root + "/old.h", {}, {{{{0, 4}, {0, 9}}, "sum"}}},
+            FileOperation{.kind = Kind::Rename, .filePath = root + "/old.h", .newPath = root + "/include/new.h"},
+            FileOperation{.kind = Kind::Create, .filePath = root + "/created.h"},
+            FileOperation{.kind = Kind::Delete, .filePath = root + "/gone.h"},
+        }};
+
+        const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(edit, {.tabs = &tabs, .servers = &servers});
+
+        QVERIFY2(outcome.errors.isEmpty(), qPrintable(outcome.errors.join('\n')));
+        QCOMPARE(outcome.filesChanged, 3);
+        QCOMPARE(read(root + "/include/new.h"), QByteArray("int sum;\n")); // saved before moving
+        QVERIFY(!QFileInfo::exists(root + "/old.h"));
+        QVERIFY(tabs.editorFor(root + "/include/new.h"));
+        QVERIFY(QFileInfo::exists(root + "/created.h"));
+        QVERIFY(!QFileInfo::exists(root + "/gone.h"));
+    }
+
+    void refusesAnEditForAnotherVersionOfTheText()
+    {
+        const QTemporaryDir dir;
+        const QString path = dir.filePath("a.cpp");
+        write(path, "int total;\n");
+        EditorTabs tabs(Theme::dark());
+        LanguageServers servers;
+        servers.setFolder(dir.path());
+        auto *editor = EditorTabs::editorIn(tabs.openFile(path));
+        QVERIFY(editor);
+        // The server saw version 1; the user typed since.
+        LspClient *client = servers.clientFor("cpp");
+        if (!client)
+            QSKIP("no C++ language server");
+        servers.syncDocument(client, path, "cpp", editor->utf8Bytes().toByteArray());
+        editor->setText("int total = 0;\n");
+        const WorkspaceEdit edit{{DocumentEdit{path, 1, {{{{0, 4}, {0, 9}}, "sum"}}}}};
+
+        const WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(edit, {.tabs = &tabs, .servers = &servers});
+
+        QCOMPARE(outcome.filesChanged, 0);
+        QCOMPARE(outcome.errors.size(), 1);
+        QCOMPARE(editor->text(), QString("int total = 0;\n"));
     }
 
     void appliesEditsFromTheEnd()
