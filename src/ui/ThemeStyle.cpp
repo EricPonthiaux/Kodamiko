@@ -210,6 +210,7 @@ QTabBar#sideTabs::tab:selected { background: @checked; border-color: @border; co
 QTabBar#sideTabs::tab:selected:hover { border-color: @accent; }
 QHeaderView::section { background: @panel; color: @muted; border: none; border-bottom: 1px solid @line; padding: 4px 6px; }
 QTreeView, QTreeWidget, QListView { background: @base; border: none; outline: 0; }
+QTreeView { padding-top: 6px; }
 QTreeView::item:selected, QTreeWidget::item:selected { background: @selection; color: @text; }
 QTreeView::item:selected:active, QTreeWidget::item:selected:active { color: @text; background: @slate; }
 QTreeView::item:hover { background: @hover; }

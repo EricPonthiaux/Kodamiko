@@ -21,7 +21,10 @@
 #include <QTabBar>
 #include <QToolButton>
 #include <QTreeView>
+#include <QWheelEvent>
 #include <QtTest>
+
+#include <cstdlib>
 
 namespace {
 
@@ -75,6 +78,18 @@ void applyPreferences(const Preferences &preferences, const Window &window)
     const Preferences previous = Preferences::load();
     preferences.save();
     FontSettings::apply(preferences, previous, &window.root);
+}
+
+// `notches` of the wheel over `tree`: up when positive, down otherwise.
+void turnWheel(const QTreeView *tree, int notches, Qt::KeyboardModifiers modifiers)
+{
+    constexpr int notch = 120;
+    const QPointF center = QRectF(tree->viewport()->rect()).center();
+    for (int turned = 0; turned < std::abs(notches); ++turned) {
+        QWheelEvent event(center, tree->viewport()->mapToGlobal(center), {}, QPoint(0, notches > 0 ? notch : -notch),
+                          Qt::NoButton, modifiers, Qt::NoScrollPhase, false);
+        QApplication::sendEvent(tree->viewport(), &event);
+    }
 }
 
 } // namespace
@@ -219,6 +234,51 @@ private slots:
         QCOMPARE(Preferences::load().treeFontSize, 17);
         QCOMPARE(window.titleBar->menuBar()->font().pointSize(), 15);
         QCOMPARE(window.outline->font().pointSize(), 17);
+    }
+
+    void ctrlWheelZoomsOnlyTheTreeUnderTheMouse()
+    {
+        const Window window;
+        applyPreferences(withSizes(11, 14), window);
+
+        turnWheel(window.outline, 2, Qt::ControlModifier);
+
+        QCOMPARE(window.outline->font().pointSize(), 16);
+        QCOMPARE(window.outline->iconSize().height(), QFontMetrics(window.outline->font()).height());
+        QCOMPARE(window.files->tree()->font().pointSize(), 14);
+    }
+
+    void wheelWithoutCtrlKeepsTheTreeFont()
+    {
+        const Window window;
+        applyPreferences(withSizes(11, 14), window);
+
+        turnWheel(window.outline, 1, Qt::NoModifier);
+
+        QCOMPARE(window.outline->font().pointSize(), 14);
+    }
+
+    void treeZoomStopsAtTheLargestFontSize()
+    {
+        const Window window;
+        applyPreferences(withSizes(11, 14), window);
+
+        turnWheel(window.outline, Preferences::maximumFontSize, Qt::ControlModifier);
+        turnWheel(window.outline, 1, Qt::ControlModifier);
+
+        QCOMPARE(window.outline->font().pointSize(), Preferences::maximumFontSize);
+    }
+
+    void treeZoomSurvivesATreeFontChange()
+    {
+        const Window window;
+        applyPreferences(withSizes(11, 14), window);
+        turnWheel(window.outline, 1, Qt::ControlModifier);
+
+        applyPreferences(withSizes(11, 16), window);
+
+        QCOMPARE(window.outline->font().pointSize(), 17);
+        QCOMPARE(window.files->tree()->font().pointSize(), 16);
     }
 
     void defaultInterfaceSizeIsEleven()

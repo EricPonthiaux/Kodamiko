@@ -183,6 +183,7 @@ add_library(duet_core STATIC
     settings/Keymap.cpp
     settings/Preferences.cpp
     settings/PreferencesPopup.cpp
+    settings/TreeZoom.cpp
     setup/Prerequisites.cpp
     setup/PrerequisitesPopup.cpp
     syntax/HighlighterFactory.cpp

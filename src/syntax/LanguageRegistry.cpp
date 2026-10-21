@@ -9,7 +9,7 @@ namespace LanguageRegistry {
 namespace {
 
 struct LanguageFiles {
-    const char *languageId;
+    const char *languageId = nullptr;
     QStringList extensions;
     QStringList fileNames;
 };

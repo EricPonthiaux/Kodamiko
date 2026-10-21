@@ -2,8 +2,8 @@
 
 #include "FontSettings.h"
 
+#include "TreeZoom.h"
 #include "ui/ThemeStyle.h"
-#include "ui/TreeMetrics.h"
 
 #include <QTreeView>
 #include <QWidget>
@@ -22,7 +22,7 @@ void applyTreeFont(const QFont &font, const QWidget *window)
 {
     const QList<QTreeView *> trees = window->findChildren<QTreeView *>();
     for (QTreeView *tree : trees)
-        applyTreeMetrics(tree, font);
+        TreeZoom::setFont(tree, font);
 }
 
 } // namespace FontSettings

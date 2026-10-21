@@ -15,7 +15,7 @@ namespace FontSettings {
 // `window`; each only when it differs from `previous`.
 void apply(const Preferences &preferences, const Preferences &previous, const QWidget *window);
 // `font` to every tree of `window` (files, outline, changes), with the
-// proportions of TreeMetrics.
+// proportions of TreeMetrics and each tree's zoom (TreeZoom).
 void applyTreeFont(const QFont &font, const QWidget *window);
 
 } // namespace FontSettings
