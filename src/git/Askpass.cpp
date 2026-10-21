@@ -69,8 +69,7 @@ void AskpassServer::onNewConnection()
             if (!socket->canReadLine())
                 return;
             const QByteArray request = socket->readLine();
-            // Not from within the socket's signal: the prompt is a modal
-            // dialog, with its own event loop.
+
             QTimer::singleShot(0, this, [this, socket = QPointer<QLocalSocket>(socket), request] {
                 if (socket)
                     answer(socket, request);
@@ -84,7 +83,7 @@ void AskpassServer::answer(QLocalSocket *socket, const QByteArray &request)
     const QString prompt = QJsonDocument::fromJson(request).object().value(QLatin1String("prompt")).toString();
     const QPointer<QLocalSocket> guard(socket);
     const std::optional<QString> answer = prompter_(prompt);
-    // git gave up waiting (cancelled) while the user was typing.
+
     if (!guard)
         return;
     const QJsonObject reply =

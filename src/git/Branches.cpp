@@ -13,13 +13,11 @@
 namespace Branches {
 namespace {
 
-// Characters git refuses anywhere in a reference name.
 bool isForbidden(QChar c)
 {
     return c.unicode() < 0x20 || c.unicode() == 0x7f || QStringLiteral(" ~^:?*[\\").contains(c);
 }
 
-// "ahead 2, behind 1", "ahead 2", "gone", or empty when up to date.
 void parseTracking(const QString &track, BranchInfo &branch)
 {
     branch.upstreamGone = track == QLatin1String("gone");
@@ -30,7 +28,6 @@ void parseTracking(const QString &track, BranchInfo &branch)
     }
 }
 
-// "git switch" to an existing local branch, or to a commit with --detach.
 void runSwitch(const RepositoryInfo &repository, const QStringList &arguments)
 {
     try {
@@ -42,7 +39,6 @@ void runSwitch(const RepositoryInfo &repository, const QStringList &arguments)
     }
 }
 
-// The arguments of "git switch" that make `name` the current branch.
 QStringList switchArguments(const RepositoryInfo &repository, const QString &name, bool remote)
 {
     if (!remote)
@@ -53,7 +49,6 @@ QStringList switchArguments(const RepositoryInfo &repository, const QString &nam
     return {QStringLiteral("--track"), name};
 }
 
-// Why `name` holds a character git refuses, or empty.
 QString characterError(const QString &name)
 {
     for (const QChar c : name) {
@@ -67,7 +62,6 @@ QString characterError(const QString &name)
     return {};
 }
 
-// Why git refuses the name as a whole, or empty.
 QString wholeNameError(const QString &name)
 {
     if (name.startsWith(QLatin1Char('-')))
@@ -83,7 +77,6 @@ QString wholeNameError(const QString &name)
     return {};
 }
 
-// Why git refuses one "/"-separated part of a name, or empty.
 QString partError(const QString &part)
 {
     if (part.isEmpty())
@@ -121,7 +114,7 @@ QString sanitizedName(const QString &typed)
         else if (!isForbidden(c))
             name += c;
     }
-    // Runs of "-" from several spaces, and ".." which git refuses.
+
     static const QRegularExpression dashes(QStringLiteral("-{2,}"));
     name.replace(dashes, QStringLiteral("-"));
     while (name.contains(QLatin1String("..")))
@@ -150,7 +143,7 @@ QList<BranchInfo> list(const QString &workDir)
         if (fields.size() < 7)
             continue;
         const QString ref = QString::fromUtf8(fields.at(0));
-        // origin/HEAD: the remote's default branch, not a branch.
+
         if (ref.endsWith(QLatin1String("/HEAD")))
             continue;
         BranchInfo branch;
@@ -163,7 +156,7 @@ QList<BranchInfo> list(const QString &workDir)
         branch.subject = QString::fromUtf8(fields.at(6));
         branches.append(branch);
     }
-    // for-each-ref sorts by reference: refs/heads before refs/remotes.
+
     return branches;
 }
 
@@ -181,7 +174,6 @@ void stashAndSwitch(const RepositoryInfo &repository, const QString &name, bool 
     try {
         runSwitch(repository, arguments);
     } catch (const GitError &) {
-        // Back to where we were.
         Stashes::pop(repository, 0);
         throw;
     }
@@ -218,7 +210,7 @@ void remove(const RepositoryInfo &repository, const QString &name, bool force)
             throw GitError(QObject::tr("The branch %1 has commits that are in no other branch").arg(name),
                            GitError::Kind::Unmerged);
         }
-        // "used by worktree at '<folder>'"; "checked out at" before git 2.42.
+
         static const QRegularExpression inWorktree(QStringLiteral("(?:used by worktree|checked out) at '(.+)'"));
         if (const QRegularExpressionMatch match = inWorktree.match(error.message()); match.hasMatch()) {
             throw GitError(QObject::tr("The branch %1 is checked out in the worktree %2").arg(name, match.captured(1)),
