@@ -4,11 +4,14 @@
 // - "initialize": no capabilities;
 // - "test/echo": its params;
 // - "test/silent": never;
+// - "test/progress": after a "$/progress" notification for each of its
+//   "values", with its "token";
 // - "$/cancelRequest": a "test/cancelled" notification with the id, so
 //   that a test sees the cancellation arrive;
 // - "exit": stops; any other request: null.
 
 #include <QByteArray>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
@@ -52,6 +55,14 @@ void answer(const QJsonObject &request, const QJsonValue &result)
     send(QJsonObject{{"jsonrpc", "2.0"}, {"id", request.value("id")}, {"result", result}});
 }
 
+void sendProgress(const QJsonObject &params)
+{
+    for (const QJsonValue &value : params.value("values").toArray())
+        send(QJsonObject{{"jsonrpc", "2.0"},
+                         {"method", "$/progress"},
+                         {"params", QJsonObject{{"token", params.value("token")}, {"value", value}}}});
+}
+
 } // namespace
 
 int main()
@@ -68,12 +79,16 @@ int main()
         const bool isRequest = message.contains("id");
         if (!isRequest || method == QLatin1String("test/silent"))
             continue;
-        if (method == QLatin1String("initialize"))
+        if (method == QLatin1String("initialize")) {
             answer(message, QJsonObject{{"capabilities", QJsonObject{}}});
-        else if (method == QLatin1String("test/echo"))
+        } else if (method == QLatin1String("test/echo")) {
             answer(message, message.value("params"));
-        else
+        } else if (method == QLatin1String("test/progress")) {
+            sendProgress(message.value("params").toObject());
             answer(message, QJsonValue::Null);
+        } else {
+            answer(message, QJsonValue::Null);
+        }
     }
     return 0;
 }

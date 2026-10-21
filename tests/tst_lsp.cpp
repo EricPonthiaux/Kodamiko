@@ -3,6 +3,8 @@
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "lsp/LspCompletionProvider.h"
+#include "lsp/LspProtocol.h"
+#include "lsp/ServerTasksLabel.h"
 #include "toolchains/JavaRuntimes.h"
 #include "toolchains/Toolchains.h"
 
@@ -12,6 +14,26 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QtTest>
+
+namespace {
+
+// A project whose C++ server is the fake server, installed in `toolchains`
+// as a downloaded clangd.
+ProjectConfig projectRunningTheFakeServerAsClangd(const QString &path, const Toolchains &toolchains)
+{
+    const QString folder = toolchains.installFolder("clangd", "23.1.0");
+    QDir().mkpath(folder + "/bin");
+    QFile::copy(FAKE_LSP_SERVER_PATH, folder + "/bin/clangd");
+    QFile marker(folder + "/.complete");
+    if (marker.open(QIODevice::WriteOnly))
+        marker.close();
+    ProjectConfig project;
+    project.path = path;
+    project.languages.append({"cpp", true, "c++20", {}, "clangd", "23.1.0"});
+    return project;
+}
+
+} // namespace
 
 class TestLsp : public QObject {
     Q_OBJECT
@@ -193,6 +215,60 @@ private slots:
         QTRY_VERIFY(!failure.isEmpty());
         QVERIFY2(failure.contains("No answer"), qPrintable(failure));
         QTRY_COMPARE(notifications.size(), 1); // and the server was told
+    }
+
+    void parsesProgressSteps()
+    {
+        using LspProtocol::Progress;
+        const QJsonObject begin{{"token", 7},
+                                {"value", QJsonObject{{"kind", "begin"}, {"title", "indexing"}, {"percentage", 0}}}};
+        const QJsonObject report{{"token", "load"}, {"value", QJsonObject{{"kind", "report"}, {"message", "3/9"}}}};
+        const QJsonObject partialResult{{"token", 1}, {"value", QJsonArray{}}};
+
+        QCOMPARE(LspProtocol::parseProgress(begin),
+                 (Progress{"7", Progress::Kind::Begin, "indexing", {}, std::optional<int>(0)}));
+        QCOMPARE(LspProtocol::parseProgress(report), (Progress{"load", Progress::Kind::Report, {}, "3/9", {}}));
+        QVERIFY(!LspProtocol::parseProgress(partialResult));
+    }
+
+    void tracksTheTasksServersReport()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        LanguageServers servers;
+        servers.setFolder(dir.path());
+        servers.setProject(projectRunningTheFakeServerAsClangd(dir.path(), toolchains), &toolchains);
+        LspClient *client = servers.clientFor("cpp");
+        QVERIFY(client);
+        const QSignalSpy changes(&servers, &LanguageServers::tasksChanged);
+        const QJsonArray started{QJsonObject{{"kind", "begin"}, {"title", "indexing"}},
+                                 QJsonObject{{"kind", "report"}, {"percentage", 42}}};
+        bool answered = false;
+
+        client->request("test/progress", QJsonObject{{"token", "index"}, {"values", started}},
+                        [&](const QJsonValue &, const QString &) { answered = true; });
+
+        QTRY_VERIFY(answered);
+        QCOMPARE(changes.size(), 2);
+        QCOMPARE(servers.tasks().size(), 1);
+        QCOMPARE(servers.tasks()[0].server, QString("clangd"));
+        QCOMPARE(servers.tasks()[0].title, QString("indexing"));
+        QCOMPARE(servers.tasks()[0].percentage, std::optional<int>(42));
+
+        answered = false;
+        client->request("test/progress",
+                        QJsonObject{{"token", "index"}, {"values", QJsonArray{QJsonObject{{"kind", "end"}}}}},
+                        [&](const QJsonValue &, const QString &) { answered = true; });
+
+        QTRY_VERIFY(answered);
+        QVERIFY(servers.tasks().isEmpty());
+    }
+
+    void describesAServerTask()
+    {
+        const LanguageServers::Task task{"clangd", "indexing", "3/9", 42};
+
+        QCOMPARE(ServerTasksLabel::describe(task), QString("clangd: indexing 42% (3/9)"));
     }
 
     void usesTheProjectsServer()

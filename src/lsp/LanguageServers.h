@@ -3,6 +3,7 @@
 #pragma once
 
 #include "LspClient.h"
+#include "LspProtocol.h"
 #include "projects/ProjectConfig.h"
 #include "toolchains/JavaRuntimes.h"
 
@@ -77,6 +78,17 @@ public:
     // preferences.
     QStringList describe() const;
 
+    // A long task a server is doing (indexing, loading the project).
+    struct Task {
+        QString server;
+        QString title; // "indexing"
+        QString message;
+        std::optional<int> percentage;
+    };
+
+    // The tasks in progress, oldest first.
+    QList<Task> tasks() const;
+
     // The open folder, the servers' workspace.
     QString folder() const { return folder_; }
 
@@ -136,6 +148,8 @@ signals:
     // The server of `languages` could not start or stopped; `message` says
     // why. Also emitted, with an empty message, when it is retried.
     void serverFailed(const QString &server, const QStringList &languages, const QString &message);
+    // tasks() changed.
+    void tasksChanged();
 
 private:
     void stopAll();
@@ -162,7 +176,10 @@ private:
                            const ServerCommand &command,
                            const LanguageSetup *setup,
                            const RuntimeInstall *runtime);
-    void receiveNotification(const QString &method, const QJsonValue &params);
+    void receiveNotification(const QString &server, const QString &method, const QJsonValue &params);
+    void updateTask(const QString &server, const LspProtocol::Progress &progress);
+    // Forgets the tasks of `server`, which stopped.
+    void forgetTasks(const QString &server);
     // Forgets the documents opened in `server`.
     void forgetDocuments(const QString &server);
 
@@ -180,8 +197,15 @@ private:
         size_t hash = 0;
     };
 
-    QHash<QString, Document> documents_;           // by path
-    QHash<QString, QJsonArray> diagnostics_;       // by path
+    QHash<QString, Document> documents_;     // by path
+    QHash<QString, QJsonArray> diagnostics_; // by path
+
+    struct TrackedTask {
+        QString token; // the server's progress token
+        Task task;
+    };
+
+    QList<TrackedTask> tasks_;                     // oldest first
     QSet<QString> warmed_;                         // servers already asked a completion, by name
     mutable QHash<QString, QString> programPaths_; // lookups in the PATH
     // specFor() by language: asked at every typed character (trigger

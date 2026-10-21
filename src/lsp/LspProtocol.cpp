@@ -95,6 +95,30 @@ WorkspaceEdit parseWorkspaceEdit(const QJsonObject &edit)
     return files;
 }
 
+std::optional<Progress> parseProgress(const QJsonValue &params)
+{
+    const QJsonObject object = params.toObject();
+    const QJsonValue token = object.value("token");
+    const QJsonObject value = object.value("value").toObject();
+    const QString kind = value.value("kind").toString();
+    Progress progress;
+    if (kind == QLatin1String("begin"))
+        progress.kind = Progress::Kind::Begin;
+    else if (kind == QLatin1String("report"))
+        progress.kind = Progress::Kind::Report;
+    else if (kind == QLatin1String("end"))
+        progress.kind = Progress::Kind::End;
+    else
+        return std::nullopt;
+    // A string or an integer.
+    progress.token = token.isString() ? token.toString() : QString::number(token.toInteger());
+    progress.title = value.value("title").toString();
+    progress.message = value.value("message").toString();
+    if (value.value("percentage").isDouble())
+        progress.percentage = value.value("percentage").toInt();
+    return progress;
+}
+
 qsizetype offsetOf(const QString &text, const Position &position)
 {
     qsizetype lineStart = 0;

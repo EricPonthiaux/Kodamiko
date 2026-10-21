@@ -33,6 +33,7 @@
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspCompletionProvider.h"
+#include "lsp/ServerTasksLabel.h"
 #include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/GoToPopup.h"
@@ -661,6 +662,7 @@ void MainWindow::createStatusBar()
     usageLabel_->setContentsMargins(8, 0, 8, 0);
     usageLabel_->hide();
     editorStatus_ = new EditorStatus(this);
+    auto *serverTasks = new ServerTasksLabel(languageServers_, this);
 
     auto *trailing = new QWidget(this);
     auto *layout = new TrailingLayout(trailing);
@@ -668,10 +670,7 @@ void MainWindow::createStatusBar()
     layout->setSpacing(4);
     layout->setGroupSpacing(statusGroupSpacing);
     const QList<QList<QWidget *>> groups = {
-        {modeTabs_},
-        {syncButton_, branchButton_, cancelGitButton_},
-        {usageLabel_},
-        {editorStatus_},
+        {modeTabs_}, {syncButton_, branchButton_, cancelGitButton_}, {serverTasks}, {usageLabel_}, {editorStatus_},
     };
     for (const QList<QWidget *> &group : groups) {
         layout->startGroup();

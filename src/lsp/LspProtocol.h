@@ -8,6 +8,8 @@
 #include <QMap>
 #include <QString>
 
+#include <optional>
+
 // The Language Server Protocol's data, as Duet uses it: positions in lines
 // and UTF-16 code units (the encoding Duet asks for), locations, and the
 // edits of a rename or a quick fix.
@@ -71,6 +73,28 @@ QList<TextEdit> applicationOrder(QList<TextEdit> edits);
 
 // `text` with `edits` applied; they must not overlap.
 QString applyEdits(const QString &text, QList<TextEdit> edits);
+
+// A step of a server's long task (indexing...), from a "$/progress"
+// notification of the work done progress protocol.
+struct Progress {
+    enum class Kind {
+        Begin,
+        Report,
+        End
+    };
+
+    QString token; // identifies the task
+    Kind kind = Kind::Begin;
+    QString title; // in a Begin step only
+    QString message;
+    std::optional<int> percentage;
+
+    bool operator==(const Progress &) const = default;
+};
+
+// The params of "$/progress"; nullopt for another kind of progress
+// (partial results) or a malformed one.
+std::optional<Progress> parseProgress(const QJsonValue &params);
 
 // The Markdown of a "hover" result's contents: MarkupContent (Markdown, or
 // plain text as a code block), MarkedString (a code block when it names its

@@ -62,6 +62,8 @@ QJsonObject clientCapabilities()
     return QJsonObject{
         {"textDocument", textDocument},
         {"workspace", workspace},
+        // Long tasks (indexing) told with "$/progress".
+        {"window", QJsonObject{{"workDoneProgress", true}}},
         {"general", QJsonObject{{"positionEncodings", QJsonArray{"utf-16"}}}},
     };
 }

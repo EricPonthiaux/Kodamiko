@@ -16,6 +16,9 @@
 #include <QSysInfo>
 #include <QUrl>
 
+#include <algorithm>
+#include <utility>
+
 LanguageServers::LanguageServers(QObject *parent)
     : QObject(parent)
 {
@@ -177,6 +180,8 @@ void LanguageServers::stopAll()
     documents_.clear();
     warmed_.clear();
     failures_.clear(); // a new folder or a new setting: worth trying again
+    if (!std::exchange(tasks_, {}).isEmpty())
+        emit tasksChanged();
     const QStringList reported = diagnostics_.keys();
     diagnostics_.clear();
     for (const QString &path : reported)
@@ -416,10 +421,13 @@ LspClient *LanguageServers::startClient(const LanguageServerSpec &spec,
         client->setRequestHandler(handler.key(), handler.value());
     clients_.insert(name, client);
     connect(client, &LspClient::ready, this, [this, name] { emit statusMessage(tr("%1 is ready").arg(name)); });
-    connect(client, &LspClient::notificationReceived, this, &LanguageServers::receiveNotification);
+    connect(
+        client, &LspClient::notificationReceived, this,
+        [this, name](const QString &method, const QJsonValue &params) { receiveNotification(name, method, params); });
     connect(client, &LspClient::failed, this, [this, spec](const QString &message) {
         // Its documents must be opened again if it is restarted.
         forgetDocuments(spec.name);
+        forgetTasks(spec.name);
         fail(spec, message);
     });
     client->start();
@@ -427,8 +435,13 @@ LspClient *LanguageServers::startClient(const LanguageServerSpec &spec,
     return client;
 }
 
-void LanguageServers::receiveNotification(const QString &method, const QJsonValue &params)
+void LanguageServers::receiveNotification(const QString &server, const QString &method, const QJsonValue &params)
 {
+    if (method == QLatin1String("$/progress")) {
+        if (const std::optional<LspProtocol::Progress> progress = LspProtocol::parseProgress(params))
+            updateTask(server, *progress);
+        return;
+    }
     if (method != QLatin1String("textDocument/publishDiagnostics"))
         return;
     const QString path = QUrl(params.toObject().value("uri").toString()).toLocalFile();
@@ -436,6 +449,50 @@ void LanguageServers::receiveNotification(const QString &method, const QJsonValu
         return;
     diagnostics_.insert(path, params.toObject().value("diagnostics").toArray());
     emit diagnosticsChanged(path);
+}
+
+QList<LanguageServers::Task> LanguageServers::tasks() const
+{
+    QList<Task> tasks;
+    tasks.reserve(tasks_.size());
+    for (const TrackedTask &tracked : tasks_)
+        tasks.append(tracked.task);
+    return tasks;
+}
+
+void LanguageServers::updateTask(const QString &server, const LspProtocol::Progress &progress)
+{
+    using Kind = LspProtocol::Progress::Kind;
+    const auto tracked = std::ranges::find_if(
+        tasks_, [&](const TrackedTask &task) { return task.task.server == server && task.token == progress.token; });
+    switch (progress.kind) {
+    case Kind::Begin:
+        if (tracked != tasks_.end())
+            return; // a token begins once
+        tasks_.append({progress.token, {server, progress.title, progress.message, progress.percentage}});
+        break;
+    case Kind::Report:
+        if (tracked == tasks_.end())
+            return;
+        // A report leaves out what did not change.
+        if (!progress.message.isEmpty())
+            tracked->task.message = progress.message;
+        if (progress.percentage)
+            tracked->task.percentage = progress.percentage;
+        break;
+    case Kind::End:
+        if (tracked == tasks_.end())
+            return;
+        tasks_.erase(tracked);
+        break;
+    }
+    emit tasksChanged();
+}
+
+void LanguageServers::forgetTasks(const QString &server)
+{
+    if (tasks_.removeIf([&](const TrackedTask &task) { return task.task.server == server; }) > 0)
+        emit tasksChanged();
 }
 
 void LanguageServers::forgetDocuments(const QString &server)
