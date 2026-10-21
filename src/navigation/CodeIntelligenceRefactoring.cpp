@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// CodeIntelligence: rename, quick fixes, and the refactorings' edits.
+// CodeIntelligence: rename, and the refactorings' edits.
 
 #include "CodeIntelligence.h"
 #include "editor/EditorTabs.h"
@@ -15,7 +15,6 @@
 
 #include <QApplication>
 #include <QFileInfo>
-#include <QJsonArray>
 #include <QPointer>
 #include <QThreadPool>
 
@@ -295,67 +294,6 @@ void CodeIntelligence::completeReferenceUpdate(const WorkspaceEdit &edit, const 
     emit statusMessage(
         tr("%n reference(s) to “%1” updated; Edit ▸ Undo Refactoring reverts them", nullptr, edit.textEditCount())
             .arg(name));
-}
-
-void CodeIntelligence::showQuickFixes()
-{
-    EditorWidget *editor = tabs_->currentEditor();
-    LspClient *client = serverFor(editor);
-    if (!client || editor->isReadOnly())
-        return;
-    const int from = int(editor->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONSTART));
-    const int to = int(editor->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONEND));
-    const QJsonObject params{
-        {"textDocument", QJsonObject{{"uri", uriOf(editor->filePath())}}},
-        {"range", toJson(Range{lspPosition(editor, from), lspPosition(editor, to)})},
-        {"context", QJsonObject{{"diagnostics", QJsonArray{}}}},
-    };
-    client->request(QStringLiteral("textDocument/codeAction"), params,
-                    [this, guard = QPointer<EditorWidget>(editor),
-                     server = QPointer<LspClient>(client)](const QJsonValue &result, const QString &error) {
-                        if (!guard)
-                            return;
-                        if (!error.isEmpty()) {
-                            emit statusMessage(tr("Quick fixes failed: %1").arg(error));
-                            return;
-                        }
-                        chooseQuickFix(guard, server, result.toArray());
-                    });
-}
-
-void CodeIntelligence::chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions)
-{
-    QList<QJsonObject> actions;
-    QStringList titles;
-    for (const QJsonValue &item : codeActions) {
-        const QJsonObject action = item.toObject();
-        if (action.contains("disabled") || action.value("title").toString().isEmpty())
-            continue;
-        actions.append(action);
-        titles.append(action.value("title").toString());
-    }
-    if (actions.isEmpty()) {
-        emit statusMessage(tr("No quick fixes here"));
-        return;
-    }
-    const int chosen = chooseFrom(editor, titles);
-    if (chosen < 0)
-        return;
-    const QJsonObject action = actions.at(chosen);
-    if (action.contains("edit"))
-        applyWorkspaceEdit(parseWorkspaceEdit(action.value("edit").toObject()), action.value("title").toString());
-    // The server carries the command out and sends back the edit
-    // ("workspace/applyEdit").
-    const QJsonObject command = commandOf(action);
-    if (command.isEmpty() || !server)
-        return;
-    server->request(
-        QStringLiteral("workspace/executeCommand"),
-        QJsonObject{{"command", command.value("command")}, {"arguments", command.value("arguments").toArray()}},
-        [this](const QJsonValue &, const QString &error) {
-            if (!error.isEmpty())
-                emit statusMessage(tr("The quick fix failed: %1").arg(error));
-        });
 }
 
 int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit, const QString &description)

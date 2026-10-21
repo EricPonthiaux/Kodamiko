@@ -2,6 +2,7 @@
 
 #include "HierarchyView.h"
 
+#include "outline/SymbolIcons.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/ViewHeader.h"
 
@@ -14,6 +15,8 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <optional>
+
 namespace {
 
 // Item data roles.
@@ -21,6 +24,42 @@ constexpr int elementRole = Qt::UserRole; // in elements_, -1 for a placeholder
 constexpr int loadedRole = Qt::UserRole + 1;
 
 constexpr int noElement = -1;
+
+// The outline's kind of an element, from its LSP SymbolKind; none for a
+// kind the outline does not show (a file, a literal...).
+std::optional<SymbolKind> symbolKindOf(const LspProtocol::HierarchyItem &element)
+{
+    switch (element.raw.value("kind").toInt()) {
+    case 2: // Module
+    case 3: // Namespace
+    case 4: // Package
+        return SymbolKind::Namespace;
+    case 5:
+        return SymbolKind::Class;
+    case 6:  // Method
+    case 9:  // Constructor
+    case 25: // Operator
+        return SymbolKind::Method;
+    case 7:  // Property
+    case 8:  // Field
+    case 13: // Variable
+    case 14: // Constant
+    case 22: // EnumMember
+        return SymbolKind::Field;
+    case 10:
+        return SymbolKind::Enum;
+    case 11:
+        return SymbolKind::Interface;
+    case 12:
+        return SymbolKind::Function;
+    case 23:
+        return SymbolKind::Struct;
+    case 26: // TypeParameter
+        return SymbolKind::Type;
+    default:
+        return std::nullopt;
+    }
+}
 
 } // namespace
 
@@ -111,7 +150,13 @@ QTreeWidgetItem *HierarchyView::addItem(QTreeWidgetItem *parent, const LspProtoc
     auto *item = parent ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(tree_);
     const QString file = QFileInfo(element.filePath).fileName();
     item->setText(0, QStringLiteral("%1  %2:%3").arg(element.name, file).arg(element.selectionRange.start.line + 1));
-    item->setToolTip(0, element.detail.isEmpty() ? element.name : element.detail);
+    const QString description = element.detail.isEmpty() ? element.name : element.detail;
+    if (const std::optional<SymbolKind> kind = symbolKindOf(element)) {
+        item->setIcon(0, SymbolIcons::icon(*kind));
+        item->setToolTip(0, QStringLiteral("%1 — %2").arg(description, SymbolIcons::name(*kind)));
+    } else {
+        item->setToolTip(0, description);
+    }
     item->setData(0, elementRole, int(elements_.size()));
     item->setChildIndicatorPolicy(QTreeWidgetItem::ShowIndicator); // known once unfolded
     elements_.push_back(element);

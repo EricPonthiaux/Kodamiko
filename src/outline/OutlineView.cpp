@@ -4,6 +4,7 @@
 
 #include "IOutlineProvider.h"
 #include "OutlineProviders.h"
+#include "SymbolIcons.h"
 #include "editor/EditorWidget.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/ViewHeader.h"
@@ -13,7 +14,6 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPainter>
 #include <QScrollBar>
 #include <QStackedWidget>
 #include <QToolButton>
@@ -30,73 +30,6 @@ constexpr int refreshDelayMs = 300;
 constexpr int positionRole = Qt::UserRole;
 constexpr int startLineRole = Qt::UserRole + 1;
 constexpr int endLineRole = Qt::UserRole + 2;
-
-struct KindStyle {
-    char letter{};
-    QColor color;
-    const char *description{};
-};
-
-KindStyle styleOf(SymbolKind kind)
-{
-    switch (kind) {
-    case SymbolKind::Namespace:
-        return {'N', QColor("#8a94a6"), QT_TRANSLATE_NOOP("OutlineView", "Namespace")};
-    case SymbolKind::Class:
-        return {'C', QColor("#d19a40"), QT_TRANSLATE_NOOP("OutlineView", "Class")};
-    case SymbolKind::Struct:
-        return {'S', QColor("#c7783e"), QT_TRANSLATE_NOOP("OutlineView", "Struct")};
-    case SymbolKind::Interface:
-        return {'I', QColor("#3fa7a0"), QT_TRANSLATE_NOOP("OutlineView", "Interface")};
-    case SymbolKind::Enum:
-        return {'E', QColor("#b5a13a"), QT_TRANSLATE_NOOP("OutlineView", "Enum")};
-    case SymbolKind::Type:
-        return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Type")};
-    case SymbolKind::Function:
-        return {'f', QColor("#9b6fd1"), QT_TRANSLATE_NOOP("OutlineView", "Function")};
-    case SymbolKind::Method:
-        return {'m', QColor("#a573c9"), QT_TRANSLATE_NOOP("OutlineView", "Method")};
-    case SymbolKind::Field:
-        return {'v', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Field")};
-    case SymbolKind::Macro:
-        return {'#', QColor("#c25b6b"), QT_TRANSLATE_NOOP("OutlineView", "Macro")};
-    case SymbolKind::Heading:
-        return {'H', QColor("#4b8fd6"), QT_TRANSLATE_NOOP("OutlineView", "Heading")};
-    case SymbolKind::Target:
-        return {'T', QColor("#4fa36b"), QT_TRANSLATE_NOOP("OutlineView", "Target")};
-    }
-    return {'?', QColor("#8a94a6"), ""};
-}
-
-// Colored badge bearing a letter, readable on light and dark backgrounds alike.
-QIcon iconFor(SymbolKind kind)
-{
-    static QHash<int, QIcon> cache;
-    if (const auto it = cache.constFind(static_cast<int>(kind)); it != cache.constEnd())
-        return *it;
-
-    const KindStyle style = styleOf(kind);
-    QIcon icon;
-    for (const int size : {16, 32}) {
-        QPixmap pixmap(size, size);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(style.color);
-        const qreal margin = size / 16.0;
-        painter.drawRoundedRect(QRectF(margin, margin, size - 2 * margin, size - 2 * margin), size / 4.0, size / 4.0);
-        QFont font = painter.font();
-        font.setPixelSize(size * 11 / 16);
-        font.setBold(true);
-        painter.setFont(font);
-        painter.setPen(Qt::white);
-        painter.drawText(QRect(0, 0, size, size), Qt::AlignCenter, QString(QLatin1Char(style.letter)));
-        icon.addPixmap(pixmap);
-    }
-    cache.insert(static_cast<int>(kind), icon);
-    return icon;
-}
 
 } // namespace
 
@@ -298,9 +231,9 @@ void OutlineView::populate(const std::vector<OutlineSymbol> &symbols)
             for (const OutlineSymbol &symbol : children) {
                 auto *item = new QTreeWidgetItem(parent);
                 item->setText(0, symbol.name);
-                item->setIcon(0, iconFor(symbol.kind));
+                item->setIcon(0, SymbolIcons::icon(symbol.kind));
                 item->setToolTip(0, QStringLiteral("%1 — %2 (line %3)")
-                                        .arg(symbol.name, tr(styleOf(symbol.kind).description))
+                                        .arg(symbol.name, SymbolIcons::name(symbol.kind))
                                         .arg(symbol.startLine + 1));
                 item->setData(0, positionRole, symbol.position);
                 item->setData(0, startLineRole, symbol.startLine);

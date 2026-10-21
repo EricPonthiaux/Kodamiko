@@ -182,6 +182,8 @@ private:
     void createFoldingMenu(QMenu *edit);
     // The current editor in Edit mode, null otherwise.
     EditorWidget *editorInEditMode() const;
+    // The current editor's file, renamed with its includes and imports.
+    void renameCurrentFile();
     void createNavigateMenu();
     // editorContextActions_, from the menus' actions.
     void createEditorContextActions();
@@ -535,11 +537,15 @@ private:
     QSystemTrayIcon *trayIcon_ = nullptr;
     QAction *snapshotBeforePrompt_ = nullptr;
     QAction *shareEditorContext_ = nullptr;
-    QList<QAction *> codeRequestActions_; // also in the editor's context menu
-    QList<QAction *> refactoringActions_; // also in the editor's context menu
-    QList<QAction *> navigationActions_;  // also in the editor's context menu
-    // On top of the editor's context menu: the refactorings, the
-    // navigation, then the agent's submenu.
+    // Also in the editor's context menu (createEditorContextActions()).
+    QList<QAction *> codeRequestActions_;
+    QAction *renameAction_ = nullptr;
+    QAction *findUsagesAction_ = nullptr;
+    QList<QAction *> navigationActions_; // the Go to and the hierarchies
+    QAction *quickFixesAction_ = nullptr;
+    QAction *undoRefactoringAction_ = nullptr;
+    // On top of the editor's context menu: Rename, Find Usages and the
+    // agent's submenu, the navigation, then the quick fixes.
     QList<QAction *> editorContextActions_;
     QAction *exposeTools_ = nullptr;
     QAction *claudeNotifications_ = nullptr;

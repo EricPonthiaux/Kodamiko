@@ -134,9 +134,10 @@ add_library(duet_core STATIC
     lsp/LspProtocol.cpp
     lsp/ServerTasksLabel.cpp
     navigation/CodeIntelligence.cpp
+    navigation/CodeIntelligenceCodeActions.cpp
     navigation/CodeIntelligenceHierarchy.cpp
+    navigation/CodeIntelligenceMoveClass.cpp
     navigation/CodeIntelligenceRefactoring.cpp
-    navigation/CodeIntelligenceRefactorThis.cpp
     navigation/CodeIntelligenceSignature.cpp
     navigation/CodeIntelligenceUsages.cpp
     navigation/CodeNavigator.cpp
@@ -165,6 +166,7 @@ add_library(duet_core STATIC
     outline/OutlineProviders.cpp
     outline/OutlineSymbol.cpp
     outline/OutlineView.cpp
+    outline/SymbolIcons.cpp
     outline/TextOutlines.cpp
     outline/TreeSitterOutline.cpp
     projects/ProjectConfig.cpp
@@ -211,6 +213,7 @@ add_library(duet_core STATIC
     ui/HoverCloseButtons.cpp
     ui/HoverProgress.cpp
     ui/KdeThemes.cpp
+    ui/LetterBadges.cpp
     ui/MessagePopup.cpp
     ui/Motion.cpp
     ui/NoticeBar.cpp

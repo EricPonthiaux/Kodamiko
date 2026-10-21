@@ -84,11 +84,9 @@ public:
     void showCallHierarchy();
     void showTypeHierarchy();
     void rename();
+    // The server's code actions at the cursor: its quick fixes, made at
+    // once, and its refactorings, shown in the preview first.
     void showQuickFixes();
-    // Refactor This, as in IntelliJ: a menu of the refactorings at the
-    // cursor, Duet's (rename, rename the file, move the class to its own
-    // file) and the server's ("refactor" code actions), each shown first.
-    void refactorThis();
     // The class at the cursor (C++, Java) in a file of its own, its
     // members' definitions too, after a preview.
     void moveClassToOwnFile();
@@ -161,8 +159,6 @@ signals:
     void statusMessage(const QString &message);
     void usagesFound(const UsageResults &results);
     void hierarchyFound(const Hierarchy &hierarchy);
-    // Refactor This ▸ Rename File: for the file tree.
-    void renameFileRequested(const QString &path);
 
 private:
     // The server of `editor`'s language, with the editor's text sent to it;
@@ -236,11 +232,6 @@ private:
 
     // Works the edit of `change` out off the UI thread, then proposes it.
     void planSignatureChange(const SignatureChange &change);
-    // The Refactor This menu, with the server's `actions` (none without
-    // `server`).
-    void chooseRefactoring(EditorWidget *editor, LspClient *server, const QList<QJsonObject> &actions);
-    // A server's refactoring: its edit after a preview, then its command.
-    void applyRefactoring(LspClient *server, const QJsonObject &action);
     // What Move Class needs from `editor`, and from its source.
     MoveClass::Input moveClassInput(EditorWidget *editor) const;
     void completeReferenceUpdate(const LspProtocol::WorkspaceEdit &edit, const QString &name);
@@ -264,6 +255,9 @@ private:
     // Offers the server's `codeActions` in a menu, and carries out the
     // chosen one.
     void chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions);
+    // A server's code action: its edit (after a preview for a
+    // refactoring), then its command.
+    void applyCodeAction(LspClient *server, const QJsonObject &action);
     // The servers read the files no longer open from disk again.
     void closeDocumentsOfClosedTabs();
     // Shows the problems of `path` in its editor.

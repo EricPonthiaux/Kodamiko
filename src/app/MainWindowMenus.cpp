@@ -68,10 +68,9 @@ void MainWindow::createEditorContextActions()
     auto *agent = new QMenu(this);
     agent->addActions(codeRequestActions_);
     nameAfterAgent(agent->menuAction(), tr("%1"));
-    editorContextActions_ = refactoringActions_;
-    editorContextActions_ << separator();
+    editorContextActions_ = {renameAction_, findUsagesAction_, agent->menuAction(), separator()};
     editorContextActions_ << navigationActions_;
-    editorContextActions_ << separator() << agent->menuAction();
+    editorContextActions_ << separator() << quickFixesAction_ << undoRefactoringAction_;
 }
 
 void MainWindow::createFileMenu()
@@ -286,16 +285,15 @@ void MainWindow::createEditMenu()
                     inCode(&CodeIntelligence::showParameterInfo));
     edit->addAction(tr("&Quick Documentation"), QKeySequence(tr("Ctrl+Q")), this,
                     inCode(&CodeIntelligence::showDocumentation));
-    refactoringActions_.append(edit->addAction(tr("Refactor &This…"), QKeySequence(tr("Ctrl+Alt+Shift+T")), this,
-                                               inCode(&CodeIntelligence::refactorThis)));
-    refactoringActions_.append(
-        edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename)));
-    refactoringActions_.append(edit->addAction(tr("Change Si&gnature…"), QKeySequence(tr("Ctrl+F6")), this,
-                                               inCode(&CodeIntelligence::changeSignature)));
-    refactoringActions_.append(edit->addAction(tr("Move C&lass to Its Own File"), QKeySequence(tr("F6")), this,
-                                               inCode(&CodeIntelligence::moveClassToOwnFile)));
-    refactoringActions_.append(edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
-                                               inCode(&CodeIntelligence::showQuickFixes)));
+    renameAction_ =
+        edit->addAction(tr("Re&name…"), QKeySequence(tr("Shift+F6")), this, inCode(&CodeIntelligence::rename));
+    edit->addAction(tr("Rename &File…"), this, &MainWindow::renameCurrentFile);
+    edit->addAction(tr("Change Si&gnature…"), QKeySequence(tr("Ctrl+F6")), this,
+                    inCode(&CodeIntelligence::changeSignature));
+    edit->addAction(tr("Move C&lass to Its Own File"), QKeySequence(tr("F6")), this,
+                    inCode(&CodeIntelligence::moveClassToOwnFile));
+    quickFixesAction_ = edit->addAction(tr("Show Quick F&ixes…"), QKeySequence(tr("Alt+Return")), this,
+                                        inCode(&CodeIntelligence::showQuickFixes));
     // In every file the refactoring changed, open or not.
     QAction *undoRefactoring = edit->addAction(tr("&Undo Refactoring"), QKeySequence(tr("Ctrl+Alt+Shift+Z")), this,
                                                inCode(&CodeIntelligence::undoRefactoring));
@@ -307,7 +305,7 @@ void MainWindow::createEditMenu()
     };
     connect(intelligence_->history(), &RefactoringHistory::changed, this, updateUndoRefactoring);
     updateUndoRefactoring();
-    refactoringActions_.append(undoRefactoring);
+    undoRefactoringAction_ = undoRefactoring;
     edit->addAction(tr("F&ormat Document"), QKeySequence(tr("Ctrl+Alt+L")), this, [this] {
         if (mode_ == Mode::Edit)
             editorTabs_->formatCurrent();
@@ -351,6 +349,14 @@ EditorWidget *MainWindow::editorInEditMode() const
     return mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
 }
 
+void MainWindow::renameCurrentFile()
+{
+    // In the tree, which updates the includes and imports.
+    const EditorWidget *editor = editorInEditMode();
+    if (editor && !editor->filePath().isEmpty())
+        fileTree_->renameEntry(editor->filePath());
+}
+
 void MainWindow::createNavigateMenu()
 {
     QMenu *navigate = titleBar_->menuBar()->addMenu(tr("&Navigate"));
@@ -383,8 +389,8 @@ void MainWindow::createNavigateMenu()
                                                   this, inEditMode([this] { intelligence_->goToImplementation(); })));
     navigationActions_.append(navigate->addAction(tr("Go to T&ype Declaration"), QKeySequence(tr("Ctrl+Shift+B")), this,
                                                   inEditMode([this] { intelligence_->goToTypeDeclaration(); })));
-    navigationActions_.append(navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this,
-                                                  inEditMode([this] { intelligence_->findUsages(); })));
+    findUsagesAction_ = navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this,
+                                            inEditMode([this] { intelligence_->findUsages(); }));
     navigationActions_.append(navigate->addAction(tr("&Call Hierarchy"), QKeySequence(tr("Ctrl+Alt+H")), this,
                                                   inEditMode([this] { intelligence_->showCallHierarchy(); })));
     navigationActions_.append(navigate->addAction(tr("Type Hi&erarchy"), QKeySequence(tr("Ctrl+H")), this,

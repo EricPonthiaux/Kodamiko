@@ -23,7 +23,6 @@
 #include <QJsonArray>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMenu>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -584,29 +583,6 @@ private slots:
         project.intelligence.undoRefactoring();
         QVERIFY2(!QFileInfo::exists(project.dir.filePath("Circle.h")), qPrintable(project.messages.join('\n')));
         QCOMPARE(editor->text(), QString("#pragma once\n\nclass Square {};\n\nclass Circle {};\n"));
-    }
-
-    void refactorThisOffersDuetsRefactoringsWithoutAServer()
-    {
-        ClangdProject project;
-        const QString path = project.dir.filePath("notes.cpp");
-        write(path, "class A {};\n");
-        QVERIFY(project.tabs.openFile(path));
-        QStringList entries;
-        QTimer::singleShot(0, this, [&entries] {
-            auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
-            QVERIFY(menu);
-            for (const QAction *action : menu->actions()) {
-                if (!action->isSeparator())
-                    entries.append(action->text());
-            }
-            menu->close();
-        });
-
-        project.servers.setEnabled(false); // no server: Duet's alone
-        project.intelligence.refactorThis();
-
-        QCOMPARE(entries, (QStringList{"Rename…", "Rename File…", "Change Signature…", "Move Class to Its Own File"}));
     }
 
     void renamesAFileWithItsIncludesAsOneRefactoring()

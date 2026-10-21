@@ -3,6 +3,7 @@
 #include "UsagesView.h"
 
 #include "ui/FileIcons.h"
+#include "ui/LetterBadges.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/ViewHeader.h"
 
@@ -49,22 +50,42 @@ QString kindName(UsageKind kind)
     return {};
 }
 
-// After the line of a usage that is not a mere read.
-QString kindTag(UsageKind kind)
+// In the tooltip of a usage.
+QString kindLabel(UsageKind kind)
 {
     switch (kind) {
     case UsageKind::Declaration:
-        return UsagesView::tr("declaration");
-    case UsageKind::Write:
-        return UsagesView::tr("write");
-    case UsageKind::Call:
-        return UsagesView::tr("call");
-    case UsageKind::Import:
-        return UsagesView::tr("import");
-    case UsageKind::Textual:
-        return UsagesView::tr("text");
+        return UsagesView::tr("Declaration");
     case UsageKind::Read:
-        break;
+        return UsagesView::tr("Read");
+    case UsageKind::Write:
+        return UsagesView::tr("Write");
+    case UsageKind::Call:
+        return UsagesView::tr("Call");
+    case UsageKind::Import:
+        return UsagesView::tr("Import");
+    case UsageKind::Textual:
+        return UsagesView::tr("In a comment or a string");
+    }
+    return {};
+}
+
+// A badge as the outline's, in the colors of its symbols.
+QIcon kindIcon(UsageKind kind)
+{
+    switch (kind) {
+    case UsageKind::Declaration:
+        return LetterBadges::icon(QLatin1Char('D'), QColor("#d19a40"));
+    case UsageKind::Read:
+        return LetterBadges::icon(QLatin1Char('R'), QColor("#4b8fd6"));
+    case UsageKind::Write:
+        return LetterBadges::icon(QLatin1Char('W'), QColor("#c25b6b"));
+    case UsageKind::Call:
+        return LetterBadges::icon(QLatin1Char('C'), QColor("#9b6fd1"));
+    case UsageKind::Import:
+        return LetterBadges::icon(QLatin1Char('I'), QColor("#4fa36b"));
+    case UsageKind::Textual:
+        return LetterBadges::icon(QLatin1Char('T'), QColor("#8a94a6"));
     }
     return {};
 }
@@ -73,13 +94,6 @@ QString kindTag(UsageKind kind)
 QString emptyText()
 {
     return UsagesView::tr("Find Usages (Alt+F7) lists here\nthe usages of the name at the cursor");
-}
-
-QString usageText(const Usage &usage)
-{
-    const QString tag = kindTag(usage.kind);
-    const QString line = QStringLiteral("%1  %2").arg(usage.line + 1).arg(usage.lineText.trimmed());
-    return tag.isEmpty() ? line : QStringLiteral("%1   · %2").arg(line, tag);
 }
 
 } // namespace
@@ -258,8 +272,9 @@ void UsagesView::addFile(const QString &path, const QList<Usage> &usages)
     fileItem->setData(0, pathRole, path);
     for (const Usage &usage : usages) {
         auto *item = new QTreeWidgetItem(fileItem);
-        item->setText(0, usageText(usage));
-        item->setToolTip(0, usage.lineText.trimmed());
+        item->setText(0, QStringLiteral("%1  %2").arg(usage.line + 1).arg(usage.lineText.trimmed()));
+        item->setIcon(0, kindIcon(usage.kind));
+        item->setToolTip(0, QStringLiteral("%1 — %2").arg(usage.lineText.trimmed(), kindLabel(usage.kind)));
         item->setData(0, pathRole, path);
         item->setData(0, lineRole, usage.line);
         item->setData(0, columnRole, usage.column);

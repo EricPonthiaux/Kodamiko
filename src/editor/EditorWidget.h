@@ -102,8 +102,8 @@ public:
     void setOptions(const EditorOptions &options);
 
     // Actions at the top of the context menu when the editor shows a file
-    // (refactorings, navigation, the agent's submenu), separators
-    // included. Not owned.
+    // (Rename, Find Usages, the agent's submenu, navigation...),
+    // separators included. Not owned.
     void setFileActions(const QList<QAction *> &actions) { fileActions_ = actions; }
 
     // The context menu: QScintilla's without Undo and Redo, with the file
