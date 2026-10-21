@@ -78,6 +78,11 @@ void HierarchyView::setDirection(Hierarchy::Direction direction)
     rebuild();
 }
 
+void HierarchyView::clear()
+{
+    showHierarchy({});
+}
+
 void HierarchyView::updateButtons()
 {
     up_->setToolTip(hierarchy_.upName.isEmpty() ? tr("Up") : hierarchy_.upName);

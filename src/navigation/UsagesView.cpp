@@ -69,6 +69,12 @@ QString kindTag(UsageKind kind)
     return {};
 }
 
+// The placeholder's text before the first search.
+QString emptyText()
+{
+    return UsagesView::tr("Find Usages (Alt+F7) lists here\nthe usages of the name at the cursor");
+}
+
 QString usageText(const Usage &usage)
 {
     const QString tag = kindTag(usage.kind);
@@ -84,7 +90,7 @@ UsagesView::UsagesView(QWidget *parent)
     , filterMenu_(new QMenu(this))
     , historyMenu_(new QMenu(this))
     , tree_(new QTreeWidget(this))
-    , placeholder_(new QLabel(tr("Find Usages (Alt+F7) lists here\nthe usages of the name at the cursor"), this))
+    , placeholder_(new QLabel(emptyText(), this))
     , stack_(new QStackedWidget(this))
 {
     connect(header_->addButton(QStringLiteral("refresh"), tr("Rerun the Search")), &QToolButton::clicked, this, [this] {
@@ -213,6 +219,7 @@ void UsagesView::rebuild()
     tree_->clear();
     if (current_ < 0) {
         header_->setDetail({});
+        placeholder_->setText(emptyText());
         stack_->setCurrentWidget(placeholder_);
         tree_->setUpdatesEnabled(true);
         return;

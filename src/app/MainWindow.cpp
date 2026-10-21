@@ -357,15 +357,15 @@ QWidget *MainWindow::createEditPage()
     createProblemsAndOutline();
     QWidget *editorArea = createEditorArea();
 
-    // Files, Outline and Claude as KDevelop's tool views: vertical tabs at the
-    // window's edge, the panel next to them.
+    // The tool views as KDevelop's: vertical tabs at the window's edge, the
+    // panel next to them.
     sidebar_ = new SidePanel(this);
     sidebar_->addView(filesPanel_, {}, tr("Files"));
     sidebar_->addView(outlineView_, {}, tr("Outline"));
-    sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
-    sidebar_->addView(problemsView_, {}, tr("Problems"));
     sidebar_->addView(usagesView_, {}, tr("Usages"));
     sidebar_->addView(hierarchyView_, {}, tr("Hierarchy"));
+    sidebar_->addView(problemsView_, {}, tr("Problems"));
+    sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
     titleBar_->alignLogoWith(sidebar_->tabBar());
 
     editSplitter_ = new GripSplitter(Qt::Horizontal, this);

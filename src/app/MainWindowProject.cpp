@@ -19,6 +19,7 @@
 #include "index/OccurrenceIndex.h"
 #include "lsp/LanguageServers.h"
 #include "navigation/GoToPopup.h"
+#include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
 #include "projects/ProjectStore.h"
 #include "run/Runner.h"
@@ -80,6 +81,7 @@ void MainWindow::openFolder(const QString &folder)
     problemStore_->clearBuildProblems();
     problemsView_->setProjectFolder(folder_);
     usagesView_->setProjectFolder(folder_);
+    hierarchyView_->clear();
     runner_->setProject(project_, toolchains_.get());
     agentMerges_->setFolder(folder_);
     agentMerges_->setCheckCommand(project_.agentCheckCommand);

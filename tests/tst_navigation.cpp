@@ -15,12 +15,15 @@
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
+#include <QLabel>
 #include <QLineEdit>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QtTest>
+
+#include <algorithm>
 
 namespace {
 
@@ -418,6 +421,29 @@ private slots:
                                                                          {Hierarchy::Direction::Up, "main"},
                                                                          {Hierarchy::Direction::Down, "total"}}));
         QCOMPARE(opened, QList<int>{7});
+    }
+
+    void hierarchyPaneForgetsItsHierarchyWhenCleared()
+    {
+        HierarchyView view;
+        view.showHierarchy({"Calls of “total”", "Callers", "Callees", {LspProtocol::HierarchyItem{"total"}}, {}});
+
+        view.clear();
+
+        QCOMPARE(view.tree()->topLevelItemCount(), 0);
+    }
+
+    void usagesPaneForgetsItsSearchesInAnotherProject()
+    {
+        UsagesView view;
+        view.setProjectFolder("/p");
+        view.showResults({{"total", "/p/a.cpp", {0, 4}}, {}, true});
+
+        view.setProjectFolder("/q");
+
+        QVERIFY(view.history().isEmpty());
+        const QList<QLabel *> labels = view.findChildren<QLabel *>();
+        QVERIFY(std::ranges::none_of(labels, [](const QLabel *label) { return label->text().contains("total"); }));
     }
 
     void usagesPaneKeepsTheEarlierSearchesAndRunsOneAgain()

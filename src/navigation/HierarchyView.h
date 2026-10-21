@@ -31,6 +31,8 @@ public:
     // Shows `hierarchy` upwards, its roots unfolded.
     void showHierarchy(Hierarchy hierarchy);
     void setDirection(Hierarchy::Direction direction);
+    // Back to the placeholder, as before the first hierarchy.
+    void clear();
 
     Hierarchy::Direction direction() const { return direction_; }
 
