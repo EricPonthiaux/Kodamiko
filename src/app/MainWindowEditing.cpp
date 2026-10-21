@@ -30,11 +30,15 @@ void MainWindow::onCurrentTabChanged()
         findBar_->dismiss();
     editorStatus_->setEditor(mode_ == Mode::Edit ? editor : nullptr);
     const QString path = editorTabs_->currentFilePath();
+    // Qt reports the current tab again when a tab before it closes or moves:
+    // the tree then stays where the user left it.
+    const bool isAnotherFile = path != currentTabPath_;
+    currentTabPath_ = path;
     recentFiles_.touch(path);
     // Looked at: the file loses its dot.
     if (claudeTouched_.remove(path))
         updateClaudeMarks();
-    if (filesPanel_->alwaysSelectOpenedFile() && !path.isEmpty())
+    if (filesPanel_->alwaysSelectOpenedFile() && isAnotherFile && !path.isEmpty())
         fileTree_->select(path);
     updateServerNotice();
 }

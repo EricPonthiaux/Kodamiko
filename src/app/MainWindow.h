@@ -428,6 +428,7 @@ private:
     EditorTabs *editorTabs_ = nullptr;
     FilesPanel *filesPanel_ = nullptr;
     FileTreeView *fileTree_ = nullptr;
+    QString currentTabPath_; // as onCurrentTabChanged() last saw it
     FileStatusReader *fileStatuses_ = nullptr;
     bool inRepository_ = false;
     // Files written by Claude since the last prompt: a dot in the tree.

@@ -458,8 +458,15 @@ bool EditorTabs::hasUnsavedChangesUnder(const QString &path) const
 
 void EditorTabs::closeFilesUnder(const QString &path)
 {
-    for (const QWidget *page : pagesUnder(path))
+    for (const QWidget *page : withCurrentLast(pagesUnder(path)))
         closeTab(indexOf(page), false);
+}
+
+QList<QWidget *> EditorTabs::withCurrentLast(QList<QWidget *> pages) const
+{
+    if (pages.removeOne(currentWidget()))
+        pages.append(currentWidget());
+    return pages;
 }
 
 void EditorTabs::followRename(const QString &oldPath, const QString &newPath)
@@ -758,17 +765,16 @@ bool EditorTabs::askToSaveBeforeClosing(QWidget *page)
 
 bool EditorTabs::closeAll()
 {
-    while (count() > 0) {
-        if (!closeTab(count() - 1))
-            return false;
-    }
-    return true;
+    QList<QWidget *> pages;
+    for (int i = 0; i < count(); ++i)
+        pages.append(widget(i));
+    return closeTabs(pages);
 }
 
 bool EditorTabs::closeTabs(const QList<QWidget *> &pages)
 {
     // Indexes shift with each close, so work from the pages.
-    return std::ranges::all_of(pages, [this](const QWidget *page) {
+    return std::ranges::all_of(withCurrentLast(pages), [this](const QWidget *page) {
         const int index = indexOf(page);
         return index < 0 || closeTab(index);
     });

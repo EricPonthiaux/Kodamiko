@@ -164,7 +164,12 @@ private:
     QString filePathOf(QWidget *page) const;
     // Pages of the files under `path`.
     QList<QWidget *> pagesUnder(const QString &path) const;
-    // Closes the given pages, stopping if the user cancels.
+    // `pages` in the order to close them: the current one last. Closed
+    // first, it would make each of the others current in turn, and the file
+    // tree, which follows the current tab, would run through their files.
+    QList<QWidget *> withCurrentLast(QList<QWidget *> pages) const;
+    // Closes the given pages, the current one last, stopping if the user
+    // cancels.
     bool closeTabs(const QList<QWidget *> &pages);
     void showTabContextMenu(const QPoint &pos);
     // Saves now, formatting first (blocking) with format on save: for the

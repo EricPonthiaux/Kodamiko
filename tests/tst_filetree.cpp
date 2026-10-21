@@ -15,6 +15,7 @@
 #include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QPointer>
+#include <QScrollBar>
 #include <QSignalSpy>
 #include <QTabBar>
 #include <QTemporaryDir>
@@ -192,6 +193,73 @@ private slots:
         QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("a.txt"), dir.filePath("b.txt")}));
     }
 
+    void replacingThePreviewShowsNoOtherTabMeanwhile()
+    {
+        const QTemporaryDir dir;
+        for (const char *name : {"kept.txt", "a.txt", "b.txt"})
+            write(dir.filePath(name), "text\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openFile(dir.filePath("kept.txt")));
+        QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
+        QStringList shown;
+        connect(&tabs, &QTabWidget::currentChanged, &tabs, [&shown, &tabs] { shown.append(tabs.currentFilePath()); });
+
+        QVERIFY(tabs.openPreview(dir.filePath("b.txt")));
+
+        // The file tree follows the current tab: kept.txt in between made it jump there.
+        QCOMPARE(shown, QStringList({dir.filePath("b.txt")}));
+        QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("kept.txt"), dir.filePath("b.txt")}));
+    }
+
+    void aPreviewThatCannotOpenLeavesThePreviousOne()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("a.txt"), "text\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
+
+        QVERIFY(!tabs.openPreview(dir.filePath("missing.txt")));
+
+        QCOMPARE(tabs.openFilePaths(), QStringList({dir.filePath("a.txt")}));
+        QVERIFY(tabs.tabBar()->property("preview").toBool());
+    }
+
+    void closingAllTabsShowsNoOtherTabMeanwhile()
+    {
+        const QTemporaryDir dir;
+        EditorTabs tabs(Theme::dark());
+        for (const char *name : {"a.txt", "b.txt", "c.txt"}) {
+            write(dir.filePath(name), "text\n");
+            QVERIFY(tabs.openFile(dir.filePath(name)));
+        }
+        QStringList shown;
+        connect(&tabs, &QTabWidget::currentChanged, &tabs, [&shown, &tabs] { shown.append(tabs.currentFilePath()); });
+
+        QVERIFY(tabs.closeAll());
+
+        // The file tree follows the current tab: b.txt and a.txt in between made it run through them.
+        shown.removeDuplicates(); // c.txt again as each tab before it closes
+        QCOMPARE(shown, QStringList({dir.filePath("c.txt"), QString()}));
+    }
+
+    void deletingAFolderShowsNoneOfItsFilesMeanwhile()
+    {
+        const QTemporaryDir dir;
+        EditorTabs tabs(Theme::dark());
+        for (const char *name : {"folder/a.txt", "folder/b.txt", "kept.txt"}) {
+            write(dir.filePath(name), "text\n");
+            QVERIFY(tabs.openFile(dir.filePath(name)));
+        }
+        tabs.setCurrentIndex(0); // folder/a.txt
+        QStringList shown;
+        connect(&tabs, &QTabWidget::currentChanged, &tabs, [&shown, &tabs] { shown.append(tabs.currentFilePath()); });
+
+        tabs.closeFilesUnder(dir.filePath("folder"));
+
+        // folder/b.txt in between made the file tree, which follows the current tab, jump there.
+        QCOMPARE(shown, QStringList({dir.filePath("kept.txt")}));
+    }
+
     void severalSelectedEntriesAreCutAndPastedTogether()
     {
         const QTemporaryDir dir;
@@ -255,6 +323,52 @@ private slots:
         QTest::keyClick(&tree, Qt::Key_Escape);
         QTRY_VERIFY(shownNames(tree).contains("guide.md") && shownNames(tree).contains("lexer.cpp"));
         QTRY_COMPARE(tree.currentPath(), root + "/src/parser.cpp");
+    }
+
+    void selectingAFileKeepsTheHorizontalScroll()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.path());
+        const QString deepFolder = root + "/a/b/c/d/e/f";
+        write(deepFolder + "/aFileWhoseNameIsLongerThanTheTreeIsWide.txt");
+        write(deepFolder + "/short.txt");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.resize(150, 300);
+        tree.show();
+        QVERIFY(tree.select(deepFolder + "/aFileWhoseNameIsLongerThanTheTreeIsWide.txt"));
+        QTRY_VERIFY(tree.horizontalScrollBar()->maximum() > 0);
+        // Its folders scrolled out of sight, the names still in view.
+        tree.horizontalScrollBar()->setValue(tree.indentation());
+        const int scrolled = tree.horizontalScrollBar()->value();
+        QVERIFY(scrolled > 0);
+
+        QVERIFY(tree.select(deepFolder + "/short.txt"));
+        QTRY_COMPARE(tree.currentPath(), deepFolder + "/short.txt");
+
+        QCOMPARE(tree.horizontalScrollBar()->value(), scrolled);
+    }
+
+    void selectingAFileOutOfSightBringsItsNameIntoView()
+    {
+        const QTemporaryDir dir;
+        const QString root = QDir::cleanPath(dir.path());
+        write(root + "/a/b/c/d/e/f/aFileWhoseNameIsLongerThanTheTreeIsWide.txt");
+        write(root + "/top.txt");
+        FileTreeView tree;
+        tree.setRootPath(root);
+        tree.resize(150, 300);
+        tree.show();
+        QVERIFY(tree.select(root + "/a/b/c/d/e/f/aFileWhoseNameIsLongerThanTheTreeIsWide.txt"));
+        QTRY_VERIFY(tree.horizontalScrollBar()->maximum() > 0);
+        tree.horizontalScrollBar()->setValue(tree.horizontalScrollBar()->maximum());
+
+        QVERIFY(tree.select(root + "/top.txt"));
+        QTRY_COMPARE(tree.currentPath(), root + "/top.txt");
+
+        const QRect name = tree.visualRect(tree.currentIndex());
+        QVERIFY(name.left() >= 0);
+        QVERIFY(name.left() < tree.viewport()->width());
     }
 
     void undoBringsBackARenamedFile()
