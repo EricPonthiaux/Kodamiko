@@ -8,8 +8,9 @@
 
 // The line between the two sides of a DiffView side by side, which the
 // mouse drags to give one side more room: a few pixels wide over the gap
-// between them, with a splitter's cursor, in the accent color under the
-// mouse. Transparent otherwise: the gap shows through.
+// between them, with a splitter's cursor and grip (see SplitterGrip), the
+// grip in the accent color under the mouse. Transparent around the grip:
+// the gap shows through.
 class SideBySideDivider : public QWidget {
     Q_OBJECT
 

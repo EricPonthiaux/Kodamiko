@@ -5,6 +5,8 @@
 #include <QColor>
 #include <QSplitter>
 
+class QPainter;
+
 // Splitter whose handles show where they are: a thin line along the whole
 // handle, and a small grip in its middle to take hold of, in the accent
 // color under the mouse.
@@ -29,3 +31,12 @@ public:
 protected:
     QSplitterHandle *createHandle() override;
 };
+
+namespace SplitterGrip {
+
+// The grip in the middle of `handle`: a small rounded bar along it (upright
+// between panes side by side), in its palette's colors, `highlight` (0 at
+// rest, 1 under the mouse) of the way to the accent color.
+void paint(QPainter &painter, const QWidget &handle, Qt::Orientation orientation, qreal highlight);
+
+} // namespace SplitterGrip

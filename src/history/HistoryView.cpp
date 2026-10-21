@@ -8,14 +8,16 @@
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "ui/AppFonts.h"
+#include "ui/FoldedPane.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
+#include "ui/ViewHeader.h"
 
 #include <QApplication>
 #include <QClipboard>
-#include <QDataStream>
 #include <QDir>
 #include <QFileInfo>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
@@ -25,16 +27,12 @@
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
-#include <QtMath>
 
-#include <numeric>
 #include <utility>
 
 namespace {
 
 constexpr int idRole = Qt::UserRole;
-// From this width, the three panes side by side.
-constexpr int wideLayoutWidth = 1180;
 // Commits read at first; twice as many each time the end of the list comes
 // into view, so that the walk, restarted each time, stays linear overall.
 constexpr int firstCommitLimit = 500;
@@ -58,8 +56,13 @@ QString commitCountText(const CommitLog &log)
 HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     : QWidget(parent)
     , summary_(new QLabel(this))
+    , currentCommit_(new QLabel(this))
     , filter_(new HistorySearchField(this))
+    , commitsHeader_(new ViewHeader(tr("Commits"), this))
     , commits_(new QTreeWidget(this))
+    , foldedCommits_(new FoldedPane(tr("Commits"), QStringLiteral("file-list"), tr("Show the commits"), this))
+    , foldedCommit_(
+          new FoldedPane(tr("Commit"), QStringLiteral("file-list"), tr("Show the commit and its files"), this))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
     , leftSplitter_(new GripSplitter(Qt::Vertical, this))
 {
@@ -94,6 +97,10 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     title_ = new QLabel(tr("History"), this);
     AppFonts::setInterfaceFont(title_, 1.15);
     summary_->setEnabled(false); // dimmed
+    AppFonts::setInterfaceFont(currentCommit_, 1, QFont::DemiBold);
+    // Clipped rather than pushing the filter away.
+    currentCommit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    currentCommit_->hide();
     // The title bar, a line under it.
     auto *titleBar = new QFrame(this);
     titleBar->setObjectName(QStringLiteral("viewTitleBar"));
@@ -105,6 +112,7 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     header->addWidget(title_);
     header->addWidget(summary_);
     header->addWidget(showAll_);
+    header->addWidget(currentCommit_, 1);
     header->addStretch();
     header->addWidget(filter_, 1);
     header->addWidget(allBranches_);
@@ -129,8 +137,9 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     connect(commits_->verticalScrollBar(), &QScrollBar::valueChanged, this, &HistoryView::loadMoreIfAtEnd);
     connect(commits_->verticalScrollBar(), &QScrollBar::rangeChanged, this, &HistoryView::loadMoreIfAtEnd);
 
+    commitListPane_ = createCommitListPane();
     commitPane_ = createCommitPane();
-    leftSplitter_->addWidget(commits_);
+    leftSplitter_->addWidget(commitListPane_);
     leftSplitter_->addWidget(commitPane_);
     leftSplitter_->setChildrenCollapsible(false);
     splitter_->addWidget(leftSplitter_);
@@ -140,16 +149,44 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     connect(splitter_, &QSplitter::splitterMoved, this, &HistoryView::rememberShares);
     connect(leftSplitter_, &QSplitter::splitterMoved, this, &HistoryView::rememberShares);
 
+    // The folded commits' bar, then the panes.
+    connect(foldedCommits_, &FoldedPane::expandRequested, this, [this] { setCommitListFolded(false); });
+    connect(foldedCommit_, &FoldedPane::expandRequested, this, [this] { setCommitPaneFolded(false); });
+    foldedCommits_->hide();
+    foldedCommit_->hide();
+    auto *panes = new QHBoxLayout;
+    panes->setSpacing(0);
+    panes->addWidget(foldedCommits_);
+    panes->addWidget(splitter_, 1);
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(titleBar);
-    layout->addWidget(splitter_);
+    layout->addLayout(panes);
     showDetails();
     applyTheme(theme);
+    // The headers' heights follow the font: aligned again after them.
+    AppFonts::followApplicationFont(this, [this] { alignBars(); });
 }
 
-// The chosen file's diff under its header; a hint until one is chosen.
+// The commits under a header whose button folds them away.
+QWidget *HistoryView::createCommitListPane()
+{
+    connect(commitsHeader_->addButton(QStringLiteral("file-list"), tr("Hide the commits")), &QToolButton::clicked, this,
+            [this] { setCommitListFolded(true); });
+    auto *pane = new QWidget(this);
+    auto *layout = new QVBoxLayout(pane);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(commitsHeader_);
+    layout->addWidget(commits_, 1);
+    return pane;
+}
+
+// The chosen file's diff under its header; a hint until one is chosen. The
+// folded commit's bar at its left: right after the commits, whatever the
+// arrangement.
 QWidget *HistoryView::createDiffPane()
 {
     auto *pane = new QFrame(this);
@@ -158,13 +195,16 @@ QWidget *HistoryView::createDiffPane()
     diff_->setToolTip({});
     diffHeader_ = new DiffHeaderBar(diff_, pane);
     connect(diffHeader_, &DiffHeaderBar::whitespaceChanged, this, &HistoryView::rereadCommit);
-    connect(diffHeader_, &DiffHeaderBar::heightChanged, this, &HistoryView::alignDiffHeaderRule);
+    connect(diffHeader_, &DiffHeaderBar::heightChanged, this, &HistoryView::alignBars);
 
-    auto *layout = new QVBoxLayout(pane);
+    auto *layout = new QGridLayout(pane);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(diffHeader_);
-    layout->addWidget(diff_, 1);
+    layout->addWidget(foldedCommit_, 0, 0, 2, 1);
+    layout->addWidget(diffHeader_, 0, 1);
+    layout->addWidget(diff_, 1, 1);
+    layout->setRowStretch(1, 1);
+    layout->setColumnStretch(1, 1);
     return pane;
 }
 
@@ -213,7 +253,7 @@ void HistoryView::setPathFilterShown(const QString &relativePath)
     const bool isFiltered = !relativePath.isEmpty();
     // A file, or a file deleted since: each commit shows only its diff.
     filtersOnFile_ = isFiltered && !QFileInfo(QDir(folder_).filePath(relativePath)).isDir();
-    commitPane_->setVisible(!filtersOnFile_);
+    showPanes();
     title_->setText(isFiltered ? tr("History of %1").arg(QFileInfo(relativePath).fileName()) : tr("History"));
     title_->setToolTip(relativePath);
     showAll_->setVisible(isFiltered);
@@ -411,6 +451,7 @@ void HistoryView::onCommitSelectionChanged()
         forgetCommit();
     else
         showCommit(selected.first()->data(0, idRole).toString());
+    showCurrentCommitTitle();
 }
 
 void HistoryView::showCommitMenu(const QPoint &position)
@@ -445,14 +486,11 @@ void HistoryView::applyTheme(const Theme &theme)
     filter_->applyTheme(theme);
     copyId_->setIcon(UiIcons::icon(QStringLiteral("copy"), theme.mutedText));
     commitId_->setFont(AppFonts::codeFont(font().pointSizeF() * 0.95));
-    alignDiffHeaderRule();
-}
-
-void HistoryView::alignDiffHeaderRule()
-{
-    // The hint can wrap as the pane narrows; its rule follows the header.
-    splitter_->setHandleRule(splitter_->indexOf(diffHeader_->parentWidget()),
-                             {diffHeader_->height() - 1, Qt::RightEdge, ruleColor_});
+    commitsHeader_->setIconColor(theme.foreground);
+    commitHeader_->setIconColor(theme.foreground);
+    foldedCommits_->applyTheme(theme);
+    foldedCommit_->applyTheme(theme);
+    alignBars();
 }
 
 void HistoryView::resizeEvent(QResizeEvent *event)
@@ -460,78 +498,4 @@ void HistoryView::resizeEvent(QResizeEvent *event)
     QWidget::resizeEvent(event);
     arrangePanes();
     fitMessage(); // its width changed
-}
-
-void HistoryView::arrangePanes()
-{
-    const bool wide = width() >= wideLayoutWidth;
-    if (wide == wide_ && commitPane_->parentWidget() == (wide ? splitter_ : leftSplitter_))
-        return;
-    arranging_ = true;
-    wide_ = wide;
-    if (wide)
-        splitter_->insertWidget(1, commitPane_);
-    else
-        leftSplitter_->insertWidget(1, commitPane_);
-    commitPane_->setVisible(!filtersOnFile_);
-    applyShares();
-    alignDiffHeaderRule();
-    arranging_ = false;
-}
-
-void HistoryView::applyShares()
-{
-    const int total = splitter_->width();
-    if (total <= 0)
-        return;
-    const int diff = qRound(total * diffShare_);
-    const int rest = total - diff;
-    if (wide_) {
-        const int commit = qRound(rest * commitShare_);
-        splitter_->setSizes({rest - commit, commit, diff});
-        return;
-    }
-    splitter_->setSizes({rest, diff});
-    const int height = leftSplitter_->height();
-    const int commit = qRound(height * commitShare_);
-    leftSplitter_->setSizes({height - commit, commit});
-}
-
-void HistoryView::rememberShares()
-{
-    if (arranging_)
-        return;
-    const QList<int> sizes = splitter_->sizes();
-    const int total = std::accumulate(sizes.begin(), sizes.end(), 0);
-    if (total <= 0 || sizes.last() <= 0)
-        return;
-    diffShare_ = double(sizes.last()) / total;
-    const QList<int> commitSizes = wide_ ? sizes.mid(0, 2) : leftSplitter_->sizes();
-    const int both = commitSizes.value(0) + commitSizes.value(1);
-    if (both > 0 && commitSizes.value(1) > 0)
-        commitShare_ = double(commitSizes.value(1)) / both;
-}
-
-QByteArray HistoryView::saveState() const
-{
-    QByteArray state;
-    QDataStream stream(&state, QIODevice::WriteOnly);
-    // The empty array once held a splitter's state: the format stays readable.
-    stream << commitShare_ << diffShare_ << QByteArray();
-    return state;
-}
-
-void HistoryView::restoreState(const QByteArray &state)
-{
-    QDataStream stream(state);
-    double commitShare = 0;
-    double diffShare = 0;
-    QByteArray unused;
-    stream >> commitShare >> diffShare >> unused;
-    // Also rejects the old format (raw QSplitter state).
-    if (stream.status() != QDataStream::Ok || commitShare <= 0 || commitShare >= 1 || diffShare <= 0 || diffShare >= 1)
-        return;
-    commitShare_ = commitShare;
-    diffShare_ = diffShare;
-    applyShares();
 }

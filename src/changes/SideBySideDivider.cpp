@@ -2,14 +2,10 @@
 
 #include "SideBySideDivider.h"
 
+#include "ui/GripSplitter.h"
+
 #include <QMouseEvent>
 #include <QPainter>
-
-namespace {
-
-constexpr int lineWidth = 2;
-
-} // namespace
 
 SideBySideDivider::SideBySideDivider(QWidget *parent)
     : QWidget(parent)
@@ -39,10 +35,7 @@ void SideBySideDivider::mouseMoveEvent(QMouseEvent *event)
 
 void SideBySideDivider::paintEvent(QPaintEvent *)
 {
-    if (hover_.progress() <= 0)
-        return;
+    // The splitters' grip, halfway down, on the gap between the sides.
     QPainter painter(this);
-    QColor accent = palette().color(QPalette::Accent);
-    accent.setAlphaF(hover_.progress());
-    painter.fillRect(QRect((width() - lineWidth) / 2, 0, lineWidth, height()), accent);
+    SplitterGrip::paint(painter, *this, Qt::Horizontal, hover_.progress());
 }

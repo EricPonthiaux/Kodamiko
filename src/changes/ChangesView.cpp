@@ -7,13 +7,13 @@
 #include "DiffHeaderBar.h"
 #include "DiffView.h"
 #include "DiscardConfirmation.h"
-#include "FoldedFileList.h"
 #include "HunkActions.h"
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
 #include "git/Integration.h"
 #include "ui/AppFonts.h"
+#include "ui/FoldedPane.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
@@ -73,7 +73,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     , splitter_(new GripSplitter(Qt::Horizontal, this))
     , fileSplitter_(new GripSplitter(Qt::Vertical, this))
     , fileColumn_(new QFrame(this))
-    , foldedList_(new FoldedFileList(this))
+    , foldedList_(new FoldedPane(tr("Files"), QStringLiteral("file-list"), tr("Show the file list"), this))
     , foldButton_(new QToolButton(this))
     , stageButton_(new QToolButton(this))
     , unstageButton_(new QToolButton(this))
@@ -97,7 +97,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     foldButton_->setFocusPolicy(Qt::NoFocus);
     foldButton_->setToolTip(tr("Hide the file list"));
     connect(foldButton_, &QToolButton::clicked, this, [this] { setFileListVisible(false); });
-    connect(foldedList_, &FoldedFileList::expandRequested, this, [this] { setFileListVisible(true); });
+    connect(foldedList_, &FoldedPane::expandRequested, this, [this] { setFileListVisible(true); });
 
     refreshButton_ = new QToolButton(this);
     QToolButton *refreshButton = refreshButton_;
@@ -611,6 +611,7 @@ void ChangesView::alignBars(const Theme &theme)
                                  diffHeader_->sizeHint().height()});
     fileActions_->setFixedHeight(height);
     diffHeader_->setFixedHeight(height);
+    foldedList_->setButtonRowHeight(height);
     // Their bottom borders, see ThemeStyle: the bars are at the top of their column.
     splitter_->setHandleRule(1, {height - 1, Qt::LeftEdge | Qt::RightEdge, theme.line});
 }

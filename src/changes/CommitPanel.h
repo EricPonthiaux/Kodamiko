@@ -12,9 +12,10 @@ class QCheckBox;
 class QPlainTextEdit;
 class QPushButton;
 
-// The commit area, fixed at the bottom of the Diff mode's file list under a
+// The commit area, at the bottom of the Diff mode's file column under a
 // line: the message, Amend, Generate (the agent's session in the terminal
-// writes the message from the changes) and Commit. With nothing staged, Commit offers to stage every
+// writes the message from the changes) and Commit. Given more height, the
+// message takes it. With nothing staged, Commit offers to stage every
 // change first. Commits go through GitCommands.
 class CommitPanel : public QFrame {
     Q_OBJECT
@@ -40,6 +41,9 @@ public:
     // The agent that writes the message: its name in the tooltip and the
     // messages, its icon on Generate from the next applyTheme().
     void setAgent(const QString &name, const QString &iconName);
+
+    // Its minimum: a few lines of message, until the user gives it more.
+    QSize sizeHint() const override;
 
 signals:
     void statusMessage(const QString &message);

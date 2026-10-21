@@ -9,6 +9,7 @@
 #include "history/CommitGraph.h"
 #include "history/CommitQuery.h"
 #include "history/HistoryView.h"
+#include "ui/FoldedPane.h"
 
 #include <QLabel>
 #include <QLineEdit>
@@ -742,6 +743,142 @@ private slots:
         QTRY_VERIFY(!view.isWide());
     }
 
+    void foldingTheCommitsNamesTheChosenOneInTheTitleBar()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "first", {{"a.txt", "a\n"}});
+        commit(dir, "second", {{"a.txt", "b\n"}});
+        HistoryView view(Theme::dark());
+        view.resize(1400, 700);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        commits->setCurrentItem(commits->topLevelItem(1)); // "first"
+        const auto titleTexts = [&view] {
+            QStringList texts;
+            for (const QLabel *label : view.findChild<QFrame *>("viewTitleBar")->findChildren<QLabel *>()) {
+                if (label->isVisible())
+                    texts.append(label->text());
+            }
+            return texts;
+        };
+        QVERIFY(!titleTexts().contains("first"));
+
+        toolButton(view, "Hide the commits")->click();
+
+        QVERIFY(!commits->isVisible());
+        QVERIFY(titleTexts().contains("first"));
+        toolButton(view, "Show the commits")->click();
+        QVERIFY(commits->isVisible());
+        QVERIFY(!titleTexts().contains("first"));
+    }
+
+    void foldingTheCommitShowsAllItsFilesInTheDiff()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "both", {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
+        HistoryView view(Theme::dark());
+        view.resize(1400, 700);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *files = view.findChild<QTreeWidget *>("files");
+        const auto *diff = view.findChild<DiffView *>();
+        commits->setCurrentItem(commits->topLevelItem(0));
+        QTRY_COMPARE(files->topLevelItemCount(), 2);
+        QVERIFY(diff->fileSummaries().isEmpty()); // no file chosen yet
+
+        toolButton(view, "Hide the commit and its files")->click();
+
+        QVERIFY(!files->isVisible());
+        QCOMPARE(diff->fileSummaries().size(), 2);
+        toolButton(view, "Show the commit and its files")->click();
+        QVERIFY(files->isVisible());
+        QVERIFY(diff->fileSummaries().isEmpty());
+    }
+
+    void theFoldedCommitSitsBetweenTheCommitsAndTheDiff_data()
+    {
+        QTest::addColumn<int>("width");
+        QTest::newRow("wide") << 1400;
+        QTest::newRow("narrow") << 900;
+    }
+
+    void theFoldedCommitSitsBetweenTheCommitsAndTheDiff()
+    {
+        QFETCH(const int, width);
+        HistoryView view(Theme::dark());
+        view.resize(width, 700);
+        view.show();
+        const auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *diff = view.findChild<DiffView *>();
+        const auto xOf = [&view](const QWidget *widget) { return widget->mapTo(&view, QPoint()).x(); };
+
+        view.setCommitPaneFolded(true);
+
+        const FoldedPane *bar = nullptr;
+        for (const FoldedPane *pane : view.findChildren<FoldedPane *>()) {
+            if (pane->isVisible())
+                bar = pane;
+        }
+        QVERIFY(bar);
+        QTRY_VERIFY(xOf(bar) >= xOf(commits) + commits->width());
+        QVERIFY(xOf(diff) >= xOf(bar) + bar->width());
+    }
+
+    void foldingAPaneWidensOnlyTheDiff()
+    {
+        HistoryView view(Theme::dark());
+        view.resize(1400, 700);
+        view.show();
+        QTRY_VERIFY(view.isWide());
+        const auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *diff = view.findChild<DiffView *>();
+        const int commitsWidth = commits->width();
+        const int diffWidth = diff->width();
+
+        view.setCommitPaneFolded(true);
+
+        QTRY_VERIFY(diff->width() > diffWidth + 100);
+        QCOMPARE(commits->width(), commitsWidth);
+    }
+
+    void foldedButtonsLineUpWithThoseOfThePaneBars()
+    {
+        HistoryView view(Theme::dark());
+        view.resize(1400, 700);
+        view.show();
+        const QToolButton *hide = toolButton(view, "Hide the commits");
+        const auto centerY = [&view](const QWidget *widget) {
+            return widget->mapTo(&view, widget->rect().center()).y();
+        };
+
+        view.setCommitPaneFolded(true);
+
+        QTRY_VERIFY(std::abs(centerY(toolButton(view, "Show the commit and its files")) - centerY(hide)) <= 1);
+    }
+
+    void foldsAreKeptInTheSavedState()
+    {
+        HistoryView folded(Theme::dark());
+        folded.setCommitListFolded(true);
+        folded.setCommitPaneFolded(true);
+        HistoryView restored(Theme::dark());
+
+        restored.restoreState(folded.saveState());
+
+        QVERIFY(restored.isCommitListFolded());
+        QVERIFY(restored.isCommitPaneFolded());
+    }
+
     void emptyDiffHintUsesThePaneWidthAndWraps_data()
     {
         QTest::addColumn<int>("paneWidth");
@@ -786,6 +923,16 @@ private slots:
     }
 
 private:
+    // The tool button of `view` that says `toolTip`.
+    static QToolButton *toolButton(const QWidget &view, const QString &toolTip)
+    {
+        for (QToolButton *button : view.findChildren<QToolButton *>()) {
+            if (button->toolTip() == toolTip)
+                return button;
+        }
+        return nullptr;
+    }
+
     QTemporaryFile config_;
 };
 

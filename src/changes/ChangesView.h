@@ -18,7 +18,7 @@ class CommitPanel;
 class DiffHeaderBar;
 class HunkActions;
 class DiffView;
-class FoldedFileList;
+class FoldedPane;
 class GitCommands;
 class QFrame;
 class QLabel;
@@ -201,7 +201,7 @@ private:
     GripSplitter *splitter_;
     GripSplitter *fileSplitter_; // in the file column: the lists and the commit area
     QFrame *fileColumn_;         // the splitter's first pane
-    FoldedFileList *foldedList_;
+    FoldedPane *foldedList_;
     QToolButton *foldButton_;
     QFrame *fileActions_; // Stage, Unstage, Discard, above the list
     QToolButton *stageButton_;

@@ -50,7 +50,6 @@ add_library(duet_core STATIC
     changes/DiffViewSideBySide.cpp
     changes/DiscardConfirmation.cpp
     changes/FileChangeDelegate.cpp
-    changes/FoldedFileList.cpp
     changes/GitActions.cpp
     changes/HunkActions.cpp
     changes/NewBranchPopup.cpp
@@ -120,6 +119,7 @@ add_library(duet_core STATIC
     history/HistorySearchField.cpp
     history/HistoryView.cpp
     history/HistoryViewCommit.cpp
+    history/HistoryViewPanes.cpp
     lsp/LanguageServers.cpp
     lsp/LspClient.cpp
     lsp/LspCompletionProvider.cpp
@@ -175,6 +175,7 @@ add_library(duet_core STATIC
     ui/ClickableCursors.cpp
     ui/DetachablePage.cpp
     ui/FileIcons.cpp
+    ui/FoldedPane.cpp
     ui/GripSplitter.cpp
     ui/HoverCloseButtons.cpp
     ui/HoverProgress.cpp

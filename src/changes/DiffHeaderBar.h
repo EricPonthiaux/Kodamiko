@@ -30,6 +30,8 @@ public:
 
     // Whitespace::Ignore while the whitespace button is checked; Compare at first.
     Whitespace whitespace() const;
+    // The height of its buttons and margins: its height unless the hint wraps.
+    int controlsHeight() const;
 
     QSize sizeHint() const override;
     int heightForWidth(int width) const override;
@@ -47,7 +49,6 @@ private:
     void follow();
     QFrame *createFilePager();
     void updateFilePager(int file, int fileCount);
-    int controlsHeight() const;
 
     DiffView *diff_;
     QString placeholder_;

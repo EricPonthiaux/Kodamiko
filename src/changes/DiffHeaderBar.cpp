@@ -87,7 +87,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     buttons->addWidget(whitespace_);
     buttons->addWidget(previous_);
     buttons->addWidget(next_);
-    layout_->setContentsMargins(12, 4, 6, 4);
+    layout_->setContentsMargins(12, 6, 6, 6);
     layout_->setSpacing(8);
     layout_->addWidget(fileSide, 1);
     layout_->addWidget(createFilePager());

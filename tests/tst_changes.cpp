@@ -3,14 +3,15 @@
 #include "changes/BranchesPopup.h"
 #include "changes/ChangeTree.h"
 #include "changes/ChangesView.h"
+#include "changes/CommitPanel.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
-#include "changes/FoldedFileList.h"
 #include "changes/GitActions.h"
 #include "changes/HunkActions.h"
 #include "changes/NewBranchPopup.h"
 #include "changes/SideBySide.h"
+#include "changes/SideBySideDivider.h"
 #include "changes/SnapshotsPopup.h"
 #include "changes/StashesPopup.h"
 #include "git/GitCommands.h"
@@ -18,8 +19,10 @@
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
 #include "git/Stashes.h"
+#include "ui/FoldedPane.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
+#include "ui/ViewHeader.h"
 
 #include <QCheckBox>
 #include <QLabel>
@@ -28,6 +31,7 @@
 #include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSplitter>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QToolButton>
@@ -55,14 +59,27 @@ QPushButton *commitButton(const QWidget &view)
     return nullptr;
 }
 
-QStringList sectionTitles(const QTreeWidget *list)
+// "Unstaged (2)" then "Staged (0)": the bar of each list, its title and its
+// count (none outside a repository). A ViewHeader's labels: its count, then
+// its title.
+QStringList sectionTitles(const ChangesView &view)
 {
     QStringList titles;
-    for (int i = 0; i < list->topLevelItemCount(); ++i)
-        titles << QStringLiteral("%1 (%2)")
-                      .arg(list->topLevelItem(i)->text(0))
-                      .arg(list->topLevelItem(i)->data(0, FileChangeDelegate::sectionCountRole).toInt());
+    for (const ViewHeader *header : view.findChildren<ViewHeader *>()) {
+        const QList<QLabel *> labels = header->findChildren<QLabel *>(Qt::FindDirectChildrenOnly);
+        const QLabel *count = labels.at(0);
+        const QString title = labels.at(1)->text();
+        titles << (count->isHidden() ? title : QStringLiteral("%1 (%2)").arg(title, count->text()));
+    }
+    std::ranges::sort(titles, std::greater<>()); // "Unstaged" first
     return titles;
+}
+
+// The list of unstaged files, or of staged ones; their files are under its
+// one top-level row.
+QTreeWidget *fileList(const ChangesView &view, const char *name)
+{
+    return view.findChild<QTreeWidget *>(name);
 }
 
 // "n1\nn2\n…": line n says its number.
@@ -298,7 +315,7 @@ private slots:
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
         const auto *column = view.findChild<QFrame *>("changesColumn");
-        const auto *bar = view.findChild<FoldedFileList *>();
+        const auto *bar = view.findChild<FoldedPane *>();
         const auto *header = view.findChild<DiffHeaderBar *>();
         QToolButton *nextFile = buttonWithToolTip(header, "Next file (Alt+Down)");
         QVERIFY(nextFile);
@@ -312,6 +329,69 @@ private slots:
         QVERIFY(nextFile->isVisible());
     }
 
+    void eachListAndTheCommitAreaTakeAResizableShareOfTheColumn()
+    {
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 700);
+        view.show();
+        QSplitter *column = view.fileSplitter();
+        QTreeWidget *unstaged = fileList(view, "unstagedList");
+        const int before = unstaged->height();
+
+        column->setSizes({400, 100, 200});
+
+        QCOMPARE(column->count(), 3);
+        QVERIFY(column->widget(0)->isAncestorOf(unstaged));
+        QVERIFY(column->widget(1)->isAncestorOf(fileList(view, "stagedList")));
+        QVERIFY(qobject_cast<CommitPanel *>(column->widget(2)));
+        QVERIFY(unstaged->height() > before);
+    }
+
+    void theCommitMessageGrowsWithTheCommitArea()
+    {
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 700);
+        view.show();
+        QSplitter *column = view.fileSplitter();
+        const auto *message = column->widget(2)->findChild<QPlainTextEdit *>();
+        const int before = message->height();
+
+        column->setSizes({200, 200, 300});
+
+        QCOMPARE(before, message->minimumHeight()); // a few lines at first
+        QVERIFY(message->height() > before + 100);
+    }
+
+    void selectingInOneListClearsTheOther()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        write(project, "b.txt", "b\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "a2\n");
+        write(project, "b.txt", "b2\n");
+        Git::run(project.path(), {"add", "b.txt"});
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        QTreeWidget *unstaged = fileList(view, "unstagedList");
+        QTreeWidget *staged = fileList(view, "stagedList");
+        unstaged->setCurrentItem(unstaged->topLevelItem(0)->child(0));
+
+        staged->setCurrentItem(staged->topLevelItem(0)->child(0));
+
+        QVERIFY(unstaged->selectedItems().isEmpty());
+        QCOMPARE(staged->selectedItems().size(), 1);
+    }
+
     void theBarsIconBringsTheFileListBack()
     {
         GitCommands commands;
@@ -319,7 +399,7 @@ private slots:
         view.resize(900, 400);
         view.show();
         view.setFileListVisible(false);
-        const auto *bar = view.findChild<FoldedFileList *>();
+        const auto *bar = view.findChild<FoldedPane *>();
 
         buttonWithToolTip(bar, "Show the file list")->click();
 
@@ -465,6 +545,84 @@ private slots:
 
         QVERIFY(texts().contains("1 / 2"));
         QVERIFY(!texts().join(' ').contains("of 2"));
+    }
+
+    void filePagerSitsInTheMiddleOfTheBar()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        const QList<DiffFile> files = {{"src/one.cpp", "modified", FilePatch::parse(patch)},
+                                       {"src/two.cpp", "modified", FilePatch::parse(patch)}};
+        DiffView diff(Theme::dark());
+        DiffHeaderBar header(&diff);
+        header.resize(800, header.sizeHint().height());
+        header.show();
+
+        diff.setFiles(files);
+
+        const auto *pager = header.findChild<QFrame *>("filePager");
+        QTRY_VERIFY(pager->isVisible());
+        const QRect inside = header.contentsRect().marginsRemoved(header.layout()->contentsMargins());
+        QTRY_VERIFY(std::abs(pager->geometry().center().x() - inside.center().x()) <= 1);
+    }
+
+    void draggingTheDividerSharesTheWidthBetweenTheSides()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.resize(800, 300);
+        diff.show();
+        diff.setMode(DiffView::Mode::SideBySide);
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+        auto *divider = diff.findChild<SideBySideDivider *>();
+        const auto *oldSide = diff.findChild<DiffView *>();
+        QVERIFY(divider && divider->isVisible());
+        QVERIFY(std::abs(oldSide->width() - diff.contentsRect().width() / 2) <= 2);
+
+        const QPoint center = divider->rect().center();
+        QTest::mousePress(divider, Qt::LeftButton, {}, center);
+        QTest::mouseMove(divider, center + QPoint(200, 0));
+        QTest::mouseRelease(divider, Qt::LeftButton, {}, center + QPoint(200, 0));
+
+        QVERIFY(oldSide->width() > diff.contentsRect().width() / 2 + 150);
+        QCOMPARE(diff.viewport()->x(), diff.contentsRect().x() + oldSide->width() + 1);
+    }
+
+    void zoomingEitherSideZoomsTheOther()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.zoomIn(); // before the old side exists
+        diff.setMode(DiffView::Mode::SideBySide);
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+        auto *oldSide = diff.findChild<DiffView *>();
+        const auto zoom = [](const DiffView &view) { return view.SendScintilla(QsciScintillaBase::SCI_GETZOOM); };
+        QCOMPARE(zoom(*oldSide), 1);
+
+        diff.zoomIn();
+        QCOMPARE(zoom(*oldSide), 2);
+        oldSide->zoomOut();
+        QCOMPARE(zoom(diff), 1);
+    }
+
+    void theOldSideDraggedToItsMinimumGrowsWithTheView()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.resize(800, 300);
+        diff.show();
+        diff.setMode(DiffView::Mode::SideBySide);
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+        auto *divider = diff.findChild<SideBySideDivider *>();
+        const auto *oldSide = diff.findChild<DiffView *>();
+        const QPoint center = divider->rect().center();
+        QTest::mousePress(divider, Qt::LeftButton, {}, center);
+        QTest::mouseMove(divider, center - QPoint(2000, 0)); // far past the left edge
+        QTest::mouseRelease(divider, Qt::LeftButton, {}, center - QPoint(2000, 0));
+        const int narrowest = oldSide->width();
+
+        diff.resize(1600, 300);
+
+        QTRY_VERIFY(oldSide->width() > narrowest + 40);
     }
 
     void goToChangeScrollsBlockByBlock()
@@ -645,8 +803,7 @@ private slots:
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
-        const auto *list = view.findChild<QTreeWidget *>();
-        QVERIFY(list->topLevelItem(0)->isHidden());
+        QCOMPARE(sectionTitles(view), QStringList({"Unstaged", "Staged"}));
         QVERIFY(!commitButton(view)->isEnabled());
     }
 
@@ -667,8 +824,8 @@ private slots:
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh(); // off the UI thread
         QTRY_COMPARE(refreshed.size(), 1);
-        const auto *list = view.findChild<QTreeWidget *>();
-        QCOMPARE(sectionTitles(list), QStringList({"Unstaged (2)", "Staged (0)"}));
+        const QTreeWidget *list = fileList(view, "unstagedList");
+        QCOMPARE(sectionTitles(view), QStringList({"Unstaged (2)", "Staged (0)"}));
         QCOMPARE(list->topLevelItem(0)->child(0)->text(0), QString("a.txt"));
         QCOMPARE(list->topLevelItem(0)->child(0)->data(0, FileChangeDelegate::kindRole).toInt(),
                  static_cast<int>(ChangeKind::Modified));
@@ -676,7 +833,7 @@ private slots:
                  static_cast<int>(ChangeKind::Added));
 
         view.stageAll();
-        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (0)", "Staged (2)"}));
+        QTRY_COMPARE(sectionTitles(view), QStringList({"Unstaged (0)", "Staged (2)"}));
 
         // The last commit's message is offered for "amend", then removed.
         auto *message = view.findChild<QPlainTextEdit *>();
@@ -688,7 +845,7 @@ private slots:
 
         message->setPlainText("second");
         commitButton(view)->click();
-        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (0)", "Staged (0)"}));
+        QTRY_COMPARE(sectionTitles(view), QStringList({"Unstaged (0)", "Staged (0)"}));
         QVERIFY(message->toPlainText().isEmpty());
         QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("second\n"));
     }
@@ -724,8 +881,7 @@ private slots:
         QCOMPARE(opened.first().at(1).toInt(), 6); // the block's first line
 
         QTest::keyClick(diff, Qt::Key_Space);
-        const auto *list = view.findChild<QTreeWidget *>();
-        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (1)", "Staged (1)"}));
+        QTRY_COMPARE(sectionTitles(view), QStringList({"Unstaged (1)", "Staged (1)"}));
         const QByteArray staged = Git::run(project.path(), {"diff", "--cached"});
         QVERIFY(staged.contains("+ten"));
         QVERIFY(!staged.contains("+one"));
@@ -806,7 +962,7 @@ private slots:
         diff->setFocus();
         QTest::keyClick(diff, Qt::Key_Space);
 
-        QTRY_COMPARE(sectionTitles(view.findChild<QTreeWidget *>()), QStringList({"Unstaged (1)", "Staged (1)"}));
+        QTRY_COMPARE(sectionTitles(view), QStringList({"Unstaged (1)", "Staged (1)"}));
         const QByteArray staged = Git::run(project.path(), {"diff", "--cached"});
         QVERIFY(staged.contains("-4\n+four"));
         QVERIFY(!staged.contains("+ten"));
@@ -854,7 +1010,7 @@ private slots:
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
-        auto *list = view.findChild<QTreeWidget *>();
+        QTreeWidget *list = fileList(view, "unstagedList");
         QTreeWidgetItem *src = list->topLevelItem(0)->child(0);
         QVERIFY(FileChangeDelegate::isFolder(src));
         // The diff in the list's order: the folder's files first.
@@ -873,19 +1029,19 @@ private slots:
 
         stage->click();
 
-        QTRY_COMPARE(sectionTitles(list), QStringList({"Unstaged (1)", "Staged (2)"}));
-        QTreeWidgetItem *stagedSrc = list->topLevelItem(1)->child(0);
+        QTRY_COMPARE(sectionTitles(view), QStringList({"Unstaged (1)", "Staged (2)"}));
+        QTreeWidgetItem *stagedSrc = fileList(view, "stagedList")->topLevelItem(0)->child(0);
         QCOMPARE(stagedSrc->text(0), QString("src"));
         QVERIFY(stagedSrc->isExpanded()); // another section: its own folder
         write(project, "c.txt", "c2\n");
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 3);
         // The list rebuilt, the folder closed by hand stays closed.
-        list->topLevelItem(1)->child(0)->setExpanded(false);
+        fileList(view, "stagedList")->topLevelItem(0)->child(0)->setExpanded(false);
         write(project, "c.txt", "c3\n");
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 4);
-        QVERIFY(!list->topLevelItem(1)->child(0)->isExpanded());
+        QVERIFY(!fileList(view, "stagedList")->topLevelItem(0)->child(0)->isExpanded());
     }
 
     void snapshotsPopupListsAndRestores()

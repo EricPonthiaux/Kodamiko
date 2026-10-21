@@ -11,6 +11,7 @@
 #include "changes/FileChangeDelegate.h"
 #include "git/ChangeKindStyle.h"
 #include "ui/AppFonts.h"
+#include "ui/ViewHeader.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -151,23 +152,33 @@ QWidget *HistoryView::createCommitPane()
     detailsLayout->addWidget(files_, 1);
     commitPages_->addWidget(details);
 
+    // Its header, whose button folds the pane away.
+    commitHeader_ = new ViewHeader(tr("Commit"), pane);
+    connect(commitHeader_->addButton(QStringLiteral("file-list"), tr("Hide the commit and its files")),
+            &QToolButton::clicked, this, [this] { setCommitPaneFolded(true); });
+
     auto *layout = new QVBoxLayout(pane);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(commitPages_);
+    layout->setSpacing(0);
+    layout->addWidget(commitHeader_);
+    layout->addWidget(commitPages_, 1);
     return pane;
 }
 
 void HistoryView::onFileSelectionChanged()
 {
     const QList<QTreeWidgetItem *> selected = files_->selectedItems();
-    if (selected.isEmpty() || !details_) {
+    // The commit folded away, its files can't be chosen: all of them.
+    const bool showsAllFiles = isCommitPaneFolded_ && details_;
+    if (!showsAllFiles && (selected.isEmpty() || !details_)) {
         diffHeader_->setPlaceholder(diffPlaceholder());
         diff_->showMessage({});
         return;
     }
     // A folder: the diffs of all its files.
     QList<DiffFile> shown;
-    for (const QTreeWidgetItem *row : ChangeTree::filesUnder(selected.first())) {
+    QTreeWidgetItem *chosen = showsAllFiles ? files_->invisibleRootItem() : selected.first();
+    for (const QTreeWidgetItem *row : ChangeTree::filesUnder(chosen)) {
         const FileDiff &file = details_->files.at(row->data(0, fileIndexRole).toInt());
         shown.append({file.change.path, changeStatusText(file.change), FilePatch::parse(file.patch), file.isTooLarge,
                       file.newText});

@@ -35,6 +35,14 @@ void alignScroll(DiffView &follower, const DiffView &leader)
         follower.SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, offset);
 }
 
+// `follower` zoomed as `leader` is: the rows keep facing each other.
+void alignZoom(DiffView &follower, const DiffView &leader)
+{
+    const int zoom = int(leader.SendScintilla(QsciScintillaBase::SCI_GETZOOM));
+    if (follower.SendScintilla(QsciScintillaBase::SCI_GETZOOM) != zoom)
+        follower.zoomTo(zoom);
+}
+
 } // namespace
 
 void DiffView::setMode(Mode mode)
@@ -85,6 +93,10 @@ void DiffView::createOldSide()
     // Whichever side scrolls, by the wheel or the keys, the other follows.
     connect(this, &QsciScintillaBase::SCN_UPDATEUI, oldSide_, [this] { alignScroll(*oldSide_, *this); });
     connect(oldSide_, &QsciScintillaBase::SCN_UPDATEUI, this, [this] { alignScroll(*this, *oldSide_); });
+    // Same for the zoom (Ctrl+wheel), from the start.
+    alignZoom(*oldSide_, *this);
+    connect(this, &QsciScintillaBase::SCN_ZOOM, oldSide_, [this] { alignZoom(*oldSide_, *this); });
+    connect(oldSide_, &QsciScintillaBase::SCN_ZOOM, this, [this] { alignZoom(*this, *oldSide_); });
     divider_ = new SideBySideDivider(this);
     // Only reachable shares are kept: dragged past a minimum, the side
     // still grows with the view.

@@ -32,7 +32,7 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
 {
     setObjectName(QStringLiteral("commitPanel"));
     message_->setTabChangesFocus(true);
-    message_->setFixedHeight(messageHeight);
+    message_->setMinimumHeight(messageHeight);
     message_->setPlaceholderText(tr("Commit message (Ctrl+Enter to commit)"));
     amend_->setToolTip(tr("Replace the last commit with the staged changes and this message"));
     generateButton_->setText(tr("Generate"));
@@ -58,8 +58,14 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(8, 8, 8, 8);
     layout->setSpacing(8);
-    layout->addWidget(message_);
+    // The message takes the height the panel is given; the actions stay below.
+    layout->addWidget(message_, 1);
     layout->addLayout(actions);
+}
+
+QSize CommitPanel::sizeHint() const
+{
+    return minimumSizeHint();
 }
 
 void CommitPanel::setStatus(const RepositoryStatus *status, const QString &pathspec)

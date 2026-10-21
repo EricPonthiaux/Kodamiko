@@ -22,7 +22,8 @@ class SideBySideDivider;
 // Alt+Down and Alt+Up to the next and previous file. Side by side, the old
 // version shows in a pane at the left, row for row with the new one: the
 // view's lines, numbers and locations are then those of the new side; the
-// line between the two drags to share the width otherwise.
+// line between the two drags to share the width otherwise. Either side
+// scrolled or zoomed, the other follows.
 class DiffView : public QsciScintilla {
     Q_OBJECT
 

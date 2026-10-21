@@ -17,6 +17,7 @@
 class CommitDelegate;
 class DiffHeaderBar;
 class DiffView;
+class FoldedPane;
 class QLabel;
 class GripSplitter;
 class HistorySearchField;
@@ -26,12 +27,15 @@ class QTextBrowser;
 class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
+class ViewHeader;
 
 // "History" mode: commits of HEAD (those touching the open folder),
 // searchable (HistorySearchField): the commits read are filtered as the
 // query is typed; a search of their changes reads the history again. Three panes that stay put whatever is chosen: the
 // commits; the chosen commit (its summary, author, date and ID, its message, its files); the diff of the chosen file
-// against the first parent. A narrow window puts the commit under the list. The repository is only read.
+// against the first parent. A narrow window puts the commit under the list. The commits and the commit
+// each fold away into a thin bar at the left edge: the commits folded, the title bar names the chosen
+// commit; the commit folded, the diff shows all its files. The repository is only read.
 class HistoryView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(HistoryView)
@@ -53,7 +57,15 @@ public:
     // Whether the three panes are side by side (a wide window).
     bool isWide() const { return wide_; }
 
-    // Pane proportions, for the settings.
+    // The commits, and the chosen commit's pane, folded away. Neither at first.
+    void setCommitListFolded(bool folded);
+    void setCommitPaneFolded(bool folded);
+
+    bool isCommitListFolded() const { return isCommitListFolded_; }
+
+    bool isCommitPaneFolded() const { return isCommitPaneFolded_; }
+
+    // Pane proportions and folds, for the settings.
     QByteArray saveState() const;
     void restoreState(const QByteArray &state);
 
@@ -69,9 +81,18 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
+    QWidget *createCommitListPane();
     QWidget *createCommitPane();
     QWidget *createDiffPane();
-    void alignDiffHeaderRule();
+    // The bars at the top of the panes take the same height, and the
+    // handle before the diff carries its header's rule.
+    void alignBars();
+    // The commit's pane is neither folded nor hidden by a file's history.
+    bool showsCommitPane() const;
+    // Shows the panes left unfolded, and the bars of those folded.
+    void showPanes();
+    // The chosen commit's summary in the title bar, while the commits are folded.
+    void showCurrentCommitTitle();
     // The log being read is outdated: its walk stops, its result is dropped.
     void abandonReading();
     // The history read again from its newest commits.
@@ -125,6 +146,7 @@ private:
     void showCommitMenu(const QPoint &position);
     // Side by side, or the commit under the list, for the view's width.
     void arrangePanes();
+    // The panes' sizes from their shares; the diff takes those of folded panes.
     void applyShares();
     void rememberShares();
 
@@ -163,13 +185,21 @@ private:
     double diffShare_ = 0.45;
     bool wide_ = false;
     bool arranging_ = false; // splitterMoved, while the panes are placed
+    bool isCommitListFolded_ = false;
+    bool isCommitPaneFolded_ = false;
 
     QLabel *summary_;
+    QLabel *currentCommit_; // in the title bar, while the commits are folded
     HistorySearchField *filter_;
+    ViewHeader *commitsHeader_;
     QTreeWidget *commits_;
+    QWidget *commitListPane_ = nullptr; // the commits under their header
+    FoldedPane *foldedCommits_;
+    FoldedPane *foldedCommit_;
     GripSplitter *splitter_;  // the commits (and the commit when narrow), the commit, the diff
     QSplitter *leftSplitter_; // the commits, the commit under them when narrow
     QWidget *commitPane_ = nullptr;
+    ViewHeader *commitHeader_ = nullptr;
     QStackedWidget *commitPages_ = nullptr; // a hint, or the chosen commit
     QLabel *commitSummary_ = nullptr;
     QLabel *avatar_ = nullptr;

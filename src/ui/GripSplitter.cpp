@@ -56,14 +56,7 @@ protected:
         if (horizontal && rule_.y >= 0)
             paintRule(painter, center.x());
 
-        QRectF grip(0, 0, horizontal ? gripWidth : gripLength, horizontal ? gripLength : gripWidth);
-        grip.moveCenter(center);
-        const QColor accent = colors.color(QPalette::Accent);
-        const qreal highlight = hover_.progress();
-        painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(QPen(ThemeStyle::mixed(colors.color(QPalette::Mid), accent, highlight), 1));
-        painter.setBrush(ThemeStyle::mixed(colors.color(QPalette::Button), accent, highlight));
-        painter.drawRoundedRect(grip.adjusted(0.5, 0.5, -0.5, -0.5), gripWidth / 2.0, gripWidth / 2.0);
+        SplitterGrip::paint(painter, *this, orientation(), hover_.progress());
     }
 
 private:
@@ -95,4 +88,19 @@ void GripSplitter::setHandleRule(int index, const HandleRule &rule)
 QSplitterHandle *GripSplitter::createHandle()
 {
     return new GripHandle(orientation(), this);
+}
+
+void SplitterGrip::paint(QPainter &painter, const QWidget &handle, Qt::Orientation orientation, qreal highlight)
+{
+    const bool horizontal = orientation == Qt::Horizontal;
+    QRectF grip(0, 0, horizontal ? gripWidth : gripLength, horizontal ? gripLength : gripWidth);
+    grip.moveCenter(QRectF(handle.rect()).center());
+    const QPalette &colors = handle.palette();
+    const QColor accent = colors.color(QPalette::Accent);
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(ThemeStyle::mixed(colors.color(QPalette::Mid), accent, highlight), 1));
+    painter.setBrush(ThemeStyle::mixed(colors.color(QPalette::Button), accent, highlight));
+    painter.drawRoundedRect(grip.adjusted(0.5, 0.5, -0.5, -0.5), gripWidth / 2.0, gripWidth / 2.0);
+    painter.restore();
 }
