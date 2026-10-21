@@ -32,12 +32,14 @@ add_tree_sitter_grammar(tree_sitter_java       ${tree_sitter_java_SOURCE_DIR}/sr
 add_tree_sitter_grammar(tree_sitter_javascript ${tree_sitter_javascript_SOURCE_DIR}/src)
 add_tree_sitter_grammar(tree_sitter_typescript ${tree_sitter_typescript_SOURCE_DIR}/typescript/src)
 add_tree_sitter_grammar(tree_sitter_tsx        ${tree_sitter_typescript_SOURCE_DIR}/tsx/src)
+# For the occurrence index only: Python's highlighting stays Lexilla's.
+add_tree_sitter_grammar(tree_sitter_python     ${tree_sitter_python_SOURCE_DIR}/src)
 
 add_library(tree_sitter_grammars INTERFACE)
 target_link_libraries(tree_sitter_grammars INTERFACE
     tree_sitter
     tree_sitter_c tree_sitter_cpp tree_sitter_java
-    tree_sitter_javascript tree_sitter_typescript tree_sitter_tsx)
+    tree_sitter_javascript tree_sitter_typescript tree_sitter_tsx tree_sitter_python)
 
 # The grammars' highlights.scm queries and the Outline panel's outline.scm
 # queries (written for Duet, in src/syntax/queries), exposed to the application as
@@ -54,6 +56,13 @@ foreach(grammar IN ITEMS c cpp java javascript typescript)
     list(APPEND TREE_SITTER_QUERY_FILES
         "${grammar}/outline.scm|${PROJECT_SOURCE_DIR}/src/syntax/queries/${grammar}/outline.scm")
 endforeach()
+# The occurrence index's queries (src/index/queries).
+foreach(grammar IN ITEMS c cpp java javascript typescript python)
+    list(APPEND TREE_SITTER_QUERY_FILES
+        "${grammar}/occurrences.scm|${PROJECT_SOURCE_DIR}/src/index/queries/${grammar}/occurrences.scm")
+endforeach()
+list(APPEND TREE_SITTER_QUERY_FILES
+    "javascript/occurrences-params.scm|${PROJECT_SOURCE_DIR}/src/index/queries/javascript/occurrences-params.scm")
 
 function(duet_add_queries target)
     set(query_dir ${CMAKE_BINARY_DIR}/queries)

@@ -55,6 +55,12 @@ FetchContent_Declare(tree_sitter_typescript
     GIT_SHALLOW ON
     SOURCE_SUBDIR ${DOWNLOAD_ONLY})
 
+FetchContent_Declare(tree_sitter_python
+    GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-python.git
+    GIT_TAG v0.25.0
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR ${DOWNLOAD_ONLY})
+
 FetchContent_Declare(libvterm
     GIT_REPOSITORY https://github.com/neovim/libvterm.git
     GIT_TAG v0.3.3
@@ -73,7 +79,7 @@ FetchContent_Declare(cmark_gfm
     EXCLUDE_FROM_ALL) # only its libraries are built, not its command
 
 FetchContent_MakeAvailable(qscintilla tree_sitter tree_sitter_c tree_sitter_cpp tree_sitter_java
-                           tree_sitter_javascript tree_sitter_typescript libvterm)
+                           tree_sitter_javascript tree_sitter_typescript tree_sitter_python libvterm)
 
 include(${CMAKE_CURRENT_LIST_DIR}/QScintilla.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/TreeSitter.cmake)

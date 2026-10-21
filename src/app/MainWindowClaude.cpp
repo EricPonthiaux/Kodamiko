@@ -250,7 +250,7 @@ void MainWindow::onHookReceived(const HookEvent &event)
             event.kind == HookEvent::Kind::FilesEdited ? event.filePaths : editorTabs_->openFilePaths();
         for (const QString &path : paths)
             editorTabs_->syncWithDisk(path);
-        symbolIndex_->refresh();
+        refreshIndexes();
         if (mode_ == Mode::Diff)
             changesView_->refresh();
         break;

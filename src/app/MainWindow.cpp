@@ -31,6 +31,7 @@
 #include "editor/FindBar.h"
 #include "git/GitCommands.h"
 #include "history/HistoryView.h"
+#include "index/OccurrenceIndex.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspCompletionProvider.h"
 #include "lsp/ServerTasksLabel.h"
@@ -173,7 +174,8 @@ void MainWindow::createWidgets()
 void MainWindow::createCodeServices()
 {
     symbolIndex_ = new SymbolIndex(this);
-    connect(editorTabs_, &EditorTabs::fileSaved, symbolIndex_, &SymbolIndex::refresh);
+    occurrenceIndex_ = new OccurrenceIndex(this);
+    connect(editorTabs_, &EditorTabs::fileSaved, this, &MainWindow::refreshIndexes);
 
     toolchains_ = std::make_unique<Toolchains>();
     languageServers_ = new LanguageServers(this);
@@ -218,7 +220,7 @@ void MainWindow::createCodeServices()
     connect(editorTabs_, &EditorTabs::fileSaved, this, [this] { fileStatuses_->refresh(); });
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
         if (state == Qt::ApplicationActive) {
-            symbolIndex_->refresh();
+            refreshIndexes();
             fileStatuses_->refresh();
         }
     });
@@ -390,7 +392,7 @@ void MainWindow::createFilesPanel()
     connect(fileTree_, &FileTreeView::statusMessage, this, &MainWindow::showStatus);
     connect(fileTree_, &FileTreeView::entryCreated, this, [this] {
         fileStatuses_->refresh();
-        symbolIndex_->refresh();
+        refreshIndexes();
     });
     connect(fileTree_, &FileTreeView::sendToClaudeRequested, this, &MainWindow::sendToClaude);
     connect(fileTree_, &FileTreeView::generateDiagramRequested, this, &MainWindow::generateDiagram);
@@ -527,7 +529,13 @@ void MainWindow::afterFilesChanged()
 {
     fileTree_->setClaudeEdited(recentFiles_.editedByClaude());
     fileStatuses_->refresh();
+    refreshIndexes();
+}
+
+void MainWindow::refreshIndexes()
+{
     symbolIndex_->refresh();
+    occurrenceIndex_->refresh();
 }
 
 void MainWindow::showStatus(const QString &message)

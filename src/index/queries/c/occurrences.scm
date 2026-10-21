@@ -1,0 +1,23 @@
+(function_declarator declarator: (identifier) @definition)
+(init_declarator declarator: (identifier) @definition)
+(declaration declarator: (identifier) @definition)
+(parameter_declaration declarator: (identifier) @definition)
+(pointer_declarator declarator: (identifier) @definition)
+(array_declarator declarator: (identifier) @definition)
+(field_declaration declarator: (field_identifier) @definition)
+(struct_specifier name: (type_identifier) @definition body: (_))
+(union_specifier name: (type_identifier) @definition body: (_))
+(enum_specifier name: (type_identifier) @definition body: (_))
+(enumerator name: (identifier) @definition)
+(type_definition declarator: (type_identifier) @definition)
+(preproc_def name: (identifier) @definition)
+(preproc_function_def name: (identifier) @definition)
+
+(call_expression function: (identifier) @call)
+(call_expression function: (field_expression field: (field_identifier) @call))
+
+(assignment_expression left: (identifier) @write)
+(assignment_expression left: (field_expression field: (field_identifier) @write))
+(update_expression argument: (identifier) @write)
+
+(preproc_include path: (_) @import)

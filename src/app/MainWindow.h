@@ -74,6 +74,7 @@ class Runner;
 class SidePanel;
 class SnapshotsPopup;
 class StashesPopup;
+class OccurrenceIndex;
 class SymbolIndex;
 class TerminalWidget;
 class TitleBar;
@@ -146,6 +147,8 @@ private:
     void forgetDeletedFiles(const QString &path);
     // Files were created, renamed or deleted: the views that list them follow.
     void afterFilesChanged();
+    // The symbol and occurrence indexes read again what changed on disk.
+    void refreshIndexes();
     // `path` relative to the project; empty for the project itself.
     QString projectRelativePath(const QString &path) const;
     QWidget *createTerminalPage();
@@ -436,6 +439,8 @@ private:
     // Files written by Claude since the last prompt: a dot in the tree.
     QSet<QString> claudeTouched_;
     SymbolIndex *symbolIndex_ = nullptr;
+    // Every word of the project, for the refactorings and the usages.
+    OccurrenceIndex *occurrenceIndex_ = nullptr;
     CompletionService *completion_ = nullptr;
     LocalFullLineModel *fullLineModel_ = nullptr;
     LanguageServers *languageServers_ = nullptr;

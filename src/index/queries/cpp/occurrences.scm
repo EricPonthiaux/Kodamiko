@@ -1,0 +1,11 @@
+(function_declarator declarator: (field_identifier) @definition)
+(function_declarator declarator: (qualified_identifier name: (identifier) @definition))
+(reference_declarator (identifier) @definition)
+(class_specifier name: (type_identifier) @definition body: (_))
+(namespace_definition name: (namespace_identifier) @definition)
+(alias_declaration name: (type_identifier) @definition)
+(optional_parameter_declaration declarator: (identifier) @definition)
+
+(call_expression function: (qualified_identifier name: (identifier) @call))
+(call_expression function: (template_function name: (identifier) @call))
+(new_expression type: (type_identifier) @call)

@@ -121,6 +121,12 @@ add_library(duet_core STATIC
     history/HistoryView.cpp
     history/HistoryViewCommit.cpp
     history/HistoryViewPanes.cpp
+    index/OccurrenceGrammars.cpp
+    index/OccurrenceIndex.cpp
+    index/OccurrenceScanner.cpp
+    index/OccurrenceStore.cpp
+    index/PostingCodec.cpp
+    index/VarintReader.cpp
     lsp/LanguageServers.cpp
     lsp/LspClient.cpp
     lsp/LspCompletionProvider.cpp

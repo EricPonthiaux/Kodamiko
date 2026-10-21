@@ -16,6 +16,7 @@
 #include "editor/EditorTabs.h"
 #include "git/FileStatuses.h"
 #include "history/HistoryView.h"
+#include "index/OccurrenceIndex.h"
 #include "lsp/LanguageServers.h"
 #include "navigation/GoToPopup.h"
 #include "projects/ProjectStore.h"
@@ -59,6 +60,7 @@ void MainWindow::openFolder(const QString &folder)
     claudeTouched_.clear();
     updateClaudeMarks();
     symbolIndex_->setFolder(folder_);
+    occurrenceIndex_->setFolder(folder_);
     completion_->history()->setFile(CompletionHistory::fileFor(folder_)); // the project's choices
     project_ = ProjectStore::touch(folder_);
     if (!project_.configured) {
