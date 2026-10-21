@@ -6,6 +6,7 @@
 #include "editor/EditorWidget.h"
 #include "editor/MarkdownToolTip.h"
 #include "editor/SymbolOccurrences.h"
+#include "index/OccurrenceIndex.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "lsp/LspProtocol.h"
@@ -18,8 +19,10 @@
 #include "refactor/RenameSymbolPopup.h"
 #include "ui/Theme.h"
 
+#include <QCheckBox>
 #include <QJsonArray>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -72,11 +75,13 @@ struct ClangdProject {
     LanguageServers servers;
     CodeNavigator navigator{&tabs, &index};
     ProblemStore problems{&servers};
-    CodeIntelligence intelligence{{&tabs, &servers, &navigator, &problems}};
+    OccurrenceIndex occurrences;
+    CodeIntelligence intelligence{{&tabs, &servers, &navigator, &problems, &occurrences.store()}};
     QStringList messages;
 
     ClangdProject()
     {
+        QStandardPaths::setTestModeEnabled(true); // the index's cache
         index.setFolder(dir.path());
         servers.setFolder(dir.path());
         write(dir.filePath("compile_flags.txt"), "-std=c++20\n");
@@ -85,6 +90,11 @@ struct ClangdProject {
                          [this](const QString &message) { messages.append(message); });
         tabs.show();
     }
+
+    ~ClangdProject() { QFile::remove(OccurrenceIndex::cachePathFor(dir.path())); }
+
+    ClangdProject(const ClangdProject &) = delete;
+    ClangdProject &operator=(const ClangdProject &) = delete;
 
     // Writes `name` with `content`, opens it, and waits for clangd.
     EditorWidget *open(const QString &name, const QByteArray &content)
@@ -96,6 +106,10 @@ struct ClangdProject {
             return nullptr;
         servers.syncDocument(client, editor->filePath(), "cpp", editor->utf8Bytes().toByteArray());
         if (!QTest::qWaitFor([client] { return client->isReady(); }, 30000))
+            return nullptr;
+        const QSignalSpy indexed(&occurrences, &OccurrenceIndex::indexingFinished);
+        occurrences.setFolder(dir.path());
+        if (!QTest::qWaitFor([&indexed] { return !indexed.isEmpty(); }, 30000))
             return nullptr;
         return editor;
     }
@@ -441,6 +455,29 @@ private slots:
         QCOMPARE(project.intelligence.history()->lastDescription(), QString("Rename “count” to “total”"));
         project.intelligence.undoRefactoring();
         QCOMPARE(editor->text(), QString("int count = 0;\nint next() { return ++count; }\n"));
+    }
+
+    void showsTheCommentsARenameChangesBeforeMakingItWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        const EditorWidget *editor = project.open("count.cpp", "// count of the calls\nint count = 0;\n");
+        QVERIFY(editor);
+        placeCaretIn(editor, "count = 0");
+
+        project.intelligence.rename();
+        QTRY_VERIFY_WITH_TIMEOUT(project.tabs.window()->findChild<RenameSymbolPopup *>(), 30000);
+        const auto *rename = project.tabs.window()->findChild<RenameSymbolPopup *>();
+        rename->field()->setText("total");
+        rename->commentsAndStrings()->setChecked(true);
+        QTest::keyClick(rename->field(), Qt::Key_Return); // Refactor
+
+        QTRY_VERIFY_WITH_TIMEOUT(project.tabs.window()->findChild<RefactoringPreviewPopup *>(), 30000);
+        auto *preview = project.tabs.window()->findChild<RefactoringPreviewPopup *>();
+        QCOMPARE(preview->files()->count(), 2); // the code, then the comment
+        preview->accept();
+        QCOMPARE(editor->text(), QString("// total of the calls\nint total = 0;\n"));
     }
 
     void highlightsTheSymbolsOccurrencesWithClangd()

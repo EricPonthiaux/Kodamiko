@@ -58,6 +58,9 @@ private slots:
 
     void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
 
+    // The caches of the temporary folders, which no later run reads.
+    void cleanupTestCase() { QDir(QFileInfo(OccurrenceIndex::cachePathFor("/")).absolutePath()).removeRecursively(); }
+
     void readsTheRolesOfCppIdentifiers()
     {
         OccurrenceScanner scanner;

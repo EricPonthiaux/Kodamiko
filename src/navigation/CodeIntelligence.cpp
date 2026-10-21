@@ -125,6 +125,7 @@ CodeIntelligence::CodeIntelligence(const Services &services, QObject *parent)
     , servers_(services.servers)
     , navigator_(services.navigator)
     , problems_(services.problems)
+    , index_(services.index)
     , history_(new RefactoringHistory(this))
 {
     // A quick fix or a refactoring carried out by the server comes back as

@@ -5,6 +5,7 @@
 #include "WorkspaceEditing.h"
 #include "lsp/LspProtocol.h"
 #include "refactor/EditTargets.h"
+#include "refactor/RenameAnalysis.h"
 #include "refactor/RenameSymbolPopup.h"
 
 #include <QHash>
@@ -21,6 +22,7 @@ class EditorTabs;
 class EditorWidget;
 class LanguageServers;
 class LspClient;
+class OccurrenceStore;
 class ProblemStore;
 class RefactoringHistory;
 class QJsonArray;
@@ -43,6 +45,9 @@ public:
         LanguageServers *servers = nullptr;
         CodeNavigator *navigator = nullptr;
         ProblemStore *problems = nullptr;
+        // Where to look for a renamed name in comments and strings;
+        // nullptr: only in the unsaved texts. Thread-safe.
+        const OccurrenceStore *index = nullptr;
     };
 
     explicit CodeIntelligence(const Services &services, QObject *parent = nullptr);
@@ -121,8 +126,7 @@ private:
     struct Rename {
         int bytePosition = 0; // where the name is in its editor
         QString name;
-        QString newName;
-        RenameSymbolPopup::Mode mode = RenameSymbolPopup::Mode::Refactor;
+        RenameSymbolPopup::Choice choice;
     };
 
     // Asks for the new name of `name`, at `bytePosition` in `editor`.
@@ -130,9 +134,17 @@ private:
     // Asks the server for the edit of `rename` in `editor`, then makes it,
     // or shows it first.
     void renameAt(EditorWidget *editor, const Rename &rename);
+    // Looks for the name in comments and strings and for conflicts, in the
+    // background, then completes the rename.
+    void analyzeRename(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
+    void completeAnalyzedRename(const LspProtocol::WorkspaceEdit &edit,
+                                const RenameAnalysis::Result &analysis,
+                                const Rename &rename);
     void completeRename(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
-    // The changes of `edit` in the preview popup, made once confirmed.
-    void showPreview(const LspProtocol::WorkspaceEdit &edit, const Rename &rename);
+    // The changes in the preview popup, made once confirmed.
+    void showPreview(const LspProtocol::WorkspaceEdit &edit,
+                     const RenameAnalysis::Result &analysis,
+                     const Rename &rename);
     void requestSignatureHelp(EditorWidget *editor, bool explicitRequest);
     // Shows the server's signature help `help` as a call tip.
     void showSignatureHelp(const EditorWidget *editor, const QJsonObject &help, bool explicitRequest);
@@ -161,6 +173,7 @@ private:
     LanguageServers *servers_;
     CodeNavigator *navigator_;
     ProblemStore *problems_;
+    const OccurrenceStore *index_;
     RefactoringHistory *history_; // owned, as a child
     // Highlights the code of the documentation; built on first use (it
     // holds a hidden editor).

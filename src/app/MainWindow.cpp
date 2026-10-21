@@ -226,7 +226,8 @@ void MainWindow::createCodeServices()
     });
     navigator_ = new CodeNavigator(editorTabs_, symbolIndex_, this);
 
-    intelligence_ = new CodeIntelligence({editorTabs_, languageServers_, navigator_, problemStore_}, this);
+    intelligence_ = new CodeIntelligence(
+        {editorTabs_, languageServers_, navigator_, problemStore_, &occurrenceIndex_->store()}, this);
     connect(editorTabs_, &EditorTabs::editorOpened, intelligence_, &CodeIntelligence::attach);
     connect(editorTabs_, &EditorTabs::definitionRequested, intelligence_, &CodeIntelligence::goToDefinition);
     connect(intelligence_, &CodeIntelligence::statusMessage, this, &MainWindow::showStatus);

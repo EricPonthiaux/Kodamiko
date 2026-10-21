@@ -8,6 +8,8 @@
 #include <QCoreApplication>
 #include <QDir>
 
+#include <algorithm>
+
 using LspProtocol::DocumentChange;
 using LspProtocol::DocumentEdit;
 using LspProtocol::WorkspaceEdit;
@@ -74,6 +76,27 @@ WorkspaceEdit without(const WorkspaceEdit &edit, const QSet<QString> &excluded)
         return documentEdit && excluded.contains(documentEdit->filePath);
     });
     return kept;
+}
+
+WorkspaceEdit merge(const WorkspaceEdit &code, const WorkspaceEdit &textual)
+{
+    WorkspaceEdit merged = code;
+    QList<DocumentChange> first;
+    for (const DocumentChange &change : textual.changes) {
+        const auto *addition = std::get_if<DocumentEdit>(&change);
+        if (!addition)
+            continue;
+        const auto joined = std::ranges::find_if(merged.changes, [addition](const DocumentChange &existing) {
+            const auto *documentEdit = std::get_if<DocumentEdit>(&existing);
+            return documentEdit && documentEdit->filePath == addition->filePath;
+        });
+        if (joined != merged.changes.end())
+            std::get<DocumentEdit>(*joined).edits.append(addition->edits);
+        else
+            first.append(*addition);
+    }
+    merged.changes = first + merged.changes;
+    return merged;
 }
 
 } // namespace EditPreview

@@ -26,4 +26,9 @@ QList<DiffFile> diffFiles(const QList<RefactoredFile> &changes, const QString &r
 // `edit` without the text edits of the files `excluded` (by path).
 LspProtocol::WorkspaceEdit without(const LspProtocol::WorkspaceEdit &edit, const QSet<QString> &excluded);
 
+// `code` with the text edits of `textual`, computed on the same texts: a
+// file's join its first edit in `code`, or come first when `code` has
+// none for it, so that each applies to the text it was computed for.
+LspProtocol::WorkspaceEdit merge(const LspProtocol::WorkspaceEdit &code, const LspProtocol::WorkspaceEdit &textual);
+
 } // namespace EditPreview

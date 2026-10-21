@@ -11,9 +11,11 @@
 #include "refactor/RefactoringHistory.h"
 #include "refactor/RefactoringPreviewPopup.h"
 
+#include <QApplication>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QPointer>
+#include <QThreadPool>
 
 #include <chrono>
 
@@ -84,11 +86,11 @@ void CodeIntelligence::showRenamePopup(EditorWidget *editor, int bytePosition, c
     const QPointer<EditorWidget> target = editor;
     auto *popup = new RenameSymbolPopup(
         name, QFileInfo(editor->filePath()).fileName(),
-        [this, target, bytePosition, name](const QString &newName, RenameSymbolPopup::Mode mode) -> QString {
-            if (newName.isEmpty())
+        [this, target, bytePosition, name](const RenameSymbolPopup::Choice &choice) -> QString {
+            if (choice.newName.isEmpty())
                 return tr("Specify a new name");
-            if (target && newName != name)
-                renameAt(target, {bytePosition, name, newName, mode});
+            if (target && choice.newName != name)
+                renameAt(target, {bytePosition, name, choice});
             return {};
         },
         editor);
@@ -102,7 +104,7 @@ void CodeIntelligence::renameAt(EditorWidget *editor, const Rename &rename)
         return;
     syncOpenEditors(client, editor->languageId());
     QJsonObject params = positionParams(editor, rename.bytePosition);
-    params.insert("newName", rename.newName);
+    params.insert("newName", rename.choice.newName);
     client->request(QStringLiteral("textDocument/rename"), params,
                     [this, rename](const QJsonValue &result, const QString &error) {
                         if (!error.isEmpty()) {
@@ -114,29 +116,70 @@ void CodeIntelligence::renameAt(EditorWidget *editor, const Rename &rename)
                             emit statusMessage(tr("Nothing to rename here"));
                             return;
                         }
-                        if (rename.mode == RenameSymbolPopup::Mode::Preview)
-                            showPreview(edit, rename);
-                        else
-                            completeRename(edit, rename);
+                        analyzeRename(edit, rename);
                     });
+}
+
+void CodeIntelligence::analyzeRename(const WorkspaceEdit &edit, const Rename &rename)
+{
+    RenameAnalysis::Input input{
+        .name = rename.name,
+        .newName = rename.choice.newName,
+        .codeEdit = edit,
+        .index = index_,
+        .unsavedTexts = tabs_->unsavedTexts(),
+        .projectFolder = servers_->folder(),
+        .searchesCommentsAndStrings = rename.choice.inCommentsAndStrings,
+    };
+    // The files are read off the UI thread; the answer comes back to it if
+    // this object still exists.
+    QThreadPool::globalInstance()->start([guard = QPointer<CodeIntelligence>(this), input = std::move(input), rename] {
+        RenameAnalysis::Result analysis = RenameAnalysis::analyze(input);
+        QMetaObject::invokeMethod(
+            qApp,
+            [guard, rename, edit = input.codeEdit, analysis = std::move(analysis)] {
+                if (guard)
+                    guard->completeAnalyzedRename(edit, analysis, rename);
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void CodeIntelligence::completeAnalyzedRename(const WorkspaceEdit &edit,
+                                              const RenameAnalysis::Result &analysis,
+                                              const Rename &rename)
+{
+    // As IntelliJ: what is not plain code is shown before it is changed.
+    const bool needsReview = rename.choice.mode == RenameSymbolPopup::Mode::Preview ||
+                             !analysis.textualEdit.isEmpty() || !analysis.conflicts.isEmpty();
+    if (needsReview)
+        showPreview(edit, analysis, rename);
+    else
+        completeRename(edit, rename);
 }
 
 void CodeIntelligence::completeRename(const WorkspaceEdit &edit, const Rename &rename)
 {
-    const int files = applyWorkspaceEdit(edit, tr("Rename “%1” to “%2”").arg(rename.name, rename.newName));
+    const QString &newName = rename.choice.newName;
+    const int files = applyWorkspaceEdit(edit, tr("Rename “%1” to “%2”").arg(rename.name, newName));
     if (files == 0)
         return; // the errors were said
-    emit statusMessage(files == 1 ? tr("Renamed “%1” to “%2”").arg(rename.name, rename.newName)
-                                  : tr("Renamed “%1” to “%2” in %3 files").arg(rename.name, rename.newName).arg(files));
+    emit statusMessage(files == 1 ? tr("Renamed “%1” to “%2”").arg(rename.name, newName)
+                                  : tr("Renamed “%1” to “%2” in %3 files").arg(rename.name, newName).arg(files));
 }
 
-void CodeIntelligence::showPreview(const WorkspaceEdit &edit, const Rename &rename)
+void CodeIntelligence::showPreview(const WorkspaceEdit &edit,
+                                   const RenameAnalysis::Result &analysis,
+                                   const Rename &rename)
 {
     RefactoringPreviewPopup::Preview preview{
-        .title = tr("Rename “%1” to “%2”").arg(rename.name, rename.newName),
+        .title = tr("Rename “%1” to “%2”").arg(rename.name, rename.choice.newName),
         .root = servers_->folder(),
         .edit = edit,
         .files = EditPreview::simulate(edit, targets()),
+        .textualEdit = analysis.textualEdit,
+        .textualFiles = EditPreview::simulate(analysis.textualEdit, targets()),
+        .conflicts = analysis.conflicts,
     };
     auto *popup = new RefactoringPreviewPopup(
         std::move(preview), [this, rename](const WorkspaceEdit &kept) { completeRename(kept, rename); },

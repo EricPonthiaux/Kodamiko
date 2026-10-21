@@ -2,6 +2,7 @@
 
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "index/OccurrenceStore.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspProtocol.h"
 #include "navigation/WorkspaceEditing.h"
@@ -9,10 +10,13 @@
 #include "refactor/EditPreview.h"
 #include "refactor/RefactoringHistory.h"
 #include "refactor/RefactoringPreviewPopup.h"
+#include "refactor/RenameAnalysis.h"
 #include "refactor/RenameSymbolPopup.h"
 #include "ui/Theme.h"
 
+#include <QCheckBox>
 #include <QFile>
+#include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QTemporaryDir>
@@ -263,13 +267,13 @@ private slots:
     {
         QWidget window;
         window.show();
-        QList<RenameSymbolPopup::Mode> modes;
+        QList<RenameSymbolPopup::Choice> choices;
         auto *popup = new RenameSymbolPopup(
             "total", "a.cpp",
-            [&modes](const QString &newName, RenameSymbolPopup::Mode mode) {
-                if (newName == "total")
+            [&choices](const RenameSymbolPopup::Choice &choice) {
+                if (choice.newName == "total")
                     return QString("Same name");
-                modes.append(mode);
+                choices.append(choice);
                 return QString();
             },
             &window);
@@ -279,9 +283,135 @@ private slots:
         popup->preview();
         QCOMPARE(popup->error(), QString("Same name")); // still open
         popup->field()->setText("sum");
+        popup->commentsAndStrings()->setChecked(false);
         popup->preview();
 
-        QCOMPARE(modes, QList<RenameSymbolPopup::Mode>{RenameSymbolPopup::Mode::Preview});
+        QCOMPARE(choices.size(), 1);
+        QCOMPARE(choices[0].newName, QString("sum"));
+        QCOMPARE(choices[0].mode, RenameSymbolPopup::Mode::Preview);
+        QVERIFY(!choices[0].inCommentsAndStrings);
+    }
+
+    void findsTheNameInCommentsStringsAndTextOutsideTheServersEdit()
+    {
+        const Project project;
+        write(project.path("a.cpp"), "// total of all\nint total = 0; // é total\nconst char *s = \"total\";\n");
+        write(project.path("notes.md"), "The total is kept.\n");
+        write(project.path("other.cpp"), "int unrelated;\n");
+        OccurrenceStore index;
+        index.setFiles({{project.path("a.cpp"), {1, 1}, {{"total", 3, 0, OccurrenceRole::Comment}}},
+                        {project.path("notes.md"), {1, 1}, {{"total", 4, 0, OccurrenceRole::Text}}}});
+        // The server renames the variable on line 1.
+        const WorkspaceEdit codeEdit{{DocumentEdit{project.path("a.cpp"), {}, {replacing(1, 4, 9, "sum")}}}};
+
+        const RenameAnalysis::Result result = RenameAnalysis::analyze({.name = "total",
+                                                                       .newName = "sum",
+                                                                       .codeEdit = codeEdit,
+                                                                       .index = &index,
+                                                                       .unsavedTexts = {},
+                                                                       .projectFolder = project.dir.path(),
+                                                                       .searchesCommentsAndStrings = true});
+
+        QCOMPARE(result.textualEdit.changes.size(), 2);
+        const auto &inSource = std::get<DocumentEdit>(result.textualEdit.changes[0]);
+        QCOMPARE(inSource.filePath, project.path("a.cpp"));
+        QCOMPARE(inSource.edits, (QList<TextEdit>{replacing(0, 3, 8, "sum"), replacing(1, 20, 25, "sum"),
+                                                  replacing(2, 17, 22, "sum")})); // "é" is one UTF-16 unit
+        QCOMPARE(std::get<DocumentEdit>(result.textualEdit.changes[1]).filePath, project.path("notes.md"));
+        QVERIFY(result.conflicts.isEmpty());
+    }
+
+    void findsTheNameInAnUnsavedText()
+    {
+        const Project project;
+        const RenameAnalysis::Result result =
+            RenameAnalysis::analyze({.name = "total",
+                                     .newName = "sum",
+                                     .codeEdit = {},
+                                     .index = nullptr,
+                                     .unsavedTexts = {{project.path("a.cpp"), "/* total */\n"}},
+                                     .projectFolder = project.dir.path(),
+                                     .searchesCommentsAndStrings = true});
+
+        QCOMPARE(result.textualEdit.changes.size(), 1);
+    }
+
+    void reportsTheConflictsOfARename()
+    {
+        const Project project;
+        write(project.path("a.cpp"), "int total;\nint sum;\n");
+        write(project.path("locked.cpp"), "int total;\n");
+        QFile::setPermissions(project.path("locked.cpp"), QFile::ReadOwner);
+        const WorkspaceEdit codeEdit{{
+            DocumentEdit{project.path("a.cpp"), {}, {replacing(0, 4, 9, "sum")}},
+            DocumentEdit{project.path("locked.cpp"), {}, {replacing(0, 4, 9, "sum")}},
+            DocumentEdit{"/elsewhere/b.cpp", {}, {replacing(0, 4, 9, "sum")}},
+        }};
+
+        const RenameAnalysis::Result result = RenameAnalysis::analyze({.name = "total",
+                                                                       .newName = "sum",
+                                                                       .codeEdit = codeEdit,
+                                                                       .index = nullptr,
+                                                                       .unsavedTexts = {},
+                                                                       .projectFolder = project.dir.path(),
+                                                                       .searchesCommentsAndStrings = false});
+
+        QCOMPARE(result.conflicts,
+                 (QStringList{"“sum” is already declared in a.cpp:2", "locked.cpp is read-only",
+                              QDir::toNativeSeparators("/elsewhere/b.cpp") + " is outside the project"}));
+        QVERIFY(result.textualEdit.isEmpty());
+        QFile::setPermissions(project.path("locked.cpp"), QFile::ReadOwner | QFile::WriteOwner);
+    }
+
+    void mergesTheTextualEditsIntoTheCodeEditOfTheirFile()
+    {
+        const WorkspaceEdit code{{
+            DocumentEdit{"/p/a.cpp", 3, {replacing(1, 0, 5, "sum")}},
+            FileOperation{.kind = Kind::Rename, .filePath = "/p/a.cpp", .newPath = "/p/b.cpp"},
+        }};
+        const WorkspaceEdit textual{{
+            DocumentEdit{"/p/a.cpp", {}, {replacing(0, 3, 8, "sum")}},
+            DocumentEdit{"/p/notes.md", {}, {replacing(0, 4, 9, "sum")}},
+        }};
+
+        const WorkspaceEdit merged = EditPreview::merge(code, textual);
+
+        QCOMPARE(merged.changes.size(), 3);
+        QCOMPARE(std::get<DocumentEdit>(merged.changes[0]).filePath, QString("/p/notes.md")); // first
+        const auto &source = std::get<DocumentEdit>(merged.changes[1]);
+        QCOMPARE(source.version, std::optional<int>(3));
+        QCOMPARE(source.edits.size(), 2);
+        QVERIFY(std::holds_alternative<FileOperation>(merged.changes[2]));
+    }
+
+    void previewShowsTheTextualFilesAndTheConflicts()
+    {
+        Project project;
+        write(project.path("a.cpp"), "int total; // total\n");
+        const WorkspaceEdit code{{DocumentEdit{project.path("a.cpp"), {}, {replacing(0, 4, 9, "sum")}}}};
+        const WorkspaceEdit textual{{DocumentEdit{project.path("a.cpp"), {}, {replacing(0, 14, 19, "sum")}}}};
+        std::optional<WorkspaceEdit> applied;
+        QWidget window;
+        auto *popup = new RefactoringPreviewPopup(
+            {.title = "Rename",
+             .root = project.dir.path(),
+             .edit = code,
+             .files = EditPreview::simulate(code, project.targets()),
+             .textualEdit = textual,
+             .textualFiles = EditPreview::simulate(textual, project.targets()),
+             .conflicts = {"“sum” is already declared in a.cpp:3"}},
+            [&applied](const WorkspaceEdit &kept) { applied = kept; }, &window);
+        window.show();
+        popup->popup();
+        QCOMPARE(popup->files()->count(), 2);
+        QCOMPARE(popup->files()->item(1)->text(), QString("a.cpp · in comments"));
+        QVERIFY(popup->conflicts()->isVisible());
+
+        popup->accept();
+
+        QVERIFY(applied);
+        QCOMPARE(applied->changes.size(), 1);
+        QCOMPARE(std::get<DocumentEdit>(applied->changes[0]).edits.size(), 2); // one edit of the file
     }
 };
 

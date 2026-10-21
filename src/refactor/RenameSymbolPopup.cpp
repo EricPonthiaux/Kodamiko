@@ -2,19 +2,33 @@
 
 #include "RenameSymbolPopup.h"
 
+#include <QCheckBox>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSettings>
 #include <QVBoxLayout>
+
+namespace {
+
+constexpr const char *commentsAndStringsKey = "rename/commentsAndStrings";
+
+} // namespace
 
 RenameSymbolPopup::RenameSymbolPopup(const QString &name, const QString &location, Rename rename, QWidget *parent)
     : EntryPopup(QStringLiteral("renameSymbolPopup"), tr("Rename “%1”").arg(name), location, parent)
     , rename_(std::move(rename))
     , field_(new QLineEdit(name, this))
+    , commentsAndStrings_(new QCheckBox(tr("Search in &comments and strings"), this))
 {
     field_->selectAll();
     connect(field_, &QLineEdit::returnPressed, this, &RenameSymbolPopup::accept);
     connect(field_, &QLineEdit::textEdited, this, [this] { showError({}); });
     content()->addWidget(field_);
+    commentsAndStrings_->setChecked(QSettings().value(commentsAndStringsKey, true).toBool());
+    connect(commentsAndStrings_, &QCheckBox::toggled, this,
+            [](bool checked) { QSettings().setValue(commentsAndStringsKey, checked); });
+    commentsAndStrings_->setStyleSheet(QStringLiteral("QCheckBox { background: transparent; }"));
+    content()->addWidget(commentsAndStrings_);
     setFooterHint(tr("Enter to rename · Alt+P to preview"));
 
     auto *cancel = new QPushButton(tr("Cancel"), this);
@@ -46,7 +60,7 @@ void RenameSymbolPopup::focusContent()
 
 void RenameSymbolPopup::submit(Mode mode)
 {
-    const QString message = rename_(field_->text().trimmed(), mode);
+    const QString message = rename_({field_->text().trimmed(), mode, commentsAndStrings_->isChecked()});
     if (message.isEmpty())
         dismiss();
     else
