@@ -139,11 +139,20 @@ void CodeIntelligence::completeAnalyzedRename(const WorkspaceEdit &edit,
                                               const RenameAnalysis::Result &analysis,
                                               const Rename &rename)
 {
+    RenameAnalysis::Result checked = analysis;
+    // A server still reading the project may not know every usage yet.
+    QStringList busy;
+    for (const LanguageServers::Task &task : servers_->tasks())
+        busy.append(task.server);
+    busy.removeDuplicates();
+    if (!busy.isEmpty())
+        checked.conflicts.append(
+            tr("%1 still reading the project: some usages may be missing").arg(busy.join(QStringLiteral(", "))));
     // As IntelliJ: what is not plain code is shown before it is changed.
-    const bool needsReview = rename.choice.mode == RenameSymbolPopup::Mode::Preview ||
-                             !analysis.textualEdit.isEmpty() || !analysis.conflicts.isEmpty();
+    const bool needsReview = rename.choice.mode == RenameSymbolPopup::Mode::Preview || !checked.textualEdit.isEmpty() ||
+                             !checked.conflicts.isEmpty();
     if (needsReview)
-        showPreview(edit, analysis, rename);
+        showPreview(edit, checked, rename);
     else
         completeRename(edit, rename);
 }

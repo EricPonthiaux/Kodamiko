@@ -3,6 +3,7 @@
 #include "FileReferences.h"
 
 #include "editor/TextFile.h"
+#include "index/OccurrenceScanner.h"
 #include "index/OccurrenceStore.h"
 #include "syntax/LanguageRegistry.h"
 
@@ -32,6 +33,8 @@ enum class Family {
 struct Reference {
     qsizetype start = 0;
     QString spec;
+    // Python "import a.b" without "as": the code then says "a.b.f()".
+    bool isPlainImport = false;
 };
 
 // What a reference pointed to before the move, and from where.
@@ -107,12 +110,14 @@ QList<Reference> pythonReferences(const QString &text)
                                                QRegularExpression::MultilineOption);
     static const QRegularExpression importList(QStringLiteral(R"(^[ \t]*import[ \t]+([^\n#;]+))"),
                                                QRegularExpression::MultilineOption);
-    static const QRegularExpression module(
-        QStringLiteral(R"(([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)(?:[ \t]+as[ \t]+\w+)?)"));
+    static const QRegularExpression module(QStringLiteral(R"(([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)([ \t]+as[ \t]+\w+)?)"));
     QList<Reference> references = matchesOf(text, fromImport, 1);
     for (const Reference &list : matchesOf(text, importList, 1)) {
-        for (const Reference &name : matchesOf(list.spec, module, 1))
-            references.append({list.start + name.start, name.spec});
+        QRegularExpressionMatchIterator names = module.globalMatch(list.spec);
+        while (names.hasNext()) {
+            const QRegularExpressionMatch name = names.next();
+            references.append({list.start + name.capturedStart(1), name.captured(1), !name.hasCaptured(2)});
+        }
     }
     return references;
 }
@@ -251,6 +256,49 @@ Position positionIn(const QString &text, qsizetype index)
     return {int(text.left(index).count(QLatin1Char('\n'))), int(index - lineStart)};
 }
 
+// Where the code of a Python `text` names module `spec` ("spec.f()",
+// "m = spec"): the start of each, comments and strings left out.
+QList<qsizetype> usesOf(const QString &text, const QString &spec)
+{
+    const QRegularExpression use(QStringLiteral("(?<![\\w.])%1(?!\\w)").arg(QRegularExpression::escape(spec)));
+    const QByteArray bytes = text.toUtf8();
+    thread_local OccurrenceScanner scanner;
+    QSet<std::uint32_t> codeOffsets;
+    for (const Occurrence &occurrence : scanner.scan(QStringLiteral("python"), bytes)) {
+        const bool isCode = occurrence.role == OccurrenceRole::Reference || occurrence.role == OccurrenceRole::Call ||
+                            occurrence.role == OccurrenceRole::Write;
+        if (isCode)
+            codeOffsets.insert(occurrence.offset);
+    }
+    QList<qsizetype> uses;
+    QRegularExpressionMatchIterator it = use.globalMatch(text);
+    while (it.hasNext()) {
+        const qsizetype start = it.next().capturedStart();
+        if (codeOffsets.contains(std::uint32_t(text.left(start).toUtf8().size())))
+            uses.append(start);
+    }
+    return uses;
+}
+
+TextEdit replacement(const QString &text, qsizetype start, qsizetype length, const QString &newText)
+{
+    const Position from = positionIn(text, start);
+    return {{from, {from.line, from.character + int(length)}}, newText};
+}
+
+// The code's uses of a module imported by `reference` ("import a.b"),
+// renamed `spec`, the import itself left out.
+QList<TextEdit> usesRenamed(const QString &text, const Reference &reference, const QString &spec)
+{
+    QList<TextEdit> edits;
+    for (const qsizetype use : usesOf(text, reference.spec)) {
+        const bool isTheImport = use >= reference.start && use < reference.start + reference.spec.size();
+        if (!isTheImport)
+            edits.append(replacement(text, use, reference.spec.size(), spec));
+    }
+    return edits;
+}
+
 // The edits of `path` (where it is now), whose text is `text`.
 QList<TextEdit> editsIn(const QString &path, const QString &text, const Moves &moves)
 {
@@ -268,8 +316,9 @@ QList<TextEdit> editsIn(const QString &path, const QString &text, const Moves &m
         const std::optional<QString> spec = respell(family, *target, path, moves);
         if (!spec || *spec == reference.spec)
             continue;
-        const Position start = positionIn(text, reference.start);
-        edits.append({{start, {start.line, start.character + int(reference.spec.size())}}, *spec});
+        edits.append(replacement(text, reference.start, reference.spec.size(), *spec));
+        if (reference.isPlainImport)
+            edits.append(usesRenamed(text, reference, *spec));
     }
     return edits;
 }
@@ -288,6 +337,27 @@ Moves movesOf(const Input &input)
     return moves;
 }
 
+// The words a reference to `move`'s file holds: its name, and the
+// folders that change ("pkg" of "pkg/a.py" moved to "lib/pkg/a.py"), or
+// the folder an index file stands for ("models" of "models/index.ts").
+QStringList wordsNaming(const Move &move)
+{
+    const QFileInfo from(move.from);
+    QStringList words{from.baseName()};
+    const QStringList fromParts = QDir::cleanPath(move.from).split(QLatin1Char('/'));
+    const QStringList toParts = QDir::cleanPath(move.to).split(QLatin1Char('/'));
+    qsizetype common = 0;
+    while (common < fromParts.size() && common < toParts.size() && fromParts[common] == toParts[common])
+        ++common;
+    for (qsizetype i = common; i + 1 < fromParts.size(); ++i)
+        words.append(fromParts[i]);
+    const bool standsForItsFolder =
+        from.baseName() == QLatin1String("index") || from.baseName() == QLatin1String("__init__");
+    if (standsForItsFolder)
+        words.append(from.absoluteDir().dirName());
+    return words;
+}
+
 // The files that may refer to the moved ones, where they are now.
 QStringList candidatesOf(const Input &input, const Moves &moves)
 {
@@ -296,8 +366,10 @@ QStringList candidatesOf(const Input &input, const Moves &moves)
         candidates.insert(QDir::cleanPath(move.to));
         if (!input.index)
             continue;
-        for (const QString &path : input.index->filesContaining(QFileInfo(move.from).baseName().toUtf8()))
-            candidates.insert(now(moves, path)); // the index may not know the move yet
+        for (const QString &word : wordsNaming(move)) {
+            for (const QString &path : input.index->filesContaining(word.toUtf8()))
+                candidates.insert(now(moves, path)); // the index may not know the move yet
+        }
     }
     for (auto it = input.unsavedTexts.cbegin(); it != input.unsavedTexts.cend(); ++it)
         candidates.insert(it.key());

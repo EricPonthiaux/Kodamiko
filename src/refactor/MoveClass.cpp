@@ -11,6 +11,7 @@
 #include <tree_sitter/api.h>
 
 #include <algorithm>
+#include <cctype>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -73,17 +74,46 @@ QString textOf(const QByteArray &bytes, TSNode node)
     return textOf(bytes, ts_node_start_byte(node), ts_node_end_byte(node));
 }
 
+bool isIdentifierByte(char c)
+{
+    return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+}
+
+// `word` replaced by `replacement`, of the same length, wherever it is a
+// whole word: the positions do not move.
+void replaceWord(QByteArray &text, const QByteArray &word, const QByteArray &replacement)
+{
+    for (qsizetype at = text.indexOf(word); at >= 0; at = text.indexOf(word, at + word.size())) {
+        const qsizetype end = at + word.size();
+        const bool startsWord = at == 0 || !isIdentifierByte(text[at - 1]);
+        const bool endsWord = end >= text.size() || !isIdentifierByte(text[end]);
+        if (startsWord && endsWord)
+            text.replace(at, word.size(), replacement);
+    }
+}
+
+// What tree-sitter reads of a C++ text: Qt's class macros blanked and
+// "signals:" read as "public:", which would otherwise break the class.
+QByteArray parsableCpp(QByteArray text)
+{
+    for (const QByteArrayView macro : {"Q_OBJECT", "Q_GADGET", "Q_NAMESPACE"})
+        replaceWord(text, macro.toByteArray(), QByteArray(macro.size(), ' '));
+    replaceWord(text, "signals", "public ");
+    replaceWord(text, "slots", "     ");
+    return text;
+}
+
 Parsed parse(const QString &languageId, const QString &text)
 {
     Parsed parsed;
     parsed.bytes = text.toUtf8();
+    const QByteArray parsable = languageId == QLatin1String("cpp") ? parsableCpp(parsed.bytes) : parsed.bytes;
     const TreeSitterGrammar *grammar = TreeSitterGrammars::forLanguage(languageId);
     if (!grammar)
         return parsed;
     TSParser *parser = ts_parser_new();
     ts_parser_set_language(parser, grammar->language);
-    parsed.tree.reset(
-        ts_parser_parse_string(parser, nullptr, parsed.bytes.constData(), std::uint32_t(parsed.bytes.size())));
+    parsed.tree.reset(ts_parser_parse_string(parser, nullptr, parsable.constData(), std::uint32_t(parsable.size())));
     ts_parser_delete(parser);
     return parsed;
 }
@@ -158,6 +188,20 @@ std::optional<TSNode> templatedClass(TSNode node)
     return std::nullopt;
 }
 
+// C's "typedef struct Point { … } Point;": the typedef's name.
+std::optional<QString> typedefStructName(const QByteArray &bytes, TSNode node)
+{
+    if (typeOf(node) != "type_definition")
+        return std::nullopt;
+    const TSNode type = ts_node_child_by_field_name(node, "type", 4);
+    const bool isStruct = !ts_node_is_null(type) &&
+                          (isCppClass(type) || typeOf(type) == "union_specifier" || typeOf(type) == "enum_specifier");
+    const TSNode declarator = ts_node_child_by_field_name(node, "declarator", 10);
+    if (!isStruct || ts_node_is_null(declarator))
+        return std::nullopt;
+    return textOf(bytes, declarator).trimmed();
+}
+
 void collectCppClasses(const QByteArray &bytes,
                        TSNode container,
                        const QStringList &namespaces,
@@ -174,6 +218,8 @@ void collectCppClasses(const QByteArray &bytes,
         } else if (typeOf(child) == "template_declaration") {
             if (const std::optional<TSNode> declared = templatedClass(child))
                 classes.append({child, nameOf(bytes, *declared), namespaces});
+        } else if (const std::optional<QString> name = typedefStructName(bytes, child)) {
+            classes.append({child, *name, namespaces});
         }
     }
 }
@@ -248,9 +294,18 @@ QStringList textsOf(const Parsed &parsed, std::initializer_list<std::string_view
     return texts;
 }
 
-QString guardOf(const QString &text, const QString &className)
+bool isHeader(const QString &path)
 {
-    if (text.contains(QLatin1String("#pragma once")))
+    const QString suffix = QFileInfo(path).suffix();
+    return suffix == QLatin1String("h") || suffix == QLatin1String("hpp") || suffix == QLatin1String("hh") ||
+           suffix == QLatin1String("hxx");
+}
+
+// The guard of a new header: the moved class's header's style, or
+// "#pragma once" for a class moved out of a source.
+QString guardOf(const QString &path, const QString &text, const QString &className)
+{
+    if (!isHeader(path) || text.contains(QLatin1String("#pragma once")))
         return QStringLiteral("#pragma once");
     const QString guard = className.toUpper() + QStringLiteral("_H");
     return QStringLiteral("#ifndef %1\n#define %1").arg(guard);
@@ -324,18 +379,13 @@ QString siblingPath(const QString &path, const QString &name, const QString &suf
     return QFileInfo(path).absolutePath() + QLatin1Char('/') + name + QLatin1Char('.') + suffix;
 }
 
-bool isHeader(const QString &path)
-{
-    const QString suffix = QFileInfo(path).suffix();
-    return suffix == QLatin1String("h") || suffix == QLatin1String("hpp") || suffix == QLatin1String("hh") ||
-           suffix == QLatin1String("hxx");
-}
-
-// A definition of a member of `className`: "Total::value", "Total::~Total".
+// A definition of a member of `className`: a function ("Total::value",
+// "Total::~Total") or a static data member ("int Total::count = 0;").
 bool definesMemberOf(const QByteArray &bytes, TSNode node, const QString &className)
 {
     const TSNode definition = typeOf(node) == "template_declaration" ? ts_node_named_child(node, 1) : node;
-    if (typeOf(definition) != "function_definition")
+    const bool isDefinition = typeOf(definition) == "function_definition" || typeOf(definition) == "declaration";
+    if (!isDefinition)
         return false;
     const TSNode declarator = ts_node_child_by_field_name(definition, "declarator", 10);
     if (ts_node_is_null(declarator))
@@ -390,7 +440,7 @@ Result planCpp(const Input &input, const Parsed &parsed, const TopLevel &moved)
     const QString suffix = isHeader(input.path) ? QFileInfo(input.path).suffix() : QStringLiteral("h");
     const QString headerPath = siblingPath(input.path, moved.name, suffix);
     const QString headerName = QFileInfo(headerPath).fileName();
-    const QString guard = guardOf(input.text, moved.name);
+    const QString guard = guardOf(input.path, input.text, moved.name);
     const Extent extent = extentOf(parsed.bytes, moved.node);
     const NewFile header{.leadingComment = leadingCommentOf(parsed),
                          .guardLine = guard,

@@ -11,6 +11,8 @@
 (assignment_expression left: (identifier) @write)
 (assignment_expression left: (member_expression property: (property_identifier) @write))
 (augmented_assignment_expression left: (identifier) @write)
+(augmented_assignment_expression left: (member_expression property: (property_identifier) @write))
+(update_expression argument: (member_expression property: (property_identifier) @write))
 (update_expression argument: (identifier) @write)
 
 (import_statement source: (string) @import)

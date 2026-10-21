@@ -12,6 +12,7 @@
 
 (assignment left: (attribute attribute: (identifier) @write))
 (augmented_assignment left: (identifier) @write)
+(augmented_assignment left: (attribute attribute: (identifier) @write))
 
 (import_statement name: (dotted_name) @import)
 (import_statement name: (aliased_import name: (dotted_name) @import))

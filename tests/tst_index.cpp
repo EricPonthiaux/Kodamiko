@@ -103,6 +103,96 @@ private slots:
                                 << QList<Role>{Role::Import, Role::Definition, Role::Call, Role::Comment};
         QTest::newRow("text") << "cmake" << QByteArray("add_library(item item.cpp)")
                               << QList<Role>{Role::Text, Role::Text};
+        QTest::newRow("c-call-and-definition")
+            << "c" << QByteArray("int item(void);\nint main(void) { return item(); }")
+            << QList<Role>{Role::Definition, Role::Call};
+        QTest::newRow("c-pointer-and-array")
+            << "c" << QByteArray("int *item; int items[3]; char *names[2];\nint f(void) { return *item; }")
+            << QList<Role>{Role::Definition, Role::Reference};
+        QTest::newRow("c-struct-field-write")
+            << "c" << QByteArray("struct s { int item; };\nvoid f(struct s *p) { p->item = 1; }")
+            << QList<Role>{Role::Definition, Role::Write};
+        QTest::newRow("c-update-is-write") << "c" << QByteArray("int item;\nvoid f(void) { item++; --item; }")
+                                           << QList<Role>{Role::Definition, Role::Write, Role::Write};
+        QTest::newRow("c-macro-definition-and-body") << "c" << QByteArray("#define item 1\n#define TWICE (item * 2)")
+                                                     << QList<Role>{Role::Definition, Role::Reference};
+        QTest::newRow("c-include-and-comment")
+            << "c" << QByteArray("#include \"item.h\"\n/* item */") << QList<Role>{Role::Import, Role::Comment};
+        QTest::newRow("c-string-and-char")
+            << "c" << QByteArray("const char *s = \"an item\"; char c = 'i';") << QList<Role>{Role::String};
+        QTest::newRow("c-enum-and-typedef") << "c" << QByteArray("enum { item };\ntypedef int item_t;\nint x = item;")
+                                            << QList<Role>{Role::Definition, Role::Reference};
+        QTest::newRow("cpp-method-definition")
+            << "cpp" << QByteArray("struct A { void item(); };\nvoid A::item() {}\nvoid f(A a) { a.item(); }")
+            << QList<Role>{Role::Definition, Role::Definition, Role::Call};
+        QTest::newRow("cpp-namespace-and-alias")
+            << "cpp" << QByteArray("namespace item {}\nusing alias = int;\nnamespace other = item;")
+            << QList<Role>{Role::Definition, Role::Reference};
+        QTest::newRow("cpp-class-and-new") << "cpp" << QByteArray("class item {};\nitem *p = new item();")
+                                           << QList<Role>{Role::Definition, Role::Reference, Role::Call};
+        QTest::newRow("cpp-template-call")
+            << "cpp" << QByteArray("template <class T> T item(T t) { return t; }\nint x = item<int>(1);")
+            << QList<Role>{Role::Definition, Role::Call};
+        QTest::newRow("cpp-reference-parameter")
+            << "cpp" << QByteArray("void f(int &item) { item = 2; }") << QList<Role>{Role::Definition, Role::Write};
+        QTest::newRow("cpp-qualified-call") << "cpp" << QByteArray("namespace n { int item(); }\nint x = n::item();")
+                                            << QList<Role>{Role::Definition, Role::Call};
+        QTest::newRow("cpp-raw-string") << "cpp" << QByteArray("auto s = R\"(an item)\"; // item")
+                                        << QList<Role>{Role::String, Role::Comment};
+        QTest::newRow("cpp-member-write")
+            << "cpp" << QByteArray("struct S { int item; };\nvoid f(S &s) { s.item = 3; }")
+            << QList<Role>{Role::Definition, Role::Write};
+        QTest::newRow("java-field-and-assignment")
+            << "java" << QByteArray("class A { int item; void f() { this.item = 1; item = 2; } }")
+            << QList<Role>{Role::Definition, Role::Write, Role::Write};
+        QTest::newRow("java-new-and-method")
+            << "java" << QByteArray("class item { item make() { return new item(); } }")
+            << QList<Role>{Role::Definition, Role::Reference, Role::Call};
+        QTest::newRow("java-import-and-javadoc") << "java" << QByteArray("import p.item;\n/** item */\nclass A {}")
+                                                 << QList<Role>{Role::Import, Role::Comment};
+        QTest::newRow("js-method-and-property")
+            << "javascript" << QByteArray("class A { item() { return this.item(); } }")
+            << QList<Role>{Role::Definition, Role::Call};
+        QTest::newRow("js-new-and-update")
+            << "javascript" << QByteArray("let item = 0;\nitem++;\nconst o = new item();")
+            << QList<Role>{Role::Definition, Role::Write, Role::Call};
+        QTest::newRow("js-import-path-and-template")
+            << "javascript" << QByteArray("import x from './item';\nconst s = `an item`;")
+            << QList<Role>{Role::Import, Role::String};
+        QTest::newRow("js-augmented-assignment")
+            << "javascript" << QByteArray("let item = 1;\nitem += 2;") << QList<Role>{Role::Definition, Role::Write};
+        QTest::newRow("js-jsx-text") << "javascript" << QByteArray("const a = <p>item</p>;")
+                                     << QList<Role>{Role::String};
+        QTest::newRow("ts-interface-and-property")
+            << "typescript" << QByteArray("interface item { name: string }\ntype T = { item: number };")
+            << QList<Role>{Role::Definition, Role::Definition};
+        QTest::newRow("ts-parameters") << "typescript"
+                                       << QByteArray("function f(item: number, other?: string) { return item; }")
+                                       << QList<Role>{Role::Definition, Role::Reference};
+        QTest::newRow("ts-enum-and-field") << "typescript" << QByteArray("enum item { A }\nclass C { item = 1; }")
+                                           << QList<Role>{Role::Definition, Role::Definition};
+        QTest::newRow("ts-type-reference") << "typescript" << QByteArray("type item = string;\nlet x: item;")
+                                           << QList<Role>{Role::Definition, Role::Reference};
+        QTest::newRow("py-assignment-and-call") << "python" << QByteArray("item = 1\nitem()\nobj.item()")
+                                                << QList<Role>{Role::Definition, Role::Call, Role::Call};
+        QTest::newRow("py-parameters") << "python"
+                                       << QByteArray("def f(item, other=1, *args, typed: int = 2):\n    return item")
+                                       << QList<Role>{Role::Definition, Role::Reference};
+        QTest::newRow("py-for-and-augmented")
+            << "python" << QByteArray("for item in []:\n    item += 1") << QList<Role>{Role::Definition, Role::Write};
+        QTest::newRow("py-augmented-attribute-write")
+            << "python" << QByteArray("self.item += 1\nprint(self.item)") << QList<Role>{Role::Write, Role::Reference};
+        QTest::newRow("js-augmented-and-updated-property")
+            << "javascript" << QByteArray("o.item += 1;\no.item++;\nf(o.item);")
+            << QList<Role>{Role::Write, Role::Write, Role::Reference};
+        QTest::newRow("py-attribute-write")
+            << "python" << QByteArray("self.item = 1\nprint(self.item)") << QList<Role>{Role::Write, Role::Reference};
+        QTest::newRow("py-class-and-docstring") << "python" << QByteArray("class item:\n    \"\"\"An item.\"\"\"")
+                                                << QList<Role>{Role::Definition, Role::String};
+        QTest::newRow("py-imports") << "python" << QByteArray("import item\nfrom item import x\nfrom pkg import item")
+                                    << QList<Role>{Role::Import, Role::Import, Role::Reference};
+        QTest::newRow("py-fstring-interpolation") << "python" << QByteArray("item = 1\ns = f\"item {item}\"")
+                                                  << QList<Role>{Role::Definition, Role::String, Role::Reference};
     }
 
     void readsTheRolesOfEachLanguage()

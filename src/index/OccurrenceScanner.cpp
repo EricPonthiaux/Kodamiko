@@ -71,7 +71,9 @@ void appendWords(const QByteArray &text, Span span, OccurrenceRole role, QList<O
         const std::uint32_t start = i;
         while (i < to && isWordByte(data[i]))
             ++i;
-        const bool isWord = !isDigit(data[start]) && i - start >= minimumProseWordLength;
+        // A path's words count whatever their length ("x.h").
+        const auto minimumLength = role == OccurrenceRole::Import ? 1 : minimumProseWordLength;
+        const bool isWord = !isDigit(data[start]) && i - start >= std::uint32_t(minimumLength);
         if (isWord)
             occurrences.append({QByteArray(data + start, i - start), start, line, role});
     }
@@ -161,7 +163,8 @@ void visitLeaf(const Reading &reading, TSNode node, bool inString)
     if (isIdentifier && end > start) {
         const OccurrenceRole role = reading.captures.roles.value(start, OccurrenceRole::Reference);
         reading.occurrences.append({reading.text.mid(start, end - start), start, line, role});
-    } else if (inString) {
+    } else if (inString || std::string_view(type) == "jsx_text") {
+        // JSX text is shown as it is written: a string.
         appendWords(reading.text, {start, end, line}, OccurrenceRole::String, reading.occurrences);
     } else if (std::string_view(type) == "preproc_arg") {
         // A macro's body: its words name what it uses.
