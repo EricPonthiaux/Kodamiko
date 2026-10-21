@@ -97,6 +97,7 @@ add_library(duet_core STATIC
     git/Branches.cpp
     git/CommitLog.cpp
     git/ContentMatcher.cpp
+    git/CredentialCache.cpp
     git/FilePatch.cpp
     git/FileStatuses.cpp
     git/GitCommands.cpp

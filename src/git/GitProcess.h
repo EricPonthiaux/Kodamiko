@@ -34,7 +34,9 @@ struct RunOptions {
 // Runs "git <arguments>" in `workDir`, waits for it to finish and returns its
 // standard output. git never prompts for anything on a terminal: no message
 // editor, no credential prompt (only through the feedback's askpass
-// program), and paths passed after "--" are taken literally.
+// program), and paths passed after "--" are taken literally. The
+// credentials it is given stay cached for the repository (see
+// CredentialCache).
 // Throws GitError (with git's error output) on failure.
 QByteArray run(const QString &workDir, const QStringList &arguments, const RunOptions &options);
 QByteArray run(const QString &workDir,

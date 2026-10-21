@@ -517,6 +517,24 @@ private slots:
         QSettings().remove("markdown/mode");
     }
 
+    void editorStaysHiddenWhileThePreviewIsCreated()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("README.md"), "# Hello\n");
+        QSettings().setValue("markdown/mode", 2); // Preview
+        EditorTabs tabs(Theme::dark());
+        const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("README.md")));
+
+        // Creating the first web view repaints the window: the editor must
+        // not be there to show.
+        QVERIFY(!page->editor()->isVisibleTo(page));
+        tabs.show();
+
+        QVERIFY(page->markdownPreview());
+        QVERIFY(!page->editor()->isVisible());
+        QSettings().remove("markdown/mode");
+    }
+
     void htmlTabsShowThePage()
     {
         const QTemporaryDir dir;

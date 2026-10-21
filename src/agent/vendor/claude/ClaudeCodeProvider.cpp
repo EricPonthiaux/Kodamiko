@@ -12,8 +12,6 @@
 
 namespace {
 
-// Notification types that mean Claude cannot go on without the user. The
-// others (auth_success, idle_prompt, agent_completed…) are informative.
 bool waitsForUser(const QString &notificationType)
 {
     static const QStringList types{
@@ -38,7 +36,6 @@ QStringList editedFiles(const QJsonObject &event)
     return paths;
 }
 
-// PostToolUse: a command ran, or files were edited.
 std::optional<HookEvent> afterToolUse(HookEvent event, const QJsonObject &object)
 {
     if (object.value(QLatin1String("tool_name")).toString() == QLatin1String("Bash")) {

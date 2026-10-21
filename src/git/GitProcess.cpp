@@ -2,6 +2,7 @@
 
 #include "GitProcess.h"
 
+#include "CredentialCache.h"
 #include "FileChange.h"
 
 #include <QProcess>
@@ -44,7 +45,17 @@ QString withoutProgress(const QByteArray &errorOutput)
     return kept.join(QLatin1Char('\n')).trimmed();
 }
 
-QProcessEnvironment gitEnvironment(const RunOptions &options)
+// Adds "key = value" to git's configuration for this run, after the
+// entries the environment already sets that way.
+void addConfig(QProcessEnvironment &environment, const QString &key, const QString &value)
+{
+    const int index = environment.value(QStringLiteral("GIT_CONFIG_COUNT")).toInt();
+    environment.insert(QStringLiteral("GIT_CONFIG_KEY_%1").arg(index), key);
+    environment.insert(QStringLiteral("GIT_CONFIG_VALUE_%1").arg(index), value);
+    environment.insert(QStringLiteral("GIT_CONFIG_COUNT"), QString::number(index + 1));
+}
+
+QProcessEnvironment gitEnvironment(const QString &workDir, const RunOptions &options)
 {
     QProcessEnvironment processEnvironment = QProcessEnvironment::systemEnvironment();
     processEnvironment.insert(QStringLiteral("GIT_TERMINAL_PROMPT"), QStringLiteral("0"));
@@ -55,6 +66,9 @@ QProcessEnvironment gitEnvironment(const RunOptions &options)
         for (auto it = environment->begin(); it != environment->end(); ++it)
             processEnvironment.insert(it.key(), it.value());
     }
+    const QString credentialHelper = CredentialCache::helper(workDir);
+    if (!credentialHelper.isEmpty())
+        addConfig(processEnvironment, QStringLiteral("credential.helper"), credentialHelper);
     return processEnvironment;
 }
 
@@ -118,7 +132,7 @@ QByteArray run(const QString &workDir, const QStringList &arguments, const RunOp
 
     QProcess process;
     process.setWorkingDirectory(workDir);
-    process.setProcessEnvironment(gitEnvironment(options));
+    process.setProcessEnvironment(gitEnvironment(workDir, options));
     process.start(git, arguments);
     if (!process.waitForStarted())
         throw GitError(QObject::tr("Cannot start git: %1").arg(process.errorString()));
