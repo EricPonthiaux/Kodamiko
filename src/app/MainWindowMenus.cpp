@@ -322,6 +322,15 @@ void MainWindow::createNavigateMenu()
         if (mode_ == Mode::Edit)
             intelligence_->goToDefinition();
     });
+    // Ctrl+Alt+B, IntelliJ's, opens the branches.
+    navigate->addAction(tr("Go to &Implementation"), QKeySequence(tr("Ctrl+Alt+Shift+B")), this, [this] {
+        if (mode_ == Mode::Edit)
+            intelligence_->goToImplementation();
+    });
+    navigate->addAction(tr("Go to T&ype Declaration"), QKeySequence(tr("Ctrl+Shift+B")), this, [this] {
+        if (mode_ == Mode::Edit)
+            intelligence_->goToTypeDeclaration();
+    });
     navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this, [this] {
         if (mode_ == Mode::Edit)
             intelligence_->findUsages();

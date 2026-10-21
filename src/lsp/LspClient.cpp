@@ -49,9 +49,11 @@ QJsonObject clientCapabilities()
         {"signatureHelp", signatureHelp},
         {"definition", QJsonObject{{"linkSupport", true}}},
         {"declaration", QJsonObject{{"linkSupport", true}}},
+        {"implementation", QJsonObject{{"linkSupport", true}}},
+        {"typeDefinition", QJsonObject{{"linkSupport", true}}},
         {"references", QJsonObject{}},
         {"documentHighlight", QJsonObject{}},
-        {"rename", QJsonObject{{"prepareSupport", false}}},
+        {"rename", QJsonObject{{"prepareSupport", true}}},
         {"codeAction", codeAction},
     };
     const QJsonObject workspace{

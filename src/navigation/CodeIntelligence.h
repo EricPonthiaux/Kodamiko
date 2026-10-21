@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QStringList>
 
+#include <functional>
 #include <memory>
 
 class CodeColorizer;
@@ -48,6 +49,12 @@ public:
     void attach(EditorWidget *editor);
 
     void goToDefinition();
+    // The implementations of the interface or virtual function at the
+    // cursor, its overrides...: what the server finds.
+    void goToImplementation();
+    // The declaration of the type of the variable or expression at the
+    // cursor.
+    void goToTypeDeclaration();
     void findUsages();
     void rename();
     void showQuickFixes();
@@ -79,10 +86,22 @@ private:
     // nullptr (with a message, unless `quiet`) when there is none.
     LspClient *serverFor(EditorWidget *editor, bool quiet = false);
     QJsonObject positionParams(EditorWidget *editor, int bytePosition) const;
+    // Goes to the `method` locations at the cursor, if the server has the
+    // `capability` ("implementationProvider"); says `noneFound` if none.
+    void goToServerLocations(const QString &method, const QString &capability, const QString &noneFound);
+    // Asks `client` for the `method` locations at the cursor of `editor`,
+    // and goes to the one found, or to the one chosen in a menu; calls
+    // `noneFound` (with the server's error, if any) when there is none.
+    void goToLocations(EditorWidget *editor,
+                       LspClient *client,
+                       const QString &method,
+                       const std::function<void(const QString &error)> &noneFound);
     // Sends the text of the other open files of `client`'s languages: a
     // rename or a search for usages covers them, unsaved changes included,
     // even before the server has indexed the project.
     void syncOpenEditors(LspClient *client, const QString &languageId);
+    // Asks for the new name of `name`, at `bytePosition` in `editor`.
+    void showRenamePopup(EditorWidget *editor, int bytePosition, const QString &name);
     // Asks the server to rename `word`, at `bytePosition` in `editor`, to
     // `newName`, and applies its edit.
     void renameAt(EditorWidget *editor, int bytePosition, const QString &word, const QString &newName);

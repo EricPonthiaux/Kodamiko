@@ -48,6 +48,57 @@ QJsonObject range(int line, int start, int end)
     return toJson(Range{{line, start}, {line, end}});
 }
 
+// Just after the start of `before` in `editor`.
+void placeCaretIn(const EditorWidget *editor, const QByteArray &before)
+{
+    const qsizetype found = editor->utf8Bytes().toByteArray().indexOf(before);
+    QVERIFY(found >= 0);
+    editor->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(found + 1));
+}
+
+int caretLine(EditorWidget *editor)
+{
+    return CodeIntelligence::lspPosition(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))).line;
+}
+
+// A C++ project in a temporary folder, read by clangd, with the editor's
+// code intelligence; what it says is kept in `messages`.
+struct ClangdProject {
+    QTemporaryDir dir;
+    EditorTabs tabs{Theme::dark()};
+    SymbolIndex index;
+    LanguageServers servers;
+    CodeNavigator navigator{&tabs, &index};
+    ProblemStore problems{&servers};
+    CodeIntelligence intelligence{{&tabs, &servers, &navigator, &problems}};
+    QStringList messages;
+
+    ClangdProject()
+    {
+        index.setFolder(dir.path());
+        servers.setFolder(dir.path());
+        write(dir.filePath("compile_flags.txt"), "-std=c++20\n");
+        QObject::connect(&tabs, &EditorTabs::editorOpened, &intelligence, &CodeIntelligence::attach);
+        QObject::connect(&intelligence, &CodeIntelligence::statusMessage,
+                         [this](const QString &message) { messages.append(message); });
+        tabs.show();
+    }
+
+    // Writes `name` with `content`, opens it, and waits for clangd.
+    EditorWidget *open(const QString &name, const QByteArray &content)
+    {
+        write(dir.filePath(name), content);
+        auto *editor = EditorTabs::editorIn(tabs.openFile(dir.filePath(name)));
+        LspClient *client = servers.clientFor("cpp");
+        if (!editor || !client)
+            return nullptr;
+        servers.syncDocument(client, editor->filePath(), "cpp", editor->utf8Bytes().toByteArray());
+        if (!QTest::qWaitFor([client] { return client->isReady(); }, 30000))
+            return nullptr;
+        return editor;
+    }
+};
+
 } // namespace
 
 class TestCodeIntelligence : public QObject {
@@ -346,6 +397,53 @@ private slots:
 
     // clangd tells the occurrences of the very symbol: not the homonym in
     // another scope, nor the word in a comment.
+    void goesToTheOverrideOfAVirtualFunctionWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        EditorWidget *editor = project.open("shapes.cpp", "struct Shape { virtual int area() const = 0; };\n"
+                                                          "struct Square : Shape { int area() const override; };\n"
+                                                          "int use(const Shape &s) { return s.area(); }\n");
+        QVERIFY(editor);
+        placeCaretIn(editor, "area(); }");
+
+        project.intelligence.goToImplementation();
+
+        QTRY_COMPARE_WITH_TIMEOUT(caretLine(editor), 1, 30000);
+    }
+
+    void goesToTheTypeOfAVariableWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        EditorWidget *editor = project.open("point.cpp", "struct Point { int x; };\n"
+                                                         "\n"
+                                                         "int f() { Point p{}; auto copy = p; return copy.x; }\n");
+        QVERIFY(editor);
+        placeCaretIn(editor, "copy.x");
+
+        project.intelligence.goToTypeDeclaration();
+
+        QTRY_COMPARE_WITH_TIMEOUT(caretLine(editor), 0, 30000);
+    }
+
+    void refusesToRenameAKeywordWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        const EditorWidget *editor = project.open("count.cpp", "int count = 0;\n");
+        QVERIFY(editor);
+        placeCaretIn(editor, "int count");
+
+        project.intelligence.rename();
+
+        QTRY_VERIFY_WITH_TIMEOUT(!project.messages.filter("rename").isEmpty(), 30000);
+        QVERIFY(!QApplication::activePopupWidget()); // no name asked
+    }
+
     void highlightsTheSymbolsOccurrencesWithClangd()
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())

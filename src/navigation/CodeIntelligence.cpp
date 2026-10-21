@@ -26,6 +26,7 @@
 #include <QToolTip>
 
 #include <algorithm>
+#include <chrono>
 
 using namespace LspProtocol;
 
@@ -36,6 +37,7 @@ constexpr int hoverDelayMs = 600;
 constexpr int problemsDelayMs = 700;
 constexpr int maxDocumentationLength = 3000;
 constexpr int maxUsagesShown = 300;
+constexpr std::chrono::seconds prepareRenameTimeout{10};
 
 bool isCFamily(const QString &languageId)
 {
@@ -419,27 +421,66 @@ void CodeIntelligence::goToDefinition()
         navigator_->goToDefinition();
         return;
     }
+    // Macros, files without compile commands...: the index again.
+    goToLocations(editor, client, QStringLiteral("textDocument/definition"),
+                  [this](const QString &) { navigator_->goToDefinition(); });
+}
+
+void CodeIntelligence::goToImplementation()
+{
+    goToServerLocations(QStringLiteral("textDocument/implementation"), QStringLiteral("implementationProvider"),
+                        tr("No implementations found"));
+}
+
+void CodeIntelligence::goToTypeDeclaration()
+{
+    goToServerLocations(QStringLiteral("textDocument/typeDefinition"), QStringLiteral("typeDefinitionProvider"),
+                        tr("No type declaration found"));
+}
+
+void CodeIntelligence::goToServerLocations(const QString &method, const QString &capability, const QString &noneFound)
+{
+    EditorWidget *editor = tabs_->currentEditor();
+    LspClient *client = serverFor(editor);
+    if (!client)
+        return;
+    // Known once the server is ready; until then, the request waits.
+    if (client->isReady() && !client->capabilities().contains(capability)) {
+        emit statusMessage(tr("%1 does not support this command").arg(QFileInfo(client->program()).fileName()));
+        return;
+    }
+    goToLocations(editor, client, method, [this, noneFound](const QString &error) {
+        emit statusMessage(error.isEmpty() ? noneFound : QStringLiteral("%1: %2").arg(noneFound, error));
+    });
+}
+
+void CodeIntelligence::goToLocations(EditorWidget *editor,
+                                     LspClient *client,
+                                     const QString &method,
+                                     const std::function<void(const QString &error)> &noneFound)
+{
     const int caret = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    client->request(QStringLiteral("textDocument/definition"), positionParams(editor, caret),
-                    [this, guard = QPointer<EditorWidget>(editor)](const QJsonValue &result, const QString &error) {
-                        if (!guard)
-                            return;
-                        const QList<Location> locations = parseLocations(result);
-                        if (!error.isEmpty() || locations.isEmpty()) {
-                            navigator_->goToDefinition(); // macros, files without compile commands...
-                            return;
-                        }
-                        if (locations.size() == 1) {
-                            jumpTo(locations.first());
-                            return;
-                        }
-                        QHash<QString, QStringList> lines;
-                        QStringList entries;
-                        for (const Location &location : locations)
-                            entries.append(describe(location, lines));
-                        if (const int chosen = chooseFrom(guard, entries); chosen >= 0)
-                            jumpTo(locations.at(chosen));
-                    });
+    client->request(
+        method, positionParams(editor, caret),
+        [this, guard = QPointer<EditorWidget>(editor), noneFound](const QJsonValue &result, const QString &error) {
+            if (!guard)
+                return;
+            const QList<Location> locations = parseLocations(result);
+            if (!error.isEmpty() || locations.isEmpty()) {
+                noneFound(error);
+                return;
+            }
+            if (locations.size() == 1) {
+                jumpTo(locations.first());
+                return;
+            }
+            QHash<QString, QStringList> lines;
+            QStringList entries;
+            for (const Location &location : locations)
+                entries.append(describe(location, lines));
+            if (const int chosen = chooseFrom(guard, entries); chosen >= 0)
+                jumpTo(locations.at(chosen));
+        });
 }
 
 void CodeIntelligence::findUsages()
@@ -544,20 +585,50 @@ void CodeIntelligence::rename()
         emit statusMessage(tr("Place the cursor on a name to rename it"));
         return;
     }
-    if (!serverFor(editor))
+    LspClient *client = serverFor(editor);
+    if (!client)
         return;
+    const QJsonValue renameProvider = client->capabilities().value("renameProvider");
+    const bool canPrepare = renameProvider.toObject().value("prepareProvider").toBool();
+    if (!canPrepare) {
+        showRenamePopup(editor, start, word);
+        return;
+    }
+    // The server says first whether the name can be renamed (not a keyword,
+    // not a symbol of the standard library), and how it is spelled.
+    client->request(
+        QStringLiteral("textDocument/prepareRename"), positionParams(editor, start),
+        [this, guard = QPointer<EditorWidget>(editor), start, word](const QJsonValue &result, const QString &error) {
+            if (!guard)
+                return;
+            if (!error.isEmpty()) {
+                emit statusMessage(tr("Cannot rename “%1”: %2").arg(word, error));
+                return;
+            }
+            if (result.isNull()) {
+                emit statusMessage(tr("“%1” cannot be renamed").arg(word));
+                return;
+            }
+            const QString placeholder = result.toObject().value("placeholder").toString();
+            showRenamePopup(guard, start, placeholder.isEmpty() ? word : placeholder);
+        },
+        prepareRenameTimeout);
+}
+
+void CodeIntelligence::showRenamePopup(EditorWidget *editor, int bytePosition, const QString &name)
+{
     const QPointer<EditorWidget> target = editor;
     auto *popup = new NamePopup(
-        tr("Rename “%1”").arg(word), QFileInfo(editor->filePath()).fileName(),
-        [this, target, start, word](const QString &newName) -> QString {
+        tr("Rename “%1”").arg(name), QFileInfo(editor->filePath()).fileName(),
+        [this, target, bytePosition, name](const QString &newName) -> QString {
             if (newName.isEmpty())
                 return tr("Specify a new name");
-            if (target && newName != word)
-                renameAt(target, start, word, newName);
+            if (target && newName != name)
+                renameAt(target, bytePosition, name, newName);
             return {};
         },
         editor);
-    popup->field()->setText(word);
+    popup->field()->setText(name);
     popup->field()->selectAll();
     popup->popup();
 }
