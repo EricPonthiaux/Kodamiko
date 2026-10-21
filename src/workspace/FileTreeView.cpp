@@ -27,6 +27,7 @@
 #include <QMenu>
 #include <QMimeData>
 #include <QPainter>
+#include <QScrollBar>
 #include <QSortFilterProxyModel>
 #include <QStyledItemDelegate>
 #include <QToolTip>
@@ -1169,6 +1170,20 @@ void FileTreeView::paintEvent(QPaintEvent *event)
     QColor line = palette().color(QPalette::Text);
     line.setAlpha(isDarkPalette(palette()) ? 45 : 50);
     painter.fillRect(QRect(0, bottom - 1, viewport()->width(), 1), line);
+}
+
+void FileTreeView::scrollTo(const QModelIndex &index, ScrollHint hint)
+{
+    // QTreeView brings the column's left edge into view whenever the column
+    // is wider than the viewport, as TreeColumnFit makes it beside deep
+    // folders: each selected file would throw the tree back to the left.
+    const int horizontalOffset = horizontalScrollBar()->value();
+    QTreeView::scrollTo(index, hint);
+    horizontalScrollBar()->setValue(horizontalOffset);
+    const QRect item = visualRect(index);
+    const bool isNameOutOfSight = item.left() < 0 || item.left() >= viewport()->width();
+    if (isNameOutOfSight)
+        horizontalScrollBar()->setValue(horizontalOffset + item.left() - indentation()); // with its arrow
 }
 
 void FileTreeView::scrollContentsBy(int dx, int dy)

@@ -34,7 +34,8 @@ public:
     QWidget *openFile(const QString &path);
     // Shows the file in the preview tab (see PreviewTab), in place of the
     // previous preview, leaving the focus where it is; a file already open
-    // is only brought to the front. Returns the tab, or nullptr on failure.
+    // is only brought to the front. Returns the tab, or nullptr on failure
+    // (the previous preview then stays).
     QWidget *openPreview(const QString &path);
     void showDiff(const QString &title, const QString &diffText);
     // A tab for `page`, which shows no file (Claude drawing a diagram…).

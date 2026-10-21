@@ -51,6 +51,10 @@ public:
     explicit FileTreeView(QWidget *parent = nullptr);
     ~FileTreeView() override;
 
+    // Brings the row into view, and its name only if it is out of sight:
+    // the horizontal offset stays otherwise.
+    void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
+
     void setRootPath(const QString &path);
 
     QString rootPath() const { return rootPath_; }

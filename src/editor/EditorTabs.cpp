@@ -145,12 +145,16 @@ QWidget *EditorTabs::openPreview(const QString &path)
         setCurrentWidget(open);
         return open;
     }
-    if (const QWidget *previous = preview_.page())
-        closeTab(indexOf(previous)); // kept as soon as edited: nothing to save
-    QWidget *focused = QApplication::focusWidget();
+    const QPointer<QWidget> previous = preview_.page();
+    const QPointer<QWidget> focused = QApplication::focusWidget();
     QWidget *page = openFile(absolutePath);
     if (!page)
         return nullptr;
+    // Closed once the new page is current: closing it first would make its
+    // neighbor current for a moment, and the file tree, which follows the
+    // current tab, would jump to that neighbor's file.
+    if (previous)
+        closeTab(indexOf(previous)); // kept as soon as edited: nothing to save
     preview_.setPage(page);
     // Edited: kept open.
     if (const EditorWidget *editor = editorIn(page))
@@ -159,7 +163,8 @@ QWidget *EditorTabs::openPreview(const QString &path)
     if (const auto *diagram = qobject_cast<DiagramView *>(page))
         connect(diagram, &DiagramView::modificationChanged, this, [this, page] { preview_.keep(page); });
 #endif
-    if (focused)
+    // Unless it was in the previous preview, now closed.
+    if (focused && focused->isVisible())
         focused->setFocus();
     return page;
 }
