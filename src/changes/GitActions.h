@@ -66,7 +66,8 @@ private:
     void run(const QString &title, Operation operation, std::function<bool(const GitError &)> onFailure = {});
     void runRemote(const QString &title,
                    std::function<QString(const RepositoryInfo &, const Git::Feedback &)> operation,
-                   std::function<bool(const GitError &)> onFailure = {});
+                   std::function<bool(const GitError &)> onFailure = {},
+                   std::function<void()> onSuccess = {});
     // The open folder's name, under the popups' titles.
     QString location() const;
     // Popup asking to confirm `question`; `action` names the button. Runs
@@ -82,6 +83,9 @@ private:
 
     bool onSwitchFailed(const GitError &error, const QString &name, bool remote);
     bool onPushFailed(const GitError &error);
+    // Tells the user the push went through: a popup, not only the status
+    // bar, which is easily missed after a long wait.
+    void onPushed();
     bool onPullFailed(const GitError &error);
     bool onDeleteBranchFailed(const GitError &error, const QString &name);
     // Deletes the worktree that has the branch `name` checked out, then the

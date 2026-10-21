@@ -65,14 +65,19 @@ void GitActions::run(const QString &title, Operation operation, std::function<bo
 
 void GitActions::runRemote(const QString &title,
                            std::function<QString(const RepositoryInfo &, const Git::Feedback &)> operation,
-                           std::function<bool(const GitError &)> onFailure)
+                           std::function<bool(const GitError &)> onFailure,
+                           std::function<void()> onSuccess)
 {
     commands_->runLong(
         title,
         [folder = folder_(), operation = std::move(operation)](const Git::Feedback &feedback) {
             return operation(repositoryOf(folder), feedback);
         },
-        [this] { emit changed(); },
+        [this, onSuccess = std::move(onSuccess)] {
+            emit changed();
+            if (onSuccess)
+                onSuccess();
+        },
         [this, title, onFailure = std::move(onFailure)](const GitError &error) {
             emit changed();
             if (error.kind() == GitError::Kind::Cancelled) {
@@ -120,7 +125,7 @@ void GitActions::push()
         [](const RepositoryInfo &repository, const Git::Feedback &feedback) {
             return Remotes::push(repository, feedback);
         },
-        [this](const GitError &error) { return onPushFailed(error); });
+        [this](const GitError &error) { return onPushFailed(error); }, [this] { onPushed(); });
 }
 
 void GitActions::sync()
@@ -154,9 +159,12 @@ bool GitActions::onPushFailed(const GitError &error)
     if (error.kind() != GitError::Kind::Rejected)
         return false;
     const auto overwrite = [this] {
-        runRemote(tr("Push"), [](const RepositoryInfo &repository, const Git::Feedback &feedback) {
-            return Remotes::push(repository, feedback, true);
-        });
+        runRemote(
+            tr("Push"),
+            [](const RepositoryInfo &repository, const Git::Feedback &feedback) {
+                return Remotes::push(repository, feedback, true);
+            },
+            {}, [this] { onPushed(); });
     };
     auto *popup = new ChoicePopup({.title = tr("Push"),
                                    .location = location(),
@@ -166,6 +174,19 @@ bool GitActions::onPushFailed(const GitError &error)
                                   {{tr("Pull"), [this] { pull(); }}, {tr("Overwrite"), overwrite}}, window_);
     popup->popup();
     return true;
+}
+
+void GitActions::onPushed()
+{
+    // Read after the push: a first push of the branch has just set its upstream.
+    const std::optional<RepositoryInfo> current = repository();
+    if (!current)
+        return;
+    showNotice({.title = tr("Push"),
+                .location = location(),
+                .message = tr("%1 was pushed to %2.").arg(current->branch, current->upstream),
+                .details = {}},
+               window_);
 }
 
 void GitActions::switchBranch(const QString &name, bool remote)
