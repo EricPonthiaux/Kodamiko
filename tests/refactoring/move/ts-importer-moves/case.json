@@ -1,0 +1,8 @@
+{
+  "moves": [
+    [
+      "src/app.ts",
+      "src/app/main.ts"
+    ]
+  ]
+}

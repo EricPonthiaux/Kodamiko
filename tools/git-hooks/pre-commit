@@ -11,7 +11,7 @@ fi
 status=0
 for file in $(git diff --cached --name-only --diff-filter=ACMR -- '*.cpp' '*.h'); do
     case "$file" in
-    third_party/* | build*/*) continue ;;
+    third_party/* | build*/* | tests/refactoring/*) continue ;;
     esac
     # The staged content, not the working tree's.
     if ! git show ":$file" | clang-format --dry-run --Werror --assume-filename="$file" >/dev/null 2>&1; then

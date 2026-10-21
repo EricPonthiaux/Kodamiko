@@ -30,6 +30,9 @@ add_dependencies(tst_lsp fake-lsp-server)
 duet_add_test(tst_codeintelligence)
 duet_add_test(tst_refactor)
 duet_add_test(tst_index)
+# The refactoring corpus: one row per case of tests/refactoring.
+duet_add_test(tst_refactorcorpus)
+target_compile_definitions(tst_refactorcorpus PRIVATE DUET_REFACTORING_CORPUS="${CMAKE_CURRENT_SOURCE_DIR}/refactoring")
 duet_add_test(tst_projects)
 duet_add_test(tst_run)
 # The Markdown preview's web engine: no Chromium sandbox on CI machines.

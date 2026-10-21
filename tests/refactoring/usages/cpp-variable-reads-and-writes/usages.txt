@@ -1,0 +1,4 @@
+main.cpp:1:5 declaration
+main.cpp:3:3 write
+main.cpp:4:3 write
+main.cpp:5:11 read

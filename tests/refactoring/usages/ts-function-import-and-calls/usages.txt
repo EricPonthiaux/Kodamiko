@@ -1,0 +1,3 @@
+main.ts:1:10 read
+main.ts:2:13 call
+math.ts:1:17 declaration

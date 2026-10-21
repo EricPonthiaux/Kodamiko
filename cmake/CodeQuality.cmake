@@ -16,6 +16,8 @@ file(GLOB_RECURSE duet_formatted_sources CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/src/*.h
     ${CMAKE_SOURCE_DIR}/tests/*.cpp ${CMAKE_SOURCE_DIR}/tests/*.h
     ${CMAKE_SOURCE_DIR}/tools/*.cpp ${CMAKE_SOURCE_DIR}/tools/*.h)
+# The refactoring corpus is test data, compared byte for byte.
+list(FILTER duet_formatted_sources EXCLUDE REGEX "^${CMAKE_SOURCE_DIR}/tests/refactoring/")
 
 if(CLANG_FORMAT_EXECUTABLE)
     add_custom_target(format

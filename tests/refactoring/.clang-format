@@ -1,0 +1,4 @@
+# The refactoring corpus: its files are test data, written exactly as the
+# cases expect them; they are never formatted.
+DisableFormat: true
+SortIncludes: Never

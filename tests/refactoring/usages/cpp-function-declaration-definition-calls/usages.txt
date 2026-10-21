@@ -1,0 +1,4 @@
+main.cpp:2:21 call
+main.cpp:2:35 call
+total.cpp:2:5 declaration
+total.h:2:5 declaration

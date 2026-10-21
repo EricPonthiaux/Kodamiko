@@ -1,0 +1,8 @@
+{
+  "moves": [
+    [
+      "src/a.cpp",
+      "src/sub/a.cpp"
+    ]
+  ]
+}

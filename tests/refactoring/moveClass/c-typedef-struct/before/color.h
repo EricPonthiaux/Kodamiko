@@ -1,0 +1,11 @@
+#pragma once
+
+typedef struct {
+    unsigned char r, g, b;
+} Rgb;
+
+/* A color with transparency. */
+typedef struct Rgba {
+    Rgb rgb;
+    unsigned char §a;
+} Rgba;

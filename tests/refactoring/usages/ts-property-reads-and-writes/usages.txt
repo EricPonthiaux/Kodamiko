@@ -1,0 +1,3 @@
+main.ts:3:8 write
+main.ts:4:15 read
+user.ts:2:3 declaration

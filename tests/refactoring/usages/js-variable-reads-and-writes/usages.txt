@@ -1,0 +1,4 @@
+app.js:1:5 declaration
+app.js:2:1 write
+app.js:3:1 write
+app.js:4:13 read
