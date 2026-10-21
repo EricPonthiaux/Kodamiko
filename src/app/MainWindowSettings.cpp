@@ -23,6 +23,7 @@
 #include "editor/FindBar.h"
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
+#include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
 #include "outline/OutlineView.h"
 #include "search/FindInFilesPopup.h"
@@ -77,6 +78,7 @@ void MainWindow::setTheme(const QString &name)
     problemsView_->setDarkIcons(theme_.isDark);
     usagesView_->setIconColor(theme_.foreground);
     usagesView_->setDarkIcons(theme_.isDark);
+    hierarchyView_->setIconColor(theme_.foreground);
     sidebar_->applyTheme(theme_);
     editorTabs_->applyTheme(theme_);
     for (int i = 0; i < terminalTabs_->count(); ++i) {

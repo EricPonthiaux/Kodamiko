@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Hierarchy.h"
 #include "Usage.h"
 #include "WorkspaceEditing.h"
 #include "lsp/LspProtocol.h"
@@ -21,6 +22,7 @@ class CodeColorizer;
 class CodeNavigator;
 class EditorTabs;
 class EditorWidget;
+struct HierarchyKind;
 class LanguageServers;
 class LspClient;
 class OccurrenceStore;
@@ -69,6 +71,11 @@ public:
     // (usagesFound): the server's, else every occurrence of the word.
     void findUsages();
     void findUsagesOf(const UsageSearch &search);
+    // The callers and callees of the function at the cursor, or the
+    // supertypes and subtypes of the type there, for the Hierarchy pane
+    // (hierarchyFound).
+    void showCallHierarchy();
+    void showTypeHierarchy();
     void rename();
     void showQuickFixes();
     void switchHeaderSource();
@@ -101,6 +108,7 @@ public:
 signals:
     void statusMessage(const QString &message);
     void usagesFound(const UsageResults &results);
+    void hierarchyFound(const Hierarchy &hierarchy);
 
 private:
     // The server of `editor`'s language, with the editor's text sent to it;
@@ -162,6 +170,9 @@ private:
     // Every occurrence of the word, from the index, then reportUsages().
     void findWordUsages(const UsageSearch &search);
     void reportUsages(const UsageResults &results);
+    // `hierarchy`'s roots asked to the server, `title` completed with the
+    // name at the cursor.
+    void showHierarchy(const HierarchyKind &kind, Hierarchy hierarchy);
     // Offers the server's `codeActions` in a menu, and carries out the
     // chosen one.
     void chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions);

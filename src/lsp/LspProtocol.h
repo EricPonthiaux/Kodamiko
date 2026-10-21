@@ -119,6 +119,23 @@ QList<TextEdit> applicationOrder(QList<TextEdit> edits);
 // `text` with `edits` applied; they must not overlap.
 QString applyEdits(const QString &text, QList<TextEdit> edits);
 
+// An element of a call or type hierarchy: a function, a method, a type.
+// `raw` is the server's object, which the next requests send back.
+struct HierarchyItem {
+    QString name;
+    QString detail; // its signature, its container…
+    QString filePath;
+    Range selectionRange; // its name
+    QJsonObject raw;
+};
+
+// The items of a "prepare…Hierarchy", "typeHierarchy/supertypes" or
+// "…/subtypes" result; those outside files are left out.
+QList<HierarchyItem> parseHierarchyItems(const QJsonValue &result);
+// The callers ("callHierarchy/incomingCalls", `key` "from") or the called
+// ("…/outgoingCalls", `key` "to") of a call hierarchy result.
+QList<HierarchyItem> parseHierarchyCalls(const QJsonValue &result, const QString &key);
+
 // A step of a server's long task (indexing...), from a "$/progress"
 // notification of the work done progress protocol.
 struct Progress {

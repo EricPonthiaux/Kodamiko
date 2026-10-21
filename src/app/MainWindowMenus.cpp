@@ -15,6 +15,7 @@
 #include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/GoToPopup.h"
+#include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
 #include "projects/ProjectStore.h"
 #include "refactor/RefactoringHistory.h"
@@ -221,6 +222,11 @@ void MainWindow::createViewMenu()
         sidebar_->showView(usagesView_);
         usagesView_->tree()->setFocus();
     });
+    view->addAction(tr("Hie&rarchy"), QKeySequence(tr("Alt+8")), this, [this] {
+        setMode(Mode::Edit);
+        sidebar_->showView(hierarchyView_);
+        hierarchyView_->tree()->setFocus();
+    });
     view->addAction(tr("&Claude Configuration"), this, [this] {
         setMode(Mode::Edit);
         sidebar_->showView(claudeConfigView_);
@@ -373,6 +379,10 @@ void MainWindow::createNavigateMenu()
                                                   inEditMode([this] { intelligence_->goToTypeDeclaration(); })));
     navigationActions_.append(navigate->addAction(tr("Find &Usages"), QKeySequence(tr("Alt+F7")), this,
                                                   inEditMode([this] { intelligence_->findUsages(); })));
+    navigationActions_.append(navigate->addAction(tr("&Call Hierarchy"), QKeySequence(tr("Ctrl+Alt+H")), this,
+                                                  inEditMode([this] { intelligence_->showCallHierarchy(); })));
+    navigationActions_.append(navigate->addAction(tr("Type Hi&erarchy"), QKeySequence(tr("Ctrl+H")), this,
+                                                  inEditMode([this] { intelligence_->showTypeHierarchy(); })));
     navigate->addAction(tr("Ne&xt Usage"), QKeySequence(tr("Ctrl+Alt+Down")), this,
                         inEditMode([this] { usagesView_->goToNext(); }));
     navigate->addAction(tr("Pre&vious Usage"), QKeySequence(tr("Ctrl+Alt+Up")), this,

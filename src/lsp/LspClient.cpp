@@ -51,6 +51,8 @@ QJsonObject clientCapabilities()
         {"declaration", QJsonObject{{"linkSupport", true}}},
         {"implementation", QJsonObject{{"linkSupport", true}}},
         {"typeDefinition", QJsonObject{{"linkSupport", true}}},
+        {"callHierarchy", QJsonObject{}},
+        {"typeHierarchy", QJsonObject{}},
         {"references", QJsonObject{}},
         {"documentHighlight", QJsonObject{}},
         {"rename", QJsonObject{{"prepareSupport", true}}},

@@ -3,6 +3,7 @@
 #include "git/GitProcess.h"
 #include "navigation/Definitions.h"
 #include "navigation/GoToPopup.h"
+#include "navigation/HierarchyView.h"
 #include "navigation/NavigationHistory.h"
 #include "navigation/RecentFiles.h"
 #include "navigation/SymbolIndex.h"
@@ -13,6 +14,7 @@
 #include <QCheckBox>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
 #include <QLineEdit>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -356,6 +358,66 @@ private slots:
 
         QCOMPARE(lines, (QList<int>{0, 1, 0}));
         QCOMPARE(view.tree()->topLevelItem(0)->childCount(), 1); // the write is left out
+    }
+
+    void parsesHierarchyItemsAndCalls()
+    {
+        using namespace LspProtocol;
+        const QJsonObject item{{"name", "total"},
+                               {"detail", "int total(int)"},
+                               {"kind", 12},
+                               {"uri", uriOf("/p/a.cpp")},
+                               {"range", toJson(Range{{2, 0}, {4, 1}})},
+                               {"selectionRange", toJson(Range{{2, 4}, {2, 9}})}};
+        const QJsonObject outside{{"name", "x"}, {"uri", "https://example.com/x"}};
+
+        const QList<HierarchyItem> items = parseHierarchyItems(QJsonArray{item, outside});
+        const QList<HierarchyItem> callers =
+            parseHierarchyCalls(QJsonArray{QJsonObject{{"from", item}, {"fromRanges", QJsonArray{}}}}, "from");
+
+        QCOMPARE(items.size(), 1);
+        QCOMPARE(items[0].name, QString("total"));
+        QCOMPARE(items[0].filePath, QString("/p/a.cpp"));
+        QCOMPARE(items[0].selectionRange.start, (Position{2, 4}));
+        QCOMPARE(items[0].raw, item);
+        QCOMPARE(callers.size(), 1);
+    }
+
+    void hierarchyPaneUnfoldsOneLevelAtATime()
+    {
+        using LspProtocol::HierarchyItem;
+        const auto element = [](const QString &name, int line) {
+            return HierarchyItem{name, {}, "/p/a.cpp", {{line, 4}, {line, 9}}, QJsonObject{{"name", name}}};
+        };
+        QList<std::pair<Hierarchy::Direction, QString>> asked;
+        HierarchyView view;
+        view.showHierarchy(
+            {"Calls of “total”",
+             "Callers",
+             "Callees",
+             {element("total", 1)},
+             [&](Hierarchy::Direction direction, const HierarchyItem &parent, const Hierarchy::ChildrenReply &reply) {
+                 asked.append({direction, parent.name});
+                 reply(parent.name == "total" ? QList<HierarchyItem>{element("main", 7)} : QList<HierarchyItem>{});
+             }});
+        QList<int> opened;
+        connect(&view, &HierarchyView::elementActivated, this,
+                [&opened](const QString &, int line, int) { opened.append(line); });
+
+        const QTreeWidgetItem *root = view.tree()->topLevelItem(0);
+        QCOMPARE(root->childCount(), 1); // asked when it was unfolded
+        QTreeWidgetItem *caller = root->child(0);
+        QCOMPARE(caller->text(0), QString("main  a.cpp:8"));
+        caller->setExpanded(true);
+        caller->setExpanded(false);
+        caller->setExpanded(true); // not asked again
+        emit view.tree()->itemClicked(caller, 0);
+        view.setDirection(Hierarchy::Direction::Down);
+
+        QCOMPARE(asked, (QList<std::pair<Hierarchy::Direction, QString>>{{Hierarchy::Direction::Up, "total"},
+                                                                         {Hierarchy::Direction::Up, "main"},
+                                                                         {Hierarchy::Direction::Down, "total"}}));
+        QCOMPARE(opened, QList<int>{7});
     }
 
     void usagesPaneKeepsTheEarlierSearchesAndRunsOneAgain()

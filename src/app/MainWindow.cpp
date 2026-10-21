@@ -38,6 +38,7 @@
 #include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "navigation/GoToPopup.h"
+#include "navigation/HierarchyView.h"
 #include "navigation/SymbolIndex.h"
 #include "navigation/UsagesView.h"
 #include "outline/OutlineView.h"
@@ -364,6 +365,7 @@ QWidget *MainWindow::createEditPage()
     sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
     sidebar_->addView(problemsView_, {}, tr("Problems"));
     sidebar_->addView(usagesView_, {}, tr("Usages"));
+    sidebar_->addView(hierarchyView_, {}, tr("Hierarchy"));
     titleBar_->alignLogoWith(sidebar_->tabBar());
 
     editSplitter_ = new GripSplitter(Qt::Horizontal, this);
@@ -485,6 +487,15 @@ void MainWindow::createProblemsAndOutline()
         navigator_->goToLine(path, line, column);
     });
     connect(usagesView_, &UsagesView::rerunRequested, intelligence_, &CodeIntelligence::findUsagesOf);
+    hierarchyView_ = new HierarchyView(this);
+    connect(hierarchyView_, &HierarchyView::elementActivated, this, [this](const QString &path, int line, int column) {
+        setMode(Mode::Edit);
+        navigator_->goToLine(path, line, column);
+    });
+    connect(intelligence_, &CodeIntelligence::hierarchyFound, this, [this](const Hierarchy &hierarchy) {
+        hierarchyView_->showHierarchy(hierarchy);
+        sidebar_->showView(hierarchyView_);
+    });
     connect(intelligence_, &CodeIntelligence::usagesFound, this, [this](const UsageResults &results) {
         usagesView_->showResults(results);
         sidebar_->showView(usagesView_);

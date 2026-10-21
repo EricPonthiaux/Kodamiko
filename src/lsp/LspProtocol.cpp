@@ -178,6 +178,39 @@ WorkspaceEdit parseWorkspaceEdit(const QJsonObject &edit)
     return result;
 }
 
+namespace {
+
+std::optional<HierarchyItem> hierarchyItemFrom(const QJsonObject &object)
+{
+    const QString path = pathOf(object.value("uri").toString());
+    if (path.isEmpty())
+        return std::nullopt;
+    return HierarchyItem{object.value("name").toString(), object.value("detail").toString(), path,
+                         rangeFrom(object.value("selectionRange")), object};
+}
+
+} // namespace
+
+QList<HierarchyItem> parseHierarchyItems(const QJsonValue &result)
+{
+    QList<HierarchyItem> items;
+    for (const QJsonValue &value : result.toArray()) {
+        if (std::optional<HierarchyItem> item = hierarchyItemFrom(value.toObject()))
+            items.append(std::move(*item));
+    }
+    return items;
+}
+
+QList<HierarchyItem> parseHierarchyCalls(const QJsonValue &result, const QString &key)
+{
+    QList<HierarchyItem> items;
+    for (const QJsonValue &value : result.toArray()) {
+        if (std::optional<HierarchyItem> item = hierarchyItemFrom(value.toObject().value(key).toObject()))
+            items.append(std::move(*item));
+    }
+    return items;
+}
+
 std::optional<Progress> parseProgress(const QJsonValue &params)
 {
     const QJsonObject object = params.toObject();

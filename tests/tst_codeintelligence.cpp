@@ -502,6 +502,39 @@ private slots:
         QCOMPARE(kinds, (QList<UsageKind>{UsageKind::Declaration, UsageKind::Write, UsageKind::Read}));
     }
 
+    void showsTheCallersAndSubtypesWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        const EditorWidget *editor = project.open("calls.cpp", "struct Shape { virtual ~Shape() = default; };\n"
+                                                         "struct Square : Shape {};\n"
+                                                         "int total() { return 1; }\n"
+                                                         "int sum() { return total() + total(); }\n");
+        QVERIFY(editor);
+        QSignalSpy found(&project.intelligence, &CodeIntelligence::hierarchyFound);
+        placeCaretIn(editor, "total() { return 1");
+
+        project.intelligence.showCallHierarchy();
+        QTRY_COMPARE_WITH_TIMEOUT(found.size(), 1, 30000);
+        auto calls = found[0][0].value<Hierarchy>();
+        QList<LspProtocol::HierarchyItem> callers;
+        calls.children(Hierarchy::Direction::Up, calls.roots.first(),
+                       [&callers](const QList<LspProtocol::HierarchyItem> &items) { callers = items; });
+        QTRY_COMPARE_WITH_TIMEOUT(callers.size(), 1, 30000);
+        QCOMPARE(callers[0].name, QString("sum"));
+
+        placeCaretIn(editor, "Shape {");
+        project.intelligence.showTypeHierarchy();
+        QTRY_COMPARE_WITH_TIMEOUT(found.size(), 2, 30000);
+        auto typeHierarchy = found[1][0].value<Hierarchy>();
+        QList<LspProtocol::HierarchyItem> subtypes;
+        typeHierarchy.children(Hierarchy::Direction::Down, typeHierarchy.roots.first(),
+                               [&subtypes](const QList<LspProtocol::HierarchyItem> &items) { subtypes = items; });
+        QTRY_COMPARE_WITH_TIMEOUT(subtypes.size(), 1, 30000);
+        QCOMPARE(subtypes[0].name, QString("Square"));
+    }
+
     void highlightsTheSymbolsOccurrencesWithClangd()
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())
