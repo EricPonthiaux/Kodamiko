@@ -33,6 +33,7 @@
 #include <QFileInfo>
 #include <QMenuBar>
 #include <QSettings>
+#include <QTabBar>
 #include <QTreeWidget>
 
 #include <algorithm>
@@ -232,12 +233,17 @@ void MainWindow::createViewMenu()
         claudeConfigView_->tree()->setFocus();
     });
 
-    // Also folded by clicking its current tab.
+    // Also folded by clicking its current tab, or by double-clicking an
+    // editor tab: the editor takes the whole width, as in VS Code.
     showSidebar_ = view->addAction(tr("&Side Panel"));
     showSidebar_->setCheckable(true);
     showSidebar_->setChecked(true);
     connect(showSidebar_, &QAction::toggled, sidebar_, &SidePanel::setPanelVisible);
     connect(sidebar_, &SidePanel::panelVisibilityChanged, showSidebar_, &QAction::setChecked);
+    connect(editorTabs_->tabBar(), &QTabBar::tabBarDoubleClicked, showSidebar_, [this](int index) {
+        if (index >= 0)
+            showSidebar_->toggle();
+    });
     showSidebar_->setChecked(QSettings().value(QStringLiteral("showSidebar"), true).toBool());
 
     view->addSeparator();
