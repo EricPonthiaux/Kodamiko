@@ -5,6 +5,7 @@
 #include "Definitions.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "ui/ContextMenus.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -93,7 +94,7 @@ void CodeNavigator::chooseTarget(EditorWidget *editor, const QList<SymbolLocatio
     const QPoint point(static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
                        static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret)) +
                            static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
-    menu.exec(editor->viewport()->mapToGlobal(point));
+    ContextMenus::exec(menu, *editor, editor->viewport()->mapToGlobal(point));
 }
 
 void CodeNavigator::jumpTo(const SymbolLocation &target)

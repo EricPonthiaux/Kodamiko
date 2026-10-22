@@ -15,6 +15,7 @@
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
 #include "refactor/RefactoringHistory.h"
+#include "ui/ContextMenus.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -495,7 +496,7 @@ int CodeIntelligence::chooseFrom(EditorWidget *editor, const QStringList &entrie
     QMenu menu(editor);
     for (int i = 0; i < entries.size(); ++i)
         menu.addAction(entries[i])->setData(i);
-    const QAction *chosen = menu.exec(belowCaret(editor));
+    const QAction *chosen = ContextMenus::exec(menu, *editor, belowCaret(editor));
     return chosen ? chosen->data().toInt() : -1;
 }
 

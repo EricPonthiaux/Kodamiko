@@ -9,6 +9,7 @@
 #include "DiscardConfirmation.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
+#include "ui/ContextMenus.h"
 
 #include <QMenu>
 #include <QShortcut>
@@ -167,6 +168,6 @@ void ChangesView::showDiffMenu(const QPoint &position)
         openFileAt(line);
     })->setEnabled(status_ && diff_->locate(line).file >= 0);
     menu->insertSeparator(first);
-    menu->exec(diff_->viewport()->mapToGlobal(position));
+    ContextMenus::exec(*menu, *diff_, diff_->viewport()->mapToGlobal(position));
     delete menu;
 }

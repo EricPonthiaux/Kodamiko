@@ -6,6 +6,7 @@
 #include "Paragraph.h"
 #include "ThemeStyle.h"
 #include "UiIcons.h"
+#include "UiMetrics.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -362,7 +363,7 @@ PopupHeader::PopupHeader(QString iconName, const QString &title, QWidget *parent
     close_->setAutoRaise(true);
     close_->setFocusPolicy(Qt::NoFocus);
     close_->setToolTip(tr("Close (Esc)"));
-    close_->setFixedSize(26, 26);
+    UiMetrics::setScaledSize(close_, QSize(26, 26));
     connect(close_, &QToolButton::clicked, this, &PopupHeader::closeRequested);
     buttons_->setSpacing(6);
 
@@ -396,7 +397,8 @@ void PopupHeader::addButton(QWidget *button)
 
 void PopupHeader::applyTheme(const Theme &theme)
 {
-    icon_->setPixmap(UiIcons::icon(iconName_, theme.accent).pixmap(QSize(16, 16), devicePixelRatioF()));
+    icon_->setPixmap(UiIcons::icon(iconName_, theme.accent)
+                         .pixmap(UiMetrics::scaledSquare(UiMetrics::iconSize), devicePixelRatioF()));
     close_->setIcon(UiIcons::icon(QStringLiteral("close"), theme.mutedText));
 }
 

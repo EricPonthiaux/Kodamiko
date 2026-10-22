@@ -2,31 +2,78 @@
 
 #include "UiIcons.h"
 
+#include <QApplication>
 #include <QHash>
+#include <QIconEngine>
 #include <QPainter>
 #include <QPainterPath>
+#include <QStyle>
+#include <QStyleOption>
 
+#include <algorithm>
 #include <cmath>
-#include <functional>
 
 namespace {
 
-QIcon drawIcon(const QColor &color, const std::function<void(QPainter &)> &draw)
-{
-    QIcon icon;
-    for (const qreal ratio : {1.0, 2.0}) {
-        QPixmap pixmap(QSize(16, 16) * ratio);
-        pixmap.setDevicePixelRatio(ratio);
+// The icons are drawn on a 16-unit square.
+constexpr qreal iconUnits = 16;
+
+using Painter = void (*)(QPainter &);
+
+// A line icon drawn at the size asked for, so that it stays sharp as the
+// interface font enlarges it (UiMetrics::iconSize), with its pen widened
+// in proportion.
+class LineIconEngine : public QIconEngine {
+public:
+    LineIconEngine(QColor color, Painter draw)
+        : color_(color)
+        , draw_(draw)
+    {
+    }
+
+    void paint(QPainter *painter, const QRect &rect, QIcon::Mode mode, QIcon::State state) override
+    {
+        const qreal ratio = painter->device() ? painter->device()->devicePixelRatioF() : 1.0;
+        painter->drawPixmap(rect, scaledPixmap(rect.size(), mode, state, ratio));
+    }
+
+    QPixmap pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state) override
+    {
+        return scaledPixmap(size, mode, state, 1.0);
+    }
+
+    QPixmap scaledPixmap(const QSize &size, QIcon::Mode mode, QIcon::State, qreal scale) override
+    {
+        QPixmap pixmap(size * scale);
+        pixmap.setDevicePixelRatio(scale);
         pixmap.fill(Qt::transparent);
+        drawCentered(pixmap, size);
+        if (mode != QIcon::Disabled)
+            return pixmap;
+        // Greyed as Qt greys the pictures of an icon.
+        const QStyleOption option;
+        return QApplication::style()->generatedIconPixmap(QIcon::Disabled, pixmap, &option);
+    }
+
+    QIconEngine *clone() const override { return new LineIconEngine(*this); }
+
+private:
+    // The icon on the 16-unit square, centered in `size`.
+    void drawCentered(QPixmap &pixmap, const QSize &size) const
+    {
         QPainter painter(&pixmap);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        const qreal side = std::min(size.width(), size.height());
+        painter.translate((size.width() - side) / 2, (size.height() - side) / 2);
+        painter.scale(side / iconUnits, side / iconUnits);
+        painter.setPen(QPen(color_, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.setBrush(Qt::NoBrush);
-        draw(painter);
-        icon.addPixmap(pixmap);
+        draw_(painter);
     }
-    return icon;
-}
+
+    QColor color_;
+    Painter draw_;
+};
 
 } // namespace
 
@@ -51,8 +98,6 @@ QIcon icon(const QString &name, const QColor &color)
 }
 
 namespace {
-
-using Painter = void (*)(QPainter &);
 
 // Each icon by name, drawn on 16 x 16 with the pen in the icon's color.
 const QHash<QString, Painter> &painters()
@@ -454,7 +499,7 @@ void drawPrompt(QPainter &p)
 
 QIcon draw(const QString &name, const QColor &color)
 {
-    return drawIcon(color, painters().value(name, &drawPrompt));
+    return QIcon(new LineIconEngine(color, painters().value(name, &drawPrompt))); // owned by the icon
 }
 
 } // namespace

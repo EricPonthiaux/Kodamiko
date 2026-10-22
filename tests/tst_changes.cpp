@@ -1173,7 +1173,7 @@ private slots:
         for (int i = 0; i < popup.list()->count(); ++i)
             rows.append(popup.list()->item(i)->text());
         QCOMPARE(rows, QStringList({"Local", "feature/a", "feature/b", "main"}));
-        QCOMPARE(popup.selected()->name, QString("feature/a")); // not the current branch
+        QCOMPARE(popup.selected()->name, QString("main")); // the current branch, unfiltered
 
         QTest::keyClicks(popup.filterField(), "/B");
         QCOMPARE(popup.list()->count(), 2); // the heading, feature/b

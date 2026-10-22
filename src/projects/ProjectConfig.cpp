@@ -4,29 +4,75 @@
 
 #include <QFileInfo>
 
+#include <algorithm>
+#include <array>
+
+namespace {
+
+struct Family {
+    QLatin1StringView id;
+    QLatin1StringView title;
+};
+
+struct LanguageFamily {
+    QLatin1StringView languageId; // a LanguageRegistry identifier
+    QLatin1StringView family;
+};
+
+// In the order the project setup shows them.
+constexpr std::array knownFamilies = {
+    Family{QLatin1StringView("java"), QLatin1StringView("Java")},
+    Family{QLatin1StringView("javascript"), QLatin1StringView("JavaScript/TypeScript")},
+    Family{QLatin1StringView("cpp"), QLatin1StringView("C/C++")},
+    Family{QLatin1StringView("python"), QLatin1StringView("Python")},
+};
+
+constexpr std::array languageFamilies = {
+    LanguageFamily{QLatin1StringView("c"), QLatin1StringView("cpp")},
+    LanguageFamily{QLatin1StringView("cpp"), QLatin1StringView("cpp")},
+    LanguageFamily{QLatin1StringView("java"), QLatin1StringView("java")},
+    LanguageFamily{QLatin1StringView("javascript"), QLatin1StringView("javascript")},
+    LanguageFamily{QLatin1StringView("typescript"), QLatin1StringView("javascript")},
+    LanguageFamily{QLatin1StringView("tsx"), QLatin1StringView("javascript")},
+    LanguageFamily{QLatin1StringView("python"), QLatin1StringView("python")},
+};
+
+// The keys of the saved maps, shared by toVariant and fromVariant so that a
+// field is read back under the name it was written with.
+constexpr QLatin1StringView languageKey("language");
+constexpr QLatin1StringView enabledKey("enabled");
+constexpr QLatin1StringView runtimeVersionKey("runtimeVersion");
+constexpr QLatin1StringView runtimePathKey("runtimePath");
+constexpr QLatin1StringView serverKey("server");
+constexpr QLatin1StringView serverVersionKey("serverVersion");
+constexpr QLatin1StringView recipeKey("recipe");
+constexpr QLatin1StringView lastOpenedKey("lastOpened");
+constexpr QLatin1StringView configuredKey("configured");
+constexpr QLatin1StringView languagesKey("languages");
+constexpr QLatin1StringView needsRecipeSetupKey("needsRecipeSetup");
+constexpr QLatin1StringView agentCheckCommandKey("agentCheckCommand");
+
+} // namespace
+
 QVariantMap LanguageSetup::toVariant() const
 {
     return {
-        {QStringLiteral("language"), language},
-        {QStringLiteral("enabled"), enabled},
-        {QStringLiteral("runtimeVersion"), runtimeVersion},
-        {QStringLiteral("runtimePath"), runtimePath},
-        {QStringLiteral("server"), server},
-        {QStringLiteral("serverVersion"), serverVersion},
-        {QStringLiteral("recipe"), recipe},
+        {languageKey, language},       {enabledKey, enabled}, {runtimeVersionKey, runtimeVersion},
+        {runtimePathKey, runtimePath}, {serverKey, server},   {serverVersionKey, serverVersion},
+        {recipeKey, recipe},
     };
 }
 
 LanguageSetup LanguageSetup::fromVariant(const QVariantMap &map)
 {
     LanguageSetup setup;
-    setup.language = map.value(QStringLiteral("language")).toString();
-    setup.enabled = map.value(QStringLiteral("enabled"), true).toBool();
-    setup.runtimeVersion = map.value(QStringLiteral("runtimeVersion")).toString();
-    setup.runtimePath = map.value(QStringLiteral("runtimePath")).toString();
-    setup.server = map.value(QStringLiteral("server")).toString();
-    setup.serverVersion = map.value(QStringLiteral("serverVersion")).toString();
-    setup.recipe = map.value(QStringLiteral("recipe")).toString();
+    setup.language = map.value(languageKey).toString();
+    setup.enabled = map.value(enabledKey, true).toBool();
+    setup.runtimeVersion = map.value(runtimeVersionKey).toString();
+    setup.runtimePath = map.value(runtimePathKey).toString();
+    setup.server = map.value(serverKey).toString();
+    setup.serverVersion = map.value(serverVersionKey).toString();
+    setup.recipe = map.value(recipeKey).toString();
     return setup;
 }
 
@@ -42,20 +88,14 @@ QStringList ProjectConfig::recipes() const
 
 const LanguageSetup *ProjectConfig::language(const QString &family) const
 {
-    for (const LanguageSetup &setup : languages) {
-        if (setup.language == family)
-            return &setup;
-    }
-    return nullptr;
+    const auto found = std::ranges::find(languages, family, &LanguageSetup::language);
+    return found == languages.end() ? nullptr : &*found;
 }
 
 LanguageSetup *ProjectConfig::language(const QString &family)
 {
-    for (LanguageSetup &setup : languages) {
-        if (setup.language == family)
-            return &setup;
-    }
-    return nullptr;
+    const auto found = std::ranges::find(languages, family, &LanguageSetup::language);
+    return found == languages.end() ? nullptr : &*found;
 }
 
 QVariantMap ProjectConfig::toVariant() const
@@ -64,11 +104,11 @@ QVariantMap ProjectConfig::toVariant() const
     for (const LanguageSetup &setup : languages)
         list.append(setup.toVariant());
     return {
-        {QStringLiteral("lastOpened"), lastOpened},
-        {QStringLiteral("configured"), configured},
-        {QStringLiteral("languages"), list},
-        {QStringLiteral("needsRecipeSetup"), needsRecipeSetup},
-        {QStringLiteral("agentCheckCommand"), agentCheckCommand},
+        {lastOpenedKey, lastOpened},
+        {configuredKey, configured},
+        {languagesKey, list},
+        {agentCheckCommandKey, agentCheckCommand},
+        {needsRecipeSetupKey, needsRecipeSetup},
     };
 }
 
@@ -77,12 +117,12 @@ ProjectConfig ProjectConfig::fromVariant(const QString &path, const QVariantMap 
     ProjectConfig config;
     config.path = path;
     config.name = QFileInfo(path).fileName();
-    config.lastOpened = map.value(QStringLiteral("lastOpened")).toDateTime();
-    config.configured = map.value(QStringLiteral("configured")).toBool();
-    for (const QVariant &setup : map.value(QStringLiteral("languages")).toList())
-        config.languages.append(LanguageSetup::fromVariant(setup.toMap()));
-    config.agentCheckCommand = map.value(QStringLiteral("agentCheckCommand")).toString();
-    config.needsRecipeSetup = map.value(QStringLiteral("needsRecipeSetup")).toBool();
+    config.lastOpened = map.value(lastOpenedKey).toDateTime();
+    config.configured = map.value(configuredKey).toBool();
+    for (const QVariant &entry : map.value(languagesKey).toList())
+        config.languages.append(LanguageSetup::fromVariant(entry.toMap()));
+    config.agentCheckCommand = map.value(agentCheckCommandKey).toString();
+    config.needsRecipeSetup = map.value(needsRecipeSetupKey).toBool();
     return config;
 }
 
@@ -90,31 +130,27 @@ namespace ProjectLanguages {
 
 QStringList families()
 {
-    return {QStringLiteral("java"), QStringLiteral("javascript"), QStringLiteral("cpp"), QStringLiteral("python")};
+    QStringList ids;
+    for (const Family &family : knownFamilies)
+        ids.append(family.id);
+    return ids;
 }
 
 QString familyOf(const QString &languageId)
 {
-    if (languageId == QLatin1String("c") || languageId == QLatin1String("cpp"))
-        return QStringLiteral("cpp");
-    if (languageId == QLatin1String("javascript") || languageId == QLatin1String("typescript") ||
-        languageId == QLatin1String("tsx"))
-        return QStringLiteral("javascript");
-    if (languageId == QLatin1String("java") || languageId == QLatin1String("python"))
-        return languageId;
+    for (const LanguageFamily &entry : languageFamilies) {
+        if (entry.languageId == languageId)
+            return entry.family;
+    }
     return {};
 }
 
 QString title(const QString &family)
 {
-    if (family == QLatin1String("cpp"))
-        return QStringLiteral("C/C++");
-    if (family == QLatin1String("java"))
-        return QStringLiteral("Java");
-    if (family == QLatin1String("javascript"))
-        return QStringLiteral("JavaScript/TypeScript");
-    if (family == QLatin1String("python"))
-        return QStringLiteral("Python");
+    for (const Family &known : knownFamilies) {
+        if (known.id == family)
+            return known.title;
+    }
     return family;
 }
 

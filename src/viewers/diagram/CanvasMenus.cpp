@@ -5,6 +5,7 @@
 #include "Board.h"
 #include "Canvas.h"
 #include "Family.h"
+#include "ui/ContextMenus.h"
 
 #include <QMenu>
 #include <QPixmap>
@@ -29,7 +30,7 @@ void Canvas::chooseElement(QPointF screen, QPointF point, const QString &from)
             action->setToolTip(preset.help);
         connect(action, &QAction::triggered, this, [this, preset, point, from] { createElement(preset, point, from); });
     }
-    menu.exec(screen.toPoint());
+    ContextMenus::exec(menu, *this, screen.toPoint());
 }
 
 void Canvas::createElement(const ElementPreset &preset, QPointF point, const QString &from)
@@ -104,7 +105,7 @@ void Canvas::chooseRelation(QPointF screen, const QString &from, const QString &
             board_->pushHistory(before);
         });
     }
-    menu.exec(screen.toPoint());
+    ContextMenus::exec(menu, *this, screen.toPoint());
 }
 
 void Canvas::addFillMenu(QMenu *menu)
@@ -235,7 +236,7 @@ void Canvas::showContextMenu(QPointF screen)
         addLinkActions(menu, *l);
     else
         addCanvasActions(menu, p);
-    menu.exec(mapToGlobal(screen.toPoint()));
+    ContextMenus::exec(menu, *this, mapToGlobal(screen.toPoint()));
 }
 
 void Canvas::addShapeActions(QMenu &menu, const Shape &shape)

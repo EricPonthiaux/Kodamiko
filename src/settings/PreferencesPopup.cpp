@@ -7,6 +7,7 @@
 #include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QAction>
 #include <QButtonGroup>
@@ -239,7 +240,7 @@ QWidget *PreferencesPopup::createSidebar()
 
     pageList_ = new QListWidget(sidebar);
     pageList_->setObjectName(QStringLiteral("popupNav"));
-    pageList_->setIconSize(QSize(16, 16));
+    UiMetrics::setScaledIconSize(pageList_);
     pageList_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     pageList_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     connect(pageList_, &QListWidget::currentRowChanged, pages_, &QStackedWidget::setCurrentIndex);

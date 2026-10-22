@@ -8,6 +8,7 @@
 #include "EditorWidget.h"
 #include "PreviewPage.h"
 #include "ui/BrandMark.h"
+#include "ui/ContextMenus.h"
 #include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/TabBarBaseLine.h"
@@ -808,7 +809,7 @@ void EditorTabs::showTabContextMenu(const QPoint &pos)
         ->setEnabled(!right.isEmpty());
     menu.addSeparator();
     menu.addAction(tr("Close All Tabs"), this, [this] { closeAll(); });
-    menu.exec(tabBar()->mapToGlobal(pos));
+    ContextMenus::exec(menu, *tabBar(), tabBar()->mapToGlobal(pos));
 }
 
 void EditorTabs::syncWithDisk(const QString &path)

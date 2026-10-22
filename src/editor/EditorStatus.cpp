@@ -3,6 +3,7 @@
 #include "EditorStatus.h"
 
 #include "EditorWidget.h"
+#include "ui/ElidingToolButton.h"
 #include "workspace/EntryPopups.h"
 
 #include <QActionGroup>
@@ -46,7 +47,7 @@ EditorStatus::EditorStatus(QWidget *parent)
 
 QToolButton *EditorStatus::addButton(const QString &toolTip)
 {
-    auto *button = new QToolButton(this);
+    auto *button = new ElidingToolButton(this, 180);
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
     button->setToolTip(toolTip);
@@ -143,6 +144,7 @@ void EditorStatus::scheduleUpdate()
 void EditorStatus::update()
 {
     position_->setText(positionText());
+    position_->setToolTip(positionText() + QLatin1Char('\n') + tr("Go to Line:Column (Ctrl+G)"));
     lineEnding_->setText(lineEndingText());
     encoding_->setText(encodingText());
     indentation_->setText(indentationText());

@@ -179,11 +179,11 @@ EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 7px 1
 EditorTabs QTabBar::tab:hover { background: @hover; color: @text; }
 EditorTabs QTabBar::tab:selected { background: @base; color: @accentText; border-color: @line; border-top-color: @accent; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
-QTabBar#modeTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
+QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 7px 10px; min-width: 0; border: 1px solid transparent; border-bottom: 2px solid transparent; }
 QTabBar#modeTabs::tab:first { border-bottom-left-radius: 3px; }
 QTabBar#modeTabs::tab:last { border-bottom-right-radius: 3px; }
 QTabBar#modeTabs::tab:hover { background: @hover; color: @text; }
-QTabBar#modeTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-top: none; border-bottom: 2px solid @accent; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px; }
+QTabBar#modeTabs::tab:selected { background: @checked; color: @accentText; border-color: @line; border-bottom-color: @accent; border-radius: 4px; }
 QTabBar::scroller { width: 56px; }
 QTabBar QToolButton { background: @window; border: none; border-radius: 0; padding: 0; }
 QTabBar QToolButton:hover { background: @button; }
@@ -237,6 +237,8 @@ TitleBar QMenuBar { background: transparent; border: none; }
 TitleBar QMenuBar::item { padding: 6px 10px; border-radius: 5px; }
 TitleBar QMenuBar::item:selected, TitleBar QMenuBar::item:pressed { background: @hover; color: @text; }
 TitleBar QMenuBar QToolButton { padding: 0; border: none; }
+TitleBar QToolButton#mainMenuButton { padding: 0; border-radius: 5px; }
+TitleBar QToolButton#mainMenuButton::menu-indicator { image: none; width: 0; }
 TitleBar QToolButton#chip:hover, TitleBar QToolButton#chip:pressed { background: @hover; }
 TitleBar QToolButton#projectChip { padding: 0 8px; border: 1px solid @line; border-radius: 5px; background: @panel; }
 TitleBar QToolButton#projectChip:hover, TitleBar QToolButton#projectChip:pressed { background: @hover; border-color: @border; }
@@ -249,11 +251,18 @@ QFrame#runBlock QToolButton#runAction { padding: 0; }
 QFrame#runBlock QToolButton:hover, QFrame#runBlock QToolButton:pressed { background: @runHover; }
 QFrame#runBlock QToolButton::menu-indicator { image: none; width: 0; }
 QFrame#runDivider { background: @runBorder; }
+TitleBar QFrame#titleDivider { background: @line; }
 QToolButton#chip { padding: 4px 9px; border-radius: 3px; }
 QToolButton#chip:hover { background: @button; }
 QToolButton#chip::menu-indicator { image: none; width: 0; }
 QStatusBar QToolButton#chip { padding: 1px 9px; background: @hover; border: 1px solid @line; }
 QStatusBar QToolButton#chip:hover { background: @button; }
+QFrame#statusPopup { background: @panel; border: 1px solid @line; border-radius: 6px; }
+QWidget#statusGroup QToolButton { padding: 2px 7px; border: 1px solid transparent; border-radius: 4px; }
+QWidget#statusGroup QToolButton:hover, QToolButton#statusOverflow:hover { background: @hover; border-color: @line; }
+QWidget#statusGroup QToolButton#chip { background: @hover; border-color: @line; }
+QLabel#statusHeading { color: @muted; font-weight: 600; }
+QToolButton#statusOverflow { padding: 0; border: 1px solid transparent; border-radius: 4px; }
 QFrame#viewHeader { border: none; border-bottom: 1px solid @line; }
 QToolButton#viewSelector { padding: 4px 6px; border-radius: 3px; }
 QToolButton#viewSelector:hover, QToolButton#viewSelector:pressed { background: @button; }

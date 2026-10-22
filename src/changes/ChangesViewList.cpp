@@ -8,6 +8,7 @@
 #include "DiffView.h"
 #include "FileChangeDelegate.h"
 #include "git/GitCommands.h"
+#include "ui/ContextMenus.h"
 #include "ui/ViewHeader.h"
 
 #include <QMenu>
@@ -270,5 +271,5 @@ void ChangesView::showListMenu(const QTreeWidget *tree, const QPoint &position)
             menu.addAction(tr("Open File"), this, [this, path = change.path] { emit openFileRequested(path, 0); });
         }
     }
-    menu.exec(tree->viewport()->mapToGlobal(position));
+    ContextMenus::exec(menu, *tree, tree->viewport()->mapToGlobal(position));
 }

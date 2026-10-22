@@ -9,6 +9,7 @@
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -64,8 +65,9 @@ public:
             painter->drawRoundedRect(row, 2, 2);
         }
 
-        // The icon, alone: 16 pixels, in the accent.
-        const QRectF tile(row.left() + 8, row.center().y() - 8, 16, 16);
+        // The icon, alone, in the accent.
+        const QSizeF iconSize = UiMetrics::scaledSquare(UiMetrics::iconSize);
+        const QRectF tile(QPointF(row.left() + 8, row.center().y() - iconSize.height() / 2), iconSize);
         const QIcon icon = UiIcons::icon(index.data(iconRole).toString(), theme.accent);
         icon.paint(painter, tile.toRect());
 
@@ -195,7 +197,7 @@ QWidget *SnapshotsPopup::createDetails()
     files_ = new QListWidget(card);
     files_->setObjectName(QStringLiteral("snapshotFiles"));
     files_->setTextElideMode(Qt::ElideMiddle);
-    files_->setIconSize(QSize(16, 16));
+    UiMetrics::setScaledIconSize(files_);
     files_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     commit_ = new QLabel(card);
@@ -247,7 +249,8 @@ void SnapshotsPopup::applyTheme(const Theme &theme)
     setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(snapshotRules)));
     const qreal ratio = devicePixelRatioF();
     header_->applyTheme(theme);
-    emptyIcon_->setPixmap(UiIcons::icon(QStringLiteral("history"), theme.mutedText).pixmap(QSize(32, 32), ratio));
+    emptyIcon_->setPixmap(
+        UiIcons::icon(QStringLiteral("history"), theme.mutedText).pixmap(UiMetrics::scaledSquare(32), ratio));
     const QFont mono = AppFonts::codeFont(font().pointSizeF() * 0.9);
     commit_->setFont(mono);
     if (auto *delegate = dynamic_cast<SnapshotDelegate *>(list_->itemDelegate()))

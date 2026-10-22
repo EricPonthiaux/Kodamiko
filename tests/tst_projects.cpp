@@ -897,6 +897,37 @@ private slots:
         QCOMPARE(saved.language("cpp")->recipe, QString("cpp-cmake"));
     }
 
+    void aProjectIsReadBackAsItWasSaved()
+    {
+        ProjectConfig project;
+        project.path = "/work/demo";
+        project.name = "demo";
+        project.lastOpened = QDateTime(QDate(2026, 10, 22), QTime(9, 30));
+        project.configured = true;
+        project.languages = {{"python", false, "3.12", "/usr/bin/python3", "pyright", "system", "python-uv"}};
+        project.agentCheckCommand = "make check";
+        project.needsRecipeSetup = true;
+
+        const ProjectConfig saved = ProjectConfig::fromVariant(project.path, project.toVariant());
+
+        QCOMPARE(saved.name, project.name);
+        QCOMPARE(saved.lastOpened, project.lastOpened);
+        QCOMPARE(saved.configured, project.configured);
+        QCOMPARE(saved.languages, project.languages);
+        QCOMPARE(saved.agentCheckCommand, project.agentCheckCommand);
+        QCOMPARE(saved.needsRecipeSetup, project.needsRecipeSetup);
+    }
+
+    void groupsLanguagesIntoTheirFamilies()
+    {
+        QCOMPARE(ProjectLanguages::familyOf("c"), QString("cpp"));
+        QCOMPARE(ProjectLanguages::familyOf("tsx"), QString("javascript"));
+        QCOMPARE(ProjectLanguages::familyOf("python"), QString("python"));
+        QVERIFY(ProjectLanguages::familyOf("rust").isEmpty());
+        QCOMPARE(ProjectLanguages::title("cpp"), QString("C/C++"));
+        QCOMPARE(ProjectLanguages::title("rust"), QString("rust"));
+    }
+
     void projectSettingsApplyStaysOpenAndOkCloses()
     {
         const QTemporaryDir dir;

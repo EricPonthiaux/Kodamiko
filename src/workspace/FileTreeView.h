@@ -168,6 +168,8 @@ signals:
     void statusMessage(const QString &message);
     // Context menu commands handled by the window.
     void sendToClaudeRequested(const QString &path);
+    // The selected files and folders for Claude to review.
+    void reviewRequested(const QStringList &paths);
     // A diagram for Claude to draw, in `folder`.
     void generateDiagramRequested(const QString &folder);
     void openTerminalRequested(const QString &folder);
@@ -227,6 +229,8 @@ private:
     void collectExpanded(const QModelIndex &parent, QStringList *paths) const;
     void expandPending();
     void showContextMenu(const QPoint &position);
+    // New file, folder and diagram in `folder`.
+    void addCreationActions(QMenu *menu, const QString &folder);
     void addEntryActions(QMenu *menu, const QModelIndex &index);
     // Git commands on `path`; Add on every entry of `selection`.
     void addGitMenu(QMenu *menu, const QString &path, const QStringList &selection);

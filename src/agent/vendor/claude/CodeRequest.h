@@ -3,6 +3,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 
 #include <optional>
 
@@ -39,5 +40,10 @@ QString mention(const Target &target);
 
 // The prompt asking Claude for `kind` about `target`.
 QString prompt(Kind kind, const Target &target);
+
+// The prompt asking Claude to review whole files and folders (absolute
+// paths, from the file tree), mentioned relative to `projectFolder` when
+// inside it.
+QString reviewPrompt(const QStringList &paths, const QString &projectFolder);
 
 } // namespace CodeRequest

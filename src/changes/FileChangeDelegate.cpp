@@ -122,8 +122,9 @@ void paintNameAndFolder(const Row &row, const QRect &area, const QString &name, 
 
 void paintFolder(const Row &row, const QString &label)
 {
-    const int iconSize = 16;
-    const QRect icon(row.rect.left(), row.rect.center().y() - iconSize / 2, iconSize, iconSize);
+    // The tree's icon size: the height of its text (TreeMetrics).
+    const QSize iconSize = row.option.decorationSize;
+    const QRect icon(QPoint(row.rect.left(), row.rect.center().y() - iconSize.height() / 2), iconSize);
     FileIcons::folder(isDark(row.option.palette)).paint(row.painter, icon);
     const QRect text(icon.right() + 9, row.rect.top(), row.rect.right() - icon.right() - 9, row.rect.height());
     row.painter->setFont(row.option.font);
@@ -201,11 +202,11 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     const bool isUnderAFolder = index.parent().data(folderRole).isValid();
     const QString folder = folderLabel(isUnderAFolder ? name : path, kind, index.data(oldPathRole).toString());
 
-    const int iconSize = 16;
+    const QSize iconSize = option.decorationSize;
     int x = row.rect.left();
     FileIcons::file(name, isDark(option.palette))
-        .paint(painter, QRect(x, row.rect.center().y() - iconSize / 2, iconSize, iconSize));
-    x += iconSize + 8;
+        .paint(painter, QRect(QPoint(x, row.rect.center().y() - iconSize.height() / 2), iconSize));
+    x += iconSize.width() + 8;
 
     int right = int(paintBadge(row, kind)) - 10;
     // The lines added and removed, when known.

@@ -4,6 +4,7 @@
 
 #include "AppFonts.h"
 #include "BrandMark.h"
+#include "ElidingToolButton.h"
 #include "FileIcons.h"
 #include "UiIcons.h"
 #include "UiMetrics.h"
@@ -21,14 +22,14 @@
 
 namespace {
 
-// Between the run block and the search actions, then before the window
-// controls.
-constexpr int groupSpacing = 14;
-constexpr int windowControlsSpacing = 12;
+constexpr int groupSpacing = 8;
+constexpr int dragSpace = 24;
 const QColor runColor("#4fa36b");
 const QColor stopColor("#d9534f");
 // The run block's border, around its buttons.
 constexpr int runBlockInset = 2;
+// Between a divider's ends and the top or bottom of a control.
+constexpr int dividerInset = 6;
 
 // The height of every control but the window's: chips, buttons, the run
 // block; the menu titles' padding comes close (see ThemeStyle).
@@ -37,16 +38,24 @@ int controlHeight()
     return UiMetrics::scaled(UiMetrics::toolbarButtonSize);
 }
 
+// The width the bar's layout gives `widget`: its hint within its limits.
+int hintedWidth(const QWidget *widget)
+{
+    return qBound(widget->minimumWidth(), widget->sizeHint().width(), widget->maximumWidth());
+}
+
 } // namespace
 
 namespace {
 
-// Duet's icon at the bar's start, drawn at the screen's resolution. Clicks
-// go through: dragging it moves the window, like the bar.
+// Duet's mark at the bar's start, without the app icon's tile, drawn at the
+// screen's resolution. Clicks go through: dragging it moves the window, like
+// the bar.
 class BrandLogo : public QWidget {
 public:
-    explicit BrandLogo(QWidget *parent)
+    BrandLogo(const Theme *theme, QWidget *parent)
         : QWidget(parent)
+        , theme_(theme)
     {
         setObjectName(QStringLiteral("brandLogo"));
         setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -61,8 +70,11 @@ protected:
     void paintEvent(QPaintEvent *) override
     {
         QPainter painter(this);
-        BrandMark::paintAppIcon(&painter, rect());
+        BrandMark::paint(&painter, rect(), BrandMark::caretColorFor(*theme_));
     }
+
+private:
+    const Theme *theme_; // the title bar's, which owns the logo
 };
 
 } // namespace
@@ -81,28 +93,51 @@ TitleBar::TitleBar(QWidget *parent)
     menuBar_ = new QMenuBar(this);
     menuBar_->setNativeMenuBar(false);
     menuBar_->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+    menuBar_->installEventFilter(this);
+    menuButton_ = new QToolButton(this);
+    menuButton_->setObjectName(QStringLiteral("mainMenuButton"));
+    menuButton_->setText(QStringLiteral("☰"));
+    menuButton_->setToolTip(tr("Main Menu"));
+    menuButton_->setAccessibleName(tr("Main Menu"));
+    menuButton_->setAutoRaise(true);
+    menuButton_->setPopupMode(QToolButton::InstantPopup);
+    compactMenu_ = new QMenu(this);
+    menuButton_->setMenu(compactMenu_);
+    connect(compactMenu_, &QMenu::aboutToShow, this, &TitleBar::rebuildCompactMenu);
+    menuButton_->hide();
 
     layout_ = new QHBoxLayout(this);
     layout_->setContentsMargins(0, 0, 0, 0);
-    layout_->setSpacing(4);
+    layout_->setSpacing(groupSpacing);
     layout_->addWidget(leadingSpace_);
-    logo_ = new BrandLogo(this);
+    logo_ = new BrandLogo(&theme_, this);
     layout_->addWidget(logo_, 0, Qt::AlignVCenter);
-    layout_->addSpacing(2);
     layout_->addWidget(menuBar_, 0, Qt::AlignVCenter);
-    layout_->addSpacing(8);
+    layout_->addWidget(menuButton_, 0, Qt::AlignVCenter);
+    // The project and the run block in the middle of the bar: the stretches
+    // share the room left equally, the balances make up for the difference
+    // between the menus and the buttons at the right.
+    layout_->addStretch(1);
+    leftBalance_ = new QSpacerItem(0, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
+    layout_->addSpacerItem(leftBalance_);
     project_ = addChip();
     project_->setObjectName(QStringLiteral("projectChip"));
     AppFonts::setInterfaceFont(project_, 1);
-    layout_->addStretch(1);
     layout_->addWidget(createRunBlock());
-    layout_->addSpacing(groupSpacing);
-    actions_ = new QHBoxLayout;
+    rightBalance_ = new QSpacerItem(0, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
+    layout_->addSpacerItem(rightBalance_);
+    layout_->addStretch(1);
+    actionGroup_ = new QWidget(this);
+    actions_ = new QHBoxLayout(actionGroup_);
+    actions_->setContentsMargins(0, 0, 0, 0);
     actions_->setSpacing(2);
-    layout_->addLayout(actions_);
-    layout_->addSpacing(windowControlsSpacing);
+    layout_->addWidget(actionGroup_);
 
+    controlsDivider_ = new QFrame(this);
+    controlsDivider_->setObjectName(QStringLiteral("titleDivider"));
+    layout_->addWidget(controlsDivider_, 0, Qt::AlignVCenter);
     controls_ = new WindowControls(this);
+    controls_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     layout_->addWidget(controls_);
     AppFonts::followApplicationFont(this, [this] { applyMetrics(); });
 }
@@ -126,9 +161,10 @@ void TitleBar::updateLogoAlignment()
     logo_->setFixedWidth(2 * tab.x() + tab.width());
 }
 
-QToolButton *TitleBar::addChip()
+ElidingToolButton *TitleBar::addChip()
 {
-    auto *chip = new QToolButton(this);
+    auto *chip = new ElidingToolButton(this);
+    chip->setTextSuffix(QStringLiteral("  ▾"));
     chip->setAutoRaise(true);
     chip->setFocusPolicy(Qt::NoFocus);
     chip->setPopupMode(QToolButton::InstantPopup);
@@ -146,7 +182,9 @@ QFrame *TitleBar::createRunBlock()
     auto *row = new QHBoxLayout(runBlock_);
     row->setContentsMargins(1, 1, 1, 1);
     row->setSpacing(0);
-    run_ = new QToolButton(runBlock_);
+    run_ = new ElidingToolButton(runBlock_, 260);
+    run_->setTextSuffix(QStringLiteral("  ▾"));
+    run_->setObjectName(QStringLiteral("runConfiguration"));
     run_->setAutoRaise(true);
     run_->setFocusPolicy(Qt::NoFocus);
     run_->setPopupMode(QToolButton::InstantPopup);
@@ -164,11 +202,11 @@ QFrame *TitleBar::createRunBlock()
 
 void TitleBar::setProject(const QString &name, const QString &toolTip, QMenu *menu)
 {
-    // Spaces set the name apart from the folder icon and the chevron: a tool
-    // button has no spacing of its own between its icon and its text.
-    project_->setText(QStringLiteral(" %1  ▾").arg(name));
+    project_->setText(name);
     project_->setToolTip(toolTip);
     project_->setMenu(menu);
+    project_->setAccessibleName(tr("Project: %1").arg(name));
+    scheduleLayout();
 }
 
 QToolButton *TitleBar::actionButton(QAction *action, const QString &iconName, const QColor &color)
@@ -180,12 +218,12 @@ QToolButton *TitleBar::actionButton(QAction *action, const QString &iconName, co
     button->setIcon(UiIcons::icon(iconName, color.isValid() ? color : theme_.foreground));
     actionButtons_.append({button, iconName, color});
     sizeActionButton(actionButtons_.last());
-    button->setIconSize(QSize(16, 16));
     const auto update = [button, action] {
         const QString shortcut = action->shortcut().toString(QKeySequence::NativeText);
         QString name = action->text();
         name.remove(QLatin1Char('&'));
         button->setToolTip(shortcut.isEmpty() ? name : QStringLiteral("%1 (%2)").arg(name, shortcut));
+        button->setAccessibleName(name);
         button->setEnabled(action->isEnabled());
     };
     update();
@@ -197,6 +235,8 @@ QToolButton *TitleBar::actionButton(QAction *action, const QString &iconName, co
 void TitleBar::addActionButton(QAction *action, const QString &iconName)
 {
     actions_->addWidget(actionButton(action, iconName));
+    secondaryActions_.append(action);
+    scheduleLayout();
 }
 
 void TitleBar::setRunConfiguration(const RunChip &chip)
@@ -204,14 +244,16 @@ void TitleBar::setRunConfiguration(const RunChip &chip)
     const bool shown = !chip.name.isEmpty();
     runBlock_->setVisible(shown);
     run_->setIcon(chip.icon);
-    run_->setText(chip.name + QStringLiteral("  ▾"));
-    run_->setToolTip(chip.toolTip);
+    run_->setText(chip.name);
+    run_->setToolTip(chip.toolTip.isEmpty() ? chip.name : chip.name + QLatin1Char('\n') + chip.toolTip);
     run_->setMenu(chip.menu);
+    run_->setAccessibleName(tr("Run configuration: %1").arg(chip.name));
     running_ = chip.running;
     if (runButton_)
         runButton_->setVisible(shown && !chip.running);
     if (stopButton_)
         stopButton_->setVisible(shown && chip.running);
+    scheduleLayout();
 }
 
 void TitleBar::setRunActions(QAction *run, QAction *stop)
@@ -235,33 +277,158 @@ void TitleBar::applyMetrics()
 {
     setFixedHeight(UiMetrics::scaled(UiMetrics::titleBarHeight));
     const int control = controlHeight();
+    layout_->setSpacing(UiMetrics::scaled(groupSpacing));
+    menuButton_->setFixedSize(control, control);
     project_->setFixedHeight(control);
     const int folderSize = UiMetrics::scaled(UiMetrics::chipIconSize);
     project_->setIconSize(QSize(folderSize, folderSize));
     runBlock_->setFixedHeight(control);
     run_->setFixedHeight(control - runBlockInset);
-    runDivider_->setFixedSize(1, control - 12);
+    run_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
+    runDivider_->setFixedSize(1, control - 2 * dividerInset);
+    controlsDivider_->setFixedSize(1, control - 2 * dividerInset);
     for (const ActionButton &entry : std::as_const(actionButtons_))
         sizeActionButton(entry);
     for (const auto kind : {WindowButton::Kind::Minimize, WindowButton::Kind::Maximize, WindowButton::Kind::Close})
         controls_->button(kind)->updateGeometry();
+    scheduleLayout();
+}
+
+void TitleBar::scheduleLayout()
+{
+    if (layoutScheduled_)
+        return;
+    layoutScheduled_ = true;
+    QMetaObject::invokeMethod(
+        this,
+        [this] {
+            layoutScheduled_ = false;
+            updateResponsiveLayout();
+        },
+        Qt::QueuedConnection);
+}
+
+int TitleBar::boundedRunBlockWidth() const
+{
+    return runBlock_->sizeHint().width() - run_->sizeHint().width() + run_->boundedWidth();
+}
+
+void TitleBar::updateResponsiveLayout()
+{
+    layout_->setSpacing(UiMetrics::scaled(width() < UiMetrics::scaled(600) ? groupSpacing / 2 : groupSpacing));
+    // Measure the expanded controls at their bounded widths, independent of
+    // which groups were hidden or how far the labels grew on the previous
+    // resize.
+    int fixed = UiMetrics::scaled(dragSpace);
+    int groups = 0;
+    const std::initializer_list<const QWidget *> fixedWidgets{leadingSpace_, logo_, controlsDivider_, controls_};
+    for (const QWidget *widget : fixedWidgets) {
+        if (widget->isHidden())
+            continue;
+        fixed += hintedWidth(widget);
+        ++groups;
+    }
+    fixed += project_->boundedWidth();
+    ++groups;
+    if (!runBlock_->isHidden()) {
+        fixed += boundedRunBlockWidth();
+        ++groups;
+    }
+    const int gap = layout_->spacing();
+    const int actionWidth = secondaryActions_.isEmpty() ? 0 : actionGroup_->sizeHint().width() + gap;
+    const int available = width() - fixed - groups * gap;
+    const bool compact = available < menuBar_->sizeHint().width() + actionWidth;
+    menuBar_->setVisible(!compact);
+    menuButton_->setVisible(compact);
+    const int menuWidth = compact ? menuButton_->width() : menuBar_->sizeHint().width();
+    const bool showsActions = actionWidth > 0 && available >= menuWidth + actionWidth;
+    actionGroup_->setVisible(showsActions);
+    // The room left lengthens the labels before it goes to the drag space.
+    int spare = available - menuWidth - (showsActions ? actionWidth : 0);
+    spare -= project_->widenInto(spare);
+    run_->widenInto(runBlock_->isHidden() ? 0 : spare);
+    const int minimumWithLogo = layout_->minimumSize().width() + (logo_->isHidden() ? hintedWidth(logo_) + gap : 0);
+    logo_->setVisible(width() >= minimumWithLogo);
+    centerProjectGroup();
+}
+
+int TitleBar::sideWidth(std::initializer_list<const QWidget *> widgets) const
+{
+    int width = 0;
+    for (const QWidget *widget : widgets)
+        if (!widget->isHidden())
+            width += hintedWidth(widget) + layout_->spacing();
+    return width;
+}
+
+void TitleBar::centerProjectGroup()
+{
+    const int left = sideWidth({leadingSpace_, logo_, menuBar_, menuButton_});
+    const int right = sideWidth({actionGroup_, controlsDivider_, controls_});
+    int center = project_->sizeHint().width();
+    if (!runBlock_->isHidden())
+        center += layout_->spacing() + runBlock_->sizeHint().width();
+    // Off center rather than over its neighbors, or without room to drag.
+    const int room = width() - left - center - right - UiMetrics::scaled(dragSpace);
+    const int balance = qBound(0, qAbs(left - right), room);
+    const int leftBalance = right > left ? balance : 0;
+    const int rightBalance = left > right ? balance : 0;
+    // Only on a change: invalidating the layout schedules this again.
+    if (leftBalance_->sizeHint().width() == leftBalance && rightBalance_->sizeHint().width() == rightBalance)
+        return;
+    leftBalance_->changeSize(leftBalance, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
+    rightBalance_->changeSize(rightBalance, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
+    layout_->invalidate();
+}
+
+void TitleBar::rebuildCompactMenu()
+{
+    compactMenu_->clear();
+    compactMenu_->addActions(menuBar_->actions());
+    if (actionGroup_->isHidden() && !secondaryActions_.isEmpty()) {
+        compactMenu_->addSeparator();
+        compactMenu_->addActions(secondaryActions_);
+    }
+}
+
+bool TitleBar::event(QEvent *event)
+{
+    const bool result = QWidget::event(event);
+    if (event->type() == QEvent::LayoutRequest || event->type() == QEvent::StyleChange)
+        scheduleLayout();
+    return result;
+}
+
+void TitleBar::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    updateResponsiveLayout();
+    // The layout already placed the controls for the new width, with the
+    // previous one's balances and labels: place them again at once, the run
+    // block first so that the bar sees its new width.
+    runBlock_->layout()->activate();
+    layout_->activate();
 }
 
 void TitleBar::sizeActionButton(const ActionButton &entry)
 {
     const int size = controlHeight() - entry.inset;
     entry.button->setFixedSize(size, size);
+    entry.button->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
 }
 
 void TitleBar::setWindowControlsVisible(bool visible)
 {
     controls_->setVisible(visible);
+    controlsDivider_->setVisible(visible);
+    scheduleLayout();
 }
 
 void TitleBar::setLeadingSpace(int pixels)
 {
     leadingSpace_->setFixedWidth(pixels);
     leadingSpace_->setVisible(pixels > 0);
+    scheduleLayout();
 }
 
 WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const
@@ -272,6 +439,7 @@ WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const
 void TitleBar::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    logo_->update();
     project_->setIcon(FileIcons::folder(theme.isDark)); // the files tree's
     controls_->applyTheme(theme);
     for (const ActionButton &entry : std::as_const(actionButtons_))
@@ -307,6 +475,9 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 
 bool TitleBar::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == menuBar_ && (event->type() == QEvent::ActionAdded || event->type() == QEvent::ActionRemoved ||
+                                event->type() == QEvent::ActionChanged))
+        scheduleLayout();
     const bool columnChanged = event->type() == QEvent::Resize || event->type() == QEvent::LayoutRequest ||
                                event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange;
     if (watched == logoColumn_ && columnChanged)

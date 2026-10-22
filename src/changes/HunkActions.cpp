@@ -6,6 +6,7 @@
 #include "ui/AppFonts.h"
 #include "ui/Theme.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QFrame>
 #include <QHBoxLayout>
@@ -36,7 +37,7 @@ QToolButton *actionButton(QFrame *bar, const QString &text, const QString &toolT
     button->setText(text);
     button->setToolTip(toolTip);
     button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    button->setIconSize(QSize(iconSize, iconSize));
+    UiMetrics::setScaledIconSize(button, iconSize);
     AppFonts::setInterfaceFont(button, 0.9, QFont::Normal);
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);

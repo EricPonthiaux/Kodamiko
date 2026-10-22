@@ -159,6 +159,22 @@ private slots:
         QCOMPARE(window.projectChip()->iconSize().width(), 2 * UiMetrics::chipIconSize);
     }
 
+    void buttonIconsGrowWithTheInterfaceFont()
+    {
+        const Window window;
+
+        applyPreferences(withSizes(2 * AppFonts::defaultInterfaceSize, 0), window);
+
+        const QToolButton *collapse = nullptr;
+        for (const QToolButton *button : window.files->findChildren<QToolButton *>()) {
+            if (button->toolTip() == QStringLiteral("Collapse All"))
+                collapse = button;
+        }
+        QVERIFY(collapse);
+        QCOMPARE(collapse->iconSize().width(), 2 * UiMetrics::iconSize);
+        QVERIFY(collapse->width() > collapse->iconSize().width());
+    }
+
     void treeFontReachesEveryTree()
     {
         const Window window;

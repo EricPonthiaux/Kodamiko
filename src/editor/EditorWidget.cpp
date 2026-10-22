@@ -9,6 +9,7 @@
 #include "syntax/ISyntaxHighlighter.h"
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
+#include "ui/ContextMenus.h"
 
 #include <QContextMenuEvent>
 #include <QFile>
@@ -397,7 +398,7 @@ void EditorWidget::contextMenuEvent(QContextMenuEvent *event)
     const QPointer<EditorWidget> guard(this); // an action may close the file
     isContextMenuShown_ = true;
     QToolTip::hideText();
-    createContextMenu()->exec(event->globalPos());
+    ContextMenus::exec(*createContextMenu(), *this, event->globalPos());
     if (guard)
         isContextMenuShown_ = false;
 }

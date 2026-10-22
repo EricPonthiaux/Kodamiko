@@ -3,6 +3,7 @@
 #include "ClaudeConfigView.h"
 
 #include "ui/AppFonts.h"
+#include "ui/ContextMenus.h"
 #include "ui/FileIcons.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
@@ -149,8 +150,8 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
         button->setAutoRaise(true);
         button->setFocusPolicy(Qt::NoFocus);
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-        button->setIconSize(QSize(16, 16));
-        button->setFixedSize(26, 24);
+        UiMetrics::setScaledIconSize(button);
+        UiMetrics::setScaledSize(button, QSize(26, 24));
         return button;
     };
     const QString noIndicator = QStringLiteral("QToolButton::menu-indicator { image: none; width: 0; }");
@@ -538,7 +539,7 @@ void ClaudeConfigView::showContextMenu(const QPoint &position)
     const Entry *entry = entryOf(item);
     if (item->data(0, effectiveRole).toBool()) {
         menu.addAction(tr("&Open"), this, &ClaudeConfigView::effectiveSettingsRequested);
-        menu.exec(tree_->viewport()->mapToGlobal(position));
+        ContextMenus::exec(menu, *tree_, tree_->viewport()->mapToGlobal(position));
         return;
     }
     if (!entry) {
@@ -546,7 +547,7 @@ void ClaudeConfigView::showContextMenu(const QPoint &position)
         if (!ClaudeConfig::canCreate(category))
             return;
         addNewActions(menu.addMenu(tr("New %1").arg(itemNoun(category))), category);
-        menu.exec(tree_->viewport()->mapToGlobal(position));
+        ContextMenus::exec(menu, *tree_, tree_->viewport()->mapToGlobal(position));
         return;
     }
 
@@ -564,5 +565,5 @@ void ClaudeConfigView::showContextMenu(const QPoint &position)
             menu.addAction(tr("&Delete…"), QKeySequence::Delete, this, [this, item] { confirmDelete(item); });
         }
     }
-    menu.exec(tree_->viewport()->mapToGlobal(position));
+    ContextMenus::exec(menu, *tree_, tree_->viewport()->mapToGlobal(position));
 }

@@ -122,15 +122,18 @@ protected:
     void changeEvent(QEvent *event) override;
 
 private:
+    // The window, built from `preferences` read once.
+    MainWindow(const QString &folder, const Preferences &preferences, QWidget *parent);
+
     // How long a status bar message stays.
     static constexpr int statusMessageMs = 5000;
     // `message` in the status bar, for statusMessageMs.
     void showStatus(const QString &message);
 
-    void createWidgets();
-    void createCodeServices();
+    void createWidgets(const Preferences &preferences);
+    void createCodeServices(const Preferences &preferences);
     void createGitViews();
-    void createCentralWidget();
+    void createCentralWidget(const Preferences &preferences);
     // The answer to the sensitive tool request shown, then the next one.
     void answerToolRequest(bool accepted);
     void createGitServices();

@@ -25,6 +25,21 @@ void paint(QPainter *painter, const QRectF &area, const QColor &caret, const QCo
     painter->restore();
 }
 
+QColor caretColorFor(const Theme &theme)
+{
+    return theme.isDark ? caretColor : lightCaretColor;
+}
+
+QPixmap markPixmap(int size, const Theme &theme, qreal devicePixelRatio)
+{
+    QPixmap pixmap(QSize(size, size) * devicePixelRatio);
+    pixmap.setDevicePixelRatio(devicePixelRatio);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    paint(&painter, QRectF(0, 0, size, size), caretColorFor(theme));
+    return pixmap;
+}
+
 void paintAppIcon(QPainter *painter, const QRectF &area)
 {
     const qreal size = std::min(area.width(), area.height());

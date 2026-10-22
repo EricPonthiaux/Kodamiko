@@ -431,7 +431,7 @@ private slots:
         bar.resize(400, bar.height());
         bar.show();
 
-        auto *extension = bar.menuBar()->findChild<QToolButton *>("qt_menubar_ext_button");
+        auto *extension = bar.findChild<QToolButton *>("mainMenuButton");
         QVERIFY(extension);
         QTRY_VERIFY(extension->isVisible());
         QCOMPARE(bar.childAt(extension->mapTo(&bar, extension->rect().center())), extension);
@@ -446,11 +446,11 @@ private slots:
 
         const QMenu *overflow = extension->menu();
         QVERIFY(overflow);
-        QVERIFY(overflow->actions().contains(bar.menuBar()->actions().last()));
         const QSignalSpy opened(overflow, &QMenu::aboutToShow);
         QTimer::singleShot(0, overflow, &QMenu::close);
         QTest::mouseClick(extension, Qt::LeftButton);
         QCOMPARE(opened.count(), 1);
+        QVERIFY(overflow->actions().contains(bar.menuBar()->actions().last()));
 
         bar.resize(1600, bar.height());
         QTRY_VERIFY(!extension->isVisible());
@@ -502,7 +502,7 @@ private slots:
         for (const QToolButton *button : titleBar->findChildren<QToolButton *>())
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
-        QVERIFY(texts.contains(" duet  ▾"));
+        QVERIFY(texts.contains("duet"));
         QVERIFY(!titleBar->findChild<AgentIndicator *>());
 
         QAction action("Go to File");

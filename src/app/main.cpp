@@ -9,6 +9,7 @@
 #include "ui/BrandMark.h"
 #include "ui/ClickableCursors.h"
 #include "ui/Motion.h"
+#include "ui/UiMetrics.h"
 #include "welcome/WelcomeWindow.h"
 
 #include <QApplication>
@@ -64,6 +65,12 @@ public:
             return 2;
         case PM_TabCloseIndicatorWidth:
             return closeButtonWidth;
+        // The icons that no widget sizes itself grow with the text.
+        case PM_SmallIconSize:
+        case PM_ButtonIconSize:
+        case PM_TabBarIconSize:
+        case PM_ListViewIconSize:
+            return UiMetrics::scaled(UiMetrics::iconSize);
         default:
             return QProxyStyle::pixelMetric(metric, option, widget);
         }

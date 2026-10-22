@@ -8,8 +8,10 @@
 #include "PreviewSite.h"
 #include "syntax/LanguageRegistry.h"
 #include "ui/AppFonts.h"
+#include "ui/ContextMenus.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QButtonGroup>
 #include <QColor>
@@ -40,6 +42,8 @@
 namespace {
 
 constexpr int updateDelayMs = 250;
+// The format label's icon and the mode buttons', smaller than the text beside them.
+constexpr int formatIconSize = 14;
 
 // One off-the-record profile for every preview: nothing is kept on disk.
 QWebEngineProfile *previewProfile()
@@ -206,7 +210,7 @@ void MarkdownPreview::contextMenuEvent(QContextMenuEvent *event)
     menu.addAction(pageAction(QWebEnginePage::CopyLinkToClipboard));
     menu.addSeparator();
     menu.addAction(pageAction(QWebEnginePage::SelectAll));
-    menu.exec(event->globalPos());
+    ContextMenus::exec(menu, *this, event->globalPos());
 }
 
 HtmlPreview::HtmlPreview(const QString &servedFolder, QWidget *parent)
@@ -292,7 +296,7 @@ void HtmlPreview::contextMenuEvent(QContextMenuEvent *event)
     menu.addAction(pageAction(QWebEnginePage::SelectAll));
     menu.addSeparator();
     menu.addAction(tr("Open in Browser"), this, [this] { QDesktopServices::openUrl(QUrl::fromLocalFile(filePath_)); });
-    menu.exec(event->globalPos());
+    ContextMenus::exec(menu, *this, event->globalPos());
 }
 
 PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QString projectFolder, QWidget *parent)
@@ -343,7 +347,7 @@ QWidget *PreviewPage::createToolbar()
     format->setContentsMargins(0, 0, 0, 0);
     format->setSpacing(5);
     formatIcon_ = new QLabel(toolbar);
-    formatIcon_->setFixedSize(14, 14);
+    UiMetrics::setScaledSize(formatIcon_, QSize(formatIconSize, formatIconSize));
     format->addWidget(formatIcon_, 0, Qt::AlignVCenter);
     auto *label = new QLabel(kind_ == Kind::Html ? tr("HTML") : tr("Markdown"), toolbar);
     label->setObjectName(QStringLiteral("previewFormat"));
@@ -375,7 +379,7 @@ QWidget *PreviewPage::createToolbar()
         button->setToolTip(choices[i].toolTip);
         button->setAccessibleName(choices[i].toolTip);
         button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-        button->setIconSize(QSize(14, 14));
+        UiMetrics::setScaledIconSize(button, formatIconSize);
         AppFonts::setInterfaceFont(button, 0.9, QFont::Normal);
         button->setCheckable(true);
         button->setAutoRaise(true);
@@ -396,7 +400,7 @@ QWidget *PreviewPage::createToolbar()
 void PreviewPage::updateToolbarIcons()
 {
     formatIcon_->setPixmap(
-        UiIcons::icon(QStringLiteral("document"), theme_.mutedText).pixmap(QSize(14, 14), devicePixelRatioF()));
+        UiIcons::icon(QStringLiteral("document"), theme_.mutedText).pixmap(formatIcon_->size(), devicePixelRatioF()));
     const std::array<QString, modeCount> names = {QStringLiteral("code"), QStringLiteral("split"),
                                                   QStringLiteral("preview")};
     for (std::size_t i = 0; i < buttons_.size(); ++i)

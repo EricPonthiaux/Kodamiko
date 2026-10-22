@@ -607,6 +607,18 @@ private slots:
         QCOMPARE(CodeRequest::mention(target), QStringLiteral("@\"my dir/a.cpp\"#L4"));
     }
 
+    void reviewPromptMentionsTheTreeEntries()
+    {
+        QTemporaryDir project;
+        QVERIFY(QDir(project.path()).mkpath(QStringLiteral("src")));
+        const QString file = project.filePath(QStringLiteral("my a.cpp"));
+
+        const QString prompt =
+            CodeRequest::reviewPrompt({project.filePath(QStringLiteral("src")), file}, project.path());
+
+        QVERIFY(prompt.startsWith(QStringLiteral("Review @src/ @\"my a.cpp\": ")));
+    }
+
     void codeRequestNeedsAFile()
     {
         EditorWidget view(Theme::dark());

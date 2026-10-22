@@ -6,6 +6,7 @@
 #include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -169,7 +170,7 @@ QFrame *PrerequisitesPopup::createCard(const Prerequisite &prerequisite)
 
     auto *icon = new QLabel(card);
     icon->setPixmap(
-        statusIcon(theme_, prerequisite.status).pixmap(QSize(statusIconSize, statusIconSize), devicePixelRatioF()));
+        statusIcon(theme_, prerequisite.status).pixmap(UiMetrics::scaledSquare(statusIconSize), devicePixelRatioF()));
     auto *name = new QLabel(prerequisite.name, card);
     AppFonts::setInterfaceFont(name, 1.0, QFont::DemiBold);
     auto *status = new QLabel(statusText(prerequisite), card);

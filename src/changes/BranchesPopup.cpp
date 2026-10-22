@@ -4,10 +4,12 @@
 
 #include "GitActions.h"
 #include "SnapshotsPopup.h"
+#include "ui/ContextMenus.h"
 #include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -73,8 +75,9 @@ public:
             painter->drawRoundedRect(row, 2, 2);
         }
 
-        // The icon, alone: 16 pixels, in the accent.
-        const QRectF tile(row.left() + 8, row.center().y() - 8, 16, 16);
+        // The icon, alone, in the accent.
+        const QSizeF iconSize = UiMetrics::scaledSquare(UiMetrics::iconSize);
+        const QRectF tile(QPointF(row.left() + 8, row.center().y() - iconSize.height() / 2), iconSize);
         UiIcons::icon(QStringLiteral("branch"), theme.accent).paint(painter, tile.toRect());
 
         // Tracking, at the right.
@@ -321,6 +324,7 @@ void BranchesPopup::rebuildList()
     bool remoteHeading = false;
     bool localHeading = false;
     int firstSelectable = -1;
+    int currentRow = -1;
     for (int i = 0; i < branches_.size(); ++i) {
         const BranchInfo &branch = branches_.at(i);
         if (!filter.isEmpty() && !branch.name.contains(filter, Qt::CaseInsensitive))
@@ -331,16 +335,21 @@ void BranchesPopup::rebuildList()
             addHeading(list_, branch.remote);
         }
         addBranch(list_, branch, i);
-        // The first branch one would switch to: not the current one.
-        if (firstSelectable < 0 && !branch.current)
+        // firstSelectable: the first branch one would switch to, not the current one.
+        if (branch.current)
+            currentRow = list_->count() - 1;
+        else if (firstSelectable < 0)
             firstSelectable = list_->count() - 1;
     }
     list_->setVisible(list_->count() > 0);
     empty_->setVisible(list_->count() == 0);
     if (list_->count() == 0 && !branches_.isEmpty())
         Paragraph::setText(empty_, tr("No branch matches \"%1\".").arg(filter));
-    if (firstSelectable >= 0)
-        list_->setCurrentRow(firstSelectable);
+    // Unfiltered, the list opens on where one is; a filter looks for a branch to go to.
+    const bool showsCurrent = filter.isEmpty() && currentRow >= 0;
+    const int row = showsCurrent ? currentRow : firstSelectable;
+    if (row >= 0)
+        list_->setCurrentRow(row);
     else if (list_->count() > 1)
         list_->setCurrentRow(1);
     updateButtons();
@@ -437,7 +446,7 @@ void BranchesPopup::showMenu(const QPoint &position)
     QAction *remove = menu.addAction(branch->remote ? tr("Delete on the Remote…") : tr("Delete"), this,
                                      &BranchesPopup::deleteSelected);
     remove->setEnabled(!branch->current);
-    menu.exec(list_->viewport()->mapToGlobal(position));
+    ContextMenus::exec(menu, *list_, list_->viewport()->mapToGlobal(position));
 }
 
 bool BranchesPopup::eventFilter(QObject *watched, QEvent *event)

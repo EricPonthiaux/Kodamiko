@@ -53,16 +53,18 @@
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
 #include "ui/DetachablePage.h"
+#include "ui/ElidingToolButton.h"
 #include "ui/GripSplitter.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/MessagePopup.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
-#include "ui/TrailingLayout.h"
 #include "ui/TrailingTabButton.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 #include "ui/WindowFrame.h"
+#include "ui/WorkspaceStatusBar.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "workspace/CommandPalette.h"
 #include "workspace/FileTreeView.h"
@@ -93,8 +95,6 @@
 
 namespace {
 
-constexpr int statusGroupSpacing = 16;
-
 QColor problemsIconColor(int errorCount, int warningCount, const Theme &theme)
 {
     if (errorCount > 0)
@@ -119,13 +119,18 @@ QList<QAction *> menuCommands(const QWidget *menu)
 } // namespace
 
 MainWindow::MainWindow(const QString &folder, QWidget *parent)
-    : QMainWindow(parent)
-    , theme_(Theme::named(savedThemeName()))
-    , agentProvider_(&AgentProviders::find(Preferences::load().defaultAgentProvider))
+    : MainWindow(folder, Preferences::load(), parent)
 {
-    Preferences::load().applyTypography(theme_);
+}
+
+MainWindow::MainWindow(const QString &folder, const Preferences &preferences, QWidget *parent)
+    : QMainWindow(parent)
+    , theme_(Theme::named(preferences.theme))
+    , agentProvider_(&AgentProviders::find(preferences.defaultAgentProvider))
+{
+    preferences.applyTypography(theme_);
     ThemeStyle::apply(theme_);
-    createWidgets();
+    createWidgets(preferences);
     createMenus();
     applyKeymap(Keymap::loadOverrides());
 
@@ -160,7 +165,7 @@ MainWindow::~MainWindow()
     delete projectSettings_;
 }
 
-void MainWindow::createWidgets()
+void MainWindow::createWidgets(const Preferences &preferences)
 {
     titleBar_ = new TitleBar(this);
     setMenuWidget(titleBar_);
@@ -168,16 +173,16 @@ void MainWindow::createWidgets()
     projectMenu_ = new QMenu(this);
 
     editorTabs_ = new EditorTabs(theme_, this);
-    editorTabs_->setEditorOptions(Preferences::load().editor);
+    editorTabs_->setEditorOptions(preferences.editor);
     connect(editorTabs_, &EditorTabs::statusMessage, this, &MainWindow::showStatus);
 
-    createCodeServices();
+    createCodeServices(preferences);
     createGitServices();
     createGitViews();
-    createCentralWidget();
+    createCentralWidget(preferences);
 }
 
-void MainWindow::createCodeServices()
+void MainWindow::createCodeServices(const Preferences &preferences)
 {
     symbolIndex_ = new SymbolIndex(this);
     occurrenceIndex_ = new OccurrenceIndex(this);
@@ -185,7 +190,7 @@ void MainWindow::createCodeServices()
 
     toolchains_ = std::make_unique<Toolchains>();
     languageServers_ = new LanguageServers(this);
-    languageServers_->setEnabled(Preferences::load().languageServers);
+    languageServers_->setEnabled(preferences.languageServers);
     connect(languageServers_, &LanguageServers::statusMessage, this, &MainWindow::showStatus);
 
     problemStore_ = new ProblemStore(languageServers_, this);
@@ -210,7 +215,7 @@ void MainWindow::createCodeServices()
     completion_->addProvider(std::make_shared<DocCommentProvider>());
     fullLineModel_ = new LocalFullLineModel(this);
     connect(fullLineModel_, &LocalFullLineModel::failed, this, &MainWindow::showStatus);
-    applyFullLine(Preferences::load());
+    applyFullLine(preferences);
     connect(editorTabs_, &EditorTabs::editorOpened, this, [this](EditorWidget *editor) {
         editor->setFileActions(editorContextActions_);
 
@@ -261,7 +266,7 @@ void MainWindow::createGitViews()
     });
 }
 
-void MainWindow::createCentralWidget()
+void MainWindow::createCentralWidget(const Preferences &preferences)
 {
     modes_ = new QStackedWidget(this);
     modes_->addWidget(createTerminalPage());
@@ -298,7 +303,7 @@ void MainWindow::createCentralWidget()
     commandPalette_ = new CommandPalette(this);
     createPopups();
 
-    FontSettings::applyTreeFont(Preferences::load().treeFont(), this);
+    FontSettings::applyTreeFont(preferences.treeFont(), this);
 
     resize(1400, 900);
 }
@@ -404,6 +409,9 @@ void MainWindow::createFilesPanel()
         refreshIndexes();
     });
     connect(fileTree_, &FileTreeView::sendToClaudeRequested, this, &MainWindow::sendToClaude);
+    connect(fileTree_, &FileTreeView::reviewRequested, this, [this](const QStringList &paths) {
+        typeInClaudePrompt(CodeRequest::reviewPrompt(paths, folder_), PromptEntry::Submitted);
+    });
     connect(fileTree_, &FileTreeView::generateDiagramRequested, this, &MainWindow::generateDiagram);
     connect(fileTree_, &FileTreeView::openTerminalRequested, this,
             [this](const QString &folder) { addTerminal(QFileInfo(folder).fileName(), defaultShell(folder)); });
@@ -668,6 +676,8 @@ void MainWindow::createModeTabs()
 
 void MainWindow::createStatusBar()
 {
+    auto *bar = new WorkspaceStatusBar(modeTabs_, this);
+    setStatusBar(bar);
     agentIndicator_ = new AgentIndicator(this);
     agentIndicator_->applyTheme(theme_);
     statusBar()->addWidget(agentIndicator_);
@@ -681,7 +691,7 @@ void MainWindow::createStatusBar()
     syncButton_->hide();
     connect(syncButton_, &QToolButton::clicked, gitActions_, &GitActions::sync);
 
-    branchButton_ = new QToolButton(this);
+    branchButton_ = new ElidingToolButton(this, 220);
     branchButton_->setObjectName(QStringLiteral("chip"));
     branchButton_->setAutoRaise(true);
     branchButton_->setFocusPolicy(Qt::NoFocus);
@@ -701,20 +711,14 @@ void MainWindow::createStatusBar()
     editorStatus_ = new EditorStatus(this);
     auto *serverTasks = new ServerTasksLabel(languageServers_, this);
 
-    auto *trailing = new QWidget(this);
-    auto *layout = new TrailingLayout(trailing);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(4);
-    layout->setGroupSpacing(statusGroupSpacing);
-    const QList<QList<QWidget *>> groups = {
-        {modeTabs_}, {syncButton_, branchButton_, cancelGitButton_}, {serverTasks}, {usageLabel_}, {editorStatus_},
-    };
-    for (const QList<QWidget *> &group : groups) {
-        layout->startGroup();
-        for (QWidget *widget : group)
-            layout->addWidget(widget);
+    bar->addGroup(tr("Language Servers"), {serverTasks});
+    bar->addGroup(tr("Agent Usage"), {usageLabel_});
+    bar->addGroup(tr("Editor"), {editorStatus_});
+    bar->addGroup(tr("Git"), {branchButton_, syncButton_, cancelGitButton_});
+    for (QToolButton *button : {syncButton_, branchButton_, cancelGitButton_}) {
+        UiMetrics::setScaledHeight(button, UiMetrics::toolbarButtonSize);
+        UiMetrics::setScaledIconSize(button);
     }
-    statusBar()->addPermanentWidget(trailing);
 }
 
 void MainWindow::restoreSettings()

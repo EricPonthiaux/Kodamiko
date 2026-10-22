@@ -12,6 +12,7 @@
 #include "toolchains/Toolchains.h"
 #include "ui/AppFonts.h"
 #include "ui/BrandMark.h"
+#include "ui/ContextMenus.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -161,7 +162,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     side->setFixedWidth(230);
     side->installEventFilter(this);
     auto *logo = new QLabel(side);
-    logo->setPixmap(BrandMark::appIcon(44, devicePixelRatioF()));
+    logo->setPixmap(BrandMark::markPixmap(44, theme_, devicePixelRatioF()));
     auto *name = new QLabel(QStringLiteral("Duet"), side);
     AppFonts::setInterfaceFont(name, 1.4);
     auto *version = new QLabel(QCoreApplication::applicationVersion(), side);
@@ -381,7 +382,7 @@ void WelcomeWindow::showContextMenu(const QPoint &position)
     menu.addAction(tr("Project Settings…"), this, [this, path] { configure(path); })->setEnabled(present);
     menu.addSeparator();
     menu.addAction(tr("Remove from List"), this, [this, item] { remove(item); });
-    menu.exec(list_->viewport()->mapToGlobal(position));
+    ContextMenus::exec(menu, *list_, list_->viewport()->mapToGlobal(position));
 }
 
 bool WelcomeWindow::eventFilter(QObject *watched, QEvent *event)

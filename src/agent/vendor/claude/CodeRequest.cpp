@@ -5,6 +5,7 @@
 #include "editor/EditorWidget.h"
 
 #include <QDir>
+#include <QFileInfo>
 
 namespace CodeRequest {
 
@@ -16,6 +17,24 @@ QString relativePath(const QString &path, const QString &projectFolder)
         return path;
     const QString relative = QDir(projectFolder).relativeFilePath(path);
     return relative.startsWith(QLatin1String("..")) ? path : relative;
+}
+
+// Claude Code ends a mention at a space: the path is quoted then.
+QString mentionedPath(const QString &path)
+{
+    const QString native = QDir::toNativeSeparators(path);
+    return native.contains(QLatin1Char(' ')) ? QStringLiteral("\"%1\"").arg(native) : native;
+}
+
+// "@src/" for a folder, "@src/main.cpp" for a file.
+QString entryMention(const QString &path, const QString &projectFolder)
+{
+    QString relative = relativePath(path, projectFolder);
+    if (relative == QLatin1String("."))
+        relative = QStringLiteral("./");
+    else if (QFileInfo(path).isDir())
+        relative += QLatin1Char('/');
+    return QLatin1Char('@') + mentionedPath(relative);
 }
 
 // What the request is about, in words: "`parse` at @a.cpp#L12" or the
@@ -70,10 +89,7 @@ std::optional<Target> targetIn(const EditorWidget &editor, const QString &projec
 
 QString mention(const Target &target)
 {
-    // Claude Code ends a mention at a space: the path is quoted then.
-    QString path = QDir::toNativeSeparators(target.path);
-    if (path.contains(QLatin1Char(' ')))
-        path = QStringLiteral("\"%1\"").arg(path);
+    const QString path = mentionedPath(target.path);
     if (target.firstLine == target.lastLine)
         return QStringLiteral("@%1#L%2").arg(path).arg(target.firstLine);
     return QStringLiteral("@%1#L%2-%3").arg(path).arg(target.firstLine).arg(target.lastLine);
@@ -98,6 +114,16 @@ QString prompt(Kind kind, const Target &target)
         break;
     }
     return request.arg(subject(target)) + unsavedNote(target);
+}
+
+QString reviewPrompt(const QStringList &paths, const QString &projectFolder)
+{
+    QStringList mentions;
+    for (const QString &path : paths)
+        mentions.append(entryMention(path, projectFolder));
+    return QStringLiteral("Review %1: point out problems with their file and line, then propose fixes, applying "
+                          "nothing until I agree.")
+        .arg(mentions.join(QLatin1Char(' ')));
 }
 
 } // namespace CodeRequest

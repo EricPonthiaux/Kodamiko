@@ -12,7 +12,7 @@
 // a Node, a Python, a C++ standard) and the language server that completes
 // it, both chosen when the project is imported.
 struct LanguageSetup {
-    QString language; // a family of ProjectLanguages: "cpp", "java", "javascript", "python"
+    QString language; // a family of ProjectLanguages: "java", "javascript", "cpp", "python"
     bool enabled = true;
     // "17" (JDK), "24" (Node), "3.12" (Python), "c++20" (C++ standard).
     QString runtimeVersion;
@@ -50,7 +50,8 @@ struct ProjectConfig {
     // The ids of the recipes attached to its enabled languages, in their
     // order.
     QStringList recipes() const;
-    // The setup of `family`, if the project has one.
+    // The setup of `family`, if the project has one; valid until `languages`
+    // changes.
     const LanguageSetup *language(const QString &family) const;
     LanguageSetup *language(const QString &family);
 
@@ -64,7 +65,8 @@ namespace ProjectLanguages {
 
 constexpr const char *systemVersion = "system";
 
-// "cpp", "java", "javascript", "python".
+// "java", "javascript", "cpp", "python", in the order the project setup
+// shows them.
 QStringList families();
 // The family of a LanguageRegistry identifier ("tsx" → "javascript");
 // empty for the others.

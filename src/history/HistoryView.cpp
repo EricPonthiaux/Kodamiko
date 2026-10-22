@@ -8,6 +8,7 @@
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "ui/AppFonts.h"
+#include "ui/ContextMenus.h"
 #include "ui/FoldedPane.h"
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
@@ -467,7 +468,7 @@ void HistoryView::showCommitMenu(const QPoint &position)
                    [summary = commit.summary] { QApplication::clipboard()->setText(summary); });
     menu.addSeparator();
     menu.addAction(tr("Check Out This Commit…"), this, [this, id = commit.shortId] { emit checkoutRequested(id); });
-    menu.exec(commits_->viewport()->mapToGlobal(position));
+    ContextMenus::exec(menu, *commits_, commits_->viewport()->mapToGlobal(position));
 }
 
 void HistoryView::focusFilter()

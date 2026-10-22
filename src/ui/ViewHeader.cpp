@@ -14,7 +14,6 @@ namespace {
 
 // The Files pane's buttons.
 constexpr QSize buttonSize(26, 24);
-constexpr int iconSize = 16;
 
 } // namespace
 
@@ -45,8 +44,8 @@ QToolButton *ViewHeader::addButton(const QString &iconName, const QString &toolT
     button->setAutoRaise(true);
     button->setFocusPolicy(Qt::NoFocus);
     button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    button->setIconSize(QSize(iconSize, iconSize));
-    button->setFixedSize(buttonSize);
+    UiMetrics::setScaledIconSize(button);
+    UiMetrics::setScaledSize(button, buttonSize);
     layout_->addWidget(button);
     buttons_.append({button, iconName});
     return button;

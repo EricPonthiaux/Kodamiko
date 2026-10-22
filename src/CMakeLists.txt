@@ -215,7 +215,9 @@ add_library(duet_core STATIC
     ui/AppFonts.cpp
     ui/BrandMark.cpp
     ui/ClickableCursors.cpp
+    ui/ContextMenus.cpp
     ui/DetachablePage.cpp
+    ui/ElidingToolButton.cpp
     ui/FileIcons.cpp
     ui/FoldedPane.cpp
     ui/GripSplitter.cpp
@@ -245,6 +247,7 @@ add_library(duet_core STATIC
     ui/WindowControls.cpp
     ui/WindowFrame.cpp
     ui/WindowTitleBar.cpp
+    ui/WorkspaceStatusBar.cpp
     viewers/DiagramKinds.cpp
     viewers/ImageView.cpp
     welcome/LanguageChoices.cpp

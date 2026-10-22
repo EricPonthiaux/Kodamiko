@@ -67,8 +67,8 @@ FilesPanel::FilesPanel(QWidget *parent)
         button->setAutoRaise(true);
         button->setFocusPolicy(Qt::NoFocus);
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-        button->setIconSize(QSize(16, 16));
-        button->setFixedSize(26, 24);
+        UiMetrics::setScaledIconSize(button);
+        UiMetrics::setScaledSize(button, QSize(26, 24));
         return button;
     };
     select_ = addButton(tr("Select Opened File (Alt+F1)"));

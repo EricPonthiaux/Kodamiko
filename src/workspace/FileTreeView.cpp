@@ -7,6 +7,7 @@
 #include "FileOperations.h"
 #include "LastCommits.h"
 #include "ProjectTreeModel.h"
+#include "ui/ContextMenus.h"
 #include "ui/FileIcons.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/TreeMetrics.h"
@@ -385,21 +386,14 @@ void FileTreeView::showContextMenu(const QPoint &position)
     const QString clicked = index.isValid() ? pathOf(index) : rootPath_;
     const QStringList targets = index.isValid() ? selectedPaths() : QStringList{rootPath_};
 
+    // Creating is offered on a folder, or on the empty area for the root, never on a file.
+    const bool isOnFolder = !index.isValid() || model_->isDir(proxy_->mapToSource(index));
+
     QMenu menu;
-    menu.addAction(tr("New &File…"), this, [this, folder] { createEntry(folder, false); });
-    menu.addAction(tr("New F&older…"), this, [this, folder] { createEntry(folder, true); });
-    if (const QList<DiagramKind> kinds = DiagramKinds::available(); !kinds.isEmpty()) {
-        QMenu *diagram = menu.addMenu(tr("New &Diagram"));
-        for (const DiagramKind &kind : kinds)
-            diagram->addAction(kind.title + QStringLiteral("…"), this,
-                               [this, folder, id = kind.id] { createDiagramIn(folder, id); });
-        if (canDrawDiagrams_) {
-            diagram->addSeparator();
-            diagram->addAction(tr("Drawn by &%1…").arg(agentName_), this,
-                               [this, folder] { emit generateDiagramRequested(folder); });
-        }
+    if (isOnFolder) {
+        addCreationActions(&menu, folder);
+        menu.addSeparator();
     }
-    menu.addSeparator();
     addEntryActions(&menu, index);
 
     menu.addSeparator();
@@ -414,12 +408,31 @@ void FileTreeView::showContextMenu(const QPoint &position)
         for (const QString &target : targets)
             emit sendToClaudeRequested(target);
     });
+    menu.addAction(tr("Re&view With %1").arg(agentName_), this, [this, targets] { emit reviewRequested(targets); });
     QMenu *open = menu.addMenu(tr("Open &In"));
     open->addAction(tr("&Terminal"), this, [this, folder] { emit openTerminalRequested(folder); });
     open->addAction(tr("&File Manager"), this, [folder] { QDesktopServices::openUrl(QUrl::fromLocalFile(folder)); });
     if (inRepository_)
         addGitMenu(&menu, clicked, targets);
-    menu.exec(viewport()->mapToGlobal(position));
+    ContextMenus::exec(menu, *this, viewport()->mapToGlobal(position));
+}
+
+void FileTreeView::addCreationActions(QMenu *menu, const QString &folder)
+{
+    menu->addAction(tr("New &File…"), this, [this, folder] { createEntry(folder, false); });
+    menu->addAction(tr("New F&older…"), this, [this, folder] { createEntry(folder, true); });
+    const QList<DiagramKind> kinds = DiagramKinds::available();
+    if (kinds.isEmpty())
+        return;
+    QMenu *diagram = menu->addMenu(tr("New &Diagram"));
+    for (const DiagramKind &kind : kinds)
+        diagram->addAction(kind.title + QStringLiteral("…"), this,
+                           [this, folder, id = kind.id] { createDiagramIn(folder, id); });
+    if (!canDrawDiagrams_)
+        return;
+    diagram->addSeparator();
+    diagram->addAction(tr("Drawn by &%1…").arg(agentName_), this,
+                       [this, folder] { emit generateDiagramRequested(folder); });
 }
 
 // Clipboard, undo, rename and delete.
@@ -437,7 +450,7 @@ void FileTreeView::addEntryActions(QMenu *menu, const QModelIndex &index)
         return;
     menu->addSeparator();
     if (selection.size() == 1) {
-        menu->addAction(tr("Cop&y…"), QKeySequence(Qt::Key_F5), this, &FileTreeView::duplicateCurrent);
+        menu->addAction(tr("D&uplicate…"), QKeySequence(Qt::Key_F5), this, &FileTreeView::duplicateCurrent);
         const QString &path = selection.first();
         menu->addAction(tr("&Rename…"), QKeySequence(Qt::Key_F2), this, [this, path] { renameEntry(path); });
     }
@@ -1396,7 +1409,7 @@ void FileTreeView::duplicateCurrent()
     const bool isFolder = info.isDir() && !info.isSymLink();
     const QString relative = QDir(QFileInfo(rootPath_).absolutePath()).relativeFilePath(info.absolutePath());
     auto *popup = new NamePopup(
-        isFolder ? tr("Copy Folder") : tr("Copy File"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
+        isFolder ? tr("Duplicate Folder") : tr("Duplicate File"), QDir::toNativeSeparators(relative + QLatin1Char('/')),
         [this, path](const QString &name) {
             const EntryTarget target = resolveRename(path, name);
             if (!target.error.isEmpty())

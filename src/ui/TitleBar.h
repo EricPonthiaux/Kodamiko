@@ -9,20 +9,25 @@
 #include <QPointer>
 #include <QWidget>
 
+#include <initializer_list>
+
+class ElidingToolButton;
 class QFrame;
 class QHBoxLayout;
 class QLabel;
 class QMenu;
 class QMenuBar;
+class QSpacerItem;
 class QTabBar;
 class QToolButton;
 
-// Duet's own title bar, in the manner of IntelliJ's main toolbar: the
-// menu, the project (with the recent folders),
-// the run block (the configuration and its Run or Stop button, on a tinted
-// background), the search actions, and the window controls, in groups set
-// apart. Its controls share one height. Dragging its empty parts moves the
-// window, a double-click maximizes it.
+// Duet's own title bar, in the manner of IntelliJ's main toolbar: the menu
+// at the left; in the middle, the project (with the recent folders) and the
+// run block (the configuration and its Run or Stop button, on a tinted
+// background); at the right, the search actions, then a divider and the
+// window controls. The middle group stays centered on the bar while the room
+// allows it. Its controls share one height. Dragging its empty parts moves
+// the window, a double-click maximizes it.
 class TitleBar : public QWidget {
     Q_OBJECT
 
@@ -64,6 +69,8 @@ public:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 protected:
+    bool event(QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
@@ -76,7 +83,7 @@ private:
         int inset = 0; // smaller by this, inside the run block
     };
 
-    QToolButton *addChip();
+    ElidingToolButton *addChip();
     QFrame *createRunBlock();
     // `color` defaults to the theme's foreground.
     QToolButton *actionButton(QAction *action, const QString &iconName, const QColor &color = {});
@@ -84,23 +91,41 @@ private:
     void applyMetrics();
     void sizeActionButton(const ActionButton &entry);
     void updateLogoAlignment();
+    void updateResponsiveLayout();
+    // Sizes the balances so that the project and the run block sit in the
+    // middle of the bar, as far as the room left allows.
+    void centerProjectGroup();
+    // The width of the visible `widgets`, each with the gap after it.
+    int sideWidth(std::initializer_list<const QWidget *> widgets) const;
+    // The run block's width with its configuration at its bounded width.
+    int boundedRunBlockWidth() const;
+    void rebuildCompactMenu();
+    void scheduleLayout();
 
     Theme theme_;
     QHBoxLayout *layout_;
+    QSpacerItem *leftBalance_;  // owned by layout_
+    QSpacerItem *rightBalance_; // owned by layout_
     QWidget *leadingSpace_;
     QWidget *logo_;
     QPointer<QTabBar> logoColumn_;
     QMenuBar *menuBar_;
-    QToolButton *project_;
+    QToolButton *menuButton_;
+    QMenu *compactMenu_;
+    ElidingToolButton *project_;
     QFrame *runBlock_ = nullptr;
-    QToolButton *run_ = nullptr;
+    ElidingToolButton *run_ = nullptr;
     QFrame *runDivider_ = nullptr;
     QHBoxLayout *runActions_ = nullptr;
     QToolButton *runButton_ = nullptr;
     QToolButton *stopButton_ = nullptr;
     bool running_ = false;
     QHBoxLayout *actions_;
+    QWidget *actionGroup_;
+    QList<QAction *> secondaryActions_;
+    bool layoutScheduled_ = false;
 
     QList<ActionButton> actionButtons_;
+    QFrame *controlsDivider_;
     WindowControls *controls_;
 };

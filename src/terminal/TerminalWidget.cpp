@@ -5,6 +5,7 @@
 #include "IPty.h"
 #include "VtScreen.h"
 #include "settings/Preferences.h"
+#include "ui/ContextMenus.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
@@ -646,7 +647,7 @@ void TerminalWidget::contextMenuEvent(QContextMenuEvent *event)
     copy->setEnabled(!selectedText().isEmpty());
     QAction *paste = menu.addAction(tr("Paste"), this, &TerminalWidget::pasteClipboard);
     paste->setEnabled(!QApplication::clipboard()->text().isEmpty());
-    menu.exec(event->globalPos());
+    ContextMenus::exec(menu, *this, event->globalPos());
 }
 
 void TerminalWidget::focusInEvent(QFocusEvent *event)

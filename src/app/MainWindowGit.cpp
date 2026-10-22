@@ -228,7 +228,7 @@ void MainWindow::updateRepositoryInfo()
                        .arg(info->upstream)
                        .arg(info->ahead)
                        .arg(info->behind);
-    branchButton_->setToolTip(tooltip + tr("\nClick for the branches (Ctrl+Alt+B)"));
+    branchButton_->setToolTip(text + QLatin1Char('\n') + tooltip + tr("\nClick for the branches (Ctrl+Alt+B)"));
     branchButton_->show();
 
     syncButton_->setVisible(!info->detached && !info->unborn);

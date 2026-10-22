@@ -45,6 +45,7 @@ void WindowTitleBar::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     controls_->applyTheme(theme);
+    updateIcon();
     update();
 }
 
@@ -52,7 +53,7 @@ void WindowTitleBar::updateIcon()
 {
     // The size of the main title bar's logo.
     const int size = UiMetrics::scaled(UiMetrics::toolbarButtonSize);
-    icon_->setPixmap(BrandMark::appIcon(size, devicePixelRatioF()));
+    icon_->setPixmap(BrandMark::markPixmap(size, theme_, devicePixelRatioF()));
     icon_->setFixedSize(size, size);
 }
 
