@@ -426,6 +426,41 @@ private slots:
         QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("reworded\n"));
     }
 
+    void commitWithoutAnIdentityAsksForOneThenSucceedsOnceItIsSet()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"a.txt", "a\n"}});
+        // No identity from the environment nor guessed from the machine.
+        git(project, {"config", "user.useConfigOnly", "true"});
+        const QList<QByteArray> identityVariables = {"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME",
+                                                     "GIT_COMMITTER_EMAIL"};
+        for (const QByteArray &variable : identityVariables)
+            qunsetenv(variable.constData());
+        const auto restoreIdentity = qScopeGuard([&identityVariables] {
+            for (const QByteArray &variable : identityVariables)
+                qputenv(variable.constData(), variable.endsWith("EMAIL") ? "t@t" : "t");
+        });
+        write(project, "a.txt", "b\n");
+        const RepositoryInfo info = *RepositoryInfo::read(project.path());
+        GitOperations::stage(info, {"a.txt"});
+
+        try {
+            GitOperations::commit(info, "message", false);
+            QFAIL("git should not know who commits");
+        } catch (const GitError &error) {
+            QCOMPARE(error.kind(), GitError::Kind::NoIdentity);
+        }
+        GitOperations::setIdentity(info, {.name = "Ada", .email = "ada@example.com"},
+                                   GitOperations::ConfigScope::Repository);
+        GitOperations::commit(info, "message", false);
+
+        const GitOperations::Identity identity = GitOperations::identity(info);
+        QCOMPARE(identity.name, QString("Ada"));
+        QCOMPARE(identity.email, QString("ada@example.com"));
+        QCOMPARE(QString::fromUtf8(git(project, {"log", "-1", "--format=%an <%ae>"})).trimmed(),
+                 QString("Ada <ada@example.com>"));
+    }
+
 #ifdef _MSC_VER
 // C4702: on Windows the QSKIP returns, so cl calls the rest of the test unreachable.
 #pragma warning(push)

@@ -1,5 +1,5 @@
 #include "Counter.h"
-#include "counter.h"
+#include "counters.h"
 
 int Counter::instances = 0;
 

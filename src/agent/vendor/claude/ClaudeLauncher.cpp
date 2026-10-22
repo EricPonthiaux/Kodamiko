@@ -61,6 +61,8 @@ const QStringList inheritedSessionVariables{
     QStringLiteral("CLAUDE_CODE_SESSION_ATTENDED"),
     QStringLiteral("CLAUDE_CODE_MESSAGING_SOCKET"),
     QStringLiteral("CLAUDE_CODE_MESSAGING_TOKEN"),
+    QStringLiteral("CLAUDE_EFFORT"),
+    QStringLiteral("AI_AGENT"),
 };
 
 void removeInheritedSessionVariables(QProcessEnvironment &environment)
