@@ -4,6 +4,7 @@
 #include "editor/PreviewSite.h"
 #include "git/LibGit2.h"
 #include "projects/ProjectConfig.h"
+#include "projects/ProjectWindowServer.h"
 #include "settings/Preferences.h"
 #include "toolchains/Toolchains.h"
 #include "ui/BrandMark.h"
@@ -163,7 +164,8 @@ void showWelcome()
     auto *welcome = new WelcomeWindow;
     welcome->setAttribute(Qt::WA_DeleteOnClose);
     QObject::connect(welcome, &WelcomeWindow::projectChosen, welcome, [welcome](const ProjectConfig &project) {
-        openProject(project.path);
+        if (!ProjectWindows::raise(project.path))
+            openProject(project.path);
         welcome->close();
     });
     welcome->show();
@@ -203,9 +205,14 @@ int main(int argc, char *argv[])
     parser.process(app);
 
     const QStringList arguments = parser.positionalArguments();
-    if (arguments.isEmpty())
+    if (arguments.isEmpty()) {
         showWelcome();
-    else
-        openProject(QDir(arguments.first()).absolutePath());
+        return QApplication::exec();
+    }
+    const QString folder = QDir(arguments.first()).absolutePath();
+    // Already open in another process: its window comes forward instead.
+    if (ProjectWindows::raise(folder))
+        return 0;
+    openProject(folder);
     return QApplication::exec();
 }

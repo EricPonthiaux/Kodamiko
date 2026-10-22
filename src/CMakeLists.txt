@@ -173,6 +173,7 @@ add_library(duet_core STATIC
     projects/ProjectConfig.cpp
     projects/ProjectDetector.cpp
     projects/ProjectStore.cpp
+    projects/ProjectWindowServer.cpp
     recipes/DeveloperEnvironment.cpp
     recipes/ProjectCreation.cpp
     recipes/Recipe.cpp

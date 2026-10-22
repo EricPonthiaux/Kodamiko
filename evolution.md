@@ -112,3 +112,88 @@ again.
   the places the server returns (not overrides).
 - The "new name already declared" conflict is checked per file, not per
   scope.
+
+## Trust: in the project, the editor, Claude and the code
+
+Goal: the user can open any folder, let Claude work and commit without
+fear: nothing from an unknown folder runs on its own, no work is ever
+lost, everything Claude did is visible and reversible, and the state of
+the code is known before the commit.
+
+Design: Duet already has the pieces (git snapshots before each prompt,
+atomic saves, confirmations for the sensitive MCP tools, problems,
+builds, format on save); the work is to close the holes between them and
+to show what they know. Rules: a folder is restricted until the user
+trusts it; every write by Claude goes through a confirmation, a preview
+or a snapshot; a loss of work is a bug.
+
+### Step 0: close the holes — to do
+
+- Folder trust: a folder opens restricted until the user trusts it (once
+  per folder, remembered); restricted, Duet runs nothing that comes from
+  it: no `node_modules/.bin/prettier` (`editor/CodeFormatter.cpp`), no
+  venv `python` given to pyright or pylsp, no Gradle or Maven import by
+  jdtls, no `.duet/recipes/` override, no `statusLine` command from
+  `.claude/settings*.json` run by `duet-hook`. Claude does not start on
+  its own in an untrusted folder, nor in `$HOME`.
+- `run_command` refuses the Git menu's actions and the Claude menu's
+  settings (Snapshot Before Each Prompt, Expose Duet's Tools); today only
+  Quit, Exit, Session, Restart and Close All are refused
+  (`agent/mcp/WorkspaceTools.cpp`).
+- `rename_file` asks for confirmation, as the sensitive tools do.
+- After "Keep My Changes", saving over a file changed on disk asks again
+  instead of overwriting it silently.
+- A file deleted on disk marks its tab modified, so that closing it asks
+  before its content is lost.
+
+### Step 1: never lose work — to do
+
+- Unsaved buffers are copied to the cache folder a few seconds after each
+  change, and offered back after a crash or a kill.
+- Local history: each save of a file is kept (size- and age-capped),
+  with or without git, and compared or restored from the file's menu.
+- Closing the window warns when Claude is answering or a run, a build or
+  a terminal command is still going.
+- A snapshot before dropping a stash, amending a commit or deleting a
+  worktree with its changes.
+- The session's tab list is saved as it changes, not only on close.
+
+### Step 2: see what Claude did — to do
+
+- A journal per turn: the prompt, the files changed, the commands run
+  (`PostToolUse` on Bash keeps the command), the permissions asked and
+  the answers.
+- The diff of a turn and of any snapshot; Restore a Snapshot shows it
+  before restoring.
+- The lines Claude changed in the last turn are marked in the gutter
+  until the user reviews them.
+- Undo a turn file by file, from its diff.
+- A worktree agent's work is merged after the user approves its diff,
+  not on its own at the end of each response.
+
+### Step 3: the health of the code — to do
+
+- The files Claude changes are sent to their language server even when
+  closed, so their problems reach the Problems pane and the tree.
+- A permanent indicator: errors, the last build and the last tests, with
+  the commit they ran on.
+- The commit panel shows the problems of the staged files, a failed
+  build or tests, and unformatted files, before the commit.
+- The check command of Check Before Merging Agents can also run after
+  each turn of the main session, and its failure goes back to Claude.
+
+### Step 4: tests — to do
+
+- The tests of CTest, pytest, Jest, Cargo, Go and Maven listed in a
+  pane, run one, a file or all, with a result per test.
+- Run the tests affected by the current changes.
+
+### Known risks, not planned
+
+- The hook socket (`agent/HookServer.cpp`) is reachable by any process of
+  the user that knows its name (given to Claude's children through
+  `DUET_SOCKET`); it has no token.
+- The HTML preview runs the page's JavaScript; the Markdown preview loads
+  remote images.
+- Snapshots run the git binary, which honours the repository's
+  `core.fsmonitor`, filters and hooks.

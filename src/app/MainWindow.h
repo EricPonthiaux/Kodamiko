@@ -12,6 +12,7 @@
 #include "agent/vendor/claude/CodeRequest.h"
 #include "navigation/RecentFiles.h"
 #include "projects/ProjectConfig.h"
+#include "projects/ProjectWindowServer.h"
 #include "recipes/Recipe.h"
 #include "settings/Keymap.h"
 #include "terminal/ProcessSpec.h"
@@ -211,6 +212,9 @@ private:
     void openProjectHere(const QString &folder, AfterOpening after);
     // Starts another Duet process on `folder`; tells the user if it fails.
     void openProjectInNewWindow(const QString &folder);
+    // Another Duet process opened this window's project: it comes forward,
+    // restored if minimized.
+    void bringToFront();
     // What opening another project in this window would stop; may be empty.
     QString projectSwitchCost(bool hasAgentWork) const;
     // Open files and expanded tree, remembered per working folder.
@@ -447,6 +451,8 @@ private:
     // The project's agent, never null. Not owned (see AgentProviders).
     const AgentProvider *agentProvider_ = nullptr;
     HookServer hookServer_;
+    // Finds this window for the processes opening its project.
+    ProjectWindowServer projectWindowServer_;
     // What the editor's MCP server offers Claude (see DuetTools).
     McpRegistry mcpRegistry_;
     AgentActivity agentActivity_;

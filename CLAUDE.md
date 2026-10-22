@@ -1,6 +1,6 @@
 # CLAUDE.md — Duet
 
-Duet is a Qt 6 / C++20 code editor built around a Claude Code session. This
+Duet is a Qt 6 / C++23 code editor built around a Claude Code session. This
 file holds the project's conventions. One goal: **code that a human
 understands quickly, changes without fear, and reviews without fatigue.**
 Every rule below reduces *cognitive complexity*: the number of things a reader

@@ -22,7 +22,6 @@
 #include "git/Integration.h"
 #include "git/RepositoryWatcher.h"
 #include "history/HistoryView.h"
-#include "navigation/SymbolIndex.h"
 #include "ui/TitleBar.h"
 #include "workspace/ChoicePopup.h"
 #include "workspace/EntryPopups.h"

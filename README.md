@@ -1,10 +1,10 @@
 # Duet
 
-**Duet is a code editor built around a Claude Code session.** You write code
-on one side, Claude works on the other, and the editor keeps both in sync:
-Claude sees what you see, and you see what Claude changes.
+**Duet is a full-featured code editor built around a Claude Code session.** You
+write code on one side, Claude works on the other, and the editor keeps both in
+sync: Claude sees what you see, and you see what Claude changes.
 
-It is open source (GPL v3), written in C++20 with Qt 6, and runs on Linux,
+It is open source (GPL v3), written in C++23 with Qt 6, and runs on Linux,
 Windows and macOS.
 
 ## Why Duet
@@ -36,7 +36,8 @@ Windows and macOS.
 ## Getting started
 
 Requirements: **Qt 6.10+** (Widgets, Network, PrintSupport, Test, WebEngine),
-CMake 3.24+, Ninja and a C++20 compiler (GCC 11+, Clang 14+ or MSVC 2022).
+CMake 3.24+, Ninja and a C++23 compiler (GCC 13+, Clang 17+, Apple Clang 16+
+or MSVC 2022).
 The other dependencies (QScintilla, tree-sitter, libvterm, libgit2,
 cmark-gfm) are downloaded and built automatically on the first
 configuration. [Graphviz](https://graphviz.org) (`libgraphviz-dev`,

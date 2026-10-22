@@ -370,7 +370,7 @@ void TitleBar::centerProjectGroup()
         center += layout_->spacing() + runBlock_->sizeHint().width();
     // Off center rather than over its neighbors, or without room to drag.
     const int room = width() - left - center - right - UiMetrics::scaled(dragSpace);
-    const int balance = qBound(0, qAbs(left - right), room);
+    const int balance = qBound(0, qAbs(left - right), qMax(room, 0));
     const int leftBalance = right > left ? balance : 0;
     const int rightBalance = left > right ? balance : 0;
     // Only on a change: invalidating the layout schedules this again.

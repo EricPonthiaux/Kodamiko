@@ -4,6 +4,7 @@
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
 #include "projects/ProjectStore.h"
+#include "projects/ProjectWindowServer.h"
 #include "recipes/RecipeLibrary.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Installer.h"
@@ -1091,6 +1092,41 @@ private slots:
         QVERIFY(QFileInfo(dir.filePath("demo")).isDir());
         QVERIFY(!QFileInfo::exists(dir.filePath("demo/.git")));
         QVERIFY(window.findChild<ProjectSetupPanel *>()->isVisibleTo(&window));
+    }
+
+    void raisesTheWindowThatHasTheProjectOpen()
+    {
+        const QTemporaryDir project;
+        ProjectWindowServer server;
+        QVERIFY(server.listen(project.path()));
+        QSignalSpy raised(&server, &ProjectWindowServer::raiseRequested);
+
+        QVERIFY(ProjectWindows::raise(project.path() + "/"));
+
+        QVERIFY(raised.wait());
+    }
+
+    void findsNoWindowForAProjectNotOpen()
+    {
+        const QTemporaryDir open;
+        const QTemporaryDir notOpen;
+        ProjectWindowServer server;
+        QVERIFY(server.listen(open.path()));
+
+        QVERIFY(!ProjectWindows::raise(notOpen.path()));
+    }
+
+    void stopsAnsweringForTheProjectItLeft()
+    {
+        const QTemporaryDir first;
+        const QTemporaryDir second;
+        ProjectWindowServer server;
+        QVERIFY(server.listen(first.path()));
+
+        QVERIFY(server.listen(second.path()));
+
+        QVERIFY(!ProjectWindows::raise(first.path()));
+        QVERIFY(ProjectWindows::raise(second.path()));
     }
 
     // Downloads for real: DUET_NETWORK_TESTS=1.

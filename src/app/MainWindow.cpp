@@ -137,6 +137,7 @@ MainWindow::MainWindow(const QString &folder, const Preferences &preferences, QW
     terminalWindow_->setWindowActions(menuCommands(titleBar_->menuBar()));
     restoreSettings();
     connect(&hookServer_, &HookServer::hookReceived, this, &MainWindow::onHookReceived);
+    connect(&projectWindowServer_, &ProjectWindowServer::raiseRequested, this, &MainWindow::bringToFront);
     registerMcpTools();
     connect(&agentActivity_, &AgentActivity::stateChanged, this, &MainWindow::updateAgentIndicator);
     connect(&agentActivity_, &AgentActivity::attentionRequested, this, &MainWindow::notify);

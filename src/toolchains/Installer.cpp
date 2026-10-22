@@ -363,8 +363,8 @@ void Installer::installNpm()
                     fail(tr("npm failed: %1").arg(output.section(QLatin1Char('\n'), -3)));
                     return;
                 }
-                const InstallStep &step = steps_.at(index_);
-                complete(content, toolchains_->installFolder(step.tool, step.version));
+                const InstallStep &installed = steps_.at(index_);
+                complete(content, toolchains_->installFolder(installed.tool, installed.version));
             });
     connect(process, &QProcess::errorOccurred, this, [this, process, generation](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart || generation != generation_)

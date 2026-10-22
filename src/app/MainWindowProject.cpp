@@ -56,6 +56,7 @@ void MainWindow::openFolder(const QString &folder)
     }
     const QString previousFolder = folder_;
     folder_ = QDir(folder).absolutePath();
+    projectWindowServer_.listen(folder_); // if it fails, only the other processes do not see the project open
     setAgentProvider(projectAgentProvider());
     fileTree_->setRootPath(folder_);
     editorTabs_->setProjectFolder(folder_);
@@ -159,6 +160,10 @@ void MainWindow::askToOpenProject(const QString &folder, AfterOpening after)
         return;
     }
     const QString name = QFileInfo(folder).fileName();
+    if (ProjectWindows::raise(folder)) {
+        showStatus(tr("%1 is already open in another window").arg(name));
+        return;
+    }
     // The agents' worktrees belong to the current project: it stays open
     // until they are closed and merged (Close Project).
     const bool hasAgentWork = !agentSessions_.isEmpty() || agentMerges_->isMerging();
@@ -214,6 +219,14 @@ void MainWindow::openProjectInNewWindow(const QString &folder)
                 .message = tr("Duet could not start a new window: %1 did not run.").arg(program),
                 .details = {}},
                this);
+}
+
+void MainWindow::bringToFront()
+{
+    setWindowState(windowState() & ~Qt::WindowMinimized);
+    show();
+    raise();
+    activateWindow();
 }
 
 void MainWindow::showNewProject()
