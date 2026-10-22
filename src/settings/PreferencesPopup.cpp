@@ -4,6 +4,7 @@
 
 #include "TerminalPreferencesPage.h"
 #include "ui/AppFonts.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
 
@@ -38,9 +39,9 @@ constexpr int commandIndexRole = Qt::UserRole;
 
 QLabel *mutedLabel(const QString &text, const char *objectName = "pageDescription")
 {
-    auto *label = new QLabel(text);
+    auto *label = new QLabel;
     label->setObjectName(QLatin1String(objectName));
-    label->setWordWrap(true);
+    Paragraph::setText(label, text);
     return label;
 }
 
@@ -187,7 +188,8 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
 
     auto *footer = new QFrame(this);
     footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = mutedLabel(tr("Changes apply with OK or Apply · Esc to close"), "footerHint");
+    auto *hint = new QLabel(tr("Changes apply with OK or Apply · Esc to close"), footer);
+    hint->setObjectName(QStringLiteral("footerHint"));
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     auto *apply = new QPushButton(tr("Apply"), footer);
     auto *ok = new QPushButton(tr("OK"), footer);
@@ -374,9 +376,8 @@ QWidget *PreferencesPopup::createFontsPage()
     const QStringList sources = fillFontFamilies(fontFamily_);
     fontSources_ = new QLabel;
     fontSources_->setObjectName(QStringLiteral("settingsDescription"));
-    fontSources_->setWordWrap(true);
     fontSources_->setOpenExternalLinks(true);
-    fontSources_->setText(tr("Recommended, to install: %1.").arg(sources.join(QStringLiteral(", "))));
+    Paragraph::setHtml(fontSources_, tr("Recommended, to install: %1.").arg(sources.join(QStringLiteral(", "))));
     fontSources_->setVisible(!sources.isEmpty());
     fontSize_ = new QSpinBox;
     fontSize_->setRange(Preferences::minimumFontSize, Preferences::maximumFontSize);
@@ -663,8 +664,8 @@ void PreferencesPopup::applyTheme(const Theme &theme)
 
 void PreferencesPopup::setInstalledServers(const QStringList &names)
 {
-    serversFound_->setText(names.isEmpty() ? tr("No language server found on this machine.")
-                                           : tr("Found: %1.").arg(names.join(QStringLiteral(", "))));
+    Paragraph::setText(serversFound_, names.isEmpty() ? tr("No language server found on this machine.")
+                                                      : tr("Found: %1.").arg(names.join(QStringLiteral(", "))));
 }
 
 void PreferencesPopup::updateFontPreview()
@@ -887,7 +888,7 @@ void PreferencesPopup::setShortcuts(const Keymap::Command &command, const QList<
 
 void PreferencesPopup::setNote(const QString &text)
 {
-    keymapNote_->setText(text);
+    Paragraph::setText(keymapNote_, text);
     keymapNote_->setVisible(!text.isEmpty());
 }
 

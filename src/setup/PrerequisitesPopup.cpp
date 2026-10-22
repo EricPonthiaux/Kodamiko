@@ -3,6 +3,7 @@
 #include "PrerequisitesPopup.h"
 
 #include "ui/AppFonts.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
 
@@ -87,11 +88,10 @@ PrerequisitesPopup::PrerequisitesPopup(const Theme &theme, QWidget *parent)
     // The footer.
     auto *footer = new QFrame(this);
     footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Installations run in a terminal tab, where you can follow them and answer their "
-                               "questions."),
-                            footer);
+    auto *hint = new QLabel(footer);
     hint->setObjectName(QStringLiteral("footerHint"));
-    hint->setWordWrap(true);
+    Paragraph::setText(hint, tr("Installations run in a terminal tab, where you can follow them and answer their "
+                                "questions."));
     auto *checkAgain = new QPushButton(tr("Check Again"), footer);
     auto *close = new QPushButton(tr("Close"), footer);
     close->setDefault(true);
@@ -183,9 +183,9 @@ QFrame *PrerequisitesPopup::createCard(const Prerequisite &prerequisite)
     title->addWidget(status, 1);
     cardLayout->addLayout(title);
 
-    auto *purpose = new QLabel(prerequisite.purpose, card);
+    auto *purpose = new QLabel(card);
     purpose->setObjectName(QStringLiteral("settingsDescription"));
-    purpose->setWordWrap(true);
+    Paragraph::setText(purpose, prerequisite.purpose);
     cardLayout->addWidget(purpose);
 
     if (prerequisite.status == Prerequisite::Status::Ok)

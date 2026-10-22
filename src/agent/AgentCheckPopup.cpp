@@ -2,6 +2,7 @@
 
 #include "AgentCheckPopup.h"
 
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -22,13 +23,12 @@ AgentCheckPopup::AgentCheckPopup(const Theme &theme, QWidget *parent)
     command_->setObjectName(QStringLiteral("agentCheckCommand"));
     command_->setPlaceholderText(tr("No check"));
     connect(command_, &QLineEdit::returnPressed, this, &AgentCheckPopup::save);
-    auto *description =
-        new QLabel(tr("Run in an agent's worktree once its commits are replayed on the current branch; if it "
-                      "fails, the agent is told to fix it. Empty: its commits are merged without a check.\n"
-                      "Example: cmake -B build && cmake --build build && ctest --test-dir build"),
-                   this);
+    auto *description = new QLabel(this);
     description->setObjectName(QStringLiteral("settingsDescription"));
-    description->setWordWrap(true);
+    Paragraph::setText(description,
+                       tr("Run in an agent's worktree once its commits are replayed on the current branch; if it "
+                          "fails, the agent is told to fix it. Empty: its commits are merged without a check.\n"
+                          "Example: cmake -B build && cmake --build build && ctest --test-dir build"));
     description->setTextInteractionFlags(Qt::TextSelectableByMouse);
     auto *commandBlock = new QWidget(this);
     auto *commandLayout = new QVBoxLayout(commandBlock);

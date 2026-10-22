@@ -2,6 +2,7 @@
 
 #include "MessagePopup.h"
 
+#include "Paragraph.h"
 #include "PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -21,7 +22,6 @@ MessagePopup::MessagePopup(QString iconName, const QString &settingsKey, const T
     connect(header_, &PopupHeader::closeRequested, this, &MessagePopup::next);
 
     // Selectable: a path or an error is copied from it.
-    text_->setWordWrap(true);
     text_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     text_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     auto *body = new QVBoxLayout;
@@ -84,7 +84,7 @@ void MessagePopup::showFirst()
 {
     const Message &message = queue_.first();
     header_->setTitle(message.title);
-    text_->setText(message.text);
+    Paragraph::setText(text_, message.text);
     const qsizetype waiting = waitingCount();
     header_->setSubtitle(waiting > 0 ? tr("%n more message(s) after this one", nullptr, int(waiting)) : QString());
     close_->setText(waiting > 0 ? tr("Next") : tr("Close"));

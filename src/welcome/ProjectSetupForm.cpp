@@ -6,6 +6,7 @@
 #include "recipes/RecipeLibrary.h"
 #include "toolchains/Toolchains.h"
 #include "ui/AppFonts.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
 
@@ -203,7 +204,6 @@ QWidget *ProjectSetupForm::createPage(Page &page)
     titleRow->addWidget(page.enabled);
     page.evidence = new QLabel(content);
     page.evidence->setObjectName(QStringLiteral("pageDescription"));
-    page.evidence->setWordWrap(true);
 
     page.recipe = settingCombo();
     page.recipeState = stateLabel();
@@ -237,9 +237,9 @@ QWidget *ProjectSetupForm::createPage(Page &page)
     settingsLayout->addWidget(sectionHeading(tr("Code intelligence")));
     settingsLayout->addWidget(serverCard);
 
-    page.offHint = new QLabel(tr("Turn it on to choose how the project is built and completed."), content);
+    page.offHint = new QLabel(content);
     page.offHint->setObjectName(QStringLiteral("pageDescription"));
-    page.offHint->setWordWrap(true);
+    Paragraph::setText(page.offHint, tr("Turn it on to choose how the project is built and completed."));
 
     auto *layout = new QVBoxLayout(content);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -349,7 +349,7 @@ void ProjectSetupForm::fill(Page &page, const LanguageSetup &setup, const QStrin
 {
     // The switch is not blocked: it draws its knob from its own signal.
     const QSignalBlocker serverBlocker(page.server);
-    page.evidence->setText(evidence);
+    Paragraph::setText(page.evidence, evidence);
     page.enabled->setChecked(setup.enabled);
     fillRecipes(page, setup.recipe);
 

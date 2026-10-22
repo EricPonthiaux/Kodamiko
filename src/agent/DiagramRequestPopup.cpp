@@ -3,6 +3,7 @@
 #include "DiagramRequestPopup.h"
 
 #include "AgentProvider.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QComboBox>
@@ -67,7 +68,6 @@ DiagramRequestPopup::DiagramRequestPopup(const Theme &theme, QWidget *parent)
     connect(name_, &QLineEdit::returnPressed, this, &DiagramRequestPopup::draw);
 
     error_->setObjectName(QStringLiteral("diagramError"));
-    error_->setWordWrap(true);
     error_->hide();
 
     auto *card = new SettingsCard(this);
@@ -172,6 +172,6 @@ void DiagramRequestPopup::keyPressEvent(QKeyEvent *event)
 
 void DiagramRequestPopup::showError(const QString &message)
 {
-    error_->setText(message);
+    Paragraph::setText(error_, message);
     error_->setVisible(!message.isEmpty());
 }

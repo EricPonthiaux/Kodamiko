@@ -7,6 +7,7 @@
 #include "projects/ProjectStore.h"
 #include "recipes/ProjectCreation.h"
 #include "recipes/RecipeLibrary.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "workspace/ChoicePopup.h"
 
@@ -81,7 +82,6 @@ QWidget *NewProjectForm::createBody()
             recipeList_->setCurrentItem(item);
     }
     description_->setObjectName(QStringLiteral("settingState"));
-    description_->setWordWrap(true);
     git_->setChecked(QSettings().value(QLatin1String(gitKey), true).toBool());
 
     for (const QLineEdit *field : {name_, location_})
@@ -113,7 +113,6 @@ QWidget *NewProjectForm::createFooter()
     footer->setObjectName(QStringLiteral("popupFooter"));
     summary_ = new QLabel(footer);
     summary_->setObjectName(QStringLiteral("footerHint"));
-    summary_->setWordWrap(true);
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     create_ = new QPushButton(tr("Create"), footer);
     create_->setDefault(true);
@@ -186,9 +185,9 @@ QString NewProjectForm::problem() const
 void NewProjectForm::updateState()
 {
     const QListWidgetItem *item = recipeList_->currentItem();
-    description_->setText(item ? item->data(descriptionRole).toString() : QString());
+    Paragraph::setText(description_, item ? item->data(descriptionRole).toString() : QString());
     const QString why = problem();
-    summary_->setText(why.isEmpty() ? tr("Creates %1").arg(QDir::toNativeSeparators(targetFolder())) : why);
+    Paragraph::setText(summary_, why.isEmpty() ? tr("Creates %1").arg(QDir::toNativeSeparators(targetFolder())) : why);
     create_->setEnabled(why.isEmpty() && selectedRecipe());
 }
 
@@ -206,7 +205,7 @@ void NewProjectForm::create()
     const QString folder = targetFolder();
     QString error;
     if (!ProjectCreation::create(*recipe, folder, &error)) {
-        summary_->setText(error);
+        Paragraph::setText(summary_, error);
         return;
     }
     if (git_->isChecked())

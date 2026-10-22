@@ -4,6 +4,7 @@
 
 #include "toolchains/Installer.h"
 #include "toolchains/Toolchains.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QDir>
@@ -19,10 +20,9 @@ ProvisioningView::ProvisioningView(Toolchains *toolchains, QWidget *parent)
 {
     layout_->setContentsMargins(0, 0, 0, 0);
     layout_->setSpacing(8);
-    auto *where =
-        new QLabel(tr("Into %1, shared by all projects.").arg(QDir::toNativeSeparators(toolchains->root())), this);
+    auto *where = new QLabel(this);
     where->setObjectName(QStringLiteral("pageDescription"));
-    where->setWordWrap(true);
+    Paragraph::setText(where, tr("Into %1, shared by all projects.").arg(QDir::toNativeSeparators(toolchains->root())));
     layout_->addWidget(where);
     layout_->addStretch();
 

@@ -2,6 +2,7 @@
 
 #include "CloseAgentPopup.h"
 
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -32,7 +33,6 @@ CloseAgentPopup::CloseAgentPopup(const Theme &theme, QWidget *parent)
     connect(header_, &PopupHeader::closeRequested, this, &CloseAgentPopup::next);
 
     // Selectable: the folder is copied from it.
-    text_->setWordWrap(true);
     text_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     text_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     auto *body = new QVBoxLayout;
@@ -109,8 +109,8 @@ void CloseAgentPopup::showFirst()
     if (const qsizetype waiting = waitingCount(); waiting > 0)
         subtitle += tr(" · %n more session(s) to close after this one", nullptr, int(waiting));
     header_->setSubtitle(subtitle);
-    text_->setText(tr("The worktree of %1 holds changes or commits that are not merged.\n\nFolder: %2")
-                       .arg(worktree.name, worktree.path));
+    Paragraph::setText(text_, tr("The worktree of %1 holds changes or commits that are not merged.\n\nFolder: %2")
+                                  .arg(worktree.name, worktree.path));
 }
 
 void CloseAgentPopup::next()

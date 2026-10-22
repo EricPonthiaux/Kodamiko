@@ -2,6 +2,7 @@
 
 #include "ChangeSignaturePopup.h"
 
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 
@@ -86,7 +87,6 @@ ChangeSignaturePopup::ChangeSignaturePopup(QString languageId,
     columns->addWidget(table_, 1);
     columns->addLayout(buttons);
     preview_->setObjectName(QStringLiteral("signaturePreview"));
-    preview_->setWordWrap(true);
     preview_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     error_->setObjectName(QStringLiteral("popupError"));
     error_->hide();
@@ -223,7 +223,8 @@ void ChangeSignaturePopup::updateSignature()
         const QString declaration = table_->item(row, declarationColumn)->text().trimmed();
         declarations.append(declaration.isEmpty() ? QStringLiteral("…") : declaration); // being typed
     }
-    preview_->setText(QStringLiteral("%1(%2)").arg(signature_.name, declarations.join(QStringLiteral(", "))));
+    Paragraph::setText(preview_,
+                       QStringLiteral("%1(%2)").arg(signature_.name, declarations.join(QStringLiteral(", "))));
     error_->hide();
 }
 

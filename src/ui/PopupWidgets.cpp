@@ -3,6 +3,7 @@
 #include "PopupWidgets.h"
 
 #include "AppFonts.h"
+#include "Paragraph.h"
 #include "ThemeStyle.h"
 #include "UiIcons.h"
 
@@ -301,9 +302,9 @@ QWidget *SettingsCard::addRow(const QString &title, const QString &description, 
     text->setSpacing(2);
     text->addWidget(titleLabel);
     if (!description.isEmpty()) {
-        auto *descriptionLabel = new QLabel(description, row);
+        auto *descriptionLabel = new QLabel(row);
         descriptionLabel->setObjectName(QStringLiteral("settingsDescription"));
-        descriptionLabel->setWordWrap(true);
+        Paragraph::setText(descriptionLabel, description);
         text->addWidget(descriptionLabel);
     }
     auto *layout = new QHBoxLayout(row);
@@ -357,7 +358,6 @@ PopupHeader::PopupHeader(QString iconName, const QString &title, QWidget *parent
     setObjectName(QStringLiteral("popupHeader"));
     AppFonts::setInterfaceFont(title_, 1.1, QFont::DemiBold);
     subtitle_->setObjectName(QStringLiteral("pageDescription"));
-    subtitle_->setWordWrap(true);
     subtitle_->hide();
     close_->setAutoRaise(true);
     close_->setFocusPolicy(Qt::NoFocus);
@@ -385,7 +385,7 @@ void PopupHeader::setTitle(const QString &title)
 
 void PopupHeader::setSubtitle(const QString &text)
 {
-    subtitle_->setText(text);
+    Paragraph::setText(subtitle_, text);
     subtitle_->setVisible(!text.isEmpty());
 }
 

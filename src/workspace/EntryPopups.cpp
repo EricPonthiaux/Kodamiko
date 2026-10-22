@@ -2,6 +2,7 @@
 
 #include "EntryPopups.h"
 
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 
@@ -130,8 +131,6 @@ EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, QString
     connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
     error_->setObjectName(QStringLiteral("entryError"));
-    error_->setTextFormat(Qt::PlainText);
-    error_->setWordWrap(true);
     error_->hide();
     content_->setSpacing(10);
     auto *body = new QVBoxLayout;
@@ -187,14 +186,15 @@ void EntryPopup::exec()
 
 QString EntryPopup::error() const
 {
-    return !error_->isHidden() ? error_->text() : QString();
+    return !error_->isHidden() ? errorMessage_ : QString();
 }
 
 void EntryPopup::showError(const QString &message)
 {
     if (message.isEmpty() && error_->isHidden())
         return;
-    error_->setText(message);
+    errorMessage_ = message;
+    Paragraph::setText(error_, message);
     error_->setVisible(!message.isEmpty());
     errorChanged(!message.isEmpty());
     resizeToContent();
@@ -287,12 +287,12 @@ void NamePopup::errorChanged(bool shown)
 ConfirmPopup::ConfirmPopup(const Question &question, std::function<bool(ConfirmPopup *)> apply, QWidget *parent)
     : EntryPopup(QStringLiteral("confirmPopup"), question.title, question.location, parent)
     , apply_(std::move(apply))
-    , message_(new QLabel(question.message, this))
+    , message_(new QLabel(this))
+    , messageText_(question.message)
     , cancel_(new QPushButton(tr("Cancel"), this))
     , action_(new QPushButton(question.actionText, this))
 {
-    message_->setWordWrap(true);
-    message_->setTextFormat(Qt::PlainText);
+    Paragraph::setText(message_, question.message);
     setIconName(QStringLiteral("discard"));
     setFooterHint(tr("Enter to confirm · Esc to cancel"));
     connect(cancel_, &QPushButton::clicked, this, &OverlayPopup::dismiss);
@@ -305,14 +305,15 @@ ConfirmPopup::ConfirmPopup(const Question &question, std::function<bool(ConfirmP
 
 void ConfirmPopup::setMessage(const QString &message, const QString &actionText)
 {
-    message_->setText(message);
+    messageText_ = message;
+    Paragraph::setText(message_, message);
     action_->setText(actionText);
     resizeToContent();
 }
 
 QString ConfirmPopup::message() const
 {
-    return message_->text();
+    return messageText_;
 }
 
 void ConfirmPopup::keyPressEvent(QKeyEvent *event)

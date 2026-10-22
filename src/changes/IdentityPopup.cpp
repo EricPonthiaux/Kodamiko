@@ -2,6 +2,8 @@
 
 #include "IdentityPopup.h"
 
+#include "ui/Paragraph.h"
+
 #include <QCheckBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -18,11 +20,10 @@ IdentityPopup::IdentityPopup(const QString &location,
     , email_(new QLineEdit(current.email, this))
     , repositoryOnly_(new QCheckBox(tr("For this repository only"), this))
 {
-    auto *explanation = new QLabel(tr("Git signs each commit with a name and an email, and does not know yours "
-                                      "yet. They go in git's configuration, as git config user.name and "
-                                      "user.email would put them."),
-                                   this);
-    explanation->setWordWrap(true);
+    auto *explanation = new QLabel(this);
+    Paragraph::setText(explanation, tr("Git signs each commit with a name and an email, and does not know yours "
+                                       "yet. They go in git's configuration, as git config user.name and "
+                                       "user.email would put them."));
     name_->setPlaceholderText(tr("Name"));
     email_->setPlaceholderText(tr("Email"));
     for (QLineEdit *field : {name_, email_}) {

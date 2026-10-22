@@ -4,6 +4,7 @@
 
 #include "GitActions.h"
 #include "SnapshotsPopup.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
@@ -231,7 +232,6 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     connect(list_, &QWidget::customContextMenuRequested, this, &BranchesPopup::showMenu);
     empty_->setObjectName(QStringLiteral("branchesEmpty"));
     empty_->setAlignment(Qt::AlignCenter);
-    empty_->setWordWrap(true);
 
     auto *body = new QVBoxLayout;
     body->setContentsMargins(16, 12, 16, 12);
@@ -306,7 +306,7 @@ void BranchesPopup::load(const QString &folder)
         current_ = repository->branch;
         header_->setSubtitle(branchSummary(*repository));
     }
-    empty_->setText(error.isEmpty() ? tr("No branches yet: make a first commit.") : error);
+    Paragraph::setText(empty_, error.isEmpty() ? tr("No branches yet: make a first commit.") : error);
 
     const QSignalBlocker blocker(filter_);
     filter_->clear();
@@ -338,7 +338,7 @@ void BranchesPopup::rebuildList()
     list_->setVisible(list_->count() > 0);
     empty_->setVisible(list_->count() == 0);
     if (list_->count() == 0 && !branches_.isEmpty())
-        empty_->setText(tr("No branch matches \"%1\".").arg(filter));
+        Paragraph::setText(empty_, tr("No branch matches \"%1\".").arg(filter));
     if (firstSelectable >= 0)
         list_->setCurrentRow(firstSelectable);
     else if (list_->count() > 1)

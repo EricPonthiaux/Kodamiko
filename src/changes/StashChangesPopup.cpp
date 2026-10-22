@@ -2,6 +2,8 @@
 
 #include "StashChangesPopup.h"
 
+#include "ui/Paragraph.h"
+
 #include <QCheckBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -16,10 +18,9 @@ StashChangesPopup::StashChangesPopup(const QString &location,
     , message_(new QLineEdit(this))
     , untracked_(new QCheckBox(tr("Include new files"), this))
 {
-    auto *explanation = new QLabel(tr("Put your changes aside: the files go back to the last commit, and the "
-                                      "changes can be brought back later, on this branch or another."),
-                                   this);
-    explanation->setWordWrap(true);
+    auto *explanation = new QLabel(this);
+    Paragraph::setText(explanation, tr("Put your changes aside: the files go back to the last commit, and the "
+                                       "changes can be brought back later, on this branch or another."));
     message_->setPlaceholderText(tr("Message (optional)"));
     connect(message_, &QLineEdit::returnPressed, this, &StashChangesPopup::accept);
     untracked_->setChecked(true);

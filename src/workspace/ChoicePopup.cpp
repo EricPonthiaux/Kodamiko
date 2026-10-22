@@ -2,6 +2,8 @@
 
 #include "ChoicePopup.h"
 
+#include "ui/Paragraph.h"
+
 #include <QKeyEvent>
 #include <QLabel>
 #include <QPushButton>
@@ -12,16 +14,14 @@ ChoicePopup::ChoicePopup(const Question &question, const QList<Choice> &choices,
     , choices_(choices)
     , cancel_(new QPushButton(choices.isEmpty() ? tr("Close") : tr("Cancel"), this))
 {
-    auto *message = new QLabel(question.message, this);
-    message->setWordWrap(true);
-    message->setTextFormat(Qt::PlainText);
+    auto *message = new QLabel(this);
+    Paragraph::setText(message, question.message);
     // Selectable: an error or a path is copied from it.
     message->setTextInteractionFlags(Qt::TextSelectableByMouse);
     content()->addWidget(message);
     if (!question.details.isEmpty()) {
-        auto *details = new QLabel(question.details, this);
-        details->setWordWrap(true);
-        details->setTextFormat(Qt::PlainText);
+        auto *details = new QLabel(this);
+        Paragraph::setText(details, question.details);
         details->setTextInteractionFlags(Qt::TextSelectableByMouse);
         details->setObjectName(QStringLiteral("settingsDescription"));
         content()->addWidget(details);

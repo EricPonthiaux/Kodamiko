@@ -3,6 +3,7 @@
 #include "NewBranchPopup.h"
 
 #include "git/Branches.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QCheckBox>
@@ -46,7 +47,6 @@ NewBranchPopup::NewBranchPopup(const Theme &theme, QWidget *parent)
     connect(name_, &QLineEdit::textChanged, this, &NewBranchPopup::validate);
     connect(name_, &QLineEdit::returnPressed, this, &NewBranchPopup::create);
     message_->setObjectName(QStringLiteral("branchMessage"));
-    message_->setWordWrap(true);
     auto *nameLabel = new QLabel(tr("Name"), this);
     auto *nameBlock = new QWidget(this);
     auto *nameLayout = new QVBoxLayout(nameBlock);
@@ -146,7 +146,8 @@ void NewBranchPopup::validate()
     if (error.isEmpty() && existing_.contains(name))
         error = tr("A branch named \"%1\" already exists.").arg(name);
     const bool hasError = !error.isEmpty();
-    message_->setText(hasError ? error : tr("Spaces become dashes; use \"/\" to group branches (feature/…)."));
+    Paragraph::setText(message_,
+                       hasError ? error : tr("Spaces become dashes; use \"/\" to group branches (feature/…)."));
     message_->setProperty("error", hasError);
     // The property only restyles after a re-polish.
     message_->style()->unpolish(message_);

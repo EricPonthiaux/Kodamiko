@@ -4,6 +4,7 @@
 
 #include "EditPreview.h"
 #include "changes/DiffView.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 
@@ -58,8 +59,7 @@ RefactoringPreviewPopup::RefactoringPreviewPopup(Preview preview, Apply apply, Q
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     addItems();
     conflicts_->setObjectName(QStringLiteral("refactoringConflicts"));
-    conflicts_->setWordWrap(true);
-    conflicts_->setText(tr("Conflicts:\n%1").arg(preview_.conflicts.join(QLatin1Char('\n'))));
+    Paragraph::setText(conflicts_, tr("Conflicts:\n%1").arg(preview_.conflicts.join(QLatin1Char('\n'))));
     conflicts_->setVisible(!preview_.conflicts.isEmpty());
     connect(list_, &QListWidget::currentRowChanged, this, &RefactoringPreviewPopup::showSelected);
     connect(list_, &QListWidget::itemChanged, this, &RefactoringPreviewPopup::updateButton);

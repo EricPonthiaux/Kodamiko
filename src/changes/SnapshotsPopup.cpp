@@ -5,6 +5,7 @@
 #include "git/GitCommands.h"
 #include "ui/AppFonts.h"
 #include "ui/FileIcons.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
@@ -288,10 +289,10 @@ void SnapshotsPopup::load(const QString &folder)
     restore_->setEnabled(!snapshots_.isEmpty());
     if (snapshots_.isEmpty()) {
         emptyTitle_->setText(error.isEmpty() ? tr("No snapshots yet") : tr("Snapshots are unavailable"));
-        emptyText_->setText(error.isEmpty()
-                                ? tr("They appear here when you discard changes in Diff mode, and before each "
-                                     "prompt you send to the agent.")
-                                : error);
+        Paragraph::setText(
+            emptyText_, error.isEmpty() ? tr("They appear here when you discard changes in Diff mode, and before each "
+                                             "prompt you send to the agent.")
+                                        : error);
         return;
     }
     list_->setCurrentRow(0);
@@ -308,11 +309,12 @@ void SnapshotsPopup::showDetails()
     date_->setText(describeDate(snapshot.date, QDateTime::currentDateTime()));
     date_->setToolTip(QLocale().toString(snapshot.date, QLocale::LongFormat));
     badge_->setText(countText(snapshot));
-    explanation_->setText(snapshot.wholeWorkingTree
-                              ? tr("Restoring undoes every change made in the working directory since then, "
-                                   "ignored files excepted. The files below had changed since the last commit.")
-                              : tr("Restoring puts these files back as they were; a file that did not exist yet "
-                                   "is deleted. Other files are left alone."));
+    Paragraph::setText(explanation_,
+                       snapshot.wholeWorkingTree
+                           ? tr("Restoring undoes every change made in the working directory since then, "
+                                "ignored files excepted. The files below had changed since the last commit.")
+                           : tr("Restoring puts these files back as they were; a file that did not exist yet "
+                                "is deleted. Other files are left alone."));
     filesHeading_->setText(
         (snapshot.wholeWorkingTree ? tr("Changed files · %1") : tr("Files · %1")).arg(snapshot.paths.size()).toUpper());
     files_->clear();

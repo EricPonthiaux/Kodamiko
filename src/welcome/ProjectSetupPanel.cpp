@@ -8,6 +8,7 @@
 #include "recipes/RecipeLibrary.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QDir>
@@ -78,7 +79,6 @@ QWidget *ProjectSetupPanel::createFooter()
     footer->setObjectName(QStringLiteral("popupFooter"));
     summary_ = new QLabel(footer);
     summary_->setObjectName(QStringLiteral("footerHint"));
-    summary_->setWordWrap(true);
     const bool isFirstSetup = purpose_ == Purpose::FirstSetup;
     cancel_ = new QPushButton(isFirstSetup ? tr("Back") : tr("Cancel"), footer);
     retry_ = new QPushButton(tr("Retry"), footer);
@@ -162,7 +162,7 @@ void ProjectSetupPanel::updateSummary()
     if (!steps.isEmpty())
         lines.append(tr("Will download: %1").arg(InstallPlan::summary(steps)));
     lines.append(InstallPlan::unavailable(project, *toolchains_, required));
-    summary_->setText(lines.isEmpty() ? tr("All tools available") : lines.join(QLatin1Char('\n')));
+    Paragraph::setText(summary_, lines.isEmpty() ? tr("All tools available") : lines.join(QLatin1Char('\n')));
 }
 
 void ProjectSetupPanel::save(Then then)
@@ -208,7 +208,7 @@ void ProjectSetupPanel::finish()
 void ProjectSetupPanel::startDownloads(const QList<InstallStep> &steps)
 {
     pages_->setCurrentIndex(1);
-    summary_->setText(tr("Downloading %1…").arg(InstallPlan::summary(steps)));
+    Paragraph::setText(summary_, tr("Downloading %1…").arg(InstallPlan::summary(steps)));
     cancel_->setText(tr("Cancel"));
     retry_->hide();
     skip_->hide();
@@ -225,8 +225,8 @@ void ProjectSetupPanel::onDownloadsFinished(bool ok)
     }
     if (pages_->currentIndex() != 1 || provisioning_->failedSteps().isEmpty())
         return; // cancelled
-    summary_->setText(tr("Some tools could not be downloaded; their languages "
-                         "complete with the project's words."));
+    Paragraph::setText(summary_, tr("Some tools could not be downloaded; their languages "
+                                    "complete with the project's words."));
     cancel_->setText(tr("Back"));
     retry_->show();
     skip_->show();

@@ -5,6 +5,7 @@
 #include "DiffView.h"
 #include "GitActions.h"
 #include "SnapshotsPopup.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -74,7 +75,6 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     body_->addWidget(columns);
     emptyText_->setObjectName(QStringLiteral("pageDescription"));
     emptyText_->setAlignment(Qt::AlignCenter);
-    emptyText_->setWordWrap(true);
     body_->addWidget(emptyText_);
 
     auto *footer = new QFrame(this);
@@ -149,7 +149,8 @@ void StashesPopup::load(const QString &folder)
     for (QPushButton *button : {drop_, apply_, pop_})
         button->setEnabled(!stashes_.isEmpty());
     if (stashes_.isEmpty()) {
-        emptyText_->setText(error.isEmpty() ? tr("No stashes. Stash Changes puts your current changes aside.") : error);
+        Paragraph::setText(emptyText_,
+                           error.isEmpty() ? tr("No stashes. Stash Changes puts your current changes aside.") : error);
         return;
     }
     list_->setCurrentRow(0);

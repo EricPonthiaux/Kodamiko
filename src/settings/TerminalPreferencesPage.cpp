@@ -2,6 +2,7 @@
 
 #include "TerminalPreferencesPage.h"
 
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QDir>
@@ -36,13 +37,12 @@ TerminalPreferencesPage::TerminalPreferencesPage(QWidget *parent)
     folders_->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
     connect(folders_, &QListWidget::currentRowChanged, this, &TerminalPreferencesPage::updateButtons);
 
-    auto *description =
-        new QLabel(tr("Put first in the PATH of the terminals, the run configurations and the agent's sessions, in "
-                      "this order, before the folders of the project's recipe. Applies to the programs started "
-                      "next."),
-                   this);
+    auto *description = new QLabel(this);
     description->setObjectName(QStringLiteral("pageDescription"));
-    description->setWordWrap(true);
+    Paragraph::setText(description,
+                       tr("Put first in the PATH of the terminals, the run configurations and the agent's sessions, in "
+                          "this order, before the folders of the project's recipe. Applies to the programs started "
+                          "next."));
 
     auto *card = new SettingsCard;
     card->addWidget(folders_);

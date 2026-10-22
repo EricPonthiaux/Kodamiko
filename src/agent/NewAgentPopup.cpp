@@ -4,6 +4,7 @@
 
 #include "AgentProvider.h"
 #include "git/Branches.h"
+#include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -41,10 +42,9 @@ NewAgentPopup::NewAgentPopup(const Theme &theme, QWidget *parent)
     connect(name_, &QLineEdit::textChanged, this, &NewAgentPopup::validate);
     connect(name_, &QLineEdit::returnPressed, this, &NewAgentPopup::start);
     message_->setObjectName(QStringLiteral("agentMessage"));
-    message_->setWordWrap(true);
     changesNote_->setObjectName(QStringLiteral("settingsDescription"));
-    changesNote_->setWordWrap(true);
-    changesNote_->setText(tr("The worktree starts from the last commit: your uncommitted changes will not be in it."));
+    Paragraph::setText(changesNote_,
+                       tr("The worktree starts from the last commit: your uncommitted changes will not be in it."));
     auto *nameBlock = new QWidget(this);
     auto *nameLayout = new QVBoxLayout(nameBlock);
     nameLayout->setContentsMargins(0, 0, 0, 0);
@@ -131,7 +131,8 @@ void NewAgentPopup::validate()
     const QString name = name_->text();
     const QString error = name.isEmpty() ? QString() : Branches::nameError(name);
     const bool hasError = !error.isEmpty();
-    message_->setText(hasError ? error : tr("Its branch: duet/%1").arg(name.isEmpty() ? tr("<name>") : name));
+    Paragraph::setText(message_,
+                       hasError ? error : tr("Its branch: duet/%1").arg(name.isEmpty() ? tr("<name>") : name));
     message_->setProperty("error", hasError);
     // The property only restyles after a re-polish.
     message_->style()->unpolish(message_);

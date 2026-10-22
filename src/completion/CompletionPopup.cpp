@@ -4,6 +4,7 @@
 
 #include "FuzzyMatch.h"
 #include "ui/Motion.h"
+#include "ui/Paragraph.h"
 
 #include <QAbstractListModel>
 #include <QAccessible>
@@ -339,8 +340,6 @@ CompletionPopup::CompletionPopup(QWidget *parent)
     documentationTitle_->setWordWrap(true);
     documentationTitle_->setTextFormat(Qt::PlainText);
     documentationBody_ = new QLabel(documentation_);
-    documentationBody_->setWordWrap(true);
-    documentationBody_->setTextFormat(Qt::PlainText);
     documentationBody_->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     auto *documentationLayout = new QVBoxLayout(documentation_);
     documentationLayout->setContentsMargins(12, 10, 12, 10);
@@ -458,7 +457,7 @@ QString CompletionPopup::documentationText() const
 {
     if (documentation_->isHidden())
         return {};
-    return documentationTitle_->text() + QLatin1Char('\n') + documentationBody_->text();
+    return documentationTitle_->text() + QLatin1Char('\n') + documentation_->accessibleDescription();
 }
 
 // The kind and the signature, then the documentation, which a server may
@@ -481,9 +480,9 @@ void CompletionPopup::updateDocumentation()
         body = tr("Loading the documentation…");
         resolveTimer_.start();
     }
-    documentationBody_->setText(body.isEmpty() ? kindName(item->kind)
-                                               : kindName(item->kind) + QStringLiteral("\n\n") + body);
-    documentation_->setAccessibleDescription(documentationBody_->text());
+    const QString text = body.isEmpty() ? kindName(item->kind) : kindName(item->kind) + QStringLiteral("\n\n") + body;
+    Paragraph::setText(documentationBody_, text);
+    documentation_->setAccessibleDescription(text);
     placeDocumentation();
     documentation_->show();
     documentation_->raise();

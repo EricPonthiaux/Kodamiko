@@ -78,6 +78,8 @@ private:
     PopupHeader *header_;
     QVBoxLayout *content_;
     QLabel *error_;
+    // As given to showError(): error_ holds it as rich text.
+    QString errorMessage_;
     QFrame *footer_;
     QLabel *hint_;
     QHBoxLayout *footerButtons_;
@@ -145,6 +147,8 @@ protected:
 private:
     std::function<bool(ConfirmPopup *)> apply_;
     QLabel *message_;
+    // As given: message_ holds it as rich text.
+    QString messageText_;
     QPushButton *cancel_;
     QPushButton *action_;
 };

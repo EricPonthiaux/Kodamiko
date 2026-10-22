@@ -1,7 +1,5 @@
 #include <iostream>
 
-int main()
-{
-    std::cout << "Hello from {{identifier}}!
-";
+int main(){std::cout << "Hello from {{identifier}}!
+                        ";
 }
