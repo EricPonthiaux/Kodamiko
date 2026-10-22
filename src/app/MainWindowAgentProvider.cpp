@@ -12,7 +12,7 @@
 #include "changes/ChangesView.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
-#include "terminal/TerminalWidget.h"
+#include "terminal/TerminalWidget.h" // IWYU pragma: keep (TerminalWidget * -> QWidget * needs the full type)
 #include "ui/MessagePopup.h"
 #include "workspace/ChoicePopup.h"
 #include "workspace/FileTreeView.h"
