@@ -153,6 +153,10 @@ MainWindow::MainWindow(const QString &folder, QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    // While the window is whole: stopping clears the diagnostics, whose
+    // signals reach the window's slots; the servers' own destructor would
+    // run after the window's.
+    languageServers_->stopAll();
     delete projectSettings_;
 }
 

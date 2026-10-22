@@ -92,10 +92,7 @@ QRect OverlayPopup::placedGeometry() const
     const QRect area = availableArea();
     const QSize size = panelSize();
     const int x = area.left() + (area.width() - size.width()) / 2;
-    // A panel sits a little above the middle (the optical center); a
-    // transient one, a search, right in the middle.
-    const int y = behavior_ == Behavior::Transient ? area.top() + (area.height() - size.height()) / 2
-                                                   : area.top() + std::max((area.height() - size.height()) / 3, 0);
+    const int y = area.top() + (area.height() - size.height()) / 2;
     const QRect centered = QRect(QPoint(x, y), size).adjusted(-shadowWidth, -shadowWidth, shadowWidth, shadowWidth);
     if (behavior_ == Behavior::Transient)
         return keptInside(centered);

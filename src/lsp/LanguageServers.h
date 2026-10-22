@@ -55,6 +55,11 @@ public:
     // and the runtimes. Stops the servers if either changed.
     void setProject(const ProjectConfig &project, Toolchains *toolchains);
     void setEnabled(bool enabled);
+    // Stops every server and clears their diagnostics and tasks, which
+    // emits diagnosticsChanged and tasksChanged. Called by the destructor:
+    // an owner whose slots receive those signals calls it first, while
+    // they can still run.
+    void stopAll();
 
     bool isEnabled() const { return enabled_; }
 
@@ -163,7 +168,6 @@ signals:
     void tasksChanged();
 
 private:
-    void stopAll();
     QString programPath(const QString &program) const;
     // The project's setup of `languageId`'s family, if it has one.
     const LanguageSetup *setupFor(const QString &languageId) const;
