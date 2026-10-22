@@ -15,14 +15,18 @@
 // patternProperties, additionalProperties, propertyNames, required, items,
 // min/maxItems, uniqueItems, min/maxLength, pattern, minimum, maximum and
 // their exclusive forms, anyOf, oneOf, allOf, not, and $ref within the
-// schema. Others (format, if/then/else...) are ignored.
+// schema or to the documents it is given. Others (format, if/then/else...)
+// are ignored.
 //
 // Every problem is a warning, the schema may lag behind the program it
 // describes. A key a closed object does not know, or one close to a known
 // name ("modle" for "model"), is reported on the key.
 class JsonSchema {
 public:
-    explicit JsonSchema(QJsonObject schema);
+    // `documents`: the other schemas its $refs name, by the file name the
+    // $ref gives ("run.schema.json" for "run.schema.json#/definitions/x").
+    // A $ref to a document it is not given is not followed.
+    explicit JsonSchema(QJsonObject schema, const QHash<QString, QJsonObject> &documents = {});
 
     Diagnostics validate(const JsonNode &root) const;
     // The schema's description of the value at `path` (keys, and "0"...
@@ -49,8 +53,11 @@ private:
     // The schema of the child `key`, looked for in `schema` and its branches.
     QJsonValue childSchema(const QJsonValue &schema, const QString &key, int depth) const;
     QJsonObject resolve(const QJsonValue &schema) const;
+    // The schema `ref` points at; undefined when it names an unknown document.
+    QJsonValue target(const QString &ref) const;
     const QRegularExpression &regex(const QString &pattern) const;
 
     QJsonObject root_;
+    QHash<QString, QJsonObject> documents_;
     mutable QHash<QString, QRegularExpression> regexes_;
 };

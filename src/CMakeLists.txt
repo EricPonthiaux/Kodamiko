@@ -178,6 +178,7 @@ add_library(duet_core STATIC
     recipes/ProjectCreation.cpp
     recipes/Recipe.cpp
     recipes/RecipeLibrary.cpp
+    recipes/RecipeSchema.cpp
     recipes/RecipeSetup.cpp
     run/BuildOutputParser.cpp
     run/RunConfiguration.cpp
@@ -312,6 +313,14 @@ qt_add_resources(duet_core schemas
     BASE ${PROJECT_SOURCE_DIR}/third_party/schemastore
     FILES
         ${PROJECT_SOURCE_DIR}/third_party/schemastore/claude-code-settings.json)
+
+# Schemas of Duet's own files, to check the recipes as they are read.
+qt_add_resources(duet_core duet_schemas
+    PREFIX /schemas
+    BASE ${PROJECT_SOURCE_DIR}/tools/schemas
+    FILES
+        ${PROJECT_SOURCE_DIR}/tools/schemas/recipe.schema.json
+        ${PROJECT_SOURCE_DIR}/tools/schemas/run.schema.json)
 
 # KDE's editor themes, those of Kate and KDevelop (see KdeThemes).
 file(GLOB kde_themes CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/third_party/ksyntaxhighlighting-themes/*.theme)

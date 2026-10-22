@@ -1,0 +1,229 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
+    "title": "Duet recipe",
+    "description": "A recipe's recipe.json: how to make one kind of project on one system. Its folder also holds files/ (the new project's files), instructions.md (added to the agent's system prompt) and skills/ (the agent's skills there), all optional.",
+    "type": "object",
+    "required": [
+        "title"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "title": {
+            "description": "Its name in the list of recipes, e.g. \"Qt Widgets · CMake · MSVC\".",
+            "type": "string",
+            "minLength": 1
+        },
+        "description": {
+            "description": "Shown under the list when it is chosen: what the new project holds and what it needs.",
+            "type": "string"
+        },
+        "systems": {
+            "description": "The systems it is made for; every system when it is not given.",
+            "$ref": "#/definitions/systems"
+        },
+        "language": {
+            "description": "The language family it is attached to in a project; none for a recipe of no language.",
+            "enum": [
+                "cpp",
+                "java",
+                "javascript",
+                "python"
+            ]
+        },
+        "environment": {
+            "description": "What it adds to the environment of the project's terminals, run configurations and agent sessions.",
+            "type": "object",
+            "properties": {
+                "visualStudio": {
+                    "description": "Windows: the MSVC developer environment, as an x64 Native Tools prompt has it (cl, link, the SDK, Visual Studio's CMake and Ninja).",
+                    "type": "boolean"
+                },
+                "path": {
+                    "description": "Folders put first in the PATH.",
+                    "$ref": "#/definitions/strings"
+                },
+                "variables": {
+                    "description": "Variables that replace the editor's.",
+                    "$ref": "run.schema.json#/definitions/variables"
+                }
+            },
+            "additionalProperties": false
+        },
+        "requires": {
+            "description": "The tools its projects need: Duet downloads those missing to ~/.duet/tools, and puts them in the project's environment as each one says.",
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/requirement"
+            }
+        },
+        "run": {
+            "description": "Written to the new project's .duet/run.json; added to an existing project's own configurations. {{identifier}} in a command or a folder stands for the project's identifier.",
+            "type": "array",
+            "items": {
+                "$ref": "run.schema.json#/definitions/configuration"
+            }
+        },
+        "setup": {
+            "description": "Commands run once, one after the other, when the new project is first opened (npm install, a CMake configure): what Build needs before it works. {{identifier}} stands for the project's identifier.",
+            "$ref": "#/definitions/strings"
+        },
+        "prompts": {
+            "description": "Prompts typed in the agent's prompt from the Project menu, for the user to complete.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "title",
+                    "text"
+                ],
+                "properties": {
+                    "title": {
+                        "description": "Its name in the Project menu.",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "text": {
+                        "description": "The text typed in the agent's prompt.",
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false,
+    "definitions": {
+        "strings": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "minLength": 1
+            }
+        },
+        "systems": {
+            "type": "array",
+            "items": {
+                "enum": [
+                    "windows",
+                    "linux",
+                    "macos"
+                ]
+            },
+            "uniqueItems": true
+        },
+        "requirement": {
+            "description": "A tool the recipe requires, and where its files go in the project's environment. {{home}} in \"path\" and \"variables\" stands for the tool's folder.",
+            "type": "object",
+            "required": [
+                "tool"
+            ],
+            "properties": {
+                "tool": {
+                    "description": "The tool's id: one Duet knows how to install (\"jdk\", \"node\", \"qt\"), or any other with a \"download\" or a \"program\" to look for.",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "version": {
+                    "description": "The version it needs; {{version}} in the download's addresses.",
+                    "type": "string"
+                },
+                "kit": {
+                    "description": "Qt: the kit, e.g. \"gcc_64\", \"macos\", \"win64_msvc2022_64\".",
+                    "type": "string"
+                },
+                "modules": {
+                    "description": "Qt: the add-on modules, e.g. \"qtcharts\".",
+                    "$ref": "#/definitions/strings"
+                },
+                "program": {
+                    "description": "The program found in the PATH when the tool is already installed, e.g. \"mvn\".",
+                    "type": "string"
+                },
+                "systems": {
+                    "description": "The systems it is required on; every system when it is not given.",
+                    "$ref": "#/definitions/systems"
+                },
+                "download": {
+                    "description": "Where to download it, by system and processor: \"windows-x64\", \"linux-aarch64\"..., else \"windows\", \"linux\", \"macos\", else \"any\".",
+                    "type": "object",
+                    "patternProperties": {
+                        "^(any|(windows|linux|macos)(-(x64|aarch64))?)$": {
+                            "$ref": "#/definitions/download"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "path": {
+                    "description": "Folders put first in the PATH. One that does not exist is left out, so a recipe lists the layouts of every system.",
+                    "$ref": "#/definitions/strings"
+                },
+                "variables": {
+                    "description": "Variables of the project's environment, e.g. {\"JAVA_HOME\": \"{{home}}\"}.",
+                    "$ref": "run.schema.json#/definitions/variables"
+                }
+            },
+            "additionalProperties": false
+        },
+        "download": {
+            "description": "An archive of the tool and how to check it. One without a checksum or a known format is not installed.",
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "anyOf": [
+                {
+                    "required": [
+                        "checksum"
+                    ]
+                },
+                {
+                    "required": [
+                        "checksumUrl"
+                    ]
+                }
+            ],
+            "properties": {
+                "url": {
+                    "description": "The archive's address; {{version}} stands for the requirement's version.",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "checksum": {
+                    "description": "The archive's hash, in hexadecimal.",
+                    "type": "string",
+                    "pattern": "^[0-9A-Fa-f]+$"
+                },
+                "checksumUrl": {
+                    "description": "The address of a file holding the archive's hash; {{url}} stands for the archive's address, {{version}} for the requirement's version.",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "algorithm": {
+                    "description": "The hash's algorithm; \"sha256\" when it is not given.",
+                    "enum": [
+                        "sha256",
+                        "sha512"
+                    ]
+                },
+                "format": {
+                    "description": "The archive's format; read from the URL when it is not given.",
+                    "enum": [
+                        "zip",
+                        "tar.gz",
+                        "tgz",
+                        "7z"
+                    ]
+                },
+                "check": {
+                    "description": "A file of the archive that must be there once it is extracted, e.g. \"bin/mvn\".",
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

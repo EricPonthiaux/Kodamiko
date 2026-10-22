@@ -6,6 +6,7 @@
 #include "recipes/ProjectCreation.h"
 #include "recipes/Recipe.h"
 #include "recipes/RecipeLibrary.h"
+#include "recipes/RecipeSchema.h"
 #include "recipes/RecipeSetup.h"
 #include "run/RunConfiguration.h"
 #include "terminal/ProcessSpec.h"
@@ -131,6 +132,64 @@ private slots:
         QVERIFY(!Recipes::parse(R"({"description": "no title"})", "/recipes/x", &error));
 
         QVERIFY(error.contains("title"));
+    }
+
+    void everyBuiltInRecipeFollowsTheSchema()
+    {
+        const QDir builtIn(RecipeLibrary::defaultSources().builtIn);
+        const QStringList ids = builtIn.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        QVERIFY(!ids.isEmpty());
+        for (const QString &id : ids) {
+            QStringList messages;
+            for (const RecipeSchema::Problem &problem :
+                 RecipeSchema::check(read(builtIn.filePath(id + "/recipe.json"))))
+                messages.append(QStringLiteral("line %1: %2").arg(problem.line).arg(problem.message));
+
+            QVERIFY2(messages.isEmpty(), qPrintable(id + ": " + messages.join(" | ")));
+        }
+    }
+
+    void theSchemaReportsWhatParseWouldSkip()
+    {
+        const QByteArray json = R"({
+            "title": "T",
+            "langage": "cpp",
+            "requires": [{"tool": "maven", "download": {"any": {"url": "example.org/m.zip"}}}],
+            "run": [{"name": "Run", "kind": "launch", "command": "a"}]
+        })";
+
+        const QList<RecipeSchema::Problem> problems = RecipeSchema::check(json);
+
+        QCOMPARE(problems.size(), 3);
+        QCOMPARE(problems[0],
+                 (RecipeSchema::Problem{.line = 3, .message = "Unknown key “langage”: did you mean “language”?"}));
+        QCOMPARE(problems[1], (RecipeSchema::Problem{.line = 4, .message = "Missing “checksum”"}));
+        QCOMPARE(problems[2].line, 5);
+        QVERIFY(problems[2].message.contains("\"run\""));
+    }
+
+    void theSchemaReportsATextThatIsNotJson()
+    {
+        const QList<RecipeSchema::Problem> problems = RecipeSchema::check("{\n  \"title\": \"T\",\n}");
+
+        QCOMPARE(problems.size(), 1);
+        QCOMPARE(problems[0].line, 3);
+    }
+
+    void theLibraryReportsTheSchemaProblemsOfTheRecipesItReads()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("odd/recipe.json"), R"({"title": "Odd", "sytems": ["linux"]})");
+        write(dir.filePath("broken/recipe.json"), R"({"description": "no title"})");
+        QStringList problems;
+
+        const QList<Recipe> recipes = RecipeLibrary::available({.builtIn = dir.path(), .user = {}, .project = {}},
+                                                               Recipes::currentSystem(), &problems);
+
+        QCOMPARE(ids(recipes), QStringList{"odd"});
+        QCOMPARE(problems.size(), 2);
+        QVERIFY(problems[0].contains("title")); // "broken", refused
+        QVERIFY(problems[1].endsWith("recipe.json:1: Unknown key “sytems”: did you mean “systems”?"));
     }
 
     void setupRunsTheCommandsInTurnWithTheIdentifier()

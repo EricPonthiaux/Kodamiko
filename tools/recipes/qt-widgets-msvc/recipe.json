@@ -1,4 +1,5 @@
 {
+    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
     "title": "Qt Widgets · CMake · MSVC",
     "language": "cpp",
     "description": "A Qt 6 Widgets window, built with Visual Studio's compiler and Qt 6.10 (msvc2022_64), downloaded if the machine has none.",

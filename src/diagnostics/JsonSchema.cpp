@@ -208,6 +208,26 @@ JsonNode keyNode(const JsonMember &member)
     return key;
 }
 
+// `schema` with its own $refs ("#/definitions/x") naming `document`, so
+// that they still resolve in it once they are met from another schema.
+QJsonValue anchoredRefs(const QJsonValue &schema, const QString &document)
+{
+    if (schema.isArray()) {
+        QJsonArray items;
+        for (const QJsonValue &item : schema.toArray())
+            items.append(anchoredRefs(item, document));
+        return items;
+    }
+    if (!schema.isObject())
+        return schema;
+    QJsonObject object = schema.toObject();
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        const bool isLocalRef = it.key() == QLatin1String("$ref") && it.value().toString().startsWith(QLatin1Char('#'));
+        it.value() = isLocalRef ? QJsonValue(document + it.value().toString()) : anchoredRefs(it.value(), document);
+    }
+    return object;
+}
+
 } // namespace
 
 struct JsonSchema::Result {
@@ -232,9 +252,11 @@ struct JsonSchema::Result {
     }
 };
 
-JsonSchema::JsonSchema(QJsonObject schema)
+JsonSchema::JsonSchema(QJsonObject schema, const QHash<QString, QJsonObject> &documents)
     : root_(std::move(schema))
 {
+    for (auto it = documents.cbegin(); it != documents.cend(); ++it)
+        documents_.insert(it.key(), anchoredRefs(it.value(), it.key()).toObject());
 }
 
 Diagnostics JsonSchema::validate(const JsonNode &root) const
@@ -250,18 +272,25 @@ QJsonObject JsonSchema::resolve(const QJsonValue &schema) const
 {
     QJsonObject object = schema.toObject();
     for (int hops = 0; hops < 32 && object.contains(QLatin1String("$ref")); ++hops) {
-        const QString ref = object.value(QLatin1String("$ref")).toString();
-        if (!ref.startsWith(QLatin1String("#")))
-            return {}; // another document: not followed
-        QJsonValue target = root_;
-        for (const QString &part : ref.mid(1).split(QLatin1Char('/'), Qt::SkipEmptyParts)) {
-            QString name = part;
-            name.replace(QLatin1String("~1"), QLatin1String("/")).replace(QLatin1String("~0"), QLatin1String("~"));
-            target = target.toObject().value(name);
-        }
-        object = target.toObject();
+        object = target(object.value(QLatin1String("$ref")).toString()).toObject();
     }
     return object;
+}
+
+QJsonValue JsonSchema::target(const QString &ref) const
+{
+    const qsizetype hash = ref.indexOf(QLatin1Char('#'));
+    const QString document = ref.left(hash);
+    if (!document.isEmpty() && !documents_.contains(document))
+        return {QJsonValue::Undefined};
+    QJsonValue found = document.isEmpty() ? root_ : documents_.value(document);
+    const QString pointer = hash < 0 ? QString() : ref.mid(hash + 1);
+    for (const QString &part : pointer.split(QLatin1Char('/'), Qt::SkipEmptyParts)) {
+        QString name = part;
+        name.replace(QLatin1String("~1"), QLatin1String("/")).replace(QLatin1String("~0"), QLatin1String("~"));
+        found = found.toObject().value(name);
+    }
+    return found;
 }
 
 const QRegularExpression &JsonSchema::regex(const QString &pattern) const

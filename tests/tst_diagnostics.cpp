@@ -18,6 +18,8 @@ private slots:
     void anyOfSaysWhatItExpected();
     void reportsUnknownAndDuplicateKeys();
     void describesKeys();
+    void followsARefIntoAnotherDocument();
+    void ignoresARefToAnUnknownDocument();
 
 private:
     static QJsonObject object(const QByteArray &json);
@@ -154,6 +156,30 @@ void TestDiagnostics::describesKeys()
     QCOMPARE(schema.description({"permissions", "allow"}), QStringLiteral("Allowed"));
     QCOMPARE(schema.description({"permissions", "allow", "0"}), QStringLiteral("A rule"));
     QCOMPARE(schema.description({"nothing"}), QString());
+}
+
+void TestDiagnostics::followsARefIntoAnotherDocument()
+{
+    const QJsonObject other = object(R"j({
+        "definitions": {"entry": {"type": "object", "properties": {"env": {"$ref": "#/definitions/env"}}},
+                        "env": {"type": "object", "additionalProperties": {"type": "string"}}}
+    })j");
+    const JsonSchema schema(object(R"j({"properties": {"entry": {"$ref": "other.json#/definitions/entry"}}})j"),
+                            {{"other.json", other}});
+    const QByteArray text = R"({"entry": {"env": {"A": 1}}})";
+
+    const Diagnostics diagnostics = schema.validate(*parseJson(text).root);
+
+    // Its own "#/definitions/env" is read in the other document.
+    QCOMPARE(diagnostics.size(), 1);
+    QCOMPARE(diagnostics[0].message, QStringLiteral("Expected a string, not a number"));
+}
+
+void TestDiagnostics::ignoresARefToAnUnknownDocument()
+{
+    const JsonSchema schema(object(R"j({"properties": {"entry": {"$ref": "other.json#/definitions/entry"}}})j"));
+
+    QVERIFY(schema.validate(*parseJson(R"({"entry": 1})").root).isEmpty());
 }
 
 QJsonObject TestDiagnostics::object(const QByteArray &json)

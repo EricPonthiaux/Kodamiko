@@ -1,0 +1,70 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/run.schema.json",
+    "title": "Duet run configurations",
+    "description": "A project's .duet/run.json: the commands it is built, run, debugged and tested with, each run by the system's shell in a terminal tab.",
+    "type": "object",
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "configurations": {
+            "description": "The project's run configurations. One named like a configuration Duet detects in the build files replaces it.",
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/configuration"
+            }
+        }
+    },
+    "additionalProperties": false,
+    "definitions": {
+        "configuration": {
+            "description": "A command the project is built, run, debugged or tested with. Duet skips one without a name or a command.",
+            "type": "object",
+            "required": [
+                "name",
+                "command"
+            ],
+            "properties": {
+                "name": {
+                    "description": "Its name in the Run menu and its terminal's title.",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "kind": {
+                    "description": "What it does: Build, Run, Debug and Test run the first configuration of their kind. \"run\" when it is not given.",
+                    "enum": [
+                        "build",
+                        "run",
+                        "debug",
+                        "test"
+                    ]
+                },
+                "command": {
+                    "description": "A shell command line, e.g. \"cmake --build build\".",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "folder": {
+                    "description": "The folder it runs in, relative to the project; its root when it is empty or not given.",
+                    "type": "string"
+                },
+                "env": {
+                    "description": "Variables added to the editor's environment.",
+                    "$ref": "#/definitions/variables"
+                }
+            },
+            "additionalProperties": false
+        },
+        "variables": {
+            "type": "object",
+            "additionalProperties": {
+                "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                ]
+            }
+        }
+    }
+}

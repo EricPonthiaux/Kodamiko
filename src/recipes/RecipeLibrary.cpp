@@ -39,7 +39,7 @@ QMap<QString, Recipe> recipesById(const RecipeSources &sources, QStringList *pro
         const QDir dir(root);
         for (const QString &name : dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
             QString error;
-            if (std::optional<Recipe> recipe = Recipes::load(dir.filePath(name), &error))
+            if (std::optional<Recipe> recipe = Recipes::load(dir.filePath(name), &error, problems))
                 byId.insert(recipe->id, *recipe);
             else if (problems)
                 problems->append(error);

@@ -2,6 +2,7 @@
 
 #include "Recipe.h"
 
+#include "RecipeSchema.h"
 #include "toolchains/ToolCatalog.h"
 
 #include <QDir>
@@ -151,6 +152,12 @@ QList<RunConfiguration> runConfigurationsOf(const QJsonValue &value)
     return RunConfigurations::parse(QJsonDocument(file).toJson(QJsonDocument::Compact));
 }
 
+void addSchemaProblems(const QByteArray &recipeJson, const QString &fileName, QStringList &warnings)
+{
+    for (const RecipeSchema::Problem &problem : RecipeSchema::check(recipeJson))
+        warnings.append(QStringLiteral("%1:%2: %3").arg(fileName).arg(problem.line).arg(problem.message));
+}
+
 QString readText(const QString &path)
 {
     QFile file(path);
@@ -244,18 +251,23 @@ std::optional<Recipe> parse(const QByteArray &recipeJson, const QString &folder,
     return recipe;
 }
 
-std::optional<Recipe> load(const QString &folder, QString *error)
+std::optional<Recipe> load(const QString &folder, QString *error, QStringList *warnings)
 {
     QFile file(QDir(folder).filePath(QStringLiteral("recipe.json")));
+    const QString fileName = QDir::toNativeSeparators(file.fileName());
     if (!file.open(QIODevice::ReadOnly)) {
-        *error = QObject::tr("Cannot read %1: %2").arg(QDir::toNativeSeparators(file.fileName()), file.errorString());
+        *error = QObject::tr("Cannot read %1: %2").arg(fileName, file.errorString());
         return std::nullopt;
     }
-    std::optional<Recipe> recipe = parse(file.readAll(), folder, error);
+    const QByteArray recipeJson = file.readAll();
+    std::optional<Recipe> recipe = parse(recipeJson, folder, error);
     if (!recipe) {
-        *error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(file.fileName()), *error);
+        *error = QStringLiteral("%1: %2").arg(fileName, *error);
         return std::nullopt;
     }
+    // Only for a recipe that is read: the error already says why one is not.
+    if (warnings)
+        addSchemaProblems(recipeJson, fileName, *warnings);
     recipe->instructions = readText(QDir(folder).filePath(QStringLiteral("instructions.md"))).trimmed();
     return recipe;
 }

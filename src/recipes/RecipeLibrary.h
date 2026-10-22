@@ -31,7 +31,8 @@ RecipeSources defaultSources(const QString &projectFolder = {});
 
 // The recipes for `system` (Recipes::currentSystem()'s names): the empty
 // one first, then by title. A folder whose recipe.json cannot be read is
-// skipped, its reason added to `problems` when given.
+// skipped, its reason added to `problems` when given, as are the
+// departures from the schema of those read (Recipes::load's warnings).
 QList<Recipe> available(const RecipeSources &sources,
                         const QString &system = Recipes::currentSystem(),
                         QStringList *problems = nullptr);

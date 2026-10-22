@@ -1,4 +1,5 @@
 {
+    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
     "title": "C++ · CMake",
     "language": "cpp",
     "description": "CMakeLists.txt (C++20) and src/main.cpp, an executable built with the system's compiler.",

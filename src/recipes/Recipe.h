@@ -52,7 +52,8 @@ struct RecipePrompt {
 // with MSVC on Windows, a Python package...): its first files, its
 // commands, its environment, and what the agent is told and can do there.
 // A recipe is a folder:
-//   recipe.json      the fields below (see Recipes::parse)
+//   recipe.json      the fields below (see Recipes::parse), described by
+//                    tools/schemas/recipe.schema.json
 //   files/           the new project's files; {{identifier}} in their paths
 //                    and texts stands for ProjectCreation::identifierOf
 //   instructions.md  added to the agent's system prompt (optional)
@@ -140,7 +141,9 @@ QString currentSystem();
 // Nullopt, with `error` saying why, when it is not a JSON object with a
 // title.
 std::optional<Recipe> parse(const QByteArray &recipeJson, const QString &folder, QString *error);
-// The recipe in `folder` (its recipe.json and instructions.md).
-std::optional<Recipe> load(const QString &folder, QString *error);
+// The recipe in `folder` (its recipe.json and instructions.md). What a
+// recipe.json it reads departs from the schema is added to `warnings` when
+// given, as "<file>:<line>: <message>" (see RecipeSchema::check).
+std::optional<Recipe> load(const QString &folder, QString *error, QStringList *warnings = nullptr);
 
 } // namespace Recipes
