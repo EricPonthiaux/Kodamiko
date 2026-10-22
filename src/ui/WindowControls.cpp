@@ -10,9 +10,18 @@
 #include <QPainter>
 #include <QPainterPath>
 
+#include <algorithm>
+
 namespace {
 
 constexpr int controlWidth = 46;
+// The glyphs' half side, at most: a title bar's 10 px glyph.
+constexpr qreal maxGlyphHalfPx = 5;
+// Below a title bar's height, as among the content's buttons, the glyph
+// shrinks with the button: 5 px for a 40 px high bar.
+constexpr qreal heightPerGlyphHalf = 8;
+// As the menu items' (ThemeStyle).
+constexpr qreal roundedRadiusPx = 4;
 
 } // namespace
 
@@ -35,6 +44,12 @@ void WindowButton::applyTheme(const Theme &theme)
     update();
 }
 
+void WindowButton::setCorners(Corners corners)
+{
+    corners_ = corners;
+    update();
+}
+
 void WindowButton::enterEvent(QEnterEvent *event)
 {
     hover_.setHovered(true);
@@ -45,6 +60,20 @@ void WindowButton::leaveEvent(QEvent *event)
 {
     hover_.setHovered(false);
     QAbstractButton::leaveEvent(event);
+}
+
+void WindowButton::fillBackground(QPainter &painter, const QColor &background) const
+{
+    switch (corners_) {
+    case Corners::Square:
+        painter.fillRect(rect(), background);
+        return;
+    case Corners::Rounded:
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(background);
+        painter.drawRoundedRect(QRectF(rect()), roundedRadiusPx, roundedRadiusPx);
+        return;
+    }
 }
 
 void WindowButton::paintEvent(QPaintEvent *)
@@ -59,14 +88,14 @@ void WindowButton::paintEvent(QPaintEvent *)
         if (isDown())
             background = background.darker(115);
         background.setAlphaF(highlight);
-        painter.fillRect(rect(), background);
+        fillBackground(painter, background);
         if (kind_ == Kind::Close)
             color = ThemeStyle::mixed(color, Qt::white, highlight);
     }
     painter.setPen(QPen(color, 1.1));
     painter.setBrush(Qt::NoBrush);
     const QPointF center = QRectF(rect()).center();
-    const qreal half = 5;
+    const qreal half = std::min(maxGlyphHalfPx, height() / heightPerGlyphHalf);
     switch (kind_) {
     case Kind::Minimize:
         painter.drawLine(QPointF(center.x() - half, center.y()), QPointF(center.x() + half, center.y()));

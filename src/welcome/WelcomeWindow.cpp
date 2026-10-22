@@ -207,9 +207,10 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     // Duet's frame has no title bar: a close button of its own.
     auto *close = new WindowButton(WindowButton::Kind::Close, projects);
     close->applyTheme(theme_);
+    close->setCorners(WindowButton::Corners::Rounded);
     close->setToolTip(tr("Close"));
     connect(close, &QAbstractButton::clicked, this, &QWidget::close);
-    top->addWidget(close, 0, Qt::AlignTop);
+    top->addWidget(close);
 
     list_->setObjectName(QStringLiteral("welcomeProjects"));
     list_->setItemDelegate(new ProjectDelegate(theme_, list_));
@@ -247,6 +248,10 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     layout->addWidget(pages_, 1);
 
     setStyleSheet(popupStyleSheet(theme_, QString::fromLatin1(welcomeRules)));
+    // A square as high as the buttons beside it, not a title bar's control:
+    // their height comes from the style sheet, so after it.
+    const int buttonHeight = import->sizeHint().height();
+    close->setFixedSize(buttonHeight, buttonHeight);
 #ifdef Q_OS_MACOS
     close->hide();
 #else

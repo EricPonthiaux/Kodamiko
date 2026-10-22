@@ -8,6 +8,8 @@
 #include <QAbstractButton>
 #include <QWidget>
 
+class QPainter;
+
 // Window control drawn in the theme: minimize, maximize (restore when the
 // window is maximized) or close.
 class WindowButton : public QAbstractButton {
@@ -20,8 +22,16 @@ public:
         Close
     };
 
+    // The shape of the hover background: square in a title bar, against
+    // the window's edge; rounded among the content's buttons.
+    enum class Corners {
+        Square,
+        Rounded
+    };
+
     WindowButton(Kind kind, QWidget *parent);
     void applyTheme(const Theme &theme);
+    void setCorners(Corners corners);
     QSize sizeHint() const override;
 
 protected:
@@ -30,7 +40,10 @@ protected:
     void leaveEvent(QEvent *event) override;
 
 private:
+    void fillBackground(QPainter &painter, const QColor &background) const;
+
     Kind kind_;
+    Corners corners_ = Corners::Square;
     Theme theme_;
     HoverProgress hover_{this};
 };
