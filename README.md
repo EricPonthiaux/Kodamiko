@@ -49,7 +49,8 @@ or MSVC 2022).
 The other dependencies (QScintilla, tree-sitter, libvterm, libgit2,
 cmark-gfm) are downloaded and built automatically on the first
 configuration. [Graphviz](https://graphviz.org) (`libgraphviz-dev`,
-optional) enables the diagram editor.
+optional) enables the diagram editor; on Windows, its official release is
+downloaded too.
 
 ```sh
 cmake --preset default
@@ -158,7 +159,7 @@ Third-party components:
 | libvterm | built and linked statically | MIT |
 | libgit2 | built and linked statically | GPL v2 with linking exception |
 | cmark-gfm | built and linked statically | BSD 2-Clause |
-| Graphviz (optional, diagram editor) | linked from the system | Eclipse Public License 1.0 |
+| Graphviz (optional, diagram editor) | linked from the system; on Windows, its release's DLLs ship with Duet | Eclipse Public License 1.0 |
 | github-markdown-css, Octicons (in `third_party/`) | embedded | MIT |
 | KDE's editor themes (in `third_party/ksyntaxhighlighting-themes/`) | embedded | MIT |
 | SchemaStore's Claude Code settings schema (in `third_party/schemastore/`) | embedded | Apache 2.0 |

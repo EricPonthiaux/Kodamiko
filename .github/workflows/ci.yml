@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps/*-subbuild
-          key: deps-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: deps-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/GraphvizWindows.cmake') }}
 
       - name: Configure
         run: cmake --preset default

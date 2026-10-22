@@ -68,21 +68,28 @@ include(cmake/Dependencies.cmake)
 include(cmake/CodeQuality.cmake)
 
 # Diagram editor (Mermaid, PlantUML, explainer boards): its layouts come from
-# Graphviz's library. Without it, diagram files open as text.
-find_package(PkgConfig)
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(GRAPHVIZ IMPORTED_TARGET libgvc libcgraph)
-endif()
-if(GRAPHVIZ_FOUND)
-    # The layout and output plugins Duet uses, linked in rather than loaded
-    # from Graphviz's plugin configuration: the same engines everywhere, and
-    # no text measured with system fonts (as in sidecar's WebAssembly build).
-    pkg_get_variable(GRAPHVIZ_LIBDIR libgvc libdir)
-    foreach(plugin core dot_layout neato_layout)
-        find_library(GVPLUGIN_${plugin} gvplugin_${plugin}
-            HINTS ${GRAPHVIZ_LIBDIR} PATH_SUFFIXES graphviz)
-    endforeach()
+# Graphviz's library. Without it, diagram files open as text. Both branches
+# set GRAPHVIZ_FOUND, GRAPHVIZ_LIBRARIES and the plugins Duet links in rather
+# than loads from Graphviz's plugin configuration (GVPLUGIN_core,
+# GVPLUGIN_dot_layout, GVPLUGIN_neato_layout): the same engines everywhere,
+# and no text measured with system fonts (as in sidecar's WebAssembly build).
+if(WIN32)
+    include(cmake/GraphvizWindows.cmake)
 else()
+    find_package(PkgConfig)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(GRAPHVIZ IMPORTED_TARGET libgvc libcgraph)
+    endif()
+    if(GRAPHVIZ_FOUND)
+        set(GRAPHVIZ_LIBRARIES PkgConfig::GRAPHVIZ)
+        pkg_get_variable(GRAPHVIZ_LIBDIR libgvc libdir)
+        foreach(plugin core dot_layout neato_layout)
+            find_library(GVPLUGIN_${plugin} gvplugin_${plugin}
+                HINTS ${GRAPHVIZ_LIBDIR} PATH_SUFFIXES graphviz)
+        endforeach()
+    endif()
+endif()
+if(NOT GRAPHVIZ_FOUND)
     message(STATUS "Graphviz (libgvc) not found: diagram files open as text")
 endif()
 find_package(Qt6 OPTIONAL_COMPONENTS Svg)

@@ -12,9 +12,17 @@
 #include <gvplugin.h>
 
 extern "C" {
+#ifdef _WIN32
+// Graphviz's Windows release builds its plugins as DLLs: MSVC links data
+// exported by a DLL only when it is declared imported.
+__declspec(dllimport) extern gvplugin_library_t gvplugin_core_LTX_library;
+__declspec(dllimport) extern gvplugin_library_t gvplugin_dot_layout_LTX_library;
+__declspec(dllimport) extern gvplugin_library_t gvplugin_neato_layout_LTX_library;
+#else
 extern gvplugin_library_t gvplugin_core_LTX_library;
 extern gvplugin_library_t gvplugin_dot_layout_LTX_library;
 extern gvplugin_library_t gvplugin_neato_layout_LTX_library;
+#endif
 }
 #endif
 

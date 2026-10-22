@@ -376,7 +376,7 @@ if(GRAPHVIZ_FOUND)
         viewers/DiagramGenerationView.cpp
         viewers/DiagramView.cpp
         ${diagram_sources})
-    target_link_libraries(duet_core PUBLIC PkgConfig::GRAPHVIZ)
+    target_link_libraries(duet_core PUBLIC ${GRAPHVIZ_LIBRARIES})
     target_compile_definitions(duet_core PUBLIC DUET_WITH_DIAGRAMS)
     if(GVPLUGIN_core AND GVPLUGIN_dot_layout AND GVPLUGIN_neato_layout)
         target_link_libraries(duet_core PUBLIC ${GVPLUGIN_core} ${GVPLUGIN_dot_layout} ${GVPLUGIN_neato_layout})
@@ -439,6 +439,11 @@ include(GNUInstallDirs)
 install(TARGETS duet
     BUNDLE DESTINATION . COMPONENT duet
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT duet)
+# Windows has no rpath: Graphviz's DLLs go next to the executable.
+if(GRAPHVIZ_RUNTIME_DLLS)
+    install(FILES ${GRAPHVIZ_RUNTIME_DLLS}
+        DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT duet)
+endif()
 if(UNIX AND NOT APPLE)
     install(FILES ${PROJECT_SOURCE_DIR}/packaging/linux/duet.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications COMPONENT duet)

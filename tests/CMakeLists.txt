@@ -6,10 +6,11 @@ function(duet_add_test name)
     target_link_libraries(${name} PRIVATE duet_core Qt6::Test)
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-    # Windows has no rpath: the tests find Qt's DLLs through PATH.
+    # Windows has no rpath: the tests find Qt's DLLs through PATH, and
+    # Graphviz's in the executable's folder, where the package takes them.
     if(WIN32)
         set_tests_properties(${name} PROPERTIES
-            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
     endif()
 endfunction()
 
