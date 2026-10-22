@@ -25,15 +25,18 @@
 #include "ui/MessagePopup.h"
 #include "ui/Theme.h"
 
+#include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocalSocket>
 #include <QProcess>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QtTest>
 
@@ -547,6 +550,32 @@ private slots:
         const QJsonObject specific = output.value("hookSpecificOutput").toObject();
         QCOMPARE(specific.value("hookEventName").toString(), QStringLiteral("UserPromptSubmit"));
         QCOMPARE(specific.value("additionalContext").toString(), QStringLiteral("Open file: a.cpp"));
+    }
+
+    // A slot that opens a popup runs an event loop, during which the hook
+    // can give up waiting: its socket is gone when the slot returns.
+    void hookThatGivesUpDuringTheSlotIsNotAnswered()
+    {
+        HookServer server;
+        server.setProvider(&claude_);
+        QVERIFY(server.listen());
+        QLocalSocket hook;
+        connect(&server, &HookServer::hookReceived, this, [&] {
+            hook.abort();
+            QEventLoop popup;
+            QTimer::singleShot(200, &popup, &QEventLoop::quit);
+            popup.exec();
+        });
+        const QSignalSpy received(&server, &HookServer::hookReceived);
+
+        hook.connectToServer(server.serverName());
+        QVERIFY(hook.waitForConnected());
+        hook.write(R"({"hook_event_name":"Stop","session_id":"hello"})"
+                   "\n");
+        hook.flush();
+
+        QTRY_COMPARE(received.size(), 1);
+        QTest::qWait(300); // the slot returns, the server does not crash
     }
 
     void codeRequestNamesTheSelectedLines()

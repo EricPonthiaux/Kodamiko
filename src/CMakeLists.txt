@@ -1,3 +1,10 @@
+# The log files, shared by the editor and its helper programs (tools/).
+add_library(duet_log STATIC log/LogFiles.cpp)
+target_include_directories(duet_log PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(duet_log PUBLIC Qt6::Core)
+target_compile_definitions(duet_log PRIVATE DUET_VERSION="${PROJECT_VERSION}")
+duet_enable_warnings(duet_log)
+
 # Library containing the whole editor except main(): the executable and the
 # tests link against it.
 add_library(duet_core STATIC
@@ -404,7 +411,7 @@ set_target_properties(duet PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 if(WIN32)
     target_sources(duet PRIVATE ${PROJECT_SOURCE_DIR}/packaging/windows/duet.rc)
 endif()
-target_link_libraries(duet PRIVATE duet_core)
+target_link_libraries(duet PRIVATE duet_core duet_log)
 target_compile_definitions(duet PRIVATE DUET_VERSION="${PROJECT_VERSION}")
 set_target_properties(duet PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_dependencies(duet duet-hook duet-mcp duet-askpass)

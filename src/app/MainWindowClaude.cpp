@@ -246,11 +246,11 @@ void MainWindow::onHookReceived(const HookEvent &event)
         }
         fileStatuses_->refresh();
         claudeConfigView_->scheduleRefresh();
-        // A command may have changed any file.
+        // A command may have changed any file. Once the hook has its reply:
+        // a conflict's question must not keep the agent waiting.
         const QStringList paths =
             event.kind == HookEvent::Kind::FilesEdited ? event.filePaths : editorTabs_->openFilePaths();
-        for (const QString &path : paths)
-            editorTabs_->syncWithDisk(path);
+        editorTabs_->syncWithDiskLater(paths);
         refreshIndexes();
         if (mode_ == Mode::Diff)
             changesView_->refresh();

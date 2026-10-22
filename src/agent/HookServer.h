@@ -5,14 +5,15 @@
 #include "HookEvent.h"
 
 #include <QLocalServer>
+#include <QLocalSocket>
 #include <QObject>
+#include <QPointer>
 
 #include <functional>
 
 class AgentProvider;
 class McpRegistry;
 class QJsonObject;
-class QLocalSocket;
 
 // Receives notifications from an agent's hooks, relayed by the small
 // `duet-hook` program through a local socket (named pipe on Windows), and
@@ -68,7 +69,7 @@ private:
     static void reply(QLocalSocket *socket);
 
     QLocalServer server_;
-    QLocalSocket *receiving_ = nullptr; // during hookReceived()
+    QPointer<QLocalSocket> receiving_; // during hookReceived()
     bool replyDeferred_ = false;
     const AgentProvider *provider_ = nullptr;
     McpRegistry *mcpRegistry_ = nullptr;

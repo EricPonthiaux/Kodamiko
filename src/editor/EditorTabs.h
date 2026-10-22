@@ -108,6 +108,9 @@ public:
 
     // Call when a file may have changed on disk.
     void syncWithDisk(const QString &path);
+    // syncWithDisk() once the current event is handled, for a caller that
+    // must not wait for the user to answer a conflict's question.
+    void syncWithDiskLater(const QStringList &paths);
     // Rereads the git index versions the change marks compare with.
     void reloadChangeBases() const;
 
@@ -155,7 +158,9 @@ private:
     void updateDiagramTabTitle(DiagramView *view);
     QList<DiagramView *> diagramViews() const;
     void syncEditorWithDisk(EditorWidget *editor, const QString &path);
-    // Asks whether to reload a file modified both in its tab and on disk.
+    // Asks whether to reload a file modified both in its tab and on disk;
+    // false without asking for the version on disk the user already kept
+    // their changes over.
     bool confirmReload(const QString &filePath, const QString &question);
     // Tells that `filePath` could not be opened or saved, and why.
     void showFileError(const QString &title, const QString &filePath, const QString &error);
@@ -203,6 +208,8 @@ private:
     QString projectFolder_;
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer
+    // The content on disk when the user chose to keep their changes, by path.
+    QHash<QString, QByteArray> keptOverDisk_;
     bool formatOnSave_ = false;
     // Editors whose formatter is running, and whether to save them after.
     QHash<EditorWidget *, bool> formatting_;

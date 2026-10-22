@@ -13,6 +13,8 @@
 // its behalf: the server initializes with no tools and says why, so that
 // Claude never waits for a reply that will not come.
 
+#include "log/LogFiles.h"
+
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -156,6 +158,7 @@ private:
 int main(int argc, char *argv[])
 {
     const QCoreApplication app(argc, argv);
+    LogFiles::install(QStringLiteral("duet-mcp"));
     Relay relay;
     // Standard input is read on a thread of its own (no portable way to wait
     // on it in the event loop); each line is handed to the relay.

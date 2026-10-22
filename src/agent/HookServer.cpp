@@ -12,6 +12,8 @@
 #include <QPointer>
 #include <QRandomGenerator>
 
+#include <utility>
+
 namespace {
 
 // The hook's output, kept on the socket until the reply.
@@ -58,13 +60,17 @@ void HookServer::onReadyRead(QLocalSocket *socket)
             socket->disconnectFromServer();
         return;
     }
-    receiving_ = socket;
-    replyDeferred_ = false;
+    // A slot may open a modal popup: its event loop can deliver another hook
+    // (hence the outer state, put back after), and the hook can give up
+    // waiting meanwhile, which deletes the socket.
+    const QPointer<QLocalSocket> outerReceiving = std::exchange(receiving_, socket);
+    const bool outerReplyDeferred = std::exchange(replyDeferred_, false);
     if (const std::optional<HookEvent> event = provider_ ? provider_->parseHook(line) : std::nullopt)
         emit hookReceived(*event);
-    receiving_ = nullptr;
-    if (!replyDeferred_)
-        reply(socket);
+    const bool isReplyDeferred = std::exchange(replyDeferred_, outerReplyDeferred);
+    const QPointer<QLocalSocket> stillOpen = std::exchange(receiving_, outerReceiving);
+    if (!isReplyDeferred && stillOpen)
+        reply(stillOpen);
 }
 
 std::function<void()> HookServer::deferReply()

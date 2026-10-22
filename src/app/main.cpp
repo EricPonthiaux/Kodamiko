@@ -3,6 +3,7 @@
 #include "MainWindow.h"
 #include "editor/PreviewSite.h"
 #include "git/LibGit2.h"
+#include "log/LogFiles.h"
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectWindowServer.h"
 #include "settings/Preferences.h"
@@ -185,6 +186,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("Duet"));
     QApplication::setOrganizationName(QStringLiteral("Duet"));
     QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
+    LogFiles::install(QStringLiteral("duet"));
     adoptLegacySettings();
     adoptLegacyToolchains();
     Motion::policy().setEnabled(Preferences::load().animations);

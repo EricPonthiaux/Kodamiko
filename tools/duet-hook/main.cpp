@@ -19,6 +19,8 @@
 // status line command (DUET_STATUSLINE_COMMAND) if there is one, a
 // short summary otherwise.
 
+#include "log/LogFiles.h"
+
 #include <QCoreApplication>
 #include <QFile>
 #include <QJsonDocument>
@@ -119,6 +121,7 @@ int statusLine(const QByteArray &input)
 int main(int argc, char *argv[])
 {
     const QCoreApplication app(argc, argv);
+    LogFiles::install(QStringLiteral("duet-hook"));
 
     QFile input;
     if (!input.open(stdin, QIODevice::ReadOnly))

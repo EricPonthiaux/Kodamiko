@@ -21,11 +21,13 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QMenu>
 #include <QPainter>
 #include <QPointer>
 #include <QTabBar>
+#include <QTimer>
 
 #include <algorithm>
 #include <functional>
@@ -39,6 +41,13 @@ constexpr qreal emptyMarkShare = 0.22;
 constexpr qreal emptyMarkMinimumSize = 48;
 constexpr qreal emptyMarkMaximumSize = 160;
 constexpr qreal emptyMarkOpacity = 0.35;
+
+// The bytes of `filePath`; empty if it cannot be read.
+QByteArray readFile(const QString &filePath)
+{
+    QFile file(filePath);
+    return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+}
 
 // Asks whether to save the changes to `filePath` before its tab closes.
 // Returns false if the user cancels, or if the requested save fails.
@@ -745,8 +754,10 @@ bool EditorTabs::closeTab(int index, bool askToSave)
         return false;
     if (!page || indexOf(page) < 0)
         return true; // closed meanwhile
-    if (const QString path = filePathOf(page); !path.isEmpty())
+    if (const QString path = filePathOf(page); !path.isEmpty()) {
         watcher_.unwatch(path);
+        keptOverDisk_.remove(path);
+    }
     removeTab(indexOf(page));
     page->deleteLater();
     return true;
@@ -831,6 +842,14 @@ void EditorTabs::syncWithDisk(const QString &path)
         syncEditorWithDisk(editor, path);
 }
 
+void EditorTabs::syncWithDiskLater(const QStringList &paths)
+{
+    QTimer::singleShot(0, this, [this, paths] {
+        for (const QString &path : paths)
+            syncWithDisk(path);
+    });
+}
+
 void EditorTabs::syncEditorWithDisk(EditorWidget *editor, const QString &path)
 {
     if (pathsBeingResolved_.contains(editor->filePath()))
@@ -840,8 +859,10 @@ void EditorTabs::syncEditorWithDisk(EditorWidget *editor, const QString &path)
         emit statusMessage(tr("%1 was deleted from disk").arg(name));
         return;
     }
-    if (editor->matchesDisk())
+    if (editor->matchesDisk()) {
+        keptOverDisk_.remove(editor->filePath());
         return; // our own save, or identical content
+    }
 
     const QString question = tr("%1 was modified on disk, but you have unsaved changes.\n\n"
                                 "Reload the file? Your changes will be lost (Ctrl+Z brings them back).")
@@ -868,8 +889,10 @@ void EditorTabs::syncDiagramWithDisk(DiagramView *diagram, const QString &path)
         emit statusMessage(tr("%1 was deleted from disk").arg(name));
         return;
     }
-    if (diagram->matchesDisk())
+    if (diagram->matchesDisk()) {
+        keptOverDisk_.remove(diagram->filePath());
         return; // our own save, or identical content
+    }
 
     const QString question = tr("%1 was modified on disk, but you have unsaved changes.\n\n"
                                 "Reload the file? Your changes will be lost.")
@@ -894,6 +917,12 @@ void EditorTabs::showFileError(const QString &title, const QString &filePath, co
 
 bool EditorTabs::confirmReload(const QString &filePath, const QString &question)
 {
+    // Asked once per version on disk: an agent's command syncs every open
+    // file again.
+    const QByteArray onDisk = readFile(filePath);
+    if (const auto kept = keptOverDisk_.constFind(filePath); kept != keptOverDisk_.cend() && *kept == onDisk)
+        return false;
+
     // The question's event loop can bring the same change again: no second
     // question meanwhile.
     pathsBeingResolved_.insert(filePath);
@@ -907,6 +936,10 @@ bool EditorTabs::confirmReload(const QString &filePath, const QString &question)
     popup->focusCancel();
     popup->exec();
     pathsBeingResolved_.remove(filePath);
+    if (reload)
+        keptOverDisk_.remove(filePath);
+    else
+        keptOverDisk_.insert(filePath, onDisk);
     return reload;
 }
 

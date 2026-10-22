@@ -9,6 +9,14 @@ Windows and macOS.
 
 ## Why Duet
 
+Today's editors were designed for a human typing code, and AI was added
+later: a chat panel on the side, or an agent in a terminal that cannot see
+your editor. The assistant does not know what you are looking at, you lose
+track of what it changes, and undoing its work is up to you.
+
+Duet starts from the other end: an editor built for working *with* an AI
+agent, where you and Claude share the same view of the project.
+
 - **Claude is part of the editor.** A Claude Code session runs in a built-in
   terminal, started in your project. With each prompt, Duet tells Claude
   which file is open, where the cursor is, what is selected and which

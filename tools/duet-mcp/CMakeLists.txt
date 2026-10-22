@@ -1,6 +1,6 @@
 add_executable(duet-mcp main.cpp)
 duet_enable_warnings(duet-mcp)
-target_link_libraries(duet-mcp PRIVATE Qt6::Core Qt6::Network)
+target_link_libraries(duet-mcp PRIVATE Qt6::Core Qt6::Network duet_log)
 
 # Installed next to the editor, where ClaudeLauncher looks for it.
 set_target_properties(duet-mcp PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

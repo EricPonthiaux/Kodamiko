@@ -835,6 +835,37 @@ private slots:
         QCOMPARE(tabs.count(), 0);
     }
 
+    void asksOnceToReloadEachVersionOnDisk()
+    {
+        const QTemporaryDir dir;
+        const QString path = dir.filePath("a.txt");
+        write(path, "a\n");
+        EditorTabs tabs(Theme::dark());
+        QVERIFY(tabs.openFile(path));
+        tabs.currentEditor()->setText("mine\n");
+        int questionCount = 0;
+        QTimer keepMyChanges;
+        connect(&keepMyChanges, &QTimer::timeout, &tabs, [&tabs, &questionCount] {
+            for (ChoicePopup *question : tabs.findChildren<ChoicePopup *>()) {
+                if (question->property("answered").toBool())
+                    continue; // deleted once its event loop runs again
+                question->setProperty("answered", true);
+                ++questionCount;
+                question->cancelButton()->click();
+            }
+        });
+        keepMyChanges.start(10);
+
+        write(path, "theirs\n");
+        tabs.syncWithDisk(path);
+        tabs.syncWithDisk(path); // an agent's next command
+        write(path, "theirs again\n");
+        tabs.syncWithDisk(path);
+
+        QCOMPARE(questionCount, 2);
+        QCOMPARE(tabs.currentEditor()->text(), QStringLiteral("mine\n"));
+    }
+
     void watchesAFileDeletedThenCreatedAgain()
     {
         const QTemporaryDir dir;

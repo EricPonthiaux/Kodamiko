@@ -11,6 +11,8 @@
 // Exit code 1 when the user cancels or the editor cannot be reached: git
 // then fails with an authentication error instead of waiting.
 
+#include "log/LogFiles.h"
+
 #include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -27,6 +29,7 @@ constexpr int connectTimeoutMs = 2000;
 int main(int argc, char *argv[])
 {
     const QCoreApplication app(argc, argv);
+    LogFiles::install(QStringLiteral("duet-askpass"));
 
     const QString serverName = qEnvironmentVariable("DUET_ASKPASS_SOCKET");
     if (serverName.isEmpty())
