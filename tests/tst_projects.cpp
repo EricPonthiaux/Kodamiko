@@ -4,10 +4,10 @@
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
 #include "projects/ProjectStore.h"
-#include "projects/ProjectTemplates.h"
-#include "run/RunConfiguration.h"
+#include "recipes/RecipeLibrary.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Installer.h"
+#include "toolchains/QtRepository.h"
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
 #include "ui/Theme.h"
@@ -47,6 +47,14 @@ void write(const QString &path, const QByteArray &content)
     file.write(content);
 }
 
+// The executables ToolCatalog looks for in Duet's installs of a JDK and a Node.
+#ifdef Q_OS_WIN
+const QString javaExecutable = QStringLiteral("bin/java.exe");
+#else
+const QString javaExecutable = QStringLiteral("bin/java");
+#endif
+const QString nodeExecutable = QStringLiteral("bin/node");
+
 // A tool installed by Duet, as Installer leaves it.
 void fakeInstall(const Toolchains &toolchains, const QString &tool, const QString &version, const QString &executable)
 {
@@ -55,6 +63,61 @@ void fakeInstall(const Toolchains &toolchains, const QString &tool, const QStrin
     QFile::setPermissions(folder + QLatin1Char('/') + executable,
                           QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
     write(folder + QStringLiteral("/.complete"), "");
+}
+
+// The Updates.xml of a Qt release, cut down to a kit, an add-on and a
+// kit of another processor.
+const QByteArray qtUpdates = R"(<Updates>
+ <PackageUpdate>
+  <Name>qt.qt6.6103.win64_msvc2022_64</Name>
+  <Version>6.10.3-0-202603310407</Version>
+  <DownloadableArchives>qtbase-MSVC2022-X86_64.7z, d3dcompiler_47-x64.7z</DownloadableArchives>
+  <UpdateFile CompressedSize="1000" OS="Any" UncompressedSize="5000"/>
+  <Operations>
+   <Operation name="Extract">
+    <Argument>@TargetDir@/6.10.3/msvc2022_64</Argument>
+    <Argument>qtbase-MSVC2022-X86_64.7z</Argument>
+   </Operation>
+   <Operation name="Extract">
+    <Argument>@TargetDir@/6.10.3/msvc2022_64/bin</Argument>
+    <Argument>d3dcompiler_47-x64.7z</Argument>
+   </Operation>
+  </Operations>
+ </PackageUpdate>
+ <PackageUpdate>
+  <Name>qt.qt6.6103.win64_msvc2022_arm64_cross_compiled</Name>
+  <Version>6.10.3-0-202603310407</Version>
+  <DownloadableArchives>qtbase-MSVC2022-ARM64.7z</DownloadableArchives>
+  <Operations>
+   <Operation name="Extract">
+    <Argument>@TargetDir@/6.10.3/msvc2022_arm64</Argument>
+    <Argument>qtbase-MSVC2022-ARM64.7z</Argument>
+   </Operation>
+  </Operations>
+ </PackageUpdate>
+ <PackageUpdate>
+  <Name>qt.qt6.6103.addons.qtcharts.win64_msvc2022_64</Name>
+  <Version>6.10.3-0-202603310407</Version>
+  <DownloadableArchives>qtcharts-MSVC2022-X86_64.7z</DownloadableArchives>
+  <UpdateFile CompressedSize="200" OS="Any" UncompressedSize="900"/>
+  <Operations>
+   <Operation name="Extract">
+    <Argument>@TargetDir@/6.10.3/msvc2022_64</Argument>
+    <Argument>qtcharts-MSVC2022-X86_64.7z</Argument>
+   </Operation>
+  </Operations>
+ </PackageUpdate>
+</Updates>)";
+
+const QtRepository::Release qt6103{.version = QVersionNumber(6, 10, 3), .folder = "qt6_6103"};
+
+// A Qt kit, as Installer leaves it (`modules` in its marker), or as Qt's
+// installer does (no marker) when `modules` is nullopt.
+void fakeQt(const QString &folder, const std::optional<QStringList> &modules)
+{
+    write(folder + "/lib/cmake/Qt6/Qt6Config.cmake", "");
+    if (modules)
+        write(folder + "/.complete", (QStringList{"Qt"} + *modules).join('\n').toUtf8());
 }
 
 ProjectConfig javaProject(const QString &path)
@@ -276,6 +339,319 @@ private slots:
         QVERIFY(ToolCatalog::checksumFor(hash.toLatin1() + "  a\n" + hash.toLatin1() + "  b\n", "c").isEmpty());
     }
 
+    void saysTheServerMayBeDownWhenItAnswersAJdtlsMilestoneWithAWebPage()
+    {
+        const QByteArray shutdownPage = "<!DOCTYPE html>\n<html><head><title>Temporary shutdown.</title></head></html>";
+
+        const DownloadSource jdtls = ToolCatalog::source("jdtls", "1.62.0", {"linux", "x64"}, shutdownPage);
+
+        QVERIFY(jdtls.url.isEmpty());
+        QVERIFY2(jdtls.error.contains("server may be down"), qPrintable(jdtls.error));
+    }
+
+    void legacyDownloadsMoveToTheStoreWithoutReplacingItsOwn()
+    {
+        const QTemporaryDir dir;
+        const Toolchains legacy(dir.filePath("legacy"), false);
+        const Toolchains store(dir.filePath("store"), false);
+        fakeInstall(legacy, "jdk", "21", "bin/java");
+        fakeInstall(legacy, "clangd", "23.1.0", "bin/clangd");
+        write(dir.filePath("legacy/.staging/node-24/node"), "");
+        fakeInstall(store, "clangd", "23.1.0", "bin/clangd-of-the-store");
+
+        const QStringList unmoved = LegacyToolchains::moveInto(legacy.root(), store.root());
+
+        QVERIFY(unmoved.isEmpty());
+        QVERIFY(store.isInstalled("jdk", "21"));
+        const QString storeClangd = store.installFolder("clangd", "23.1.0");
+        QVERIFY(QFileInfo::exists(storeClangd + "/bin/clangd-of-the-store"));
+        QVERIFY(!QFileInfo::exists(storeClangd + "/bin/clangd"));
+        QVERIFY(!QFileInfo::exists(store.root() + "/.staging"));
+        QVERIFY(!QFileInfo::exists(legacy.root()));
+    }
+
+    void plansTheRuntimesTheRecipeRequires()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), false);
+        const ProjectConfig config;
+        const QList<ToolRequirement> required{{.tool = "node", .version = "24", .kit = {}, .modules = {}},
+                                              {.tool = "jdk", .version = {}, .kit = {}, .modules = {}}};
+
+        QCOMPARE(titles(InstallPlan::plan(config, toolchains, required)),
+                 (QStringList{"Node.js 24", "JDK " + ToolCatalog::defaultRuntimeVersion("java")}));
+
+        fakeInstall(toolchains, "node", "24", nodeExecutable);
+        fakeInstall(toolchains, "jdk", "17", javaExecutable);
+        QVERIFY(InstallPlan::plan(config, toolchains, required).isEmpty()); // any JDK will do
+    }
+
+    void saysWhatARecipeRequiresThatDuetCannotDownload()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), false);
+        const QList<ToolRequirement> required{{.tool = "maven", .version = "3", .kit = {}, .modules = {}},
+                                              {.tool = "node", .version = "7", .kit = {}, .modules = {}}};
+
+        const QStringList problems = InstallPlan::unavailable({}, toolchains, required);
+
+        QVERIFY(InstallPlan::plan({}, toolchains, required).isEmpty());
+        QCOMPARE(problems.size(), 2);
+        QVERIFY(problems.first().contains("maven")); // not in the PATH: Toolchains does not look
+        QVERIFY(problems.last().contains("node 7"));
+    }
+
+    void choosesTheNewestQtReleaseOfTheVersionAsked()
+    {
+        const QByteArray listing = R"(<a href="qt6_683/">x</a> <a href="qt6_6103/">x</a> <a href="qt6_6111/">x</a>
+            <a href="qt6_6120/">x</a> <a href="qt6_6103_src_doc_examples/">x</a> <a href="qt6_62_preview/">x</a>)";
+
+        QCOMPARE(QtRepository::newestRelease(listing, "6.10")->folder, QString("qt6_6103"));
+        QCOMPARE(QtRepository::newestRelease(listing, "6.11")->version, QVersionNumber(6, 11, 1));
+        QCOMPARE(QtRepository::newestRelease(listing, "")->version, QVersionNumber(6, 12, 0));
+        QVERIFY(!QtRepository::newestRelease(listing, "6.9"));
+    }
+
+    void findsTheRepositoryOfAKit()
+    {
+        const QtRepository::Release qt6120{.version = QVersionNumber(6, 12, 0), .folder = "qt6_6120"};
+        const QByteArray perKit = R"(<a href="qt6_6120_msvc2022_64/">x</a> <a href="qt6_6120_mingw/">x</a>)";
+
+        QCOMPARE(QtRepository::repositoryFolder(perKit, qt6120, "msvc2022_64"), QString("qt6_6120_msvc2022_64"));
+        QCOMPARE(QtRepository::repositoryFolder(R"(<a href="qt6_6103/">x</a>)", qt6103, "msvc2022_64"),
+                 QString("qt6_6103"));
+        QVERIFY(QtRepository::repositoryFolder(perKit, qt6120, "gcc_64").isEmpty());
+    }
+
+    void readsTheArchivesOfAQtKitAndItsModules()
+    {
+        const QUrl repository("https://download.qt.io/r");
+        QString error;
+
+        const std::optional<QtPackageSet> set =
+            QtRepository::packages(qtUpdates, repository, qt6103, "msvc2022_64", {"qtcharts"}, &error);
+
+        QVERIFY2(set, qPrintable(error));
+        QStringList folders;
+        for (const QtArchive &archive : set->archives)
+            folders.append(archive.fileName + " → " + archive.folder);
+        QCOMPARE(folders, (QStringList{"qtbase-MSVC2022-X86_64.7z → ", "d3dcompiler_47-x64.7z → bin",
+                                       "qtcharts-MSVC2022-X86_64.7z → "}));
+        const QString base = "https://download.qt.io/r/qt.qt6.6103.win64_msvc2022_64/6.10.3-0-202603310407";
+        QCOMPARE(set->archives.first().url, QUrl(base + "qtbase-MSVC2022-X86_64.7z"));
+        QCOMPARE(set->archives.first().checksumUrl, QUrl(base + "qtbase-MSVC2022-X86_64.7z.sha1"));
+        QCOMPARE(set->compressedSize, 1200);
+    }
+
+    void saysWhichQtKitOrModuleTheRepositoryLacks()
+    {
+        const QUrl repository("https://download.qt.io/r");
+        QString error;
+
+        QVERIFY(!QtRepository::packages(qtUpdates, repository, qt6103, "gcc_64", {}, &error));
+        QVERIFY(error.contains("gcc_64"));
+        QVERIFY(!QtRepository::packages(qtUpdates, repository, qt6103, "msvc2022_64", {"qtgraphs"}, &error));
+        QVERIFY(error.contains("qtgraphs"));
+    }
+
+    void findsTheNewestQtOfAKitWithItsModules()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), false);
+        fakeQt(toolchains.qtInstallFolder("6.8.3", "msvc2022_64"), QStringList{"qtcharts"});
+        fakeQt(toolchains.qtInstallFolder("6.10.3", "msvc2022_64"), QStringList{});
+        fakeQt(toolchains.qtInstallFolder("6.11.0", "mingw_64"), QStringList{});
+        QDir().mkpath(toolchains.qtInstallFolder("7.0.0", "msvc2022_64")); // without Qt6Config.cmake
+
+        QCOMPARE(toolchains.qtFolder("", "msvc2022_64"), toolchains.qtInstallFolder("6.10.3", "msvc2022_64"));
+        QCOMPARE(toolchains.qtFolder("6.8", "msvc2022_64"), toolchains.qtInstallFolder("6.8.3", "msvc2022_64"));
+        QCOMPARE(toolchains.qtFolder("", "msvc2022_64", {"qtcharts"}),
+                 toolchains.qtInstallFolder("6.8.3", "msvc2022_64"));
+        QVERIFY(toolchains.qtFolder("6.9", "msvc2022_64").isEmpty());
+        QVERIFY(toolchains.qtFolder("", "gcc_64").isEmpty());
+    }
+
+    void aQtInstalledWithoutDuetIsTakenWithItsModules()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), false);
+        fakeQt(toolchains.qtInstallFolder("6.10.3", "msvc2022_64"), std::nullopt);
+
+        QCOMPARE(toolchains.qtFolder("6.10", "msvc2022_64", {"qtcharts"}),
+                 toolchains.qtInstallFolder("6.10.3", "msvc2022_64"));
+    }
+
+    void plansTheQtKitTheRecipeRequires()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), false);
+        const QList<ToolRequirement> required{
+            {.tool = "qt", .version = "6.10", .kit = "msvc2022_64", .modules = {"qtcharts"}}};
+
+        const QList<InstallStep> steps = InstallPlan::plan({}, toolchains, required);
+
+        QCOMPARE(titles(steps), QStringList{"Qt 6.10 msvc2022_64 with qtcharts"});
+        QCOMPARE(steps.first().kit, QString("msvc2022_64"));
+        QCOMPARE(steps.first().modules, QStringList{"qtcharts"});
+        fakeQt(toolchains.qtInstallFolder("6.10.3", "msvc2022_64"), QStringList{"qtcharts"});
+        QVERIFY(InstallPlan::plan({}, toolchains, required).isEmpty());
+    }
+
+    void aRequiredQtWithoutAKitIsAProblem()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), false);
+        const QList<ToolRequirement> required{{.tool = "qt", .version = "6.10", .kit = {}, .modules = {}}};
+
+        QVERIFY(InstallPlan::plan({}, toolchains, required).isEmpty());
+        QCOMPARE(InstallPlan::unavailable({}, toolchains, required).size(), 1);
+    }
+
+    void aProgramOfThePathMeetsARequirement()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), true);
+#ifdef Q_OS_WIN
+        const QString program = "cmd";
+#else
+        const QString program = "sh";
+#endif
+        const QList<ToolRequirement> present{{.tool = program, .version = {}, .kit = {}, .modules = {}}};
+        const QList<ToolRequirement> absent{
+            {.tool = "no-such-program-of-duet", .version = {}, .kit = {}, .modules = {}}};
+
+        QVERIFY(InstallPlan::unavailable({}, toolchains, present).isEmpty());
+        QVERIFY(InstallPlan::plan({}, toolchains, absent).isEmpty()); // never downloaded
+        QCOMPARE(InstallPlan::unavailable({}, toolchains, absent).size(), 1);
+    }
+
+    void plansTheDownloadsTheRecipeDescribes()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), false);
+        const DownloadSource zip{.url = QUrl("https://example.org/maven.zip"),
+                                 .fileName = "maven.zip",
+                                 .checksumUrl = {},
+                                 .checksum = "ab",
+                                 .algorithm = ChecksumAlgorithm::Sha256,
+                                 .format = ArchiveFormat::Zip,
+                                 .error = {}};
+        const QList<ToolRequirement> required{{.tool = "maven",
+                                               .version = "3.9.16",
+                                               .kit = {},
+                                               .modules = {},
+                                               .program = "mvn",
+                                               .download = zip,
+                                               .check = "bin/mvn"}};
+
+        const QList<InstallStep> steps = InstallPlan::plan({}, toolchains, required);
+
+        QCOMPARE(titles(steps), QStringList{"maven 3.9.16"});
+        QCOMPARE(steps.first().source, std::optional(zip));
+        QCOMPARE(steps.first().check, QString("bin/mvn"));
+        QVERIFY(InstallPlan::unavailable({}, toolchains, required).isEmpty());
+        write(toolchains.installFolder("maven", "3.9.16") + "/.complete", "maven 3.9.16");
+        QVERIFY(InstallPlan::plan({}, toolchains, required).isEmpty());
+    }
+
+    void aProgramOfThePathSparesTheDownload()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.path(), true);
+#ifdef Q_OS_WIN
+        const QString program = "cmd";
+#else
+        const QString program = "sh";
+#endif
+        const QList<ToolRequirement> required{{.tool = "shell",
+                                               .version = "1",
+                                               .kit = {},
+                                               .modules = {},
+                                               .program = program,
+                                               .download = DownloadSource{},
+                                               .check = {}}};
+
+        QVERIFY(InstallPlan::plan({}, toolchains, required).isEmpty());
+    }
+
+    void installsADownloadTheRecipeDescribes()
+    {
+        if (QStandardPaths::findExecutable("tar").isEmpty())
+            QSKIP("No tar");
+        QTemporaryDir dir;
+        // apache-maven-3.9.16/bin/mvn, as Maven's archive holds it.
+        write(dir.filePath("source/apache-maven-3.9.16/bin/mvn"), "#!/bin/sh\necho maven\n");
+        QProcess tar;
+        tar.start("tar", {"-czf", dir.filePath("maven.tar.gz"), "-C", dir.filePath("source"), "apache-maven-3.9.16"});
+        QVERIFY(tar.waitForFinished());
+        QCOMPARE(tar.exitCode(), 0);
+        QFile archive(dir.filePath("maven.tar.gz"));
+        QVERIFY(archive.open(QIODevice::ReadOnly));
+        const QString sha512 =
+            QString::fromLatin1(QCryptographicHash::hash(archive.readAll(), QCryptographicHash::Sha512).toHex());
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        Installer installer(&toolchains);
+        const DownloadSource source{.url = QUrl::fromLocalFile(dir.filePath("maven.tar.gz")),
+                                    .fileName = "maven.tar.gz",
+                                    .checksumUrl = {},
+                                    .checksum = sha512,
+                                    .algorithm = ChecksumAlgorithm::Sha512,
+                                    .format = ArchiveFormat::TarGz,
+                                    .error = {}};
+        const InstallStep step{.tool = "maven",
+                               .version = "3.9.16",
+                               .title = "maven 3.9.16",
+                               .reason = {},
+                               .kit = {},
+                               .modules = {},
+                               .source = source,
+                               .check = "bin/mvn"};
+        QSignalSpy finished(&installer, &Installer::finished);
+        QSignalSpy steps(&installer, &Installer::stepFinished);
+
+        installer.run({step});
+
+        QVERIFY(finished.wait(10000));
+        QCOMPARE(steps.first().at(1).toString(), QString());
+        QVERIFY(toolchains.isInstalled("maven", "3.9.16"));
+        QVERIFY(QFileInfo::exists(toolchains.installFolder("maven", "3.9.16") + "/bin/mvn"));
+    }
+
+    void aDownloadWithoutItsCheckFileIsNotInstalled()
+    {
+        if (QStandardPaths::findExecutable("tar").isEmpty())
+            QSKIP("No tar");
+        QTemporaryDir dir;
+        write(dir.filePath("source/maven/README"), "no bin/mvn\n");
+        QProcess tar;
+        tar.start("tar", {"-czf", dir.filePath("maven.tar.gz"), "-C", dir.filePath("source"), "maven"});
+        QVERIFY(tar.waitForFinished());
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        Installer installer(&toolchains);
+        const DownloadSource source{.url = QUrl::fromLocalFile(dir.filePath("maven.tar.gz")),
+                                    .fileName = "maven.tar.gz",
+                                    .checksumUrl = {},
+                                    .checksum = {},
+                                    .algorithm = ChecksumAlgorithm::Sha256,
+                                    .format = ArchiveFormat::TarGz,
+                                    .error = {}};
+        QSignalSpy finished(&installer, &Installer::finished);
+        QSignalSpy steps(&installer, &Installer::stepFinished);
+
+        installer.run({{.tool = "maven",
+                        .version = "3.9.16",
+                        .title = "maven 3.9.16",
+                        .reason = {},
+                        .kit = {},
+                        .modules = {},
+                        .source = source,
+                        .check = "bin/mvn"}});
+
+        QVERIFY(finished.wait(10000));
+        QVERIFY(steps.first().at(1).toString().contains("expected files"));
+        QVERIFY(!toolchains.isInstalled("maven", "3.9.16"));
+    }
+
     void plansWhatIsMissing()
     {
         const QTemporaryDir dir;
@@ -283,19 +659,19 @@ private slots:
         ProjectConfig config;
         config.languages.append({"java", true, "17", {}, "jdtls", "1.62.0"});
         // jdtls itself runs on Java 21.
-        QCOMPARE(titles(InstallPlan::plan(config, toolchains)), (QStringList{"JDK 17", "JDK 21", "jdtls 1.62.0"}));
+        QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"JDK 17", "JDK 21", "jdtls 1.62.0"}));
 
         fakeInstall(toolchains, "jdk", "21", "bin/java");
         fakeInstall(toolchains, "jdtls", "1.62.0", "bin/jdtls");
-        QCOMPARE(titles(InstallPlan::plan(config, toolchains)), (QStringList{"JDK 17"}));
+        QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"JDK 17"}));
         config.languages[0].runtimeVersion = "21";
-        QVERIFY(InstallPlan::plan(config, toolchains).isEmpty());
+        QVERIFY(InstallPlan::plan(config, toolchains, {}).isEmpty());
 
         // A server needing Node brings one; disabled languages need nothing.
         config.languages.append({"python", true, "3.12", {}, "pyright", "1.1.414"});
         config.languages.append({"cpp", false, "c++20", {}, "clangd", "23.1.0"});
-        QCOMPARE(titles(InstallPlan::plan(config, toolchains)), (QStringList{"Node.js 24", "pyright 1.1.414"}));
-        QVERIFY(InstallPlan::unavailable(config, toolchains).join(' ').contains("Python 3.12"));
+        QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"Node.js 24", "pyright 1.1.414"}));
+        QVERIFY(InstallPlan::unavailable(config, toolchains, {}).join(' ').contains("Python 3.12"));
     }
 
     void completesASetup()
@@ -317,6 +693,11 @@ private slots:
         QCOMPARE(toolchains.runtimeAtLeast("jdk", 11)->version, QString("17"));
     }
 
+#ifdef _MSC_VER
+// C4702: on Windows the QSKIP returns, so cl calls the rest of the test unreachable.
+#pragma warning(push)
+#pragma warning(disable : 4702)
+#endif
     void installsAnArchive()
     {
 #ifdef Q_OS_WIN
@@ -374,6 +755,9 @@ private slots:
         QCOMPARE(toolchains.serverExecutable("clangd", "23.1.0"), clangd);
         QVERIFY(!QDir(dir.filePath("toolchains/.staging")).exists());
     }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
     void editsASetup()
     {
@@ -454,6 +838,65 @@ private slots:
         QVERIFY(!form.project().languages.first().enabled);
     }
 
+    void setupOffersOnlyTheRecipesOfTheLanguage()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+
+        form.setProject(javaProject(dir.path()), {});
+
+        const QComboBox *recipes = form.recipeChoice("java");
+        QCOMPARE(recipes->itemData(0).toString(), QString()); // None
+        QVERIFY(recipes->findData("java-maven") > 0);
+        QCOMPARE(recipes->findData("cpp-cmake"), -1);
+        QCOMPARE(form.recipeChoice("cpp")->findData("java-maven"), -1);
+    }
+
+    void setupAttachesTheChosenRecipeToItsLanguage()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+        form.setProject(javaProject(dir.path()), {});
+        QComboBox *recipes = form.recipeChoice("java");
+
+        recipes->setCurrentIndex(recipes->findData("java-maven"));
+
+        QCOMPARE(form.project().language("java")->recipe, QString("java-maven"));
+        QCOMPARE(form.project().recipes(), QStringList{"java-maven"});
+    }
+
+    void detectionKeepsTheRecipeOfALanguageNoFileShowsYet()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectConfig saved;
+        saved.path = dir.path();
+        LanguageSetup cpp;
+        cpp.language = "cpp";
+        cpp.recipe = "cpp-cmake";
+        saved.languages.append(cpp);
+
+        const ProjectConfig detected = ProjectSetupForm::detectedProject(saved, toolchains);
+
+        QVERIFY(detected.language("cpp"));
+        QCOMPARE(detected.language("cpp")->recipe, QString("cpp-cmake"));
+    }
+
+    void aProjectHasTheRecipesOfItsEnabledLanguagesOnly()
+    {
+        ProjectConfig project;
+        LanguageSetup java{"java", true, "21", {}, "jdtls", "1.62.0", "java-maven"};
+        LanguageSetup cpp{"cpp", false, "c++20", {}, "clangd", "23.1.0", "cpp-cmake"};
+        project.languages = {java, cpp};
+
+        const ProjectConfig saved = ProjectConfig::fromVariant("/p", project.toVariant());
+
+        QCOMPARE(saved.recipes(), QStringList{"java-maven"});
+        QCOMPARE(saved.language("cpp")->recipe, QString("cpp-cmake"));
+    }
+
     void projectSettingsApplyStaysOpenAndOkCloses()
     {
         const QTemporaryDir dir;
@@ -516,99 +959,13 @@ private slots:
         QCOMPARE(chosen.first().first().value<ProjectConfig>().path, dir.filePath("alpha"));
     }
 
-    void templateIsDetectedWithItsRuntime_data()
-    {
-        QTest::addColumn<QString>("family");
-        QTest::addColumn<QString>("runtimeVersion");
-        for (const QString family : {"cpp", "java", "javascript"})
-            QTest::newRow(qPrintable(family)) << family << ToolCatalog::defaultRuntimeVersion(family);
-        QTest::newRow("python") << QString("python") << QString("3.12");
-    }
-
-    void templateIsDetectedWithItsRuntime()
-    {
-        QFETCH(QString, family);
-        QFETCH(QString, runtimeVersion);
-        const QTemporaryDir dir;
-        QString error;
-
-        QVERIFY2(ProjectTemplates::create(family, dir.filePath("My App"), &error), qPrintable(error));
-
-        const QList<DetectedLanguage> found = ProjectDetector::detect(dir.filePath("My App"));
-        QCOMPARE(found.size(), 1);
-        QCOMPARE(found.first().language, family);
-        QCOMPARE(found.first().runtimeVersion, runtimeVersion);
-    }
-
-    void templateConfiguresBuildRunAndDebug_data()
-    {
-        QTest::addColumn<QString>("family");
-        for (const QString &family : ProjectLanguages::families())
-            QTest::newRow(qPrintable(family)) << family;
-    }
-
-    void templateConfiguresBuildRunAndDebug()
-    {
-        QFETCH(QString, family);
-        const QTemporaryDir dir;
-        QString error;
-        QVERIFY2(ProjectTemplates::create(family, dir.filePath("My App"), &error), qPrintable(error));
-        QFile file(RunConfigurations::filePath(dir.filePath("My App")));
-        QVERIFY(file.open(QIODevice::ReadOnly));
-
-        const QList<RunConfiguration> configurations = RunConfigurations::parse(file.readAll(), &error);
-
-        QVERIFY2(error.isEmpty(), qPrintable(error));
-        QList<RunConfiguration::Kind> kinds;
-        for (const RunConfiguration &configuration : configurations)
-            kinds.append(configuration.kind);
-        const QList<RunConfiguration::Kind> expected{RunConfiguration::Kind::Build, RunConfiguration::Kind::Run,
-                                                     RunConfiguration::Kind::Debug};
-        QCOMPARE(kinds, expected);
-        QVERIFY(!configurations.last().command.contains("{{"));
-    }
-
-    void namesTheTemplateFilesAfterTheFolder()
-    {
-        const QTemporaryDir dir;
-        QString error;
-
-        QVERIFY(ProjectTemplates::create("python", dir.filePath("My App"), &error));
-
-        QVERIFY(QFileInfo::exists(dir.filePath("My App/src/my_app/__main__.py")));
-        QFile pyproject(dir.filePath("My App/pyproject.toml"));
-        QVERIFY(pyproject.open(QIODevice::ReadOnly));
-        QVERIFY(pyproject.readAll().contains("name = \"my_app\""));
-    }
-
-    void makesAnIdentifierOfTheProjectName()
-    {
-        QCOMPARE(ProjectTemplates::identifierOf("My App!"), QString("my_app"));
-        QCOMPARE(ProjectTemplates::identifierOf("--web-front--"), QString("web_front"));
-        QCOMPARE(ProjectTemplates::identifierOf("2048"), QString("project_2048"));
-        QCOMPARE(ProjectTemplates::identifierOf("Éclair"), QString("clair"));
-        QCOMPARE(ProjectTemplates::identifierOf("???"), QString("project"));
-    }
-
-    void templateRefusesAFolderThatIsNotEmpty()
-    {
-        const QTemporaryDir dir;
-        write(dir.filePath("taken/notes.txt"), "keep me");
-        QString error;
-
-        QVERIFY(!ProjectTemplates::create("cpp", dir.filePath("taken"), &error));
-
-        QVERIFY(!error.isEmpty());
-        QVERIFY(!QFileInfo::exists(dir.filePath("taken/CMakeLists.txt")));
-    }
-
     void newProjectFormCreatesTheProjectWithARepository()
     {
         const QTemporaryDir dir;
         NewProjectForm form;
         form.nameEdit()->setText("demo");
         form.locationEdit()->setText(dir.path());
-        form.templateList()->setCurrentRow(1); // C++
+        form.recipeList()->setCurrentRow(1); // C++
         form.gitCheck()->setChecked(true);
         QSignalSpy created(&form, &NewProjectForm::created);
 
@@ -621,6 +978,10 @@ private slots:
         const std::optional<ProjectConfig> project = ProjectStore::find(dir.filePath("demo"));
         QVERIFY(project.has_value());
         QVERIFY(!project->configured); // its languages are chosen next
+        QCOMPARE(project->recipes().size(), 1);
+        QVERIFY(project->recipes().first().startsWith("cpp-cmake"));
+        QVERIFY(project->language("cpp"));
+        QVERIFY(project->needsRecipeSetup); // CMake configures at the first opening
         QVERIFY(ClaudeTrust::isTrusted(dir.filePath("demo")));
     }
 
@@ -669,7 +1030,7 @@ private slots:
         QVERIFY(!form.createButton()->isEnabled());
     }
 
-    void newProjectTemplatesKeepApartWhenTheStyleSheetChanges()
+    void newProjectRecipesKeepApartWhenTheStyleSheetChanges()
     {
         QWidget host;
         host.resize(1200, 900);
@@ -691,7 +1052,7 @@ private slots:
         NewProjectForm *form = window.newProjectForm();
         form->nameEdit()->setText("demo");
         form->locationEdit()->setText(dir.path());
-        form->templateList()->setCurrentRow(0); // empty
+        form->recipeList()->setCurrentRow(0); // empty
         form->gitCheck()->setChecked(false);
 
         form->createButton()->click();
@@ -699,6 +1060,31 @@ private slots:
         QVERIFY(QFileInfo(dir.filePath("demo")).isDir());
         QVERIFY(!QFileInfo::exists(dir.filePath("demo/.git")));
         QVERIFY(window.findChild<ProjectSetupPanel *>()->isVisibleTo(&window));
+    }
+
+    // Downloads for real: DUET_NETWORK_TESTS=1.
+    void downloadsTheMavenOfItsRecipe()
+    {
+        if (qEnvironmentVariableIsEmpty("DUET_NETWORK_TESTS"))
+            QSKIP("Set DUET_NETWORK_TESTS=1 to download from the Internet");
+        const std::optional<Recipe> recipe = RecipeLibrary::find(RecipeLibrary::defaultSources(), "java-maven");
+        QVERIFY(recipe);
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        QList<ToolRequirement> maven = recipe->tools();
+        maven.removeIf([](const ToolRequirement &tool) { return tool.tool != "maven"; });
+        const QList<InstallStep> steps = InstallPlan::plan({}, toolchains, maven);
+        QCOMPARE(titles(steps), QStringList{"maven 3.9.16"});
+        Installer installer(&toolchains);
+        QSignalSpy finished(&installer, &Installer::finished);
+        QSignalSpy stepFinished(&installer, &Installer::stepFinished);
+
+        installer.run(steps);
+
+        QVERIFY(finished.wait(300000));
+        QCOMPARE(stepFinished.first().at(1).toString(), QString());
+        QVERIFY(QFileInfo::exists(toolchains.installFolder("maven", "3.9.16") + "/bin/mvn"));
+        QVERIFY(InstallPlan::plan({}, toolchains, maven).isEmpty());
     }
 
     // Downloads for real: DUET_NETWORK_TESTS=1.
@@ -710,7 +1096,7 @@ private slots:
         Toolchains toolchains(dir.filePath("toolchains"), false);
         ProjectConfig project;
         project.languages.append({"python", true, "3.12", {}, "pyright", "1.1.414"});
-        const QList<InstallStep> steps = InstallPlan::plan(project, toolchains);
+        const QList<InstallStep> steps = InstallPlan::plan(project, toolchains, {});
         QCOMPARE(titles(steps), (QStringList{"Node.js 24", "pyright 1.1.414"}));
         Installer installer(&toolchains);
         QSignalSpy finished(&installer, &Installer::finished);

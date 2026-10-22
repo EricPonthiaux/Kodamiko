@@ -5,6 +5,7 @@
 #include "ProjectSetupForm.h"
 #include "ProvisioningView.h"
 #include "projects/ProjectStore.h"
+#include "recipes/RecipeLibrary.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
 #include "ui/PopupWidgets.h"
@@ -155,11 +156,12 @@ void ProjectSetupPanel::updateSummary()
     if (pages_->currentIndex() != 0)
         return;
     const ProjectConfig project = form_->project();
-    const QList<InstallStep> steps = InstallPlan::plan(project, *toolchains_);
+    const QList<ToolRequirement> required = RecipeLibrary::requirementsOf(project);
+    const QList<InstallStep> steps = InstallPlan::plan(project, *toolchains_, required);
     QStringList lines;
     if (!steps.isEmpty())
         lines.append(tr("Will download: %1").arg(InstallPlan::summary(steps)));
-    lines.append(InstallPlan::unavailable(project, *toolchains_));
+    lines.append(InstallPlan::unavailable(project, *toolchains_, required));
     summary_->setText(lines.isEmpty() ? tr("All tools available") : lines.join(QLatin1Char('\n')));
 }
 
@@ -182,7 +184,7 @@ void ProjectSetupPanel::saveAndDownload(const ProjectConfig &project)
     project_ = project;
     // The setup is kept even if the downloads fail.
     ProjectStore::save(project_);
-    const QList<InstallStep> steps = InstallPlan::plan(project_, *toolchains_);
+    const QList<InstallStep> steps = InstallPlan::plan(project_, *toolchains_, RecipeLibrary::requirementsOf(project_));
     if (steps.isEmpty()) {
         finish();
         return;

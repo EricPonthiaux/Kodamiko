@@ -77,7 +77,7 @@ std::array<QByteArray, 2> scratchStyles(const QsciScintilla &scratch, const std:
     std::array<QByteArray, 2> styles;
     for (size_t side = 0; side < code.size(); ++side) {
         const qsizetype length = code[side].size();
-        scratch.SendScintilla(QsciScintillaBase::SCI_SETTEXT, 0UL, code[side].constData());
+        scratch.SendScintilla(QsciScintillaBase::SCI_SETTEXT, uintptr_t(0), code[side].constData());
         scratch.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0UL, -1L);
         // Each byte followed by its style, then two zero bytes.
         QByteArray styled(2 * length + 2, '\0');

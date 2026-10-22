@@ -1,0 +1,31 @@
+{
+    "title": "C++ · CMake · MSVC",
+    "language": "cpp",
+    "description": "CMakeLists.txt (C++20) and src/main.cpp, built with Visual Studio's compiler, CMake and Ninja.",
+    "systems": [
+        "windows"
+    ],
+    "environment": {
+        "visualStudio": true
+    },
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "cmake --build build"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "build\\{{identifier}}.exe"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "devenv /DebugExe build\\{{identifier}}.exe"
+        }
+    ],
+    "setup": [
+        "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=cl"
+    ]
+}

@@ -88,7 +88,7 @@ std::optional<QString> writeSettingsFile(const QByteArray &settings, const QStri
 
 // An npm installation provides claude.cmd, which CreateProcess can only
 // launch through cmd.exe.
-void launchThroughCmd(const ProcessSpec &spec)
+void launchThroughCmd(ProcessSpec &spec)
 {
 #ifdef Q_OS_WIN
     if (spec.program.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive) ||
@@ -258,6 +258,8 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
     spec.arguments = QStringList{QStringLiteral("--settings"), *settingsFile};
     if (const QString plugin = pluginPath(); !plugin.isEmpty())
         spec.arguments << QStringLiteral("--plugin-dir") << QDir::toNativeSeparators(plugin);
+    for (const QString &folder : options.pluginFolders)
+        spec.arguments << QStringLiteral("--plugin-dir") << QDir::toNativeSeparators(folder);
     if (mcpFile)
         spec.arguments << QStringLiteral("--mcp-config") << *mcpFile;
     if (!options.name.isEmpty())

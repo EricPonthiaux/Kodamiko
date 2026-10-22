@@ -33,6 +33,9 @@ public:
     // The project's folder and its runtimes (JDK, Node, Python), which the
     // commands find first in their PATH.
     void setProject(const ProjectConfig &project, const Toolchains *toolchains);
+    // The configurations of the project's recipe, offered after the
+    // project's own; one named as one of the project's is left out.
+    void setRecipeConfigurations(const QList<RunConfiguration> &configurations);
 
     QString folder() const { return project_.path; }
 
@@ -79,6 +82,7 @@ private:
     ProblemStore *problems_;
     ProjectConfig project_;
     const Toolchains *toolchains_ = nullptr;
+    QList<RunConfiguration> recipeConfigurations_;
     QHash<QString, std::shared_ptr<Run>> runs_;
     QStringList order_; // names, the last started first
 };

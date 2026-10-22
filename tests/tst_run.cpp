@@ -65,6 +65,33 @@ private slots:
 
     void cleanup() { QSettings().clear(); }
 
+    void offersTheRecipeConfigurationsAfterTheProjectsOwn()
+    {
+        const QTemporaryDir dir;
+        write(dir.path() + "/.duet/run.json",
+              R"({"configurations": [{"name": "Build", "kind": "build", "command": "make"}]})");
+        ProjectConfig project;
+        project.path = dir.path();
+        ProblemStore store(nullptr);
+        Runner runner(&store);
+        runner.setProject(project, nullptr);
+
+        RunConfiguration build;
+        build.name = "Build";
+        build.kind = RunConfiguration::Kind::Build;
+        build.command = "cmake";
+        RunConfiguration run;
+        run.name = "Run";
+        run.command = "app";
+
+        runner.setRecipeConfigurations({build, run});
+
+        const QList<RunConfiguration> all = runner.configurations();
+        QCOMPARE(all.size(), 2);
+        QCOMPARE(all.at(0).command, QString("make"));
+        QCOMPARE(all.at(1).name, QString("Run"));
+    }
+
     void readsAndWritesRunJson()
     {
         RunConfiguration build;

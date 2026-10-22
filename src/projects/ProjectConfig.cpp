@@ -13,6 +13,7 @@ QVariantMap LanguageSetup::toVariant() const
         {QStringLiteral("runtimePath"), runtimePath},
         {QStringLiteral("server"), server},
         {QStringLiteral("serverVersion"), serverVersion},
+        {QStringLiteral("recipe"), recipe},
     };
 }
 
@@ -25,7 +26,18 @@ LanguageSetup LanguageSetup::fromVariant(const QVariantMap &map)
     setup.runtimePath = map.value(QStringLiteral("runtimePath")).toString();
     setup.server = map.value(QStringLiteral("server")).toString();
     setup.serverVersion = map.value(QStringLiteral("serverVersion")).toString();
+    setup.recipe = map.value(QStringLiteral("recipe")).toString();
     return setup;
+}
+
+QStringList ProjectConfig::recipes() const
+{
+    QStringList ids;
+    for (const LanguageSetup &setup : languages) {
+        if (setup.enabled && !setup.recipe.isEmpty())
+            ids.append(setup.recipe);
+    }
+    return ids;
 }
 
 const LanguageSetup *ProjectConfig::language(const QString &family) const
@@ -55,6 +67,7 @@ QVariantMap ProjectConfig::toVariant() const
         {QStringLiteral("lastOpened"), lastOpened},
         {QStringLiteral("configured"), configured},
         {QStringLiteral("languages"), list},
+        {QStringLiteral("needsRecipeSetup"), needsRecipeSetup},
         {QStringLiteral("agentCheckCommand"), agentCheckCommand},
     };
 }
@@ -69,6 +82,7 @@ ProjectConfig ProjectConfig::fromVariant(const QString &path, const QVariantMap 
     for (const QVariant &setup : map.value(QStringLiteral("languages")).toList())
         config.languages.append(LanguageSetup::fromVariant(setup.toMap()));
     config.agentCheckCommand = map.value(QStringLiteral("agentCheckCommand")).toString();
+    config.needsRecipeSetup = map.value(QStringLiteral("needsRecipeSetup")).toBool();
     return config;
 }
 

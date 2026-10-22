@@ -35,9 +35,43 @@
         "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -fno-omit-frame-pointer -DNDEBUG",
         "DUET_NATIVE": "OFF"
       }
+    },
+    {
+      "name": "windows",
+      "displayName": "Release (Ninja, MSVC)",
+      "description": "From an x64 Native Tools prompt, with CMAKE_PREFIX_PATH pointing to Qt (msvc2022_64).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-win",
+      "architecture": { "value": "x64", "strategy": "external" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
+        "DUET_LTO": "ON",
+        "DUET_NATIVE": "OFF"
+      },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "windows-debug",
+      "inherits": "windows",
+      "displayName": "Debug (Ninja, MSVC)",
+      "binaryDir": "${sourceDir}/build-win-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DUET_LTO": "OFF"
+      }
     }
   ],
   "buildPresets": [
+    {
+      "name": "windows",
+      "configurePreset": "windows"
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug"
+    },
     {
       "name": "default",
       "configurePreset": "default"
@@ -69,6 +103,20 @@
     {
       "name": "profile",
       "configurePreset": "profile",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows",
+      "configurePreset": "windows",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug",
       "output": {
         "outputOnFailure": true
       }

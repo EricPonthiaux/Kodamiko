@@ -19,6 +19,29 @@
 #include <algorithm>
 #include <utility>
 
+namespace {
+
+// As CLion: a symbol of a header not included yet comes with its #include
+// (header insertion), and symbols of every namespace are offered, qualified
+// (all scopes). Parsing always: otherwise, while the file's headers are being
+// read, clangd answers with mere words (the local providers already give
+// those, at once).
+QStringList clangdArguments()
+{
+    QStringList arguments = {QStringLiteral("--background-index"), QStringLiteral("--header-insertion=iwyu"),
+                             QStringLiteral("--all-scopes-completion"), QStringLiteral("--pch-storage=memory"),
+                             QStringLiteral("--completion-parse=always")};
+#ifdef Q_OS_WIN
+    // On Windows, LLVM runs the default "low" priority in
+    // THREAD_MODE_BACKGROUND_BEGIN, which also drops the threads' I/O and
+    // memory priority: indexing a project's thousands of headers crawls.
+    arguments << QStringLiteral("--background-index-priority=normal");
+#endif
+    return arguments;
+}
+
+} // namespace
+
 LanguageServers::LanguageServers(QObject *parent)
     : QObject(parent)
 {
@@ -32,16 +55,9 @@ LanguageServers::~LanguageServers()
 const QList<LanguageServerSpec> &LanguageServers::known()
 {
     static const QList<LanguageServerSpec> specs = {
-        // As CLion: a symbol of a header not included yet comes with its
-        // #include (header insertion), and symbols of every namespace are
-        // offered, qualified (all scopes). Parsing always: otherwise,
-        // while the file's headers are being read, clangd answers with
-        // mere words (the local providers already give those, at once).
         {QStringLiteral("clangd"),
          QStringLiteral("clangd"),
-         {QStringLiteral("--background-index"), QStringLiteral("--header-insertion=iwyu"),
-          QStringLiteral("--all-scopes-completion"), QStringLiteral("--pch-storage=memory"),
-          QStringLiteral("--completion-parse=always")},
+         clangdArguments(),
          {QStringLiteral("c"), QStringLiteral("cpp")},
          QStringLiteral(".>:")},
         // Its workspace data goes to a cache folder (see clientFor). "@":

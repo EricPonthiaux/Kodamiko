@@ -3,6 +3,7 @@
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"
+#include "settings/TerminalPreferencesPage.h"
 #include "syntax/ScintillaStyles.h"
 #include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
@@ -274,6 +275,7 @@ private slots:
         preferences.codeLineHeight = 1.75;
         preferences.ligatures = true;
         preferences.animations = false;
+        preferences.terminalPathFolders = {"C:/tools/bin", "/opt/cmake/bin"};
         QWidget window;
         PreferencesPopup popup(Theme::dark(), &window);
         popup.load(preferences, {}, {});
@@ -287,6 +289,16 @@ private slots:
         preferences.theme = "light";
         popup.load(preferences, {}, {}); // reopened with other settings
         QCOMPARE(popup.preferences(), preferences);
+    }
+
+    void terminalPageLeavesOutTheEmptyFolders()
+    {
+        TerminalPreferencesPage page;
+        page.setPathFolders({"/a", "/b"});
+
+        page.folderList()->item(0)->setText("  ");
+
+        QCOMPARE(page.pathFolders(), QStringList{"/b"});
     }
 
     void dialogMovesAShortcutToTheSelectedCommand()

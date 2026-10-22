@@ -22,6 +22,7 @@
 #include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
 #include "projects/ProjectStore.h"
+#include "recipes/RecipeLibrary.h"
 #include "run/Runner.h"
 #include "search/FindInFilesPopup.h"
 #include "settings/PreferencesPopup.h"
@@ -67,9 +68,7 @@ void MainWindow::openFolder(const QString &folder)
     project_ = ProjectStore::touch(folder_);
     if (!project_.configured) {
         // Opened without the welcome window: set up from its files.
-        const QDateTime lastOpened = project_.lastOpened;
-        project_ = ProjectSetupForm::detectedProject(folder_, *toolchains_);
-        project_.lastOpened = lastOpened;
+        project_ = ProjectSetupForm::detectedProject(project_, *toolchains_);
         project_.configured = true;
         ProjectStore::save(project_);
     }
@@ -83,6 +82,7 @@ void MainWindow::openFolder(const QString &folder)
     usagesView_->setProjectFolder(folder_);
     hierarchyView_->clear();
     runner_->setProject(project_, toolchains_.get());
+    loadProjectRecipes();
     agentMerges_->setFolder(folder_);
     agentMerges_->setCheckCommand(project_.agentCheckCommand);
     goToPopup_->setFolder(folder_);
@@ -101,6 +101,10 @@ void MainWindow::openFolder(const QString &folder)
     setWindowTitle(QStringLiteral("%1 — Duet").arg(QFileInfo(folder_).fileName()));
     terminalWindow_->setWindowTitle(tr("Terminals — %1").arg(QFileInfo(folder_).fileName()));
     updateProjectMenu();
+    if (project_.needsRecipeSetup) {
+        for (const Recipe &recipe : std::as_const(recipes_))
+            runRecipeSetup(recipe);
+    }
 }
 
 void MainWindow::saveSession()
@@ -247,9 +251,17 @@ void MainWindow::applyProject(const ProjectConfig &project)
 {
     if (QDir(project.path).absolutePath() != folder_)
         return; // another project's downloads, finished after a switch
+    const bool recipesChanged = project.recipes() != project_.recipes();
     project_ = project;
     languageServers_->setProject(project_, toolchains_.get());
     runner_->setProject(project_, toolchains_.get());
+    // Its runtimes may have been downloaded just now.
+    loadProjectRecipes();
+    if (recipesChanged) {
+        updateProjectMenu();
+        showStatus(tr("Recipes changed: the terminals and the %1 session started from now on use them")
+                       .arg(agentProvider_->name()));
+    }
     agentMerges_->setCheckCommand(project_.agentCheckCommand);
     warmUpLanguageServers();
     if (preferencesPopup_)
@@ -269,7 +281,8 @@ void MainWindow::closeProject()
 
 void MainWindow::updateToolsNotice()
 {
-    const QList<InstallStep> steps = InstallPlan::plan(project_, *toolchains_);
+    const QList<ToolRequirement> required = RecipeLibrary::requirementsOf(project_);
+    const QList<InstallStep> steps = InstallPlan::plan(project_, *toolchains_, required);
     if (steps.isEmpty()) {
         toolsNotice_->hide();
         return;

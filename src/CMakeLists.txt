@@ -53,6 +53,7 @@ add_library(duet_core STATIC
     changes/FileChangeDelegate.cpp
     changes/GitActions.cpp
     changes/HunkActions.cpp
+    changes/IdentityPopup.cpp
     changes/NewBranchPopup.cpp
     changes/ScratchEditors.cpp
     changes/SnapshotsPopup.cpp
@@ -172,7 +173,11 @@ add_library(duet_core STATIC
     projects/ProjectConfig.cpp
     projects/ProjectDetector.cpp
     projects/ProjectStore.cpp
-    projects/ProjectTemplates.cpp
+    recipes/DeveloperEnvironment.cpp
+    recipes/ProjectCreation.cpp
+    recipes/Recipe.cpp
+    recipes/RecipeLibrary.cpp
+    recipes/RecipeSetup.cpp
     run/BuildOutputParser.cpp
     run/RunConfiguration.cpp
     run/RunConfigurationMenu.cpp
@@ -183,6 +188,7 @@ add_library(duet_core STATIC
     settings/Keymap.cpp
     settings/Preferences.cpp
     settings/PreferencesPopup.cpp
+    settings/TerminalPreferencesPage.cpp
     settings/TreeZoom.cpp
     setup/Prerequisites.cpp
     setup/PrerequisitesPopup.cpp
@@ -202,6 +208,8 @@ add_library(duet_core STATIC
     toolchains/Installer.cpp
     toolchains/InstallPlan.cpp
     toolchains/JavaRuntimes.cpp
+    toolchains/QtDownload.cpp
+    toolchains/QtRepository.cpp
     toolchains/ToolCatalog.cpp
     toolchains/Toolchains.cpp
     ui/AppFonts.cpp
@@ -263,7 +271,10 @@ add_library(duet_core STATIC
 # The PTY depends on the system: ConPTY on Windows, forkpty elsewhere.
 if(WIN32)
     target_sources(duet_core PRIVATE terminal/ConPty.cpp)
-    target_compile_definitions(duet_core PRIVATE _WIN32_WINNT=0x0A00 NOMINMAX)
+    # Public: ConPty.h includes <windows.h>, and so does every source that
+    # includes it. WIN32_LEAN_AND_MEAN leaves out rpcndr.h, whose `small`
+    # macro breaks a field of vterm.h.
+    target_compile_definitions(duet_core PUBLIC _WIN32_WINNT=0x0A00 NOMINMAX WIN32_LEAN_AND_MEAN)
 else()
     target_sources(duet_core PRIVATE terminal/UnixPty.cpp)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -367,6 +378,7 @@ qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/MainWindowGit.cpp
     app/MainWindowMenus.cpp
     app/MainWindowProject.cpp
+    app/MainWindowRecipe.cpp
     app/MainWindowRun.cpp
     app/MainWindowSettings.cpp)
 duet_enable_warnings(duet)
@@ -385,7 +397,7 @@ add_dependencies(duet duet-hook duet-mcp duet-askpass)
 # ClaudeLauncher looks for duet-hook and duet-mcp next to the executable, and
 # AskpassServer for duet-askpass: on macOS,
 # that is inside the bundle (Duet.app/Contents/MacOS), with Duet's Claude
-# plugin in Contents/Resources.
+# plugin and recipes in Contents/Resources.
 if(APPLE)
     set_target_properties(duet PROPERTIES OUTPUT_NAME Duet)
     add_custom_command(TARGET duet POST_BUILD
@@ -393,7 +405,9 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-mcp> $<TARGET_FILE_DIR:duet>
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-askpass> $<TARGET_FILE_DIR:duet>
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/claude-plugin
-                $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin)
+                $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/recipes
+                $<TARGET_FILE_DIR:duet>/../Resources/recipes)
 endif()
 
 # "duet" component: the dependencies (libgit2) declare their own

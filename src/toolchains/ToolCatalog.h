@@ -40,18 +40,30 @@ struct Platform {
 enum class ArchiveFormat {
     TarGz,
     Zip,
+    SevenZip, // Qt's archives
     Npm
+};
+
+enum class ChecksumAlgorithm {
+    Sha256,
+    Sha512 // Apache's releases
 };
 
 // Where to download one version of a tool.
 struct DownloadSource {
     QUrl url;
     QString fileName;
-    // A file giving its SHA-256; empty when none is published.
+    // A file giving its hash; empty when none is published.
     QUrl checksumUrl;
+    // The hash itself, when it is known beforehand (a recipe gives it):
+    // checksumUrl is not fetched.
+    QString checksum;
+    ChecksumAlgorithm algorithm = ChecksumAlgorithm::Sha256;
     ArchiveFormat format = ArchiveFormat::TarGz;
     // Why it cannot be downloaded (no build for this platform...).
     QString error;
+
+    bool operator==(const DownloadSource &) const = default;
 };
 
 namespace ToolCatalog {
@@ -76,8 +88,8 @@ QUrl metadataUrl(const QString &id, const QString &version);
 // The archive of `id` `version` for `platform`, given what metadataUrl
 // returned.
 DownloadSource source(const QString &id, const QString &version, const Platform &platform, const QByteArray &metadata);
-// The SHA-256 of `fileName` in a checksum file: a single hash, or lines of
-// "hash  name". Empty if it is not there.
+// The hash (SHA-256 or SHA-512) of `fileName` in a checksum file: a single
+// hash, or lines of "hash  name". Empty if it is not there.
 QString checksumFor(const QByteArray &checksums, const QString &fileName);
 
 } // namespace ToolCatalog

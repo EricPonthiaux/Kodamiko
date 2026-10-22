@@ -15,13 +15,15 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 class QProcess;
+class QtDownload;
 class Toolchains;
 
 // Downloads the steps of an InstallPlan into Toolchains' folder, one after
 // the other: each archive is fetched (its address first, from the release's
 // information), checked against its published SHA-256, unpacked with the
 // system's tar (or unzip), and moved in place; npm packages are installed
-// with the Node Duet has. A step that fails does not stop the others.
+// with the Node Duet has, a Qt kit by QtDownload. A step that fails does
+// not stop the others.
 class Installer : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(Installer)
@@ -65,7 +67,9 @@ private:
                        const QString &expectedChecksum);
     void extract(const DownloadSource &source, const QString &archive);
     void installNpm();
-    void complete(const QString &content);
+    void installQt();
+    // Moves `content` to `target` and marks it complete.
+    void complete(const QString &content, const QString &target);
     void fail(const QString &error);
     void nextStep();
     // GET `url` into memory; `done` gets the body, or an error.
@@ -82,6 +86,7 @@ private:
     // The current step's work: one at a time.
     QPointer<QNetworkReply> reply_;
     QPointer<QProcess> process_;
+    QPointer<QtDownload> qt_;
     std::unique_ptr<QFile> file_;
     // Incremented by cancel(): callbacks of an older generation are ignored.
     int generation_ = 0;

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "recipes/Recipe.h"
 #include "ui/Theme.h"
 
 #include <QWidget>
@@ -14,17 +15,18 @@ class QListWidget;
 class QPushButton;
 
 // Creating a project, for the welcome window and File ▸ New Project: its
-// name, the folder it goes in, what it starts with (ProjectTemplates) and
-// whether it gets a git repository. Create writes the folder, adds it to the
-// projects (ProjectStore, not set up yet) and emits created: the host then
-// sets its languages up, detected from the template's files.
+// name, the folder it goes in, the recipe it is made with (those of this
+// system, see RecipeLibrary) and whether it gets a git repository. Create
+// writes the folder, adds it to the projects (ProjectStore, not set up yet,
+// the recipe attached to its language) and emits created: the host then
+// sets its languages up, detected from the recipe's files.
 class NewProjectForm : public QWidget {
     Q_OBJECT
 
 public:
     explicit NewProjectForm(QWidget *parent = nullptr);
 
-    // Empties the name and gives it the focus; the location, the template
+    // Empties the name and gives it the focus; the location, the recipe
     // and the git choice stay those of the last project created.
     void reset();
     void applyTheme(const Theme &theme);
@@ -34,7 +36,7 @@ public:
 
     QLineEdit *locationEdit() const { return location_; }
 
-    QListWidget *templateList() const { return templates_; }
+    QListWidget *recipeList() const { return recipeList_; }
 
     QCheckBox *gitCheck() const { return git_; }
 
@@ -60,11 +62,14 @@ private:
     void create();
     void initRepository(const QString &folder);
     void trustForClaude(const QString &folder);
+    // The recipe of the selected item, if any.
+    const Recipe *selectedRecipe() const;
 
     PopupHeader *header_;
     QLineEdit *name_;
     QLineEdit *location_;
-    QListWidget *templates_;
+    QListWidget *recipeList_;
+    QList<Recipe> recipes_; // the items' recipes, in the same order
     QLabel *description_;
     QCheckBox *git_;
     QLabel *summary_ = nullptr;

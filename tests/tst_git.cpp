@@ -426,6 +426,11 @@ private slots:
         QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("reworded\n"));
     }
 
+#ifdef _MSC_VER
+// C4702: on Windows the QSKIP returns, so cl calls the rest of the test unreachable.
+#pragma warning(push)
+#pragma warning(disable : 4702)
+#endif
     void commitRunsTheRepositoryHooks()
     {
 #ifdef Q_OS_WIN
@@ -446,6 +451,9 @@ private slots:
             QVERIFY(QString::fromStdString(error.what()).contains("rejected by the hook"));
         }
     }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
     void rollbackRestoresTheLastCommitStagedChangesIncluded()
     {

@@ -111,9 +111,21 @@ DownloadSource clangdSource(const QString &version, const Platform &platform)
     return source;
 }
 
+// A server that is down may answer with a web page, and HTTP 200, in place
+// of the file asked for: download.eclipse.org's "Temporary shutdown" does.
+bool isWebPage(const QString &text)
+{
+    return text.startsWith(QLatin1String("<!DOCTYPE"), Qt::CaseInsensitive) ||
+           text.startsWith(QLatin1String("<html"), Qt::CaseInsensitive);
+}
+
 DownloadSource jdtlsSource(const QString &version, const QByteArray &metadata)
 {
     const QString name = QString::fromUtf8(metadata).trimmed();
+    if (isWebPage(name))
+        return failure(QObject::tr("download.eclipse.org answered with a web page instead of the name of the jdtls "
+                                   "%1 milestone: the server may be down, retry later")
+                           .arg(version));
     if (!name.startsWith(QLatin1String("jdt-language-server-")) || !name.endsWith(QLatin1String(".tar.gz")))
         return failure(QObject::tr("No jdtls %1 milestone found").arg(version));
     DownloadSource source;
@@ -309,7 +321,8 @@ QString checksumFor(const QByteArray &checksums, const QString &fileName)
     const QList<QByteArray> lines = checksums.trimmed().split('\n');
     for (const QByteArray &line : lines) {
         const QList<QByteArray> fields = line.simplified().split(' ');
-        if (fields.isEmpty() || fields.first().size() != 64)
+        const bool isHash = !fields.isEmpty() && (fields.first().size() == 64 || fields.first().size() == 128);
+        if (!isHash)
             continue;
         // "hash", or "hash  name" ("*name" in binary mode).
         QByteArray name = fields.size() > 1 ? fields.at(1) : QByteArray();

@@ -49,6 +49,19 @@ ctest --preset default
 ./build/bin/duet [project-folder]
 ```
 
+On Windows, from an *x64 Native Tools Command Prompt* (Visual Studio 2022
+or later, which also provides CMake and Ninja), with Qt's `msvc2022_64`
+kit in `CMAKE_PREFIX_PATH` and its `bin` directory in `PATH`:
+
+```bat
+set CMAKE_PREFIX_PATH=C:\Qt\6.10.3\msvc2022_64
+set PATH=%CMAKE_PREFIX_PATH%\bin;%PATH%
+cmake --preset windows
+cmake --build --preset windows
+ctest --preset windows
+build-win\bin\duet.exe [project-folder]
+```
+
 At runtime Duet needs [Claude Code](https://claude.com/claude-code) 2.1+
 and git 2.23+. If either is missing, *Help ▸ Check Prerequisites* opens on
 startup and offers to install it.
@@ -68,6 +81,35 @@ A few shortcuts to start with: F11 jumps to the terminal and back,
 Ctrl+Shift+P opens the command palette, Ctrl+Shift+N goes to a file,
 Ctrl+Alt+K adds the selected lines to Claude's prompt, and right-clicking
 code offers *Explain*, *Review* and *Write Tests*.
+
+### Recipes
+
+A *recipe* is how to make one kind of project on one system: a Qt Widgets
+application with MSVC on Windows, a Python package… *File ▸ New Project*
+lists the recipes of your system; the project gets the recipe's first
+files, and from then on:
+
+- its terminals, run configurations and Claude sessions get the recipe's
+  environment (Visual Studio's compiler, CMake and Ninja, the Qt kit in
+  `CMAKE_PREFIX_PATH`…), without an *x64 Native Tools* prompt;
+- Claude gets the recipe's skills and instructions;
+- the *Project* menu offers the recipe's prompts, and the *Run* menu its
+  Build, Run and Debug configurations.
+
+A recipe belongs to one language (`"language": "cpp"` in its `recipe.json`),
+and a project has at most one recipe per language: in *Project Settings*,
+select a language, then one of its recipes (its files are not copied). A
+project using C++ and Java can combine a Qt recipe and a Maven one; their
+environments, tools, configurations, skills and prompts add up. A recipe
+is a folder with a `recipe.json`, its `files/`, an
+optional `instructions.md` and an optional `skills/` folder (a Claude Code
+plugin): see `src/recipes/Recipe.h` and Duet's own in `tools/recipes/`. Yours
+go in Duet's application data folder (`recipes/`), or in a project's
+`.duet/recipes/` to share them with its repository; one with the same name
+replaces Duet's.
+
+*Preferences ▸ Terminal* adds folders of your own in front of the `PATH` of
+every program Duet starts.
 
 ## How it works
 

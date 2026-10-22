@@ -1,0 +1,99 @@
+{
+    "title": "Qt Widgets · CMake",
+    "language": "cpp",
+    "description": "A Qt 6 Widgets window, built with the system's compiler and Qt 6.10, downloaded if the machine has none.",
+    "systems": [
+        "linux",
+        "macos"
+    ],
+    "requires": [
+        {
+            "tool": "cmake",
+            "version": "4.4.4",
+            "program": "cmake",
+            "download": {
+                "linux-x64": {
+                    "url": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-linux-x86_64.tar.gz",
+                    "checksumUrl": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-SHA-256.txt",
+                    "check": "bin/cmake"
+                },
+                "linux-aarch64": {
+                    "url": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-linux-aarch64.tar.gz",
+                    "checksumUrl": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-SHA-256.txt",
+                    "check": "bin/cmake"
+                },
+                "macos": {
+                    "url": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-macos-universal.tar.gz",
+                    "checksumUrl": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-SHA-256.txt",
+                    "check": "CMake.app/Contents/bin/cmake"
+                }
+            },
+            "path": [
+                "{{home}}/bin",
+                "{{home}}/CMake.app/Contents/bin"
+            ]
+        },
+        {
+            "tool": "qt",
+            "version": "6.10",
+            "kit": "gcc_64",
+            "systems": [
+                "linux"
+            ],
+            "path": [
+                "{{home}}/bin"
+            ],
+            "variables": {
+                "CMAKE_PREFIX_PATH": "{{home}}"
+            }
+        },
+        {
+            "tool": "qt",
+            "version": "6.10",
+            "kit": "macos",
+            "systems": [
+                "macos"
+            ],
+            "path": [
+                "{{home}}/bin"
+            ],
+            "variables": {
+                "CMAKE_PREFIX_PATH": "{{home}}"
+            }
+        }
+    ],
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "cmake --build build"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "build/{{identifier}}"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "gdb build/{{identifier}}"
+        }
+    ],
+    "setup": [
+        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug"
+    ],
+    "prompts": [
+        {
+            "title": "Add a Dialog",
+            "text": "Add a dialog to this Qt application: "
+        },
+        {
+            "title": "Add a Menu Action",
+            "text": "Add a menu action to the main window that "
+        },
+        {
+            "title": "Add a Settings Page with QSettings",
+            "text": "Add a settings dialog, saved with QSettings, with these settings: "
+        }
+    ]
+}

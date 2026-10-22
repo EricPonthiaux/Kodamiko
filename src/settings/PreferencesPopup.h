@@ -21,9 +21,11 @@ class QStackedWidget;
 class QTreeWidget;
 class PopupHeader;
 class QCheckBox;
+class TerminalPreferencesPage;
 
 // File ▸ Preferences, a popup over the window like Find in Files: a side
-// bar of pages (Appearance, Fonts, Editor, Files, Claude, Keymap), each made of
+// bar of pages (Appearance, Fonts, Editor, Files, Claude, Terminal,
+// Keymap), each made of
 // cards of settings. Changes apply on OK or Apply; Cancel, Escape or a
 // click elsewhere leave everything as it was.
 class PreferencesPopup : public OverlayPopup {
@@ -128,6 +130,7 @@ private:
     QCheckBox *shareEditorContext_ = nullptr;
     QCheckBox *exposeTools_ = nullptr;
     QCheckBox *claudeNotifications_ = nullptr;
+    TerminalPreferencesPage *terminalPage_ = nullptr;
 
     QList<Keymap::Command> commands_;
     Keymap::Overrides overrides_;

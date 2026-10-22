@@ -55,7 +55,7 @@ qreal paintBadge(const Row &row, ChangeKind kind)
     const int badge = QFontMetrics(row.option.font).height();
     const QRectF badgeRect(row.rect.right() - badge, row.rect.center().y() - badge / 2.0, badge, badge);
     QColor tile = changeKindColor(kind);
-    tile.setAlphaF(0.18);
+    tile.setAlphaF(0.18f);
     painter->setPen(Qt::NoPen);
     painter->setBrush(tile);
     painter->drawRoundedRect(badgeRect, 2, 2);

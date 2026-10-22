@@ -48,8 +48,11 @@ struct AgentSessionOptions {
     // the other sessions'. Without one, the agent picks it.
     QString sessionId;
     // Added to the agent's system prompt (the instructions of a worktree
-    // session); empty for none.
+    // session, of the project's recipe); empty for none.
     QString instructions;
+    // Plugin folders of skills the session loads besides Duet's own (the
+    // project's recipe's); an agent without plugins ignores them.
+    QStringList pluginFolders;
 };
 
 // A run without a session, outside the terminal, that writes one file (a

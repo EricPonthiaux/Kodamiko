@@ -3,6 +3,7 @@
 #include "ProjectSetupForm.h"
 
 #include "LanguageChoices.h"
+#include "recipes/RecipeLibrary.h"
 #include "toolchains/Toolchains.h"
 #include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
@@ -83,6 +84,26 @@ QWidget *fieldWithState(QComboBox *combo, QLabel *state)
     return field;
 }
 
+// The recipes of `saved`'s enabled languages, attached to the same
+// languages of `project`: a language its files do not show yet (a project
+// just created) is added for its recipe.
+void keepRecipes(ProjectConfig &project, const ProjectConfig &saved, const Toolchains &toolchains)
+{
+    for (const LanguageSetup &kept : saved.languages) {
+        if (!kept.enabled || kept.recipe.isEmpty())
+            continue;
+        if (LanguageSetup *setup = project.language(kept.language)) {
+            setup->recipe = kept.recipe;
+            continue;
+        }
+        LanguageSetup added;
+        added.language = kept.language;
+        added.recipe = kept.recipe;
+        toolchains.complete(added);
+        project.languages.append(added);
+    }
+}
+
 QScrollArea *scrolled(QWidget *content)
 {
     auto *holder = new QWidget;
@@ -152,6 +173,23 @@ QWidget *ProjectSetupForm::createSidebar()
     return sidebar;
 }
 
+void ProjectSetupForm::fillRecipes(const Page &page, const QString &selected)
+{
+    const QSignalBlocker blocker(page.recipe);
+    page.recipe->clear();
+    page.recipe->addItem(tr("None"), QString());
+    page.recipe->setItemData(0, tr("Only the language's runtime and server."), Qt::ToolTipRole);
+    for (const Recipe &recipe : RecipeLibrary::forLanguage(recipes_, page.family)) {
+        page.recipe->addItem(recipe.title, recipe.id);
+        page.recipe->setItemData(page.recipe->count() - 1, recipe.description, Qt::ToolTipRole);
+    }
+    if (!selected.isEmpty() && page.recipe->findData(selected) < 0) {
+        page.recipe->addItem(tr("%1 (not installed)").arg(selected), selected);
+        page.recipe->setItemData(page.recipe->count() - 1, tr("No recipe folder has this id."), Qt::ToolTipRole);
+    }
+    page.recipe->setCurrentIndex(std::max(page.recipe->findData(selected), 0));
+}
+
 QWidget *ProjectSetupForm::createPage(Page &page)
 {
     auto *content = new QWidget;
@@ -167,11 +205,17 @@ QWidget *ProjectSetupForm::createPage(Page &page)
     page.evidence->setObjectName(QStringLiteral("pageDescription"));
     page.evidence->setWordWrap(true);
 
+    page.recipe = settingCombo();
+    page.recipeState = stateLabel();
     page.runtime = settingCombo();
     page.runtimeState = stateLabel();
     page.server = settingCombo();
     page.serverVersion = settingCombo();
     page.serverState = stateLabel();
+    auto *recipeCard = new SettingsCard;
+    recipeCard->addRow(tr("Recipe"),
+                       tr("Its environment, run configurations, skills and prompts; its files are not copied."),
+                       fieldWithState(page.recipe, page.recipeState));
     auto *runtimeCard = new SettingsCard;
     runtimeCard->addRow(runtimeLabel(page.family), runtimeDescription(page.family),
                         fieldWithState(page.runtime, page.runtimeState));
@@ -184,6 +228,9 @@ QWidget *ProjectSetupForm::createPage(Page &page)
     auto *settingsLayout = new QVBoxLayout(page.settings);
     settingsLayout->setContentsMargins(0, 0, 0, 0);
     settingsLayout->setSpacing(0);
+    settingsLayout->addWidget(sectionHeading(tr("Recipe")));
+    settingsLayout->addWidget(recipeCard);
+    settingsLayout->addSpacing(16);
     settingsLayout->addWidget(sectionHeading(runtimeGroup(page.family)));
     settingsLayout->addWidget(runtimeCard);
     settingsLayout->addSpacing(16);
@@ -217,6 +264,7 @@ void ProjectSetupForm::connectPage(const Page &page)
         updatePage(pageOf(family));
         emit changed();
     };
+    connect(page.recipe, &QComboBox::currentIndexChanged, this, update);
     connect(page.runtime, &QComboBox::currentIndexChanged, this, update);
     connect(page.serverVersion, &QComboBox::currentIndexChanged, this, update);
     connect(page.server, &QComboBox::currentIndexChanged, this, [this, family] {
@@ -242,13 +290,15 @@ void ProjectSetupForm::applyTheme(const Theme &theme)
     detect_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
 }
 
-ProjectConfig ProjectSetupForm::detectedProject(const QString &folder,
+ProjectConfig ProjectSetupForm::detectedProject(const ProjectConfig &saved,
                                                 const Toolchains &toolchains,
                                                 QList<DetectedLanguage> *detected)
 {
     ProjectConfig project;
-    project.path = QDir(folder).absolutePath();
+    project.path = QDir(saved.path).absolutePath();
     project.name = QFileInfo(project.path).fileName();
+    project.lastOpened = saved.lastOpened;
+    project.needsRecipeSetup = saved.needsRecipeSetup;
     const QList<DetectedLanguage> found = ProjectDetector::detect(project.path);
     for (const DetectedLanguage &language : found) {
         LanguageSetup setup;
@@ -258,6 +308,7 @@ ProjectConfig ProjectSetupForm::detectedProject(const QString &folder,
         toolchains.complete(setup);
         project.languages.append(setup);
     }
+    keepRecipes(project, saved, toolchains);
     if (detected)
         *detected = found;
     return project;
@@ -266,6 +317,7 @@ ProjectConfig ProjectSetupForm::detectedProject(const QString &folder,
 void ProjectSetupForm::setProject(const ProjectConfig &project, const QList<DetectedLanguage> &detected)
 {
     project_ = project;
+    recipes_ = RecipeLibrary::available(RecipeLibrary::defaultSources(project_.path));
     for (Page &page : pages_) {
         LanguageSetup setup;
         setup.language = page.family;
@@ -289,9 +341,8 @@ void ProjectSetupForm::setProject(const ProjectConfig &project, const QList<Dete
 void ProjectSetupForm::detectAgain()
 {
     QList<DetectedLanguage> detected;
-    ProjectConfig project = detectedProject(project_.path, *toolchains_, &detected);
-    project.lastOpened = project_.lastOpened;
-    setProject(project, detected);
+    const ProjectConfig shown = project();
+    setProject(detectedProject(shown, *toolchains_, &detected), detected);
 }
 
 void ProjectSetupForm::fill(Page &page, const LanguageSetup &setup, const QString &evidence)
@@ -300,6 +351,7 @@ void ProjectSetupForm::fill(Page &page, const LanguageSetup &setup, const QStrin
     const QSignalBlocker serverBlocker(page.server);
     page.evidence->setText(evidence);
     page.enabled->setChecked(setup.enabled);
+    fillRecipes(page, setup.recipe);
 
     {
         const QSignalBlocker runtimeBlocker(page.runtime);
@@ -322,6 +374,7 @@ void ProjectSetupForm::updatePage(const Page &page)
     page.settings->setVisible(page.enabled->isChecked());
     page.offHint->setVisible(!page.enabled->isChecked());
     page.versionRow->setVisible(!page.server->currentData().toString().isEmpty());
+    page.recipeState->setText(page.recipe->currentData(Qt::ToolTipRole).toString());
     const QString runtimeState = page.runtime->currentData(LanguageChoices::stateRole).toString();
     page.runtimeState->setText(runtimeState);
     page.runtimeState->setVisible(!runtimeState.isEmpty());
@@ -356,6 +409,11 @@ void ProjectSetupForm::updateListItem(const Page &page)
     }
 }
 
+QComboBox *ProjectSetupForm::recipeChoice(const QString &family)
+{
+    return pageOf(family).recipe;
+}
+
 QString ProjectSetupForm::currentLanguage() const
 {
     const QListWidgetItem *current = list_->currentItem();
@@ -385,6 +443,7 @@ LanguageSetup ProjectSetupForm::setupOf(const Page &page) const
     setup.runtimePath = runtime.path;
     setup.server = page.server->currentData().toString();
     setup.serverVersion = setup.server.isEmpty() ? QString() : page.serverVersion->currentData().toString();
+    setup.recipe = page.recipe->currentData().toString();
     return setup;
 }
 

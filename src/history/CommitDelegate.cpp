@@ -47,7 +47,7 @@ const std::array avatarColors{QColor("#7c6cf0"), QColor("#4c9be8"), QColor("#2fa
 QColor dimmed(const QStyleOptionViewItem &option)
 {
     QColor color = option.palette.color(QPalette::Text);
-    color.setAlphaF(0.52);
+    color.setAlphaF(0.52f);
     return color;
 }
 
@@ -298,7 +298,7 @@ int CommitDelegate::paintBadges(QPainter *painter,
         const QRectF badge(right - width, line.top() + (line.height() - badgeMetrics.height() - 2) / 2.0, width,
                            badgeMetrics.height() + 2);
         QColor fill = refColor(name);
-        fill.setAlphaF(0.2);
+        fill.setAlphaF(0.2f);
         painter->setPen(Qt::NoPen);
         painter->setBrush(fill);
         painter->drawRoundedRect(badge, 2, 2);

@@ -2,6 +2,7 @@
 
 #include "InstallPlan.h"
 
+#include "QtRepository.h"
 #include "ToolCatalog.h"
 #include "Toolchains.h"
 
@@ -44,6 +45,8 @@ bool isSystem(const QString &version)
 // The steps of a plan, each tool and version once.
 class PlannedSteps {
 public:
+    void add(const InstallStep &step) { steps_.append(step); }
+
     void add(const QString &tool, const QString &version, const QString &reason)
     {
         const bool isPlanned = std::ranges::any_of(
@@ -108,13 +111,120 @@ void planLanguage(const LanguageSetup &setup, const Toolchains &toolchains, Plan
         steps.add(server->id, setup.serverVersion, QObject::tr("%1 language server").arg(family));
 }
 
+// The runtime Duet downloads for `requirement`, nullptr when it offers none.
+const ToolSpec *downloadableRuntime(const ToolRequirement &requirement)
+{
+    const ToolSpec *spec = ToolCatalog::find(requirement.tool);
+    if (!spec || !spec->isRuntime)
+        return nullptr;
+    const bool isOffered = requirement.version.isEmpty() || spec->versions.contains(requirement.version);
+    return isOffered ? spec : nullptr;
+}
+
+bool isQt(const ToolRequirement &requirement)
+{
+    return requirement.tool == QLatin1String(QtRepository::toolId);
+}
+
+// "Qt 6.10 msvc2022_64", "Qt msvc2022_64 with qtcharts".
+QString qtTitle(const ToolRequirement &requirement)
+{
+    QStringList words{QStringLiteral("Qt"), requirement.version, requirement.kit};
+    words.removeAll(QString());
+    QString title = words.join(QLatin1Char(' '));
+    if (!requirement.modules.isEmpty())
+        title += QObject::tr(" with %1").arg(requirement.modules.join(QStringLiteral(", ")));
+    return title;
+}
+
+void planQt(const ToolRequirement &requirement, const Toolchains &toolchains, PlannedSteps &steps)
+{
+    const bool isPresent = !toolchains.qtFolder(requirement.version, requirement.kit, requirement.modules).isEmpty();
+    if (requirement.kit.isEmpty() || isPresent)
+        return;
+    steps.add({.tool = requirement.tool,
+               .version = requirement.version,
+               .title = qtTitle(requirement),
+               .reason = QObject::tr("required by the recipe"),
+               .kit = requirement.kit,
+               .modules = requirement.modules,
+               .source = std::nullopt,
+               .check = {}});
+}
+
+// The command standing for `requirement` in the PATH.
+QString programOf(const ToolRequirement &requirement)
+{
+    return requirement.program.isEmpty() ? requirement.tool : requirement.program;
+}
+
+void planDownload(const ToolRequirement &requirement, const Toolchains &toolchains, PlannedSteps &steps)
+{
+    const bool isPresent = toolchains.isInstalled(requirement.tool, requirement.version) ||
+                           !toolchains.systemProgram(programOf(requirement)).isEmpty();
+    if (isPresent)
+        return;
+    steps.add({.tool = requirement.tool,
+               .version = requirement.version,
+               .title = QStringLiteral("%1 %2").arg(requirement.tool, requirement.version),
+               .reason = QObject::tr("required by the recipe"),
+               .kit = {},
+               .modules = {},
+               .source = requirement.download,
+               .check = requirement.check});
+}
+
+void planRequirement(const ToolRequirement &requirement, const Toolchains &toolchains, PlannedSteps &steps)
+{
+    if (isQt(requirement)) {
+        planQt(requirement, toolchains, steps);
+        return;
+    }
+    if (requirement.download) {
+        planDownload(requirement, toolchains, steps);
+        return;
+    }
+    const ToolSpec *spec = downloadableRuntime(requirement);
+    if (!spec || toolchains.runtime(requirement.tool, requirement.version))
+        return;
+    const QString version =
+        requirement.version.isEmpty() ? ToolCatalog::defaultRuntimeVersion(spec->family) : requirement.version;
+    steps.add(requirement.tool, version, QObject::tr("required by the recipe"));
+}
+
+// Why `requirement` cannot be met, empty when it can.
+QString requirementProblem(const ToolRequirement &requirement, const Toolchains &toolchains)
+{
+    if (isQt(requirement))
+        return requirement.kit.isEmpty() ? QObject::tr("The recipe requires Qt without saying which kit.") : QString();
+    if (requirement.download) {
+        const QString &error = requirement.download->error;
+        return error.isEmpty() ? QString()
+                               : QObject::tr("The recipe cannot download %1: %2").arg(requirement.tool, error);
+    }
+    if (downloadableRuntime(requirement) || toolchains.runtime(requirement.tool, requirement.version))
+        return {};
+    if (!ToolCatalog::find(requirement.tool)) {
+        const bool isInPath = !toolchains.systemProgram(programOf(requirement)).isEmpty();
+        return isInPath ? QString()
+                        : QObject::tr("The recipe requires %1, which is not in the PATH: install it.")
+                              .arg(programOf(requirement));
+    }
+    const QString tool = QStringLiteral("%1 %2").arg(requirement.tool, requirement.version).trimmed();
+    return QObject::tr("The recipe requires %1, which Duet cannot download: install it.").arg(tool);
+}
+
 } // namespace
 
 namespace InstallPlan {
 
-QList<InstallStep> plan(const ProjectConfig &config, const Toolchains &toolchains)
+QList<InstallStep> plan(const ProjectConfig &config,
+                        const Toolchains &toolchains,
+                        const QList<ToolRequirement> &required)
 {
     PlannedSteps steps;
+    for (const ToolRequirement &requirement : required)
+        planRequirement(requirement, toolchains, steps);
     for (const LanguageSetup &setup : config.languages) {
         if (setup.enabled)
             planLanguage(setup, toolchains, steps);
@@ -122,9 +232,15 @@ QList<InstallStep> plan(const ProjectConfig &config, const Toolchains &toolchain
     return steps.runtimesFirst();
 }
 
-QStringList unavailable(const ProjectConfig &config, const Toolchains &toolchains)
+QStringList unavailable(const ProjectConfig &config,
+                        const Toolchains &toolchains,
+                        const QList<ToolRequirement> &required)
 {
     QStringList problems;
+    for (const ToolRequirement &requirement : required) {
+        if (const QString problem = requirementProblem(requirement, toolchains); !problem.isEmpty())
+            problems.append(problem);
+    }
     for (const LanguageSetup &setup : config.languages) {
         if (!setup.enabled)
             continue;

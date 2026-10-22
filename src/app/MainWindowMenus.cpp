@@ -428,6 +428,12 @@ void MainWindow::updateProjectMenu()
 {
     projectMenu_->clear();
     projectMenu_->addAction(tr("Project Settings…"), this, &MainWindow::showProjectSettings);
+    for (const Recipe &recipe : std::as_const(recipes_)) {
+        if (!recipe.setupCommands.isEmpty())
+            projectMenu_->addAction(tr("Run %1 Setup").arg(recipe.title), this,
+                                    [this, recipe] { runRecipeSetup(recipe); });
+    }
+    addRecipePrompts(projectMenu_);
     projectMenu_->addSeparator();
     int listed = 0;
     for (const ProjectConfig &project : ProjectStore::all()) {

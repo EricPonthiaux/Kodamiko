@@ -6,6 +6,7 @@
 #include "ProjectSetupForm.h"
 #include "ProjectSetupPanel.h"
 #include "projects/ProjectStore.h"
+#include "recipes/RecipeLibrary.h"
 #include "settings/Preferences.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
@@ -316,7 +317,7 @@ void WelcomeWindow::open(const QString &path)
         return;
     }
     // Set up already: only its missing tools, if any.
-    if (InstallPlan::plan(*saved, *toolchains_).isEmpty()) {
+    if (InstallPlan::plan(*saved, *toolchains_, RecipeLibrary::requirementsOf(*saved)).isEmpty()) {
         emit projectChosen(*saved);
         return;
     }
@@ -331,10 +332,10 @@ void WelcomeWindow::configure(const QString &path)
     if (saved && saved->configured) {
         setup_->load(*saved);
     } else {
+        // A project just created keeps the recipe it was made with.
         QList<DetectedLanguage> detected;
-        ProjectConfig project = ProjectSetupForm::detectedProject(path, *toolchains_, &detected);
-        if (saved)
-            project.lastOpened = saved->lastOpened;
+        const ProjectConfig project =
+            ProjectSetupForm::detectedProject(saved.value_or(ProjectConfig{.path = path}), *toolchains_, &detected);
         setup_->load(project, detected);
     }
     pages_->setCurrentIndex(1);

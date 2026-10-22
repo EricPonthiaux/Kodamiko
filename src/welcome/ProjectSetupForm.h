@@ -4,6 +4,7 @@
 
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
+#include "recipes/Recipe.h"
 #include "ui/Theme.h"
 
 #include <QWidget>
@@ -19,10 +20,12 @@ class Toolchains;
 // The setup of a project's languages, in two columns as Preferences: at the
 // left, the languages (those the project uses first, the others marked
 // Off) and Detect Again; at the right, the selected one's settings: whether
-// it is used, its runtime (JDK, Node, Python, C++ standard), its language
-// server and the server's version. Each list shows the values alone; the
-// line under it says whether the one chosen is downloaded already, on the
-// machine (and where), or still to download.
+// it is used, its recipe (one of the language's, see RecipeLibrary: its
+// environment, skills, prompts and run configurations, without its files),
+// its runtime (JDK, Node, Python, C++ standard), its language server and the
+// server's version. Each list shows the values alone; the line under it
+// says whether the one chosen is downloaded already, on the machine (and
+// where), or still to download.
 class ProjectSetupForm : public QWidget {
     Q_OBJECT
 
@@ -42,12 +45,16 @@ public:
     // For tests.
     QListWidget *languageList() const { return list_; }
 
+    // The recipe choice of `family`'s page. For tests.
+    QComboBox *recipeChoice(const QString &family);
     QString currentLanguage() const;
     // Shows `family`'s settings.
     void selectLanguage(const QString &family);
 
-    // A setup for `folder` from what its files say.
-    static ProjectConfig detectedProject(const QString &folder,
+    // A setup for `saved.path` from what its files say, keeping `saved`'s
+    // last opening, pending recipe setup and the recipes of its enabled
+    // languages (their language kept even when no file shows it yet).
+    static ProjectConfig detectedProject(const ProjectConfig &saved,
                                          const Toolchains &toolchains,
                                          QList<DetectedLanguage> *detected = nullptr);
 
@@ -60,6 +67,8 @@ private:
         QString family;
         QLabel *evidence{};
         QCheckBox *enabled{};
+        QComboBox *recipe{};
+        QLabel *recipeState{};
         QComboBox *runtime{};
         QLabel *runtimeState{};
         QComboBox *server{};
@@ -71,6 +80,9 @@ private:
     };
 
     QWidget *createSidebar();
+    // The language's recipes for this system, `selected` among them (kept,
+    // marked missing, when it is not installed).
+    void fillRecipes(const Page &page, const QString &selected);
     QWidget *createPage(Page &page);
     void connectPage(const Page &page);
     Page &pageOf(const QString &family);
@@ -88,4 +100,5 @@ private:
     QListWidget *list_ = nullptr;
     QStackedWidget *stack_ = nullptr;
     QPushButton *detect_ = nullptr;
+    QList<Recipe> recipes_; // those of this system, for the project
 };

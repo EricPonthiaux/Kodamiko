@@ -1,0 +1,35 @@
+{
+    "title": "TypeScript · Node.js",
+    "language": "javascript",
+    "description": "package.json, tsconfig.json and src/index.ts, built with Node.js 24 (downloaded if the machine has none). Debug waits for chrome://inspect.",
+    "requires": [
+        {
+            "tool": "node",
+            "version": "24",
+            "path": [
+                "{{home}}/bin",
+                "{{home}}"
+            ]
+        }
+    ],
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "npm run build"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "npm start"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "node --inspect-brk --enable-source-maps dist/index.js"
+        }
+    ],
+    "setup": [
+        "npm install"
+    ]
+}

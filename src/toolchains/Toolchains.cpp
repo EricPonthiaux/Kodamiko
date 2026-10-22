@@ -7,6 +7,7 @@
 #include "projects/ProjectDetector.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QSet>
@@ -26,6 +27,48 @@ QHash<QString, QList<RuntimeInstall>> &probedRuntimes()
 }
 
 const QString completeMarker = QStringLiteral(".complete");
+
+// The add-on modules Installer wrote in the marker of a Qt it installed,
+// after its title; nullopt when the folder has no marker (a Qt installed
+// otherwise).
+std::optional<QStringList> markedModules(const QString &folder)
+{
+    QFile marker(folder + QLatin1Char('/') + completeMarker);
+    if (!marker.open(QIODevice::ReadOnly))
+        return std::nullopt;
+    return QString::fromUtf8(marker.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts).mid(1);
+}
+
+bool hasModules(const QString &folder, const QStringList &modules)
+{
+    const std::optional<QStringList> marked = markedModules(folder);
+    return !marked || std::ranges::all_of(modules, [&](const QString &module) { return marked->contains(module); });
+}
+
+struct QtInstall {
+    QVersionNumber version;
+    QString folder;
+};
+
+// The newest Qt of `kit` in `root` (<root>/<version>/<kit>) whose version
+// starts with `wanted` and that has `modules`.
+std::optional<QtInstall> newestQtIn(const QString &root,
+                                    const QVersionNumber &wanted,
+                                    const QString &kit,
+                                    const QStringList &modules)
+{
+    std::optional<QtInstall> newest;
+    for (const QString &name : QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        const QVersionNumber version = QVersionNumber::fromString(name);
+        const QString folder = QDir(root).filePath(name + QLatin1Char('/') + kit);
+        const bool fits = !version.isNull() && (wanted.isNull() || wanted.isPrefixOf(version));
+        const bool isUsable =
+            QFileInfo::exists(folder + QStringLiteral("/lib/cmake/Qt6/Qt6Config.cmake")) && hasModules(folder, modules);
+        if (fits && isUsable && (!newest || version > newest->version))
+            newest = QtInstall{.version = version, .folder = folder};
+    }
+    return newest;
+}
 
 // The output of `executable --version`, empty if it does not answer.
 QString runVersion(const QString &executable)
@@ -179,7 +222,38 @@ Toolchains::Toolchains(QString root, bool lookOnMachine)
 
 QString Toolchains::defaultRoot()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/toolchains");
+    return QDir::homePath() + QStringLiteral("/.duet/tools");
+}
+
+QString Toolchains::qtInstallFolder(const QString &version, const QString &kit) const
+{
+    return root_ + QStringLiteral("/qt/") + version + QLatin1Char('/') + kit;
+}
+
+QString Toolchains::qtFolder(const QString &version, const QString &kit, const QStringList &modules) const
+{
+    QStringList roots{root_ + QStringLiteral("/qt")};
+    if (lookOnMachine_)
+        roots += machineQtRoots();
+    const QVersionNumber wanted = QVersionNumber::fromString(version);
+    std::optional<QtInstall> newest;
+    for (const QString &root : std::as_const(roots)) {
+        const std::optional<QtInstall> found = newestQtIn(root, wanted, kit, modules);
+        if (found && (!newest || found->version > newest->version))
+            newest = found;
+    }
+    return newest ? newest->folder : QString();
+}
+
+QStringList Toolchains::machineQtRoots()
+{
+    QStringList roots{QDir::homePath() + QStringLiteral("/Qt")};
+#ifdef Q_OS_WIN
+    roots.prepend(QStringLiteral("C:/Qt"));
+#else
+    roots.append(QStringLiteral("/opt/Qt"));
+#endif
+    return roots;
 }
 
 QString Toolchains::installFolder(const QString &tool, const QString &version) const
@@ -325,14 +399,14 @@ QString Toolchains::npmScript(const RuntimeInstall &node)
     return {};
 }
 
-QString Toolchains::systemProgram(const QString &server) const
+QString Toolchains::systemProgram(const QString &tool) const
 {
     if (!lookOnMachine_)
         return {};
-    auto it = programs_.find(server);
+    auto it = programs_.find(tool);
     if (it == programs_.end()) {
-        const ToolSpec *spec = ToolCatalog::find(server);
-        it = programs_.insert(server, QStandardPaths::findExecutable(spec ? spec->program : server));
+        const ToolSpec *spec = ToolCatalog::find(tool);
+        it = programs_.insert(tool, QStandardPaths::findExecutable(spec ? spec->program : tool));
     }
     return it.value();
 }
@@ -394,3 +468,33 @@ void Toolchains::refresh()
     programs_.clear();
     probedRuntimes().clear();
 }
+
+namespace LegacyToolchains {
+
+QString defaultRoot()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/toolchains");
+}
+
+QStringList moveInto(const QString &from, const QString &to)
+{
+    QStringList unmoved;
+    const QDir legacy(from);
+    // .staging holds unfinished downloads: they are started again.
+    const QStringList tools = legacy.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &tool : tools) {
+        if (tool.startsWith(QLatin1Char('.')) || !QDir().mkpath(to + QLatin1Char('/') + tool))
+            continue;
+        for (const QString &version : QDir(legacy.filePath(tool)).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+            const QString source = legacy.filePath(tool + QLatin1Char('/') + version);
+            const QString target = to + QLatin1Char('/') + tool + QLatin1Char('/') + version;
+            if (!QFileInfo::exists(target) && !QDir().rename(source, target))
+                unmoved.append(source);
+        }
+    }
+    if (unmoved.isEmpty())
+        QDir(from).removeRecursively();
+    return unmoved;
+}
+
+} // namespace LegacyToolchains

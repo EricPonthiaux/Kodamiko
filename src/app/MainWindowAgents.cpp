@@ -114,6 +114,7 @@ void MainWindow::startAgentSession(const Worktree &worktree)
     options.name = worktree.name;
     options.sessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     options.instructions = agentInstructions(worktree, QFileInfo(folder_).fileName(), *agentProvider_);
+    addRecipesToSession(options);
     QString error;
     const std::optional<ProcessSpec> spec =
         agentProvider_->sessionProcess(worktree.path, hookServer_.serverName(), options, &error);

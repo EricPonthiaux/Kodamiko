@@ -1,0 +1,53 @@
+{
+    "title": "Java · Maven",
+    "language": "java",
+    "description": "pom.xml (JDK 21, downloaded if the machine has none) and src/main/java/Main.java, built with Maven. Debug waits for a debugger on port 5005.",
+    "requires": [
+        {
+            "tool": "jdk",
+            "version": "21",
+            "path": [
+                "{{home}}/bin"
+            ],
+            "variables": {
+                "JAVA_HOME": "{{home}}"
+            }
+        },
+        {
+            "tool": "maven",
+            "version": "3.9.16",
+            "program": "mvn",
+            "download": {
+                "any": {
+                    "url": "https://archive.apache.org/dist/maven/maven-3/{{version}}/binaries/apache-maven-{{version}}-bin.zip",
+                    "checksumUrl": "{{url}}.sha512",
+                    "algorithm": "sha512",
+                    "check": "bin/mvn"
+                }
+            },
+            "path": [
+                "{{home}}/bin"
+            ],
+            "variables": {
+                "MAVEN_HOME": "{{home}}"
+            }
+        }
+    ],
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "mvn package"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "java -cp target/classes Main"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005 -cp target/classes Main"
+        }
+    ]
+}

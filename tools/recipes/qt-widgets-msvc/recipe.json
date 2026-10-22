@@ -1,0 +1,58 @@
+{
+    "title": "Qt Widgets · CMake · MSVC",
+    "language": "cpp",
+    "description": "A Qt 6 Widgets window, built with Visual Studio's compiler and Qt 6.10 (msvc2022_64), downloaded if the machine has none.",
+    "systems": [
+        "windows"
+    ],
+    "environment": {
+        "visualStudio": true
+    },
+    "requires": [
+        {
+            "tool": "qt",
+            "version": "6.10",
+            "kit": "msvc2022_64",
+            "path": [
+                "{{home}}/bin"
+            ],
+            "variables": {
+                "CMAKE_PREFIX_PATH": "{{home}}"
+            }
+        }
+    ],
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "cmake --build build"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "build\\{{identifier}}.exe"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "devenv /DebugExe build\\{{identifier}}.exe"
+        }
+    ],
+    "setup": [
+        "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=cl"
+    ],
+    "prompts": [
+        {
+            "title": "Add a Dialog",
+            "text": "Add a dialog to this Qt application: "
+        },
+        {
+            "title": "Add a Menu Action",
+            "text": "Add a menu action to the main window that "
+        },
+        {
+            "title": "Add a Settings Page with QSettings",
+            "text": "Add a settings dialog, saved with QSettings, with these settings: "
+        }
+    ]
+}

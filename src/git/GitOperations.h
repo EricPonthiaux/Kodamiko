@@ -35,8 +35,28 @@ void rollback(const RepositoryInfo &repository, const QStringList &paths);
 void discardPatch(const RepositoryInfo &repository, const QStringList &paths, const QByteArray &patch);
 
 // Commits the index (or replaces the last commit if `amend`). Returns the
-// abbreviated identifier of the created commit.
+// abbreviated identifier of the created commit. Throws a GitError of kind
+// NoIdentity when git does not know who commits (see setIdentity).
 QString commit(const RepositoryInfo &repository, const QString &message, bool amend);
+
+// Who commits: git's user.name and user.email.
+struct Identity {
+    QString name;
+    QString email;
+};
+
+// Where setIdentity writes: the user's configuration (~/.gitconfig), for
+// every repository, or the repository's own.
+enum class ConfigScope {
+    Global,
+    Repository,
+};
+
+// The identity git's configuration gives in `repository`; a part that is
+// not set is empty.
+Identity identity(const RepositoryInfo &repository);
+// Writes user.name and user.email in `scope`.
+void setIdentity(const RepositoryInfo &repository, const Identity &identity, ConfigScope scope);
 
 // Creates an empty repository in `folder` ("git init"): its branch is the
 // one the user's init.defaultBranch names.

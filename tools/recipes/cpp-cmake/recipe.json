@@ -1,0 +1,57 @@
+{
+    "title": "C++ · CMake",
+    "language": "cpp",
+    "description": "CMakeLists.txt (C++20) and src/main.cpp, an executable built with the system's compiler.",
+    "systems": [
+        "linux",
+        "macos"
+    ],
+    "requires": [
+        {
+            "tool": "cmake",
+            "version": "4.4.4",
+            "program": "cmake",
+            "download": {
+                "linux-x64": {
+                    "url": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-linux-x86_64.tar.gz",
+                    "checksumUrl": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-SHA-256.txt",
+                    "check": "bin/cmake"
+                },
+                "linux-aarch64": {
+                    "url": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-linux-aarch64.tar.gz",
+                    "checksumUrl": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-SHA-256.txt",
+                    "check": "bin/cmake"
+                },
+                "macos": {
+                    "url": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-macos-universal.tar.gz",
+                    "checksumUrl": "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}-SHA-256.txt",
+                    "check": "CMake.app/Contents/bin/cmake"
+                }
+            },
+            "path": [
+                "{{home}}/bin",
+                "{{home}}/CMake.app/Contents/bin"
+            ]
+        }
+    ],
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "cmake --build build"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "build/{{identifier}}"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "gdb build/{{identifier}}"
+        }
+    ],
+    "setup": [
+        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug"
+    ]
+}

@@ -6,6 +6,11 @@ function(duet_add_test name)
     target_link_libraries(${name} PRIVATE duet_core Qt6::Test)
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # Windows has no rpath: the tests find Qt's DLLs through PATH.
+    if(WIN32)
+        set_tests_properties(${name} PROPERTIES
+            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+    endif()
 endfunction()
 
 duet_add_test(tst_syntax)
@@ -34,6 +39,11 @@ duet_add_test(tst_index)
 duet_add_test(tst_refactorcorpus)
 target_compile_definitions(tst_refactorcorpus PRIVATE DUET_REFACTORING_CORPUS="${CMAKE_CURRENT_SOURCE_DIR}/refactoring")
 duet_add_test(tst_projects)
+duet_add_test(tst_recipes)
+# Duet's own recipes, from the source tree.
+foreach(test tst_projects tst_recipes)
+    set_property(TEST ${test} APPEND PROPERTY ENVIRONMENT "DUET_RECIPES_DIR=${CMAKE_SOURCE_DIR}/tools/recipes")
+endforeach()
 duet_add_test(tst_run)
 # The Markdown preview's web engine: no Chromium sandbox on CI machines.
 set_property(TEST tst_editor APPEND PROPERTY ENVIRONMENT "QTWEBENGINE_DISABLE_SANDBOX=1")

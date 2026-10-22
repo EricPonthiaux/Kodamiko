@@ -198,7 +198,7 @@ void indexFolder(OccurrenceIndex &index, const QString &root)
 // Where the user's Duet downloaded its language servers.
 QString userToolchains()
 {
-    return QDir::homePath() + QStringLiteral("/.local/share/Duet/Duet/toolchains");
+    return Toolchains::defaultRoot();
 }
 
 // The latest complete download of `tool`, empty if none.

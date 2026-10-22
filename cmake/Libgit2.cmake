@@ -14,6 +14,8 @@ set(USE_NTLMCLIENT     OFF CACHE BOOL "" FORCE)
 set(USE_BUNDLED_ZLIB   ON  CACHE BOOL "" FORCE)
 set(REGEX_BACKEND      builtin CACHE STRING "" FORCE)
 set(USE_HTTP_PARSER    builtin CACHE STRING "" FORCE)
+# MSVC only: the same C runtime as Qt and Duet (/MD), not libgit2's default /MT.
+set(STATIC_CRT         OFF CACHE BOOL "" FORCE)
 
 # libgit2 detects `struct stat::st_mtim` in strict C90, where glibc does not
 # expose it without _DEFAULT_SOURCE: without this definition, detection fails and

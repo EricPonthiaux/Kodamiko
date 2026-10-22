@@ -22,6 +22,9 @@ struct LanguageSetup {
     QString server; // a ToolCatalog server ("clangd"); empty: none
     // A version Duet downloads, or "system" for the one in the PATH.
     QString serverVersion;
+    // The id of the recipe attached to the language (see RecipeLibrary),
+    // one of this family's; empty: none.
+    QString recipe;
 
     QVariantMap toVariant() const;
     static LanguageSetup fromVariant(const QVariantMap &map);
@@ -40,7 +43,13 @@ struct ProjectConfig {
     // Shell command run in an agent's worktree before its commits are
     // merged (see AgentMergeQueue); empty: none.
     QString agentCheckCommand;
+    // True from its creation with a recipe that has setup commands until
+    // they succeed (see Recipe::setupCommands).
+    bool needsRecipeSetup = false;
 
+    // The ids of the recipes attached to its enabled languages, in their
+    // order.
+    QStringList recipes() const;
     // The setup of `family`, if the project has one.
     const LanguageSetup *language(const QString &family) const;
     LanguageSetup *language(const QString &family);

@@ -70,6 +70,8 @@ Preferences Preferences::load()
         settings.value(QStringLiteral("defaultAgentProvider"), preferences.defaultAgentProvider).toString();
     preferences.exposeTools = settings.value(QStringLiteral("exposeTools"), true).toBool();
     preferences.claudeNotifications = settings.value(QStringLiteral("claudeNotifications"), true).toBool();
+
+    preferences.terminalPathFolders = settings.value(QStringLiteral("terminal/pathFolders")).toStringList();
     return preferences;
 }
 
@@ -106,6 +108,8 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("defaultAgentProvider"), defaultAgentProvider);
     settings.setValue(QStringLiteral("exposeTools"), exposeTools);
     settings.setValue(QStringLiteral("claudeNotifications"), claudeNotifications);
+
+    settings.setValue(QStringLiteral("terminal/pathFolders"), terminalPathFolders);
 }
 
 QFont Preferences::codeFont() const

@@ -1,9 +1,14 @@
 {
   "configurations": [
     {
+      "command": "cmake --preset windows-debug && cmake --build --preset windows-debug",
+      "kind": "build",
+      "name": "Build"
+    },
+    {
       "command": "cmake --build --preset default",
       "kind": "build",
       "name": "CMake: build default"
-    } 
+    }
   ]
 }

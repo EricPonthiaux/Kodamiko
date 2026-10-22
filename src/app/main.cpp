@@ -5,6 +5,7 @@
 #include "git/LibGit2.h"
 #include "projects/ProjectConfig.h"
 #include "settings/Preferences.h"
+#include "toolchains/Toolchains.h"
 #include "ui/BrandMark.h"
 #include "ui/ClickableCursors.h"
 #include "ui/Motion.h"
@@ -13,6 +14,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDir>
+#include <QFileInfo>
 #include <QMenu>
 #include <QProxyStyle>
 #include <QSettings>
@@ -124,6 +126,19 @@ void adoptLegacySettings()
     settings.setValue(adopted, true);
 }
 
+// Duet's downloads, from its application data to ~/.duet/tools, once.
+void adoptLegacyToolchains()
+{
+    const QString legacy = LegacyToolchains::defaultRoot();
+    if (!QFileInfo::exists(legacy))
+        return;
+    const QStringList unmoved = LegacyToolchains::moveInto(legacy, Toolchains::defaultRoot());
+    if (!unmoved.isEmpty())
+        qWarning("Could not move these downloads to %s, they will be downloaded again: %s",
+                 qPrintable(QDir::toNativeSeparators(Toolchains::defaultRoot())),
+                 qPrintable(unmoved.join(QStringLiteral(", "))));
+}
+
 void showWelcome();
 
 // A main window on `folder`; Close Project brings the welcome window back.
@@ -162,6 +177,7 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("Duet"));
     QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
     adoptLegacySettings();
+    adoptLegacyToolchains();
     Motion::policy().setEnabled(Preferences::load().animations);
     Motion::install();
 

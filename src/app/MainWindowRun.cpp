@@ -9,6 +9,7 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/FileStatuses.h"
+#include "recipes/Recipe.h"
 #include "run/RunConfiguration.h"
 #include "run/RunConfigurationMenu.h"
 #include "run/Runner.h"
@@ -283,6 +284,8 @@ void MainWindow::onRunFinished(const RunConfiguration &configuration, int exitCo
     if (terminal)
         setRunTabIcon(terminal, runKindIconName(configuration.kind), runOutcomeColor(exitCode));
     showStatus(runFinishedMessage(configuration, exitCode, errors, warnings));
+    if (configuration.name == QLatin1String(Recipes::setupName))
+        onRecipeSetupFinished(exitCode);
 
     const bool failed = exitCode != 0;
     const bool isBuildOrTest =

@@ -20,14 +20,15 @@ struct RuntimeInstall {
 };
 
 // The runtimes and language servers available: those Duet downloaded, in
-// its own folder (<root>/<tool>/<version>, complete once a ".complete"
-// file is there), and those of the machine (the PATH, JavaRuntimes, nvm,
+// its store (<root>/<tool>/<version>, complete once a ".complete" file is
+// there), and those of the machine (the PATH, JavaRuntimes, nvm,
 // pyenv...). What is found on the machine is kept until refresh().
 class Toolchains {
 public:
     // `lookOnMachine` false: only Duet's own installs (tests).
     explicit Toolchains(QString root = defaultRoot(), bool lookOnMachine = true);
-    // <application data>/toolchains.
+    // ~/.duet/tools: the store shared by every project and every version of
+    // Duet, so that nothing is downloaded twice.
     static QString defaultRoot();
 
     QString root() const { return root_; }
@@ -53,11 +54,23 @@ public:
     // npm's script in a Node install, empty if it has none.
     static QString npmScript(const RuntimeInstall &node);
 
-    // `server`'s command in the PATH, empty if there is none.
-    QString systemProgram(const QString &server) const;
+    // The command of `tool` (a ToolCatalog id, or a program's name: "mvn")
+    // in the PATH, empty if there is none.
+    QString systemProgram(const QString &tool) const;
     // The server's executable for `version`: Duet's install, or the PATH's
     // for "system". Empty when it is not there.
     QString serverExecutable(const QString &server, const QString &version) const;
+
+    // Duet's install of Qt `version` ("6.10.3") for `kit`:
+    // <root>/qt/<version>/<kit>, as Qt's installer lays it out.
+    QString qtInstallFolder(const QString &version, const QString &kit) const;
+    // The newest Qt for `kit` whose version starts with `version` ("6.10";
+    // empty: any): Duet's, or one in the machine's usual folders (see
+    // machineQtRoots). Duet's must have `modules`; one installed otherwise
+    // is taken as it is. Empty when there is none.
+    QString qtFolder(const QString &version, const QString &kit, const QStringList &modules = {}) const;
+    // C:/Qt and ~/Qt, and /opt/Qt outside Windows.
+    static QStringList machineQtRoots();
 
     // Fills what `setup` leaves empty: the runtime version, the preferred
     // server, and its version (the PATH's when it has one, else the
@@ -80,3 +93,16 @@ private:
     mutable QHash<QString, QList<RuntimeInstall>> machine_; // by tool
     mutable QHash<QString, QString> programs_;              // by server
 };
+
+// Where Duet downloaded its tools before ~/.duet/tools.
+namespace LegacyToolchains {
+
+// <application data>/toolchains.
+QString defaultRoot();
+
+// Moves each <tool>/<version> of `from` into `to`, unless `to` has it
+// already, then removes `from` if nothing is left in it. Returns the
+// folders that could not be moved, empty when all were.
+[[nodiscard]] QStringList moveInto(const QString &from, const QString &to);
+
+} // namespace LegacyToolchains

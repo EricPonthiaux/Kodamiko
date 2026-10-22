@@ -11,6 +11,8 @@
 #include <QFileInfo>
 #include <QSettings>
 
+#include <algorithm>
+
 namespace {
 
 constexpr int publishDelayMs = 300;
@@ -66,7 +68,20 @@ QList<RunConfiguration> Runner::configurations(QString *error) const
 {
     if (project_.path.isEmpty())
         return {};
-    return RunConfigurations::all(project_.path, error);
+    QList<RunConfiguration> all = RunConfigurations::all(project_.path, error);
+    for (const RunConfiguration &configuration : recipeConfigurations_) {
+        const bool isNamed = std::ranges::any_of(
+            all, [&configuration](const RunConfiguration &other) { return other.name == configuration.name; });
+        if (!isNamed)
+            all.append(configuration);
+    }
+    return all;
+}
+
+void Runner::setRecipeConfigurations(const QList<RunConfiguration> &configurations)
+{
+    recipeConfigurations_ = configurations;
+    emit selectionChanged();
 }
 
 std::optional<RunConfiguration> Runner::selected() const

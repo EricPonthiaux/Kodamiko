@@ -81,6 +81,7 @@ const SymbolLocation &find(const QList<SymbolLocation> &symbols,
             return symbol;
     }
     qFatal("symbol not found");
+    Q_UNREACHABLE(); // MSVC does not know that qFatal() never returns (C4715)
 }
 
 Definitions::Request request(const QString &word, const QString &file, int position = -1, int line = 0)

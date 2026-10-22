@@ -591,7 +591,7 @@ bool EditorWidget::reloadFromDisk(QString *error)
     // text; a target with its length, as a selection stops at a NUL byte.
     const QByteArray bytes = decoded->text.toUtf8();
     SendScintilla(SCI_SETTARGETRANGE, 0UL, SendScintilla(SCI_GETLENGTH));
-    SendScintilla(SCI_REPLACETARGET, static_cast<unsigned long>(bytes.size()), bytes.constData());
+    SendScintilla(SCI_REPLACETARGET, uintptr_t(bytes.size()), bytes.constData());
     setModified(false);
 
     setCursorPosition(std::min(line, lines() - 1), index);
@@ -659,7 +659,7 @@ bool EditorWidget::applyFormattedText(QString formatted)
     const QByteArray replacement = after.mid(prefix, after.size() - prefix - suffix);
     SendScintilla(SCI_BEGINUNDOACTION);
     SendScintilla(SCI_SETTARGETRANGE, static_cast<unsigned long>(prefix), static_cast<long>(before.size() - suffix));
-    SendScintilla(SCI_REPLACETARGET, static_cast<unsigned long>(replacement.size()), replacement.constData());
+    SendScintilla(SCI_REPLACETARGET, uintptr_t(replacement.size()), replacement.constData());
     SendScintilla(SCI_ENDUNDOACTION);
 
     SendScintilla(SCI_SETSEL, static_cast<unsigned long>(CodeFormatter::mapPosition(before, anchor, after)),

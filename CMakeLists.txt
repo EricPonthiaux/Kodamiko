@@ -9,6 +9,17 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# clangd finds the compile commands at the root of the sources or in build/,
+# not in the other presets' folders (build-win, build-debug...): each build
+# copies its own to the root (ignored by git), the last one built wins.
+if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    add_custom_target(compile-commands ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/compile_commands.json ${CMAKE_SOURCE_DIR}/compile_commands.json
+        COMMENT "Copying compile_commands.json to the source root for clangd"
+        VERBATIM)
+endif()
+
 # Sources contain non-ASCII characters: MSVC must read them as UTF-8.
 if(MSVC)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/utf-8>)
@@ -83,5 +94,6 @@ add_subdirectory(tools/duet-hook)
 add_subdirectory(tools/duet-askpass)
 add_subdirectory(tools/duet-mcp)
 add_subdirectory(tools/claude-plugin)
+add_subdirectory(tools/recipes)
 add_subdirectory(tools/bench-index)
 add_subdirectory(tests)

@@ -2,6 +2,7 @@
 
 #include "GitOperations.h"
 
+#include "FileChange.h"
 #include "GitProcess.h"
 #include "Snapshots.h"
 
@@ -24,6 +25,30 @@ QSet<QString> trackedPaths(const RepositoryInfo &repository, const QStringList &
     const QStringList tracked = Git::splitNul(
         Git::run(repository.workDir, withPaths({QStringLiteral("ls-files"), QStringLiteral("-z")}, paths)));
     return {tracked.begin(), tracked.end()};
+}
+
+// Whether git can name the author and the committer: `git var` fails as
+// commit does, whatever the language of git's messages.
+bool hasIdentity(const RepositoryInfo &repository)
+{
+    try {
+        Git::run(repository.workDir, {QStringLiteral("var"), QStringLiteral("GIT_AUTHOR_IDENT")});
+        Git::run(repository.workDir, {QStringLiteral("var"), QStringLiteral("GIT_COMMITTER_IDENT")});
+    } catch (const GitError &) {
+        return false;
+    }
+    return true;
+}
+
+// The value of `key`, empty when it is not set (git config then fails).
+QString configValue(const RepositoryInfo &repository, const QString &key)
+{
+    try {
+        return QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("config"), QStringLiteral("--get"), key}))
+            .trimmed();
+    } catch (const GitError &) {
+        return {};
+    }
 }
 
 QString discardReason(const QStringList &paths)
@@ -119,10 +144,39 @@ QString commit(const RepositoryInfo &repository, const QString &message, bool am
                           QStringLiteral("-F"), QStringLiteral("-")};
     if (amend)
         arguments << QStringLiteral("--amend");
-    Git::run(repository.workDir, arguments, message.toUtf8());
+    try {
+        Git::run(repository.workDir, arguments, message.toUtf8());
+    } catch (const GitError &error) {
+        if (error.kind() == GitError::Kind::General && !hasIdentity(repository))
+            throw GitError(QObject::tr("Git does not know who you are: set your name and email to commit"),
+                           GitError::Kind::NoIdentity);
+        throw;
+    }
     return QString::fromUtf8(Git::run(repository.workDir,
                                       {QStringLiteral("rev-parse"), QStringLiteral("--short"), QStringLiteral("HEAD")}))
         .trimmed();
+}
+
+Identity identity(const RepositoryInfo &repository)
+{
+    return {.name = configValue(repository, QStringLiteral("user.name")),
+            .email = configValue(repository, QStringLiteral("user.email"))};
+}
+
+void setIdentity(const RepositoryInfo &repository, const Identity &identity, ConfigScope scope)
+{
+    QString scopeOption;
+    switch (scope) {
+    case ConfigScope::Global:
+        scopeOption = QStringLiteral("--global");
+        break;
+    case ConfigScope::Repository:
+        scopeOption = QStringLiteral("--local");
+        break;
+    }
+    Git::run(repository.workDir, {QStringLiteral("config"), scopeOption, QStringLiteral("user.name"), identity.name});
+    Git::run(repository.workDir,
+             {QStringLiteral("config"), scopeOption, QStringLiteral("user.email"), identity.email});
 }
 
 void init(const QString &folder)

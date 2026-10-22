@@ -7,6 +7,7 @@
 
 #include <QFont>
 #include <QString>
+#include <QStringList>
 
 struct Theme;
 
@@ -55,6 +56,11 @@ struct Preferences {
     // The editor's MCP server (tools, resources, prompts) in its sessions.
     bool exposeTools = true;
     bool claudeNotifications = true;
+
+    // Terminal
+    // Put first in the PATH of every program Duet launches in a terminal,
+    // in this order.
+    QStringList terminalPathFolders;
 
     static constexpr int minimumFontSize = 6;
     static constexpr int maximumFontSize = 32;

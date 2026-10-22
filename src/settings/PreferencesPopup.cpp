@@ -2,6 +2,7 @@
 
 #include "PreferencesPopup.h"
 
+#include "TerminalPreferencesPage.h"
 #include "ui/AppFonts.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
@@ -178,6 +179,9 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
     addPage(QStringLiteral("code"), tr("Editor"), createEditorPage());
     addPage(QStringLiteral("files"), tr("Files"), createFilesPage());
     addPage(QStringLiteral("claude"), tr("Claude"), createClaudePage());
+    terminalPage_ = new TerminalPreferencesPage;
+    addPage(QStringLiteral("terminal"), tr("Terminal"),
+            page(tr("Terminal"), tr("The environment of the programs Duet launches."), terminalPage_));
     addPage(QStringLiteral("keyboard"), tr("Keymap"), createKeymapPage());
     pageList_->setCurrentRow(0);
 
@@ -752,6 +756,7 @@ void PreferencesPopup::load(const Preferences &preferences,
     shareEditorContext_->setChecked(preferences.shareEditorContext);
     exposeTools_->setChecked(preferences.exposeTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
+    terminalPage_->setPathFolders(preferences.terminalPathFolders);
 
     commands_ = commands;
     overrides_ = overrides;
@@ -808,6 +813,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.shareEditorContext = shareEditorContext_->isChecked();
     preferences.exposeTools = exposeTools_->isChecked();
     preferences.claudeNotifications = claudeNotifications_->isChecked();
+    preferences.terminalPathFolders = terminalPage_->pathFolders();
     return preferences;
 }
 

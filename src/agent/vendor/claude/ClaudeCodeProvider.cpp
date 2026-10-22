@@ -97,6 +97,7 @@ std::optional<ProcessSpec> ClaudeCodeProvider::sessionProcess(const QString &wor
     claudeOptions.mcpReadOnlyTools = options.mcpReadOnlyTools;
     claudeOptions.name = options.name;
     claudeOptions.sessionId = options.sessionId;
+    claudeOptions.pluginFolders = options.pluginFolders;
     if (options.start == SessionStart::Continue)
         claudeOptions.extraArguments << QStringLiteral("--continue");
     if (!options.instructions.isEmpty())

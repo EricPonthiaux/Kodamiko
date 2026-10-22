@@ -5,7 +5,8 @@
 #include "agent/vendor/claude/ClaudeTrust.h"
 #include "git/GitOperations.h"
 #include "projects/ProjectStore.h"
-#include "projects/ProjectTemplates.h"
+#include "recipes/ProjectCreation.h"
+#include "recipes/RecipeLibrary.h"
 #include "ui/PopupWidgets.h"
 #include "workspace/ChoicePopup.h"
 
@@ -24,12 +25,11 @@
 
 namespace {
 
-constexpr int templateRole = Qt::UserRole;
 constexpr int descriptionRole = Qt::UserRole + 1;
 
 // The choices of the last project created, proposed for the next one.
 constexpr auto locationKey = "newProject/location";
-constexpr auto templateKey = "newProject/template";
+constexpr auto recipeKey = "newProject/recipe";
 constexpr auto gitKey = "newProject/git";
 
 QLabel *fieldLabel(const QString &text, QWidget *parent)
@@ -46,7 +46,7 @@ NewProjectForm::NewProjectForm(QWidget *parent)
     , header_(new PopupHeader(QStringLiteral("plus"), tr("New Project"), this))
     , name_(new QLineEdit(this))
     , location_(new QLineEdit(this))
-    , templates_(new QListWidget(this))
+    , recipeList_(new QListWidget(this))
     , description_(new QLabel(this))
     , git_(new QCheckBox(tr("Create a Git repository"), this))
 {
@@ -70,15 +70,15 @@ QWidget *NewProjectForm::createBody()
     auto *browse = new QPushButton(tr("Browse…"), body);
     connect(browse, &QPushButton::clicked, this, &NewProjectForm::browse);
 
-    templates_->setObjectName(QStringLiteral("projectTemplates"));
-    templates_->installEventFilter(this);
-    const QString lastTemplate = QSettings().value(QLatin1String(templateKey)).toString();
-    for (const ProjectTemplate &projectTemplate : ProjectTemplates::all()) {
-        auto *item = new QListWidgetItem(projectTemplate.title, templates_);
-        item->setData(templateRole, projectTemplate.id);
-        item->setData(descriptionRole, projectTemplate.description);
-        if (projectTemplate.id == lastTemplate || !templates_->currentItem())
-            templates_->setCurrentItem(item);
+    recipeList_->setObjectName(QStringLiteral("projectRecipes"));
+    recipeList_->installEventFilter(this);
+    const QString lastRecipe = QSettings().value(QLatin1String(recipeKey)).toString();
+    recipes_ = RecipeLibrary::available(RecipeLibrary::defaultSources());
+    for (const Recipe &recipe : std::as_const(recipes_)) {
+        auto *item = new QListWidgetItem(recipe.title, recipeList_);
+        item->setData(descriptionRole, recipe.description);
+        if (recipe.id == lastRecipe || !recipeList_->currentItem())
+            recipeList_->setCurrentItem(item);
     }
     description_->setObjectName(QStringLiteral("settingState"));
     description_->setWordWrap(true);
@@ -86,7 +86,7 @@ QWidget *NewProjectForm::createBody()
 
     for (const QLineEdit *field : {name_, location_})
         connect(field, &QLineEdit::textChanged, this, &NewProjectForm::updateState);
-    connect(templates_, &QListWidget::currentItemChanged, this, &NewProjectForm::updateState);
+    connect(recipeList_, &QListWidget::currentItemChanged, this, &NewProjectForm::updateState);
     connect(name_, &QLineEdit::returnPressed, this, &NewProjectForm::create);
 
     auto *grid = new QGridLayout(body);
@@ -99,7 +99,7 @@ QWidget *NewProjectForm::createBody()
     grid->addWidget(location_, 1, 1);
     grid->addWidget(browse, 1, 2);
     grid->addWidget(fieldLabel(tr("Start with"), body), 2, 0, Qt::AlignTop);
-    grid->addWidget(templates_, 2, 1, 1, 2);
+    grid->addWidget(recipeList_, 2, 1, 1, 2);
     grid->addWidget(description_, 3, 1, 1, 2);
     grid->addWidget(git_, 4, 1, 1, 2);
     grid->setRowStretch(2, 1);
@@ -149,8 +149,8 @@ bool NewProjectForm::eventFilter(QObject *watched, QEvent *event)
     // sheet change (the padding of its items), the items would be painted
     // at their new height over one another. Queued: the list hears the
     // change before the new rules reach its items' size.
-    if (watched == templates_ && event->type() == QEvent::StyleChange)
-        QMetaObject::invokeMethod(templates_, &QListWidget::doItemsLayout, Qt::QueuedConnection);
+    if (watched == recipeList_ && event->type() == QEvent::StyleChange)
+        QMetaObject::invokeMethod(recipeList_, &QListWidget::doItemsLayout, Qt::QueuedConnection);
     return QWidget::eventFilter(watched, event);
 }
 
@@ -178,29 +178,34 @@ QString NewProjectForm::problem() const
         return tr("A project name cannot contain / or \\.");
     if (!QDir::isAbsolutePath(QDir::fromNativeSeparators(location_->text().trimmed())))
         return tr("Choose the folder the project goes in.");
-    if (!ProjectTemplates::isFreeFolder(targetFolder()))
+    if (!ProjectCreation::isFreeFolder(targetFolder()))
         return tr("%1 already exists.").arg(QDir::toNativeSeparators(targetFolder()));
     return {};
 }
 
 void NewProjectForm::updateState()
 {
-    const QListWidgetItem *item = templates_->currentItem();
+    const QListWidgetItem *item = recipeList_->currentItem();
     description_->setText(item ? item->data(descriptionRole).toString() : QString());
     const QString why = problem();
     summary_->setText(why.isEmpty() ? tr("Creates %1").arg(QDir::toNativeSeparators(targetFolder())) : why);
-    create_->setEnabled(why.isEmpty() && item);
+    create_->setEnabled(why.isEmpty() && selectedRecipe());
+}
+
+const Recipe *NewProjectForm::selectedRecipe() const
+{
+    const int row = recipeList_->currentRow();
+    return row >= 0 && row < recipes_.size() ? &recipes_.at(row) : nullptr;
 }
 
 void NewProjectForm::create()
 {
-    const QListWidgetItem *item = templates_->currentItem();
-    if (!item || !problem().isEmpty())
+    const Recipe *recipe = selectedRecipe();
+    if (!recipe || !problem().isEmpty())
         return;
     const QString folder = targetFolder();
-    const QString templateId = item->data(templateRole).toString();
     QString error;
-    if (!ProjectTemplates::create(templateId, folder, &error)) {
+    if (!ProjectCreation::create(*recipe, folder, &error)) {
         summary_->setText(error);
         return;
     }
@@ -209,9 +214,17 @@ void NewProjectForm::create()
     trustForClaude(folder);
     QSettings settings;
     settings.setValue(QLatin1String(locationKey), location_->text().trimmed());
-    settings.setValue(QLatin1String(templateKey), templateId);
+    settings.setValue(QLatin1String(recipeKey), recipe->id);
     settings.setValue(QLatin1String(gitKey), git_->isChecked());
-    ProjectStore::touch(folder);
+    ProjectConfig project = ProjectStore::touch(folder);
+    if (!recipe->language.isEmpty()) {
+        LanguageSetup setup;
+        setup.language = recipe->language;
+        setup.recipe = recipe->id;
+        project.languages.append(setup);
+        project.needsRecipeSetup = !recipe->setupCommands.isEmpty();
+        ProjectStore::save(project);
+    }
     emit created(folder);
 }
 

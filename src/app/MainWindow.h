@@ -12,7 +12,9 @@
 #include "agent/vendor/claude/CodeRequest.h"
 #include "navigation/RecentFiles.h"
 #include "projects/ProjectConfig.h"
+#include "recipes/Recipe.h"
 #include "settings/Keymap.h"
+#include "terminal/ProcessSpec.h"
 #include "ui/Theme.h"
 
 #include <QJsonObject>
@@ -221,6 +223,21 @@ private:
     // The project settings popup, built on first use.
     ProjectSettingsPopup *projectSettings();
     void applyProject(const ProjectConfig &project);
+    // The recipes of the project's languages (ProjectConfig::recipes):
+    // their environment in the programs started from now on, their run
+    // configurations; says what they lack on this machine.
+    void loadProjectRecipes();
+    // The recipes' environment with `preferredFolders` (Preferences ▸
+    // Terminal) first in the PATH, for terminalEnvironment().
+    void applyTerminalEnvironment(const QStringList &preferredFolders);
+    // The recipes' skills and instructions, added to a session's.
+    void addRecipesToSession(AgentSessionOptions &options) const;
+    // Each recipe's prompts, in a submenu of `menu`.
+    void addRecipePrompts(QMenu *menu);
+    // Runs `recipe`'s setup commands in a terminal; the project no longer
+    // needs them once they succeed (see onRecipeSetupFinished).
+    void runRecipeSetup(const Recipe &recipe);
+    void onRecipeSetupFinished(int exitCode);
     void closeProject();
     // Says when the project lacks tools Duet can download.
     void updateToolsNotice();
@@ -450,6 +467,8 @@ private:
     LanguageServers *languageServers_ = nullptr;
     std::unique_ptr<Toolchains> toolchains_;
     ProjectConfig project_;
+    QList<Recipe> recipes_; // those of the project's languages that are installed
+    EnvironmentAdditions recipeEnvironment_;
     ProjectSettingsPopup *projectSettings_ = nullptr;
     NewProjectPopup *newProjectPopup_ = nullptr; // built on first use
     NoticeBar *toolsNotice_ = nullptr;

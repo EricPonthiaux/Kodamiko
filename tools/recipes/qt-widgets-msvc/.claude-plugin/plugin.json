@@ -1,0 +1,5 @@
+{
+  "name": "qt-widgets-msvc",
+  "description": "Duet recipe: the skills of a Qt 6 Widgets application built with CMake.",
+  "version": "1.0.0"
+}

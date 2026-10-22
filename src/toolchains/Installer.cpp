@@ -2,6 +2,8 @@
 
 #include "Installer.h"
 
+#include "QtDownload.h"
+#include "QtRepository.h"
 #include "Toolchains.h"
 
 #include <QCoreApplication>
@@ -36,12 +38,13 @@ QString replyError(const QNetworkReply *reply)
     return QObject::tr("%1 (%2)").arg(reply->errorString(), reply->url().toDisplayString());
 }
 
-QString sha256Of(const QString &path)
+QString hashOf(const QString &path, ChecksumAlgorithm algorithm)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return {};
-    QCryptographicHash hash(QCryptographicHash::Sha256);
+    QCryptographicHash hash(algorithm == ChecksumAlgorithm::Sha512 ? QCryptographicHash::Sha512
+                                                                   : QCryptographicHash::Sha256);
     hash.addData(&file);
     return QString::fromLatin1(hash.result().toHex());
 }
@@ -73,12 +76,15 @@ QStringList Installer::extractCommand(ArchiveFormat format, const QString &archi
                                                           QStringLiteral("-C"), destination}
                                             : QStringList{};
 #if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
-    // Their tar is bsdtar, which reads zip files too.
+    // Their tar is bsdtar, which reads zip and 7z files too.
     if (found(QStringLiteral("tar")))
         return {QStringLiteral("tar"), QStringLiteral("-xf"), archive, QStringLiteral("-C"), destination};
 #endif
     if (found(QStringLiteral("bsdtar")))
         return {QStringLiteral("bsdtar"), QStringLiteral("-xf"), archive, QStringLiteral("-C"), destination};
+    // GNU tar does not read 7z files.
+    if (format == ArchiveFormat::SevenZip)
+        return {};
     if (found(QStringLiteral("unzip")))
         return {QStringLiteral("unzip"), QStringLiteral("-q"), QStringLiteral("-o"), archive,
                 QStringLiteral("-d"),    destination};
@@ -112,6 +118,10 @@ void Installer::cancel()
     if (process_) {
         process_->kill();
         process_->waitForFinished(2000);
+    }
+    if (qt_) {
+        qt_->cancel();
+        qt_->deleteLater();
     }
     file_ = nullptr;
     QDir(stagingFolder()).removeRecursively();
@@ -149,6 +159,14 @@ void Installer::startStep()
     QDir(stagingFolder()).removeRecursively();
     if (!QDir().mkpath(stagingFolder())) {
         fail(tr("Cannot create %1").arg(QDir::toNativeSeparators(stagingFolder())));
+        return;
+    }
+    if (step.tool == QLatin1String(QtRepository::toolId)) {
+        installQt();
+        return;
+    }
+    if (step.source) {
+        download(*step.source);
         return;
     }
     if (resolver_) {
@@ -193,8 +211,8 @@ void Installer::download(const DownloadSource &source)
         installNpm();
         return;
     }
-    if (source.checksumUrl.isEmpty()) {
-        fetchArchive(source, {});
+    if (!source.checksum.isEmpty() || source.checksumUrl.isEmpty()) {
+        fetchArchive(source, source.checksum);
         return;
     }
     fetch(source.checksumUrl, [this, source](const QByteArray &body, const QString &error) {
@@ -253,7 +271,7 @@ void Installer::finishArchive(QNetworkReply *reply,
         fail(error);
         return;
     }
-    if (!expectedChecksum.isEmpty() && sha256Of(archive) != expectedChecksum) {
+    if (!expectedChecksum.isEmpty() && hashOf(archive, source.algorithm) != expectedChecksum.toLower()) {
         fail(tr("%1 is damaged: its checksum does not match").arg(QFileInfo(archive).fileName()));
         return;
     }
@@ -288,7 +306,9 @@ void Installer::extract(const DownloadSource &source, const QString &archive)
                 // Archives holding a single folder (jdk-17.0.2+8/): its contents.
                 const QFileInfoList children =
                     QDir(content).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
-                complete(children.size() == 1 && children.first().isDir() ? children.first().filePath() : content);
+                const InstallStep &step = steps_.at(index_);
+                complete(children.size() == 1 && children.first().isDir() ? children.first().filePath() : content,
+                         toolchains_->installFolder(step.tool, step.version));
             });
     connect(process, &QProcess::errorOccurred, this, [this, process, generation](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart || generation != generation_)
@@ -343,7 +363,8 @@ void Installer::installNpm()
                     fail(tr("npm failed: %1").arg(output.section(QLatin1Char('\n'), -3)));
                     return;
                 }
-                complete(content);
+                const InstallStep &step = steps_.at(index_);
+                complete(content, toolchains_->installFolder(step.tool, step.version));
             });
     connect(process, &QProcess::errorOccurred, this, [this, process, generation](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart || generation != generation_)
@@ -354,10 +375,36 @@ void Installer::installNpm()
     process->start(node->executable, arguments);
 }
 
-void Installer::complete(const QString &content)
+void Installer::installQt()
 {
     const InstallStep step = steps_.at(index_);
-    const QString target = toolchains_->installFolder(step.tool, step.version);
+    const QString content = stagingFolder() + QStringLiteral("/content");
+    auto *qt = new QtDownload(
+        network_, {.version = step.version, .kit = step.kit, .modules = step.modules, .folder = content}, this);
+    qt_ = qt;
+    const int generation = generation_;
+    const int index = index_;
+    connect(qt, &QtDownload::progress, this, [this, index, generation](qint64 received, qint64 total) {
+        if (generation == generation_)
+            emit progress(index, received, total);
+    });
+    connect(qt, &QtDownload::finished, this,
+            [this, qt, generation, step, content](const QString &version, const QString &error) {
+                qt->deleteLater();
+                if (generation != generation_)
+                    return;
+                if (!error.isEmpty()) {
+                    fail(error);
+                    return;
+                }
+                complete(content, toolchains_->qtInstallFolder(version, step.kit));
+            });
+    qt->start();
+}
+
+void Installer::complete(const QString &content, const QString &target)
+{
+    const InstallStep step = steps_.at(index_);
     QDir(target).removeRecursively();
     QDir().mkpath(QFileInfo(target).absolutePath());
     if (!QDir().rename(content, target)) {
@@ -376,10 +423,17 @@ void Installer::complete(const QString &content)
         fail(tr("Cannot write %1").arg(QDir::toNativeSeparators(marker.fileName())));
         return;
     }
-    marker.write(step.title.toUtf8());
+    // A Qt's modules follow its title, one per line (see Toolchains::qtFolder).
+    marker.write((QStringList{step.title} + step.modules).join(QLatin1Char('\n')).toUtf8());
     marker.close();
     QDir(stagingFolder()).removeRecursively();
-    if (toolchains_->installedExecutable(step.tool, step.version).isEmpty() && ToolCatalog::find(step.tool)) {
+    const QString check = target + QLatin1Char('/') + step.check;
+    if (!step.check.isEmpty() && QFileInfo::exists(check))
+        makeExecutable(check);
+    const bool lacksCheck = !step.check.isEmpty() && !QFileInfo::exists(check);
+    const bool lacksExecutable =
+        toolchains_->installedExecutable(step.tool, step.version).isEmpty() && ToolCatalog::find(step.tool);
+    if (lacksCheck || lacksExecutable) {
         // Unpacked, but not as expected: not usable.
         QFile::remove(marker.fileName());
         fail(tr("%1 does not contain the expected files").arg(step.title));

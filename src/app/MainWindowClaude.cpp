@@ -122,6 +122,7 @@ bool MainWindow::startClaudeSession(QString *error, SessionStart start)
     options.name = QFileInfo(folder_).fileName(); // the agents' sessions address it by the project's name
     if (exposeTools_->isChecked())
         options.mcpReadOnlyTools = mcpRegistry_.readOnlyToolPermissions(QStringLiteral("duet"));
+    addRecipesToSession(options);
     const std::optional<ProcessSpec> spec =
         agentProvider_->sessionProcess(folder_, hookServer_.serverName(), options, &launchError);
     if (!spec) {

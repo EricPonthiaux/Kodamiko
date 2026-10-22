@@ -283,7 +283,7 @@ void ChangeGutter::rollback(const LineChange &change)
     editor_->beginUndoAction();
     editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(from),
                            static_cast<long>(to));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<unsigned long>(replacement.size()),
+    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(replacement.size()),
                            replacement.constData());
     editor_->endUndoAction();
     editor_->setCursorPosition(std::min(change.start, editor_->lines() - 1), 0);

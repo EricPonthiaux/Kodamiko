@@ -1,0 +1,24 @@
+{
+    "title": "Python · pyproject",
+    "language": "python",
+    "description": "pyproject.toml (Python 3.12) and a package in src/. Build checks the syntax of every module.",
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "python -m compileall -q src"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "python -m {{identifier}}",
+            "folder": "src"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "python -m pdb -m {{identifier}}",
+            "folder": "src"
+        }
+    ]
+}

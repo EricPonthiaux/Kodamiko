@@ -2,6 +2,7 @@
 
 #include "CommitPanel.h"
 
+#include "IdentityPopup.h"
 #include "agent/CommitMessage.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
@@ -9,6 +10,7 @@
 #include "workspace/ChoicePopup.h"
 
 #include <QCheckBox>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -181,7 +183,33 @@ void CommitPanel::runCommit(const QString &message, bool amend, bool stageEveryt
             const QSignalBlocker blocker(amend_);
             amend_->setChecked(false);
             message_->clear();
+        },
+        [this, message, amend, stageEverything](const GitError &error) {
+            if (error.kind() != GitError::Kind::NoIdentity)
+                return false;
+            askIdentityThenCommit(message, amend, stageEverything);
+            return true;
         });
+}
+
+void CommitPanel::askIdentityThenCommit(const QString &message, bool amend, bool stageEverything)
+{
+    if (!status_)
+        return;
+    const RepositoryInfo info = status_->info;
+    const auto save = [this, info, message, amend, stageEverything](const GitOperations::Identity &identity,
+                                                                    GitOperations::ConfigScope scope) {
+        commands_->run(
+            tr("Set identity"),
+            [info, identity, scope] {
+                GitOperations::setIdentity(info, identity, scope);
+                return QObject::tr("Commits are now signed %1 <%2>").arg(identity.name, identity.email);
+            },
+            [this, message, amend, stageEverything] { runCommit(message, amend, stageEverything); });
+    };
+    // Read here, on the UI thread: two quick git config calls.
+    auto *popup = new IdentityPopup(QFileInfo(info.workDir).fileName(), GitOperations::identity(info), save, this);
+    popup->popup();
 }
 
 void CommitPanel::setAgent(const QString &name, const QString &iconName)

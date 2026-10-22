@@ -16,7 +16,8 @@ class QPushButton;
 // line: the message, Amend, Generate (the agent's session in the terminal
 // writes the message from the changes) and Commit. Given more height, the
 // message takes it. With nothing staged, Commit offers to stage every
-// change first. Commits go through GitCommands.
+// change first; when git does not know who commits, it asks for the name
+// and email. Commits go through GitCommands.
 class CommitPanel : public QFrame {
     Q_OBJECT
 
@@ -54,6 +55,9 @@ private:
     void onAmendToggled(bool amend);
     void commit();
     void runCommit(const QString &message, bool amend, bool stageEverything);
+    // Git does not know who commits: asks for the name and email, saves
+    // them, then commits again.
+    void askIdentityThenCommit(const QString &message, bool amend, bool stageEverything);
 
     GitCommands *commands_;
     const RepositoryStatus *status_ = nullptr;

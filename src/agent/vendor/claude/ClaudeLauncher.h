@@ -61,6 +61,8 @@ struct SessionOptions {
     // Its identifier (--session-id, a UUID), which its hooks carry: tells
     // its events from the other sessions'. Without one, Claude Code picks it.
     QString sessionId;
+    // Claude Code plugin folders loaded besides Duet's (--plugin-dir).
+    QStringList pluginFolders;
 };
 
 // Process to launch, or nullopt (with `error` set) if `claude` or
