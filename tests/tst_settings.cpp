@@ -187,11 +187,11 @@ private slots:
         QVERIFY(!QSettings().contains("keymap"));
     }
 
-    void codeAndInterfaceAreInUbuntuSansByDefault()
+    void codeDefaultsToDroidSansMonoAndInterfaceToUbuntuSans()
     {
         const Preferences preferences;
 
-        QCOMPARE(preferences.codeFont().family(), QString("Ubuntu Sans Mono"));
+        QCOMPARE(preferences.codeFont().family(), QString("Droid Sans Mono"));
         QVERIFY(AppFonts::isBuiltInCode(preferences.codeFont().family()));
         QCOMPARE(preferences.interfaceFont().family(), QString("Ubuntu Sans"));
         QCOMPARE(preferences.treeFont().family(), QString("Ubuntu Sans"));

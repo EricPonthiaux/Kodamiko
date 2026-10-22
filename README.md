@@ -154,6 +154,7 @@ Third-party components:
 | KDE's editor themes (in `third_party/ksyntaxhighlighting-themes/`) | embedded | MIT |
 | SchemaStore's Claude Code settings schema (in `third_party/schemastore/`) | embedded | Apache 2.0 |
 | Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | embedded | Ubuntu Font Licence 1.0 |
+| Droid Sans Mono (in `third_party/fonts/`) | embedded | Apache 2.0 |
 | JetBrains Mono (in `third_party/fonts/`) | embedded | SIL Open Font License 1.1 |
 | One Dark Pro, Dracula, GitHub, Tokyo Night and Catppuccin theme colors (notices in `third_party/vscode-themes/`) | reproduced | MIT |
 

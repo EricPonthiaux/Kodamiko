@@ -12,7 +12,6 @@
 #include "recipes/RecipeSetup.h"
 #include "run/Runner.h"
 #include "settings/Preferences.h"
-#include "toolchains/Toolchains.h"
 
 #include <QFileInfo>
 #include <QGuiApplication>

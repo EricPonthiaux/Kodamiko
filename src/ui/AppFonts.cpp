@@ -17,6 +17,7 @@ namespace {
 struct Families {
     QString interface;
     QString code;
+    QString ubuntuMono;
     QString jetBrains;         // without ligatures
     QString jetBrainsLigature; // the same with them
 };
@@ -67,11 +68,12 @@ void load()
     loaded = true;
     embedded().interface = addFont(QStringLiteral(":/fonts/UbuntuSans-Variable.ttf"));
     addFont(QStringLiteral(":/fonts/UbuntuSans-VariableItalic.ttf"));
-    embedded().code = addFont(QStringLiteral(":/fonts/UbuntuSansMono-Variable.ttf"));
+    embedded().code = addFont(QStringLiteral(":/fonts/DroidSansMono.ttf"));
+    embedded().ubuntuMono = addFont(QStringLiteral(":/fonts/UbuntuSansMono-Variable.ttf"));
     addFont(QStringLiteral(":/fonts/UbuntuSansMono-VariableItalic.ttf"));
-    // The "NL" version has no programming ligatures: the terminal and, by
-    // default, the editor use it. The other one is for the editor when the
-    // ligatures are on.
+    // When JetBrains Mono is selected, the terminal and, by default, the
+    // editor use the "NL" version without programming ligatures. The other
+    // one is for the editor when the ligatures are on.
     embedded().jetBrains = addFont(QStringLiteral(":/fonts/JetBrainsMonoNL-Regular.ttf"));
     embedded().jetBrainsLigature = addFont(QStringLiteral(":/fonts/JetBrainsMono-Regular.ttf"));
     for (const char *style : {"Italic", "Light", "LightItalic", "Medium", "MediumItalic", "Bold", "BoldItalic"}) {
@@ -125,8 +127,14 @@ bool isBuiltInCode(const QString &family)
 {
     load();
     const Families &fonts = embedded();
-    return !family.isEmpty() &&
-           (family == fonts.code || family == fonts.jetBrains || family == fonts.jetBrainsLigature);
+    return !family.isEmpty() && (family == fonts.code || family == fonts.ubuntuMono || family == fonts.jetBrains ||
+                                 family == fonts.jetBrainsLigature);
+}
+
+QString ubuntuSansMono()
+{
+    load();
+    return embedded().ubuntuMono;
 }
 
 QString jetBrainsMono()

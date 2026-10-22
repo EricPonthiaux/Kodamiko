@@ -135,7 +135,9 @@ bool isOtherCodeFamily(const QString &family, const QStringList &recommended)
 // installed. Returns the download links of the missing recommended fonts.
 QStringList fillFontFamilies(QComboBox *combo)
 {
-    combo->addItem(QCoreApplication::translate("PreferencesPopup", "Ubuntu Sans Mono (built in)"), QString());
+    combo->addItem(QCoreApplication::translate("PreferencesPopup", "Droid Sans Mono (built in)"), QString());
+    combo->addItem(QCoreApplication::translate("PreferencesPopup", "Ubuntu Sans Mono (built in)"),
+                   AppFonts::ubuntuSansMono());
     combo->addItem(QCoreApplication::translate("PreferencesPopup", "JetBrains Mono (built in)"),
                    AppFonts::jetBrainsMono());
     combo->insertSeparator(combo->count());

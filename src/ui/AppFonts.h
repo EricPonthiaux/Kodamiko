@@ -12,10 +12,10 @@ class QObject;
 class QWidget;
 
 // Fonts embedded in Duet, so that it looks the same on every system:
-// Ubuntu Sans for the interface (menus, panels, trees), Ubuntu Sans Mono
-// for code (editor, terminal, diffs), both variable in weight; JetBrains
-// Mono too, the other code font offered, with and without its programming
-// ligatures. Each falls back on the system's font if it cannot be loaded.
+// Ubuntu Sans for the interface (menus, panels, trees), Droid Sans Mono
+// for code (editor, terminal, diffs); Ubuntu Sans Mono and JetBrains Mono
+// are also offered, the latter with and without programming ligatures.
+// Each default falls back on the system's font if it cannot be loaded.
 namespace AppFonts {
 
 // Registers the embedded fonts (once); needs the application to exist.
@@ -39,16 +39,19 @@ void followApplicationFont(QObject *owner, std::function<void()> apply);
 
 // The code font at `pointSize`, without programming ligatures.
 QFont codeFont(qreal pointSize);
-// Whether `family` is an embedded code font (Ubuntu Sans Mono, "JetBrains
-// Mono NL" or its version with ligatures).
+// Whether `family` is an embedded code font (Droid Sans Mono, Ubuntu Sans
+// Mono, "JetBrains Mono NL" or its version with ligatures).
 bool isBuiltInCode(const QString &family);
+// The family of the embedded Ubuntu Sans Mono.
+QString ubuntuSansMono();
 // The family of the embedded JetBrains Mono, without ligatures.
 QString jetBrainsMono();
 
 // `font` with its programming ligatures ("->" drawn as an arrow) on or
 // off. The embedded JetBrains Mono comes in two versions: "NL" without
 // them, the other with them. For other fonts, the OpenType features turn
-// them on or off (Qt 6.7 and later); Ubuntu Sans Mono has none.
+// them on or off (Qt 6.7 and later); Droid Sans Mono and Ubuntu Sans Mono
+// have none.
 QFont withLigatures(QFont font, bool ligatures);
 // The family to give Scintilla for `font`: Scintilla builds its fonts from
 // the family name alone, so "#liga" at its end turns the ligatures on (see

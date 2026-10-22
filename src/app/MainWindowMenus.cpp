@@ -301,6 +301,7 @@ void MainWindow::createEditMenu()
     const auto updateUndoRefactoring = [this, undoRefactoring] {
         const QString last = intelligence_->history()->lastDescription();
         undoRefactoring->setEnabled(!last.isEmpty());
+        undoRefactoring->setVisible(!last.isEmpty());
         undoRefactoring->setText(last.isEmpty() ? tr("&Undo Refactoring") : tr("&Undo %1").arg(last));
     };
     connect(intelligence_->history(), &RefactoringHistory::changed, this, updateUndoRefactoring);

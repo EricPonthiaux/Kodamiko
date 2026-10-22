@@ -320,12 +320,13 @@ qt_add_resources(duet_core kde_themes
     FILES ${kde_themes})
 
 # Interface and code fonts, the same on every system: Ubuntu Sans and
-# Ubuntu Sans Mono by default; JetBrains Mono, the other code font, comes
-# without ligatures (NL) and with them (the editor's option).
+# Droid Sans Mono by default; Ubuntu Sans Mono is also offered. JetBrains
+# Mono comes without ligatures (NL) and with them (the editor's option).
 qt_add_resources(duet_core fonts
     PREFIX /fonts
     BASE ${PROJECT_SOURCE_DIR}/third_party/fonts
     FILES
+        ${PROJECT_SOURCE_DIR}/third_party/fonts/DroidSansMono.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/UbuntuSans-Variable.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/UbuntuSans-VariableItalic.ttf
         ${PROJECT_SOURCE_DIR}/third_party/fonts/UbuntuSansMono-Variable.ttf
