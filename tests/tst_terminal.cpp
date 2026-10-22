@@ -233,6 +233,37 @@ private slots:
         QCOMPARE(finished.first().first().toInt(), 3);
 #endif
     }
+
+#ifndef Q_OS_WIN
+    void seesTheCommandAShellRunsInTheForeground()
+    {
+        auto pty = createPty();
+        ProcessSpec spec;
+        spec.environment = terminalEnvironment();
+        spec.program = "/bin/sh";
+        // -m: job control, as in an interactive shell; "; true" keeps the
+        // shell from replacing itself with sleep.
+        spec.arguments = {"-m", "-c", "sleep 30; true"};
+
+        QVERIFY2(pty->start(spec, QSize(80, 24)), qPrintable(pty->errorString()));
+
+        QTRY_VERIFY_WITH_TIMEOUT(pty->hasForegroundJob(), 5000);
+    }
+
+    void seesNoJobWhileTheProgramStartedHoldsTheTerminal()
+    {
+        auto pty = createPty();
+        ProcessSpec spec;
+        spec.environment = terminalEnvironment();
+        spec.program = "/bin/sh";
+        spec.arguments = {"-c", "sleep 30; true"};
+
+        QVERIFY2(pty->start(spec, QSize(80, 24)), qPrintable(pty->errorString()));
+        QTest::qWait(300); // time for sleep to start
+
+        QVERIFY(!pty->hasForegroundJob());
+    }
+#endif
 };
 
 QTEST_GUILESS_MAIN(TestTerminal)

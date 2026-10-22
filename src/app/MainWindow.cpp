@@ -748,6 +748,10 @@ void MainWindow::restoreTitleBarFrame(const QSettings &settings)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    if (!confirmCloseWhileWorking()) {
+        event->ignore();
+        return;
+    }
     const bool hasAgentWork = !agentSessions_.isEmpty() || agentMerges_->isMerging();
     if (isClosingAgents_ || hasAgentWork) {
         event->ignore();
@@ -755,6 +759,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
         return;
     }
     saveSession();
+    // Closed or cancelled at the unsaved files: the next close asks again.
+    closeConfirmation_ = CloseConfirmation::NotAsked;
     if (!editorTabs_->closeAll()) {
         event->ignore();
         return;

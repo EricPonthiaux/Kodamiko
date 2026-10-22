@@ -157,6 +157,16 @@ void UnixPty::resize(QSize cells)
 // repainted once per batch. The batch is bounded: a program that writes as
 // fast as we parse (`cat` of a big file, `yes`) must not starve input and
 // painting; the notifier fires again on the next event loop iteration.
+bool UnixPty::hasForegroundJob() const
+{
+    if (masterFd_ < 0)
+        return false;
+    // forkpty() makes the child a session leader: its process group holds
+    // the terminal until a shell gives it to a job it runs.
+    const pid_t foreground = ::tcgetpgrp(masterFd_);
+    return foreground > 0 && foreground != childPid_;
+}
+
 void UnixPty::readAvailable()
 {
     constexpr qsizetype chunkSize = 65536;

@@ -309,6 +309,15 @@ private:
     // Something needs the user (a cancelled question, a failed merge…): the
     // window stays open; `reason` says why.
     void stopClosingAgents(const QString &reason);
+    // Closing while work is in progress (the agent answering, a run
+    // configuration, a command in a terminal): asks the user first; false
+    // if they cancel. Asked once per close, even when the agents' sessions
+    // delay it.
+    bool confirmCloseWhileWorking();
+    // The work closing the window would stop, one sentence each.
+    QStringList workInProgress() const;
+    // Shell tabs where a command runs, by tab title.
+    QStringList busyShells() const;
     void newShell();
     TerminalWidget *addTerminal(const QString &title, const ProcessSpec &spec);
     // Runs `configuration` in its terminal tab (the one of its last run,
@@ -483,6 +492,14 @@ private:
     NoticeBar *toolsNotice_ = nullptr;
     bool closingProject_ = false;
     bool isClosingAgents_ = false; // see closeAgentsThenWindow()
+
+    enum class CloseConfirmation {
+        NotAsked,
+        Asking,    // the question is on screen
+        Confirmed, // the user agreed to stop the work in progress
+    };
+
+    CloseConfirmation closeConfirmation_ = CloseConfirmation::NotAsked; // see confirmCloseWhileWorking()
     NoticeBar *serverNotice_ = nullptr;
     QSet<QString> dismissedServerNotices_;   // closed by the user, by message
     NoticeBar *unsavedEditNotice_ = nullptr; // an edit by Claude refused

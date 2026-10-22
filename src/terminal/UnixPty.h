@@ -26,6 +26,8 @@ public:
 
     QString errorString() const override { return errorString_; }
 
+    bool hasForegroundJob() const override;
+
 private:
     void readAvailable();
     void flushPendingWrites();

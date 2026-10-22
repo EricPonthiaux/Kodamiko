@@ -216,6 +216,11 @@ bool TerminalWidget::start(const ProcessSpec &spec)
     return running_;
 }
 
+bool TerminalWidget::isBusy() const
+{
+    return running_ && pty_->hasForegroundJob();
+}
+
 void TerminalWidget::interrupt()
 {
     if (running_)

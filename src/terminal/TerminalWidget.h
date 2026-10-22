@@ -37,6 +37,10 @@ public:
 
     bool isRunning() const { return running_; }
 
+    // A program other than the one started holds the terminal: a shell runs
+    // a command. Always false on Windows.
+    bool isBusy() const;
+
     // Ctrl+C, as typed: the program is asked to stop.
     void interrupt();
     // Ends the program at once (the terminal hangs up).

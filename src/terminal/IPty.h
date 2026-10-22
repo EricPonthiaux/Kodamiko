@@ -26,6 +26,10 @@ public:
     virtual void resize(QSize cells) = 0;
     virtual QString errorString() const = 0;
 
+    // Whether the program started has handed the terminal to another one (a
+    // command typed in a shell). False where the system cannot tell.
+    virtual bool hasForegroundJob() const { return false; }
+
 signals:
     void dataReceived(const QByteArray &data);
     void finished(int exitCode);

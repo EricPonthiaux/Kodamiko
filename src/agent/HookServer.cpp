@@ -90,6 +90,7 @@ void HookServer::respond(const QJsonObject &output)
         receiving_->setProperty(outputProperty, QJsonDocument(output).toJson(QJsonDocument::Compact));
 }
 
+// SIGTERM
 void HookServer::reply(QLocalSocket *socket)
 {
     const QByteArray output = socket->property(outputProperty).toByteArray();

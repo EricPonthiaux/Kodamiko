@@ -365,5 +365,6 @@ void MainWindow::stopClosingAgents(const QString &reason)
         return;
     isClosingAgents_ = false;
     closingProject_ = false;
+    closeConfirmation_ = CloseConfirmation::NotAsked;
     showStatus(tr("The window stays open: %1").arg(reason));
 }

@@ -292,6 +292,62 @@ void MainWindow::closeProject()
         closingProject_ = false;
 }
 
+bool MainWindow::confirmCloseWhileWorking()
+{
+    switch (closeConfirmation_) {
+    case CloseConfirmation::NotAsked:
+        break;
+    case CloseConfirmation::Asking:
+        return false;
+    case CloseConfirmation::Confirmed:
+        return true;
+    }
+    const QStringList work = workInProgress();
+    if (work.isEmpty())
+        return true;
+    closeConfirmation_ = CloseConfirmation::Asking;
+    bool isConfirmed = false;
+    const QString title = closingProject_ ? tr("Close Project") : tr("Close Window");
+    auto *popup = new ChoicePopup(
+        {.title = title, .location = {}, .message = tr("Work is in progress. Stop it?"), .details = work.join(u'\n')},
+        {{tr("Stop and Close"), [&isConfirmed] { isConfirmed = true; }}}, this);
+    popup->focusCancel();
+    popup->exec();
+    closeConfirmation_ = isConfirmed ? CloseConfirmation::Confirmed : CloseConfirmation::NotAsked;
+    return isConfirmed;
+}
+
+QStringList MainWindow::workInProgress() const
+{
+    QStringList work;
+    const bool isAgentWorking =
+        claudeTerminal_ && claudeTerminal_->isRunning() && agentActivity_.state() == AgentActivity::State::Working;
+    if (isAgentWorking)
+        work.append(tr("%1 is working.").arg(agentProvider_->name()));
+    for (const QString &name : runner_->running())
+        work.append(tr("%1 is running.").arg(name));
+    for (const QString &shell : busyShells())
+        work.append(tr("A command runs in the terminal %1.").arg(shell));
+    return work;
+}
+
+QStringList MainWindow::busyShells() const
+{
+    QList<const QWidget *> others{claudeTerminal_};
+    for (const QString &name : runner_->running())
+        others.append(runner_->terminal(name));
+    for (const TerminalWidget *agent : agentSessions_.terminals())
+        others.append(agent);
+
+    QStringList titles;
+    for (int i = 0; i < terminalTabs_->count(); ++i) {
+        const auto *terminal = qobject_cast<const TerminalWidget *>(terminalTabs_->widget(i));
+        if (terminal && terminal->isBusy() && !others.contains(terminal))
+            titles.append(terminalTabs_->tabText(i));
+    }
+    return titles;
+}
+
 void MainWindow::updateToolsNotice()
 {
     const QList<ToolRequirement> required = RecipeLibrary::requirementsOf(project_);
