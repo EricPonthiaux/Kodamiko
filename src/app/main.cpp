@@ -11,6 +11,7 @@
 #include "ui/BrandMark.h"
 #include "ui/ClickableCursors.h"
 #include "ui/Motion.h"
+#include "ui/ToolTipPlacement.h"
 #include "ui/UiMetrics.h"
 #include "welcome/WelcomeWindow.h"
 
@@ -191,6 +192,7 @@ int main(int argc, char *argv[])
     adoptLegacyToolchains();
     Motion::policy().setEnabled(Preferences::load().animations);
     Motion::install();
+    ToolTipPlacement::install();
 
     QApplication::setStyle(new AppStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
 

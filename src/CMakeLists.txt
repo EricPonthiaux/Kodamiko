@@ -244,6 +244,7 @@ add_library(duet_core STATIC
     ui/PopupMotion.cpp
     ui/Theme.cpp
     ui/ThemeStyle.cpp
+    ui/ToolTipPlacement.cpp
     ui/TitleBar.cpp
     ui/TrailingLayout.cpp
     ui/TrailingTabButton.cpp

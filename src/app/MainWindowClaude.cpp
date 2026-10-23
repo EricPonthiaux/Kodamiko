@@ -19,7 +19,6 @@
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
 #include "git/Snapshots.h"
-#include "navigation/SymbolIndex.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
