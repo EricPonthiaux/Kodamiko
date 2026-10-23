@@ -34,6 +34,12 @@ namespace diagram::graphviz {
 
 namespace {
 
+// gvRenderData's length is an unsigned int before Graphviz 3.0 (Ubuntu 24.04
+// ships 2.42) and a size_t since; its signature tells which one this build has.
+template <typename Length>
+Length renderLengthOf(int (*)(GVC_t *, graph_t *, const char *, char **, Length *));
+using RenderLength = decltype(renderLengthOf(&gvRenderData));
+
 int silent(char *)
 {
     return 0;
@@ -124,7 +130,7 @@ QByteArray layout(const QByteArray &dot, const char *engine, QString *error)
     QByteArray result;
     if (gvLayout(gvc, graph, engine) == 0) {
         char *data = nullptr;
-        size_t length = 0;
+        RenderLength length = 0;
         if (gvRenderData(gvc, graph, "json", &data, &length) == 0)
             result = QByteArray(data, qsizetype(length));
         gvFreeRenderData(data);
