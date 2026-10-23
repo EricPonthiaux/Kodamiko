@@ -205,6 +205,8 @@ private slots:
     {
         LspClient client(FAKE_LSP_SERVER_PATH, {}, QDir::tempPath());
         client.start();
+        // A request still waiting for the initialization is dropped, not cancelled.
+        QTRY_VERIFY(client.isReady());
         const QSignalSpy notifications(&client, &LspClient::notificationReceived);
         QString failure;
 

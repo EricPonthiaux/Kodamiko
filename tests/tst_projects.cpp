@@ -973,11 +973,18 @@ private slots:
         const QTemporaryDir dir;
         QDir(dir.path()).mkpath("alpha");
         QDir(dir.path()).mkpath("beta");
-        ProjectConfig alpha = ProjectStore::touch(dir.filePath("alpha"));
+        // Seconds apart: QSettings keeps whole seconds on macOS.
+        const QDateTime now = QDateTime::currentDateTime();
+        const auto touch = [&](const QString &name, int secondsAgo) {
+            ProjectConfig config = ProjectStore::touch(dir.filePath(name));
+            config.lastOpened = now.addSecs(-secondsAgo);
+            return config;
+        };
+        ProjectConfig alpha = touch("alpha", 2);
         alpha.configured = true; // nothing to download
         ProjectStore::save(alpha);
-        ProjectStore::touch(dir.filePath("beta"));
-        ProjectStore::touch(dir.filePath("gone"));
+        ProjectStore::save(touch("beta", 1));
+        ProjectStore::save(touch("gone", 0));
 
         WelcomeWindow window;
         QCOMPARE(window.projectList()->count(), 3);

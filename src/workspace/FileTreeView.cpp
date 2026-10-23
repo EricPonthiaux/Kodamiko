@@ -557,7 +557,10 @@ bool FileTreeView::handleEntryKey(QKeyEvent *event)
     const Qt::KeyboardModifiers modifiers = event->modifiers() & ~Qt::KeypadModifier;
     const bool isF2 = event->key() == Qt::Key_F2 && modifiers == Qt::NoModifier;
     const bool isShiftF6 = event->key() == Qt::Key_F6 && event->modifiers() == Qt::ShiftModifier; // IntelliJ's
-    if (event->matches(QKeySequence::Cut))
+    const bool isEnterKey = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
+    if (isEnterKey && modifiers == Qt::NoModifier && currentIndex().isValid())
+        emit activated(currentIndex()); // macOS's item views would edit the item instead
+    else if (event->matches(QKeySequence::Cut))
         cutSelection();
     else if (event->matches(QKeySequence::Copy))
         copySelection();

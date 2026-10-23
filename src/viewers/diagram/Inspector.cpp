@@ -36,6 +36,9 @@ namespace diagram {
 
 namespace {
 
+// Keeps the color buttons from reading as one more row of swatches.
+constexpr int swatchButtonsGapPx = 8;
+
 const QStringList directions{QStringLiteral("TB"), QStringLiteral("LR"), QStringLiteral("BT"), QStringLiteral("RL")};
 
 QString directionLabel(const QString &direction)
@@ -467,6 +470,7 @@ QWidget *Inspector::buildShapeSection()
     buttons->addWidget(other);
     buttons->addWidget(reset);
     buttons->addStretch();
+    layout->addSpacing(swatchButtonsGapPx);
     layout->addLayout(buttons);
     return section;
 }

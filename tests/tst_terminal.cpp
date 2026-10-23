@@ -19,9 +19,16 @@ private slots:
             const QKeyEvent event(QEvent::ShortcutOverride, key, modifiers, text);
             return TerminalWidget::isApplicationShortcut(event);
         };
+#ifdef Q_OS_MACOS
+        // Qt calls the Ctrl key Meta on macOS, and Cmd Control.
+        constexpr Qt::KeyboardModifier ctrlKey = Qt::MetaModifier;
+        QVERIFY(passes(Qt::Key_R, Qt::ControlModifier)); // Cmd+R, as in Terminal.app
+#else
+        constexpr Qt::KeyboardModifier ctrlKey = Qt::ControlModifier;
+#endif
         // The keys programs use stay in the terminal.
-        QVERIFY(!passes(Qt::Key_C, Qt::ControlModifier));
-        QVERIFY(!passes(Qt::Key_R, Qt::ControlModifier));
+        QVERIFY(!passes(Qt::Key_C, ctrlKey));
+        QVERIFY(!passes(Qt::Key_R, ctrlKey));
         QVERIFY(!passes(Qt::Key_B, Qt::AltModifier));
         QVERIFY(!passes(Qt::Key_Escape, Qt::NoModifier));
         QVERIFY(!passes(Qt::Key_Tab, Qt::ShiftModifier));
@@ -241,11 +248,12 @@ private slots:
         ProcessSpec spec;
         spec.environment = terminalEnvironment();
         spec.program = "/bin/sh";
-        // -m: job control, as in an interactive shell; "; true" keeps the
-        // shell from replacing itself with sleep.
-        spec.arguments = {"-m", "-c", "sleep 30; true"};
+        // Interactive, as in a terminal tab: job control is on, the command
+        // typed gets its own process group and the terminal.
+        spec.arguments = {"-i"};
 
         QVERIFY2(pty->start(spec, QSize(80, 24)), qPrintable(pty->errorString()));
+        pty->write("sleep 30\n");
 
         QTRY_VERIFY_WITH_TIMEOUT(pty->hasForegroundJob(), 5000);
     }

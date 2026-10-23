@@ -168,7 +168,7 @@ QString nextWordOf(const QString &text)
     while (end < text.size() && text[end].isSpace())
         ++end;
     const bool isWord = end < text.size() && isIdentifierCharacter(text[end]);
-    const auto continuesRun = [&text, isWord](QChar c) {
+    const auto continuesRun = [isWord](QChar c) {
         return isWord ? isIdentifierCharacter(c) : !c.isSpace() && !isIdentifierCharacter(c);
     };
     while (end < text.size() && continuesRun(text[end]))
