@@ -5,6 +5,23 @@
 #include "LibGit2.h"
 
 #include <QDir>
+#include <QFileInfo>
+
+namespace {
+
+// libgit2 gives the working directory with its symbolic links resolved
+// (/private/var on macOS), the callers give paths as they spelled the folder
+// (/var): the working directory is spelled the same way, to compare them.
+QString spelledLikeFolder(const QString &workDir, const QString &folder)
+{
+    const QString canonicalFolder = QFileInfo(folder).canonicalFilePath();
+    const QString canonicalWorkDir = QFileInfo(workDir).canonicalFilePath();
+    if (canonicalFolder.isEmpty() || canonicalWorkDir.isEmpty())
+        return workDir;
+    return QDir::cleanPath(QDir(folder).absoluteFilePath(QDir(canonicalFolder).relativeFilePath(canonicalWorkDir)));
+}
+
+} // namespace
 
 struct IgnoreRules::Repository {
     libgit2::Session session;
@@ -22,7 +39,7 @@ IgnoreRules::IgnoreRules(const QString &folder)
     repository->repository.reset(opened);
     if (git_repository_is_bare(opened))
         return;
-    repository->workDir = QDir(QString::fromUtf8(git_repository_workdir(opened)));
+    repository->workDir = QDir(spelledLikeFolder(QString::fromUtf8(git_repository_workdir(opened)), folder));
     repository_ = std::move(repository);
 }
 

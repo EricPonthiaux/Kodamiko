@@ -8,6 +8,7 @@
 #include <QLocalSocket>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 
 #include <functional>
 
@@ -70,6 +71,7 @@ private:
 
     QLocalServer server_;
     QPointer<QLocalSocket> receiving_; // during hookReceived()
+    QSet<QLocalSocket *> handling_;    // in onReadyRead(): deleted after, not on disconnection
     bool replyDeferred_ = false;
     const AgentProvider *provider_ = nullptr;
     McpRegistry *mcpRegistry_ = nullptr;

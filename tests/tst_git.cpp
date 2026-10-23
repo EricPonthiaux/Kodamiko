@@ -872,7 +872,8 @@ private slots:
         const Worktree worktree = Worktrees::add(info, "agent-1");
 
         QCOMPARE(worktree.branch, QString("duet/agent-1"));
-        QCOMPARE(worktree.path, project.filePath(".claude/worktrees/agent-1"));
+        // The repository's paths have their symbolic links resolved (/private/var on macOS).
+        QCOMPARE(worktree.path, QDir(info.workDir).filePath(".claude/worktrees/agent-1"));
         QCOMPARE(read(project, ".claude/worktrees/agent-1/a.txt"), QByteArray("a\n"));
         QVERIFY(Branches::local(project.path()).contains("duet/agent-1"));
         QVERIFY(git(project, {"status", "--porcelain"}).isEmpty());

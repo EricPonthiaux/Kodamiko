@@ -3,6 +3,7 @@
 #include "LspClient.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -90,6 +91,40 @@ std::optional<qsizetype> contentLength(QByteArrayView headers)
     return length;
 }
 
+// `uri`, if it is the folder `from` or inside it, under the folder `to`.
+QString respelled(const QString &uri, const QString &from, const QString &to)
+{
+    const bool isInside = uri.startsWith(from) && (uri.size() == from.size() || uri.at(from.size()) == u'/');
+    return isInside ? to + uri.sliced(from.size()) : uri;
+}
+
+// `value` with every URI (string or object key) under `from` respelled
+// under `to`.
+QJsonValue respelledUris(const QJsonValue &value, const QString &from, const QString &to)
+{
+    if (value.isString())
+        return respelled(value.toString(), from, to);
+    if (value.isArray()) {
+        QJsonArray array;
+        for (const QJsonValue &item : value.toArray())
+            array.append(respelledUris(item, from, to));
+        return array;
+    }
+    if (value.isObject()) {
+        QJsonObject object;
+        const QJsonObject original = value.toObject();
+        for (auto it = original.begin(); it != original.end(); ++it)
+            object.insert(respelled(it.key(), from, to), respelledUris(it.value(), from, to));
+        return object;
+    }
+    return value;
+}
+
+QString folderUri(const QString &folder)
+{
+    return QUrl::fromLocalFile(folder).toString(QUrl::FullyEncoded);
+}
+
 } // namespace
 
 LspClient::LspClient(QString program, QStringList arguments, const QString &rootFolder, QObject *parent)
@@ -99,6 +134,14 @@ LspClient::LspClient(QString program, QStringList arguments, const QString &root
     , rootFolder_(rootFolder)
     , process_(new QProcess(this))
 {
+    // Servers resolve the symbolic links of some paths (clangd's index; /var
+    // is /private/var on macOS) and not others: the server is only told the
+    // resolved paths, and its answers are named back as the project is, so
+    // that one file has one path on each side.
+    if (const QString canonical = QFileInfo(rootFolder).canonicalFilePath();
+        !canonical.isEmpty() && canonical != QDir::cleanPath(rootFolder)) {
+        uriRespelling_ = {.from = folderUri(canonical), .to = folderUri(QDir::cleanPath(rootFolder))};
+    }
     process_->setProcessChannelMode(QProcess::SeparateChannels);
     process_->setWorkingDirectory(rootFolder);
     connect(process_, &QProcess::readyReadStandardOutput, this, &LspClient::onOutput);
@@ -274,7 +317,11 @@ QByteArray LspClient::frame(const QJsonObject &message)
 
 void LspClient::send(const QJsonObject &message)
 {
-    if (process_->state() != QProcess::NotRunning)
+    if (process_->state() == QProcess::NotRunning)
+        return;
+    if (uriRespelling_)
+        process_->write(frame(respelledUris(message, uriRespelling_->to, uriRespelling_->from).toObject()));
+    else
         process_->write(frame(message));
 }
 
@@ -322,8 +369,12 @@ QJsonValue LspClient::settingAt(const QJsonObject &settings, const QString &sect
 void LspClient::onOutput()
 {
     buffer_.append(process_->readAllStandardOutput());
-    for (const QJsonObject &message : takeMessages(buffer_))
-        handle(message);
+    for (const QJsonObject &message : takeMessages(buffer_)) {
+        if (uriRespelling_)
+            handle(respelledUris(message, uriRespelling_->from, uriRespelling_->to).toObject());
+        else
+            handle(message);
+    }
 }
 
 void LspClient::handle(const QJsonObject &message)

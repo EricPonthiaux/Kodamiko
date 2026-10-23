@@ -105,6 +105,13 @@ private:
     QString program_;
     QStringList arguments_;
     QString rootFolder_;
+
+    struct UriRespelling {
+        QString from; // the root's URI with its symbolic links resolved: the server's
+        QString to;   // the root's URI as given: the editor's
+    };
+
+    std::optional<UriRespelling> uriRespelling_;
     QProcess *process_; // outlives this object while the server stops
     QByteArray buffer_;
     // The end of the server's error output: why it stopped.

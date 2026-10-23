@@ -40,7 +40,10 @@ void HookServer::onNewConnection()
 {
     while (QLocalSocket *socket = server_.nextPendingConnection()) {
         connect(socket, &QLocalSocket::readyRead, this, [this, socket] { onReadyRead(socket); });
-        connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
+        connect(socket, &QLocalSocket::disconnected, this, [this, socket] {
+            if (!handling_.contains(socket))
+                socket->deleteLater();
+        });
         if (socket->canReadLine())
             onReadyRead(socket);
     }
@@ -62,15 +65,20 @@ void HookServer::onReadyRead(QLocalSocket *socket)
     }
     // A slot may open a modal popup: its event loop can deliver another hook
     // (hence the outer state, put back after), and the hook can give up
-    // waiting meanwhile, which deletes the socket.
+    // waiting meanwhile. The socket must then outlive the slot: we run inside
+    // its readyRead() emission, and deleting it there crashes on return (macOS).
     const QPointer<QLocalSocket> outerReceiving = std::exchange(receiving_, socket);
     const bool outerReplyDeferred = std::exchange(replyDeferred_, false);
+    handling_.insert(socket);
     if (const std::optional<HookEvent> event = provider_ ? provider_->parseHook(line) : std::nullopt)
         emit hookReceived(*event);
+    handling_.remove(socket);
     const bool isReplyDeferred = std::exchange(replyDeferred_, outerReplyDeferred);
-    const QPointer<QLocalSocket> stillOpen = std::exchange(receiving_, outerReceiving);
-    if (!isReplyDeferred && stillOpen)
-        reply(stillOpen);
+    receiving_ = outerReceiving;
+    if (socket->state() == QLocalSocket::UnconnectedState)
+        socket->deleteLater();
+    else if (!isReplyDeferred)
+        reply(socket);
 }
 
 std::function<void()> HookServer::deferReply()
@@ -93,6 +101,8 @@ void HookServer::respond(const QJsonObject &output)
 // SIGTERM
 void HookServer::reply(QLocalSocket *socket)
 {
+    if (socket->state() != QLocalSocket::ConnectedState)
+        return; // the hook gave up waiting
     const QByteArray output = socket->property(outputProperty).toByteArray();
     socket->write(output.isEmpty() ? QByteArray("ok\n") : "ok " + output + '\n');
     socket->flush();
