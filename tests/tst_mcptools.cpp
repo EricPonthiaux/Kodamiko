@@ -234,6 +234,16 @@ class TestMcpTools : public QObject {
 
 private slots:
 
+    // Git ignores the user's configuration and commits under a fixed identity, which a CI runner has none of.
+    void initTestCase()
+    {
+        QVERIFY(gitConfig_.open());
+        qputenv("GIT_CONFIG_GLOBAL", gitConfig_.fileName().toUtf8());
+        qputenv("GIT_CONFIG_NOSYSTEM", "1");
+        for (const char *name : {"GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"})
+            qputenv(name, "t");
+    }
+
     // Files as the user has them, unsaved changes included.
     void readsTheEditor()
     {
@@ -328,7 +338,7 @@ private slots:
         write(editor.folder, QStringLiteral("a.txt"), "one\n");
         Git::run(editor.folder.path(), {"init", "-q", "-b", "main"});
         Git::run(editor.folder.path(), {"add", "-A"});
-        Git::run(editor.folder.path(), {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"});
+        Git::run(editor.folder.path(), {"commit", "-qm", "init"});
         write(editor.folder, QStringLiteral("a.txt"), "two\n");
 
         QJsonObject status =
@@ -404,13 +414,6 @@ private slots:
     // Branches, a remote, stashes and merges; what changes is asked first.
     void actsOnBranchesAndRemotes()
     {
-        QTemporaryFile config;
-        QVERIFY(config.open());
-        qputenv("GIT_CONFIG_GLOBAL", config.fileName().toUtf8());
-        qputenv("GIT_CONFIG_NOSYSTEM", "1");
-        for (const char *name : {"GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"})
-            qputenv(name, "t");
-
         const QTemporaryDir bare;
         Git::run(bare.path(), {"init", "-q", "--bare", "-b", "main"});
         Editor editor;
@@ -670,6 +673,8 @@ private slots:
         QCOMPARE(result.value("status").toString(), QString("applied"));
         QCOMPARE(file->text(), QString("int total = 0; // total\nint main() { return total; }\n"));
     }
+private:
+    QTemporaryFile gitConfig_;
 };
 
 QTEST_MAIN(TestMcpTools)
