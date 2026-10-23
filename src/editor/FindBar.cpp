@@ -217,8 +217,8 @@ std::optional<QList<FindBar::Match>> FindBar::findAll(EditorWidget *editor, cons
     long position = 0;
     while (position <= length && matches.size() < query.limit) {
         editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(position), length);
-        const long found = editor->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET,
-                                                 uintptr_t(pattern.size()), pattern.constData());
+        const long found = editor->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET, uintptr_t(pattern.size()),
+                                                 pattern.constData());
         if (found < 0)
             break;
         const long end = editor->SendScintilla(QsciScintillaBase::SCI_GETTARGETEND);
@@ -390,13 +390,12 @@ void FindBar::replaceCurrent()
     // The target must come from a search for "\1"-style references to work.
     editor_->SendScintilla(QsciScintillaBase::SCI_SETSEARCHFLAGS, searchFlags());
     editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(match.start), match.end);
-    if (editor_->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET, uintptr_t(pattern.size()),
-                               pattern.constData()) < 0)
+    if (editor_->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET, uintptr_t(pattern.size()), pattern.constData()) <
+        0)
         return;
     const int message =
         regularExpression_->isChecked() ? QsciScintillaBase::SCI_REPLACETARGETRE : QsciScintillaBase::SCI_REPLACETARGET;
-    const long replacedLength =
-        editor_->SendScintilla(message, uintptr_t(replacement.size()), replacement.constData());
+    const long replacedLength = editor_->SendScintilla(message, uintptr_t(replacement.size()), replacement.constData());
     refresh();
     selectFrom(match.start + replacedLength, true);
 }

@@ -766,8 +766,7 @@ void CompletionController::acceptNextWord()
     editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
     editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(prefixStart_),
                            static_cast<long>(position));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()),
-                           text.constData());
+    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
     editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
     editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(prefixStart_ + text.size()));
     refilter();
@@ -873,8 +872,7 @@ void CompletionController::accept(bool replaceWord)
     editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
     editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start),
                            static_cast<long>(end));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()),
-                           text.constData());
+    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
     selectExpansion(expanded, start);
     // An import that comes with it, in the same undo step.
     // Watched for a few seconds: erased at once, it was the wrong one. From
@@ -945,8 +943,7 @@ void CompletionController::insertSnippet(int start, int end, const QString &snip
     editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
     editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start),
                            static_cast<long>(end));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()),
-                           text.constData());
+    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
     selectExpansion(expanded, start);
     snippet_->start(expanded, start);
     editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
@@ -1083,8 +1080,7 @@ void CompletionController::acceptFullLine(bool nextWordOnly)
     editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
     editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(position),
                            static_cast<long>(position));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(bytes.size()),
-                           bytes.constData());
+    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(bytes.size()), bytes.constData());
     editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
     editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(position + bytes.size()));
     if (!rest.trimmed().isEmpty()) {

@@ -175,8 +175,7 @@ void setIdentity(const RepositoryInfo &repository, const Identity &identity, Con
         break;
     }
     Git::run(repository.workDir, {QStringLiteral("config"), scopeOption, QStringLiteral("user.name"), identity.name});
-    Git::run(repository.workDir,
-             {QStringLiteral("config"), scopeOption, QStringLiteral("user.email"), identity.email});
+    Git::run(repository.workDir, {QStringLiteral("config"), scopeOption, QStringLiteral("user.email"), identity.email});
 }
 
 void init(const QString &folder)

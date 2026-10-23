@@ -222,8 +222,7 @@ void SnippetSession::synchronize()
         // onModified moves every range, this one included.
         editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(ranges[i].start),
                                static_cast<long>(ranges[i].end));
-        editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()),
-                               text.constData());
+        editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
     }
     synchronizing_ = false;
     paint();

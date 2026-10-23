@@ -87,8 +87,7 @@ bool openFile(LogFile &log)
         return false;
     const QString folder = LogFiles::folder();
     const QString name = QStringLiteral("%1-%2-%3.log")
-                             .arg(log.program,
-                                  QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")))
+                             .arg(log.program, QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")))
                              .arg(QCoreApplication::applicationPid());
     log.file.setFileName(QDir(folder).filePath(name));
     if (QDir().mkpath(folder) && log.file.open(QIODevice::WriteOnly | QIODevice::Append)) {

@@ -673,6 +673,7 @@ private slots:
         QCOMPARE(result.value("status").toString(), QString("applied"));
         QCOMPARE(file->text(), QString("int total = 0; // total\nint main() { return total; }\n"));
     }
+
 private:
     QTemporaryFile gitConfig_;
 };
