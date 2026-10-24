@@ -991,6 +991,36 @@ private slots:
         QVERIFY(!commitButton(view)->isEnabled());
     }
 
+    void withoutChangesOnlyAmendCanCommit()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        const QPushButton *generate = nullptr;
+        for (const QPushButton *button : view.findChildren<QPushButton *>()) {
+            if (button->text() == QLatin1String("Generate"))
+                generate = button;
+        }
+        QVERIFY(generate);
+        const bool commitWithoutChanges = commitButton(view)->isEnabled();
+        const bool generateWithoutChanges = generate->isEnabled();
+
+        view.findChild<QCheckBox *>()->setChecked(true); // Amend
+
+        QVERIFY(!commitWithoutChanges);
+        QVERIFY(!generateWithoutChanges);
+        QVERIFY(commitButton(view)->isEnabled());
+        QVERIFY(generate->isEnabled());
+    }
+
     void stageAllThenCommit()
     {
         const QTemporaryDir project;

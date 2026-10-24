@@ -17,7 +17,9 @@ class QPushButton;
 // writes the message from the changes) and Commit. Given more height, the
 // message takes it. With nothing staged, Commit offers to stage every
 // change first; when git does not know who commits, it asks for the name
-// and email. Commits go through GitCommands.
+// and email. Without changes, Commit and Generate are disabled, unless
+// Amend is checked (to reword the last commit). Commits go through
+// GitCommands.
 class CommitPanel : public QFrame {
     Q_OBJECT
 
