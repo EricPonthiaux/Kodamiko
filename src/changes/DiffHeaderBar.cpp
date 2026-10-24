@@ -188,7 +188,10 @@ void DiffHeaderBar::follow()
         return;
     }
     const int file = std::max(0, diff_->locate(diff_->firstVisibleLine()).file);
-    updateFilePager(file, int(files.size()));
+    if (const std::optional<DiffView::ListPosition> &list = diff_->listPosition())
+        updateFilePager(list->index, list->count);
+    else
+        updateFilePager(file, int(files.size()));
     const DiffView::FileSummary &shown = files.value(file, files.first());
     const qsizetype slash = shown.path.lastIndexOf(QLatin1Char('/'));
     name_->setText(shown.path.mid(slash + 1));
@@ -214,8 +217,10 @@ void DiffHeaderBar::updateFilePager(int file, int fileCount)
     const bool hasPager = fileCount > 1;
     filePager_->setVisible(hasPager);
     // Both sides as wide: the pager in the middle. Without it, the file's
-    // side takes the whole bar (a wrapped hint).
+    // side takes the rest of the bar (or all of it: a wrapped hint), the
+    // buttons the room they need.
     layout_->setStretchFactor(buttonsSide_, hasPager ? 1 : 0);
+    buttonsSide_->setSizePolicy(hasPager ? QSizePolicy::Ignored : QSizePolicy::Minimum, QSizePolicy::Preferred);
     previousFile_->setEnabled(file > 0);
     nextFile_->setEnabled(file < fileCount - 1);
     filePosition_->setText(QStringLiteral("%1 / %2").arg(file + 1).arg(fileCount));

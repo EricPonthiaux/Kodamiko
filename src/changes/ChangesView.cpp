@@ -180,6 +180,9 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     diff_->setContextMenuPolicy(Qt::CustomContextMenu);
     diff_->setToolTip({});
     connect(diff_, &QWidget::customContextMenuRequested, this, &ChangesView::showDiffMenu);
+    connect(diff_, &DiffView::fileRequested, this, [this](DiffView::Direction direction) {
+        selectFileAfter(direction == DiffView::Direction::Next ? 1 : -1);
+    });
     addDiffShortcuts();
     // A block's buttons act on the whole block, whatever lines are selected.
     connect(hunkActions_, &HunkActions::applyRequested, this, [this](int line) {
@@ -375,7 +378,8 @@ void ChangesView::selectFile(const QString &relativePath)
 
 void ChangesView::showDiff()
 {
-    const QList<FileRef> selected = selectedFiles();
+    const QList<FileRef> selection = selectedFiles();
+    const QSet<FileRef> selected(selection.begin(), selection.end());
     shownFiles_.clear();
     std::ranges::copy_if(filesInListOrder(), std::back_inserter(shownFiles_),
                          [&selected](const FileRef &ref) { return selected.contains(ref); });
@@ -393,6 +397,12 @@ void ChangesView::showDiff()
                       diff.isTooLarge, diff.newText});
     }
     hunkActions_->setStagedFiles(stagedFiles);
+    // One file selected: the pager and Alt+Down go through the list's files.
+    const QList<QTreeWidgetItem *> listedFiles = ChangeTree::filesUnder(rootItem());
+    std::optional<DiffView::ListPosition> listPosition;
+    if (const std::optional<int> index = selectedFileIndex(listedFiles))
+        listPosition = DiffView::ListPosition{*index, int(listedFiles.size())};
+    diff_->setListPosition(listPosition);
     if (!shown.isEmpty())
         diff_->setFiles(shown);
     else
@@ -411,9 +421,11 @@ QString ChangesView::emptyDiffMessage() const
 ChangesView::DiffPosition ChangesView::diffPosition() const
 {
     DiffPosition position{diffCursorLine(), diff_->firstVisibleLine()};
-    position.file = shownFileAt(position.cursorLine);
-    if (position.file)
-        position.fileStart = diff_->fileStart(int(shownFiles_.indexOf(*position.file)));
+    const std::optional<FileRef> file = shownFileAt(position.cursorLine);
+    if (!file)
+        return position;
+    position.part = FilePart{file->section, changeOf(*file).path};
+    position.partStart = diff_->fileStart(int(shownFiles_.indexOf(*file)));
     return position;
 }
 
@@ -422,13 +434,12 @@ void ChangesView::restoreDiffPosition(const DiffPosition &position)
     // The same part of the same file, wherever it moved: the cursor near
     // the block just staged, Space goes on with the next.
     int shift = 0;
-    if (position.file) {
-        const QString &path = changeOf(*position.file).path;
-        const auto samePart = [&](const FileRef &ref) {
-            return ref.section == position.file->section && changeOf(ref).path == path;
+    if (position.part) {
+        const auto samePart = [this, &part = *position.part](const FileRef &ref) {
+            return ref.section == part.section && changeOf(ref).path == part.path;
         };
         if (const auto found = std::ranges::find_if(shownFiles_, samePart); found != shownFiles_.end())
-            shift = diff_->fileStart(int(found - shownFiles_.begin())) - position.fileStart;
+            shift = diff_->fileStart(int(found - shownFiles_.begin())) - position.partStart;
     }
     diff_->setCursorPosition(std::clamp(position.cursorLine + shift, 0, std::max(0, diff_->lines() - 1)), 0);
     diff_->setFirstVisibleLine(std::max(0, position.firstLine + shift));

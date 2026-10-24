@@ -279,6 +279,28 @@ void ChangesView::toggleSelectedFiles()
         unstageFiles(selection);
 }
 
+std::optional<int> ChangesView::selectedFileIndex(const QList<QTreeWidgetItem *> &listedFiles) const
+{
+    const QList<QTreeWidgetItem *> selected = fileList_->selectedItems();
+    if (selected.size() != 1 || FileChangeDelegate::isFolder(selected.first()))
+        return std::nullopt;
+    const qsizetype index = listedFiles.indexOf(selected.first());
+    return index >= 0 ? std::optional(int(index)) : std::nullopt;
+}
+
+void ChangesView::selectFileAfter(int step)
+{
+    const QList<QTreeWidgetItem *> listedFiles = ChangeTree::filesUnder(rootItem());
+    const std::optional<int> index = selectedFileIndex(listedFiles);
+    if (!index)
+        return;
+    QTreeWidgetItem *row = listedFiles.value(*index + step);
+    if (!row)
+        return;
+    fileList_->setCurrentItem(row);
+    fileList_->scrollToItem(row);
+}
+
 void ChangesView::openItem(const QTreeWidgetItem *item)
 {
     const QList<FileRef> refs = refsOf(item);
@@ -294,12 +316,13 @@ QList<ChangesView::FileRef> ChangesView::selectedFiles() const
     QList<FileRef> result;
     if (!status_)
         return result;
-    // A folder stands for the files under it.
+    // A folder stands for the files under it, which may be selected too.
+    QSet<const QTreeWidgetItem *> listed;
     for (QTreeWidgetItem *item : fileList_->selectedItems()) {
         for (const QTreeWidgetItem *row : ChangeTree::filesUnder(item)) {
-            for (const FileRef &ref : refsOf(row)) {
-                if (!result.contains(ref))
-                    result.append(ref);
+            if (!listed.contains(row)) {
+                listed.insert(row);
+                result.append(refsOf(row));
             }
         }
     }

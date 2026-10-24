@@ -19,7 +19,9 @@ class SideBySideDivider;
 // margin their numbers before and after. The arrows of a separator reveal
 // the unchanged lines it hides, 20 at a time. Read only; the text can be
 // selected and copied. F7 and Shift+F7 go to the next and previous block,
-// Alt+Down and Alt+Up to the next and previous file. Side by side, the old
+// Alt+Down and Alt+Up to the next and previous file (or, when the files
+// are a page of a list beside the view, ask for its next or previous
+// one). Side by side, the old
 // version shows in a pane at the left, row for row with the new one: the
 // view's lines, numbers and locations are then those of the new side; the
 // line between the two drags to share the width otherwise. Either side
@@ -44,6 +46,13 @@ public:
     enum class Mode {
         Unified,
         SideBySide
+    };
+
+    // Where the files shown are in a list outside the view: file `index`
+    // of `count`.
+    struct ListPosition {
+        int index = 0;
+        int count = 0;
     };
 
     explicit DiffView(const Theme &theme, QWidget *parent = nullptr);
@@ -79,8 +88,16 @@ public:
     // the cursor on its separator. Next after the cursor when it is in view,
     // otherwise after the top of the view.
     void goToChange(Direction direction);
-    // Same for the next (or previous) file's title bar.
+    // Same for the next (or previous) file's title bar; with a list
+    // position, asks for the list's next (or previous) file instead
+    // (fileRequested()).
     void goToFile(Direction direction);
+    // The files shown are one page of a list (see goToFile()); nullopt, the
+    // default: the view pages through its own files.
+    void setListPosition(std::optional<ListPosition> position);
+
+    const std::optional<ListPosition> &listPosition() const { return listPosition_; }
+
     // The line, from 0, of the file's new version that displayed line `line`
     // stands for: the line itself, or the next line of the new version for a
     // removed line, a block separator or a title bar.
@@ -94,8 +111,11 @@ public:
     void applyTheme(const Theme &theme);
 
 signals:
-    // setFiles() or showMessage() changed what is shown.
+    // setFiles(), showMessage() or setListPosition() changed what is shown.
     void contentChanged();
+    // Alt+Down, Alt+Up or a header's pager, with a list position: the
+    // list's next or previous file is to be shown.
+    void fileRequested(Direction direction);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -144,6 +164,7 @@ private:
     QList<FileSummary> summaries_;
     int numberWidth_ = 3; // digits of the largest line number
     Mode mode_ = Mode::Unified;
+    std::optional<ListPosition> listPosition_;
     NumberColumns numbers_ = NumberColumns::Both;
     DiffView *oldSide_ = nullptr;          // side by side, at the left; a child of the view
     SideBySideDivider *divider_ = nullptr; // between the two sides; a child of the view

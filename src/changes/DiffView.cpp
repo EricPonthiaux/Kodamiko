@@ -169,8 +169,18 @@ void DiffView::goToChange(Direction direction)
 
 void DiffView::goToFile(Direction direction)
 {
+    if (listPosition_) {
+        emit fileRequested(direction);
+        return;
+    }
     if (const auto title = nextLineOfKind(DiffLineKind::FileHeader, direction))
         showAtTop(*title);
+}
+
+void DiffView::setListPosition(std::optional<ListPosition> position)
+{
+    listPosition_ = position;
+    emit contentChanged();
 }
 
 std::optional<int> DiffView::nextLineOfKind(DiffLineKind kind, Direction direction) const

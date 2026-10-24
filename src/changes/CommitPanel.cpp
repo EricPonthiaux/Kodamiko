@@ -87,12 +87,12 @@ void CommitPanel::reset()
 void CommitPanel::updateActions()
 {
     const bool hasChanges = status_ && (!status_->staged.isEmpty() || !status_->unstaged.isEmpty());
-    // Amend can reword the last commit alone.
-    const bool isAmend = status_ && amend_->isChecked();
-    const bool hasSomethingToCommit = hasChanges || isAmend;
-    commitButton_->setEnabled(!commands_->isBusy() && hasSomethingToCommit);
-    generateButton_->setEnabled(hasSomethingToCommit);
-    amend_->setEnabled(status_ && !status_->info.unborn);
+    const bool hasLastCommit = status_ && !status_->info.unborn;
+    commitButton_->setEnabled(!commands_->isBusy() && hasChanges);
+    generateButton_->setEnabled(hasChanges);
+    amend_->setEnabled(hasChanges && hasLastCommit);
+    if (!hasChanges)
+        amend_->setChecked(false); // the changes it was for are gone
 }
 
 void CommitPanel::focusMessage()
@@ -102,7 +102,6 @@ void CommitPanel::focusMessage()
 
 void CommitPanel::onAmendToggled(bool amend)
 {
-    updateActions();
     if (!status_)
         return;
     const QString lastMessage = status_->info.headMessage.trimmed();

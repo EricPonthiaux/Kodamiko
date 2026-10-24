@@ -379,7 +379,6 @@ private slots:
         const auto *header = view.findChild<DiffHeaderBar *>();
         QToolButton *nextFile = buttonWithToolTip(header, "Next file (Alt+Down)");
         QVERIFY(nextFile);
-        fileList(view)->selectAll(); // two files in the diff: the pager shows
         QVERIFY(!bar->isVisible());
         QVERIFY(nextFile->isVisible());
 
@@ -388,6 +387,58 @@ private slots:
         QVERIFY(!column->isVisible());
         QVERIFY(bar->isVisible());
         QVERIFY(nextFile->isVisible());
+    }
+
+    void theFileArrowsGoThroughTheListsFiles()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *diff = view.findChild<DiffView *>();
+        QToolButton *nextFile = buttonWithToolTip(view.findChild<DiffHeaderBar *>(), "Next file (Alt+Down)");
+        QVERIFY(nextFile);
+
+        nextFile->click();
+        const QStringList afterArrow = diffParts(view);
+        diff->setFocus();
+        QTest::keyClick(diff, Qt::Key_Down, Qt::AltModifier);
+
+        QCOMPARE(afterArrow, QStringList({"b.txt  modified  ·  staged"}));
+        QCOMPARE(diffParts(view), QStringList({"c.txt  modified  ·  staged", "c.txt  modified  ·  unstaged"}));
+        QCOMPARE(fileList(view)->selectedItems(), {fileList(view)->topLevelItem(0)->child(2)});
+        QVERIFY(!nextFile->isEnabled()); // the last file
+    }
+
+    void theDiffOfOneFileKeepsItsButtons()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "a2\n");
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 400);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+
+        view.refresh();
+
+        QTRY_COMPARE(refreshed.size(), 1);
+        const auto *header = view.findChild<DiffHeaderBar *>();
+        const QToolButton *sideBySide = buttonWithToolTip(header, "Show the old and new versions side by side");
+        QVERIFY(sideBySide);
+        QTRY_VERIFY(sideBySide->isVisible() && sideBySide->width() > 0);
+        QVERIFY(header->rect().contains(sideBySide->mapTo(header, sideBySide->rect().bottomRight())));
     }
 
     void theListAndTheCommitAreaTakeAResizableShareOfTheColumn()
@@ -493,6 +544,37 @@ private slots:
 
         QTRY_COMPARE(rowStates(view), QStringList({"a.txt: unstaged", "b.txt: staged", "c.txt: unstaged"}));
         QVERIFY(!Git::run(project.path(), {"diff", "--cached"}).contains("c.txt"));
+    }
+
+    void aNewFileBeforeKeepsTheCursorInItsPart()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 600);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        fileList(view)->selectAll();
+        auto *diff = view.findChild<DiffView *>();
+        const auto lineOf = [diff](const QString &text) {
+            const QList<DiffLine> &lines = diff->displayedLines();
+            return int(std::ranges::find_if(lines, [&text](const DiffLine &line) { return line.text == text; }) -
+                       lines.begin());
+        };
+        diff->setCursorPosition(lineOf("ten"), 0); // c.txt's unstaged part, the second unstaged file
+
+        write(project, "0.txt", "0\n"); // the first unstaged file now
+        view.refresh();
+
+        QTRY_COMPARE(refreshed.size(), 2);
+        int cursorLine = 0;
+        int index = 0;
+        diff->getCursorPosition(&cursorLine, &index);
+        QCOMPARE(cursorLine, lineOf("ten"));
     }
 
     void clickingAFilesBoxStagesItThenUnstagesIt()
@@ -991,7 +1073,7 @@ private slots:
         QVERIFY(!commitButton(view)->isEnabled());
     }
 
-    void withoutChangesOnlyAmendCanCommit()
+    void withoutChangesNothingCanBeCommitted()
     {
         const QTemporaryDir project;
         write(project, "a.txt", "a\n");
@@ -1010,15 +1092,23 @@ private slots:
                 generate = button;
         }
         QVERIFY(generate);
-        const bool commitWithoutChanges = commitButton(view)->isEnabled();
-        const bool generateWithoutChanges = generate->isEnabled();
+        const auto *amend = view.findChild<QCheckBox *>();
+        const bool couldCommitBefore = commitButton(view)->isEnabled();
 
-        view.findChild<QCheckBox *>()->setChecked(true); // Amend
+        write(project, "a.txt", "a2\n");
+        view.refresh();
 
-        QVERIFY(!commitWithoutChanges);
-        QVERIFY(!generateWithoutChanges);
+        QTRY_COMPARE(refreshed.size(), 2);
+        QVERIFY(!couldCommitBefore);
         QVERIFY(commitButton(view)->isEnabled());
         QVERIFY(generate->isEnabled());
+        QVERIFY(amend->isEnabled());
+        Git::run(project.path(), {"checkout", "--", "a.txt"});
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 3);
+        QVERIFY(!commitButton(view)->isEnabled());
+        QVERIFY(!generate->isEnabled());
+        QVERIFY(!amend->isEnabled());
     }
 
     void stageAllThenCommit()

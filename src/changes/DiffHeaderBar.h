@@ -16,7 +16,9 @@ class QToolButton;
 // of the view as it scrolls (its name, its folder and state, its counts),
 // the buttons that show the two versions side by side and hide whitespace
 // changes, and those that go to the previous or next block of changes. With
-// several files, a pager ("‹ 3 / 12 ›") goes to the previous or next file.
+// several files, a pager ("‹ 3 / 12 ›") goes to the previous or next file:
+// of the view, or of the list the view shows a page of (see
+// DiffView::setListPosition()).
 class DiffHeaderBar : public QFrame {
     Q_OBJECT
 

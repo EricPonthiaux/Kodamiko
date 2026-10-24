@@ -110,6 +110,18 @@ private:
         int index; // in RepositoryStatus::staged or ::unstaged
 
         bool operator==(const FileRef &) const = default;
+
+        friend size_t qHash(const FileRef &ref, size_t seed = 0)
+        {
+            return qHashMulti(seed, int(ref.section), ref.index);
+        }
+    };
+
+    // A file's staged or unstaged part by its path: unlike a FileRef, it
+    // still means the same part once the status is read again.
+    struct FilePart {
+        Section section;
+        QString path;
     };
 
     // The diff's cursor and scroll position, kept across a rebuild relative
@@ -117,8 +129,8 @@ private:
     struct DiffPosition {
         int cursorLine = 0;
         int firstLine = 0;
-        std::optional<FileRef> file; // nullopt outside the files
-        int fileStart = 0;
+        std::optional<FilePart> part; // nullopt outside the files
+        int partStart = 0;
     };
 
     const QList<FileDiff> &files(Section section) const;
@@ -167,6 +179,12 @@ private:
     void onItemChanged(QTreeWidgetItem *item);
     // Stages the selected files, or unstages them when they are all staged.
     void toggleSelectedFiles();
+    // Where the selected file is among the list's files, when it is
+    // selected alone (not a folder); nullopt otherwise.
+    // `listedFiles`: the list's files (ChangeTree::filesUnder(rootItem())).
+    std::optional<int> selectedFileIndex(const QList<QTreeWidgetItem *> &listedFiles) const;
+    // Selects the file `step` rows after (or before) the selected one.
+    void selectFileAfter(int step);
     // Opens the file of `item` in the editor (signal openFileRequested()).
     void openItem(const QTreeWidgetItem *item);
     void updateActions();
