@@ -64,6 +64,30 @@ jobs:
       - name: Test
         run: ctest --preset default
 
+      # The report of every test, failed or not, for the cases where ctest's
+      # output lacks it.
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}
+          path: build/test-logs/
+          if-no-files-found: ignore
+
+      - name: Failed test reports
+        if: failure()
+        shell: bash
+        run: |
+          for log in build/test-logs/*.txt; do
+            # A crashed test never writes its "Finished testing" line.
+            if ! grep -q -E '^(FAIL!|QFATAL)' "$log" && grep -q '^\*\*\*\*\*\*\*\*\* Finished testing' "$log"; then
+              continue
+            fi
+            echo "::group::$(basename "$log" .txt)"
+            cat "$log"
+            echo "::endgroup::"
+          done
+
       - name: Linux package (AppImage)
         if: runner.os == 'Linux'
         run: |

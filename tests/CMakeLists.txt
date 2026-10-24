@@ -1,10 +1,14 @@
 # One Qt Test executable per tst_*.cpp file. Tests that create
 # widgets run without a display (Qt "offscreen" platform).
+# Each test also writes its report to test-logs/: on the Windows CI, the
+# report Qt Test prints to stdout does not reach ctest's output.
+set(DUET_TEST_LOG_DIR ${CMAKE_BINARY_DIR}/test-logs)
+file(MAKE_DIRECTORY ${DUET_TEST_LOG_DIR})
 function(duet_add_test name)
     add_executable(${name} ${name}.cpp)
     duet_enable_warnings(${name})
     target_link_libraries(${name} PRIVATE duet_core Qt6::Test)
-    add_test(NAME ${name} COMMAND ${name})
+    add_test(NAME ${name} COMMAND ${name} -o -,txt -o ${DUET_TEST_LOG_DIR}/${name}.txt,txt)
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     # Windows has no rpath: the tests find Qt's DLLs through PATH, and
     # Graphviz's in the executable's folder, where the package takes them.
