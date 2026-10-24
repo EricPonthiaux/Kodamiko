@@ -27,7 +27,9 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
-          modules: qtwebengine qtwebchannel qtpositioning
+          # qtserialport: Qt Positioning's NMEA plugin links against it, and
+          # the AppImage step deploys every plugin of a module it bundles.
+          modules: qtwebengine qtwebchannel qtpositioning qtserialport
           cache: true
 
       - name: Linux tools
