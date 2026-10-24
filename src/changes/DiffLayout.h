@@ -91,9 +91,14 @@ struct DiffLine {
 
 namespace DiffLayout {
 
-// Unchanged lines to show around the blocks, per file path: their numbers in
-// the new version.
+// Unchanged lines to show around the blocks, per file (see revealKey()):
+// their numbers in the new version.
 using RevealedLines = QHash<QString, QSet<int>>;
+
+// The key of `file` in RevealedLines: its path, and its status, which tells
+// apart two versions of one file shown together (its staged and unstaged
+// changes).
+QString revealKey(const DiffFile &file);
 
 // The displayed lines for `files`: per file a blank line and a title bar,
 // then per block a separator ("⋯ ↑ ↓  lines 40–48 · function") and its

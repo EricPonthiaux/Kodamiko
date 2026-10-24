@@ -14,7 +14,9 @@ struct FilePatch;
 // (M, A, D, R, U) at the right, the lines added and removed before it.
 // In a tree (see ChangeTree), folder rows show the folder's icon and
 // name, and the files under them leave their folder out. Rows are given
-// room to breathe.
+// room to breathe. A row with a check state (Qt::CheckStateRole) has a check
+// box at its left; a click on it checks the row, or unchecks it when it was
+// checked, through the model (QTreeWidget::itemChanged()).
 class FileChangeDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
@@ -34,6 +36,7 @@ public:
     static void setChange(QTreeWidgetItem *item, const FileChange &change);
     // Shows the lines `patch` adds and removes ("+12 −3").
     static void setStats(QTreeWidgetItem *item, const FilePatch &patch);
+    static void setStats(QTreeWidgetItem *item, int added, int removed);
     // Makes `item` the row of the folder at `path`, shown as `label` (the
     // part of the path below its parent row).
     static void setFolder(QTreeWidgetItem *item, const QString &label, const QString &path);
@@ -41,4 +44,6 @@ public:
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+    bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option,
+                     const QModelIndex &index) override;
 };

@@ -12,7 +12,6 @@
 #include <QWidget>
 
 #include <optional>
-#include <utility>
 
 class CommitPanel;
 class DiffHeaderBar;
@@ -27,14 +26,17 @@ class QSplitter;
 class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
-class ViewHeader;
 
 // "Diff" mode: pending changes, split as in "git status" between staged ones
-// (ready to commit) and the rest. Here you stage or unstage files, hunks or
-// lines, discard changes and commit. Operations go through GitCommands. In
-// the diff, Space stages (or unstages) the selected lines or the block at
-// the cursor and Delete discards them, unless the diff hides whitespace
-// changes; F4 opens the file at the cursor's line.
+// (ready to commit) and the rest, in one list of files and one diff. A
+// file's box says whether its changes are staged (checked), partly staged,
+// or not; the diff shows its staged changes, then its unstaged ones, each
+// under its own title bar. Here you stage or unstage files, hunks or lines,
+// discard changes and commit. Operations go through GitCommands. In the
+// list, Space stages the selected files, or unstages them when they are all
+// staged. In the diff, Space stages (or unstages) the selected lines or the
+// block at the cursor and Delete discards them, unless the diff hides
+// whitespace changes; F4 opens the file at the cursor's line.
 class ChangesView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(ChangesView)
@@ -67,7 +69,7 @@ public:
 
     QSplitter *splitter() const { return splitter_; }
 
-    // The file column's splitter: the unstaged list, the staged one, the commit area.
+    // The file column's splitter: the list, the commit area.
     QSplitter *fileSplitter() const { return fileSplitter_; }
 
     // The file column (actions, lists, commit area); folded away, a thin bar
@@ -105,43 +107,59 @@ private:
     struct FileRef {
         Section section;
         int index; // in RepositoryStatus::staged or ::unstaged
+
+        bool operator==(const FileRef &) const = default;
+    };
+
+    // The diff's cursor and scroll position, kept across a rebuild relative
+    // to the start of the cursor's file (its staged or unstaged part).
+    struct DiffPosition {
+        int cursorLine = 0;
+        int firstLine = 0;
+        std::optional<FileRef> file; // nullopt outside the files
+        int fileStart = 0;
     };
 
     const QList<FileDiff> &files(Section section) const;
-    QTreeWidget *list(Section section) const;
-    ViewHeader *listHeader(Section section) const;
-    // The list of `section` under its bar.
-    QWidget *listPane(Section section);
-    void setUpList(Section section);
-    // The row standing for the section's files, the root of its list, out of view.
-    QTreeWidgetItem *sectionItem(Section section) const;
-    // Files selected in the lists; a folder stands for its files.
+    const FileChange &changeOf(const FileRef &ref) const;
+    // The files of both sections in the list's order, a file's staged
+    // changes before its unstaged ones: the diff's files.
+    QList<FileRef> filesInListOrder() const;
+    void setUpList();
+    // The list's own row, out of view: its files show at the top level.
+    QTreeWidgetItem *rootItem() const;
+    // The changes of a file's row: staged, unstaged, or both; none on a folder.
+    static QList<FileRef> refsOf(const QTreeWidgetItem *row);
+    // Files selected in the list; a folder stands for its files.
     QList<FileRef> selectedFiles() const;
     QStringList repoPaths(const QList<FileRef> &refs) const;
     // Path of the open folder within the repository, to stage or unstage "everything".
     QString folderPathspec() const;
 
     void onStatusRead(const std::optional<RepositoryStatus> &status, const QString &error, int generation);
-    // An item of a list as its section and file path, which survive a
-    // rebuild of the list; the path is empty on a section's row.
-    using ItemKey = std::pair<int, QString>;
-    ItemKey keyOf(const QTreeWidgetItem *item) const;
-    QList<ItemKey> selectedKeys() const;
-    void restoreSelection(const QList<ItemKey> &selected, const std::optional<ItemKey> &current);
-    // `preferred`, unless only the other section has changes.
-    Section sectionToShow(Section preferred) const;
+    // An item of the list as its path, which survives a rebuild of the
+    // list: a folder's ends with "/", the list's own row's is empty.
+    static QString keyOf(const QTreeWidgetItem *item);
+    QStringList selectedKeys() const;
+    void restoreSelection(const QStringList &selected, const std::optional<QString> &current);
     void showStatus(std::optional<RepositoryStatus> status, const QString &error);
     void selectNow(const QString &relativePath);
     void rebuildList();
-    // Gives the folder rows under `parent` their section, recursively, and
-    // closes those the user had closed.
-    void markFolders(QTreeWidgetItem *parent, Section section);
-    // The row of file `index` of `section`; nullptr if there is none.
-    QTreeWidgetItem *fileRow(Section section, int index) const;
-    void showSection(Section section);
-    void onCurrentItemChanged(const QTreeWidget *tree);
-    // Clears the other list's selection.
-    void onSelectionChanged(Section section);
+    // Closes the folder rows under `parent` that the user had closed, recursively.
+    void markFolders(QTreeWidgetItem *parent);
+    void showDiff();
+    DiffPosition diffPosition() const;
+    void restoreDiffPosition(const DiffPosition &position);
+    // The diff's first file for `row` (a folder: for its first file); -1 if none.
+    int shownFileOf(const QTreeWidgetItem *row) const;
+    // The part of a file the diff shows at displayed line `line`; nullopt
+    // outside the files.
+    std::optional<FileRef> shownFileAt(int line) const;
+    void onCurrentItemChanged();
+    // A file's box was clicked: stages it, or unstages it when unchecked.
+    void onItemChanged(QTreeWidgetItem *item);
+    // Stages the selected files, or unstages them when they are all staged.
+    void toggleSelectedFiles();
     // Opens the file of `item` in the editor (signal openFileRequested()).
     void openItem(const QTreeWidgetItem *item);
     void updateActions();
@@ -165,7 +183,7 @@ private:
     // The file of displayed line `line` in the editor, at the line facing it.
     void openFileAt(int line);
     void showDiffMenu(const QPoint &position);
-    void showListMenu(const QTreeWidget *tree, const QPoint &position);
+    void showListMenu(const QPoint &position);
     // The file actions and the diff's header, side by side, take the same
     // height, and their rules make one line across the handle between them.
     void alignBars(const Theme &theme);
@@ -182,7 +200,7 @@ private:
     bool reading_ = false;
     bool refreshPending_ = false;
     std::optional<QString> pendingSelection_; // for selectFile()
-    QSet<ItemKey> collapsedFolders_;
+    QSet<QString> collapsedFolders_; // their keys, see keyOf()
 
     QLabel *summary_;
     QWidget *operationArea_; // the bar and its margins, hidden together
@@ -191,10 +209,7 @@ private:
     QPushButton *continueButton_;
     QPushButton *skipButton_;
     QPushButton *abortButton_;
-    ViewHeader *unstagedHeader_;
-    QTreeWidget *unstagedList_;
-    ViewHeader *stagedHeader_;
-    QTreeWidget *stagedList_;
+    QTreeWidget *fileList_;
     DiffView *diff_;
     DiffHeaderBar *diffHeader_;
     HunkActions *hunkActions_;
@@ -210,7 +225,7 @@ private:
     QToolButton *refreshButton_;
     CommitPanel *commitPanel_;
 
-    // Displayed diff: files of one section.
-    Section shownSection_ = Section::Unstaged;
+    // Displayed diff: the files' parts, staged or unstaged, and their patches.
+    QList<FileRef> shownFiles_;
     QList<FilePatch> shownPatches_;
 };

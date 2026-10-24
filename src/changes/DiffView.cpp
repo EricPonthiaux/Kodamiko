@@ -82,7 +82,7 @@ void DiffView::revealLines(int line, Reveal reveal)
     const LineRange part = DiffLayout::revealedPart(separator.hidden, reveal);
     if (part.count() == 0 || separator.location.file < 0)
         return;
-    QSet<int> &revealed = revealed_[files_[separator.location.file].path];
+    QSet<int> &revealed = revealed_[DiffLayout::revealKey(files_[separator.location.file])];
     for (int number = part.first; number <= part.last; ++number)
         revealed.insert(number);
     const int top = firstVisibleLine();

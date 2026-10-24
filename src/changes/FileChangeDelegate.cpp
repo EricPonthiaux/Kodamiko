@@ -7,6 +7,7 @@
 #include "ui/FileIcons.h"
 
 #include <QApplication>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QTreeWidgetItem>
 
@@ -14,6 +15,7 @@ namespace {
 
 constexpr qreal rowRatio = 1.95; // row height / text height
 constexpr int horizontalPadding = 10;
+constexpr int checkSpacing = 8; // between the check box and the file's icon
 
 bool isDark(const QPalette &palette)
 {
@@ -120,6 +122,47 @@ void paintNameAndFolder(const Row &row, const QRect &area, const QString &name, 
                       smallMetrics.elidedText(folder, Qt::ElideLeft, available - nameWidth));
 }
 
+const QStyle *styleOf(const QStyleOptionViewItem &option)
+{
+    return option.widget ? option.widget->style() : QApplication::style();
+}
+
+// The check box at the left of the row, less its padding.
+QRect checkBoxRect(const QStyleOptionViewItem &option)
+{
+    const QStyle *style = styleOf(option);
+    const QSize size(style->pixelMetric(QStyle::PM_IndicatorWidth, &option, option.widget),
+                     style->pixelMetric(QStyle::PM_IndicatorHeight, &option, option.widget));
+    const QRect row = option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0);
+    return {QPoint(row.left(), row.center().y() - size.height() / 2), size};
+}
+
+QStyle::State checkStyleState(Qt::CheckState state)
+{
+    switch (state) {
+    case Qt::Unchecked:
+        return QStyle::State_Off;
+    case Qt::PartiallyChecked:
+        return QStyle::State_NoChange;
+    case Qt::Checked:
+        return QStyle::State_On;
+    }
+    return QStyle::State_Off;
+}
+
+// Paints the check box of `index`; returns the room it takes at the left.
+int paintCheckBox(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index)
+{
+    const QVariant state = index.data(Qt::CheckStateRole);
+    if (!state.isValid())
+        return 0;
+    QStyleOptionViewItem box = option;
+    box.rect = checkBoxRect(option);
+    box.state = (option.state & QStyle::State_Enabled) | checkStyleState(state.value<Qt::CheckState>());
+    styleOf(option)->drawPrimitive(QStyle::PE_IndicatorItemViewItemCheck, &box, painter, option.widget);
+    return box.rect.width() + checkSpacing;
+}
+
 void paintFolder(const Row &row, const QString &label)
 {
     // The tree's icon size: the height of its text (TreeMetrics).
@@ -151,8 +194,13 @@ void FileChangeDelegate::setChange(QTreeWidgetItem *item, const FileChange &chan
 
 void FileChangeDelegate::setStats(QTreeWidgetItem *item, const FilePatch &patch)
 {
-    item->setData(0, addedRole, patch.addedLines());
-    item->setData(0, removedRole, patch.removedLines());
+    setStats(item, patch.addedLines(), patch.removedLines());
+}
+
+void FileChangeDelegate::setStats(QTreeWidgetItem *item, int added, int removed)
+{
+    item->setData(0, addedRole, added);
+    item->setData(0, removedRole, removed);
 }
 
 void FileChangeDelegate::setFolder(QTreeWidgetItem *item, const QString &label, const QString &path)
@@ -178,17 +226,19 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     QStyleOptionViewItem item = option;
     initStyleOption(&item, index);
     const QWidget *widget = option.widget;
-    const QStyle *style = widget ? widget->style() : QApplication::style();
-    const Row row{painter, option, option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0)};
+    const QStyle *style = styleOf(option);
+    Row row{painter, option, option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0)};
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
 
-    // Background, selection and hover from the style.
+    // Background, selection and hover from the style; the check box apart.
     const QString label = item.text;
     item.text.clear();
     item.icon = QIcon();
+    item.features &= ~QStyleOptionViewItem::HasCheckIndicator;
     style->drawControl(QStyle::CE_ItemViewItem, &item, painter, widget);
+    row.rect.setLeft(row.rect.left() + paintCheckBox(painter, option, index));
     if (index.data(folderRole).isValid()) {
         paintFolder(row, label);
         painter->restore();
@@ -215,4 +265,25 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
 
     paintNameAndFolder(row, QRect(x, row.rect.top(), right - x, row.rect.height()), name, folder);
     painter->restore();
+}
+
+bool FileChangeDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option,
+                                     const QModelIndex &index)
+{
+    const QVariant state = index.data(Qt::CheckStateRole);
+    const bool isMouseEvent = event->type() == QEvent::MouseButtonPress ||
+                              event->type() == QEvent::MouseButtonRelease ||
+                              event->type() == QEvent::MouseButtonDblClick;
+    if (!state.isValid() || !isMouseEvent)
+        return QStyledItemDelegate::editorEvent(event, model, option, index);
+    const auto *mouse = static_cast<QMouseEvent *>(event);
+    const bool isOnTheBox = checkBoxRect(option).contains(mouse->position().toPoint());
+    if (!isOnTheBox || mouse->button() != Qt::LeftButton)
+        return QStyledItemDelegate::editorEvent(event, model, option, index);
+    // The whole click is the box's: the row's selection stays as it is.
+    if (event->type() == QEvent::MouseButtonRelease) {
+        const bool isChecked = state.value<Qt::CheckState>() == Qt::Checked;
+        model->setData(index, isChecked ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
+    }
+    return true;
 }

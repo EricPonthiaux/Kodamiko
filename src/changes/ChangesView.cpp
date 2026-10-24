@@ -63,10 +63,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     : QWidget(parent)
     , commands_(commands)
     , summary_(new QLabel(this))
-    , unstagedHeader_(new ViewHeader(tr("Unstaged"), this))
-    , unstagedList_(new QTreeWidget(this))
-    , stagedHeader_(new ViewHeader(tr("Staged"), this))
-    , stagedList_(new QTreeWidget(this))
+    , fileList_(new QTreeWidget(this))
     , diff_(new DiffView(theme, this))
     , diffHeader_(new DiffHeaderBar(diff_, this))
     , hunkActions_(new HunkActions(diff_))
@@ -160,22 +157,18 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     operationRow->addWidget(operationBar_);
     operationArea_->hide();
 
-    // Two lists, "Unstaged" then "Staged", the one nearer the commit area;
-    // their files in their folders.
-    setUpList(Section::Unstaged);
-    setUpList(Section::Staged);
+    // The files in their folders.
+    setUpList();
 
     connect(commitPanel_, &CommitPanel::statusMessage, this, &ChangesView::statusMessage);
     connect(commitPanel_, &CommitPanel::messageRequested, this, &ChangesView::commitMessageRequested);
 
-    // The column: the file actions, then each list under its bar and the
-    // commit area, which share its height as the user likes.
+    // The column: the file actions, then the list and the commit area,
+    // which share its height as the user likes.
     fileSplitter_->setChildrenCollapsible(false);
-    fileSplitter_->addWidget(listPane(Section::Unstaged));
-    fileSplitter_->addWidget(listPane(Section::Staged));
+    fileSplitter_->addWidget(fileList_);
     fileSplitter_->addWidget(commitPanel_);
     fileSplitter_->setStretchFactor(0, 1);
-    fileSplitter_->setStretchFactor(1, 1);
     fileColumn_->setObjectName(QStringLiteral("changesColumn"));
     auto *leftLayout = new QVBoxLayout(fileColumn_);
     leftLayout->setContentsMargins(0, 0, 0, 0);
@@ -249,17 +242,6 @@ ChangesView::~ChangesView()
     pool_.waitForDone();
 }
 
-QWidget *ChangesView::listPane(Section section)
-{
-    auto *pane = new QWidget(this);
-    auto *layout = new QVBoxLayout(pane);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
-    layout->addWidget(listHeader(section));
-    layout->addWidget(list(section), 1);
-    return pane;
-}
-
 void ChangesView::setFolder(const QString &folder)
 {
     folder_ = folder;
@@ -268,7 +250,7 @@ void ChangesView::setFolder(const QString &folder)
     status_.reset();
     error_.clear();
     rebuildList();
-    showSection(Section::Unstaged);
+    showDiff();
     showOperation();
     summary_->clear();
     commitPanel_->reset();
@@ -281,6 +263,35 @@ const QList<FileDiff> &ChangesView::files(Section section) const
     if (!status_)
         return none;
     return section == Section::Staged ? status_->staged : status_->unstaged;
+}
+
+const FileChange &ChangesView::changeOf(const FileRef &ref) const
+{
+    return files(ref.section).at(ref.index).change;
+}
+
+QList<ChangesView::FileRef> ChangesView::filesInListOrder() const
+{
+    const QList<FileDiff> &staged = files(Section::Staged);
+    const QList<FileDiff> &unstaged = files(Section::Unstaged);
+    int s = 0;
+    int u = 0;
+    // Both sections are in the tree's order (sortAsTheTree()): merged.
+    const auto stagedComesFirst = [&] {
+        if (s == staged.size())
+            return false;
+        if (u == unstaged.size())
+            return true;
+        return !ChangeTree::comesBefore(unstaged[u].change.path, staged[s].change.path);
+    };
+    QList<FileRef> result;
+    while (s < staged.size() || u < unstaged.size()) {
+        if (stagedComesFirst())
+            result.append({Section::Staged, s++});
+        else
+            result.append({Section::Unstaged, u++});
+    }
+    return result;
 }
 
 void ChangesView::refresh()
@@ -332,47 +343,25 @@ void ChangesView::onStatusRead(const std::optional<RepositoryStatus> &status, co
     emit refreshed();
 }
 
-ChangesView::Section ChangesView::sectionToShow(Section preferred) const
-{
-    const Section other = preferred == Section::Staged ? Section::Unstaged : Section::Staged;
-    const bool onlyOtherHasChanges = files(preferred).isEmpty() && !files(other).isEmpty();
-    return onlyOtherHasChanges ? other : preferred;
-}
-
 void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QString &error)
 {
     error_ = error;
 
-    // Selection to restore: section and path of each file.
-    const QList<ItemKey> selected = selectedKeys();
-    const Section previousSection = shownSection_;
-    const QTreeWidgetItem *currentItem = list(previousSection)->currentItem();
-    const std::optional<ItemKey> current = currentItem ? std::optional(keyOf(currentItem)) : std::nullopt;
-    const int firstLine = diff_->firstVisibleLine();
-    const int cursorLine = diffCursorLine();
+    // Selection to restore: the path of each file.
+    const QStringList selected = selectedKeys();
+    const QTreeWidgetItem *currentItem = fileList_->currentItem();
+    const std::optional<QString> current = currentItem ? std::optional(keyOf(currentItem)) : std::nullopt;
+    const DiffPosition position = diffPosition();
 
     status_ = std::move(status);
     rebuildList();
     restoreSelection(selected, current);
 
     showOperation();
-    if (!status_) {
-        summary_->setText(error);
-        showSection(Section::Unstaged);
-        updateActions();
-        return;
-    }
-    summary_->setText(statusSummary(*status_));
-
-    // Displayed section: that of the current file, otherwise the same as
-    // before, otherwise the one that has changes.
-    const Section section = sectionToShow(current ? static_cast<Section>(current->first) : previousSection);
-    showSection(section);
-    if (section == previousSection) {
-        // The cursor near the block just staged: Space goes on with the next.
-        diff_->setCursorPosition(std::min(cursorLine, diff_->lines() - 1), 0);
-        diff_->setFirstVisibleLine(firstLine);
-    }
+    showDiff();
+    summary_->setText(status_ ? statusSummary(*status_) : error);
+    if (status_)
+        restoreDiffPosition(position);
     updateActions();
 }
 
@@ -382,30 +371,61 @@ void ChangesView::selectFile(const QString &relativePath)
     refresh();
 }
 
-void ChangesView::showSection(Section section)
+void ChangesView::showDiff()
 {
-    // The other section has other versions of the files.
-    if (section != shownSection_)
-        diff_->hideUnchangedLines();
-    shownSection_ = section;
-    hunkActions_->setStaged(section == Section::Staged);
+    shownFiles_ = filesInListOrder();
     shownPatches_.clear();
     QList<DiffFile> shown;
-    if (status_) {
-        for (const FileDiff &diff : files(section)) {
-            shownPatches_.append(FilePatch::parse(diff.patch));
-            shown.append(
-                {diff.change.path, changeStatusText(diff.change), shownPatches_.last(), diff.isTooLarge, diff.newText});
-        }
+    QSet<int> stagedFiles;
+    for (const FileRef &ref : std::as_const(shownFiles_)) {
+        const FileDiff &diff = files(ref.section).at(ref.index);
+        const bool isStaged = ref.section == Section::Staged;
+        const QString status = isStaged ? tr("%1  ·  staged") : tr("%1  ·  unstaged");
+        if (isStaged)
+            stagedFiles.insert(int(shown.size()));
+        shownPatches_.append(FilePatch::parse(diff.patch));
+        shown.append({diff.change.path, status.arg(changeStatusText(diff.change)), shownPatches_.last(),
+                      diff.isTooLarge, diff.newText});
     }
-    if (!shown.isEmpty()) {
+    hunkActions_->setStagedFiles(stagedFiles);
+    if (!shown.isEmpty())
         diff_->setFiles(shown);
-        return;
-    }
-    if (!status_)
-        diff_->showMessage(QString());
     else
-        diff_->showMessage(section == Section::Staged ? tr("Nothing is staged") : tr("No changes"));
+        diff_->showMessage(status_ ? tr("No changes") : QString());
+}
+
+ChangesView::DiffPosition ChangesView::diffPosition() const
+{
+    DiffPosition position{diffCursorLine(), diff_->firstVisibleLine()};
+    position.file = shownFileAt(position.cursorLine);
+    if (position.file)
+        position.fileStart = diff_->fileStart(int(shownFiles_.indexOf(*position.file)));
+    return position;
+}
+
+void ChangesView::restoreDiffPosition(const DiffPosition &position)
+{
+    // The same part of the same file, wherever it moved: the cursor near
+    // the block just staged, Space goes on with the next.
+    int shift = 0;
+    if (position.file) {
+        const QString &path = changeOf(*position.file).path;
+        const auto samePart = [&](const FileRef &ref) {
+            return ref.section == position.file->section && changeOf(ref).path == path;
+        };
+        if (const auto found = std::ranges::find_if(shownFiles_, samePart); found != shownFiles_.end())
+            shift = diff_->fileStart(int(found - shownFiles_.begin())) - position.fileStart;
+    }
+    diff_->setCursorPosition(std::clamp(position.cursorLine + shift, 0, std::max(0, diff_->lines() - 1)), 0);
+    diff_->setFirstVisibleLine(std::max(0, position.firstLine + shift));
+}
+
+std::optional<ChangesView::FileRef> ChangesView::shownFileAt(int line) const
+{
+    const int file = diff_->locate(line).file;
+    if (file < 0 || file >= shownFiles_.size())
+        return std::nullopt;
+    return shownFiles_[file];
 }
 
 QStringList ChangesView::repoPaths(const QList<FileRef> &refs) const
@@ -414,7 +434,7 @@ QStringList ChangesView::repoPaths(const QList<FileRef> &refs) const
     if (!status_)
         return paths;
     for (const FileRef &ref : refs) {
-        const FileChange &change = files(ref.section).at(ref.index).change;
+        const FileChange &change = changeOf(ref);
         paths.append(status_->info.repoPath(change.path));
         if (change.kind == ChangeKind::Renamed)
             paths.append(status_->info.repoPath(change.oldPath));
@@ -511,11 +531,11 @@ void ChangesView::discardFiles(const QList<FileRef> &refs)
     if (unstaged.isEmpty() || !status_)
         return;
     const qsizetype created = std::count_if(unstaged.begin(), unstaged.end(), [this](const FileRef &ref) {
-        return files(ref.section).at(ref.index).change.kind == ChangeKind::Added;
+        return changeOf(ref).kind == ChangeKind::Added;
     });
     const QString question =
         unstaged.size() == 1
-            ? tr("Discard changes to \"%1\"?").arg(files(Section::Unstaged).at(unstaged.first().index).change.path)
+            ? tr("Discard changes to \"%1\"?").arg(changeOf(unstaged.first()).path)
             : tr("Discard changes to %n file(s)?", nullptr, static_cast<int>(unstaged.size()));
     const QString details =
         created > 0 ? tr("%n untracked file(s) will be deleted.", nullptr, static_cast<int>(created)) : QString();

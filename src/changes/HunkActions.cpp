@@ -68,14 +68,18 @@ HunkActions::HunkActions(DiffView *diff)
     });
 }
 
-void HunkActions::setStaged(bool staged)
+void HunkActions::setStagedFiles(const QSet<int> &files)
 {
-    staged_ = staged;
-    apply_->setText(staged ? tr("Unstage") : tr("Stage"));
-    apply_->setToolTip(staged ? tr("Unstage this block") : tr("Stage this block"));
-    apply_->setIcon(staged ? unstageIcon_ : stageIcon_);
-    discard_->setVisible(!staged);
+    stagedFiles_ = files;
     hide();
+}
+
+void HunkActions::updateButtons()
+{
+    apply_->setText(staged_ ? tr("Unstage") : tr("Stage"));
+    apply_->setToolTip(staged_ ? tr("Unstage this block") : tr("Stage this block"));
+    apply_->setIcon(staged_ ? unstageIcon_ : stageIcon_);
+    discard_->setVisible(!staged_);
 }
 
 void HunkActions::applyTheme(const Theme &theme)
@@ -119,6 +123,8 @@ void HunkActions::placeAt(int y)
         return;
     }
     hunkLine_ = hunkLine;
+    staged_ = stagedFiles_.contains(diff_->locate(hunkLine).file);
+    updateButtons();
     // Centered on the separator, which it may overlap a little.
     const int top = std::max(0, diff_->lineTop(hunkLine));
     bar_->adjustSize();

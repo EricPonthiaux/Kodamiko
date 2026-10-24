@@ -336,6 +336,11 @@ void appendFileBody(QList<DiffLine> &lines, const DiffFile &file, int fileIndex,
 
 namespace DiffLayout {
 
+QString revealKey(const DiffFile &file)
+{
+    return file.status.isEmpty() ? file.path : file.path + QLatin1Char('\n') + file.status;
+}
+
 QList<DiffLine> lines(const QList<DiffFile> &files, const RevealedLines &revealed)
 {
     QList<DiffLine> lines;
@@ -350,7 +355,7 @@ QList<DiffLine> lines(const QList<DiffFile> &files, const RevealedLines &reveale
         if (file.patch.hunks.isEmpty())
             lines.append(noTextNote(file, f));
         else
-            appendFileBody(lines, file, f, revealed.value(file.path));
+            appendFileBody(lines, file, f, revealed.value(revealKey(file)));
     }
     return lines;
 }

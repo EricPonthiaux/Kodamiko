@@ -4,6 +4,7 @@
 
 #include <QIcon>
 #include <QObject>
+#include <QSet>
 
 class DiffView;
 class QFrame;
@@ -23,8 +24,9 @@ public:
     // Over `diff`, which owns it.
     explicit HunkActions(DiffView *diff);
 
-    // Unstage rather than Stage and Discard.
-    void setStaged(bool staged);
+    // The view's files (their index in DiffView::setFiles()) whose changes
+    // are staged: their blocks get Unstage rather than Stage and Discard.
+    void setStagedFiles(const QSet<int> &files);
     void setEnabled(bool enabled);
     void applyTheme(const Theme &theme);
 
@@ -40,6 +42,8 @@ private:
     // Over the block under `y`, in the viewport; hidden outside a block.
     void placeAt(int y);
     void hide();
+    // The buttons of a staged block, or of an unstaged one, as staged_ says.
+    void updateButtons();
 
     DiffView *diff_;
     QFrame *bar_; // holds the buttons
@@ -47,6 +51,7 @@ private:
     QToolButton *discard_;
     QIcon stageIcon_;
     QIcon unstageIcon_;
-    bool staged_ = false;
+    QSet<int> stagedFiles_;
+    bool staged_ = false; // the block they act on
     int hunkLine_ = -1; // the separator of the block they act on
 };
