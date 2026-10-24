@@ -3,6 +3,8 @@
 #include "CloseAgentPopup.h"
 
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -17,7 +19,7 @@ namespace {
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *closeRules = R"(
-QPushButton#deleteWorktree { color: #e06c75; }
+QPushButton#deleteWorktree { color: @error; }
 )";
 
 } // namespace
@@ -36,31 +38,21 @@ CloseAgentPopup::CloseAgentPopup(const Theme &theme, QWidget *parent)
     text_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     text_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(16, 14, 16, 14);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
     body->addWidget(text_, 1);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
+    auto *footer = new PopupFooter(this);
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     delete_->setObjectName(QStringLiteral("deleteWorktree"));
-    for (QPushButton *button : {cancel, delete_, keep_, merge_}) {
-        button->setParent(footer);
-        button->setMinimumWidth(84);
-    }
     // Highlighted, as in the message box it replaces: nothing is lost by mistake.
     cancel->setDefault(true);
     connect(cancel, &QPushButton::clicked, this, &CloseAgentPopup::next);
     connect(delete_, &QPushButton::clicked, this, [this] { choose(WorktreeFate::Delete); });
     connect(keep_, &QPushButton::clicked, this, [this] { choose(WorktreeFate::Keep); });
     connect(merge_, &QPushButton::clicked, this, [this] { choose(WorktreeFate::MergeAndDelete); });
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(delete_);
-    footerLayout->addStretch(1);
-    footerLayout->addWidget(cancel);
-    footerLayout->addWidget(keep_);
-    footerLayout->addWidget(merge_);
+    footer->addLeadingButton(delete_);
+    for (QPushButton *button : {cancel, keep_, merge_})
+        footer->addButton(button);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

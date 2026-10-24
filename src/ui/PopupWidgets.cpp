@@ -4,6 +4,7 @@
 
 #include "AppFonts.h"
 #include "Paragraph.h"
+#include "PopupMetrics.h"
 #include "ThemeStyle.h"
 #include "UiIcons.h"
 #include "UiMetrics.h"
@@ -125,11 +126,10 @@ struct KeycapColors {
     QColor muted;
 };
 
-// Light keycaps on a selected row, the palette's otherwise.
-KeycapColors keycapColors(const QPalette &palette, bool selected)
+// The palette's keycaps, on a selected row too: the selection is a tint
+// (ThemeStyle::selectionColor), not a strong color to stand out from.
+KeycapColors keycapColors(const QPalette &palette)
 {
-    if (selected)
-        return {QColor(255, 255, 255, 40), QColor(255, 255, 255, 90), QColor(Qt::white), QColor(255, 255, 255, 170)};
     return {palette.color(QPalette::Button), palette.color(QPalette::Mid), palette.color(QPalette::Text),
             palette.color(QPalette::PlaceholderText)};
 }
@@ -159,12 +159,18 @@ QFrame#settingsSeparator { background: @line; border: none; margin: 0; }
 QScrollArea#pageScroll, QWidget#pageContent { background: transparent; border: none; }
 QFrame#popupFooter { border: none; border-top: 1px solid @line; }
 QFrame#popupSidebar { background: @window; border: none; border-right: 1px solid @line; }
-QListWidget#popupNav { background: transparent; border: none; outline: 0; }
-QListWidget#popupNav::item { padding: 5px 8px; margin: 1px 0; border-radius: 2px; color: @text; }
-QListWidget#popupNav::item:hover { background: @hover; }
-QListWidget#popupNav::item:selected { background: @slate; color: @text; }
+QListWidget, QTreeWidget { background: transparent; border: none; outline: 0; }
+QListWidget::item, QTreeWidget::item { padding: 3px @rowPaddingpx; border-radius: @rowRadiuspx; color: @text; }
+QListWidget::item:hover, QTreeWidget::item:hover { background: @hover; }
+QListWidget::item:selected, QTreeWidget::item:selected { background: @slate; color: @text; }
+QListWidget#popupNav::item { margin: 1px 0; }
 QLabel#navHeading, QLabel#settingState { color: @muted; }
+QLabel#popupError, QLabel[error="true"] { color: @error; }
+QLabel#popupWarning { color: @warning; }
+QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )") + extra;
+    sheet.replace(QStringLiteral("@rowPadding"), QString::number(PopupMetrics::rowPadding));
+    sheet.replace(QStringLiteral("@rowRadius"), QString::number(PopupMetrics::rowRadius));
     const QList<std::pair<QString, QColor>> colors = {
         {"@accentText", theme.accentText},
         {"@accent", theme.accent},
@@ -177,6 +183,8 @@ QLabel#navHeading, QLabel#settingState { color: @muted; }
         {"@hover", theme.hover},
         {"@selection", theme.selection},
         {"@slate", ThemeStyle::selectionColor(theme)},
+        {"@error", theme.error},
+        {"@warning", theme.warning},
     };
     for (const auto &[name, color] : colors)
         sheet.replace(name, color.name());
@@ -466,8 +474,7 @@ void KeycapDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     QFont font = option.font;
     font.setPointSizeF(font.pointSizeF() * 0.86);
     const QFontMetricsF metrics(font);
-    const bool selected = option.state & QStyle::State_Selected;
-    const KeycapColors colors = keycapColors(option.palette, selected);
+    const KeycapColors colors = keycapColors(option.palette);
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);

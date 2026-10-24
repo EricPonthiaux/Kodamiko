@@ -3,6 +3,8 @@
 #include "AgentCheckPopup.h"
 
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -41,27 +43,19 @@ AgentCheckPopup::AgentCheckPopup(const Theme &theme, QWidget *parent)
     auto *card = new SettingsCard(this);
     card->addWidget(commandBlock);
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(16, 12, 16, 12);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
     body->addWidget(card);
     body->addStretch();
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Enter to save · Esc to cancel"), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Enter to save · Esc to cancel"));
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     auto *saveButton = new QPushButton(tr("Save"), footer);
-    cancel->setMinimumWidth(84);
-    saveButton->setMinimumWidth(84);
     saveButton->setDefault(true);
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(saveButton, &QPushButton::clicked, this, &AgentCheckPopup::save);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(cancel);
-    footerLayout->addWidget(saveButton);
+    footer->addButton(cancel);
+    footer->addButton(saveButton);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

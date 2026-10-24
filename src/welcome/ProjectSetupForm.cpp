@@ -7,6 +7,7 @@
 #include "toolchains/Toolchains.h"
 #include "ui/AppFonts.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
 
@@ -110,7 +111,7 @@ QScrollArea *scrolled(QWidget *content)
     auto *holder = new QWidget;
     holder->setObjectName(QStringLiteral("pageContent"));
     auto *layout = new QVBoxLayout(holder);
-    layout->setContentsMargins(20, 16, 20, 16);
+    layout->setContentsMargins(PopupMetrics::bodyMargins);
     layout->addWidget(content);
     layout->addStretch();
     auto *scroll = new QScrollArea;
@@ -150,7 +151,7 @@ QWidget *ProjectSetupForm::createSidebar()
     auto *sidebar = new QFrame(this);
     sidebar->setObjectName(QStringLiteral("popupSidebar"));
     // "JavaScript/TypeScript · Off" whole.
-    sidebar->setFixedWidth(220);
+    sidebar->setFixedWidth(PopupMetrics::sidebarWidth);
     auto *heading = new QLabel(tr("LANGUAGES"), sidebar);
     heading->setObjectName(QStringLiteral("navHeading"));
     AppFonts::setInterfaceFont(heading, 0.85, QFont::DemiBold, 0.6);
@@ -166,7 +167,7 @@ QWidget *ProjectSetupForm::createSidebar()
     connect(detect_, &QPushButton::clicked, this, &ProjectSetupForm::detectAgain);
 
     auto *layout = new QVBoxLayout(sidebar);
-    layout->setContentsMargins(8, 12, 8, 10);
+    layout->setContentsMargins(PopupMetrics::sidebarMargins);
     layout->setSpacing(6);
     layout->addWidget(heading);
     layout->addWidget(list_, 1);

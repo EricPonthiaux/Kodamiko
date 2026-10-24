@@ -71,10 +71,11 @@ void ChoicePopup::accept()
 
 void ChoicePopup::focusContent()
 {
-    if (focusesCancel_ || buttons_.isEmpty())
-        cancel_->setFocus();
-    else
-        buttons_.first()->setFocus();
+    // The button Enter presses first is drawn as the default one, as in
+    // the other popups.
+    QPushButton *focused = focusesCancel_ || buttons_.isEmpty() ? cancel_ : buttons_.first();
+    focused->setDefault(true);
+    focused->setFocus();
 }
 
 void ChoicePopup::choose(qsizetype index)

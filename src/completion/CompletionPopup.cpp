@@ -5,6 +5,8 @@
 #include "FuzzyMatch.h"
 #include "ui/Motion.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupMetrics.h"
+#include "ui/PopupRows.h"
 
 #include <QAbstractListModel>
 #include <QAccessible>
@@ -184,15 +186,10 @@ public:
     {
         const Entry &entry = model_->entries[index.row()];
         const Theme &theme = *theme_;
-        const bool selected = option.state & QStyle::State_Selected;
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
         const QRectF row = QRectF(option.rect).adjusted(3, 1, -3, -1);
-        if (selected) {
-            painter->setPen(Qt::NoPen);
-            painter->setBrush(theme.selection);
-            painter->drawRoundedRect(row, 2, 2);
-        }
+        PopupRows::paintBackground(painter, row, option.state, theme);
 
         // The badge: the kind's letter on a tint of its syntax color.
         const auto [letter, category] = badgeOf(entry.item.kind);
@@ -314,6 +311,7 @@ CompletionPopup::CompletionPopup(QWidget *parent)
     view_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     view_->setUniformItemSizes(true);
     view_->setFrameShape(QFrame::NoFrame);
+    view_->setMouseTracking(true); // the row under the mouse lights up
     connect(view_, &QListView::doubleClicked, this, &CompletionPopup::activated);
     connect(view_->selectionModel(), &QItemSelectionModel::currentChanged, this, [this] {
         updateDocumentation();
@@ -367,16 +365,18 @@ void CompletionPopup::applyTheme(const Theme &theme)
     // Called each time the popup shows: a style sheet is only set when it
     // changes, setting one restyles the whole popup.
     const QString sheet =
-        QStringLiteral("QFrame#completionPopup { background: %1; border: 1px solid %2; border-radius: 4px; }"
+        QStringLiteral("QFrame#completionPopup { background: %1; border: 1px solid %2; border-radius: %5px; }"
                        "QListView { background: transparent; border: none; outline: 0; }"
                        "QLabel#completionHint { color: %3; border-top: 1px solid %4; }")
-            .arg(theme.alternateBase.name(), theme.border.name(), theme.mutedText.name(), theme.line.name());
+            .arg(theme.alternateBase.name(), theme.border.name(), theme.mutedText.name(), theme.line.name())
+            .arg(PopupMetrics::frameRadius);
     if (sheet != styleSheet())
         setStyleSheet(sheet);
     const QString documentationSheet =
-        QStringLiteral("QFrame#completionDocumentation { background: %1; border: 1px solid %2; border-radius: 4px; }"
+        QStringLiteral("QFrame#completionDocumentation { background: %1; border: 1px solid %2; border-radius: %4px; }"
                        "QLabel { color: %3; background: transparent; }")
-            .arg(theme.alternateBase.name(), theme.border.name(), theme.foreground.name());
+            .arg(theme.alternateBase.name(), theme.border.name(), theme.foreground.name())
+            .arg(PopupMetrics::frameRadius);
     if (documentationSheet != documentation_->styleSheet())
         documentation_->setStyleSheet(documentationSheet);
     // The signature in the code font, the text in the interface's.

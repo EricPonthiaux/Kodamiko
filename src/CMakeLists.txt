@@ -240,6 +240,9 @@ add_library(duet_core STATIC
     ui/OverlayPopup.cpp
     ui/TabBarBaseLine.cpp
     ui/Paragraph.cpp
+    ui/PopupFooter.cpp
+    ui/PopupRows.cpp
+    ui/PopupSearchField.cpp
     ui/PopupWidgets.cpp
     ui/PopupMotion.cpp
     ui/Theme.cpp

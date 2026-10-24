@@ -3,6 +3,8 @@
 #include "ChangeSignaturePopup.h"
 
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 
@@ -28,7 +30,6 @@ constexpr int valueColumn = 1;
 
 constexpr QSizeF windowShare(0.55, 0.55);
 constexpr QSize minimumPanelSize(640, 400);
-constexpr int marginPx = 16;
 constexpr int spacingPx = 8;
 
 constexpr const char *popupRules = R"(
@@ -91,28 +92,21 @@ ChangeSignaturePopup::ChangeSignaturePopup(QString languageId,
     error_->setObjectName(QStringLiteral("popupError"));
     error_->hide();
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(marginPx, spacingPx + 4, marginPx, spacingPx + 4);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
     body->setSpacing(spacingPx);
     body->addLayout(columns, 1);
     body->addWidget(preview_);
     body->addWidget(error_);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint =
-        new QLabel(tr("A new parameter's value is passed by every call; empty, the calls leave it out."), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
-    hint->setWordWrap(true);
-    auto *cancel = new QPushButton(tr("Cancel"), this);
+    auto *footer = new PopupFooter(this);
+    footer->hint()->setWordWrap(true);
+    footer->setHint(tr("A new parameter's value is passed by every call; empty, the calls leave it out."));
+    auto *cancel = new QPushButton(tr("Cancel"), footer);
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     refactor_->setDefault(true);
     connect(refactor_, &QPushButton::clicked, this, &ChangeSignaturePopup::accept);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(marginPx, spacingPx + 2, marginPx, spacingPx + 2);
-    footerLayout->setSpacing(spacingPx);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(cancel);
-    footerLayout->addWidget(refactor_);
+    footer->addButton(cancel);
+    footer->addButton(refactor_);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

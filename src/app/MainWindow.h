@@ -18,6 +18,7 @@
 #include "terminal/ProcessSpec.h"
 #include "ui/Theme.h"
 
+#include <QElapsedTimer>
 #include <QJsonObject>
 #include <QMainWindow>
 #include <QSet>
@@ -257,10 +258,15 @@ private:
     // Shows `provider` everywhere the agent is named or drawn, and decodes
     // its hooks; the session is not restarted.
     void setAgentProvider(const AgentProvider &provider);
-    bool startClaudeSession(QString *error = nullptr, SessionStart start = SessionStart::New);
+    bool startClaudeSession(QString *error = nullptr, SessionStart start = SessionStart::Resume);
     void restartClaudeSession();
-    // Starts the session again, on with its last conversation.
+    // Starts the session again, on with its conversation.
     void continueClaudeSession();
+    // The session must not end: `/exit` in it starts it again, on with its
+    // conversation. Not if it exited right after starting, so that a
+    // failing `claude` is not relaunched in a loop; but a conversation that
+    // could not be resumed gives way to a new one.
+    void restartExitedClaudeSession(const TerminalWidget *terminal);
     // The Effective Settings tab, opened, or updated if it is open.
     void showEffectiveSettings(bool open);
     void showClaudeSession();
@@ -531,6 +537,8 @@ private:
     QToolButton *newTerminalButton_ = nullptr;      // "+" at the right of the terminal tabs
     QToolButton *emptyNewTerminalButton_ = nullptr; // the same, when no terminal is open
     TerminalWidget *claudeTerminal_ = nullptr;
+    QElapsedTimer claudeSessionClock_;                    // since claudeTerminal_ started
+    SessionStart claudeSessionStart_ = SessionStart::New; // how it started
     QStackedWidget *terminalPage_ = nullptr;
     DetachablePage *terminalWindow_ = nullptr;     // terminalPage_ in a window of its own
     QToolButton *detachTerminalsButton_ = nullptr; // at the right of the terminal tabs

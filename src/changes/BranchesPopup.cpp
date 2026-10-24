@@ -6,8 +6,10 @@
 #include "SnapshotsPopup.h"
 #include "ui/ContextMenus.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
+#include "ui/PopupRows.h"
 #include "ui/PopupWidgets.h"
-#include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
 
@@ -32,9 +34,8 @@ constexpr int currentRole = Qt::UserRole + 4;
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *branchesRules = R"(
-QListWidget#branchList { background: transparent; border: none; border-top: 1px solid @line; outline: 0; }
+QListWidget#branchList { border-top: 1px solid @line; }
 QLabel#branchesEmpty { color: @muted; }
-QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )";
 
 // A branch's row: the branch icon, its name (with a "current" badge), and
@@ -68,16 +69,12 @@ public:
             return;
         }
 
-        const bool selected = option.state & QStyle::State_Selected;
-        if (selected || option.state & QStyle::State_MouseOver) {
-            painter->setPen(Qt::NoPen);
-            painter->setBrush(selected ? ThemeStyle::selectionColor(theme) : theme.hover);
-            painter->drawRoundedRect(row, 2, 2);
-        }
+        PopupRows::paintBackground(painter, row, option.state, theme);
 
         // The icon, alone, in the accent.
         const QSizeF iconSize = UiMetrics::scaledSquare(UiMetrics::iconSize);
-        const QRectF tile(QPointF(row.left() + 8, row.center().y() - iconSize.height() / 2), iconSize);
+        const QRectF tile(QPointF(row.left() + PopupMetrics::rowPadding, row.center().y() - iconSize.height() / 2),
+                          iconSize);
         UiIcons::icon(QStringLiteral("branch"), theme.accent).paint(painter, tile.toRect());
 
         // Tracking, at the right.
@@ -179,6 +176,15 @@ void addBranch(QListWidget *list, const BranchInfo &branch, int index)
     item->setToolTip(branch.subject);
 }
 
+// Selects `row`, or the first row under the heading when there is none.
+void selectInitialRow(QListWidget *list, int row)
+{
+    if (row >= 0)
+        list->setCurrentRow(row);
+    else if (list->count() > 1)
+        list->setCurrentRow(1);
+}
+
 bool isNavigationKey(int key)
 {
     return key == Qt::Key_Up || key == Qt::Key_Down || key == Qt::Key_PageUp || key == Qt::Key_PageDown;
@@ -237,27 +243,20 @@ BranchesPopup::BranchesPopup(GitActions *actions, const Theme &theme, QWidget *p
     empty_->setAlignment(Qt::AlignCenter);
 
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(16, 12, 16, 12);
-    body->setSpacing(10);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
+    body->setSpacing(PopupMetrics::bodySpacing);
     body->addWidget(filter_);
     body->addWidget(list_, 1);
     body->addWidget(empty_, 1);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Right-click a branch for more."), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Right-click a branch for more."));
     switch_->setDefault(true);
     connect(merge_, &QPushButton::clicked, this, &BranchesPopup::mergeSelected);
     connect(rebase_, &QPushButton::clicked, this, &BranchesPopup::rebaseSelected);
     connect(switch_, &QPushButton::clicked, this, &BranchesPopup::switchToSelected);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(merge_);
-    footerLayout->addWidget(rebase_);
-    footerLayout->addWidget(switch_);
+    for (QPushButton *button : {merge_, rebase_, switch_})
+        footer->addButton(button);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
@@ -347,11 +346,7 @@ void BranchesPopup::rebuildList()
         Paragraph::setText(empty_, tr("No branch matches \"%1\".").arg(filter));
     // Unfiltered, the list opens on where one is; a filter looks for a branch to go to.
     const bool showsCurrent = filter.isEmpty() && currentRow >= 0;
-    const int row = showsCurrent ? currentRow : firstSelectable;
-    if (row >= 0)
-        list_->setCurrentRow(row);
-    else if (list_->count() > 1)
-        list_->setCurrentRow(1);
+    selectInitialRow(list_, showsCurrent ? currentRow : firstSelectable);
     updateButtons();
 }
 

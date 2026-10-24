@@ -8,6 +8,8 @@
 #include "recipes/ProjectCreation.h"
 #include "recipes/RecipeLibrary.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "workspace/ChoicePopup.h"
 
@@ -90,7 +92,7 @@ QWidget *NewProjectForm::createBody()
     connect(name_, &QLineEdit::returnPressed, this, &NewProjectForm::create);
 
     auto *grid = new QGridLayout(body);
-    grid->setContentsMargins(24, 20, 24, 20);
+    grid->setContentsMargins(PopupMetrics::bodyMargins);
     grid->setHorizontalSpacing(12);
     grid->setVerticalSpacing(10);
     grid->addWidget(fieldLabel(tr("Name"), body), 0, 0);
@@ -109,24 +111,15 @@ QWidget *NewProjectForm::createBody()
 
 QWidget *NewProjectForm::createFooter()
 {
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    summary_ = new QLabel(footer);
-    summary_->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    summary_ = footer->hint();
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     create_ = new QPushButton(tr("Create"), footer);
     create_->setDefault(true);
     connect(cancel, &QPushButton::clicked, this, &NewProjectForm::cancelled);
     connect(create_, &QPushButton::clicked, this, &NewProjectForm::create);
-
-    auto *layout = new QHBoxLayout(footer);
-    layout->setContentsMargins(16, 10, 16, 10);
-    layout->setSpacing(8);
-    layout->addWidget(summary_, 1);
-    for (QPushButton *button : {cancel, create_}) {
-        button->setMinimumWidth(84);
-        layout->addWidget(button);
-    }
+    footer->addButton(cancel);
+    footer->addButton(create_);
     return footer;
 }
 

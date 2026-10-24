@@ -3,6 +3,7 @@
 #include "OverlayPopup.h"
 
 #include "Motion.h"
+#include "PopupMetrics.h"
 #include "WindowFrame.h"
 
 #include <QApplication>
@@ -13,7 +14,7 @@
 
 namespace {
 
-constexpr int radius = 4;
+constexpr int radius = PopupMetrics::frameRadius;
 // The shadow spreads this far, within the room kept for resizing
 // (shadowWidth), and drops this much below the panel.
 constexpr int shadowSpread = 8;

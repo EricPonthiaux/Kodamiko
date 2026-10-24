@@ -5,6 +5,8 @@
 #include "EditPreview.h"
 #include "changes/DiffView.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 
@@ -19,11 +21,7 @@
 namespace {
 
 constexpr const char *previewRules = R"(
-QListWidget#refactoredFiles { background: transparent; border: none; border-right: 1px solid @line; outline: 0; }
-QListWidget#refactoredFiles::item { padding: 4px 8px; border-radius: 2px; }
-QListWidget#refactoredFiles::item:hover { background: @hover; }
-QListWidget#refactoredFiles::item:selected { background: @selection; color: @accentText; }
-QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
+QListWidget#refactoredFiles { border-right: 1px solid @line; }
 )";
 
 // The conflicts' color comes from the theme.
@@ -31,8 +29,6 @@ constexpr const char *conflictsRule = "QLabel#refactoringConflicts { color: %1; 
 
 constexpr QSizeF windowShare(0.75, 0.8);
 constexpr QSize minimumPanelSize(860, 540);
-constexpr int marginPx = 16;
-constexpr int spacingPx = 12;
 constexpr int listStretch = 3;
 constexpr int diffStretch = 8;
 
@@ -65,25 +61,19 @@ RefactoringPreviewPopup::RefactoringPreviewPopup(Preview preview, Apply apply, Q
     connect(list_, &QListWidget::itemChanged, this, &RefactoringPreviewPopup::updateButton);
     auto *columns = new QWidget(this);
     auto *columnsLayout = new QHBoxLayout(columns);
-    columnsLayout->setContentsMargins(marginPx, spacingPx, marginPx, spacingPx);
-    columnsLayout->setSpacing(spacingPx);
+    columnsLayout->setContentsMargins(PopupMetrics::bodyMargins);
+    columnsLayout->setSpacing(PopupMetrics::bodySpacing);
     columnsLayout->addWidget(list_, listStretch);
     columnsLayout->addWidget(diff_, diffStretch);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Uncheck a file to leave it as it is."), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
-    auto *cancel = new QPushButton(tr("Cancel"), this);
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Uncheck a file to leave it as it is."));
+    auto *cancel = new QPushButton(tr("Cancel"), footer);
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     refactor_->setDefault(true);
     connect(refactor_, &QPushButton::clicked, this, &RefactoringPreviewPopup::accept);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(marginPx, spacingPx - 2, marginPx, spacingPx - 2);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(cancel);
-    footerLayout->addWidget(refactor_);
+    footer->addButton(cancel);
+    footer->addButton(refactor_);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

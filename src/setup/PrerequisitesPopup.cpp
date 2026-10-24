@@ -4,6 +4,8 @@
 
 #include "ui/AppFonts.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
@@ -76,8 +78,8 @@ PrerequisitesPopup::PrerequisitesPopup(const Theme &theme, QWidget *parent)
     auto *content = new QWidget(this);
     content->setObjectName(QStringLiteral("pageContent"));
     auto *contentLayout = new QVBoxLayout(content);
-    contentLayout->setContentsMargins(16, 14, 16, 14);
-    cardsLayout_->setSpacing(12);
+    contentLayout->setContentsMargins(PopupMetrics::bodyMargins);
+    cardsLayout_->setSpacing(PopupMetrics::bodySpacing);
     contentLayout->addLayout(cardsLayout_);
     contentLayout->addStretch();
     auto *scroll = new QScrollArea(this);
@@ -87,24 +89,16 @@ PrerequisitesPopup::PrerequisitesPopup(const Theme &theme, QWidget *parent)
     scroll->setWidget(content);
 
     // The footer.
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
-    Paragraph::setText(hint, tr("Installations run in a terminal tab, where you can follow them and answer their "
-                                "questions."));
+    auto *footer = new PopupFooter(this);
+    Paragraph::setText(footer->hint(), tr("Installations run in a terminal tab, where you can follow them and "
+                                          "answer their questions."));
     auto *checkAgain = new QPushButton(tr("Check Again"), footer);
     auto *close = new QPushButton(tr("Close"), footer);
     close->setDefault(true);
-    close->setMinimumWidth(84);
     connect(checkAgain, &QPushButton::clicked, this, &PrerequisitesPopup::recheck);
     connect(close, &QPushButton::clicked, this, &OverlayPopup::dismiss);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(checkAgain);
-    footerLayout->addWidget(close);
+    footer->addButton(checkAgain);
+    footer->addButton(close);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

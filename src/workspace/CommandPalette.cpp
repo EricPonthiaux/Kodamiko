@@ -2,6 +2,9 @@
 
 #include "CommandPalette.h"
 
+#include "ui/PopupSearchField.h"
+#include "ui/ThemeStyle.h"
+
 #include <QAction>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -47,14 +50,14 @@ CommandPalette::CommandPalette(QWidget *parent)
     : OverlayPopup(QStringLiteral("commandPalette"), QSizeF(0.45, 0.55), QSize(560, 360), parent)
 {
     setBehavior(Behavior::Transient);
-    search_ = new QLineEdit(this);
+    search_ = new PopupSearchField(this);
     search_->setPlaceholderText(tr("Type a command"));
-    search_->setClearButtonEnabled(true);
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &CommandPalette::filter);
     connect(search_, &QLineEdit::returnPressed, this, &CommandPalette::runCurrent);
 
     list_ = new QTreeWidget(this);
+    list_->setObjectName(QStringLiteral("popupList"));
     list_->setColumnCount(2);
     list_->setHeaderHidden(true);
     list_->setRootIsDecorated(false);
@@ -67,8 +70,9 @@ CommandPalette::CommandPalette(QWidget *parent)
     connect(list_, &QTreeWidget::itemClicked, this, &CommandPalette::runCurrent);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(6, 6, 6, 6);
-    layout->setSpacing(6);
+    // Inside the panel's border: the field reaches its edges.
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(0);
     layout->addWidget(search_);
     layout->addWidget(list_);
 }
@@ -130,7 +134,7 @@ void CommandPalette::filter()
         auto *item =
             new QTreeWidgetItem(list_, {command.name, command.action->shortcut().toString(QKeySequence::NativeText)});
         item->setData(0, Qt::UserRole, QVariant::fromValue(index));
-        item->setForeground(1, palette().brush(QPalette::Disabled, QPalette::Text));
+        item->setForeground(1, ThemeStyle::applied().mutedText);
         item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     }
     if (matches.isEmpty()) {

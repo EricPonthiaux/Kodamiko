@@ -3,6 +3,8 @@
 #include "MessagePopup.h"
 
 #include "Paragraph.h"
+#include "PopupFooter.h"
+#include "PopupMetrics.h"
 #include "PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -25,21 +27,14 @@ MessagePopup::MessagePopup(QString iconName, const QString &settingsKey, const T
     text_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     text_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(16, 14, 16, 14);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
     body->addWidget(text_, 1);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Enter or Esc to close"), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
-    close_->setParent(footer);
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Enter or Esc to close"));
     close_->setDefault(true);
-    close_->setMinimumWidth(84);
     connect(close_, &QPushButton::clicked, this, &MessagePopup::next);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(close_);
+    footer->addButton(close_);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

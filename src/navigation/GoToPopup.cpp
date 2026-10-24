@@ -3,6 +3,9 @@
 #include "GoToPopup.h"
 
 #include "RecentFiles.h"
+#include "ui/PopupMetrics.h"
+#include "ui/PopupSearchField.h"
+#include "ui/ThemeStyle.h"
 #include "workspace/CommandPalette.h"
 #include "workspace/ProjectFiles.h"
 
@@ -123,13 +126,13 @@ GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
     editedByClaude_->setFocusPolicy(Qt::NoFocus);
     connect(editedByClaude_, &QCheckBox::toggled, this, &GoToPopup::filter);
 
-    search_ = new QLineEdit(this);
-    search_->setClearButtonEnabled(true);
+    search_ = new PopupSearchField(this);
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &GoToPopup::filter);
     connect(search_, &QLineEdit::returnPressed, this, &GoToPopup::openCurrent);
 
     list_ = new QTreeWidget(this);
+    list_->setObjectName(QStringLiteral("popupList"));
     list_->setColumnCount(2);
     list_->setHeaderHidden(true);
     list_->setRootIsDecorated(false);
@@ -142,14 +145,16 @@ GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
     connect(list_, &QTreeWidget::itemClicked, this, &GoToPopup::openCurrent);
 
     auto *header = new QHBoxLayout;
-    header->setContentsMargins(0, 0, 0, 0);
+    const QMargins room = PopupMetrics::searchMargins;
+    header->setContentsMargins(room.left(), room.top(), room.right(), 0);
     header->addWidget(tabs_);
     header->addStretch();
     header->addWidget(editedByClaude_);
 
+    // Inside the panel's border: the field reaches its edges.
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(6, 4, 6, 6);
-    layout->setSpacing(4);
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(0);
     layout->addLayout(header);
     layout->addWidget(search_);
     layout->addWidget(list_);
@@ -292,7 +297,7 @@ void GoToPopup::filter()
     shown_ = entries;
 
     list_->clear();
-    const QBrush gray = palette().brush(QPalette::Disabled, QPalette::Text);
+    const QColor gray = ThemeStyle::applied().mutedText;
     for (qsizetype i = 0; i < shown_.size(); ++i) {
         auto *item = new QTreeWidgetItem(list_, {shown_[i].title, shown_[i].location});
         item->setData(0, Qt::UserRole, QVariant::fromValue(i));

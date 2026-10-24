@@ -4,6 +4,8 @@
 
 #include "git/Branches.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 
 #include <QCheckBox>
@@ -19,9 +21,7 @@ namespace {
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *branchRules = R"(
-QLabel#branchMessage[error="true"] { color: #e06c75; }
 QLabel#branchMessage[error="false"] { color: @muted; }
-QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )";
 
 const QString switchSetting = QStringLiteral("newBranch/switchTo");
@@ -64,27 +64,19 @@ NewBranchPopup::NewBranchPopup(const Theme &theme, QWidget *parent)
             [](bool checked) { QSettings().setValue(switchSetting, checked); });
 
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(16, 12, 16, 12);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
     body->addWidget(card);
     body->addStretch();
 
     // The footer.
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Enter to create · Esc to cancel"), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Enter to create · Esc to cancel"));
     auto *cancel = new QPushButton(tr("Cancel"), footer);
-    cancel->setMinimumWidth(84);
-    create_->setParent(footer);
     create_->setDefault(true);
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(create_, &QPushButton::clicked, this, &NewBranchPopup::create);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(cancel);
-    footerLayout->addWidget(create_);
+    footer->addButton(cancel);
+    footer->addButton(create_);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

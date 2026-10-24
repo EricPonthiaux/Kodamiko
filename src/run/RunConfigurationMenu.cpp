@@ -2,8 +2,10 @@
 
 #include "RunConfigurationMenu.h"
 
-#include "ui/ThemeStyle.h"
+#include "ui/AppFonts.h"
+#include "ui/PopupRows.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QDir>
 #include <QLabel>
@@ -17,9 +19,9 @@
 
 namespace {
 
+// For an 11 pt interface font (UiMetrics::scaled).
 constexpr int rowHeight = 46;
 constexpr int rowWidth = 340;
-constexpr int iconSize = 16;
 constexpr int tileSize = 28;
 const QColor runningColor("#4fa36b");
 
@@ -57,8 +59,8 @@ public:
         , content_(std::move(content))
     {
         setMouseTracking(true);
-        setFixedHeight(rowHeight);
-        setMinimumWidth(rowWidth);
+        setFixedHeight(UiMetrics::scaled(rowHeight));
+        setMinimumWidth(UiMetrics::scaled(rowWidth));
         QString toolTip = content_.configuration.command;
         if (!content_.configuration.folder.isEmpty())
             toolTip += QObject::tr("\nin %1").arg(QDir::toNativeSeparators(content_.configuration.folder));
@@ -91,8 +93,10 @@ protected:
         painter.setRenderHint(QPainter::Antialiasing);
         const bool highlighted = menu_->activeAction() == action_ || underMouse();
         if (highlighted)
-            paintHighlight(painter);
-        const QRectF tile(10, (height() - tileSize) / 2.0, tileSize, tileSize);
+            PopupRows::paintBackground(&painter, QRectF(rect()).adjusted(0, 1, 0, -1), QStyle::State_Selected,
+                                       content_.theme);
+        const qreal tileSide = UiMetrics::scaled(tileSize);
+        const QRectF tile(10, (height() - tileSide) / 2.0, tileSide, tileSide);
         paintTile(painter, tile);
         const int right = paintState(painter);
         paintText(painter, {int(tile.right()) + 12, right});
@@ -104,14 +108,6 @@ private:
         int left = 0;
         int right = 0;
     };
-
-    void paintHighlight(QPainter &painter) const
-    {
-        const QRectF frame = QRectF(rect()).adjusted(0, 1, 0, -1);
-        QPainterPath path;
-        path.addRoundedRect(frame, 2, 2);
-        painter.fillPath(path, ThemeStyle::selectionColor(content_.theme));
-    }
 
     QColor tileColor() const
     {
@@ -129,6 +125,7 @@ private:
         tilePath.addRoundedRect(tile, 3, 3);
         painter.fillPath(tilePath, tileColor());
         const QIcon icon = UiIcons::icon(iconOf(content_.configuration.kind), iconColor());
+        const int iconSize = UiMetrics::scaled(UiMetrics::iconSize);
         icon.paint(&painter, QRect(int(tile.center().x()) - iconSize / 2, int(tile.center().y()) - iconSize / 2,
                                    iconSize, iconSize));
     }
@@ -138,6 +135,7 @@ private:
     {
         int right = width() - 12;
         if (content_.isSelected) {
+            const int iconSize = UiMetrics::scaled(UiMetrics::iconSize);
             const QRect check(right - iconSize, (height() - iconSize) / 2, iconSize, iconSize);
             UiIcons::icon(QStringLiteral("check"), content_.theme.accent).paint(&painter, check);
             right = check.left() - 8;
@@ -224,10 +222,11 @@ QWidgetAction *addConfiguration(QMenu *menu, const RunConfiguration &configurati
 void addHeading(QMenu *menu, const QString &text, const Theme &theme)
 {
     QLabel *heading = label(menu, text.toUpper(),
-                            QStringLiteral("color: %1; font-size: 8pt; font-weight: 600; letter-spacing: 1px;"
+                            QStringLiteral("color: %1; letter-spacing: 1px;"
                                            " padding: 8px 10px 4px 10px; background: transparent;")
                                 .arg(theme.mutedText.name()));
-    heading->setMinimumWidth(rowWidth);
+    AppFonts::setInterfaceFont(heading, 0.8, QFont::DemiBold);
+    heading->setMinimumWidth(UiMetrics::scaled(rowWidth));
 }
 
 void addNote(QMenu *menu, const QString &text, const Theme &theme)
@@ -236,7 +235,7 @@ void addNote(QMenu *menu, const QString &text, const Theme &theme)
         label(menu, text,
               QStringLiteral("color: %1; padding: 8px 10px; background: transparent;").arg(theme.mutedText.name()));
     note->setWordWrap(true);
-    note->setMaximumWidth(rowWidth);
+    note->setMaximumWidth(UiMetrics::scaled(rowWidth));
 }
 
 } // namespace RunConfigurationMenu

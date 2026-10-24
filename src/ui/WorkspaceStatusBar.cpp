@@ -57,6 +57,8 @@ WorkspaceStatusBar::WorkspaceStatusBar(QTabBar *modes, QWidget *parent)
 
     popup_ = new QFrame(this, Qt::Popup);
     popup_->setObjectName(QStringLiteral("statusPopup"));
+    // Its corners rounded on nothing, as a menu's.
+    popup_->setAttribute(Qt::WA_TranslucentBackground);
     auto *popupLayout = new QVBoxLayout(popup_);
     popupLayout->setContentsMargins(12, 12, 12, 12);
     popupLayout->setSizeConstraint(QLayout::SetFixedSize);

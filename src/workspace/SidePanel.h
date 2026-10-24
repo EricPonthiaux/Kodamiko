@@ -7,6 +7,7 @@
 #include <QIcon>
 #include <QStackedWidget>
 
+class QSplitter;
 class QTabBar;
 class SideTabBar;
 
@@ -14,6 +15,8 @@ class SideTabBar;
 // vertical tabs (their text read from bottom to top) and the panel they
 // show. Clicking the current tab folds the panel away, clicking it again
 // (or another tab) brings it back. The strip stays at the edge either way.
+// On a short window, the strip scrolls its tabs instead of making the
+// window taller.
 class SidePanel : public QStackedWidget {
     Q_OBJECT
 
@@ -37,10 +40,17 @@ public:
 
     void setPanelVisible(bool visible);
 
+    // Lets the user fold the panel by dragging the handle of `splitter`,
+    // which holds it, to the strip. Not owned: the splitter is its parent.
+    void foldWithSplitter(QSplitter *splitter);
+
 signals:
     void panelVisibilityChanged(bool visible);
 
 private:
+    void restoreCollapsedWidth();
+
     QWidget *strip_;
     SideTabBar *tabBar_;
+    QSplitter *splitter_ = nullptr;
 };

@@ -5,6 +5,8 @@
 #include "editor/EditorWidget.h"
 #include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
+#include "ui/PopupMetrics.h"
+#include "ui/PopupSearchField.h"
 #include "ui/TreeMetrics.h"
 
 #include <QCheckBox>
@@ -106,8 +108,8 @@ public:
         layout.endLayout();
         painter->save();
         painter->setClipRect(rect);
-        painter->setPen(
-            item.palette.color(item.state & QStyle::State_Selected ? QPalette::HighlightedText : QPalette::Text));
+        // The selection is a tint (ThemeStyle::selectionColor): the text keeps its color.
+        painter->setPen(item.palette.color(QPalette::Text));
         const qreal y = rect.top() + (rect.height() - line.height()) / 2;
         layout.draw(painter, QPointF(rect.left(), y));
         painter->restore();
@@ -168,11 +170,10 @@ FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
     auto *title = new QLabel(tr("Find in Files"), this);
     AppFonts::setInterfaceFont(title, 1);
     summary_ = new QLabel(this);
-    summary_->setEnabled(false);
+    summary_->setObjectName(QStringLiteral("findSummary"));
 
-    search_ = new QLineEdit(this);
+    search_ = new PopupSearchField(this);
     search_->setPlaceholderText(tr("Text to find"));
-    search_->setClearButtonEnabled(true);
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &FindInFilesPopup::scheduleSearch);
 
@@ -196,6 +197,7 @@ FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
     connect(mask_, &QLineEdit::textChanged, this, &FindInFilesPopup::scheduleSearch);
 
     results_ = new QTreeWidget(this);
+    results_->setObjectName(QStringLiteral("popupList"));
     results_->setColumnCount(2);
     results_->setHeaderHidden(true);
     results_->setRootIsDecorated(false);
@@ -221,23 +223,32 @@ FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
     splitter->setSizes({300, 260});
 
     auto *header = new QHBoxLayout;
+    const QMargins room = PopupMetrics::searchMargins;
+    header->setContentsMargins(room.left(), room.top(), room.right(), room.bottom());
     header->addWidget(title);
     header->addWidget(summary_, 1);
     header->addWidget(useMask_);
     header->addWidget(mask_);
 
-    auto *searchRow = new QHBoxLayout;
+    // The field and its options on one line, underlined together.
+    auto *searchBar = new QFrame(this);
+    searchBar->setObjectName(QStringLiteral("popupSearchBar"));
+    search_->setParent(searchBar);
+    auto *searchRow = new QHBoxLayout(searchBar);
+    searchRow->setContentsMargins(0, 0, room.right(), 0);
     searchRow->setSpacing(4);
     searchRow->addWidget(search_, 1);
-    searchRow->addWidget(matchCase_);
-    searchRow->addWidget(wholeWords_);
-    searchRow->addWidget(regularExpression_);
+    for (QToolButton *option : {matchCase_, wholeWords_, regularExpression_}) {
+        option->setParent(searchBar);
+        searchRow->addWidget(option);
+    }
 
+    // Inside the panel's border: the field reaches its edges.
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(8, 6, 8, 8);
-    layout->setSpacing(6);
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(0);
     layout->addLayout(header);
-    layout->addLayout(searchRow);
+    layout->addWidget(searchBar);
     layout->addWidget(splitter, 1);
 
     searchTimer_.setSingleShot(true);
@@ -342,7 +353,7 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
         item->setData(0, matchRole, QVariant::fromValue(i));
         item->setData(0, highlightStartRole, excerpt.highlightStart);
         item->setData(0, highlightLengthRole, match.length);
-        item->setForeground(1, palette().brush(QPalette::Disabled, QPalette::Text));
+        item->setForeground(1, theme_.mutedText);
         item->setToolTip(1, match.filePath);
     }
     if (search_->text().isEmpty())

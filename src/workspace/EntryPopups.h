@@ -6,6 +6,7 @@
 
 #include <functional>
 
+class PopupFooter;
 class PopupHeader;
 class QHBoxLayout;
 class QLabel;
@@ -80,9 +81,7 @@ private:
     QLabel *error_;
     // As given to showError(): error_ holds it as rich text.
     QString errorMessage_;
-    QFrame *footer_;
-    QLabel *hint_;
-    QHBoxLayout *footerButtons_;
+    PopupFooter *footer_;
 };
 
 // Asks for a name: a single field, outlined in red while an error is

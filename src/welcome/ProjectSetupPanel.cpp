@@ -9,6 +9,8 @@
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 
 #include <QDir>
@@ -75,10 +77,8 @@ ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, Purpose purpose, QW
 
 QWidget *ProjectSetupPanel::createFooter()
 {
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    summary_ = new QLabel(footer);
-    summary_->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    summary_ = footer->hint();
     const bool isFirstSetup = purpose_ == Purpose::FirstSetup;
     cancel_ = new QPushButton(isFirstSetup ? tr("Back") : tr("Cancel"), footer);
     retry_ = new QPushButton(tr("Retry"), footer);
@@ -100,14 +100,8 @@ QWidget *ProjectSetupPanel::createFooter()
     connect(apply_, &QPushButton::clicked, this, [this] { save(Then::StayOpen); });
     connect(ok_, &QPushButton::clicked, this, [this] { save(Then::Close); });
 
-    auto *layout = new QHBoxLayout(footer);
-    layout->setContentsMargins(16, 10, 16, 10);
-    layout->setSpacing(8);
-    layout->addWidget(summary_, 1);
-    for (QPushButton *button : {cancel_, retry_, skip_, apply_, ok_}) {
-        button->setMinimumWidth(84);
-        layout->addWidget(button);
-    }
+    for (QPushButton *button : {cancel_, retry_, skip_, apply_, ok_})
+        footer->addButton(button);
     return footer;
 }
 

@@ -384,6 +384,7 @@ QWidget *MainWindow::createEditPage()
     editSplitter_->addWidget(editorArea);
     editSplitter_->setStretchFactor(1, 1);
     editSplitter_->setSizes({260, 1140});
+    sidebar_->foldWithSplitter(editSplitter_);
 
     auto *page = new QWidget(this);
     auto *pageLayout = new QHBoxLayout(page);

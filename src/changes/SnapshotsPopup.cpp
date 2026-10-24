@@ -6,6 +6,10 @@
 #include "ui/AppFonts.h"
 #include "ui/FileIcons.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupMetrics.h"
+#include "ui/PopupRows.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
@@ -30,15 +34,10 @@ constexpr int iconRole = Qt::UserRole + 1;
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *snapshotRules = R"(
-QListWidget#snapshotList, QListWidget#snapshotFiles { background: transparent; border: none; outline: 0; }
 QListWidget#snapshotList { border-right: 1px solid @line; }
-QListWidget#snapshotFiles::item { padding: 3px 4px; border-radius: 2px; }
-QListWidget#snapshotFiles::item:hover { background: @hover; }
-QListWidget#snapshotFiles::item:selected { background: @selection; color: @text; }
 QLabel#snapshotBadge { color: @accentText; background: @selection; border-radius: 2px; padding: 2px 8px; }
 QLabel#snapshotCommit { color: @muted; }
 QLabel#snapshotDate { color: @muted; }
-QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
 )";
 
 // Row of a snapshot: an icon, the reason, and below, when and how many
@@ -58,16 +57,11 @@ public:
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
         const QRectF row = QRectF(option.rect).adjusted(0, 1, -4, -1);
-        const bool selected = option.state & QStyle::State_Selected;
-        if (selected || option.state & QStyle::State_MouseOver) {
-            painter->setPen(Qt::NoPen);
-            painter->setBrush(selected ? ThemeStyle::selectionColor(theme) : theme.hover);
-            painter->drawRoundedRect(row, 2, 2);
-        }
+        PopupRows::paintBackground(painter, row, option.state, theme);
 
         // The icon, alone, in the accent.
         const QSizeF iconSize = UiMetrics::scaledSquare(UiMetrics::iconSize);
-        const QRectF tile(QPointF(row.left() + 8, row.center().y() - iconSize.height() / 2), iconSize);
+        const QRectF tile(QPointF(row.left() + PopupMetrics::rowPadding, row.center().y() - iconSize.height() / 2), iconSize);
         const QIcon icon = UiIcons::icon(index.data(iconRole).toString(), theme.accent);
         icon.paint(painter, tile.toRect());
 
@@ -139,30 +133,24 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
     connect(list_, &QListWidget::currentRowChanged, this, &SnapshotsPopup::showDetails);
     auto *columns = new QWidget(this);
     auto *columnsLayout = new QHBoxLayout(columns);
-    columnsLayout->setContentsMargins(16, 12, 16, 12);
-    columnsLayout->setSpacing(12);
+    columnsLayout->setContentsMargins(PopupMetrics::bodyMargins);
+    columnsLayout->setSpacing(PopupMetrics::bodySpacing);
     columnsLayout->addWidget(list_, 5);
     columnsLayout->addWidget(createDetails(), 6);
     body_->addWidget(columns);
     body_->addWidget(createEmptyState());
 
     // The footer.
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = wrapped(QStringLiteral("footerHint"), footer);
-    hint->setText(tr("Your current files are saved first: a restore can itself be undone."));
+    auto *footer = new PopupFooter(this);
+    footer->hint()->setWordWrap(true);
+    footer->setHint(tr("Your current files are saved first: a restore can itself be undone."));
     auto *close = new QPushButton(tr("Close"), footer);
     restore_ = new QPushButton(tr("Restore These Files"), footer);
     restore_->setDefault(true);
-    close->setMinimumWidth(84);
     connect(close, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(restore_, &QPushButton::clicked, this, &SnapshotsPopup::restoreSelected);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(close);
-    footerLayout->addWidget(restore_);
+    footer->addButton(close);
+    footer->addButton(restore_);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

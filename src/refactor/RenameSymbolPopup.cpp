@@ -20,6 +20,7 @@ RenameSymbolPopup::RenameSymbolPopup(const QString &name, const QString &locatio
     , field_(new QLineEdit(name, this))
     , commentsAndStrings_(new QCheckBox(tr("Search in &comments and strings"), this))
 {
+    setIconName(QStringLiteral("code")); // as Change Signature
     field_->selectAll();
     connect(field_, &QLineEdit::returnPressed, this, &RenameSymbolPopup::accept);
     connect(field_, &QLineEdit::textEdited, this, [this] { showError({}); });

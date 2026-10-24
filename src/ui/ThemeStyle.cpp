@@ -2,6 +2,8 @@
 
 #include "ThemeStyle.h"
 
+#include "PopupMetrics.h"
+
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -116,7 +118,7 @@ QPalette palette(const Theme &theme)
     palette.setColor(QPalette::ButtonText, theme.foreground);
     palette.setColor(QPalette::Highlight, theme.highlight);
     palette.setColor(QPalette::HighlightedText, Qt::white);
-    palette.setColor(QPalette::ToolTipBase, theme.button);
+    palette.setColor(QPalette::ToolTipBase, theme.alternateBase);
     palette.setColor(QPalette::ToolTipText, theme.foreground);
     palette.setColor(QPalette::PlaceholderText, theme.marginForeground);
     palette.setColor(QPalette::Link, theme.accent);
@@ -135,12 +137,12 @@ QPalette palette(const Theme &theme)
 QString styleSheet(const Theme &theme)
 {
     QString sheet = QStringLiteral(R"(
-QToolTip { color: @text; background: @button; border: 1px solid @border; border-radius: 3px; padding: 4px 6px; }
+QToolTip { color: @text; background: @panel; border: 1px solid @border; border-radius: @frameRadiuspx; padding: 4px 6px; }
 QMenuBar { background: @window; border-bottom: 1px solid @line; }
 QMenuBar::item { padding: 5px 10px; border-radius: 5px; background: transparent; }
 QMenuBar::item:selected, QMenuBar::item:pressed { background: @hover; color: @text; }
-QMenu { background: @panel; color: @text; border: 1px solid @border; border-radius: 7px; padding: 6px; }
-QMenu::item { padding: 6px 28px 6px 22px; border: 1px solid transparent; border-radius: 4px; }
+QMenu { background: @panel; color: @text; border: 1px solid @border; border-radius: @frameRadiuspx; padding: 6px; }
+QMenu::item { padding: 6px 28px 6px 22px; border: 1px solid transparent; border-radius: @rowRadiuspx; }
 QMenu::icon { padding-left: 32px; }
 QMenu::item:selected { color: @text; background: @slate; }
 QMenu::item:disabled { color: @muted; }
@@ -257,7 +259,15 @@ QToolButton#chip:hover { background: @button; }
 QToolButton#chip::menu-indicator { image: none; width: 0; }
 QStatusBar QToolButton#chip { padding: 1px 9px; background: @hover; border: 1px solid @line; }
 QStatusBar QToolButton#chip:hover { background: @button; }
-QFrame#statusPopup { background: @panel; border: 1px solid @line; border-radius: 6px; }
+QFrame#statusPopup, QFrame#changePopup { background: @panel; border: 1px solid @border; border-radius: @frameRadiuspx; }
+QLabel#changeSummary { color: @muted; }
+QLineEdit#popupSearch, QLineEdit#popupSearch:focus { background: transparent; border: none; border-bottom: 1px solid @line; border-radius: 0; padding: 7px 8px; }
+QFrame#popupSearchBar { border: none; border-bottom: 1px solid @line; }
+QFrame#popupSearchBar QLineEdit#popupSearch { border-bottom: none; }
+QLabel#findSummary { color: @muted; }
+QTreeWidget#popupList { background: transparent; padding: 4px 6px; }
+QTreeWidget#popupList::item { padding: 3px 4px; border-radius: @rowRadiuspx; }
+QTreeWidget#popupList::item:selected { background: @slate; color: @text; }
 QWidget#statusGroup QToolButton { padding: 2px 7px; border: 1px solid transparent; border-radius: 4px; }
 QWidget#statusGroup QToolButton:hover, QToolButton#statusOverflow:hover { background: @hover; border-color: @line; }
 QWidget#statusGroup QToolButton#chip { background: @hover; border-color: @line; }
@@ -280,8 +290,11 @@ QCheckBox::indicator:unchecked { background: @base; border: 1px solid @border; b
 QComboBox { background: @button; border: 1px solid @border; border-radius: 3px; padding: 4px 8px; }
 QComboBox:focus, QComboBox:on { border-color: @accent; }
 QComboBox::drop-down { border: none; width: 18px; }
-QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; selection-background-color: @highlight; outline: 0; }
+QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; selection-background-color: @slate; selection-color: @text; outline: 0; }
 )");
+    // The popups' shared sizes (PopupMetrics), then the colors.
+    sheet.replace(QStringLiteral("@frameRadius"), QString::number(PopupMetrics::frameRadius));
+    sheet.replace(QStringLiteral("@rowRadius"), QString::number(PopupMetrics::rowRadius));
     const QList<std::pair<QString, QColor>> colors = {
         {"@accentText", theme.accentText},
         {"@accent", theme.accent},

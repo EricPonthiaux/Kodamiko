@@ -3,6 +3,8 @@
 #include "EntryPopups.h"
 
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 
@@ -66,12 +68,6 @@ QString alreadyExists(const QFileInfo &info)
         .arg(info.fileName());
 }
 
-// Error outline and text: the colors of the usage warning in the status bar.
-QString errorColor(const QPalette &palette)
-{
-    return palette.color(QPalette::Window).lightness() < 128 ? QStringLiteral("#e06c75") : QStringLiteral("#e45649");
-}
-
 } // namespace
 
 EntryTarget resolveNewEntry(const QString &root, const QString &folder, const QString &name, bool isFolder)
@@ -123,32 +119,21 @@ EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, QString
     , header_(new PopupHeader(QStringLiteral("document"), title, this))
     , content_(new QVBoxLayout)
     , error_(new QLabel(this))
-    , footer_(new QFrame(this))
-    , hint_(new QLabel(this))
-    , footerButtons_(new QHBoxLayout)
+    , footer_(new PopupFooter(this))
 {
     connect(this, &OverlayPopup::dismissed, this, &QObject::deleteLater);
     connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
-    error_->setObjectName(QStringLiteral("entryError"));
+    error_->setObjectName(QStringLiteral("popupError"));
     error_->hide();
-    content_->setSpacing(10);
+    content_->setSpacing(PopupMetrics::bodySpacing);
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(16, 14, 16, 14);
-    body->setSpacing(10);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
+    body->setSpacing(PopupMetrics::bodySpacing);
     body->addLayout(content_);
     body->addWidget(error_);
 
-    footer_->setObjectName(QStringLiteral("popupFooter"));
-    hint_->setParent(footer_);
-    hint_->setObjectName(QStringLiteral("footerHint"));
-    hint_->setText(tr("Enter to apply · Esc to cancel"));
-    footerButtons_->setSpacing(8);
-    auto *footerLayout = new QHBoxLayout(footer_);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint_, 1);
-    footerLayout->addLayout(footerButtons_);
+    footer_->setHint(tr("Enter to apply · Esc to cancel"));
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
@@ -158,8 +143,7 @@ EntryPopup::EntryPopup(const QString &settingsKey, const QString &title, QString
     layout->addWidget(footer_);
 
     const Theme &theme = ThemeStyle::applied();
-    setStyleSheet(
-        popupStyleSheet(theme, QStringLiteral("QLabel#entryError { color: %1; }").arg(errorColor(palette()))));
+    setStyleSheet(popupStyleSheet(theme));
     header_->applyTheme(theme);
 }
 
@@ -202,13 +186,12 @@ void EntryPopup::showError(const QString &message)
 
 void EntryPopup::addFooterButton(QPushButton *button)
 {
-    button->setMinimumWidth(84);
-    footerButtons_->addWidget(button);
+    footer_->addButton(button);
 }
 
 void EntryPopup::setFooterHint(const QString &hint)
 {
-    hint_->setText(hint);
+    footer_->setHint(hint);
 }
 
 void EntryPopup::resizeToContent()
@@ -280,8 +263,8 @@ void NamePopup::focusContent()
 void NamePopup::errorChanged(bool shown)
 {
     // The outline only: the field keeps the style's look otherwise.
-    field_->setStyleSheet(shown ? QStringLiteral("QLineEdit { border-color: %1; }").arg(errorColor(palette()))
-                                : QString());
+    field_->setStyleSheet(
+        shown ? QStringLiteral("QLineEdit { border-color: %1; }").arg(ThemeStyle::applied().error.name()) : QString());
 }
 
 ConfirmPopup::ConfirmPopup(const Question &question, std::function<bool(ConfirmPopup *)> apply, QWidget *parent)

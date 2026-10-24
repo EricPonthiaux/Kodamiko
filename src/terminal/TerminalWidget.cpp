@@ -25,6 +25,9 @@ namespace {
 
 constexpr int initialRows = 24;
 constexpr int initialColumns = 80;
+// Blank space between the viewport's edges and the grid, so that the text
+// does not touch the panel's border.
+constexpr int gridMarginPx = 6;
 
 // Terminal-specific copy/paste: Ctrl+C and Ctrl+V must remain available to
 // the program (Ctrl+C interrupts Claude).
@@ -292,8 +295,9 @@ void TerminalWidget::onScreenChanged()
     }
     // One extra column on each side: wide and italic glyphs overhang.
     const QRect cells = damage.adjusted(-1, 0, 1, 0);
-    viewport()->update(QRect(cells.x() * cellSize_.width(), cells.y() * cellSize_.height(),
-                             cells.width() * cellSize_.width(), cells.height() * cellSize_.height()));
+    viewport()->update(QRect(gridMarginPx + cells.x() * cellSize_.width(),
+                             gridMarginPx + cells.y() * cellSize_.height(), cells.width() * cellSize_.width(),
+                             cells.height() * cellSize_.height()));
 }
 
 void TerminalWidget::updateGridSize()
@@ -302,8 +306,8 @@ void TerminalWidget::updateGridSize()
     // columns. The grid follows the size it is shown at.
     if (!isVisible())
         return;
-    const int columns = std::max(2, viewport()->width() / cellSize_.width());
-    const int rows = std::max(1, viewport()->height() / cellSize_.height());
+    const int columns = std::max(2, (viewport()->width() - 2 * gridMarginPx) / cellSize_.width());
+    const int rows = std::max(1, (viewport()->height() - 2 * gridMarginPx) / cellSize_.height());
     if (columns == screen_->columns() && rows == screen_->rows())
         return;
     screen_->resize(rows, columns);
@@ -416,9 +420,10 @@ void TerminalWidget::scheduleGridUpdate()
 void TerminalWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(viewport());
-    const QRect area = event->rect();
-    painter.fillRect(area, background_);
+    painter.fillRect(event->rect(), background_);
+    painter.translate(gridMarginPx, gridMarginPx);
 
+    const QRect area = event->rect().translated(-gridMarginPx, -gridMarginPx);
     const int firstRow = std::max(0, area.top() / cellSize_.height());
     const int lastRow = std::min(screen_->rows() - 1, area.bottom() / cellSize_.height());
     for (int row = firstRow; row <= lastRow; ++row)
@@ -597,8 +602,9 @@ void TerminalWidget::wheelEvent(QWheelEvent *event)
 
 QPoint TerminalWidget::cellAt(const QPoint &widgetPosition) const
 {
-    const int column = std::clamp(widgetPosition.x() / cellSize_.width(), 0, screen_->columns() - 1);
-    const int row = std::clamp(widgetPosition.y() / cellSize_.height(), 0, screen_->rows() - 1);
+    const QPoint gridPosition = widgetPosition - QPoint(gridMarginPx, gridMarginPx);
+    const int column = std::clamp(gridPosition.x() / cellSize_.width(), 0, screen_->columns() - 1);
+    const int row = std::clamp(gridPosition.y() / cellSize_.height(), 0, screen_->rows() - 1);
     return {column, row - scrollOffset_};
 }
 

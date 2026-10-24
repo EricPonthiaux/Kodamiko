@@ -40,6 +40,7 @@
 #include <QFileInfo>
 #include <QLabel>
 #include <QPainter>
+#include <QSettings>
 #include <QStatusBar>
 #include <QStyle>
 #include <QSystemTrayIcon>
@@ -55,6 +56,39 @@ constexpr int submitDelayMs = 150;
 constexpr int notificationMs = 10000;
 
 constexpr qsizetype snapshotPromptLength = 60;
+// A session that exits sooner failed to start: it is not relaunched.
+constexpr qint64 sessionRestartMinimumMs = 5000;
+
+// QSettings map from a project folder to the session identifier of its
+// agent's last conversation, written at each prompt: the next launch
+// resumes it, however the editor closed.
+const QString conversationsKey = QStringLiteral("agentConversations");
+
+QString savedConversation(const QString &folder)
+{
+    return QSettings().value(conversationsKey).toMap().value(folder).toString();
+}
+
+// The session of an event works in `folder` (its root or below): an event
+// still on its way from the previous project's session does not count.
+bool isSessionOf(const HookEvent &event, const QString &folder)
+{
+    const QString directory = QDir::cleanPath(event.workingDirectory);
+    return directory == folder || directory.startsWith(folder + QLatin1Char('/'));
+}
+
+void saveConversation(const QString &folder, const QString &sessionId)
+{
+    QSettings settings;
+    QVariantMap conversations = settings.value(conversationsKey).toMap();
+    if (conversations.value(folder).toString() == sessionId)
+        return;
+    if (sessionId.isEmpty())
+        conversations.remove(folder);
+    else
+        conversations.insert(folder, sessionId);
+    settings.setValue(conversationsKey, conversations);
+}
 
 // The indicator's state for the activity's.
 AgentStatus indicatorStatus(AgentActivity::State state)
@@ -117,6 +151,10 @@ bool MainWindow::startClaudeSession(QString *error, SessionStart start)
     }
     QString launchError;
     AgentSessionOptions options;
+    options.conversationId = savedConversation(folder_);
+    // Nothing to resume yet: the project's first conversation.
+    if (start == SessionStart::Resume && options.conversationId.isEmpty())
+        start = SessionStart::New;
     options.start = start;
     options.name = QFileInfo(folder_).fileName(); // the agents' sessions address it by the project's name
     if (exposeTools_->isChecked())
@@ -138,6 +176,8 @@ bool MainWindow::startClaudeSession(QString *error, SessionStart start)
     // The indicator leaves the status bar with the session, even when the
     // agent was already idle.
     connect(claudeTerminal_, &TerminalWidget::finished, this, &MainWindow::updateAgentIndicator);
+    connect(claudeTerminal_, &TerminalWidget::finished, this,
+            [this, terminal = claudeTerminal_] { restartExitedClaudeSession(terminal); });
     agentActivity_.reset();
     claudeStatus_ = {};
     updateUsage();
@@ -148,6 +188,8 @@ bool MainWindow::startClaudeSession(QString *error, SessionStart start)
     terminalTabs_->setCurrentIndex(0);
     updateTerminalPage();
     claudeTerminal_->start(*spec);
+    claudeSessionClock_.start();
+    claudeSessionStart_ = start;
     if (mode_ == Mode::Terminal || terminalWindow_->isDetached())
         claudeTerminal_->setFocus();
     updateAgentIndicator();
@@ -193,13 +235,29 @@ void MainWindow::restartClaudeSession()
 void MainWindow::continueClaudeSession()
 {
     QString error;
-    if (!startClaudeSession(&error, SessionStart::Continue)) {
+    if (!startClaudeSession(&error)) {
         showNotice(
             {.title = tr("%1 Session").arg(agentProvider_->name()), .location = {}, .message = error, .details = {}},
             this);
         return;
     }
     showTerminals();
+}
+
+void MainWindow::restartExitedClaudeSession(const TerminalWidget *terminal)
+{
+    if (terminal != claudeTerminal_)
+        return;
+    const bool failedToStart = claudeSessionClock_.elapsed() < sessionRestartMinimumMs;
+    if (!failedToStart) {
+        startClaudeSession(); // on failure, the status bar says why
+        return;
+    }
+    // Its conversation is gone (deleted, or of another agent): a new one.
+    if (claudeSessionStart_ == SessionStart::Resume) {
+        saveConversation(folder_, {});
+        startClaudeSession(nullptr, SessionStart::New);
+    }
 }
 
 void MainWindow::showEffectiveSettings(bool open)
@@ -226,6 +284,9 @@ void MainWindow::onHookReceived(const HookEvent &event)
     agentActivity_.handle(event);
     switch (event.kind) {
     case HookEvent::Kind::PromptSubmitted:
+        // From the prompt on, the conversation is saved and can be resumed.
+        if (isSessionOf(event, folder_))
+            saveConversation(folder_, event.sessionId);
         shareEditorContext();
         snapshotBeforePrompt(event.prompt);
         claudeTouched_.clear(); // the dots show the last prompt's files

@@ -6,6 +6,8 @@
 #include "GitActions.h"
 #include "SnapshotsPopup.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 
 #include <QHBoxLayout>
@@ -19,11 +21,7 @@
 namespace {
 
 constexpr const char *stashRules = R"(
-QListWidget#stashList { background: transparent; border: none; border-right: 1px solid @line; outline: 0; }
-QListWidget#stashList::item { padding: 6px 8px; border-radius: 2px; }
-QListWidget#stashList::item:hover { background: @hover; }
-QListWidget#stashList::item:selected { background: @selection; color: @accentText; }
-QPushButton:default:disabled { color: @muted; background: @panel; border: 1px solid @line; }
+QListWidget#stashList { border-right: 1px solid @line; }
 )";
 
 // "added", "deleted" or "modified", from the header of a file's patch.
@@ -68,8 +66,8 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
             [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, true); }); });
     auto *columns = new QWidget(this);
     auto *columnsLayout = new QHBoxLayout(columns);
-    columnsLayout->setContentsMargins(16, 12, 16, 12);
-    columnsLayout->setSpacing(12);
+    columnsLayout->setContentsMargins(PopupMetrics::bodyMargins);
+    columnsLayout->setSpacing(PopupMetrics::bodySpacing);
     columnsLayout->addWidget(list_, 4);
     columnsLayout->addWidget(diff_, 7);
     body_->addWidget(columns);
@@ -77,10 +75,8 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
     emptyText_->setAlignment(Qt::AlignCenter);
     body_->addWidget(emptyText_);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Pop brings the changes back and drops the stash; Apply keeps it."), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Pop brings the changes back and drops the stash; Apply keeps it."));
     pop_->setDefault(true);
     connect(drop_, &QPushButton::clicked, this,
             [this] { act([this](const Stash &stash) { actions_->dropStash(stash.index, stash.message); }); });
@@ -88,13 +84,8 @@ StashesPopup::StashesPopup(GitActions *actions, const Theme &theme, QWidget *par
             [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, false); }); });
     connect(pop_, &QPushButton::clicked, this,
             [this] { act([this](const Stash &stash) { actions_->applyStash(stash.index, true); }); });
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(drop_);
-    footerLayout->addWidget(apply_);
-    footerLayout->addWidget(pop_);
+    for (QPushButton *button : {drop_, apply_, pop_})
+        footer->addButton(button);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

@@ -7,10 +7,20 @@
 #include <QEvent>
 #include <QImage>
 #include <QPainter>
+#include <QSplitter>
 #include <QStyleOptionTab>
 #include <QStylePainter>
 #include <QTabBar>
 #include <QVBoxLayout>
+
+#include <algorithm>
+
+namespace {
+
+// The panel's width when it comes back after being dragged down to nothing.
+constexpr int unfoldedWidthPx = 260;
+
+} // namespace
 
 // The tabs' backgrounds come from the style sheet; their labels are drawn
 // level into an image, then turned a quarter. Text drawn turned is not
@@ -113,7 +123,9 @@ SidePanel::SidePanel(QWidget *parent)
     tabBar_->setDocumentMode(true);
     tabBar_->setDrawBase(false);
     tabBar_->setExpanding(false);
-    tabBar_->setUsesScrollButtons(false);
+    tabBar_->setUsesScrollButtons(true);
+    // Shorter than its tabs on a short window, which then scroll.
+    tabBar_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
     tabBar_->setFocusPolicy(Qt::NoFocus);
     tabBar_->setAttribute(Qt::WA_Hover);
     connect(tabBar_, &QTabBar::currentChanged, this, [this](int index) {
@@ -164,5 +176,34 @@ void SidePanel::setPanelVisible(bool visible)
     if (visible)
         Motion::fadeIn(this);
     setVisible(visible);
+    if (visible)
+        restoreCollapsedWidth();
     emit panelVisibilityChanged(visible);
+}
+
+void SidePanel::foldWithSplitter(QSplitter *splitter)
+{
+    splitter_ = splitter;
+    splitter->setCollapsible(splitter->indexOf(this), true);
+    connect(splitter, &QSplitter::splitterMoved, this, [this] {
+        if (splitter_->sizes().at(splitter_->indexOf(this)) == 0)
+            setPanelVisible(false);
+    });
+}
+
+// A panel dragged down to nothing comes back at a usable width, taken from
+// the pane next to it.
+void SidePanel::restoreCollapsedWidth()
+{
+    if (!splitter_)
+        return;
+    QList<int> sizes = splitter_->sizes();
+    const int index = splitter_->indexOf(this);
+    const int neighbor = index + 1 < sizes.size() ? index + 1 : index - 1;
+    if (sizes.at(index) > 0 || neighbor < 0)
+        return;
+    const int width = std::min(unfoldedWidthPx, sizes.at(neighbor) / 2);
+    sizes[index] = width;
+    sizes[neighbor] -= width;
+    splitter_->setSizes(sizes);
 }

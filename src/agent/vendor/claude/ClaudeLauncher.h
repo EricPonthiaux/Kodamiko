@@ -50,7 +50,7 @@ QString mcpConfigPath();
 
 // What a session is started with, besides its folder and hooks.
 struct SessionOptions {
-    // After --settings ("--continue" to resume the last conversation).
+    // After --settings ("--resume" and an identifier to resume a conversation).
     QStringList extraArguments;
     // With them, the session gets the editor's MCP server (duet-mcp), these
     // of its tools allowed without asking.

@@ -32,7 +32,7 @@ struct AgentFeatures {
 // How a session conversation begins.
 enum class SessionStart {
     New,
-    Continue, // resumes the last conversation in its folder
+    Resume, // resumes the conversation `AgentSessionOptions::conversationId`
 };
 
 // What a session is started with, besides its folder and the editor's hooks.
@@ -47,6 +47,9 @@ struct AgentSessionOptions {
     // Its identifier (a UUID), which its hooks carry: tells its events from
     // the other sessions'. Without one, the agent picks it.
     QString sessionId;
+    // With SessionStart::Resume, the session identifier of the conversation
+    // to resume.
+    QString conversationId;
     // Added to the agent's system prompt (the instructions of a worktree
     // session, of the project's recipe); empty for none.
     QString instructions;

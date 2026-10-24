@@ -372,7 +372,9 @@ void ChangeGutter::showChangeAt(int line)
 
     auto *popup = new QFrame(editor_, Qt::Popup);
     popup->setAttribute(Qt::WA_DeleteOnClose);
-    popup->setFrameShape(QFrame::StyledPanel);
+    // Framed as the other popups (ThemeStyle), its corners on nothing.
+    popup->setObjectName(QStringLiteral("changePopup"));
+    popup->setAttribute(Qt::WA_TranslucentBackground);
     popup_ = popup;
 
     auto *layout = new QVBoxLayout(popup);
@@ -407,7 +409,7 @@ QHBoxLayout *ChangeGutter::createPopupToolbar(QFrame *popup, const LineChange &c
     const QToolButton *showDiff = addToolButton(popup, toolbar, tr("Show Diff"), tr("Show this change in a diff tab"));
     toolbar->addStretch();
     auto *label = new QLabel(changeSummary(change), popup);
-    label->setEnabled(false);
+    label->setObjectName(QStringLiteral("changeSummary"));
     toolbar->addWidget(label);
 
     connect(previous, &QToolButton::clicked, this, [this] {

@@ -4,6 +4,8 @@
 
 #include "AgentProvider.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 
 #include <QComboBox>
@@ -19,7 +21,7 @@ namespace {
 
 // The popup's own rules, besides the shared ones (popupStyleSheet).
 constexpr const char *diagramRules = R"(
-QLabel#diagramError { color: #e06c75; }
+QLabel#diagramError { color: @error; }
 )";
 
 constexpr int descriptionLines = 5;
@@ -77,27 +79,18 @@ DiagramRequestPopup::DiagramRequestPopup(const Theme &theme, QWidget *parent)
     fileBlock->layout()->addWidget(error_);
     card->addWidget(fileBlock);
     auto *body = new QVBoxLayout;
-    body->setContentsMargins(16, 12, 16, 12);
+    body->setContentsMargins(PopupMetrics::bodyMargins);
     body->addWidget(card);
     body->addStretch();
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Ctrl+Enter to draw · Esc to cancel"), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Ctrl+Enter to draw · Esc to cancel"));
     auto *cancel = new QPushButton(tr("Cancel"), footer);
-    cancel->setMinimumWidth(84);
-    draw_->setParent(footer);
-    draw_->setMinimumWidth(84);
     draw_->setDefault(true);
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(draw_, &QPushButton::clicked, this, &DiagramRequestPopup::draw);
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(cancel);
-    footerLayout->addWidget(draw_);
+    footer->addButton(cancel);
+    footer->addButton(draw_);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);

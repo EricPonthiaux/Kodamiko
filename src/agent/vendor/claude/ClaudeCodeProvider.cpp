@@ -98,8 +98,13 @@ std::optional<ProcessSpec> ClaudeCodeProvider::sessionProcess(const QString &wor
     claudeOptions.name = options.name;
     claudeOptions.sessionId = options.sessionId;
     claudeOptions.pluginFolders = options.pluginFolders;
-    if (options.start == SessionStart::Continue)
-        claudeOptions.extraArguments << QStringLiteral("--continue");
+    switch (options.start) {
+    case SessionStart::New:
+        break;
+    case SessionStart::Resume:
+        claudeOptions.extraArguments << QStringLiteral("--resume") << options.conversationId;
+        break;
+    }
     if (!options.instructions.isEmpty())
         claudeOptions.extraArguments << QStringLiteral("--append-system-prompt") << options.instructions;
     return ClaudeLauncher::claudeProcess(workingDirectory, hookServerName, error, claudeOptions);

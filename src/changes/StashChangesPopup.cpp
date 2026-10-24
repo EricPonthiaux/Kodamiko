@@ -30,7 +30,7 @@ StashChangesPopup::StashChangesPopup(const QString &location,
     stashButton->setDefault(true);
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(stashButton, &QPushButton::clicked, this, &StashChangesPopup::accept);
-    setIconName(QStringLiteral("branch"));
+    setIconName(QStringLiteral("files")); // as the Stashes popup
     setFooterHint(tr("Enter to stash · Esc to cancel"));
     addFooterButton(cancel);
     addFooterButton(stashButton);

@@ -5,6 +5,8 @@
 #include "TerminalPreferencesPage.h"
 #include "ui/AppFonts.h"
 #include "ui/Paragraph.h"
+#include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
@@ -165,7 +167,7 @@ QStringList fillFontFamilies(QComboBox *combo)
 // The keymap, besides the shared rules (popupStyleSheet).
 constexpr const char *preferencesRules = R"(
 QLabel#keymapNote { color: @accent; }
-QTreeWidget#keymapList { background: transparent; border: none; border-top: 1px solid @line; }
+QTreeWidget#keymapList { border-top: 1px solid @line; }
 QTreeWidget#keymapList::item { padding: 0 6px; }
 QKeySequenceEdit QLineEdit { padding: 4px 8px; }
 )";
@@ -189,29 +191,20 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
     addPage(QStringLiteral("keyboard"), tr("Keymap"), createKeymapPage());
     pageList_->setCurrentRow(0);
 
-    auto *footer = new QFrame(this);
-    footer->setObjectName(QStringLiteral("popupFooter"));
-    auto *hint = new QLabel(tr("Changes apply with OK or Apply · Esc to close"), footer);
-    hint->setObjectName(QStringLiteral("footerHint"));
+    auto *footer = new PopupFooter(this);
+    footer->setHint(tr("Changes apply with OK or Apply · Esc to close"));
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     auto *apply = new QPushButton(tr("Apply"), footer);
     auto *ok = new QPushButton(tr("OK"), footer);
     ok->setDefault(true);
     for (QPushButton *button : {cancel, apply, ok})
-        button->setMinimumWidth(84);
+        footer->addButton(button);
     connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
     connect(apply, &QPushButton::clicked, this, &PreferencesPopup::applied);
     connect(ok, &QPushButton::clicked, this, [this] {
         emit applied();
         dismiss();
     });
-    auto *footerLayout = new QHBoxLayout(footer);
-    footerLayout->setContentsMargins(16, 10, 16, 10);
-    footerLayout->setSpacing(8);
-    footerLayout->addWidget(hint, 1);
-    footerLayout->addWidget(cancel);
-    footerLayout->addWidget(apply);
-    footerLayout->addWidget(ok);
 
     // The header across, then the categories at the left of their page,
     // then the footer across.
@@ -238,7 +231,7 @@ QWidget *PreferencesPopup::createSidebar()
 {
     auto *sidebar = new QFrame(this);
     sidebar->setObjectName(QStringLiteral("popupSidebar"));
-    sidebar->setFixedWidth(190);
+    sidebar->setFixedWidth(PopupMetrics::sidebarWidth);
 
     pageList_ = new QListWidget(sidebar);
     pageList_->setObjectName(QStringLiteral("popupNav"));
@@ -248,7 +241,7 @@ QWidget *PreferencesPopup::createSidebar()
     connect(pageList_, &QListWidget::currentRowChanged, pages_, &QStackedWidget::setCurrentIndex);
 
     auto *layout = new QVBoxLayout(sidebar);
-    layout->setContentsMargins(8, 10, 8, 10);
+    layout->setContentsMargins(PopupMetrics::sidebarMargins);
     layout->addWidget(pageList_, 1);
     return sidebar;
 }
