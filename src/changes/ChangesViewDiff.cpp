@@ -2,6 +2,8 @@
 
 // ChangesView: the diff pane, where the lines or blocks shown are staged,
 // unstaged or discarded from the keyboard, the block buttons or the menu.
+// The part of a file at the cursor, staged or unstaged, says which: the
+// lines selected in the other parts are left out.
 
 #include "ChangesView.h"
 #include "DiffHeaderBar.h"
@@ -53,6 +55,20 @@ bool ChangesView::canApplyDiffLines() const
     return diffHeader_->whitespace() == Whitespace::Compare;
 }
 
+ChangesView::PartialPatch ChangesView::partialPatch(const QHash<int, PatchSelection> &selection,
+                                                    Section section,
+                                                    PatchDirection direction) const
+{
+    PartialPatch result;
+    for (auto it = selection.begin(); it != selection.end(); ++it) {
+        if (shownFiles_[it.key()].section != section)
+            continue;
+        result.patch += shownPatches_[it.key()].partial(it.value(), direction);
+        result.files.append(shownFiles_[it.key()]);
+    }
+    return result;
+}
+
 void ChangesView::applyDiffSelection(int line, bool discard)
 {
     if (!status_)
@@ -61,21 +77,20 @@ void ChangesView::applyDiffSelection(int line, bool discard)
         emit statusMessage(tr("Show the whitespace changes to stage, unstage or discard lines."));
         return;
     }
+    const std::optional<FileRef> fileAtLine = shownFileAt(line);
+    if (!fileAtLine)
+        return;
+    const Section section = fileAtLine->section;
+    if (discard && section == Section::Staged)
+        return;
     bool lines = false;
     const QHash<int, PatchSelection> selection = diffSelection(line, &lines);
-    if (selection.isEmpty())
-        return;
 
     // Stage: patch applied as is to the index. Unstage: applied in reverse
     // to the index. Discard: applied in reverse to the files.
     const PatchDirection direction =
-        shownSection_ == Section::Unstaged && !discard ? PatchDirection::Forward : PatchDirection::Reverse;
-    QByteArray patch;
-    QList<FileRef> touched;
-    for (auto it = selection.begin(); it != selection.end(); ++it) {
-        patch += shownPatches_[it.key()].partial(it.value(), direction);
-        touched.append({shownSection_, it.key()});
-    }
+        section == Section::Unstaged && !discard ? PatchDirection::Forward : PatchDirection::Reverse;
+    const auto [patch, touched] = partialPatch(selection, section, direction);
     if (patch.isEmpty())
         return;
 
@@ -88,7 +103,7 @@ void ChangesView::applyDiffSelection(int line, bool discard)
         });
         return;
     }
-    commands_->run(shownSection_ == Section::Unstaged ? tr("Staging") : tr("Unstaging"),
+    commands_->run(section == Section::Unstaged ? tr("Staging") : tr("Unstaging"),
                    [info = status_->info, patch, direction] {
                        GitOperations::applyToIndex(info, patch, direction);
                        return QString();
@@ -106,7 +121,7 @@ void ChangesView::addDiffShortcuts()
             applyDiffSelection(diffCursorLine(), false);
     });
     add(QKeySequence(Qt::Key_Delete), [this] {
-        if (shownSection_ == Section::Unstaged && !commands_->isBusy())
+        if (!commands_->isBusy())
             applyDiffSelection(diffCursorLine(), true);
     });
     add(QKeySequence(Qt::Key_F4), [this] { openFileAt(diffCursorLine()); });
@@ -122,10 +137,10 @@ int ChangesView::diffCursorLine() const
 
 void ChangesView::openFileAt(int line)
 {
-    const int file = diff_->locate(line).file;
-    if (!status_ || file < 0)
+    const std::optional<FileRef> file = shownFileAt(line);
+    if (!status_ || !file)
         return;
-    const FileChange &change = files(shownSection_).at(file).change;
+    const FileChange &change = changeOf(*file);
     if (change.kind != ChangeKind::Deleted)
         emit openFileRequested(change.path, diff_->newFileLine(line));
 }
@@ -152,14 +167,15 @@ void ChangesView::showDiffMenu(const QPoint &position)
         return action;
     };
     const bool canApply = hasSelection && !busy && canApplyDiffLines();
-    if (shownSection_ == Section::Unstaged) {
+    const std::optional<FileRef> fileAtLine = shownFileAt(line);
+    if (fileAtLine && fileAtLine->section == Section::Unstaged) {
         addAction(lines ? tr("Stage Selected Lines") : tr("Stage This Hunk"), QKeySequence(Qt::Key_Space),
                   [this, line] { applyDiffSelection(line, false); })
             ->setEnabled(canApply);
         addAction(lines ? tr("Discard Selected Lines…") : tr("Discard This Hunk…"), QKeySequence(Qt::Key_Delete),
                   [this, line] { applyDiffSelection(line, true); })
             ->setEnabled(canApply);
-    } else {
+    } else if (fileAtLine) {
         addAction(lines ? tr("Unstage Selected Lines") : tr("Unstage This Hunk"), QKeySequence(Qt::Key_Space),
                   [this, line] { applyDiffSelection(line, false); })
             ->setEnabled(canApply);

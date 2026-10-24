@@ -30,8 +30,9 @@ class QTreeWidgetItem;
 // "Diff" mode: pending changes, split as in "git status" between staged ones
 // (ready to commit) and the rest, in one list of files and one diff. A
 // file's box says whether its changes are staged (checked), partly staged,
-// or not; the diff shows its staged changes, then its unstaged ones, each
-// under its own title bar. Here you stage or unstage files, hunks or lines,
+// or not; the diff shows the selected files (a folder: the files under it),
+// each with its staged changes, then its unstaged ones, under their own
+// title bars. Here you stage or unstage files, hunks or lines,
 // discard changes and commit. Operations go through GitCommands. In the
 // list, Space stages the selected files, or unstages them when they are all
 // staged. In the diff, Space stages (or unstages) the selected lines or the
@@ -72,7 +73,7 @@ public:
     // The file column's splitter: the list, the commit area.
     QSplitter *fileSplitter() const { return fileSplitter_; }
 
-    // The file column (actions, lists, commit area); folded away, a thin bar
+    // The file column (actions, list, commit area); folded away, a thin bar
     // stands for it at the left edge. Visible at first.
     bool isFileListVisible() const;
     void setFileListVisible(bool visible);
@@ -142,20 +143,26 @@ private:
     static QString keyOf(const QTreeWidgetItem *item);
     QStringList selectedKeys() const;
     void restoreSelection(const QStringList &selected, const std::optional<QString> &current);
+    // Selects the first file when nothing is selected, so that the diff
+    // shows one.
+    void selectFirstFileIfNone();
     void showStatus(std::optional<RepositoryStatus> status, const QString &error);
     void selectNow(const QString &relativePath);
     void rebuildList();
     // Closes the folder rows under `parent` that the user had closed, recursively.
     void markFolders(QTreeWidgetItem *parent);
+    // Shows the diff of the selected files.
     void showDiff();
+    QString emptyDiffMessage() const;
     DiffPosition diffPosition() const;
     void restoreDiffPosition(const DiffPosition &position);
     // The diff's first file for `row` (a folder: for its first file); -1 if none.
-    int shownFileOf(const QTreeWidgetItem *row) const;
+    int shownFileOf(QTreeWidgetItem *row) const;
     // The part of a file the diff shows at displayed line `line`; nullopt
     // outside the files.
     std::optional<FileRef> shownFileAt(int line) const;
     void onCurrentItemChanged();
+    void onSelectionChanged();
     // A file's box was clicked: stages it, or unstages it when unchecked.
     void onItemChanged(QTreeWidgetItem *item);
     // Stages the selected files, or unstages them when they are all staged.
@@ -174,6 +181,17 @@ private:
     QHash<int, PatchSelection> diffSelection(int line, bool *lines) const;
     // The changed lines among the selected ones, per file; empty without a selection.
     QHash<int, PatchSelection> selectedChanges() const;
+
+    // The lines of `selection` in the diff's parts of `section`, as a patch
+    // to apply in `direction`, and the parts they are in.
+    struct PartialPatch {
+        QByteArray patch;
+        QList<FileRef> files;
+    };
+
+    PartialPatch partialPatch(const QHash<int, PatchSelection> &selection,
+                              Section section,
+                              PatchDirection direction) const;
     // Lines and blocks can be applied: their patch matches the files, which
     // a diff that ignores whitespace does not.
     bool canApplyDiffLines() const;
@@ -200,7 +218,7 @@ private:
     bool reading_ = false;
     bool refreshPending_ = false;
     std::optional<QString> pendingSelection_; // for selectFile()
-    QSet<QString> collapsedFolders_; // their keys, see keyOf()
+    QSet<QString> collapsedFolders_;          // their keys, see keyOf()
 
     QLabel *summary_;
     QWidget *operationArea_; // the bar and its margins, hidden together

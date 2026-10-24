@@ -17,7 +17,6 @@
 #include "ui/GripSplitter.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
-#include "ui/ViewHeader.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -29,6 +28,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <iterator>
 #include <utility>
 
 namespace {
@@ -86,7 +86,8 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     };
     toolButton(stageButton_, tr("Stage"), tr("Stage the selected files"));
     toolButton(unstageButton_, tr("Unstage"), tr("Unstage the selected files"));
-    toolButton(discardButton_, tr("Discard…"), tr("Discard changes to the selected files (a copy is kept)"));
+    toolButton(discardButton_, tr("Discard…"),
+               tr("Discard the unstaged changes to the selected files (a copy is kept)"));
     connect(stageButton_, &QToolButton::clicked, this, [this] { stageFiles(selectedFiles()); });
     connect(unstageButton_, &QToolButton::clicked, this, [this] { unstageFiles(selectedFiles()); });
     connect(discardButton_, &QToolButton::clicked, this, [this] { discardFiles(selectedFiles()); });
@@ -356,6 +357,7 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
     status_ = std::move(status);
     rebuildList();
     restoreSelection(selected, current);
+    selectFirstFileIfNone();
 
     showOperation();
     showDiff();
@@ -373,7 +375,10 @@ void ChangesView::selectFile(const QString &relativePath)
 
 void ChangesView::showDiff()
 {
-    shownFiles_ = filesInListOrder();
+    const QList<FileRef> selected = selectedFiles();
+    shownFiles_.clear();
+    std::ranges::copy_if(filesInListOrder(), std::back_inserter(shownFiles_),
+                         [&selected](const FileRef &ref) { return selected.contains(ref); });
     shownPatches_.clear();
     QList<DiffFile> shown;
     QSet<int> stagedFiles;
@@ -391,7 +396,16 @@ void ChangesView::showDiff()
     if (!shown.isEmpty())
         diff_->setFiles(shown);
     else
-        diff_->showMessage(status_ ? tr("No changes") : QString());
+        diff_->showMessage(emptyDiffMessage());
+}
+
+QString ChangesView::emptyDiffMessage() const
+{
+    if (!status_)
+        return {};
+    if (status_->staged.isEmpty() && status_->unstaged.isEmpty())
+        return tr("No changes");
+    return tr("Select a file to see its changes");
 }
 
 ChangesView::DiffPosition ChangesView::diffPosition() const
@@ -533,10 +547,9 @@ void ChangesView::discardFiles(const QList<FileRef> &refs)
     const qsizetype created = std::count_if(unstaged.begin(), unstaged.end(), [this](const FileRef &ref) {
         return changeOf(ref).kind == ChangeKind::Added;
     });
-    const QString question =
-        unstaged.size() == 1
-            ? tr("Discard changes to \"%1\"?").arg(changeOf(unstaged.first()).path)
-            : tr("Discard changes to %n file(s)?", nullptr, static_cast<int>(unstaged.size()));
+    const QString question = unstaged.size() == 1
+                                 ? tr("Discard changes to \"%1\"?").arg(changeOf(unstaged.first()).path)
+                                 : tr("Discard changes to %n file(s)?", nullptr, static_cast<int>(unstaged.size()));
     const QString details =
         created > 0 ? tr("%n untracked file(s) will be deleted.", nullptr, static_cast<int>(created)) : QString();
     if (!DiscardConfirmation::ask(this, question, details))

@@ -38,13 +38,42 @@ Qt::CheckState checkStateOf(const ListedFile &file)
     return file.staged < 0 ? Qt::Unchecked : Qt::PartiallyChecked;
 }
 
-// The change a row shows for a file changed both in the index and on disk:
-// where it comes from (added, renamed, conflicted) unless the disk deleted
-// it since.
-const FileChange &shownChange(const FileChange &staged, const FileChange &unstaged)
+// The change a file's row shows. Changed both in the index and on disk:
+// where the file comes from (added, renamed, conflicted), unless the disk
+// deleted it since.
+const FileChange &shownChange(const RepositoryStatus &status, const ListedFile &file)
 {
+    if (file.unstaged < 0)
+        return status.staged[file.staged].change;
+    const FileChange &unstaged = status.unstaged[file.unstaged].change;
+    if (file.staged < 0)
+        return unstaged;
+    const FileChange &staged = status.staged[file.staged].change;
     const bool tellsTheOrigin = staged.kind != ChangeKind::Modified && staged.kind != ChangeKind::Deleted;
     return tellsTheOrigin && unstaged.kind != ChangeKind::Deleted ? staged : unstaged;
+}
+
+// The lines added and removed by both the file's staged and unstaged changes.
+void setStats(QTreeWidgetItem *row, const RepositoryStatus &status, const ListedFile &file)
+{
+    int added = 0;
+    int removed = 0;
+    for (const auto &[diffs, index] :
+         {std::pair{&status.staged, file.staged}, std::pair{&status.unstaged, file.unstaged}}) {
+        if (index < 0)
+            continue;
+        const FilePatch patch = FilePatch::parse(diffs->at(index).patch);
+        added += patch.addedLines();
+        removed += patch.removedLines();
+    }
+    FileChangeDelegate::setStats(row, added, removed);
+}
+
+// The index a file's row holds in `role`; -1 on a folder, or for no changes.
+int indexIn(const QTreeWidgetItem *row, int role)
+{
+    const QVariant index = row->data(0, role);
+    return index.isValid() ? index.toInt() : -1;
 }
 
 } // namespace
@@ -71,7 +100,7 @@ void ChangesView::setUpList()
 
     connect(tree, &QTreeWidget::currentItemChanged, this, &ChangesView::onCurrentItemChanged);
     connect(tree, &QTreeWidget::itemClicked, this, &ChangesView::onCurrentItemChanged);
-    connect(tree, &QTreeWidget::itemSelectionChanged, this, &ChangesView::updateActions);
+    connect(tree, &QTreeWidget::itemSelectionChanged, this, &ChangesView::onSelectionChanged);
     connect(tree, &QTreeWidget::itemChanged, this, &ChangesView::onItemChanged);
     connect(tree, &QTreeWidget::customContextMenuRequested, this, &ChangesView::showListMenu);
     // A folder closed stays closed when the list is rebuilt.
@@ -92,10 +121,9 @@ QTreeWidgetItem *ChangesView::rootItem() const
 QList<ChangesView::FileRef> ChangesView::refsOf(const QTreeWidgetItem *row)
 {
     QList<FileRef> refs;
-    if (const int staged = row->data(0, stagedIndexRole).toInt(); row->data(0, stagedIndexRole).isValid() && staged >= 0)
+    if (const int staged = indexIn(row, stagedIndexRole); staged >= 0)
         refs.append({Section::Staged, staged});
-    if (const int unstaged = row->data(0, unstagedIndexRole).toInt();
-        row->data(0, unstagedIndexRole).isValid() && unstaged >= 0)
+    if (const int unstaged = indexIn(row, unstagedIndexRole); unstaged >= 0)
         refs.append({Section::Unstaged, unstaged});
     return refs;
 }
@@ -127,6 +155,17 @@ void ChangesView::restoreSelection(const QStringList &selected, const std::optio
         if (current && key == *current)
             fileList_->setCurrentItem(*it, 0, QItemSelectionModel::NoUpdate);
     }
+}
+
+void ChangesView::selectFirstFileIfNone()
+{
+    if (!fileList_->selectedItems().isEmpty())
+        return;
+    const QList<QTreeWidgetItem *> rows = ChangeTree::filesUnder(rootItem());
+    if (rows.isEmpty())
+        return;
+    const QSignalBlocker blocker(fileList_);
+    fileList_->setCurrentItem(rows.first());
 }
 
 void ChangesView::selectNow(const QString &relativePath)
@@ -168,22 +207,8 @@ void ChangesView::rebuildList()
     const QList<QTreeWidgetItem *> rows = ChangeTree::addFiles(root, paths);
     for (int i = 0; i < listed.size(); ++i) {
         const ListedFile &file = listed[i];
-        int added = 0;
-        int removed = 0;
-        for (const FileRef &ref : {FileRef{Section::Staged, file.staged}, FileRef{Section::Unstaged, file.unstaged}}) {
-            if (ref.index < 0)
-                continue;
-            const FilePatch patch = FilePatch::parse(files(ref.section).at(ref.index).patch);
-            added += patch.addedLines();
-            removed += patch.removedLines();
-        }
-        const bool isInBoth = file.staged >= 0 && file.unstaged >= 0;
-        const FileChange &change = isInBoth ? shownChange(status_->staged[file.staged].change,
-                                                          status_->unstaged[file.unstaged].change)
-                                            : changeOf(file.staged >= 0 ? FileRef{Section::Staged, file.staged}
-                                                                        : FileRef{Section::Unstaged, file.unstaged});
-        FileChangeDelegate::setChange(rows[i], change);
-        FileChangeDelegate::setStats(rows[i], added, removed);
+        FileChangeDelegate::setChange(rows[i], shownChange(*status_, file));
+        setStats(rows[i], *status_, file);
         rows[i]->setData(0, stagedIndexRole, file.staged);
         rows[i]->setData(0, unstagedIndexRole, file.unstaged);
         rows[i]->setCheckState(0, checkStateOf(file));
@@ -203,9 +228,9 @@ void ChangesView::markFolders(QTreeWidgetItem *parent)
     }
 }
 
-int ChangesView::shownFileOf(const QTreeWidgetItem *row) const
+int ChangesView::shownFileOf(QTreeWidgetItem *row) const
 {
-    const QList<QTreeWidgetItem *> rows = ChangeTree::filesUnder(const_cast<QTreeWidgetItem *>(row));
+    const QList<QTreeWidgetItem *> rows = ChangeTree::filesUnder(row);
     if (rows.isEmpty())
         return -1;
     const QList<FileRef> refs = refsOf(rows.first());
@@ -216,26 +241,27 @@ int ChangesView::shownFileOf(const QTreeWidgetItem *row) const
 
 void ChangesView::onCurrentItemChanged()
 {
-    const QTreeWidgetItem *item = fileList_->currentItem();
+    QTreeWidgetItem *item = fileList_->currentItem();
     if (!item || !status_)
         return;
     const int file = shownFileOf(item);
     diff_->setFirstVisibleLine(file >= 0 ? diff_->fileStart(file) : 0);
 }
 
+void ChangesView::onSelectionChanged()
+{
+    showDiff();
+    onCurrentItemChanged();
+    updateActions();
+}
+
 void ChangesView::onItemChanged(QTreeWidgetItem *item)
 {
+    // A command still running, this one waits for it (GitCommands): staging
+    // or unstaging whole files does not depend on what it changes.
     const QList<FileRef> refs = refsOf(item);
     if (refs.isEmpty() || !status_)
         return;
-    if (commands_->isBusy()) {
-        // The box comes back to what the index holds.
-        const QSignalBlocker blocker(fileList_);
-        const bool hasStaged = refs.first().section == Section::Staged;
-        const bool hasUnstaged = refs.last().section == Section::Unstaged;
-        item->setCheckState(0, checkStateOf({{}, hasStaged ? 0 : -1, hasUnstaged ? 0 : -1}));
-        return;
-    }
     if (item->checkState(0) == Qt::Checked)
         stageFiles(refs);
     else
@@ -247,8 +273,6 @@ void ChangesView::toggleSelectedFiles()
     const QList<FileRef> selection = selectedFiles();
     const bool hasUnstaged =
         std::ranges::any_of(selection, [](const FileRef &ref) { return ref.section == Section::Unstaged; });
-    if (commands_->isBusy())
-        return;
     if (hasUnstaged)
         stageFiles(selection);
     else

@@ -267,7 +267,9 @@ void FileChangeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     painter->restore();
 }
 
-bool FileChangeDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option,
+bool FileChangeDelegate::editorEvent(QEvent *event,
+                                     QAbstractItemModel *model,
+                                     const QStyleOptionViewItem &option,
                                      const QModelIndex &index)
 {
     const QVariant state = index.data(Qt::CheckStateRole);
@@ -280,8 +282,10 @@ bool FileChangeDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, c
     const bool isOnTheBox = checkBoxRect(option).contains(mouse->position().toPoint());
     if (!isOnTheBox || mouse->button() != Qt::LeftButton)
         return QStyledItemDelegate::editorEvent(event, model, option, index);
-    // The whole click is the box's: the row's selection stays as it is.
-    if (event->type() == QEvent::MouseButtonRelease) {
+    // The whole click is the box's: the row's selection stays as it is. On
+    // the press, which a quick second click on another box turns into a
+    // double-click.
+    if (event->type() != QEvent::MouseButtonRelease) {
         const bool isChecked = state.value<Qt::CheckState>() == Qt::Checked;
         model->setData(index, isChecked ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
     }

@@ -53,5 +53,5 @@ private:
     QIcon unstageIcon_;
     QSet<int> stagedFiles_;
     bool staged_ = false; // the block they act on
-    int hunkLine_ = -1; // the separator of the block they act on
+    int hunkLine_ = -1;   // the separator of the block they act on
 };
