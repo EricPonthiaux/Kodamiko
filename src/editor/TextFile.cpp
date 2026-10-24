@@ -2,6 +2,8 @@
 
 #include "TextFile.h"
 
+#include "system/Host.h"
+
 #include <QCoreApplication>
 #include <QFile>
 #include <QSaveFile>
@@ -14,6 +16,19 @@ namespace {
 
 const QByteArray utf8Bom("\xEF\xBB\xBF");
 
+// The line ending of a file without lines yet.
+LineEnding nativeLineEnding()
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::Windows:
+        return LineEnding::CrLf;
+    case OperatingSystem::MacOS:
+    case OperatingSystem::Linux:
+        return LineEnding::Lf;
+    }
+    return LineEnding::Lf;
+}
+
 LineEnding detectLineEnding(const QByteArray &bytes)
 {
     const qsizetype lf = bytes.indexOf('\n');
@@ -23,11 +38,7 @@ LineEnding detectLineEnding(const QByteArray &bytes)
         return LineEnding::Lf;
     if (bytes.contains('\r'))
         return LineEnding::Cr;
-#ifdef Q_OS_WIN
-    return LineEnding::CrLf;
-#else
-    return LineEnding::Lf;
-#endif
+    return nativeLineEnding();
 }
 
 // Common editor heuristic: a null byte near the start = binary file.

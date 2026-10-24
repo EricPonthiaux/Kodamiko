@@ -2,6 +2,7 @@
 
 #include "EntryPopups.h"
 
+#include "system/FilePaths.h"
 #include "ui/Paragraph.h"
 #include "ui/PopupFooter.h"
 #include "ui/PopupMetrics.h"
@@ -36,10 +37,6 @@ QString translate(const char *text)
 
 bool isValidCharacter(QChar character)
 {
-#ifdef Q_OS_WIN
-    if (QStringLiteral("<>:\"|?*\\").contains(character))
-        return false;
-#endif
     return character.category() != QChar::Other_Control && character != QLatin1Char('/');
 }
 
@@ -47,13 +44,7 @@ bool isValidComponent(const QString &component)
 {
     if (component.isEmpty() || component == QLatin1String(".") || component == QLatin1String(".."))
         return false;
-    if (!std::ranges::all_of(component, isValidCharacter))
-        return false;
-#ifdef Q_OS_WIN
-    if (component.endsWith(QLatin1Char('.')) || component.endsWith(QLatin1Char(' ')))
-        return false;
-#endif
-    return true;
+    return std::ranges::all_of(component, isValidCharacter) && FilePaths::systemAcceptsName(component);
 }
 
 QString invalidName(const QString &name)

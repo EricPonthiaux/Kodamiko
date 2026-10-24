@@ -6,6 +6,8 @@
 #include "projects/ProjectStore.h"
 #include "projects/ProjectWindowServer.h"
 #include "recipes/RecipeLibrary.h"
+#include "support/SystemFixtures.h"
+#include "system/Executables.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Installer.h"
 #include "toolchains/QtRepository.h"
@@ -49,11 +51,7 @@ void write(const QString &path, const QByteArray &content)
 }
 
 // The executables ToolCatalog looks for in Duet's installs of a JDK and a Node.
-#ifdef Q_OS_WIN
-const QString javaExecutable = QStringLiteral("bin/java.exe");
-#else
-const QString javaExecutable = QStringLiteral("bin/java");
-#endif
+const QString javaExecutable = Executables::fileName(QStringLiteral("bin/java"));
 const QString nodeExecutable = QStringLiteral("bin/node");
 
 // A tool installed by Duet, as Installer leaves it.
@@ -234,12 +232,9 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("pyproject.toml"), "requires-python = \">=3.9\"");
         write(dir.filePath(".venv/pyvenv.cfg"), "home = /usr/bin\nversion = 3.12.3\n");
-#ifdef Q_OS_WIN
-        write(dir.filePath(".venv/Scripts/python.exe"), "");
-#else
-        write(dir.filePath(".venv/bin/python"), "");
-        QFile::setPermissions(dir.filePath(".venv/bin/python"), QFile::ReadOwner | QFile::ExeOwner);
-#endif
+        const QString python = Executables::virtualEnvironmentPython(dir.filePath(".venv"));
+        write(python, "");
+        QFile::setPermissions(python, QFile::ReadOwner | QFile::ExeOwner);
         const QList<DetectedLanguage> found = ProjectDetector::detect(dir.path());
         QCOMPARE(found.size(), 1);
         QCOMPARE(found[0].language, QString("python"));
@@ -512,11 +507,7 @@ private slots:
     {
         const QTemporaryDir dir;
         const Toolchains toolchains(dir.path(), true);
-#ifdef Q_OS_WIN
-        const QString program = "cmd";
-#else
-        const QString program = "sh";
-#endif
+        const QString program = SystemFixtures::programOfEveryMachine();
         const QList<ToolRequirement> present{{.tool = program, .version = {}, .kit = {}, .modules = {}}};
         const QList<ToolRequirement> absent{
             {.tool = "no-such-program-of-duet", .version = {}, .kit = {}, .modules = {}}};
@@ -559,11 +550,7 @@ private slots:
     {
         const QTemporaryDir dir;
         const Toolchains toolchains(dir.path(), true);
-#ifdef Q_OS_WIN
-        const QString program = "cmd";
-#else
-        const QString program = "sh";
-#endif
+        const QString program = SystemFixtures::programOfEveryMachine();
         const QList<ToolRequirement> required{{.tool = "shell",
                                                .version = "1",
                                                .kit = {},
@@ -694,21 +681,14 @@ private slots:
         QCOMPARE(toolchains.runtimeAtLeast("jdk", 11)->version, QString("17"));
     }
 
-#ifdef _MSC_VER
-// C4702: on Windows the QSKIP returns, so cl calls the rest of the test unreachable.
-#pragma warning(push)
-#pragma warning(disable : 4702)
-#endif
     void installsAnArchive()
     {
-#ifdef Q_OS_WIN
-        QSKIP("Builds its archive with tar and sh");
-#endif
         if (QStandardPaths::findExecutable("tar").isEmpty())
             QSKIP("No tar");
         QTemporaryDir dir;
         // clangd_23.1.0/bin/clangd, as the release's archive holds it.
-        write(dir.filePath("source/clangd_23.1.0/bin/clangd"), "#!/bin/sh\necho clangd\n");
+        const QString clangdFile = Executables::fileName("bin/clangd");
+        write(dir.filePath("source/clangd_23.1.0/" + clangdFile), "#!/bin/sh\necho clangd\n");
         QProcess tar;
         tar.start("tar", {"-czf", dir.filePath("clangd.tar.gz"), "-C", dir.filePath("source"), "clangd_23.1.0"});
         QVERIFY(tar.waitForFinished());
@@ -751,14 +731,11 @@ private slots:
         QVERIFY(toolchains.isInstalled("clangd", "23.1.0"));
         // The single top folder is removed.
         const QString clangd = toolchains.installedExecutable("clangd", "23.1.0");
-        QCOMPARE(clangd, toolchains.installFolder("clangd", "23.1.0") + "/bin/clangd");
+        QCOMPARE(clangd, toolchains.installFolder("clangd", "23.1.0") + '/' + clangdFile);
         QVERIFY(QFileInfo(clangd).isExecutable());
         QCOMPARE(toolchains.serverExecutable("clangd", "23.1.0"), clangd);
         QVERIFY(!QDir(dir.filePath("toolchains/.staging")).exists());
     }
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
 
     void editsASetup()
     {

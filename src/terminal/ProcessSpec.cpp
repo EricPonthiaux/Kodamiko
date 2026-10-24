@@ -2,8 +2,9 @@
 
 #include "ProcessSpec.h"
 
+#include "system/Shell.h"
+
 #include <QDir>
-#include <QStandardPaths>
 
 namespace {
 
@@ -49,14 +50,8 @@ ProcessSpec defaultShell(const QString &workingDirectory)
     ProcessSpec spec;
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
-#ifdef Q_OS_WIN
-    spec.program = QStandardPaths::findExecutable(QStringLiteral("pwsh"));
-    if (spec.program.isEmpty())
-        spec.program = QStandardPaths::findExecutable(QStringLiteral("powershell"));
-    spec.arguments = {QStringLiteral("-NoLogo")};
-#else
-    spec.program = qEnvironmentVariable("SHELL", QStringLiteral("/bin/sh"));
-    spec.arguments = {QStringLiteral("-l")};
-#endif
+    const ShellCommand shell = Shell::userShell();
+    spec.program = shell.program;
+    spec.arguments = shell.arguments;
     return spec;
 }

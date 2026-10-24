@@ -12,16 +12,12 @@
 // then fails with an authentication error instead of waiting.
 
 #include "log/LogFiles.h"
+#include "system/StandardStreams.h"
 
 #include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalSocket>
-
-#ifdef Q_OS_WIN
-#include <fcntl.h>
-#include <io.h>
-#endif
 
 #include <cstdio>
 
@@ -55,10 +51,8 @@ int main(int argc, char *argv[])
     if (!reply.contains(QLatin1String("answer")))
         return 1;
     const QByteArray answer = reply.value(QLatin1String("answer")).toString().toUtf8() + '\n';
-#ifdef Q_OS_WIN
-    // The answer as it is: a text-mode stdout would end it with "\r\n".
-    _setmode(_fileno(stdout), _O_BINARY);
-#endif
+    // The answer as it is, without a "\r\n" on Windows.
+    StandardStreams::useBinaryMode();
     std::fwrite(answer.constData(), 1, static_cast<size_t>(answer.size()), stdout);
     return 0;
 }

@@ -11,6 +11,7 @@
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
 #include "git/Worktrees.h"
+#include "support/SystemFixtures.h"
 
 #include <QFileInfo>
 #include <QSignalSpy>
@@ -463,35 +464,6 @@ private slots:
         QCOMPARE(QString::fromUtf8(git(project, {"log", "-1", "--format=%an <%ae>"})).trimmed(),
                  QString("Ada <ada@example.com>"));
     }
-
-#ifdef _MSC_VER
-// C4702: on Windows the QSKIP returns, so cl calls the rest of the test unreachable.
-#pragma warning(push)
-#pragma warning(disable : 4702)
-#endif
-    void commitRunsTheRepositoryHooks()
-    {
-#ifdef Q_OS_WIN
-        QSKIP("hook shell");
-#endif
-        const QTemporaryDir project;
-        initRepository(project, {{"a.txt", "a\n"}});
-        write(project, ".git/hooks/pre-commit", "#!/bin/sh\necho 'rejected by the hook' >&2\nexit 1\n");
-        QFile::setPermissions(project.filePath(".git/hooks/pre-commit"),
-                              QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
-        write(project, "a.txt", "b\n");
-        const RepositoryInfo info = *RepositoryInfo::read(project.path());
-        GitOperations::stage(info, {"a.txt"});
-        try {
-            GitOperations::commit(info, "message", false);
-            QFAIL("the hook should have rejected the commit");
-        } catch (const GitError &error) {
-            QVERIFY(QString::fromStdString(error.what()).contains("rejected by the hook"));
-        }
-    }
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
 
     void rollbackRestoresTheLastCommitStagedChangesIncluded()
     {
@@ -1106,11 +1078,7 @@ private slots:
         GitCommands commands;
         AgentMergeQueue queue(&commands);
         queue.setFolder(project.path());
-#ifdef Q_OS_WIN
-        queue.setCheckCommand("echo tests broken& exit 3"); // cmd.exe
-#else
-        queue.setCheckCommand("echo tests broken; exit 3");
-#endif
+        queue.setCheckCommand(SystemFixtures::printingThenExiting("tests broken", 3));
         QSignalSpy sentBack(&queue, &AgentMergeQueue::sentBack);
 
         queue.enqueue(worktree);

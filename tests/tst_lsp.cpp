@@ -5,6 +5,7 @@
 #include "lsp/LspCompletionProvider.h"
 #include "lsp/LspProtocol.h"
 #include "lsp/ServerTasksLabel.h"
+#include "system/Executables.h"
 #include "toolchains/JavaRuntimes.h"
 #include "toolchains/Toolchains.h"
 
@@ -23,11 +24,7 @@ ProjectConfig projectRunningTheFakeServerAsClangd(const QString &path, const Too
 {
     const QString folder = toolchains.installFolder("clangd", "23.1.0");
     QDir().mkpath(folder + "/bin");
-#ifdef Q_OS_WIN
-    const QString clangd = folder + "/bin/clangd.exe";
-#else
-    const QString clangd = folder + "/bin/clangd";
-#endif
+    const QString clangd = folder + '/' + Executables::fileName("bin/clangd");
     QFile::copy(FAKE_LSP_SERVER_PATH, clangd);
     QFile marker(folder + "/.complete");
     if (marker.open(QIODevice::WriteOnly))

@@ -5,6 +5,33 @@ target_link_libraries(duet_log PUBLIC Qt6::Core)
 target_compile_definitions(duet_log PRIVATE DUET_VERSION="${PROJECT_VERSION}")
 duet_enable_warnings(duet_log)
 
+# The system's ways (shells, executables, file names...), shared by the
+# editor and its helper programs: an interface per concept, and one source
+# per system implementing it.
+add_library(duet_system STATIC system/Executables.cpp)
+if(WIN32)
+    target_sources(duet_system PRIVATE
+        system/ExecutablesWindows.cpp
+        system/FilePathsWindows.cpp
+        system/HostWindows.cpp
+        system/ShellWindows.cpp
+        system/StandardStreamsWindows.cpp)
+else()
+    target_sources(duet_system PRIVATE
+        system/ExecutablesUnix.cpp
+        system/FilePathsUnix.cpp
+        system/ShellUnix.cpp
+        system/StandardStreamsUnix.cpp)
+    if(APPLE)
+        target_sources(duet_system PRIVATE system/HostMacOS.cpp)
+    else()
+        target_sources(duet_system PRIVATE system/HostLinux.cpp)
+    endif()
+endif()
+target_include_directories(duet_system PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(duet_system PUBLIC Qt6::Core)
+duet_enable_warnings(duet_system)
+
 # Library containing the whole editor except main(): the executable and the
 # tests link against it.
 add_library(duet_core STATIC
@@ -285,15 +312,34 @@ add_library(duet_core STATIC
     workspace/TreeDecorations.cpp
 )
 
-# The PTY depends on the system: ConPTY on Windows, forkpty elsewhere.
+# The features that work differently on each system: one source per
+# system. The PTY is ConPTY on Windows, forkpty elsewhere.
 if(WIN32)
-    target_sources(duet_core PRIVATE terminal/ConPty.cpp)
+    target_sources(duet_core PRIVATE
+        git/CredentialCacheWindows.cpp
+        recipes/VisualStudio.cpp
+        setup/SystemSetupWindows.cpp
+        terminal/ConPty.cpp
+        toolchains/SystemJdksWindows.cpp)
     # Public: ConPty.h includes <windows.h>, and so does every source that
     # includes it. WIN32_LEAN_AND_MEAN leaves out rpcndr.h, whose `small`
     # macro breaks a field of vterm.h.
     target_compile_definitions(duet_core PUBLIC _WIN32_WINNT=0x0A00 NOMINMAX WIN32_LEAN_AND_MEAN)
 else()
-    target_sources(duet_core PRIVATE terminal/UnixPty.cpp)
+    target_sources(duet_core PRIVATE
+        git/CredentialCacheUnix.cpp
+        terminal/UnixPty.cpp)
+    if(APPLE)
+        target_sources(duet_core PRIVATE
+            setup/SystemSetupMacOS.cpp
+            terminal/PtyForegroundMacOS.cpp
+            toolchains/SystemJdksMacOS.cpp)
+    else()
+        target_sources(duet_core PRIVATE
+            setup/SystemSetupLinux.cpp
+            terminal/PtyForegroundLinux.cpp
+            toolchains/SystemJdksLinux.cpp)
+    endif()
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_link_libraries(duet_core PRIVATE util) # forkpty() before glibc 2.34
     endif()
@@ -301,7 +347,7 @@ endif()
 
 target_include_directories(duet_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(duet_core PUBLIC
-    Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets
+    duet_system Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets
     qscintilla tree_sitter_grammars vterm git2 cmark_gfm)
 duet_add_queries(duet_core)
 

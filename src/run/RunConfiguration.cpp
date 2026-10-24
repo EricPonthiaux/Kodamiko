@@ -2,6 +2,8 @@
 
 #include "RunConfiguration.h"
 
+#include "system/Shell.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -27,11 +29,7 @@ bool exists(const QString &folder, const QString &name)
 // A wrapper script of the project (mvnw) as the shell runs it.
 QString wrapper(const QString &name)
 {
-#ifdef Q_OS_WIN
-    return name;
-#else
-    return QStringLiteral("./") + name;
-#endif
+    return Shell::programInWorkingFolder(name);
 }
 
 RunConfiguration make(const QString &name, RunConfiguration::Kind kind, const QString &command)

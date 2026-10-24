@@ -2,7 +2,6 @@
 
 #include "git/Askpass.h"
 #include "git/Branches.h"
-#include "git/CredentialCache.h"
 #include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/Integration.h"
@@ -560,36 +559,6 @@ private slots:
 
         QVERIFY(AskpassServer::isConfirmation("Are you sure you want to continue connecting (yes/no/[fingerprint])? "));
         QVERIFY(!AskpassServer::isConfirmation("Enter passphrase for key '/home/u/.ssh/id_ed25519': "));
-    }
-
-    void credentialsStayCachedPerRepository()
-    {
-#ifdef Q_OS_WIN
-        QSKIP("git's credential cache needs Unix sockets: Duet leaves Windows' credential manager in charge");
-#else
-        // Without askpass, a credential that is not cached fails instead of
-        // prompting.
-        qunsetenv("GIT_ASKPASS");
-        qunsetenv("SSH_ASKPASS");
-        QTemporaryDir project;
-        QTemporaryDir other;
-        git(project, {"init", "-q", "-b", "main"});
-        git(other, {"init", "-q", "-b", "main"});
-        write(project, "sub/a.txt", "a\n");
-        const QString socket = CredentialCache::socketPath(project.path());
-        QVERIFY(!socket.startsWith(project.path()));
-        QCOMPARE(CredentialCache::socketPath(project.filePath("sub")), socket);
-        QVERIFY(CredentialCache::socketPath(other.path()) != socket);
-
-        Git::run(project.path(), {"credential", "approve"},
-                 "protocol=https\nhost=example.com\nusername=u\npassword=s3cret\n\n");
-        const QByteArray question = "protocol=https\nhost=example.com\n\n";
-        const QByteArray filled = Git::run(project.filePath("sub"), {"credential", "fill"}, question);
-        QVERIFY2(filled.contains("username=u\n") && filled.contains("password=s3cret\n"), filled.constData());
-        QVERIFY_THROWS_EXCEPTION(GitError, Git::run(other.path(), {"credential", "fill"}, question));
-
-        Git::run(project.path(), {"credential-cache", "exit", "--socket=" + socket});
-#endif
     }
 
 private:

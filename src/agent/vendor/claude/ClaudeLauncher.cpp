@@ -3,6 +3,8 @@
 #include "ClaudeLauncher.h"
 
 #include "ClaudeConfig.h"
+#include "system/Executables.h"
+#include "system/Shell.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -17,21 +19,9 @@
 namespace ClaudeLauncher {
 namespace {
 
-// A program shipped next to the editor, or an empty string.
-QString companionPath(const QString &program)
-{
-#ifdef Q_OS_WIN
-    const QString name = program + QStringLiteral(".exe");
-#else
-    const QString &name = program;
-#endif
-    const QString path = QDir(QCoreApplication::applicationDirPath()).filePath(name);
-    return QFileInfo::exists(path) ? path : QString();
-}
-
 QString hookExecutablePath()
 {
-    return companionPath(QStringLiteral("duet-hook"));
+    return Executables::besideTheApplication(QStringLiteral("duet-hook"));
 }
 
 QJsonArray commandHook(const QString &command, const QString &matcher = {}, int timeout = 60)
@@ -88,20 +78,12 @@ std::optional<QString> writeSettingsFile(const QByteArray &settings, const QStri
     return path;
 }
 
-// An npm installation provides claude.cmd, which CreateProcess can only
-// launch through cmd.exe.
-void launchThroughCmd(ProcessSpec &spec)
+// An npm installation provides claude.cmd, a batch file.
+void makeLaunchable(ProcessSpec &spec)
 {
-#ifdef Q_OS_WIN
-    if (spec.program.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive) ||
-        spec.program.endsWith(QLatin1String(".bat"), Qt::CaseInsensitive)) {
-        spec.arguments.prepend(QDir::toNativeSeparators(spec.program));
-        spec.arguments.prepend(QStringLiteral("/c"));
-        spec.program = QStringLiteral("cmd.exe");
-    }
-#else
-    Q_UNUSED(spec);
-#endif
+    const ShellCommand launchable = Shell::launchable(spec.program, spec.arguments);
+    spec.program = launchable.program;
+    spec.arguments = launchable.arguments;
 }
 
 } // namespace
@@ -144,7 +126,7 @@ QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowe
 
 QString mcpServerPath()
 {
-    return companionPath(QStringLiteral("duet-mcp"));
+    return Executables::besideTheApplication(QStringLiteral("duet-mcp"));
 }
 
 QByteArray mcpConfig(const QString &mcpServer)
@@ -279,7 +261,7 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
         spec.environment.insert(QStringLiteral("DUET_STATUSLINE_COMMAND"), userStatusLine);
     removeInheritedSessionVariables(spec.environment);
 
-    launchThroughCmd(spec);
+    makeLaunchable(spec);
     return spec;
 }
 
@@ -298,7 +280,7 @@ std::optional<ProcessSpec> printProcess(const QString &workingDirectory, const Q
     spec.workingDirectory = workingDirectory;
     spec.environment = QProcessEnvironment::systemEnvironment();
     removeInheritedSessionVariables(spec.environment);
-    launchThroughCmd(spec);
+    makeLaunchable(spec);
     return spec;
 }
 

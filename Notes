@@ -1,9 +1,8 @@
 Bugs UI : 
 
+
 1 - Sur les petits écrans les libellés de onglets sont tronqués ( trouver une autre stratégie ) 
-2 - Lorsqu'il y a beaucoup d'options de build , le menu est surchargée ( prévoir un menu glissant) 
-3 - Dans le panel des propriétés d'un schéma "other" et "default" sont trop prés des champs de couleurs .
-4 - Les tooltips sont souvent mal situés 
+2 - Lorsqu'il y a beaucoup d'options de build , le menu est surchargé ( prévoir un menu glissant) 
 5 - On ne peut pas zoomer sur une image ouverte dans l'éditeur .
 
 Dependances : 

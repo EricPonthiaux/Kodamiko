@@ -28,15 +28,13 @@ private slots:
         QVERIFY(Prerequisites::linuxInstallCommand("nixos", "", "git").isEmpty());
     }
 
-    void installRunsInAShell()
+    void installRunsInTheWorkingDirectory()
     {
         Prerequisite claude;
-        claude.installCommand = "curl -fsSL https://claude.ai/install.sh | bash";
+        claude.installCommand = "claude install";
+
         const ProcessSpec spec = Prerequisites::installProcess(claude, "/tmp");
-#ifndef Q_OS_WIN
-        QCOMPARE(spec.program, QString("/bin/sh"));
-        QCOMPARE(spec.arguments, (QStringList{"-c", claude.installCommand}));
-#endif
+
         QCOMPARE(spec.workingDirectory, QString("/tmp"));
     }
 

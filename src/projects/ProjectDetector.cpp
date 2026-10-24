@@ -3,6 +3,7 @@
 #include "ProjectDetector.h"
 
 #include "ProjectConfig.h"
+#include "system/Executables.h"
 
 #include <QDir>
 #include <QFile>
@@ -97,11 +98,7 @@ void detectVirtualEnvironment(const QString &folder, DetectedLanguage &python)
         const QDir environment(QDir(folder).filePath(name));
         if (!environment.exists(QStringLiteral("pyvenv.cfg")))
             continue;
-#ifdef Q_OS_WIN
-        const QString executable = environment.filePath(QStringLiteral("Scripts/python.exe"));
-#else
-        const QString executable = environment.filePath(QStringLiteral("bin/python"));
-#endif
+        const QString executable = Executables::virtualEnvironmentPython(environment.path());
         if (!QFileInfo::exists(executable))
             continue;
         python.runtimePath = executable;

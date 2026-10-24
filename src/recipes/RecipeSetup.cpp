@@ -2,7 +2,7 @@
 
 #include "RecipeSetup.h"
 
-#include "DeveloperEnvironment.h"
+#include "VisualStudio.h"
 #include "toolchains/QtRepository.h"
 #include "toolchains/Toolchains.h"
 
@@ -37,6 +37,18 @@ void addRequirement(EnvironmentAdditions &additions, const RecipeRequirement &re
         additions.variables.insert(it.key(), QString(it.value()).replace(placeholder, QDir::toNativeSeparators(home)));
 }
 
+// Visual Studio exists on Windows only: elsewhere, the recipe asking for it
+// gets a problem.
+std::optional<QMap<QString, QString>> visualStudioVariables(QString *error)
+{
+#ifdef Q_OS_WIN
+    return VisualStudio::environment(error);
+#else
+    *error = QObject::tr("Visual Studio's environment exists on Windows only");
+    return std::nullopt;
+#endif
+}
+
 } // namespace
 
 namespace RecipeSetup {
@@ -46,7 +58,7 @@ EnvironmentAdditions environmentAdditions(const RecipeEnvironment &environment, 
     EnvironmentAdditions additions;
     if (environment.visualStudio) {
         QString error;
-        if (const std::optional<QMap<QString, QString>> variables = DeveloperEnvironment::visualStudio(&error))
+        if (const std::optional<QMap<QString, QString>> variables = visualStudioVariables(&error))
             additions.variables = *variables;
         else
             problems->append(error);

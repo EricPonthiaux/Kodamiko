@@ -5,6 +5,7 @@
 
 #include "DuetTools.h"
 #include "McpRegistry.h"
+#include "system/Shell.h"
 #include "terminal/ProcessSpec.h"
 #include "terminal/TerminalWidget.h"
 
@@ -36,11 +37,9 @@ using Answer = std::function<void(bool finished, int exitCode)>;
 ProcessSpec commandSpec(const QString &folder, const QString &command)
 {
     ProcessSpec spec = defaultShell(folder);
-#ifdef Q_OS_WIN
-    spec.arguments = {QStringLiteral("-NoLogo"), QStringLiteral("-Command"), command};
-#else
-    spec.arguments = {QStringLiteral("-c"), command};
-#endif
+    const ShellCommand shell = Shell::userShellRunning(command);
+    spec.program = shell.program;
+    spec.arguments = shell.arguments;
     return spec;
 }
 

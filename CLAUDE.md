@@ -212,6 +212,17 @@ One strategy per layer:
 - Implementation details in an anonymous namespace in the `.cpp`.
 - Declare variables **as close as possible to their first use**.
 - One-way dependencies between packages; no cycles.
+- **What depends on the system**: an interface (a header) and one source
+  per system, chosen by CMake: `Shell.h`, `ShellWindows.cpp`,
+  `ShellUnix.cpp` (`Unix` for macOS and Linux together, `MacOS` and
+  `Linux` when they differ). The ways every package shares live in
+  `src/system`; a feature's own in its package
+  (`git/CredentialCacheUnix.cpp`). A constant that only names the system
+  is a `switch` on `Host::operatingSystem()`. A feature that exists on one
+  system only (Visual Studio) has no stand-in elsewhere: its source is
+  compiled there alone, and its caller has the `#ifdef`. `#ifdef Q_OS_…`
+  stays for that, UI conventions (macOS's keys and title bar) and system
+  headers.
 
 ---
 
@@ -258,6 +269,12 @@ Configured in `.clang-format`, `.clang-tidy` and `cmake/CodeQuality.cmake`:
   (`highlightsEveryOccurrenceOfTheNameAtTheCursor`), *Arrange / Act /
   Assert*. Run them with `ctest --test-dir build` (`QT_QPA_PLATFORM=offscreen`
   without a display).
+- **Tests by system**: a feature of the system (pty, processes and shells,
+  git and credentials, toolchains, file system) has one test file per
+  system, added by CMake (`if(WIN32)`…): `tst_terminal_windows.cpp` beside
+  `tst_terminal_unix.cpp`, the behavior they share in `tst_terminal.cpp`. A
+  UI test gets a variant only when a system needs one, as an `#ifdef` in
+  the test itself.
 
 ---
 

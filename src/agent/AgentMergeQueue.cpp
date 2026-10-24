@@ -5,6 +5,7 @@
 #include "git/FileChange.h"
 #include "git/GitCommands.h"
 #include "git/RepositoryStatus.h"
+#include "system/Shell.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -192,11 +193,8 @@ void AgentMergeQueue::runCheck(const QString &branch)
         if (error == QProcess::FailedToStart)
             onChecked(-1, branch);
     });
-#ifdef Q_OS_WIN
-    check_->start(QStringLiteral("cmd.exe"), {QStringLiteral("/c"), checkCommand_});
-#else
-    check_->start(QStringLiteral("/bin/sh"), {QStringLiteral("-c"), checkCommand_});
-#endif
+    const ShellCommand check = Shell::systemShellRunning(checkCommand_);
+    check_->start(check.program, check.arguments);
 }
 
 void AgentMergeQueue::onChecked(int exitCode, const QString &branch)

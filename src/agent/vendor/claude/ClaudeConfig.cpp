@@ -2,6 +2,7 @@
 
 #include "ClaudeConfig.h"
 
+#include "system/Host.h"
 #include "workspace/ProjectFiles.h"
 
 #include <QCoreApplication>
@@ -23,13 +24,15 @@ QString tr(const char *text)
 
 QString managedDir()
 {
-#ifdef Q_OS_WIN
-    return QStringLiteral("C:/Program Files/ClaudeCode");
-#elif defined(Q_OS_MACOS)
-    return QStringLiteral("/Library/Application Support/ClaudeCode");
-#else
-    return QStringLiteral("/etc/claude-code");
-#endif
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::Windows:
+        return QStringLiteral("C:/Program Files/ClaudeCode");
+    case OperatingSystem::MacOS:
+        return QStringLiteral("/Library/Application Support/ClaudeCode");
+    case OperatingSystem::Linux:
+        return QStringLiteral("/etc/claude-code");
+    }
+    return {};
 }
 
 QByteArray readHead(const QString &path)

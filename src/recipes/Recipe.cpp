@@ -3,6 +3,7 @@
 #include "Recipe.h"
 
 #include "RecipeSchema.h"
+#include "system/Host.h"
 #include "toolchains/ToolCatalog.h"
 
 #include <QDir>
@@ -214,13 +215,15 @@ namespace Recipes {
 
 QString currentSystem()
 {
-#if defined(Q_OS_WIN)
-    return QStringLiteral("windows");
-#elif defined(Q_OS_MACOS)
-    return QStringLiteral("macos");
-#else
-    return QStringLiteral("linux");
-#endif
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::Windows:
+        return QStringLiteral("windows");
+    case OperatingSystem::MacOS:
+        return QStringLiteral("macos");
+    case OperatingSystem::Linux:
+        return QStringLiteral("linux");
+    }
+    return {};
 }
 
 std::optional<Recipe> parse(const QByteArray &recipeJson, const QString &folder, QString *error)

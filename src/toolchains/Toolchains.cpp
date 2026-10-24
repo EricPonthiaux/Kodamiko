@@ -5,6 +5,8 @@
 #include "JavaRuntimes.h"
 #include "ToolCatalog.h"
 #include "projects/ProjectDetector.h"
+#include "system/Executables.h"
+#include "system/Host.h"
 
 #include <QDir>
 #include <QFile>
@@ -125,15 +127,6 @@ std::optional<RuntimeInstall> newest(const QList<RuntimeInstall> &runtimes)
     });
 }
 
-#ifdef Q_OS_WIN
-const QStringList pythonNames{QStringLiteral("python"), QStringLiteral("python3")};
-#else
-const QStringList pythonNames{QStringLiteral("python3"),    QStringLiteral("python"),     QStringLiteral("python3.15"),
-                              QStringLiteral("python3.14"), QStringLiteral("python3.13"), QStringLiteral("python3.12"),
-                              QStringLiteral("python3.11"), QStringLiteral("python3.10"), QStringLiteral("python3.9"),
-                              QStringLiteral("python3.8")};
-#endif
-
 // Version managers keep one folder per version.
 QStringList versionManagerNodes()
 {
@@ -184,7 +177,7 @@ QList<RuntimeInstall> machineNodes()
 QList<RuntimeInstall> machinePythons()
 {
     QStringList executables;
-    for (const QString &name : pythonNames) {
+    for (const QString &name : Executables::pythonNames()) {
         if (const QString path = QStandardPaths::findExecutable(name); !path.isEmpty())
             executables.append(path);
     }
@@ -247,13 +240,16 @@ QString Toolchains::qtFolder(const QString &version, const QString &kit, const Q
 
 QStringList Toolchains::machineQtRoots()
 {
-    QStringList roots{QDir::homePath() + QStringLiteral("/Qt")};
-#ifdef Q_OS_WIN
-    roots.prepend(QStringLiteral("C:/Qt"));
-#else
-    roots.append(QStringLiteral("/opt/Qt"));
-#endif
-    return roots;
+    // The folders the Qt Online Installer proposes.
+    const QString inHome = QDir::homePath() + QStringLiteral("/Qt");
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::Windows:
+        return {QStringLiteral("C:/Qt"), inHome};
+    case OperatingSystem::MacOS:
+    case OperatingSystem::Linux:
+        return {inHome, QStringLiteral("/opt/Qt")};
+    }
+    return {inHome};
 }
 
 QString Toolchains::installFolder(const QString &tool, const QString &version) const

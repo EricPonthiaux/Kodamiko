@@ -384,28 +384,6 @@ private slots:
         QCOMPARE(changed.value("PATH"), QString("C:\\VS\\bin;C:\\Windows"));
     }
 
-    // On a machine with Visual Studio's C++ tools only.
-    void findsVisualStudiosCompilerAndCMake()
-    {
-#ifndef Q_OS_WIN
-        QSKIP("Visual Studio's environment exists on Windows only");
-#else
-        QString error;
-
-        const std::optional<QMap<QString, QString>> variables = DeveloperEnvironment::visualStudio(&error);
-
-        if (!variables)
-            QSKIP(qPrintable(error));
-        QVERIFY(variables->contains("INCLUDE"));
-        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        addTo(environment, {.variables = *variables, .pathFolders = {}});
-        const QStringList path = environment.value("PATH").split(QDir::listSeparator());
-        QVERIFY(!QStandardPaths::findExecutable("cl", path).isEmpty());
-        QVERIFY(!QStandardPaths::findExecutable("cmake", path).isEmpty());
-        QVERIFY(!QStandardPaths::findExecutable("ninja", path).isEmpty());
-#endif
-    }
-
     void additionsHaveTheRecipesFoldersAndVariables()
     {
         RecipeEnvironment environment;

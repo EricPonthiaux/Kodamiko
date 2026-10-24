@@ -20,6 +20,7 @@
 // short summary otherwise.
 
 #include "log/LogFiles.h"
+#include "system/Shell.h"
 
 #include <QCoreApplication>
 #include <QFile>
@@ -27,7 +28,6 @@
 #include <QJsonObject>
 #include <QLocalSocket>
 #include <QProcess>
-#include <QStandardPaths>
 
 #include <cstdio>
 
@@ -66,16 +66,7 @@ QByteArray sendToEditor(const QJsonDocument &event, int acknowledgeTimeout)
 QByteArray runUserStatusLine(const QString &command, const QByteArray &input)
 {
     QProcess process;
-#ifdef Q_OS_WIN
-    process.setProgram(QStringLiteral("cmd.exe"));
-    process.setNativeArguments(QStringLiteral("/c ") + command);
-#else
-    QString shell = QStandardPaths::findExecutable(QStringLiteral("bash"));
-    if (shell.isEmpty())
-        shell = QStringLiteral("/bin/sh");
-    process.setProgram(shell);
-    process.setArguments({QStringLiteral("-c"), command});
-#endif
+    Shell::prepareVerbatim(process, command);
     process.setProcessChannelMode(QProcess::ForwardedErrorChannel);
     process.start();
     if (!process.waitForStarted())

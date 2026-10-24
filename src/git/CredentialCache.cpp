@@ -7,12 +7,8 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
-#include <chrono>
-
 namespace CredentialCache {
 namespace {
-
-constexpr std::chrono::seconds cacheLifetime = std::chrono::days(7);
 
 constexpr int socketNameLength = 16;
 
@@ -28,12 +24,6 @@ QString repositoryRoot(const QString &workDir)
     return startPath;
 }
 
-QString shellQuoted(QString text)
-{
-    text.replace(QLatin1Char('\''), QLatin1String("'\\''"));
-    return QLatin1Char('\'') + text + QLatin1Char('\'');
-}
-
 } // namespace
 
 QString socketPath(const QString &workDir)
@@ -44,18 +34,6 @@ QString socketPath(const QString &workDir)
     const QString directory =
         QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + QLatin1String("/duet/credentials");
     return directory + QLatin1Char('/') + QString::fromLatin1(hash.left(socketNameLength));
-}
-
-QString helper(const QString &workDir)
-{
-#ifdef Q_OS_WIN
-    Q_UNUSED(workDir)
-    return {};
-#else
-    return QStringLiteral("cache --timeout=%1 --socket=%2")
-        .arg(cacheLifetime.count())
-        .arg(shellQuoted(socketPath(workDir)));
-#endif
 }
 
 } // namespace CredentialCache

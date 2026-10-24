@@ -803,19 +803,6 @@ private slots:
         QCOMPARE(session->category, ClaudeConfig::Category::Settings);
     }
 
-    void autoMemoryFollowsClaudeCodeNaming()
-    {
-        qputenv("CLAUDE_CONFIG_DIR", "/c");
-#ifdef Q_OS_WIN
-        QCOMPARE(ClaudeConfig::autoMemoryDir("C:/Users/me/my_app.v2"),
-                 QStringLiteral("/c/projects/C--Users-me-my-app-v2/memory"));
-#else
-        QCOMPARE(ClaudeConfig::autoMemoryDir("/home/me/my_app.v2"),
-                 QStringLiteral("/c/projects/-home-me-my-app-v2/memory"));
-#endif
-        qunsetenv("CLAUDE_CONFIG_DIR");
-    }
-
     void readsFrontMatter()
     {
         const QMap<QString, QString> fields =

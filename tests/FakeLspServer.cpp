@@ -12,15 +12,12 @@
 //   params;
 // - "exit": stops; any other request: null.
 
+#include "system/StandardStreams.h"
+
 #include <QByteArray>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-
-#ifdef Q_OS_WIN
-#include <fcntl.h>
-#include <io.h>
-#endif
 
 #include <array>
 #include <cstdio>
@@ -74,11 +71,7 @@ void sendProgress(const QJsonObject &params)
 
 int main()
 {
-#ifdef Q_OS_WIN
-    // The framing counts bytes: no "\n" turned into "\r\n" either way.
-    _setmode(_fileno(stdin), _O_BINARY);
-    _setmode(_fileno(stdout), _O_BINARY);
-#endif
+    StandardStreams::useBinaryMode(); // the framing counts bytes
     while (const std::optional<QByteArray> body = readMessage()) {
         const QJsonObject message = QJsonDocument::fromJson(*body).object();
         const QString method = message.value("method").toString();

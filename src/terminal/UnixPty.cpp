@@ -2,6 +2,8 @@
 
 #include "UnixPty.h"
 
+#include "PtyForeground.h"
+
 #include <QFileInfo>
 #include <QSocketNotifier>
 #include <QStandardPaths>
@@ -17,7 +19,6 @@
 #include <cstring>
 
 #ifdef Q_OS_MACOS
-#include <sys/sysctl.h>
 #include <util.h>
 #elif defined(Q_OS_FREEBSD)
 #include <libutil.h>
@@ -26,23 +27,6 @@
 #endif
 
 namespace {
-
-// The process group that holds the terminal of `sessionLeader`, or -1.
-pid_t foregroundGroup([[maybe_unused]] int masterFd, [[maybe_unused]] pid_t sessionLeader)
-{
-#ifdef Q_OS_MACOS
-    // Darwin answers TIOCGPGRP (tcgetpgrp) only to a process the terminal
-    // controls; the process table gives the group to any process of the user.
-    kinfo_proc info{};
-    size_t size = sizeof info;
-    int query[] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, sessionLeader};
-    if (::sysctl(query, 4, &info, &size, nullptr, 0) != 0 || size == 0)
-        return -1;
-    return info.kp_eproc.e_tpgid;
-#else
-    return ::tcgetpgrp(masterFd);
-#endif
-}
 
 // nullptr-terminated array of C strings, for execve().
 class CStringArray {
@@ -181,7 +165,7 @@ bool UnixPty::hasForegroundJob() const
         return false;
     // forkpty() makes the child a session leader: its process group holds
     // the terminal until a shell gives it to a job it runs.
-    const pid_t foreground = foregroundGroup(masterFd_, childPid_);
+    const pid_t foreground = PtyForeground::group(masterFd_, childPid_);
     return foreground > 0 && foreground != childPid_;
 }
 

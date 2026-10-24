@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "terminal/IPty.h"
 #include "terminal/TerminalWidget.h"
 #include "terminal/VtScreen.h"
 
@@ -214,64 +213,6 @@ private slots:
         screen.feed("\x1b[?1000l");
         QVERIFY(!screen.isMouseReporting());
     }
-
-    // A real program in a real PTY: its output arrives and its exit is reported.
-    void runsAProgramInAPty()
-    {
-        auto pty = createPty();
-        QByteArray output;
-        connect(pty.get(), &IPty::dataReceived, this, [&output](const QByteArray &data) { output += data; });
-        QSignalSpy finished(pty.get(), &IPty::finished);
-
-        ProcessSpec spec;
-        spec.environment = terminalEnvironment();
-#ifdef Q_OS_WIN
-        spec.program = "cmd.exe";
-        spec.arguments = {"/c", "echo duet-ok"};
-#else
-        spec.program = "/bin/sh";
-        spec.arguments = {"-c", "echo duet-ok; stty size; exit 3"};
-#endif
-        QVERIFY2(pty->start(spec, QSize(91, 33)), qPrintable(pty->errorString()));
-        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
-        QVERIFY(output.contains("duet-ok"));
-#ifndef Q_OS_WIN
-        QVERIFY(output.contains("33 91")); // the grid size is passed on to the program
-        QCOMPARE(finished.first().first().toInt(), 3);
-#endif
-    }
-
-#ifndef Q_OS_WIN
-    void seesTheCommandAShellRunsInTheForeground()
-    {
-        auto pty = createPty();
-        ProcessSpec spec;
-        spec.environment = terminalEnvironment();
-        spec.program = "/bin/sh";
-        // Interactive, as in a terminal tab: job control is on, the command
-        // typed gets its own process group and the terminal.
-        spec.arguments = {"-i"};
-
-        QVERIFY2(pty->start(spec, QSize(80, 24)), qPrintable(pty->errorString()));
-        pty->write("sleep 30\n");
-
-        QTRY_VERIFY_WITH_TIMEOUT(pty->hasForegroundJob(), 5000);
-    }
-
-    void seesNoJobWhileTheProgramStartedHoldsTheTerminal()
-    {
-        auto pty = createPty();
-        ProcessSpec spec;
-        spec.environment = terminalEnvironment();
-        spec.program = "/bin/sh";
-        spec.arguments = {"-c", "sleep 30; true"};
-
-        QVERIFY2(pty->start(spec, QSize(80, 24)), qPrintable(pty->errorString()));
-        QTest::qWait(300); // time for sleep to start
-
-        QVERIFY(!pty->hasForegroundJob());
-    }
-#endif
 };
 
 QTEST_GUILESS_MAIN(TestTerminal)

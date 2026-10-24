@@ -3,6 +3,7 @@
 #include "LanguageServers.h"
 
 #include "LspClient.h"
+#include "system/Host.h"
 #include "toolchains/JavaRuntimes.h"
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
@@ -31,13 +32,26 @@ QStringList clangdArguments()
     QStringList arguments = {QStringLiteral("--background-index"), QStringLiteral("--header-insertion=iwyu"),
                              QStringLiteral("--all-scopes-completion"), QStringLiteral("--pch-storage=memory"),
                              QStringLiteral("--completion-parse=always")};
-#ifdef Q_OS_WIN
     // On Windows, LLVM runs the default "low" priority in
     // THREAD_MODE_BACKGROUND_BEGIN, which also drops the threads' I/O and
     // memory priority: indexing a project's thousands of headers crawls.
-    arguments << QStringLiteral("--background-index-priority=normal");
-#endif
+    if (Host::operatingSystem() == OperatingSystem::Windows)
+        arguments << QStringLiteral("--background-index-priority=normal");
     return arguments;
+}
+
+// The folder of jdtls' installation configured for `system`.
+QString jdtlsConfiguration(OperatingSystem system)
+{
+    switch (system) {
+    case OperatingSystem::Windows:
+        return QStringLiteral("config_win");
+    case OperatingSystem::MacOS:
+        return QStringLiteral("config_mac");
+    case OperatingSystem::Linux:
+        return QStringLiteral("config_linux");
+    }
+    return {};
 }
 
 } // namespace
@@ -267,13 +281,7 @@ std::optional<LanguageServers::Launch> LanguageServers::jdtlsLaunch(const QStrin
                                       .entryList({QStringLiteral("org.eclipse.equinox.launcher_*.jar"),
                                                   QStringLiteral("org.eclipse.equinox.launcher.jar")},
                                                  QDir::Files);
-#ifdef Q_OS_WIN
-    QString config = QStringLiteral("config_win");
-#elif defined(Q_OS_MACOS)
-    QString config = QStringLiteral("config_mac");
-#else
-    QString config = QStringLiteral("config_linux");
-#endif
+    QString config = jdtlsConfiguration(Host::operatingSystem());
     if (QSysInfo::currentCpuArchitecture().startsWith(QLatin1String("arm")) &&
         base.exists(config + QStringLiteral("_arm")))
         config += QStringLiteral("_arm");

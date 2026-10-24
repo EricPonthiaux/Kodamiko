@@ -2,6 +2,8 @@
 
 #include "PreviewSite.h"
 
+#include "system/FilePaths.h"
+
 #include <QBuffer>
 #include <QDir>
 #include <QFile>
@@ -37,24 +39,6 @@ bool isInside(const QString &path, const QString &folder)
     return path.startsWith(prefix);
 }
 
-// A URL's path starts with a slash: Windows' "C:/a.html" is "/C:/a.html"
-// there.
-QString urlPathOf(const QString &filePath)
-{
-    return filePath.startsWith(u'/') ? filePath : u'/' + filePath;
-}
-
-QString filePathOf(const QUrl &url)
-{
-    const QString path = url.path();
-#ifdef Q_OS_WIN
-    const bool hasDrive = path.size() > 2 && path.at(0) == u'/' && path.at(1).isLetter() && path.at(2) == u':';
-    if (hasDrive)
-        return QDir::cleanPath(path.mid(1));
-#endif
-    return QDir::cleanPath(path);
-}
-
 class SiteHandler : public QWebEngineUrlSchemeHandler {
 public:
     using QWebEngineUrlSchemeHandler::QWebEngineUrlSchemeHandler;
@@ -67,7 +51,7 @@ public:
             job->fail(QWebEngineUrlRequestJob::UrlNotFound);
             return;
         }
-        const QString path = filePathOf(url);
+        const QString path = FilePaths::fromUrlPath(url.path());
         if (path == site->filePath) {
             auto *buffer = new QBuffer(job);
             buffer->setData(site->text);
@@ -137,7 +121,7 @@ QUrl PreviewSite::serve(const QString &filePath, const QString &text)
     QUrl url;
     url.setScheme(QString::fromLatin1(schemeName));
     url.setHost(host_);
-    url.setPath(urlPathOf(site.filePath));
+    url.setPath(FilePaths::toUrlPath(site.filePath));
     return url;
 }
 
@@ -145,5 +129,5 @@ std::optional<QString> PreviewSite::localPath(const QUrl &url) const
 {
     if (url.scheme() != QLatin1String(schemeName) || url.host() != host_)
         return std::nullopt;
-    return filePathOf(url);
+    return FilePaths::fromUrlPath(url.path());
 }

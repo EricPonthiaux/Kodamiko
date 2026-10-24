@@ -5,6 +5,7 @@
 #include "QtDownload.h"
 #include "QtRepository.h"
 #include "Toolchains.h"
+#include "system/Host.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -75,11 +76,10 @@ QStringList Installer::extractCommand(ArchiveFormat format, const QString &archi
         return found(QStringLiteral("tar")) ? QStringList{QStringLiteral("tar"), QStringLiteral("-xzf"), archive,
                                                           QStringLiteral("-C"), destination}
                                             : QStringList{};
-#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
-    // Their tar is bsdtar, which reads zip and 7z files too.
-    if (found(QStringLiteral("tar")))
+    // Windows' and macOS's tar is bsdtar, which reads zip and 7z files too.
+    const bool isTarBsdtar = Host::operatingSystem() != OperatingSystem::Linux;
+    if (isTarBsdtar && found(QStringLiteral("tar")))
         return {QStringLiteral("tar"), QStringLiteral("-xf"), archive, QStringLiteral("-C"), destination};
-#endif
     if (found(QStringLiteral("bsdtar")))
         return {QStringLiteral("bsdtar"), QStringLiteral("-xf"), archive, QStringLiteral("-C"), destination};
     // GNU tar does not read 7z files.

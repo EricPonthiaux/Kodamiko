@@ -2,6 +2,9 @@
 
 #include "JavaRuntimes.h"
 
+#include "SystemJdks.h"
+#include "system/Executables.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -16,11 +19,7 @@
 namespace JavaRuntimes {
 namespace {
 
-#ifdef Q_OS_WIN
-const QString javaName = QStringLiteral("java.exe");
-#else
-const QString javaName = QStringLiteral("java");
-#endif
+const QString javaName = Executables::fileName(QStringLiteral("java"));
 
 // The version in the JDK's "release" file, without running Java.
 QString releaseVersion(const QString &home)
@@ -52,27 +51,10 @@ QString runVersion(const QString &executable)
 QStringList jdkParents()
 {
     const QString home = QDir::homePath();
-    QStringList parents{home + QStringLiteral("/.sdkman/candidates/java"), home + QStringLiteral("/.jdks"),
-                        home + QStringLiteral("/.asdf/installs/java"),
-                        home + QStringLiteral("/.local/share/mise/installs/java")};
-#ifdef Q_OS_WIN
-    for (const char *variable : {"ProgramFiles", "ProgramW6432"}) {
-        const QString programFiles = qEnvironmentVariable(variable);
-        if (programFiles.isEmpty())
-            continue;
-        for (const char *vendor :
-             {"Java", "Eclipse Adoptium", "Microsoft", "Zulu", "Amazon Corretto", "BellSoft", "Semeru", "OpenJDK"})
-            parents.append(programFiles + QLatin1Char('/') + QLatin1String(vendor));
-    }
-#elif defined(Q_OS_MACOS)
-    parents << QStringLiteral("/Library/Java/JavaVirtualMachines")
-            << home + QStringLiteral("/Library/Java/JavaVirtualMachines") << QStringLiteral("/opt/homebrew/opt")
-            << QStringLiteral("/usr/local/opt");
-#else
-    parents << QStringLiteral("/usr/lib/jvm") << QStringLiteral("/usr/lib64/jvm") << QStringLiteral("/usr/java")
-            << QStringLiteral("/opt/java") << QStringLiteral("/opt");
-#endif
-    return parents;
+    const QStringList parents{home + QStringLiteral("/.sdkman/candidates/java"), home + QStringLiteral("/.jdks"),
+                              home + QStringLiteral("/.asdf/installs/java"),
+                              home + QStringLiteral("/.local/share/mise/installs/java")};
+    return parents + SystemJdks::parentFolders();
 }
 
 // The JDK folders inside `folder` (macOS bundles keep it in Contents/Home).

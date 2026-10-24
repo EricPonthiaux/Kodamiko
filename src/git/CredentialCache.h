@@ -16,7 +16,8 @@ namespace CredentialCache {
 
 // The credential.helper value for the repository containing `workDir` (the
 // repository itself when `workDir` is not in one); empty where git has no
-// credential cache (Windows).
+// credential cache (Windows). One implementation per system:
+// CredentialCacheWindows.cpp, CredentialCacheUnix.cpp.
 QString helper(const QString &workDir);
 
 // The socket of that repository's cache daemon; "git credential-cache exit

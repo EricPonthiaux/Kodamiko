@@ -4,6 +4,7 @@
 
 #include "BuildOutputParser.h"
 #include "diagnostics/ProblemStore.h"
+#include "system/Shell.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
 
@@ -134,14 +135,10 @@ ProcessSpec Runner::processSpec(const RunConfiguration &configuration) const
     }
     for (auto it = configuration.environment.cbegin(); it != configuration.environment.cend(); ++it)
         spec.environment.insert(it.key(), it.value());
-#ifdef Q_OS_WIN
-    spec.program = qEnvironmentVariable("ComSpec", QStringLiteral("cmd.exe"));
-    spec.arguments = {QStringLiteral("/d"), QStringLiteral("/s"), QStringLiteral("/c"), configuration.command};
-#else
-    // A login shell, as in Duet's terminals: the PATH of the user's profile.
-    spec.program = qEnvironmentVariable("SHELL", QStringLiteral("/bin/sh"));
-    spec.arguments = {QStringLiteral("-l"), QStringLiteral("-c"), configuration.command};
-#endif
+    // As in Duet's terminals: the PATH of the user's profile.
+    const ShellCommand shell = Shell::loginShellRunning(configuration.command);
+    spec.program = shell.program;
+    spec.arguments = shell.arguments;
     return spec;
 }
 

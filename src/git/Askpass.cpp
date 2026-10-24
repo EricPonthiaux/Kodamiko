@@ -2,9 +2,8 @@
 
 #include "Askpass.h"
 
-#include <QCoreApplication>
-#include <QDir>
-#include <QFileInfo>
+#include "system/Executables.h"
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalSocket>
@@ -16,13 +15,7 @@ namespace {
 
 QString defaultHelperPath()
 {
-#ifdef Q_OS_WIN
-    const QString name = QStringLiteral("duet-askpass.exe");
-#else
-    const QString name = QStringLiteral("duet-askpass");
-#endif
-    const QString path = QDir(QCoreApplication::applicationDirPath()).filePath(name);
-    return QFileInfo::exists(path) ? path : QString();
+    return Executables::besideTheApplication(QStringLiteral("duet-askpass"));
 }
 
 } // namespace

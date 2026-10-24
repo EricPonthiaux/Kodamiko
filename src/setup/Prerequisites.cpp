@@ -2,10 +2,10 @@
 
 #include "Prerequisites.h"
 
+#include "SystemSetup.h"
 #include "agent/vendor/claude/ClaudeLauncher.h"
 
 #include <QCoreApplication>
-#include <QFile>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStandardPaths>
@@ -42,33 +42,6 @@ QVersionNumber programVersion(const QString &program)
     return parseVersion(QString::fromUtf8(process.readAllStandardOutput()));
 }
 
-#ifdef Q_OS_LINUX
-QString osReleaseField(const QByteArray &osRelease, const QString &key)
-{
-    const QRegularExpression field(QStringLiteral("^%1=\"?([^\"\\n]*)\"?$").arg(key),
-                                   QRegularExpression::MultilineOption);
-    return field.match(QString::fromUtf8(osRelease)).captured(1);
-}
-#endif
-
-QString gitInstallCommand()
-{
-#ifdef Q_OS_WIN
-    return QStringLiteral("winget install --id Git.Git -e --source winget");
-#elif defined(Q_OS_MACOS)
-    return QStringLiteral("xcode-select --install");
-#elif defined(Q_OS_LINUX)
-    QFile file(QStringLiteral("/etc/os-release"));
-    if (!file.open(QIODevice::ReadOnly))
-        return {};
-    const QByteArray osRelease = file.readAll();
-    return linuxInstallCommand(osReleaseField(osRelease, QStringLiteral("ID")),
-                               osReleaseField(osRelease, QStringLiteral("ID_LIKE")), QStringLiteral("git"));
-#else
-    return {};
-#endif
-}
-
 } // namespace
 
 bool allFound()
@@ -81,15 +54,10 @@ QList<Prerequisite> check()
     Prerequisite git;
     git.id = Prerequisite::Id::Git;
     git.name = QStringLiteral("Git");
-#ifdef Q_OS_WIN
-    git.purpose = tr("Staging, commits, discarding changes and snapshots. Claude Code also needs Git for Windows "
-                     "(Git Bash) to run commands.");
-#else
-    git.purpose = tr("Staging, commits, discarding changes and snapshots.");
-#endif
+    git.purpose = SystemSetup::gitPurpose();
     git.minimumVersion = QVersionNumber(2, 23); // git restore
     git.path = findGit();
-    git.installCommand = gitInstallCommand();
+    git.installCommand = SystemSetup::gitInstallCommand();
     git.helpUrl = QUrl(QStringLiteral("https://git-scm.com/downloads"));
 
     Prerequisite claude;
@@ -116,11 +84,7 @@ QList<Prerequisite> check()
     if (claudeResult.status == Prerequisite::Status::Outdated) {
         claudeResult.installCommand = QStringLiteral("claude update");
     } else {
-#ifdef Q_OS_WIN
-        claudeResult.installCommand = QStringLiteral("irm https://claude.ai/install.ps1 | iex");
-#else
-        claudeResult.installCommand = QStringLiteral("curl -fsSL https://claude.ai/install.sh | bash");
-#endif
+        claudeResult.installCommand = SystemSetup::claudeInstallCommand();
     }
     return prerequisites;
 }
@@ -159,21 +123,11 @@ ProcessSpec installProcess(const Prerequisite &prerequisite, const QString &work
     spec.environment.remove(QStringLiteral("CLAUDECODE"));
     QString command = prerequisite.installCommand;
     // "claude update" with the program found, which may not be in the PATH.
-    if (command == QLatin1String("claude update")) {
-#ifdef Q_OS_WIN
-        command = QStringLiteral("& \"%1\" update").arg(prerequisite.path); // "&": call, not a string
-#else
-        command = QStringLiteral("\"%1\" update").arg(prerequisite.path);
-#endif
-    }
-#ifdef Q_OS_WIN
-    spec.program = QStringLiteral("powershell.exe");
-    spec.arguments = {QStringLiteral("-NoProfile"), QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"),
-                      QStringLiteral("-Command"), command};
-#else
-    spec.program = QStringLiteral("/bin/sh");
-    spec.arguments = {QStringLiteral("-c"), command};
-#endif
+    if (command == QLatin1String("claude update"))
+        command = SystemSetup::programCall(prerequisite.path, QStringLiteral("update"));
+    const ShellCommand shell = SystemSetup::installerShell(command);
+    spec.program = shell.program;
+    spec.arguments = shell.arguments;
     return spec;
 }
 

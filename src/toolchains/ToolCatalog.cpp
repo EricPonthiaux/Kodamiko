@@ -2,6 +2,9 @@
 
 #include "ToolCatalog.h"
 
+#include "system/Executables.h"
+#include "system/Host.h"
+
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -12,13 +15,18 @@ namespace {
 const QString jdkId = QStringLiteral("jdk");
 const QString nodeId = QStringLiteral("node");
 
-QString exe(const QString &path)
+// The system's name in the download services' URLs.
+QString downloadName(OperatingSystem system)
 {
-#ifdef Q_OS_WIN
-    return path + QStringLiteral(".exe");
-#else
-    return path;
-#endif
+    switch (system) {
+    case OperatingSystem::Windows:
+        return QStringLiteral("windows");
+    case OperatingSystem::MacOS:
+        return QStringLiteral("mac");
+    case OperatingSystem::Linux:
+        return QStringLiteral("linux");
+    }
+    return {};
 }
 
 DownloadSource failure(const QString &error)
@@ -152,7 +160,7 @@ QList<ToolSpec> all()
     jdk.versions = {QStringLiteral("25"), QStringLiteral("21"), QStringLiteral("17"), QStringLiteral("11"),
                     QStringLiteral("8")};
     jdk.program = QStringLiteral("java");
-    jdk.executables = {exe(QStringLiteral("bin/java")), QStringLiteral("Contents/Home/bin/java")};
+    jdk.executables = {Executables::fileName(QStringLiteral("bin/java")), QStringLiteral("Contents/Home/bin/java")};
     tools.append(jdk);
 
     ToolSpec node;
@@ -171,7 +179,7 @@ QList<ToolSpec> all()
     clangd.family = QStringLiteral("cpp");
     clangd.versions = {QStringLiteral("23.1.0"), QStringLiteral("22.1.6")};
     clangd.program = QStringLiteral("clangd");
-    clangd.executables = {exe(QStringLiteral("bin/clangd"))};
+    clangd.executables = {Executables::fileName(QStringLiteral("bin/clangd"))};
     tools.append(clangd);
 
     ToolSpec jdtls;
@@ -274,13 +282,7 @@ QString defaultRuntimeVersion(const QString &family)
 Platform currentPlatform()
 {
     Platform platform;
-#ifdef Q_OS_WIN
-    platform.os = QStringLiteral("windows");
-#elif defined(Q_OS_MACOS)
-    platform.os = QStringLiteral("mac");
-#else
-    platform.os = QStringLiteral("linux");
-#endif
+    platform.os = downloadName(Host::operatingSystem());
     const QString cpu = QSysInfo::currentCpuArchitecture();
     platform.arch = cpu.startsWith(QLatin1String("arm")) ? QStringLiteral("aarch64") : QStringLiteral("x64");
     return platform;
