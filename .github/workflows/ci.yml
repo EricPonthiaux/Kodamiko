@@ -42,11 +42,15 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      # The sources and the subbuilds go together: a subbuild's stamps alone
+      # make FetchContent skip the clone and update an empty source folder.
       - name: Cache downloaded dependencies
         uses: actions/cache@v4
         with:
-          path: build/_deps/*-subbuild
-          key: deps-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/GraphvizWindows.cmake') }}
+          path: |
+            build/_deps/*-src
+            build/_deps/*-subbuild
+          key: deps-v2-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/GraphvizWindows.cmake') }}
 
       # LTO is off in the CI for now.
       - name: Configure
