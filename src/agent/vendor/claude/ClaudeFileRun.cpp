@@ -29,6 +29,9 @@ QString step(const QString &tool, const QJsonObject &input, const QString &workD
         return tr("Searching for “%1”").arg(input.value(QLatin1String("pattern")).toString());
     if (tool == QLatin1String("Glob"))
         return tr("Looking for %1").arg(input.value(QLatin1String("pattern")).toString());
+    // Claude Code's tool for an answer that follows --json-schema.
+    if (tool == QLatin1String("StructuredOutput"))
+        return tr("Writing the answer");
     if (tool == QLatin1String("Skill"))
         return tr("Learning the diagram format");
     if (tool == QLatin1String("Write") || tool == QLatin1String("Edit") || tool == QLatin1String("MultiEdit"))
@@ -68,6 +71,26 @@ QStringList arguments(const QString &prompt,
     return arguments;
 }
 
+QStringList reviewArguments(const AgentReviewRun &run)
+{
+    // The prompt first: --allowedTools takes every argument that follows.
+    // No MCP server: the user's own could write, and Duet's would hand over
+    // the editor's state, and with it the writing session's context.
+    QStringList arguments{run.prompt,
+                          QStringLiteral("--output-format"),
+                          QStringLiteral("stream-json"),
+                          QStringLiteral("--verbose"),
+                          QStringLiteral("--no-session-persistence"),
+                          QStringLiteral("--strict-mcp-config"),
+                          QStringLiteral("--json-schema"),
+                          QString::fromUtf8(QJsonDocument(run.answerSchema).toJson(QJsonDocument::Compact))};
+    if (!run.model.isEmpty())
+        arguments << QStringLiteral("--model") << run.model;
+    arguments << QStringLiteral("--tools") << QStringLiteral("Read,Grep,Glob") << QStringLiteral("--allowedTools")
+              << QStringLiteral("Read") << QStringLiteral("Grep") << QStringLiteral("Glob");
+    return arguments;
+}
+
 AgentRunEvent parseLine(const QByteArray &line, const QString &workDir)
 {
     const QJsonObject object = QJsonDocument::fromJson(line).object();
@@ -89,6 +112,10 @@ AgentRunEvent parseLine(const QByteArray &line, const QString &workDir)
         event.failed = object.value(QLatin1String("is_error")).toBool() ||
                        object.value(QLatin1String("subtype")).toString() != QLatin1String("success");
         event.text = object.value(QLatin1String("result")).toString().trimmed();
+        // With --json-schema, the answer as the schema says.
+        const QJsonValue structured = object.value(QLatin1String("structured_output"));
+        if (structured.isObject())
+            event.text = QString::fromUtf8(QJsonDocument(structured.toObject()).toJson(QJsonDocument::Compact));
         if (event.text.isEmpty() && event.failed)
             event.text = object.value(QLatin1String("subtype")).toString();
     }

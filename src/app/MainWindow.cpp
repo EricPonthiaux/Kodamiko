@@ -411,9 +411,7 @@ void MainWindow::createFilesPanel()
         refreshIndexes();
     });
     connect(fileTree_, &FileTreeView::sendToClaudeRequested, this, &MainWindow::sendToClaude);
-    connect(fileTree_, &FileTreeView::reviewRequested, this, [this](const QStringList &paths) {
-        typeInClaudePrompt(CodeRequest::reviewPrompt(paths, folder_), PromptEntry::Submitted);
-    });
+    connect(fileTree_, &FileTreeView::reviewRequested, this, &MainWindow::reviewPaths);
     connect(fileTree_, &FileTreeView::generateDiagramRequested, this, &MainWindow::generateDiagram);
     connect(fileTree_, &FileTreeView::openTerminalRequested, this,
             [this](const QString &folder) { addTerminal(QFileInfo(folder).fileName(), defaultShell(folder)); });

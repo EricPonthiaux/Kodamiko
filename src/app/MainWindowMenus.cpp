@@ -131,6 +131,10 @@ void MainWindow::createClaudeMenu()
             claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); }));
     claude->addSeparator();
     createCodeRequestActions(claude);
+    claude->addAction(tr("Review &Changes"), this, &MainWindow::reviewChanges)
+        ->setToolTip(tr("Have a separate session review the uncommitted changes of the project"));
+    QMenu *reviewerModel = claude->addMenu(tr("Reviewer &Model"));
+    connect(reviewerModel, &QMenu::aboutToShow, this, [this, reviewerModel] { fillReviewerModelMenu(reviewerModel); });
     claude->addSeparator();
     claude->addAction(tr("Restore the State Before a &Prompt…"), this, &MainWindow::showSnapshots);
     snapshotBeforePrompt_ = addAgentSettingToggle(

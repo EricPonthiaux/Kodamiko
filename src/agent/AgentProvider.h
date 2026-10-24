@@ -8,6 +8,7 @@
 #include <QByteArray>
 #include <QColor>
 #include <QJsonObject>
+#include <QList>
 #include <QString>
 #include <QStringList>
 
@@ -27,6 +28,12 @@ struct AgentFeatures {
     // It runs without a session to write a file (fileRunProcess()): the
     // editor offers to have it draw diagrams.
     bool hasFileRuns = false;
+};
+
+// A model the agent can run, for the user to pick one (the reviewer's).
+struct AgentModel {
+    QString id;    // as the agent's command line takes it: "opus"
+    QString title; // in menus: "Opus"
 };
 
 // How a session conversation begins.
@@ -69,7 +76,22 @@ struct AgentFileRun {
     QString hookServerName;
 };
 
-// What a line of a file run's output tells (parseRunOutput()).
+// A run without a session, outside the terminal, that reviews code: the
+// agent may read the project and change nothing. It starts from a blank
+// conversation, so that it judges the code without the reasoning of the
+// session that wrote it.
+struct AgentReviewRun {
+    QString workingDirectory;
+    QString prompt;
+    // The JSON Schema the agent's answer follows (ReviewReport::schema()).
+    QJsonObject answerSchema;
+    // The model that reviews, as the agent names it ("opus"); empty for the
+    // agent's default.
+    QString model;
+};
+
+// What a line of a file run's or a review run's output tells
+// (parseRunOutput()).
 struct AgentRunEvent {
     enum class Kind {
         None,
@@ -117,8 +139,14 @@ public:
     // The process of `run`; nullopt (with `error` set) when the agent cannot
     // be found. Only for a provider with features().hasFileRuns.
     virtual std::optional<ProcessSpec> fileRunProcess(const AgentFileRun &run, QString *error) const = 0;
-    // Decodes a line of a file run's standard output; file paths in steps
-    // are shown relative to `workingDirectory`.
+    // The models a review run may use (AgentReviewRun::model), the most
+    // capable first.
+    virtual QList<AgentModel> models() const = 0;
+    // The process of `run`; nullopt (with `error` set) when the agent cannot
+    // be found.
+    virtual std::optional<ProcessSpec> reviewRunProcess(const AgentReviewRun &run, QString *error) const = 0;
+    // Decodes a line of a file run's or a review run's standard output; file
+    // paths in steps are shown relative to `workingDirectory`.
     virtual AgentRunEvent parseRunOutput(const QByteArray &line, const QString &workingDirectory) const = 0;
 
     // Decodes the JSON a hook passes (relayed by duet-hook); nullopt for

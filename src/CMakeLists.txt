@@ -40,6 +40,7 @@ add_library(duet_core STATIC
     agent/AgentIndicator.cpp
     agent/AgentMergeQueue.cpp
     agent/AgentProviders.cpp
+    agent/AgentRun.cpp
     agent/AgentSessions.cpp
     agent/CloseAgentPopup.cpp
     agent/CommitMessage.cpp
@@ -56,6 +57,11 @@ add_library(duet_core STATIC
     agent/mcp/TerminalTools.cpp
     agent/mcp/WorkspaceTools.cpp
     agent/NewAgentPopup.cpp
+    agent/ProjectCheck.cpp
+    agent/ReviewFindingCard.cpp
+    agent/ReviewReport.cpp
+    agent/ReviewRequest.cpp
+    agent/ReviewView.cpp
     agent/vendor/claude/ClaudeCodeProvider.cpp
     agent/vendor/claude/ClaudeConfig.cpp
     agent/vendor/claude/ClaudeConfigView.cpp
@@ -272,6 +278,7 @@ add_library(duet_core STATIC
     ui/PopupSearchField.cpp
     ui/PopupWidgets.cpp
     ui/PopupMotion.cpp
+    ui/Spinner.cpp
     ui/Theme.cpp
     ui/ThemeStyle.cpp
     ui/ToolTipPlacement.cpp

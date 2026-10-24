@@ -9,6 +9,8 @@
 #include <QJsonObject>
 #include <QSet>
 
+#include <algorithm>
+
 ProblemStore::ProblemStore(LanguageServers *servers, QObject *parent)
     : QObject(parent)
     , servers_(servers)
@@ -19,19 +21,31 @@ ProblemStore::ProblemStore(LanguageServers *servers, QObject *parent)
 
 void ProblemStore::setBuildProblems(const QString &source, const Problems &problems)
 {
+    replaceSet(build_, source, source, problems);
+}
+
+void ProblemStore::setReviewProblems(const QString &review, const Problems &problems)
+{
+    // The findings keep the source their review gave them.
+    replaceSet(reviews_, review, QString(), problems);
+}
+
+void ProblemStore::replaceSet(ProblemSets &sets, const QString &key, const QString &source, const Problems &problems)
+{
     QSet<QString> touched;
-    for (auto it = build_.value(source).cbegin(); it != build_.value(source).cend(); ++it)
+    for (auto it = sets.value(key).cbegin(); it != sets.value(key).cend(); ++it)
         touched.insert(it.key());
     QHash<QString, Problems> byPath;
     for (const Problem &problem : problems) {
         byPath[problem.path].append(problem);
-        byPath[problem.path].last().source = source;
+        if (!source.isEmpty())
+            byPath[problem.path].last().source = source;
         touched.insert(problem.path);
     }
     if (byPath.isEmpty())
-        build_.remove(source);
+        sets.remove(key);
     else
-        build_.insert(source, byPath);
+        sets.insert(key, byPath);
     for (const QString &path : touched)
         emit changed(path);
 }
@@ -84,17 +98,31 @@ Problems ProblemStore::buildProblems(const QString &path) const
     return problems;
 }
 
-Problems ProblemStore::problems(const QString &path) const
+Problems ProblemStore::unreportedBuildProblems(const QString &path) const
 {
-    Problems problems = serverProblems(path);
     QSet<QPair<int, int>> reported; // line, severity
-    for (const Problem &problem : problems)
+    for (const Problem &problem : serverProblems(path))
         reported.insert({problem.line, static_cast<int>(problem.severity)});
+    Problems problems;
     for (const Problem &problem : buildProblems(path)) {
         if (!reported.contains({problem.line, static_cast<int>(problem.severity)}))
             problems.append(problem);
     }
     return problems;
+}
+
+Problems ProblemStore::reviewProblems(const QString &path) const
+{
+    Problems problems;
+    for (const QHash<QString, Problems> &byPath : reviews_)
+        problems += byPath.value(path);
+    std::ranges::sort(problems, {}, &Problem::line);
+    return problems;
+}
+
+Problems ProblemStore::problems(const QString &path) const
+{
+    return serverProblems(path) + unreportedBuildProblems(path) + reviewProblems(path);
 }
 
 QStringList ProblemStore::filesWithBuildProblems() const
@@ -114,6 +142,10 @@ QStringList ProblemStore::files() const
     QSet<QString> files;
     for (const QString &path : filesWithBuildProblems())
         files.insert(path);
+    for (const QHash<QString, Problems> &byPath : reviews_) {
+        for (auto it = byPath.cbegin(); it != byPath.cend(); ++it)
+            files.insert(it.key());
+    }
     if (servers_) {
         for (const QString &path : servers_->filesWithDiagnostics()) {
             if (!serverProblems(path).isEmpty())

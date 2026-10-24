@@ -5,11 +5,9 @@
 #include "git/FileChange.h"
 #include "git/GitCommands.h"
 #include "git/RepositoryStatus.h"
-#include "system/Shell.h"
 
 #include <QDir>
 #include <QFileInfo>
-#include <QProcess>
 
 #include <algorithm>
 #include <memory>
@@ -31,12 +29,6 @@ struct RebaseOutcome {
     QString branch; // the checkout's current branch, replayed on
     QString head;   // the worktree's last commit afterwards
 };
-
-QString lastLines(const QString &output, int count)
-{
-    const QStringList lines = output.trimmed().split(QLatin1Char('\n'));
-    return lines.mid(std::max<qsizetype>(0, lines.size() - count)).join(QLatin1Char('\n'));
-}
 
 // `paths`, absolute in the repository's canonical directory, as the file
 // states name them: from the open folder, which may go through a symbolic
@@ -183,32 +175,23 @@ void AgentMergeQueue::onRebased(const RebaseResult &result, const QString &branc
 void AgentMergeQueue::runCheck(const QString &branch)
 {
     emit progress(tr("Checking %1's commits: %2").arg(current().worktree.name, checkCommand_));
-    check_ = new QProcess(this);
-    check_->setWorkingDirectory(current().worktree.path);
-    check_->setProcessChannelMode(QProcess::MergedChannels);
-    connect(check_, &QProcess::finished, this, [this, branch](int exitCode, QProcess::ExitStatus status) {
-        onChecked(status == QProcess::NormalExit ? exitCode : -1, branch);
-    });
-    connect(check_, &QProcess::errorOccurred, this, [this, branch](QProcess::ProcessError error) {
-        if (error == QProcess::FailedToStart)
-            onChecked(-1, branch);
-    });
-    const ShellCommand check = Shell::systemShellRunning(checkCommand_);
-    check_->start(check.program, check.arguments);
+    check_ = new ProjectCheck(this);
+    connect(check_, &ProjectCheck::finished, this,
+            [this, branch](const ProjectCheck::Result &result) { onChecked(result, branch); });
+    check_->start(checkCommand_, current().worktree.path);
 }
 
-void AgentMergeQueue::onChecked(int exitCode, const QString &branch)
+void AgentMergeQueue::onChecked(const ProjectCheck::Result &result, const QString &branch)
 {
-    const QString output = QString::fromLocal8Bit(check_->readAll());
     check_->deleteLater();
     check_ = nullptr;
-    if (exitCode == 0) {
+    if (result.hasPassed()) {
         fastForward(branch);
         return;
     }
     sendBack(tr("Duet did not merge your commits into %1: the project's check failed (`%2`, exit code %3). Fix it, "
                 "commit, then end your turn: Duet merges again.\n\nLast lines of its output:\n%4")
-                 .arg(branch, checkCommand_, QString::number(exitCode), lastLines(output, reportedOutputLines)));
+                 .arg(branch, checkCommand_, QString::number(result.exitCode), result.lastLines(reportedOutputLines)));
 }
 
 void AgentMergeQueue::fastForward(const QString &branch)

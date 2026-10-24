@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "agent/AgentRun.h"
 #include "agent/HookServer.h"
 
 #include <QElapsedTimer>
@@ -9,9 +10,9 @@
 
 class AgentProvider;
 class QLabel;
-class QProcess;
 class QPushButton;
 class QTimer;
+class Spinner;
 
 // The tab shown while the agent draws a diagram (see DiagramRequest): what
 // was asked, what the agent is doing, the time spent, and Cancel. Once the file is
@@ -47,8 +48,7 @@ signals:
 
 private:
     void stop();
-    void readOutput();
-    void onProcessFinished();
+    void onRunFinished(const AgentRun::Outcome &outcome);
     void onHookReceived(const HookEvent &event);
     void addSteps(const QStringList &steps);
     void fail(const QString &error);
@@ -61,15 +61,12 @@ private:
 
     const AgentProvider *agent_;
     HookServer hookServer_;
-    QProcess *process_ = nullptr;
-    QByteArray pending_; // output not yet split into lines
-    QString answer_;     // the agent's final answer
-    bool answerFailed_ = false;
+    AgentRun *run_;
     QStringList steps_;
     QElapsedTimer elapsed_;
     QTimer *clock_;
 
-    QWidget *spinner_;
+    Spinner *spinner_;
     QLabel *title_;
     QLabel *stepsLabel_;
     QLabel *elapsedLabel_;

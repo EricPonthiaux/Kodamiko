@@ -10,6 +10,8 @@
 #include "agent/HookEvent.h"
 #include "agent/HookServer.h"
 #include "agent/NewAgentPopup.h"
+#include "agent/ReviewReport.h"
+#include "agent/ReviewRequest.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
 #include "agent/vendor/claude/ClaudeConfig.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
@@ -156,6 +158,33 @@ private slots:
         QVERIFY(!bare.contains("--settings"));
     }
 
+    void reviewRunMayOnlyReadTheProject()
+    {
+        const AgentReviewRun run{.workingDirectory = "/p",
+                                 .prompt = QStringLiteral("Review a.cpp."),
+                                 .answerSchema = QJsonObject{{"type", "object"}},
+                                 .model = QStringLiteral("opus")};
+
+        const QStringList arguments = ClaudeFileRun::reviewArguments(run);
+
+        QCOMPARE(arguments.first(), QStringLiteral("Review a.cpp.")); // before the variadic --allowedTools
+        QCOMPARE(arguments.at(arguments.indexOf("--output-format") + 1), QStringLiteral("stream-json"));
+        QVERIFY(arguments.contains("--no-session-persistence"));
+        QVERIFY(arguments.contains("--strict-mcp-config"));
+        QVERIFY(!arguments.contains("--mcp-config"));
+        QCOMPARE(arguments.at(arguments.indexOf("--json-schema") + 1), QStringLiteral(R"({"type":"object"})"));
+        QCOMPARE(arguments.at(arguments.indexOf("--model") + 1), QStringLiteral("opus"));
+        QCOMPARE(arguments.at(arguments.indexOf("--tools") + 1), QStringLiteral("Read,Grep,Glob"));
+        QCOMPARE(arguments.mid(arguments.indexOf("--allowedTools") + 1), (QStringList{"Read", "Grep", "Glob"}));
+    }
+
+    void reviewRunWithoutAModelUsesTheAgentsDefault()
+    {
+        const QStringList arguments = ClaudeFileRun::reviewArguments({.workingDirectory = "/p", .prompt = "Review."});
+
+        QVERIFY(!arguments.contains("--model"));
+    }
+
     void followsClaudeDrawing()
     {
         using Kind = AgentRunEvent::Kind;
@@ -182,6 +211,64 @@ private slots:
             ClaudeFileRun::parseLine(R"({"type":"result","subtype":"error_max_turns","is_error":true})", "/p");
         QVERIFY(limit.failed);
         QCOMPARE(limit.text, QStringLiteral("error_max_turns"));
+    }
+
+    void reviewRunAnswerIsItsStructuredOutput()
+    {
+        const auto done =
+            ClaudeFileRun::parseLine(R"({"type":"result","subtype":"success","is_error":false,"result":"Done.",)"
+                                     R"("structured_output":{"summary":"Fine.","findings":[]}})",
+                                     "/p");
+
+        QCOMPARE(done.kind, AgentRunEvent::Kind::Finished);
+        QCOMPARE(done.text, QStringLiteral(R"({"findings":[],"summary":"Fine."})"));
+    }
+
+    void readsTheFindingsOfAReview()
+    {
+        const QString answer = QStringLiteral(
+            R"({"summary":" One bug. ","findings":[)"
+            R"({"file":"src/a.cpp","line":12,"severity":"warning","problem":"Lost error.","scenario":"Disk full."},)"
+            R"({"file":"b.cpp","line":0,"severity":"error","problem":"Crash.","scenario":""},)"
+            R"({"file":"c.cpp","line":3,"severity":"error","problem":"","scenario":"x"}]})");
+
+        const QTemporaryDir project;
+
+        const std::optional<ReviewReport::Report> report = ReviewReport::parse(answer, project.path());
+
+        QVERIFY(report);
+        QCOMPARE(report->summary, QStringLiteral("One bug."));
+        QCOMPARE(report->findings.size(), 2); // the one without a problem is dropped
+        QCOMPARE(report->findings.at(0).path, project.filePath("src/a.cpp"));
+        QCOMPARE(report->findings.at(0).line, 12);
+        QCOMPARE(report->findings.at(0).severity, Diagnostic::Severity::Warning);
+        QCOMPARE(report->findings.at(1).line, 1);
+        QCOMPARE(report->findings.at(1).severity, Diagnostic::Severity::Error);
+    }
+
+    void reviewAnswerThatIsNotTheJsonAskedForHasNoReport()
+    {
+        QVERIFY(!ReviewReport::parse(QStringLiteral("No problems found."), "/p"));
+        QVERIFY(!ReviewReport::parse(QStringLiteral(R"({"summary":"Fine."})"), "/p"));
+    }
+
+    void reviewFindingBecomesAProblemAndMarkdown()
+    {
+        const QTemporaryDir project;
+        const ReviewReport::Finding finding{.path = project.filePath("src/a.cpp"),
+                                            .line = 12,
+                                            .severity = Diagnostic::Severity::Error,
+                                            .problem = "Lost error.",
+                                            .scenario = "Disk full."};
+
+        const Problem problem = ReviewReport::toProblem(finding, "Claude review");
+        const QString markdown = ReviewReport::toMarkdown({finding}, project.path());
+
+        QCOMPARE(problem.line, 11);
+        QCOMPARE(problem.message, QStringLiteral("Lost error.\nWhen it fails: Disk full."));
+        QCOMPARE(problem.source, QStringLiteral("Claude review"));
+        QCOMPARE(markdown, QDir::toNativeSeparators("1. **src/a.cpp:12** (error): Lost error.") +
+                               "\n   When it fails: Disk full.");
     }
 
     void ignoresUnknownOrInvalidEvents()
@@ -594,9 +681,7 @@ private slots:
         QVERIFY(target);
         // Claude Code reads paths with the system's separators.
         QCOMPARE(CodeRequest::mention(*target), QDir::toNativeSeparators("@src/a.cpp#L2-3"));
-        QCOMPARE(CodeRequest::prompt(CodeRequest::Kind::Review, *target),
-                 QDir::toNativeSeparators("Review @src/a.cpp#L2-3: point out problems with their line, then "
-                                          "propose fixes, applying nothing until I agree."));
+        QCOMPARE(CodeRequest::describe(*target), QDir::toNativeSeparators("src/a.cpp, lines 2-3"));
     }
 
     void codeRequestWithoutSelectionNamesTheSymbol()
@@ -612,6 +697,7 @@ private slots:
 
         QVERIFY(target);
         QCOMPARE(target->symbol, QStringLiteral("parse"));
+        QCOMPARE(CodeRequest::describe(*target), QStringLiteral("`parse` in a.cpp, line 1"));
         const QString prompt = CodeRequest::prompt(CodeRequest::Kind::Explain, *target);
         QVERIFY(prompt.startsWith(QStringLiteral("Explain `parse` at @a.cpp#L1: ")));
         QVERIFY(!prompt.contains(QStringLiteral("unsaved")));
@@ -638,16 +724,66 @@ private slots:
         QCOMPARE(CodeRequest::mention(target), QDir::toNativeSeparators("@\"my dir/a.cpp\"#L4"));
     }
 
-    void reviewPromptMentionsTheTreeEntries()
+    void reviewOfTreeEntriesNamesThemRelativeToTheProject()
     {
-        QTemporaryDir project;
+        const QTemporaryDir project;
         QVERIFY(QDir(project.path()).mkpath(QStringLiteral("src")));
         const QString file = project.filePath(QStringLiteral("my a.cpp"));
 
-        const QString prompt =
-            CodeRequest::reviewPrompt({project.filePath(QStringLiteral("src")), file}, project.path());
+        const QString subject = CodeRequest::describe({project.filePath(QStringLiteral("src")), file}, project.path());
 
-        QVERIFY(prompt.startsWith(QDir::toNativeSeparators("Review @src/ @\"my a.cpp\": ")));
+        QCOMPARE(subject, QDir::toNativeSeparators("src/, my a.cpp"));
+    }
+
+    void reviewPromptOfTheCodeAsItIsTellsNoPatchNorCheck()
+    {
+        const QString prompt = ReviewRequest::prompt({.subject = "a.cpp", .patchPath = {}, .check = std::nullopt});
+
+        QVERIFY(prompt.startsWith(QStringLiteral("Review a.cpp. You did not write this code")));
+        QVERIFY(!prompt.contains(QStringLiteral("unified diff")));
+        QVERIFY(!prompt.contains(QStringLiteral("check")));
+        QVERIFY(prompt.contains(QStringLiteral("do not invent problems")));
+    }
+
+    void reviewPromptOfChangesPointsToTheirPatch()
+    {
+        const QString prompt = ReviewRequest::prompt(
+            {.subject = "the uncommitted changes", .patchPath = "/tmp/r/changes.diff", .check = std::nullopt});
+
+        QVERIFY(prompt.contains(QStringLiteral("unified diff ") + QDir::toNativeSeparators("/tmp/r/changes.diff")));
+    }
+
+    void reviewPromptTellsWhatThePassedCheckCatches()
+    {
+        const ReviewRequest::Check check{.command = "ctest", .result = {.exitCode = 0, .output = "100% passed"}};
+
+        const QString prompt = ReviewRequest::prompt({.subject = "a.cpp", .patchPath = {}, .check = check});
+
+        QVERIFY(prompt.contains(QStringLiteral("the project's check `ctest`: it passed. Do not report what it would "
+                                               "catch")));
+        QVERIFY(!prompt.contains(QStringLiteral("100% passed")));
+    }
+
+    void reviewPromptGivesTheFailedCheckOutput()
+    {
+        const ReviewRequest::Check check{.command = "ctest", .result = {.exitCode = 8, .output = "tst_a failed\n"}};
+
+        const QString prompt = ReviewRequest::prompt({.subject = "a.cpp", .patchPath = {}, .check = check});
+
+        QVERIFY(prompt.contains(QStringLiteral("it failed, with exit code 8")));
+        QVERIFY(prompt.contains(QStringLiteral("```\ntst_a failed\n```")));
+    }
+
+    void reviewFollowUpHandsTheReviewOverVerbatim()
+    {
+        const QString review = QStringLiteral("1. **a.cpp:3**: 100%1 lost");
+
+        const QString followUp = ReviewRequest::followUp(QStringLiteral("Claude"), QStringLiteral("a.cpp"), review);
+
+        QVERIFY(followUp.startsWith(QStringLiteral("A separate Claude session, which did not see this conversation, "
+                                                   "reviewed a.cpp ")));
+        QVERIFY(followUp.contains(QStringLiteral("Apply nothing until I agree.")));
+        QVERIFY(followUp.endsWith(QStringLiteral("\n\n") + review));
     }
 
     void codeRequestNeedsAFile()

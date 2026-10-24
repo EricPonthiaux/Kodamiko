@@ -8,10 +8,11 @@
 #include <QString>
 #include <QStringList>
 
-// Claude Code's file runs (AgentFileRun): a one-off `claude --print` with
-// Duet's plugin (the diagrams skill), allowed to read the project and to
-// write the run's file only. Its stream-json output tells what Claude is
-// doing, for the loading screen.
+// Claude Code's runs without a session, one-off `claude --print` processes:
+// file runs (AgentFileRun), with Duet's plugin (the diagrams skill), allowed
+// to read the project and to write the run's file only; review runs
+// (AgentReviewRun), allowed to read the project only. Their stream-json
+// output tells what Claude is doing, for the loading screen.
 namespace ClaudeFileRun {
 
 // The arguments that follow --print. `hookCommand`, when given, checks the
@@ -21,6 +22,9 @@ QStringList arguments(const QString &prompt,
                       const QString &relativePath,
                       const QString &pluginPath,
                       const QString &hookCommand);
+
+// The arguments that follow --print for `run`.
+QStringList reviewArguments(const AgentReviewRun &run);
 
 // One line of the stream-json output; file paths in steps are shown
 // relative to `workDir`.

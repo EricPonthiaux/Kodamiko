@@ -165,9 +165,8 @@ QJsonArray buildProblemsJson(const DuetToolContext &context, const QString &path
     QJsonArray array;
     if (!context.problems)
         return array;
-    // The servers' first, then the builds'.
-    const Problems problems = context.problems->problems(path).mid(context.problems->serverProblems(path).size());
-    for (const Problem &problem : problems) {
+    // Not the reviews' findings: the user decides which ones the agent gets.
+    for (const Problem &problem : context.problems->unreportedBuildProblems(path)) {
         QJsonObject item{{QStringLiteral("line"), problem.line + 1},
                          {QStringLiteral("severity"), problem.severity == Diagnostic::Severity::Error
                                                           ? QStringLiteral("error")

@@ -7,6 +7,8 @@
 #include "agent/AgentIndicator.h"
 #include "agent/DiagramRequestPopup.h"
 #include "agent/EditorContext.h"
+#include "agent/ReviewRequest.h"
+#include "agent/ReviewView.h"
 #include "agent/mcp/DuetTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "agent/vendor/claude/ClaudeUsage.h"
@@ -18,7 +20,9 @@
 #include "editor/EditorWidget.h"
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
+#include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
+#include "navigation/CodeNavigator.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
@@ -34,11 +38,13 @@
 #include "viewers/DiagramView.h"
 #endif
 
+#include <QActionGroup>
 #include <QApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLabel>
+#include <QMenu>
 #include <QPainter>
 #include <QSettings>
 #include <QStatusBar>
@@ -47,6 +53,9 @@
 #include <QTabBar>
 #include <QTabWidget>
 #include <QTimer>
+
+#include <algorithm>
+#include <memory>
 
 namespace {
 
@@ -75,6 +84,31 @@ bool isSessionOf(const HookEvent &event, const QString &folder)
 {
     const QString directory = QDir::cleanPath(event.workingDirectory);
     return directory == folder || directory.startsWith(folder + QLatin1Char('/'));
+}
+
+// QSettings key of the model of the review runs: an AgentModel::id, empty
+// for the agent's default.
+const QString reviewerModelKey = QStringLiteral("reviewerModel");
+
+// The uncommitted changes of `status` as one patch for the reviewer: the
+// staged ones, then the others, untracked files included.
+QByteArray uncommittedPatch(const RepositoryStatus &status)
+{
+    QByteArray patch;
+    const auto append = [&patch](const QByteArray &title, const QList<FileDiff> &files) {
+        if (files.isEmpty())
+            return;
+        patch += "# " + title + "\n";
+        for (const FileDiff &file : files) {
+            if (file.isTooLarge)
+                patch += "# Too large to show: " + file.change.path.toUtf8() + "\n";
+            else
+                patch += file.patch;
+        }
+    };
+    append("Staged changes (last commit -> index)", status.staged);
+    append("Changes not staged (index -> files on disk)", status.unstaged);
+    return patch;
 }
 
 void saveConversation(const QString &folder, const QString &sessionId)
@@ -652,7 +686,7 @@ void MainWindow::createCodeRequestActions(QMenu *claude)
         codeRequestActions_.append(action);
     };
     add(tr("&Explain This Code"), {}, [this] { askClaude(CodeRequest::Kind::Explain); });
-    add(tr("Re&view This Code"), {}, [this] { askClaude(CodeRequest::Kind::Review); });
+    add(tr("Re&view This Code"), {}, [this] { reviewCode(); });
     add(tr("Write T&ests for This Code"), {}, [this] { askClaude(CodeRequest::Kind::WriteTests); });
     add(tr("&Add to %1's Prompt"), QKeySequence(tr("Ctrl+Alt+K")), [this] { addCodeToClaudePrompt(); });
     nameAfterAgent(codeRequestActions_.last(), tr("&Add to %1's Prompt"));
@@ -662,6 +696,101 @@ void MainWindow::askClaude(CodeRequest::Kind kind)
 {
     if (const std::optional<CodeRequest::Target> target = currentCodeTarget())
         typeInClaudePrompt(CodeRequest::prompt(kind, *target), PromptEntry::Submitted);
+}
+
+void MainWindow::reviewCode()
+{
+    const std::optional<CodeRequest::Target> target = currentCodeTarget();
+    if (!target)
+        return;
+    if (target->unsaved) {
+        showStatus(tr("Save the file first: the review reads it from the disk"));
+        return;
+    }
+    openReview(CodeRequest::describe(*target), QFileInfo(target->path).fileName());
+}
+
+void MainWindow::reviewPaths(const QStringList &paths)
+{
+    const bool isUnsaved =
+        std::ranges::any_of(paths, [this](const QString &path) { return editorTabs_->hasUnsavedChangesUnder(path); });
+    if (isUnsaved) {
+        showStatus(tr("Save the files first: the review reads them from the disk"));
+        return;
+    }
+    const QString title =
+        paths.size() == 1 ? QFileInfo(paths.first()).fileName() : tr("%n Entries", "", int(paths.size()));
+    openReview(CodeRequest::describe(paths, folder_), title);
+}
+
+void MainWindow::reviewChanges()
+{
+    if (editorTabs_->hasUnsavedChangesUnder(folder_)) {
+        showStatus(tr("Save the files first: the review reads them from the disk"));
+        return;
+    }
+    // Filled by the job, off the UI thread, then read on it: shared by the two.
+    const auto patch = std::make_shared<QByteArray>();
+    gitCommands_->runQuietly(
+        [folder = folder_, patch] {
+            const std::optional<RepositoryStatus> status = RepositoryStatus::read(folder);
+            if (!status)
+                throw GitError(QObject::tr("The folder is not in a git repository"));
+            *patch = uncommittedPatch(*status);
+            return QString();
+        },
+        [this, patch](const QString &, const QString &error) {
+            if (!error.isEmpty()) {
+                showStatus(tr("Could not read the changes to review: %1").arg(error));
+                return;
+            }
+            if (patch->isEmpty()) {
+                showStatus(tr("No uncommitted changes to review"));
+                return;
+            }
+            openReview(tr("the uncommitted changes of the project"), tr("Changes"), *patch);
+        });
+}
+
+void MainWindow::openReview(const QString &subject, const QString &title, const QByteArray &patch)
+{
+    setMode(Mode::Edit);
+    auto *view = new ReviewView({.workDir = folder_,
+                                 .subject = subject,
+                                 .patch = patch,
+                                 .checkCommand = project_.agentCheckCommand.trimmed(),
+                                 .model = QSettings().value(reviewerModelKey).toString(),
+                                 .agent = agentProvider_,
+                                 .problems = problemStore_});
+    editorTabs_->showPage(view, tr("Review: %1").arg(title), agentProvider_->iconName());
+    connect(view, &ReviewView::closeRequested, this, [this, view] { editorTabs_->closePage(view); });
+    connect(view, &ReviewView::openRequested, this, [this](const QString &path, int line) {
+        setMode(Mode::Edit);
+        navigator_->goToLine(path, line - 1, 0);
+    });
+    connect(view, &ReviewView::sendRequested, this, [this, subject](const QString &review) {
+        typeInClaudePrompt(ReviewRequest::followUp(agentProvider_->name(), subject, review), PromptEntry::Typed);
+    });
+    view->start();
+}
+
+void MainWindow::fillReviewerModelMenu(QMenu *menu)
+{
+    menu->clear();
+    // The previous opening's group, without its actions now.
+    qDeleteAll(menu->findChildren<QActionGroup *>(Qt::FindDirectChildrenOnly));
+    auto *group = new QActionGroup(menu);
+    const QString chosen = QSettings().value(reviewerModelKey).toString();
+    const auto add = [this, menu, group, &chosen](const QString &title, const QString &id) {
+        QAction *action = menu->addAction(title);
+        action->setCheckable(true);
+        action->setChecked(id == chosen);
+        group->addAction(action);
+        connect(action, &QAction::triggered, this, [id] { QSettings().setValue(reviewerModelKey, id); });
+    };
+    add(tr("&Default (%1's Settings)").arg(agentProvider_->name()), QString());
+    for (const AgentModel &model : agentProvider_->models())
+        add(model.title, model.id);
 }
 
 void MainWindow::addCodeToClaudePrompt()

@@ -13,11 +13,14 @@ class EditorWidget;
 // by the editor's context menu and the Claude menu. They name the code with
 // a file mention and its lines, so they hold even when the editor context
 // is not shared with each prompt.
+//
+// Reviews are not typed in the session: they run apart (AgentReviewRun, see
+// ReviewRequest), so that the reviewer does not inherit the reasoning that
+// wrote the code; describe() names their subject.
 namespace CodeRequest {
 
 enum class Kind {
     Explain,
-    Review,
     WriteTests,
 };
 
@@ -41,9 +44,11 @@ QString mention(const Target &target);
 // The prompt asking Claude for `kind` about `target`.
 QString prompt(Kind kind, const Target &target);
 
-// The prompt asking Claude to review whole files and folders (absolute
-// paths, from the file tree), mentioned relative to `projectFolder` when
-// inside it.
-QString reviewPrompt(const QStringList &paths, const QString &projectFolder);
+// What a review is about, in words, for its prompt and its tab:
+// "src/a.cpp, lines 2-3", "`parse` in a.cpp, line 1".
+QString describe(const Target &target);
+// The same for whole files and folders (absolute paths, from the file
+// tree), named relative to `projectFolder` when inside it: "src/, a.cpp".
+QString describe(const QStringList &paths, const QString &projectFolder);
 
 } // namespace CodeRequest

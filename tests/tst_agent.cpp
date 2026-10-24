@@ -4,10 +4,12 @@
 #include "agent/AgentIndicator.h"
 #include "agent/AgentProviders.h"
 #include "agent/HookServer.h"
+#include "agent/ProjectCheck.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
 
 #include <QLocalSocket>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 #include <QtTest>
 
 class TestAgent : public QObject {
@@ -103,6 +105,31 @@ private slots:
 
         QCOMPARE(socket.readLine(), QByteArray("ok\n"));
         QCOMPARE(received.size(), 0);
+    }
+
+    void projectCheckReportsItsExitCodeAndOutput()
+    {
+        const QTemporaryDir folder;
+        ProjectCheck check;
+        const QSignalSpy finished(&check, &ProjectCheck::finished);
+
+        // The same line for cmd.exe and /bin/sh.
+        check.start(QStringLiteral("echo checked && exit 3"), folder.path());
+
+        QTRY_COMPARE(finished.size(), 1);
+        const auto result = finished.first().first().value<ProjectCheck::Result>();
+        QCOMPARE(result.exitCode, 3);
+        QVERIFY(!result.hasPassed());
+        QCOMPARE(result.lastLines(1), QStringLiteral("checked"));
+    }
+
+    void projectCheckKeepsTheLastLinesOfItsOutput()
+    {
+        const ProjectCheck::Result result{.exitCode = 0, .output = QStringLiteral("a\nb\nc\n")};
+
+        QVERIFY(result.hasPassed());
+        QCOMPARE(result.lastLines(2), QStringLiteral("b\nc"));
+        QCOMPARE(result.lastLines(10), QStringLiteral("a\nb\nc"));
     }
 };
 

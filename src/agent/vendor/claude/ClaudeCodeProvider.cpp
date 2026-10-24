@@ -121,6 +121,19 @@ std::optional<ProcessSpec> ClaudeCodeProvider::fileRunProcess(const AgentFileRun
     return spec;
 }
 
+QList<AgentModel> ClaudeCodeProvider::models() const
+{
+    // The aliases of `claude --model`: always the latest of each family.
+    return {{QStringLiteral("opus"), QStringLiteral("Opus")},
+            {QStringLiteral("sonnet"), QStringLiteral("Sonnet")},
+            {QStringLiteral("haiku"), QStringLiteral("Haiku")}};
+}
+
+std::optional<ProcessSpec> ClaudeCodeProvider::reviewRunProcess(const AgentReviewRun &run, QString *error) const
+{
+    return ClaudeLauncher::printProcess(run.workingDirectory, ClaudeFileRun::reviewArguments(run), error);
+}
+
 AgentRunEvent ClaudeCodeProvider::parseRunOutput(const QByteArray &line, const QString &workingDirectory) const
 {
     return ClaudeFileRun::parseLine(line, workingDirectory);

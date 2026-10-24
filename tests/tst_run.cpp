@@ -336,6 +336,30 @@ private slots:
         QVERIFY(store.files().isEmpty());
     }
 
+    void keepsReviewFindingsBesideBuildProblemsUntilTheirReviewEnds()
+    {
+        ProblemStore store(nullptr);
+        Problem build;
+        build.path = "/p/a.cpp";
+        build.line = 3;
+        build.message = "build";
+        Problem finding = build;
+        finding.message = "finding";
+        finding.source = "Claude review";
+        store.setBuildProblems("Build", {build});
+
+        store.setReviewProblems("review-1", {finding});
+
+        // Same line and severity as the build's: still kept, with its source.
+        QCOMPARE(store.problems("/p/a.cpp").size(), 2);
+        QCOMPARE(store.problems("/p/a.cpp").last().source, QString("Claude review"));
+        QCOMPARE(store.unreportedBuildProblems("/p/a.cpp").size(), 1);
+        store.clearBuildProblems();
+        QCOMPARE(store.files(), QStringList{"/p/a.cpp"});
+        store.setReviewProblems("review-1", {});
+        QVERIFY(store.files().isEmpty());
+    }
+
     void remembersTheChosenConfiguration()
     {
         const QTemporaryDir dir;

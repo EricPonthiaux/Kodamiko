@@ -26,15 +26,15 @@ QString mentionedPath(const QString &path)
     return native.contains(QLatin1Char(' ')) ? QStringLiteral("\"%1\"").arg(native) : native;
 }
 
-// "@src/" for a folder, "@src/main.cpp" for a file.
-QString entryMention(const QString &path, const QString &projectFolder)
+// "src/" for a folder, "src/main.cpp" for a file.
+QString entryName(const QString &path, const QString &projectFolder)
 {
     QString relative = relativePath(path, projectFolder);
     if (relative == QLatin1String("."))
         relative = QStringLiteral("./");
     else if (QFileInfo(path).isDir())
         relative += QLatin1Char('/');
-    return QLatin1Char('@') + mentionedPath(relative);
+    return QDir::toNativeSeparators(relative);
 }
 
 // What the request is about, in words: "`parse` at @a.cpp#L12" or the
@@ -104,10 +104,6 @@ QString prompt(Kind kind, const Target &target)
                       ? QStringLiteral("Explain %1: what it does and why, briefly.")
                       : QStringLiteral("Explain %1: what it is, what it does and how the project uses it, briefly.");
         break;
-    case Kind::Review:
-        request = QStringLiteral("Review %1: point out problems with their line, then propose fixes, applying "
-                                 "nothing until I agree.");
-        break;
     case Kind::WriteTests:
         request = QStringLiteral("Write tests for %1, with the project's test framework and in the style of its "
                                  "existing tests, then run them.");
@@ -116,14 +112,25 @@ QString prompt(Kind kind, const Target &target)
     return request.arg(subject(target)) + unsavedNote(target);
 }
 
-QString reviewPrompt(const QStringList &paths, const QString &projectFolder)
+QString describe(const Target &target)
 {
-    QStringList mentions;
+    const QString path = QDir::toNativeSeparators(target.path);
+    QString lines;
+    if (target.firstLine == target.lastLine)
+        lines = QStringLiteral("%1, line %2").arg(path).arg(target.firstLine);
+    else
+        lines = QStringLiteral("%1, lines %2-%3").arg(path).arg(target.firstLine).arg(target.lastLine);
+    if (target.symbol.isEmpty())
+        return lines;
+    return QStringLiteral("`%1` in %2").arg(target.symbol, lines);
+}
+
+QString describe(const QStringList &paths, const QString &projectFolder)
+{
+    QStringList names;
     for (const QString &path : paths)
-        mentions.append(entryMention(path, projectFolder));
-    return QStringLiteral("Review %1: point out problems with their file and line, then propose fixes, applying "
-                          "nothing until I agree.")
-        .arg(mentions.join(QLatin1Char(' ')));
+        names.append(entryName(path, projectFolder));
+    return names.join(QStringLiteral(", "));
 }
 
 } // namespace CodeRequest

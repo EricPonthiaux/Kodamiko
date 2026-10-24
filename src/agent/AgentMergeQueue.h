@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ProjectCheck.h"
 #include "git/FileStatuses.h"
 #include "git/Worktrees.h"
 
@@ -11,7 +12,6 @@
 
 class GitCommands;
 class GitError;
-class QProcess;
 
 // Merges the agents' commits into the checkout's current branch, one agent at
 // a time: replays them on the branch in the agent's worktree, runs the
@@ -86,7 +86,7 @@ private:
     void rebase();
     void onRebased(const RebaseResult &result, const QString &branch, const QString &head);
     void runCheck(const QString &branch);
-    void onChecked(int exitCode, const QString &branch);
+    void onChecked(const ProjectCheck::Result &result, const QString &branch);
     void fastForward(const QString &branch);
     void onFastForwardFailed(const GitError &error, const QStringList &blockingFiles);
     void fail(const QString &message);
@@ -104,5 +104,5 @@ private:
     QList<Request> queue_;
     // Kept out by the user's changes, apart from the queue.
     QList<Request> waiting_;
-    QProcess *check_ = nullptr; // the running check, a child
+    ProjectCheck *check_ = nullptr; // the running check, a child
 };

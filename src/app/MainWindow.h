@@ -417,6 +417,19 @@ private:
     // the editor's context menu and the Claude menu.
     void createCodeRequestActions(QMenu *claude);
     void askClaude(CodeRequest::Kind kind);
+    // Reviews in a separate agent process (ReviewView), not in the session:
+    // the code at the cursor or selection, or files and folders of the tree.
+    // The files must be saved, as the reviewer reads them from the disk.
+    void reviewCode();
+    void reviewPaths(const QStringList &paths);
+    // Claude ▸ Review Changes: the uncommitted changes of the project.
+    void reviewChanges();
+    // The review tab of `subject` (a CodeRequest::describe() result), named
+    // after `title`; `patch`, a unified diff, holds the changes to review
+    // (empty: the code as it is). The project's check runs first.
+    void openReview(const QString &subject, const QString &title, const QByteArray &patch = {});
+    // Claude ▸ Reviewer Model: the agent's default or one of its models.
+    void fillReviewerModelMenu(QMenu *menu);
     void addCodeToClaudePrompt();
     // The code the requests are about; nullopt, with a message, without a
     // file in front of the user.

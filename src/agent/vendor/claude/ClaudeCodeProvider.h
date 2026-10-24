@@ -26,6 +26,8 @@ public:
                                               QString *error) const override;
 
     std::optional<ProcessSpec> fileRunProcess(const AgentFileRun &run, QString *error) const override;
+    QList<AgentModel> models() const override;
+    std::optional<ProcessSpec> reviewRunProcess(const AgentReviewRun &run, QString *error) const override;
     AgentRunEvent parseRunOutput(const QByteArray &line, const QString &workingDirectory) const override;
 
     std::optional<HookEvent> parseHook(const QByteArray &json) const override;
