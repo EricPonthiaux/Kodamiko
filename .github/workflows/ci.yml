@@ -48,8 +48,9 @@ jobs:
           path: build/_deps/*-subbuild
           key: deps-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/GraphvizWindows.cmake') }}
 
+      # LTO is off in the CI for now.
       - name: Configure
-        run: cmake --preset default
+        run: cmake --preset default -DDUET_LTO=OFF
 
       - name: Build
         run: cmake --build --preset default
