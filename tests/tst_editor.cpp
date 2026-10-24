@@ -65,6 +65,10 @@ private slots:
         qputenv("GIT_AUTHOR_EMAIL", "t@t");
         qputenv("GIT_COMMITTER_NAME", "t");
         qputenv("GIT_COMMITTER_EMAIL", "t@t");
+        // Settings of the tests, not the user's. Without an organization,
+        // Windows' registry keeps no settings at all.
+        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setApplicationName(QStringLiteral("tst_editor"));
     }
 
     void findCountsAndCyclesThroughMatches()
@@ -173,6 +177,9 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\ntwo\nthree\nfour\n");
         Git::run(dir.path(), {"init", "-q"});
+        // libgit2 reads the system's configuration despite GIT_CONFIG_NOSYSTEM:
+        // on Windows, its core.autocrlf would give the index's text in CRLF.
+        Git::run(dir.path(), {"config", "core.autocrlf", "false"});
         Git::run(dir.path(), {"add", "a.txt"});
 
         EditorWidget editor(Theme::dark());

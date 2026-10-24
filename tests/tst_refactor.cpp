@@ -19,6 +19,7 @@
 #include "ui/Theme.h"
 
 #include <QCheckBox>
+#include <QDir>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
@@ -627,14 +628,16 @@ private slots:
         const QByteArray text = "package p;\n\nimport java.util.List;\n\npublic class A {}\n\n"
                                 "/** Doc. */\n@Deprecated\nclass B extends A {}\n";
 
+        // An absolute path on every system: "C:/p/A.java" on Windows.
+        const QString path = QDir::rootPath() + "p/A.java";
         const MoveClass::Result result =
-            MoveClass::plan({.path = "/p/A.java", .languageId = "java", .text = text, .cursor = {8, 7}});
+            MoveClass::plan({.path = path, .languageId = "java", .text = text, .cursor = {8, 7}});
 
-        QCOMPARE(result.newPath, QString("/p/B.java"));
+        QCOMPARE(result.newPath, QDir::rootPath() + "p/B.java");
         QCOMPARE(std::get<DocumentEdit>(result.edit.changes[1]).edits.first().newText,
                  QString("package p;\nimport java.util.List;\n\n/** Doc. */\n@Deprecated\nclass B extends A {}\n"));
         const MoveClass::Result publicOne =
-            MoveClass::plan({.path = "/p/A.java", .languageId = "java", .text = text, .cursor = {4, 15}});
+            MoveClass::plan({.path = path, .languageId = "java", .text = text, .cursor = {4, 15}});
         QCOMPARE(publicOne.error, QString("“A” is the public class of its file"));
     }
 

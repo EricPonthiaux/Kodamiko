@@ -76,8 +76,32 @@ void editInEditor(EditorWidget *editor, const QList<TextEdit> &edits)
     editor->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
 }
 
-// Changes the text of `edit`'s file, recording it in `journal`.
-QString editText(const DocumentEdit &edit, const EditTargets &targets, EditJournal &journal)
+// The line ending of a file the edit fills from empty: that of the first
+// existing file it changes, the one a moved class comes from, rather than
+// the platform's.
+LineEnding lineEndingOfNewFiles(const WorkspaceEdit &edit, const EditTargets &targets)
+{
+    for (const DocumentChange &change : edit.changes) {
+        const auto *documentEdit = std::get_if<DocumentEdit>(&change);
+        if (!documentEdit)
+            continue;
+        if (const EditorWidget *editor = targets.tabs->editorFor(documentEdit->filePath))
+            return editor->format().lineEnding;
+        if (!QFileInfo::exists(documentEdit->filePath))
+            continue;
+        QString error;
+        if (const std::optional<DecodedText> decoded = TextFile::load(documentEdit->filePath, &error))
+            return decoded->format.lineEnding;
+    }
+    return TextFile::decode({}).format.lineEnding;
+}
+
+// Changes the text of `edit`'s file, recording it in `journal`. An empty
+// file gets `newFileLineEnding`.
+QString editText(const DocumentEdit &edit,
+                 const EditTargets &targets,
+                 EditJournal &journal,
+                 LineEnding newFileLineEnding)
 {
     if (EditorWidget *editor = targets.tabs->editorFor(edit.filePath)) {
         const QString before = editor->text();
@@ -89,11 +113,14 @@ QString editText(const DocumentEdit &edit, const EditTargets &targets, EditJourn
     const std::optional<DecodedText> decoded = TextFile::load(edit.filePath, &error);
     if (!decoded)
         return tr("Could not change %1: %2").arg(nameOf(edit.filePath), error);
+    TextFileFormat format = decoded->format;
+    if (decoded->text.isEmpty())
+        format.lineEnding = newFileLineEnding;
     QList<TextEdit> edits = edit.edits;
     for (TextEdit &textEdit : edits)
-        textEdit.newText = TextFile::withLineEnding(textEdit.newText, decoded->format.lineEnding);
+        textEdit.newText = TextFile::withLineEnding(textEdit.newText, format.lineEnding);
     const QString after = applyEdits(decoded->text, edits);
-    if (!TextFile::save(edit.filePath, after, decoded->format, &error))
+    if (!TextFile::save(edit.filePath, after, format, &error))
         return tr("Could not change %1: %2").arg(nameOf(edit.filePath), error);
     journal.record(EditJournal::TextChange{edit.filePath, decoded->text, after});
     return {};
@@ -162,10 +189,13 @@ QString remove(const FileOperation &operation, const EditTargets &targets, EditJ
     return {};
 }
 
-QString perform(const DocumentChange &change, const EditTargets &targets, EditJournal &journal)
+QString perform(const DocumentChange &change,
+                const EditTargets &targets,
+                EditJournal &journal,
+                LineEnding newFileLineEnding)
 {
     if (const auto *documentEdit = std::get_if<DocumentEdit>(&change))
-        return editText(*documentEdit, targets, journal);
+        return editText(*documentEdit, targets, journal, newFileLineEnding);
     const auto &operation = std::get<FileOperation>(change);
     switch (operation.kind) {
     case FileOperation::Kind::Create:
@@ -208,9 +238,10 @@ Outcome apply(const WorkspaceEdit &edit, const EditTargets &targets)
             outcome.errors.append(tr("%1 changed meanwhile: nothing was changed, try again").arg(nameOf(path)));
         return outcome;
     }
+    const LineEnding newFileLineEnding = lineEndingOfNewFiles(edit, targets);
     EditJournal journal;
     for (const DocumentChange &change : edit.changes) {
-        const QString error = perform(change, targets, journal);
+        const QString error = perform(change, targets, journal, newFileLineEnding);
         if (error.isEmpty())
             continue;
         outcome.errors.append(error);

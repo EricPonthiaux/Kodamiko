@@ -662,7 +662,7 @@ private slots:
         // jdtls itself runs on Java 21.
         QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"JDK 17", "JDK 21", "jdtls 1.62.0"}));
 
-        fakeInstall(toolchains, "jdk", "21", "bin/java");
+        fakeInstall(toolchains, "jdk", "21", javaExecutable);
         fakeInstall(toolchains, "jdtls", "1.62.0", "bin/jdtls");
         QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"JDK 17"}));
         config.languages[0].runtimeVersion = "21";
@@ -685,7 +685,7 @@ private slots:
         QCOMPARE(setup.runtimeVersion, QString("21"));
         QCOMPARE(setup.server, QString("jdtls"));
         QCOMPARE(setup.serverVersion, QString("1.62.0")); // nothing installed: the newest
-        fakeInstall(toolchains, "jdk", "17", "bin/java");
+        fakeInstall(toolchains, "jdk", "17", javaExecutable);
         const std::optional<RuntimeInstall> jdk = toolchains.runtime("jdk", "17");
         QVERIFY(jdk);
         QVERIFY(jdk->managed);
@@ -1027,14 +1027,18 @@ private slots:
     void trustingAFolderKeepsTheRestOfClaudesState()
     {
         const QTemporaryDir dir;
+        // An absolute path on every system: "C:/elsewhere" on Windows.
+        const QString elsewhere = QDir::rootPath() + "elsewhere";
         write(claudeConfig_.filePath(".claude.json"),
-              R"({"theme": "dark", "projects": {"/elsewhere": {"hasTrustDialogAccepted": true}}})");
+              QStringLiteral(R"({"theme": "dark", "projects": {"%1": {"hasTrustDialogAccepted": true}}})")
+                  .arg(elsewhere)
+                  .toUtf8());
         QString error;
 
         QVERIFY2(ClaudeTrust::trust(dir.path(), &error), qPrintable(error));
 
         QVERIFY(ClaudeTrust::isTrusted(dir.path()));
-        QVERIFY(ClaudeTrust::isTrusted("/elsewhere"));
+        QVERIFY(ClaudeTrust::isTrusted(elsewhere));
         QFile file(claudeConfig_.filePath(".claude.json"));
         QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(QJsonDocument::fromJson(file.readAll()).object().value("theme").toString(), QString("dark"));

@@ -137,6 +137,10 @@ bool ConPty::start(const ProcessSpec &spec, QSize cells)
     STARTUPINFOEXW startupInfo{};
     startupInfo.StartupInfo.cb = sizeof(STARTUPINFOEXW);
     startupInfo.lpAttributeList = attributeList;
+    // Null handles: without them, when Duet's own output is redirected (a
+    // pipe, as under ctest), the program writes there instead of into the
+    // pseudo-console.
+    startupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
 
     std::wstring command = commandLine(program, spec.arguments);
     std::wstring environment = environmentBlock(spec.environment);

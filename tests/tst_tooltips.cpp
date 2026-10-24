@@ -86,7 +86,9 @@ private slots:
     {
         window_.setToolTip({});
         sendHelpEvent(&window_, QGuiApplication::primaryScreen()->geometry().topLeft() + QPoint(40, 100));
-        QCoreApplication::processEvents();
+        // The help event's turn of the event loop ends: one processEvents()
+        // does not always run its zero timer on Windows.
+        QTest::qWait(10);
         const QPoint anchor = nearTheRightEdge();
 
         QToolTip::showText(anchor, wideText, &window_);

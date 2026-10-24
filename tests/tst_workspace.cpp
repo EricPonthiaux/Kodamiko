@@ -91,7 +91,14 @@ class TestWorkspace : public QObject {
 
 private slots:
 
-    void initTestCase() { ClickableCursors::install(); }
+    void initTestCase()
+    {
+        // Settings of the tests, not the user's. Without an organization,
+        // Windows' registry keeps no settings at all.
+        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setApplicationName(QStringLiteral("tst_workspace"));
+        ClickableCursors::install();
+    }
 
     // The widgets are children: a window always keeps a cursor of its own.
     void clickableControlsShowThePointingHand()

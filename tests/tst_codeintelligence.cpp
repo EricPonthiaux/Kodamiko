@@ -20,6 +20,7 @@
 #include "ui/Theme.h"
 
 #include <QCheckBox>
+#include <QDir>
 #include <QJsonArray>
 #include <QLineEdit>
 #include <QListWidget>
@@ -601,7 +602,8 @@ private slots:
         QCOMPARE(outcome->status, RefactoringOutcome::Status::Applied);
         QCOMPARE(read(project.dir.filePath("main.cpp")), QByteArray("#include \"inc/sum.h\"\n"));
         QVERIFY(QFileInfo::exists(project.dir.filePath("inc/sum.h")));
-        QCOMPARE(project.intelligence.history()->lastDescription(), QString("Move “total.h” to inc/sum.h"));
+        QCOMPARE(project.intelligence.history()->lastDescription(),
+                 QDir::toNativeSeparators("Move “total.h” to inc/sum.h"));
         project.intelligence.undoRefactoring(); // the move and the include, together
         QVERIFY(QFileInfo::exists(project.dir.filePath("total.h")));
         QCOMPARE(read(project.dir.filePath("main.cpp")), QByteArray("#include \"total.h\"\n"));

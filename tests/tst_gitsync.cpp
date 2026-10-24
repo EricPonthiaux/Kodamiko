@@ -564,6 +564,9 @@ private slots:
 
     void credentialsStayCachedPerRepository()
     {
+#ifdef Q_OS_WIN
+        QSKIP("git's credential cache needs Unix sockets: Duet leaves Windows' credential manager in charge");
+#else
         // Without askpass, a credential that is not cached fails instead of
         // prompting.
         qunsetenv("GIT_ASKPASS");
@@ -586,6 +589,7 @@ private slots:
         QVERIFY_THROWS_EXCEPTION(GitError, Git::run(other.path(), {"credential", "fill"}, question));
 
         Git::run(project.path(), {"credential-cache", "exit", "--socket=" + socket});
+#endif
     }
 
 private:

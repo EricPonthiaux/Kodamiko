@@ -25,6 +25,7 @@
 #include "ui/MessagePopup.h"
 #include "ui/Theme.h"
 
+#include <QDir>
 #include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -591,10 +592,11 @@ private slots:
         const std::optional<CodeRequest::Target> target = CodeRequest::targetIn(editor, project.path());
 
         QVERIFY(target);
-        QCOMPARE(CodeRequest::mention(*target), QStringLiteral("@src/a.cpp#L2-3"));
+        // Claude Code reads paths with the system's separators.
+        QCOMPARE(CodeRequest::mention(*target), QDir::toNativeSeparators("@src/a.cpp#L2-3"));
         QCOMPARE(CodeRequest::prompt(CodeRequest::Kind::Review, *target),
-                 QStringLiteral("Review @src/a.cpp#L2-3: point out problems with their line, then propose fixes, "
-                                "applying nothing until I agree."));
+                 QDir::toNativeSeparators("Review @src/a.cpp#L2-3: point out problems with their line, then "
+                                          "propose fixes, applying nothing until I agree."));
     }
 
     void codeRequestWithoutSelectionNamesTheSymbol()
@@ -633,7 +635,7 @@ private slots:
     void codeRequestMentionsQuotePathsWithSpaces()
     {
         const CodeRequest::Target target{.path = QStringLiteral("my dir/a.cpp"), .firstLine = 4, .lastLine = 4};
-        QCOMPARE(CodeRequest::mention(target), QStringLiteral("@\"my dir/a.cpp\"#L4"));
+        QCOMPARE(CodeRequest::mention(target), QDir::toNativeSeparators("@\"my dir/a.cpp\"#L4"));
     }
 
     void reviewPromptMentionsTheTreeEntries()
@@ -645,7 +647,7 @@ private slots:
         const QString prompt =
             CodeRequest::reviewPrompt({project.filePath(QStringLiteral("src")), file}, project.path());
 
-        QVERIFY(prompt.startsWith(QStringLiteral("Review @src/ @\"my a.cpp\": ")));
+        QVERIFY(prompt.startsWith(QDir::toNativeSeparators("Review @src/ @\"my a.cpp\": ")));
     }
 
     void codeRequestNeedsAFile()
@@ -804,8 +806,13 @@ private slots:
     void autoMemoryFollowsClaudeCodeNaming()
     {
         qputenv("CLAUDE_CONFIG_DIR", "/c");
+#ifdef Q_OS_WIN
+        QCOMPARE(ClaudeConfig::autoMemoryDir("C:/Users/me/my_app.v2"),
+                 QStringLiteral("/c/projects/C--Users-me-my-app-v2/memory"));
+#else
         QCOMPARE(ClaudeConfig::autoMemoryDir("/home/me/my_app.v2"),
                  QStringLiteral("/c/projects/-home-me-my-app-v2/memory"));
+#endif
         qunsetenv("CLAUDE_CONFIG_DIR");
     }
 

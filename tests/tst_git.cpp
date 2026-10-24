@@ -54,6 +54,9 @@ void initRepository(const QTemporaryDir &dir, const QHash<QString, QByteArray> &
     for (auto it = files.begin(); it != files.end(); ++it)
         write(dir, it.key(), it.value());
     git(dir, {"init", "-q", "-b", "main"});
+    // libgit2 reads the system's configuration despite GIT_CONFIG_NOSYSTEM:
+    // on Windows, its core.autocrlf would give the index's text in CRLF.
+    git(dir, {"config", "core.autocrlf", "false"});
     if (!files.isEmpty()) {
         git(dir, {"add", "-A"});
         git(dir, {"commit", "-qm", "init"});
@@ -1103,7 +1106,11 @@ private slots:
         GitCommands commands;
         AgentMergeQueue queue(&commands);
         queue.setFolder(project.path());
+#ifdef Q_OS_WIN
+        queue.setCheckCommand("echo tests broken& exit 3"); // cmd.exe
+#else
         queue.setCheckCommand("echo tests broken; exit 3");
+#endif
         QSignalSpy sentBack(&queue, &AgentMergeQueue::sentBack);
 
         queue.enqueue(worktree);
