@@ -214,7 +214,7 @@ void NewProjectForm::create()
         setup.language = recipe->language;
         setup.recipe = recipe->id;
         project.languages.append(setup);
-        project.needsRecipeSetup = !recipe->setupCommands.isEmpty();
+        project.needsRecipeSetup = true;
         ProjectStore::save(project);
     }
     emit created(folder);

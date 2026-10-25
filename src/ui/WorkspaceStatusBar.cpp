@@ -18,6 +18,8 @@
 
 namespace {
 
+constexpr int boxGapPx = 4;
+
 class StatusRow : public QWidget {
 public:
     using QWidget::QWidget;
@@ -69,11 +71,15 @@ WorkspaceStatusBar::WorkspaceStatusBar(QTabBar *modes, QWidget *parent)
     trailing_->installEventFilter(this);
     modes_->installEventFilter(this);
     AppFonts::followApplicationFont(this, [this] {
-        const int control = UiMetrics::scaled(UiMetrics::toolbarButtonSize);
+        const int control = UiMetrics::controlHeight();
         more_->setFixedSize(control, control);
         more_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
         modes_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
         trailingLayout_->setSpacing(UiMetrics::scaled(8));
+        // Room above and below the boxes: they stand in the middle of the
+        // bar, clear of its line.
+        const int gap = UiMetrics::scaled(boxGapPx);
+        trailingLayout_->setContentsMargins(0, gap, 0, gap);
         detailsLayout_->setSpacing(UiMetrics::scaled(12));
         scheduleLayout();
     });

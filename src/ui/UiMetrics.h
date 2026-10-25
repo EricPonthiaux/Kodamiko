@@ -31,6 +31,16 @@ constexpr int panelHeaderHeight = 41;
 // `referencePx`, given for an 11 pt interface font, at the application
 // font's size.
 int scaled(int referencePx);
+// The height of an editor tab at the application font: a line of text,
+// the tab's 7 px paddings and its 2 px accent line (ThemeStyle).
+int tabHeight();
+// The height of the bars' boxes (chips, the run block, buttons, the mode
+// tabs): toolbarButtonSize scaled, but never taller than a tab, which
+// grows less than the font with it.
+int controlHeight();
+// Gives `widget` the fixed height controlHeight(), and again whenever the
+// application font changes.
+void setControlHeight(QWidget *widget);
 // Gives `widget` the fixed height `referencePx` scaled, and again whenever
 // the application font changes.
 void setScaledHeight(QWidget *widget, int referencePx);

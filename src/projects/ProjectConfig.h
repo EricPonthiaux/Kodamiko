@@ -43,8 +43,9 @@ struct ProjectConfig {
     // Shell command run in an agent's worktree before its commits are
     // merged (see AgentMergeQueue); empty: none.
     QString agentCheckCommand;
-    // True from its creation with a recipe that has setup commands until
-    // they succeed (see Recipe::setupCommands).
+    // True from its creation with a recipe until its first setup is done:
+    // the tools the recipe requires downloaded, then its setup commands
+    // succeeded (see Recipe::setupCommands).
     bool needsRecipeSetup = false;
 
     // The ids of the recipes attached to its enabled languages, in their

@@ -277,6 +277,7 @@ add_library(duet_core STATIC
     ui/KdeThemes.cpp
     ui/LetterBadges.cpp
     ui/MessagePopup.cpp
+    ui/ModeTabBar.cpp
     ui/Motion.cpp
     ui/NoticeBar.cpp
     ui/OverlayPopup.cpp

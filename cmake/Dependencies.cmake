@@ -7,7 +7,13 @@
 #   cmark-gfm    GitHub's Markdown parser (Markdown preview)    BSD-2-Clause
 
 include(FetchContent)
-set(FETCHCONTENT_QUIET ON)
+# Downloads print their progress: a quiet configure looks stuck while git
+# clones (FetchContent is quiet by default).
+set(FETCHCONTENT_QUIET OFF)
+# A dependency already downloaded is not checked against its repository
+# again: configuring needs no network. Changing its GIT_TAG still fetches
+# the new version.
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
 # Pointing SOURCE_SUBDIR at a nonexistent folder makes FetchContent
 # download the project without adding it to the build: we define its

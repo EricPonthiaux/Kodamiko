@@ -11,15 +11,6 @@
 #include <algorithm>
 #include <cmath>
 
-namespace {
-
-int controlHeight()
-{
-    return UiMetrics::scaled(UiMetrics::toolbarButtonSize);
-}
-
-} // namespace
-
 BrandLogo::BrandLogo(const Theme *theme, QWidget *parent)
     : QWidget(parent)
     , theme_(theme)
@@ -27,7 +18,7 @@ BrandLogo::BrandLogo(const Theme *theme, QWidget *parent)
     setObjectName(QStringLiteral("brandLogo"));
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     AppFonts::followApplicationFont(this, [this] {
-        setFixedHeight(controlHeight());
+        setFixedHeight(UiMetrics::controlHeight());
         updateGeometry();
     });
     setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -60,7 +51,7 @@ void BrandLogo::setTrailingGap(int pixels)
 QSize BrandLogo::sizeHint() const
 {
     const int inkRight = int(std::ceil(BrandMark::inkRect(markArea()).right()));
-    return {inkRight + trailingGap_, controlHeight()};
+    return {inkRight + trailingGap_, UiMetrics::controlHeight()};
 }
 
 void BrandLogo::paintEvent(QPaintEvent *)
@@ -71,7 +62,7 @@ void BrandLogo::paintEvent(QPaintEvent *)
 
 QRectF BrandLogo::markArea() const
 {
-    const int control = controlHeight();
+    const int control = UiMetrics::controlHeight();
     const qreal side = control * scale_;
     const int place = std::max(placeWidth_, control);
     return {(place - side) / 2, (control - side) / 2, side, side};

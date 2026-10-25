@@ -102,10 +102,8 @@ void MainWindow::openFolder(const QString &folder)
     setWindowTitle(QStringLiteral("%1 — Duet").arg(QFileInfo(folder_).fileName()));
     terminalWindow_->setWindowTitle(tr("Terminals — %1").arg(QFileInfo(folder_).fileName()));
     updateProjectMenu();
-    if (project_.needsRecipeSetup) {
-        for (const Recipe &recipe : std::as_const(recipes_))
-            runRecipeSetup(recipe);
-    }
+    if (project_.needsRecipeSetup)
+        setUpNewProject();
 }
 
 void MainWindow::saveSession()
@@ -282,6 +280,9 @@ void MainWindow::applyProject(const ProjectConfig &project)
     dismissedServerNotices_.clear();
     updateToolsNotice();
     updateServerNotice();
+    // The new project's tools, downloaded just now: its setup can run.
+    if (project_.needsRecipeSetup && !hasMissingTools())
+        runRecipeSetups();
 }
 
 void MainWindow::closeProject()
@@ -346,6 +347,11 @@ QStringList MainWindow::busyShells() const
             titles.append(terminalTabs_->tabText(i));
     }
     return titles;
+}
+
+bool MainWindow::hasMissingTools() const
+{
+    return !InstallPlan::plan(project_, *toolchains_, RecipeLibrary::requirementsOf(project_)).isEmpty();
 }
 
 void MainWindow::updateToolsNotice()

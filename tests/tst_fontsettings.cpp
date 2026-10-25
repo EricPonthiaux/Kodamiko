@@ -155,7 +155,10 @@ private slots:
 
         QCOMPARE(window.titleBar->height(), 2 * UiMetrics::titleBarHeight);
         QCOMPARE(window.panelHeader()->height(), 2 * UiMetrics::panelHeaderHeight);
-        QCOMPARE(window.projectChip()->height(), 2 * UiMetrics::toolbarButtonSize);
+        // Taller, but no taller than a tab.
+        QVERIFY(window.projectChip()->height() > UiMetrics::toolbarButtonSize);
+        QCOMPARE(window.projectChip()->height(), UiMetrics::controlHeight());
+        QVERIFY(window.projectChip()->height() <= UiMetrics::tabHeight());
         QCOMPARE(window.projectChip()->iconSize().width(), 2 * UiMetrics::chipIconSize);
     }
 

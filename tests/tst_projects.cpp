@@ -1001,6 +1001,23 @@ private slots:
         QVERIFY(ClaudeTrust::isTrusted(dir.filePath("demo")));
     }
 
+    void aProjectWhoseRecipeHasNoSetupCommandsStillGetsItsToolsAtTheFirstOpening()
+    {
+        const QTemporaryDir dir;
+        NewProjectForm form;
+        form.nameEdit()->setText("demo");
+        form.locationEdit()->setText(dir.path());
+        const QList<QListWidgetItem *> java = form.recipeList()->findItems("Java · Maven", Qt::MatchExactly);
+        QCOMPARE(java.size(), 1);
+        form.recipeList()->setCurrentItem(java.first());
+
+        form.createButton()->click();
+
+        const std::optional<ProjectConfig> project = ProjectStore::find(dir.filePath("demo"));
+        QVERIFY(project.has_value());
+        QVERIFY(project->needsRecipeSetup); // the JDK and Maven, downloaded without asking
+    }
+
     void trustingAFolderKeepsTheRestOfClaudesState()
     {
         const QTemporaryDir dir;

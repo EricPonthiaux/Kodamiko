@@ -34,13 +34,6 @@ constexpr int runBlockInset = 2;
 // Between a divider's ends and the top or bottom of a control.
 constexpr int dividerInset = 6;
 
-// The height of every control but the window's: chips, buttons, the run
-// block; the menu titles' padding comes close (see ThemeStyle).
-int controlHeight()
-{
-    return UiMetrics::scaled(UiMetrics::toolbarButtonSize);
-}
-
 // The width the bar's layout gives `widget`: its hint within its limits.
 int hintedWidth(const QWidget *widget)
 {
@@ -268,7 +261,7 @@ void TitleBar::setRunActions(QAction *run, QAction *stop)
 void TitleBar::applyMetrics()
 {
     setFixedHeight(UiMetrics::scaled(UiMetrics::titleBarHeight));
-    const int control = controlHeight();
+    const int control = UiMetrics::controlHeight();
     layout_->setSpacing(UiMetrics::scaled(groupSpacing));
     menuButton_->setFixedSize(control, control);
     project_->setFixedHeight(control);
@@ -416,7 +409,7 @@ void TitleBar::resizeEvent(QResizeEvent *event)
 
 void TitleBar::sizeActionButton(const ActionButton &entry)
 {
-    const int size = controlHeight() - entry.inset;
+    const int size = UiMetrics::controlHeight() - entry.inset;
     entry.button->setFixedSize(size, size);
     entry.button->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
 }

@@ -12,10 +12,13 @@
 #include "recipes/RecipeSetup.h"
 #include "run/Runner.h"
 #include "settings/Preferences.h"
+#include "welcome/ProjectSettingsPopup.h"
 
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QMenu>
+
+#include <algorithm>
 
 void MainWindow::loadProjectRecipes()
 {
@@ -78,6 +81,28 @@ void MainWindow::addRecipePrompts(QMenu *menu)
             prompts->addAction(prompt.title, this, [this, text] { typeInClaudePrompt(text, PromptEntry::Typed); });
         }
     }
+}
+
+void MainWindow::setUpNewProject()
+{
+    if (hasMissingTools()) {
+        projectSettings()->download(project_);
+        return;
+    }
+    runRecipeSetups();
+}
+
+void MainWindow::runRecipeSetups()
+{
+    const bool hasSetupCommands =
+        std::ranges::any_of(recipes_, [](const Recipe &recipe) { return !recipe.setupCommands.isEmpty(); });
+    if (!hasSetupCommands) {
+        project_.needsRecipeSetup = false;
+        ProjectStore::save(project_);
+        return;
+    }
+    for (const Recipe &recipe : std::as_const(recipes_))
+        runRecipeSetup(recipe);
 }
 
 void MainWindow::runRecipeSetup(const Recipe &recipe)

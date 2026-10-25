@@ -59,6 +59,7 @@
 #include "ui/GripSplitter.h"
 #include "ui/HoverCloseButtons.h"
 #include "ui/MessagePopup.h"
+#include "ui/ModeTabBar.h"
 #include "ui/NoticeBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -706,7 +707,7 @@ QWidget *MainWindow::createTerminalPage()
 
 void MainWindow::createModeTabs()
 {
-    modeTabs_ = new QTabBar(this);
+    modeTabs_ = new ModeTabBar(this);
     modeTabs_->setObjectName(QStringLiteral("modeTabs"));
     modeTabs_->setDocumentMode(true);
     modeTabs_->setDrawBase(false);
@@ -775,7 +776,7 @@ void MainWindow::createStatusBar()
     bar->addGroup(tr("Editor"), {editorStatus_});
     bar->addGroup(tr("Git"), {branchButton_, syncButton_, cancelGitButton_});
     for (QToolButton *button : {syncButton_, branchButton_, cancelGitButton_}) {
-        UiMetrics::setScaledHeight(button, UiMetrics::toolbarButtonSize);
+        UiMetrics::setControlHeight(button);
         UiMetrics::setScaledIconSize(button);
     }
 }

@@ -4,9 +4,11 @@
 #include "editor/EditorWidget.h"
 #include "ui/AppFonts.h"
 #include "ui/ElidingToolButton.h"
+#include "ui/ModeTabBar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 #include "ui/WorkspaceStatusBar.h"
 
 #include <QFile>
@@ -25,7 +27,7 @@ namespace {
 struct Window {
     QMainWindow root;
     TitleBar *title = new TitleBar(&root);
-    QTabBar *modes = new QTabBar(&root);
+    QTabBar *modes = new ModeTabBar(&root);
     WorkspaceStatusBar *status = nullptr;
     QAction run{"Run", &root};
     QAction stop{"Stop", &root};
@@ -178,6 +180,39 @@ private slots:
         const QString preview = qEnvironmentVariable("DUET_BAR_PREVIEW_DIR");
         if (!preview.isEmpty())
             window.root.grab().save(preview + "/" + QString::fromLatin1(QTest::currentDataTag()) + ".png");
+    }
+
+    void boxesAreNoTallerThanATabAndStandInTheMiddleOfTheirBar_data()
+    {
+        QTest::addColumn<int>("fontSize");
+        for (int fontSize : {11, 16, 22})
+            QTest::newRow(qPrintable(QStringLiteral("%1pt").arg(fontSize))) << fontSize;
+    }
+
+    void boxesAreNoTallerThanATabAndStandInTheMiddleOfTheirBar()
+    {
+        QFETCH(int, fontSize);
+        QFont font = QApplication::font();
+        font.setPointSize(fontSize);
+        QApplication::setFont(font);
+        Window window(Theme::duet());
+
+        window.show(1440);
+        QVERIFY(QTest::qWaitForWindowExposed(&window.root));
+        QTest::qWait(20);
+
+        const QWidget *project = window.title->findChild<QToolButton *>("projectChip");
+        const QWidget *run = window.title->findChild<QToolButton *>("runConfiguration")->parentWidget();
+        const QList<std::pair<const QWidget *, const QWidget *>> boxes{
+            {project, window.title}, {run, window.title}, {window.modes, window.status}};
+        for (const auto &[box, bar] : boxes) {
+            const int top = box->mapTo(bar, QPoint()).y();
+            const int bottom = bar->height() - top - box->height();
+            QVERIFY2(box->height() <= UiMetrics::tabHeight(), qPrintable(box->objectName()));
+            QVERIFY2(top > 0 && bottom > 0, qPrintable(box->objectName()));
+            QVERIFY2(qAbs(top - bottom) <= 2,
+                     qPrintable(QStringLiteral("%1: %2 above, %3 below").arg(box->objectName()).arg(top).arg(bottom)));
+        }
     }
 
     void compactMenuKeepsActionsAndRunStopWorking()

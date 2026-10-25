@@ -248,11 +248,20 @@ private:
     void addRecipesToSession(AgentSessionOptions &options) const;
     // Each recipe's prompts, in a submenu of `menu`.
     void addRecipePrompts(QMenu *menu);
+    // A new project's first opening: downloads the tools its recipes
+    // require, without asking (the recipe chosen asked for them), then runs
+    // their setup commands (see applyProject).
+    void setUpNewProject();
+    // Runs every recipe's setup commands; a project whose recipes have none
+    // is set up at once.
+    void runRecipeSetups();
     // Runs `recipe`'s setup commands in a terminal; the project no longer
     // needs them once they succeed (see onRecipeSetupFinished).
     void runRecipeSetup(const Recipe &recipe);
     void onRecipeSetupFinished(int exitCode);
     void closeProject();
+    // Whether the project lacks tools Duet can download.
+    bool hasMissingTools() const;
     // Says when the project lacks tools Duet can download.
     void updateToolsNotice();
     // The project's agent: the one its session names, else the default of
