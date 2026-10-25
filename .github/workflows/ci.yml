@@ -114,9 +114,16 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           cmake --install build --component duet --prefix dist
-          macdeployqt dist/Duet.app -dmg -executable=dist/Duet.app/Contents/MacOS/duet-hook \
+          macdeployqt dist/Duet.app -executable=dist/Duet.app/Contents/MacOS/duet-hook \
             -executable=dist/Duet.app/Contents/MacOS/duet-mcp \
             -executable=dist/Duet.app/Contents/MacOS/duet-askpass
+          # macdeployqt rewrites the binaries and leaves the bundle unsealed:
+          # macOS calls an unsealed download damaged and refuses to open it.
+          # An ad hoc signature seals it; without a Developer ID, Gatekeeper
+          # still asks to confirm the first launch.
+          codesign --force --deep --sign - dist/Duet.app
+          codesign --verify --deep --strict dist/Duet.app
+          hdiutil create -volname Duet -srcfolder dist/Duet.app -format UDZO dist/Duet.dmg
 
       - name: Upload the package
         uses: actions/upload-artifact@v4
