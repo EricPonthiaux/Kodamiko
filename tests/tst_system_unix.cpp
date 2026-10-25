@@ -34,6 +34,11 @@ private slots:
         QCOMPARE(FilePaths::toUrlPath("/site/index.html"), QString("/site/index.html"));
         QCOMPARE(FilePaths::fromUrlPath("/site/index.html"), QString("/site/index.html"));
     }
+
+    void aFileUrlGivesItsPathUnchanged()
+    {
+        QCOMPARE(FilePaths::fromFileUrl(QUrl("file:///home/me/Project/main.ts")), QString("/home/me/Project/main.ts"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestSystemUnix)

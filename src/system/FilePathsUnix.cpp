@@ -22,4 +22,9 @@ QString fromUrlPath(const QString &urlPath)
     return QDir::cleanPath(urlPath);
 }
 
+QString fromFileUrl(const QUrl &url)
+{
+    return url.toLocalFile();
+}
+
 } // namespace FilePaths

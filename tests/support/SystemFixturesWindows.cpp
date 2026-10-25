@@ -15,4 +15,10 @@ QString printingThenExiting(const QString &text, int exitCode)
     return QStringLiteral("echo %1& exit %2").arg(text).arg(exitCode);
 }
 
+QString succeedingIfFileExists(const QString &fileName)
+{
+    // cmd.exe has no test command.
+    return QStringLiteral("if exist %1 (exit 0) else (exit 1)").arg(fileName);
+}
+
 } // namespace SystemFixtures

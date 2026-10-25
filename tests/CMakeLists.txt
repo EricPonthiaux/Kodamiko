@@ -23,9 +23,12 @@ function(duet_add_test name)
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     # Windows has no rpath: the tests find Qt's DLLs through PATH, and
     # Graphviz's in the executable's folder, where the package takes them.
+    # Qt's installation comes first: the copy windeployqt puts in bin has
+    # no offscreen platform plugin, and a test without one aborts. The last
+    # prepend ends up first.
     if(WIN32)
         set_tests_properties(${name} PROPERTIES
-            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
+            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
     endif()
 endfunction()
 

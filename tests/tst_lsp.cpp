@@ -322,7 +322,7 @@ private slots:
         // A clangd downloaded by Duet.
         const QString folder = toolchains.installFolder("clangd", "23.1.0");
         QDir().mkpath(folder + "/bin");
-        QFile clangd(folder + "/bin/clangd");
+        QFile clangd(folder + "/" + Executables::fileName("bin/clangd"));
         QVERIFY(clangd.open(QIODevice::WriteOnly));
         clangd.close();
         QFile::setPermissions(clangd.fileName(), QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);

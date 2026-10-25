@@ -3,6 +3,7 @@
 #pragma once
 
 #include <QString>
+#include <QUrl>
 
 // What the file system adds to Duet's rules on names, and file paths in
 // URLs. One implementation per system: FilePathsWindows.cpp,
@@ -20,5 +21,10 @@ QString toUrlPath(const QString &filePath);
 
 // The file path of the URL path `urlPath`, cleaned: toUrlPath reversed.
 QString fromUrlPath(const QString &urlPath);
+
+// The file path of the file URL `url`, its drive as Qt writes it: language
+// servers send Windows' "C:/a.ts" as "file:///c%3A/a.ts", and a path
+// compared with Duet's must say "C:".
+QString fromFileUrl(const QUrl &url);
 
 } // namespace FilePaths

@@ -40,6 +40,12 @@ private slots:
         QCOMPARE(FilePaths::toUrlPath("C:/site/index.html"), QString("/C:/site/index.html"));
         QCOMPARE(FilePaths::fromUrlPath("/C:/site/index.html"), QString("C:/site/index.html"));
     }
+
+    void aLanguageServersLowercaseDriveComesBackInUppercase()
+    {
+        QCOMPARE(FilePaths::fromFileUrl(QUrl("file:///c%3A/project/main.ts")), QString("C:/project/main.ts"));
+        QCOMPARE(FilePaths::fromFileUrl(QUrl("file:///D:/project/main.ts")), QString("D:/project/main.ts"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestSystemWindows)

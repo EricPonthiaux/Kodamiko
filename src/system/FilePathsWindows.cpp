@@ -28,4 +28,13 @@ QString fromUrlPath(const QString &urlPath)
     return QDir::cleanPath(hasDrive ? urlPath.mid(1) : urlPath);
 }
 
+QString fromFileUrl(const QUrl &url)
+{
+    QString path = url.toLocalFile();
+    const bool hasDrive = path.size() > 1 && path.at(0).isLetter() && path.at(1) == u':';
+    if (hasDrive)
+        path[0] = path.at(0).toUpper();
+    return path;
+}
+
 } // namespace FilePaths

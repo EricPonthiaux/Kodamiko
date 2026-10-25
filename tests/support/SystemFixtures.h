@@ -16,4 +16,8 @@ QString programOfEveryMachine();
 // prints `text`, then exits with `exitCode`.
 QString printingThenExiting(const QString &text, int exitCode);
 
+// A command line of the system's shell that succeeds when the file
+// `fileName` of its working folder exists, and fails otherwise.
+QString succeedingIfFileExists(const QString &fileName);
+
 } // namespace SystemFixtures

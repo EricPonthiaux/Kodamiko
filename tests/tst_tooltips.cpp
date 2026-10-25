@@ -11,6 +11,10 @@
 namespace {
 
 const QString wideText = QStringLiteral("A tooltip as wide as the path of a file deep in a project's tree");
+// Wider than the room right of nearTheRightEdge(), narrower than the room
+// left of it, whatever the system's font: wideText nearly fills the
+// offscreen screen on Windows.
+const QString mediumText = QStringLiteral("A tooltip wider than the room on the right");
 
 QWidget *visibleToolTip()
 {
@@ -85,16 +89,24 @@ private slots:
     void aToolTipShownByCodeKeepsQtsPlacement()
     {
         window_.setToolTip({});
-        sendHelpEvent(&window_, QGuiApplication::primaryScreen()->geometry().topLeft() + QPoint(40, 100));
+        const QPoint mouse = QGuiApplication::primaryScreen()->geometry().topLeft() + QPoint(40, 100);
+        sendHelpEvent(&window_, mouse);
         // The help event's turn of the event loop ends: one processEvents()
         // does not always run its zero timer on Windows.
         QTest::qWait(10);
         const QPoint anchor = nearTheRightEdge();
 
-        QToolTip::showText(anchor, wideText, &window_);
+        QToolTip::showText(anchor, mediumText, &window_);
 
         QTRY_VERIFY(visibleToolTip());
-        QVERIFY(visibleToolTip()->geometry().right() < anchor.x());
+        const QRect tip = visibleToolTip()->geometry();
+        // Flipped left of the anchor by Qt, not moved beside the old mouse.
+        const bool isLeftOfTheAnchor = tip.right() < anchor.x() && tip.left() > mouse.x() + 2;
+        QVERIFY2(isLeftOfTheAnchor, qPrintable(QStringLiteral("tip %1..%2, anchor at %3, mouse at %4")
+                                                   .arg(tip.left())
+                                                   .arg(tip.right())
+                                                   .arg(anchor.x())
+                                                   .arg(mouse.x())));
     }
 
 private:

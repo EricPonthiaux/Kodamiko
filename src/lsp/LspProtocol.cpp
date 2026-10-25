@@ -2,6 +2,8 @@
 
 #include "LspProtocol.h"
 
+#include "system/FilePaths.h"
+
 #include <QJsonArray>
 #include <QUrl>
 
@@ -27,7 +29,7 @@ QString uriOf(const QString &filePath)
 QString pathOf(const QString &uri)
 {
     const QUrl url(uri);
-    return url.isLocalFile() ? url.toLocalFile() : QString();
+    return url.isLocalFile() ? FilePaths::fromFileUrl(url) : QString();
 }
 
 QJsonObject toJson(const Position &position)

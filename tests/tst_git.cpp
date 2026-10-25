@@ -1100,7 +1100,7 @@ private slots:
         GitCommands commands;
         AgentMergeQueue queue(&commands);
         queue.setFolder(project.path());
-        queue.setCheckCommand("test -f agent.txt");
+        queue.setCheckCommand(SystemFixtures::succeedingIfFileExists("agent.txt"));
         QSignalSpy merged(&queue, &AgentMergeQueue::merged);
 
         queue.enqueue(worktree);

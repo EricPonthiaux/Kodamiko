@@ -227,7 +227,10 @@ void TreeSitterHighlighter::styleRange(int start, int end)
     for (const StyledSpan &span : spans) {
         const int from = std::max<int>(span.start, start);
         const int to = std::min<int>(span.end, end);
-        std::fill(styles.begin() + (from - start), styles.begin() + std::max(from, to) - start, span.style);
+        // A match that crosses the range can hold captures outside it.
+        if (from >= to)
+            continue;
+        std::fill(styles.begin() + (from - start), styles.begin() + (to - start), span.style);
     }
 
     editor_->SendScintilla(QsciScintillaBase::SCI_STARTSTYLING, start, 0L);

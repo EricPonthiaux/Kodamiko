@@ -468,7 +468,7 @@ void LanguageServers::receiveNotification(const QString &server, const QString &
     }
     if (method != QLatin1String("textDocument/publishDiagnostics"))
         return;
-    const QString path = QUrl(params.toObject().value("uri").toString()).toLocalFile();
+    const QString path = LspProtocol::pathOf(params.toObject().value("uri").toString());
     if (path.isEmpty())
         return;
     diagnostics_.insert(path, params.toObject().value("diagnostics").toArray());
