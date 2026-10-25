@@ -3,6 +3,7 @@
 #include "TreeZoom.h"
 
 #include "Preferences.h"
+#include "ui/AppFonts.h"
 #include "ui/TreeMetrics.h"
 
 #include <QTreeView>
@@ -33,12 +34,13 @@ bool TreeZoom::eventFilter(QObject *watched, QEvent *event)
         return QObject::eventFilter(watched, event);
     const auto *wheel = static_cast<QWheelEvent *>(event);
     const int delta = wheel->angleDelta().y();
-    const qreal size = baseFont_.pointSizeF();
+    // Rounded: the size converted to the system's points and back is 13.99….
+    const int size = qRound(AppFonts::duetPoints(baseFont_.pointSizeF()));
     const bool isZoom = wheel->modifiers() & Qt::ControlModifier;
     if (!isZoom || delta == 0 || size <= 0)
         return QObject::eventFilter(watched, event);
-    const int zoomPoints = std::clamp(zoomPoints_ + (delta > 0 ? 1 : -1), Preferences::minimumFontSize - int(size),
-                                      Preferences::maximumFontSize - int(size));
+    const int zoomPoints = std::clamp(zoomPoints_ + (delta > 0 ? 1 : -1), Preferences::minimumFontSize - size,
+                                      Preferences::maximumFontSize - size);
     if (zoomPoints != zoomPoints_) {
         zoomPoints_ = zoomPoints;
         apply();
@@ -50,6 +52,6 @@ void TreeZoom::apply()
 {
     QFont font = baseFont_;
     if (font.pointSizeF() > 0)
-        font.setPointSizeF(font.pointSizeF() + zoomPoints_);
+        font.setPointSizeF(AppFonts::systemPoints(AppFonts::duetPoints(font.pointSizeF()) + zoomPoints_));
     applyTreeMetrics(tree_, font);
 }

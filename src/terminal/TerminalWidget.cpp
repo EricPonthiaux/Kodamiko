@@ -5,6 +5,7 @@
 #include "IPty.h"
 #include "VtScreen.h"
 #include "settings/Preferences.h"
+#include "ui/AppFonts.h"
 #include "ui/ContextMenus.h"
 #include "ui/Theme.h"
 
@@ -256,9 +257,11 @@ void TerminalWidget::applyFont()
     QFont font = baseFont_;
     font.setStyleHint(QFont::TypeWriter);
     font.setKerning(false);
-    if (font.pointSizeF() > 0)
-        font.setPointSizeF(std::clamp(font.pointSizeF() + zoom_, qreal(Preferences::minimumFontSize),
-                                      qreal(Preferences::maximumFontSize)));
+    if (font.pointSizeF() > 0) {
+        const qreal zoomed = std::clamp(AppFonts::duetPoints(font.pointSizeF()) + zoom_,
+                                        qreal(Preferences::minimumFontSize), qreal(Preferences::maximumFontSize));
+        font.setPointSizeF(AppFonts::systemPoints(zoomed));
+    }
 
     const QFontMetricsF metrics(font);
     cellSize_ = QSize(static_cast<int>(std::ceil(metrics.horizontalAdvance(QLatin1Char('M')))),

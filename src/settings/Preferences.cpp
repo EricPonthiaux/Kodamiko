@@ -114,7 +114,7 @@ void Preferences::save() const
 
 QFont Preferences::codeFont() const
 {
-    QFont font = AppFonts::codeFont(codeFontSize);
+    QFont font = AppFonts::codeFont(AppFonts::systemPoints(codeFontSize));
     if (!codeFontFamily.isEmpty())
         font.setFamily(codeFontFamily);
     font.setWeight(QFont::Weight(codeFontWeight));
@@ -132,7 +132,7 @@ void Preferences::applyTypography(Theme &target) const
 QFont Preferences::interfaceFont() const
 {
     QFont font = AppFonts::interfaceFont();
-    font.setPointSize(interfaceFontSize);
+    font.setPointSizeF(AppFonts::systemPoints(interfaceFontSize));
     return font;
 }
 
@@ -140,8 +140,8 @@ QFont Preferences::treeFont() const
 {
     QFont font = interfaceFont();
     if (treeFontSize > 0)
-        font.setPointSize(treeFontSize);
+        font.setPointSizeF(AppFonts::systemPoints(treeFontSize));
     else
-        font.setPointSizeF(std::max(font.pointSizeF(), qreal(codeFontSize)));
+        font.setPointSizeF(std::max(font.pointSizeF(), AppFonts::systemPoints(codeFontSize)));
     return font;
 }

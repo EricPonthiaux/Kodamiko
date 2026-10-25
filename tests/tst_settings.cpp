@@ -24,6 +24,16 @@
 #include <Qsci/qsciscintilla.h>
 #include <QtTest>
 
+namespace {
+
+// A font's size in the points of Preferences ▸ Fonts.
+int preferencePoints(const QFont &font)
+{
+    return qRound(AppFonts::duetPoints(font.pointSizeF()));
+}
+
+} // namespace
+
 class TestSettings : public QObject {
     Q_OBJECT
 
@@ -66,13 +76,13 @@ private slots:
         Preferences preferences;
         preferences.codeFontSize = 30;
         // The tree follows the code font, never below the interface's.
-        QCOMPARE(preferences.treeFont().pointSize(), 30);
+        QCOMPARE(preferencePoints(preferences.treeFont()), 30);
         preferences.interfaceFontSize = 9;
         preferences.codeFontSize = 7;
-        QCOMPARE(preferences.interfaceFont().pointSize(), 9);
-        QCOMPARE(preferences.treeFont().pointSize(), 9);
+        QCOMPARE(preferencePoints(preferences.interfaceFont()), 9);
+        QCOMPARE(preferencePoints(preferences.treeFont()), 9);
         preferences.treeFontSize = 14;
-        QCOMPARE(preferences.treeFont().pointSize(), 14);
+        QCOMPARE(preferencePoints(preferences.treeFont()), 14);
     }
 
     void typographyReachesTheTheme()

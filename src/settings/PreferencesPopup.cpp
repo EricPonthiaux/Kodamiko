@@ -374,7 +374,6 @@ QWidget *PreferencesPopup::createFontsPage()
     fontSources_->setObjectName(QStringLiteral("settingsDescription"));
     fontSources_->setOpenExternalLinks(true);
     Paragraph::setHtml(fontSources_, tr("Recommended, to install: %1.").arg(sources.join(QStringLiteral(", "))));
-    fontSources_->setVisible(!sources.isEmpty());
     fontSize_ = new QSpinBox;
     fontSize_->setRange(Preferences::minimumFontSize, Preferences::maximumFontSize);
     fontSize_->setSuffix(tr(" pt"));
@@ -398,6 +397,9 @@ QWidget *PreferencesPopup::createFontsPage()
     connect(ligatures_, &QAbstractButton::toggled, this, &PreferencesPopup::updateFontPreview);
     fontCard->addRow(tr("Font"), tr("The editor, the terminals and the diffs use it."), fontFamily_);
     fontCard->addWidget(fontSources_);
+    // Only once in the card: shown without a parent, the label would be a
+    // window of its own, and on macOS leave a full-screen Space for another.
+    fontSources_->setVisible(!sources.isEmpty());
     fontCard->addRow(tr("Size"), QString(), fontSize_);
     fontCard->addRow(tr("Weight"), tr("Light reads finer on a bright screen; Medium, bolder."), fontWeight_);
     fontCard->addRow(tr("Line height"), tr("Lines of code, as a multiple of the font size (not in the terminals)."),

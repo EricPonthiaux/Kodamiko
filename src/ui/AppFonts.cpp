@@ -5,6 +5,7 @@
 #include <QEvent>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QScreen>
 #include <QWidget>
 
 #include <functional>
@@ -110,6 +111,31 @@ void followApplicationFont(QObject *owner, std::function<void()> apply)
 {
     apply();
     new ApplicationFontFollower(owner, std::move(apply)); // owned by `owner`
+}
+
+namespace {
+
+// The points of 1/96 inch in one of the system's: the screen's logical
+// DPI is the one Qt draws text at (72 on macOS, 96 elsewhere and in the
+// offscreen platform the tests run on).
+qreal systemPointsPerDuetPoint()
+{
+    constexpr qreal duetDpi = 96;
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    const qreal systemDpi = screen ? screen->logicalDotsPerInchY() : duetDpi;
+    return systemDpi > 0 ? duetDpi / systemDpi : 1;
+}
+
+} // namespace
+
+qreal systemPoints(qreal duetPoints)
+{
+    return duetPoints * systemPointsPerDuetPoint();
+}
+
+qreal duetPoints(qreal systemPoints)
+{
+    return systemPoints / systemPointsPerDuetPoint();
 }
 
 QFont codeFont(qreal pointSize)
