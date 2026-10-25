@@ -303,6 +303,25 @@ void VtScreen::sendWheel(int row, int column, bool up, Qt::KeyboardModifiers mod
     vterm_mouse_button(terminal_, up ? 4 : 5, true, modifier);
 }
 
+void VtScreen::sendLeftButtonPress(QPoint cell, Qt::KeyboardModifiers modifiers)
+{
+    const VTermModifier modifier = toVTermModifier(modifiers);
+    vterm_mouse_move(terminal_, cell.y(), cell.x(), modifier);
+    vterm_mouse_button(terminal_, 1, true, modifier);
+}
+
+void VtScreen::sendMouseMove(QPoint cell, Qt::KeyboardModifiers modifiers)
+{
+    vterm_mouse_move(terminal_, cell.y(), cell.x(), toVTermModifier(modifiers));
+}
+
+void VtScreen::sendLeftButtonRelease(QPoint cell, Qt::KeyboardModifiers modifiers)
+{
+    const VTermModifier modifier = toVTermModifier(modifiers);
+    vterm_mouse_move(terminal_, cell.y(), cell.x(), modifier);
+    vterm_mouse_button(terminal_, 1, false, modifier);
+}
+
 void VtScreen::paste(const QString &text)
 {
     vterm_keyboard_start_paste(terminal_);

@@ -187,6 +187,8 @@ TerminalWidget::TerminalWidget(QWidget *parent)
     setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     viewport()->setCursor(Qt::IBeamCursor);
     viewport()->setAttribute(Qt::WA_OpaquePaintEvent);
+    // Moves without a button too: programs that track the pointer highlight what it hovers.
+    viewport()->setMouseTracking(true);
 
     connect(screen_.get(), &VtScreen::screenChanged, this, &TerminalWidget::onScreenChanged);
     connect(screen_.get(), &VtScreen::titleChanged, this, &TerminalWidget::titleChanged);
@@ -588,9 +590,9 @@ void TerminalWidget::wheelEvent(QWheelEvent *event)
         wheelRemainder_ += event->angleDelta().y();
         const int notches = wheelRemainder_ / 120;
         wheelRemainder_ -= notches * 120;
-        const QPoint cell = cellAt(event->position().toPoint());
+        const QPoint cell = screenCellAt(event->position().toPoint());
         for (int i = 0; i < std::abs(notches); ++i)
-            screen_->sendWheel(cell.y() + scrollOffset_, cell.x(), notches > 0, event->modifiers());
+            screen_->sendWheel(cell.y(), cell.x(), notches > 0, event->modifiers());
         event->accept();
         return;
     }
@@ -608,6 +610,12 @@ QPoint TerminalWidget::cellAt(const QPoint &widgetPosition) const
     return {column, row - scrollOffset_};
 }
 
+QPoint TerminalWidget::screenCellAt(const QPoint &widgetPosition) const
+{
+    const QPoint cell = cellAt(widgetPosition);
+    return {cell.x(), cell.y() + scrollOffset_};
+}
+
 void TerminalWidget::mousePressEvent(QMouseEvent *event)
 {
     setFocus();
@@ -620,6 +628,13 @@ void TerminalWidget::mousePressEvent(QMouseEvent *event)
     }
     if (event->button() != Qt::LeftButton)
         return;
+    // The program handles its clicks (Claude Code's panels); Shift+click
+    // keeps Duet's selection, as Shift+wheel keeps its history.
+    if (screen_->isMouseReporting() && !(event->modifiers() & Qt::ShiftModifier)) {
+        reportingClick_ = true;
+        screen_->sendLeftButtonPress(screenCellAt(event->position().toPoint()), event->modifiers());
+        return;
+    }
     selecting_ = true;
     selectionAnchor_ = cellAt(event->position().toPoint());
     selectionEnd_ = selectionAnchor_;
@@ -628,6 +643,11 @@ void TerminalWidget::mousePressEvent(QMouseEvent *event)
 
 void TerminalWidget::mouseMoveEvent(QMouseEvent *event)
 {
+    const bool isHovering = !selecting_ && screen_->isMouseReporting();
+    if (reportingClick_ || isHovering) {
+        screen_->sendMouseMove(screenCellAt(event->position().toPoint()), event->modifiers());
+        return;
+    }
     if (!selecting_)
         return;
     selectionEnd_ = cellAt(event->position().toPoint());
@@ -636,6 +656,11 @@ void TerminalWidget::mouseMoveEvent(QMouseEvent *event)
 
 void TerminalWidget::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (event->button() == Qt::LeftButton && reportingClick_) {
+        reportingClick_ = false;
+        screen_->sendLeftButtonRelease(screenCellAt(event->position().toPoint()), event->modifiers());
+        return;
+    }
     if (event->button() != Qt::LeftButton || !selecting_)
         return;
     selecting_ = false;

@@ -80,6 +80,12 @@ public:
     void paste(const QString &text);
     // A wheel notch at a screen cell, in the encoding the program asked for.
     void sendWheel(int row, int column, bool up, Qt::KeyboardModifiers modifiers);
+    // The left button pressed, moved or released at a screen cell (x =
+    // column, y = row), in the encoding the program asked for. libvterm
+    // sends a move only while the program tracks drags or motion.
+    void sendLeftButtonPress(QPoint cell, Qt::KeyboardModifiers modifiers);
+    void sendMouseMove(QPoint cell, Qt::KeyboardModifiers modifiers);
+    void sendLeftButtonRelease(QPoint cell, Qt::KeyboardModifiers modifiers);
 
 signals:
     void outputReady(const QByteArray &data); // to be written to the program

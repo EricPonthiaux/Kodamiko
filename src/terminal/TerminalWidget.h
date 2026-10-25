@@ -108,6 +108,8 @@ private:
     // Position (column, content row) under a widget point; content rows are
     // negative in the history.
     QPoint cellAt(const QPoint &widgetPosition) const;
+    // The screen cell under a widget point, for the program's mouse events.
+    QPoint screenCellAt(const QPoint &widgetPosition) const;
     bool isSelected(int contentRow, int column) const;
     QString selectedText() const;
     void copySelection(QClipboard::Mode mode) const;
@@ -133,6 +135,7 @@ private:
     int scrollOffset_ = 0;           // history lines shown above the screen
     bool updatingScrollBar_ = false; // the bar follows scrollOffset_, not the reverse
     bool selecting_ = false;
+    bool reportingClick_ = false; // the left button went to the program, not to the selection
     bool gridUpdatePending_ = false;
     QPoint selectionAnchor_{-1, 0};
     QPoint selectionEnd_{-1, 0};
