@@ -28,6 +28,12 @@
 
 namespace {
 
+// A font's size in the points of Preferences ▸ Fonts.
+int preferencePoints(const QFont &font)
+{
+    return qRound(AppFonts::duetPoints(font.pointSizeF()));
+}
+
 // The parts of the main window whose fonts Preferences ▸ Fonts sets,
 // under the theme's style sheet as in the application.
 struct Window {
@@ -122,8 +128,8 @@ private slots:
         applyPreferences(withSizes(15, 0), window);
 
         for (const QWidget *widget : window.interfaceWidgets())
-            QVERIFY2(widget->font().pointSize() == 15, qPrintable(widget->metaObject()->className()));
-        QCOMPARE(window.title->font().pointSizeF(), 15 * 1.15);
+            QVERIFY2(preferencePoints(widget->font()) == 15, qPrintable(widget->metaObject()->className()));
+        QCOMPARE(AppFonts::duetPoints(window.title->font().pointSizeF()), 15 * 1.15);
     }
 
     void interfaceFontLeavesTheCodeFont()
@@ -132,7 +138,7 @@ private slots:
 
         applyPreferences(withSizes(15, 0), window);
 
-        QCOMPARE(window.code->font().pointSize(), 17);
+        QCOMPARE(window.code->font().pointSize(), 17); // set in Qt points
         QVERIFY(AppFonts::isBuiltInCode(window.code->font().family()));
     }
 
@@ -144,7 +150,7 @@ private slots:
         applyPreferences(withSizes(9, 0), window);
 
         for (const QWidget *widget : window.interfaceWidgets())
-            QVERIFY2(widget->font().pointSize() == 9, qPrintable(widget->metaObject()->className()));
+            QVERIFY2(preferencePoints(widget->font()) == 9, qPrintable(widget->metaObject()->className()));
     }
 
     void barsGrowWithTheInterfaceFont()
@@ -185,7 +191,7 @@ private slots:
         applyPreferences(withSizes(11, 16), window);
 
         for (const QTreeView *tree : {static_cast<QTreeView *>(window.files->tree()), window.outline}) {
-            QCOMPARE(tree->font().pointSize(), 16);
+            QCOMPARE(preferencePoints(tree->font()), 16);
             QCOMPARE(tree->iconSize().height(), QFontMetrics(tree->font()).height());
         }
     }
@@ -198,8 +204,8 @@ private slots:
 
         applyPreferences(preferences, window);
 
-        QCOMPARE(window.outline->font().pointSize(), 14);
-        QCOMPARE(window.files->tree()->font().pointSize(), 14);
+        QCOMPARE(preferencePoints(window.outline->font()), 14);
+        QCOMPARE(preferencePoints(window.files->tree()->font()), 14);
     }
 
     void treesKeepTheirFontWhenOnlyTheInterfaceChanges()
@@ -209,8 +215,8 @@ private slots:
 
         applyPreferences(withSizes(13, 16), window);
 
-        QCOMPARE(window.outline->font().pointSize(), 16);
-        QCOMPARE(window.files->tree()->font().pointSize(), 16);
+        QCOMPARE(preferencePoints(window.outline->font()), 16);
+        QCOMPARE(preferencePoints(window.files->tree()->font()), 16);
     }
 
     void fontsSurviveAThemeChange()
@@ -220,11 +226,11 @@ private slots:
 
         ThemeStyle::apply(Theme::light());
 
-        QCOMPARE(window.outline->font().pointSize(), 16);
-        QCOMPARE(window.files->tree()->font().pointSize(), 16);
-        QCOMPARE(window.code->font().pointSize(), 17);
+        QCOMPARE(preferencePoints(window.outline->font()), 16);
+        QCOMPARE(preferencePoints(window.files->tree()->font()), 16);
+        QCOMPARE(window.code->font().pointSize(), 17); // set in Qt points
         for (const QWidget *widget : window.interfaceWidgets())
-            QVERIFY2(widget->font().pointSize() == 14, qPrintable(widget->metaObject()->className()));
+            QVERIFY2(preferencePoints(widget->font()) == 14, qPrintable(widget->metaObject()->className()));
     }
 
     void platformClassFontsGiveWayToTheInterfaceFont()
@@ -238,7 +244,7 @@ private slots:
 
         ThemeStyle::apply(Theme::light());
 
-        QCOMPARE(window.titleBar->menuBar()->font().pointSize(), 14);
+        QCOMPARE(preferencePoints(window.titleBar->menuBar()->font()), 14);
     }
 
     void dialogSizesAreSavedAndApplied()
@@ -251,8 +257,8 @@ private slots:
 
         QCOMPARE(Preferences::load().interfaceFontSize, 15);
         QCOMPARE(Preferences::load().treeFontSize, 17);
-        QCOMPARE(window.titleBar->menuBar()->font().pointSize(), 15);
-        QCOMPARE(window.outline->font().pointSize(), 17);
+        QCOMPARE(preferencePoints(window.titleBar->menuBar()->font()), 15);
+        QCOMPARE(preferencePoints(window.outline->font()), 17);
     }
 
     void ctrlWheelZoomsOnlyTheTreeUnderTheMouse()
@@ -262,9 +268,9 @@ private slots:
 
         turnWheel(window.outline, 2, Qt::ControlModifier);
 
-        QCOMPARE(window.outline->font().pointSize(), 16);
+        QCOMPARE(preferencePoints(window.outline->font()), 16);
         QCOMPARE(window.outline->iconSize().height(), QFontMetrics(window.outline->font()).height());
-        QCOMPARE(window.files->tree()->font().pointSize(), 14);
+        QCOMPARE(preferencePoints(window.files->tree()->font()), 14);
     }
 
     void wheelWithoutCtrlKeepsTheTreeFont()
@@ -274,7 +280,7 @@ private slots:
 
         turnWheel(window.outline, 1, Qt::NoModifier);
 
-        QCOMPARE(window.outline->font().pointSize(), 14);
+        QCOMPARE(preferencePoints(window.outline->font()), 14);
     }
 
     void treeZoomStopsAtTheLargestFontSize()
@@ -285,7 +291,7 @@ private slots:
         turnWheel(window.outline, Preferences::maximumFontSize, Qt::ControlModifier);
         turnWheel(window.outline, 1, Qt::ControlModifier);
 
-        QCOMPARE(window.outline->font().pointSize(), Preferences::maximumFontSize);
+        QCOMPARE(preferencePoints(window.outline->font()), Preferences::maximumFontSize);
     }
 
     void treeZoomSurvivesATreeFontChange()
@@ -296,13 +302,13 @@ private slots:
 
         applyPreferences(withSizes(11, 16), window);
 
-        QCOMPARE(window.outline->font().pointSize(), 17);
-        QCOMPARE(window.files->tree()->font().pointSize(), 16);
+        QCOMPARE(preferencePoints(window.outline->font()), 17);
+        QCOMPARE(preferencePoints(window.files->tree()->font()), 16);
     }
 
     void defaultInterfaceSizeIsEleven()
     {
-        QCOMPARE(Preferences().interfaceFont().pointSize(), 11);
+        QCOMPARE(preferencePoints(Preferences().interfaceFont()), 11);
         QSettings().setValue(QStringLiteral("interfaceFont/size"), 0); // "System", before
         QCOMPARE(Preferences::load().interfaceFontSize, 11);
     }

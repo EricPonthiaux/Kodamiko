@@ -17,10 +17,11 @@ namespace UiMetrics {
 
 int scaled(int referencePx)
 {
-    // The size asked for, not the matched font's (11 pt matches 11.25).
+    // The size asked for, not the matched font's (11 pt matches 11.25), in
+    // the points of Preferences, which are the same pixels on every system.
     const QFont font = QGuiApplication::font();
     const qreal fontSize = font.pointSizeF() > 0 ? font.pointSizeF() : QFontInfo(font).pointSizeF();
-    return qRound(referencePx * fontSize / AppFonts::defaultInterfaceSize);
+    return qRound(referencePx * AppFonts::duetPoints(fontSize) / AppFonts::defaultInterfaceSize);
 }
 
 int tabHeight()

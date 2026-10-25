@@ -39,6 +39,13 @@ void followApplicationFont(QObject *owner, std::function<void()> apply);
 
 // The code font at `pointSize`, without programming ligatures.
 QFont codeFont(qreal pointSize);
+
+// The sizes of Preferences ▸ Fonts are points of 1/96 inch, as Linux and
+// Windows draw them, so that Duet looks the same on every system; macOS
+// draws a point at 1/72 inch, a quarter smaller. The size Qt is given for
+// `duetPoints` on this screen, and back.
+qreal systemPoints(qreal duetPoints);
+qreal duetPoints(qreal systemPoints);
 // Whether `family` is an embedded code font (Droid Sans Mono, Ubuntu Sans
 // Mono, "JetBrains Mono NL" or its version with ligatures).
 bool isBuiltInCode(const QString &family);
