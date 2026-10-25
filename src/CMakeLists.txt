@@ -229,6 +229,7 @@ add_library(duet_core STATIC
     recipes/RecipeSchema.cpp
     recipes/RecipeSetup.cpp
     run/BuildOutputParser.cpp
+    run/CMakePresets.cpp
     run/RunConfiguration.cpp
     run/RunConfigurationMenu.cpp
     run/Runner.cpp

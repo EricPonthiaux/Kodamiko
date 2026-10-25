@@ -112,8 +112,14 @@ QSize AgentIndicator::sizeHint() const
 {
     // As tall as the status bar's text, square whatever the state: the bar
     // keeps its layout as the state changes.
+    // The contents margins set the room around it.
     const int side = std::max(iconPx, fontMetrics().height()) + 2 * paddingPx;
-    return {side, side};
+    return QSize(side, side).grownBy(contentsMargins());
+}
+
+bool AgentIndicator::hitButton(const QPoint &pos) const
+{
+    return contentsRect().contains(pos);
 }
 
 void AgentIndicator::paintEvent(QPaintEvent *)
@@ -124,7 +130,7 @@ void AgentIndicator::paintEvent(QPaintEvent *)
     paintBackground(painter, color);
     const QRectF iconBox(QPointF(0, 0), QSizeF(iconPx, iconPx));
     if (provider_)
-        provider_->mark().paint(painter, iconBox.translated(QRectF(rect()).center() - iconBox.center()), color,
+        provider_->mark().paint(painter, iconBox.translated(QRectF(contentsRect()).center() - iconBox.center()), color,
                                 {.status = status_, .index = frame_});
 }
 
@@ -141,7 +147,7 @@ void AgentIndicator::paintBackground(QPainter &painter, const QColor &color) con
     }
     painter.setPen(QPen(border, 1));
     painter.setBrush(background);
-    painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), radiusPx, radiusPx);
+    painter.drawRoundedRect(QRectF(contentsRect()).adjusted(0.5, 0.5, -0.5, -0.5), radiusPx, radiusPx);
 }
 
 void AgentIndicator::advanceFrame()

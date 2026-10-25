@@ -31,6 +31,7 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QToolTip>
+#include <QWheelEvent>
 #include <Qsci/qscicommandset.h>
 #include <QtTest>
 
@@ -69,6 +70,18 @@ private slots:
         // Windows' registry keeps no settings at all.
         QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_editor"));
+    }
+
+    // Ctrl is Command on macOS, as for the trees.
+    void zoomsTheTextOnControlWheel()
+    {
+        EditorWidget editor(Theme::dark());
+        QWheelEvent wheel(QPointF(10, 10), QPointF(10, 10), QPoint(), QPoint(0, 120), Qt::NoButton, Qt::ControlModifier,
+                          Qt::NoScrollPhase, false);
+
+        QCoreApplication::sendEvent(editor.viewport(), &wheel);
+
+        QCOMPARE(editor.SendScintilla(QsciScintillaBase::SCI_GETZOOM), 1);
     }
 
     void findCountsAndCyclesThroughMatches()

@@ -50,8 +50,7 @@
 #include <QTabWidget>
 #include <QTimer>
 
-#include <algorithm>
-#include <memory>
+#include <utility>
 
 namespace {
 
@@ -93,7 +92,6 @@ void saveConversation(const QString &folder, const QString &sessionId)
     else
         conversations.insert(folder, sessionId);
     settings.setValue(conversationsKey, conversations);
-    
 }
 
 // The indicator's state for the activity's.

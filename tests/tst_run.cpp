@@ -141,6 +141,32 @@ private slots:
         QVERIFY(found.at(0).detected);
     }
 
+    void hidesTheCMakePresetsOfAnotherSystem()
+    {
+        const QTemporaryDir dir;
+        write(dir.path() + "/CMakeLists.txt", "project(x)\n");
+        write(dir.path() + "/CMakePresets.json", R"({
+            "version": 6,
+            "configurePresets": [
+                {"name": "here"},
+                {"name": "elsewhere",
+                 "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "NoSuchSystem"}},
+                {"name": "elsewhere-debug", "inherits": "elsewhere"},
+                {"name": "not-elsewhere", "inherits": "elsewhere",
+                 "condition": {"type": "not", "condition": {"type": "inList", "string": "${hostSystemName}",
+                                                            "list": ["NoSuchSystem"]}}}
+            ],
+            "buildPresets": [{"name": "here", "configurePreset": "here"},
+                             {"name": "elsewhere", "configurePreset": "elsewhere"}],
+            "testPresets": [{"name": "elsewhere-debug", "configurePreset": "elsewhere-debug"}]
+        })");
+
+        const QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
+
+        QCOMPARE(names(found),
+                 (QStringList{"CMake: build here", "CMake: configure here", "CMake: configure not-elsewhere"}));
+    }
+
     void detectsCMakeWithoutPresets()
     {
         const QTemporaryDir dir;

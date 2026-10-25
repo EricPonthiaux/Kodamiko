@@ -1,7 +1,7 @@
 {
   "configurations": [
     {
-      "command": "cmake --preset windows-debug && cmake --build --preset windows-debug",
+      "command": "cmake --preset debug && cmake --build --preset debug",
       "kind": "build",
       "name": "Build"
     },

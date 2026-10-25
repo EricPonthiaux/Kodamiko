@@ -142,6 +142,7 @@ signals:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 private:
     // Which line numbers the margin shows.

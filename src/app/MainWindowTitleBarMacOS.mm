@@ -17,6 +17,9 @@ namespace {
 // a compact and a regular toolbar (measured on macOS 26).
 constexpr int compactToolbarButtonsCenterPx = 20;
 constexpr int toolbarButtonsCenterPx = 26;
+// The Duet mark beside the traffic lights, a little smaller than the bar's
+// buttons.
+constexpr qreal logoScale = 0.8;
 
 NSWindow *nativeWindow(QWidget *window)
 {
@@ -45,12 +48,23 @@ void fitTitleBarHeight(QWidget *window, int barHeight)
     nsWindow.toolbarStyle = isCompactCloser ? NSWindowToolbarStyleUnifiedCompact : NSWindowToolbarStyleUnified;
 }
 
+NSRect inWindow(NSButton *button)
+{
+    return [button convertRect:button.bounds toView:nil];
+}
+
 // The width, from the left edge of `window`, that the traffic lights cover.
 int trafficLightsWidth(QWidget *window)
 {
     NSButton *zoom = [nativeWindow(window) standardWindowButton:NSWindowZoomButton];
-    const NSRect inWindow = [zoom convertRect:zoom.bounds toView:nil];
-    return int(std::ceil(NSMaxX(inWindow)));
+    return int(std::ceil(NSMaxX(inWindow(zoom))));
+}
+
+// The gap between the left edge of `window` and its traffic lights.
+int trafficLightsMargin(QWidget *window)
+{
+    NSButton *close = [nativeWindow(window) standardWindowButton:NSWindowCloseButton];
+    return int(std::floor(NSMinX(inWindow(close))));
 }
 
 } // namespace
@@ -61,6 +75,7 @@ void MainWindow::setSystemTitleBar(bool system)
 {
     Q_UNUSED(system);
     titleBar_->setWindowControlsVisible(false);
+    titleBar_->setLogoScale(logoScale);
     setWindowFlag(Qt::ExpandedClientAreaHint, true);
     setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
     // Qt would push the whole window below the system title bar, leaving
@@ -73,9 +88,11 @@ void MainWindow::setSystemTitleBar(bool system)
     AppFonts::followApplicationFont(this, [this] { fitTitleBarToWindowState(); });
 }
 
-// In full screen, macOS hides the traffic lights: their room goes too.
+// In full screen, macOS hides the traffic lights: their room goes too. The
+// buttons at the right keep the traffic lights' margin from the edge.
 void MainWindow::fitTitleBarToWindowState()
 {
     fitTitleBarHeight(this, UiMetrics::scaled(UiMetrics::titleBarHeight));
     titleBar_->setLeadingSpace(isFullScreen() ? 0 : trafficLightsWidth(this));
+    titleBar_->setTrailingSpace(trafficLightsMargin(this));
 }

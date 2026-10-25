@@ -32,6 +32,8 @@ public:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    // Only the square: the contents margins do not click.
+    bool hitButton(const QPoint &pos) const override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void changeEvent(QEvent *event) override;

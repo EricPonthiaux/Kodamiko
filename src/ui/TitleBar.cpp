@@ -70,7 +70,7 @@ protected:
     void paintEvent(QPaintEvent *) override
     {
         QPainter painter(this);
-        BrandMark::paint(&painter, rect(), BrandMark::caretColorFor(*theme_));
+        BrandMark::paint(&painter, contentsRect(), BrandMark::caretColorFor(*theme_));
     }
 
 private:
@@ -280,6 +280,8 @@ void TitleBar::applyMetrics()
     run_->setFixedHeight(control - runBlockInset);
     run_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
     runDivider_->setFixedSize(1, control - 2 * dividerInset);
+    const int logoInset = qRound(control * (1 - logoScale_) / 2);
+    logo_->setContentsMargins(logoInset, logoInset, logoInset, logoInset);
     controlsDivider_->setFixedSize(1, control - 2 * dividerInset);
     for (const ActionButton &entry : std::as_const(actionButtons_))
         sizeActionButton(entry);
@@ -313,7 +315,7 @@ void TitleBar::updateResponsiveLayout()
     // Measure the expanded controls at their bounded widths, independent of
     // which groups were hidden or how far the labels grew on the previous
     // resize.
-    int fixed = UiMetrics::scaled(dragSpace) + layout_->contentsMargins().left();
+    int fixed = UiMetrics::scaled(dragSpace) + layout_->contentsMargins().left() + layout_->contentsMargins().right();
     int groups = 0;
     const std::initializer_list<const QWidget *> fixedWidgets{logo_, controlsDivider_, controls_};
     for (const QWidget *widget : fixedWidgets) {
@@ -360,7 +362,7 @@ int TitleBar::sideWidth(std::initializer_list<const QWidget *> widgets) const
 void TitleBar::centerProjectGroup()
 {
     const int left = layout_->contentsMargins().left() + sideWidth({logo_, menuBar_, menuButton_});
-    const int right = sideWidth({actionGroup_, controlsDivider_, controls_});
+    const int right = sideWidth({actionGroup_, controlsDivider_, controls_}) + layout_->contentsMargins().right();
     int center = project_->sizeHint().width();
     if (!runBlock_->isHidden())
         center += layout_->spacing() + runBlock_->sizeHint().width();
@@ -422,8 +424,25 @@ void TitleBar::setWindowControlsVisible(bool visible)
 
 void TitleBar::setLeadingSpace(int pixels)
 {
-    layout_->setContentsMargins(pixels, 0, 0, 0);
+    QMargins margins = layout_->contentsMargins();
+    margins.setLeft(pixels);
+    layout_->setContentsMargins(margins);
     scheduleLayout();
+}
+
+void TitleBar::setTrailingSpace(int pixels)
+{
+    QMargins margins = layout_->contentsMargins();
+    margins.setRight(pixels);
+    layout_->setContentsMargins(margins);
+    scheduleLayout();
+}
+
+void TitleBar::setLogoScale(qreal scale)
+{
+    Q_ASSERT(scale > 0 && scale <= 1);
+    logoScale_ = scale;
+    applyMetrics();
 }
 
 WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const

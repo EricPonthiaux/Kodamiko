@@ -63,6 +63,10 @@ public:
     // Room left free at the left: macOS keeps its traffic lights there, in
     // the logo's place, which the bar then hides.
     void setLeadingSpace(int pixels);
+    // Room left free at the right, after the last button.
+    void setTrailingSpace(int pixels);
+    // The logo's mark at `scale` (0 to 1) of its place, which keeps its size.
+    void setLogoScale(qreal scale);
     void applyTheme(const Theme &theme);
 
     WindowButton *windowButton(WindowButton::Kind kind) const;
@@ -124,6 +128,7 @@ private:
     QWidget *actionGroup_;
     QList<QAction *> secondaryActions_;
     bool layoutScheduled_ = false;
+    qreal logoScale_ = 1;
 
     QList<ActionButton> actionButtons_;
     QFrame *controlsDivider_;

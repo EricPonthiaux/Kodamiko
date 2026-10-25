@@ -99,8 +99,6 @@ void MainWindow::createRunMenu()
 {
     QMenu *run = titleBar_->menuBar()->addMenu(tr("&Run"));
     runAction_ = run->addAction(tr("&Run"), QKeySequence(tr("Shift+F10")), this, &MainWindow::runSelected);
-    QMenu *runOther = run->addMenu(tr("Run &Configuration"));
-    connect(runOther, &QMenu::aboutToShow, this, [this, runOther] { fillRunMenu(runOther, true); });
     run->addAction(tr("Run &Other…"), QKeySequence(tr("Alt+Shift+F10")), this, [this] {
         // The configurations under the title bar's chip.
         auto *menu = new QMenu(this);

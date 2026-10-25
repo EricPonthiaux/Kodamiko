@@ -9,6 +9,7 @@
 #include <QFontMetrics>
 #include <QPalette>
 #include <QShortcut>
+#include <QWheelEvent>
 
 #include <algorithm>
 
@@ -403,4 +404,19 @@ void DiffView::applyTheme(const Theme &theme)
     rule.setColor(QPalette::Window, theme.line);
     setPalette(rule);
     setAutoFillBackground(true);
+}
+
+void DiffView::wheelEvent(QWheelEvent *event)
+{
+    // QScintilla zooms with the Control key on macOS; Duet, as in its trees,
+    // with Command there (Qt's ControlModifier) and Ctrl elsewhere.
+    if (!(event->modifiers() & Qt::ControlModifier)) {
+        QsciScintillaBase::wheelEvent(event);
+        return;
+    }
+    const int delta = event->angleDelta().y();
+    if (delta > 0)
+        zoomIn();
+    else if (delta < 0)
+        zoomOut();
 }

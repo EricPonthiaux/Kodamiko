@@ -51,6 +51,7 @@
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "setup/Prerequisites.h"
+#include "system/Host.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
 #include "ui/DetachablePage.h"
@@ -96,6 +97,21 @@
 #include <utility>
 
 namespace {
+
+// Between the window's left edge and the agent indicator: macOS rounds the
+// window's bottom corners, and the indicator must clear them.
+int agentIndicatorMarginPx()
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::Windows:
+        return 6;
+    case OperatingSystem::MacOS:
+        return 10;
+    case OperatingSystem::Linux:
+        return 8;
+    }
+    return 0;
+}
 
 QColor problemsIconColor(int errorCount, int warningCount, const Theme &theme)
 {
@@ -722,6 +738,7 @@ void MainWindow::createStatusBar()
     setStatusBar(bar);
     agentIndicator_ = new AgentIndicator(this);
     agentIndicator_->applyTheme(theme_);
+    agentIndicator_->setContentsMargins(UiMetrics::scaled(agentIndicatorMarginPx()), 0, 0, 0);
     statusBar()->addWidget(agentIndicator_);
     agentIndicator_->hide();
     connect(agentIndicator_, &AgentIndicator::clicked, this, &MainWindow::showClaudeSession);

@@ -6,10 +6,9 @@
 #include "ui/AppFonts.h"
 #include "ui/FileIcons.h"
 #include "ui/Paragraph.h"
-#include "ui/PopupMetrics.h"
-#include "ui/PopupRows.h"
 #include "ui/PopupFooter.h"
 #include "ui/PopupMetrics.h"
+#include "ui/PopupRows.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
@@ -61,7 +60,8 @@ public:
 
         // The icon, alone, in the accent.
         const QSizeF iconSize = UiMetrics::scaledSquare(UiMetrics::iconSize);
-        const QRectF tile(QPointF(row.left() + PopupMetrics::rowPadding, row.center().y() - iconSize.height() / 2), iconSize);
+        const QRectF tile(QPointF(row.left() + PopupMetrics::rowPadding, row.center().y() - iconSize.height() / 2),
+                          iconSize);
         const QIcon icon = UiIcons::icon(index.data(iconRole).toString(), theme.accent);
         icon.paint(painter, tile.toRect());
 

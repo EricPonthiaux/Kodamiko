@@ -20,6 +20,7 @@
 #include <QPointer>
 #include <QTimer>
 #include <QToolTip>
+#include <QWheelEvent>
 #include <Qsci/qscicommandset.h>
 
 #include <algorithm>
@@ -808,4 +809,19 @@ void EditorWidget::updateLineNumberMargin()
 {
     const QString widest = QString(QString::number(lines()).size() + 1, QLatin1Char('9'));
     setMarginWidth(0, widest);
+}
+
+void EditorWidget::wheelEvent(QWheelEvent *event)
+{
+    // QScintilla zooms with the Control key on macOS; Duet, as in its trees,
+    // with Command there (Qt's ControlModifier) and Ctrl elsewhere.
+    if (!(event->modifiers() & Qt::ControlModifier)) {
+        QsciScintillaBase::wheelEvent(event);
+        return;
+    }
+    const int delta = event->angleDelta().y();
+    if (delta > 0)
+        zoomIn();
+    else if (delta < 0)
+        zoomOut();
 }

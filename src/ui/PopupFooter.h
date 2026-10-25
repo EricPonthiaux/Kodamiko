@@ -19,6 +19,7 @@ public:
 
     // The hint, on one line.
     void setHint(const QString &text);
+
     // The label of the hint, for a hint of several lines (Paragraph) or
     // one that follows a form. Owned by the footer.
     QLabel *hint() const { return hint_; }
