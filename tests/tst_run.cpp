@@ -130,12 +130,13 @@ private slots:
         write(dir.path() + "/CMakePresets.json", R"({
             "version": 3,
             "configurePresets": [{"name": "base", "hidden": true}, {"name": "default", "inherits": "base"}],
-            "buildPresets": [{"name": "default", "configurePreset": "default"}],
+            "buildPresets": [{"name": "fast", "configurePreset": "default"}],
             "testPresets": [{"name": "default", "configurePreset": "default"}]
         })");
         const QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
-        QCOMPARE(names(found), (QStringList{"CMake: build default", "CMake: configure default", "CTest: default"}));
-        QCOMPARE(found.at(0).command, QString("cmake --build --preset default"));
+        QCOMPARE(names(found), (QStringList{"CMake: build fast", "CMake: configure default", "CTest: default"}));
+        // Configured first: `cmake --build` does not create the build folder.
+        QCOMPARE(found.at(0).command, QString("cmake --preset default && cmake --build --preset fast"));
         QCOMPARE(found.at(2).kind, RunConfiguration::Kind::Test);
         QVERIFY(found.at(0).detected);
     }

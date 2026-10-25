@@ -532,9 +532,8 @@ public:
         static const QRegularExpression leading(QStringLiteral("^\\s+"));
         start.remove(leading);
         // Comments (the layout, a title) may come first.
-        for (const QString &line : mermaidLines(start))
-            return header().match(line).hasMatch();
-        return false;
+        const QStringList lines = mermaidLines(start);
+        return !lines.isEmpty() && header().match(lines.first()).hasMatch();
     }
 
     bool parse(const QString &source, Model &model, QString *) const override

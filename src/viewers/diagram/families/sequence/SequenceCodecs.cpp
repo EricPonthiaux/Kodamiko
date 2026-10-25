@@ -356,9 +356,8 @@ public:
     bool matches(const QString &source) const override
     {
         // Comments (the layout, a title) may come first.
-        for (const QString &line : mermaidLines(source))
-            return mermaidHeader().match(line).hasMatch();
-        return false;
+        const QStringList lines = mermaidLines(source);
+        return !lines.isEmpty() && mermaidHeader().match(lines.first()).hasMatch();
     }
 
     bool parse(const QString &source, Model &model, QString *) const override

@@ -43,19 +43,38 @@ RunConfiguration make(const QString &name, RunConfiguration::Kind kind, const QS
 }
 
 // The non-hidden presets of `key` in CMakePresets.json and CMakeUserPresets.json.
-QStringList cmakePresets(const QString &folder, const QString &key)
+QList<QJsonObject> cmakePresets(const QString &folder, const QString &key)
 {
-    QStringList names;
+    QList<QJsonObject> presets;
+    QSet<QString> names;
     for (const QString &file : {QStringLiteral("CMakePresets.json"), QStringLiteral("CMakeUserPresets.json")}) {
         const QJsonObject root = QJsonDocument::fromJson(readFile(folder + QLatin1Char('/') + file)).object();
         for (const QJsonValue &value : root.value(key).toArray()) {
             const QJsonObject preset = value.toObject();
             const QString name = preset.value(QStringLiteral("name")).toString();
-            if (!name.isEmpty() && !preset.value(QStringLiteral("hidden")).toBool() && !names.contains(name))
-                names.append(name);
+            if (!name.isEmpty() && !preset.value(QStringLiteral("hidden")).toBool() && !names.contains(name)) {
+                names.insert(name);
+                presets.append(preset);
+            }
         }
     }
-    return names;
+    return presets;
+}
+
+QString presetName(const QJsonObject &preset)
+{
+    return preset.value(QStringLiteral("name")).toString();
+}
+
+// `cmake --build` fails until the build folder is configured, so the build configures first:
+// quick when it already is. A build preset that inherits its configure preset is only built.
+QString cmakeBuildCommand(const QJsonObject &buildPreset)
+{
+    const QString build = QStringLiteral("cmake --build --preset %1").arg(presetName(buildPreset));
+    const QString configurePreset = buildPreset.value(QStringLiteral("configurePreset")).toString();
+    if (configurePreset.isEmpty())
+        return build;
+    return QStringLiteral("cmake --preset %1 && %2").arg(configurePreset, build);
 }
 
 void detectCMake(const QString &folder, QList<RunConfiguration> &found)
@@ -63,15 +82,19 @@ void detectCMake(const QString &folder, QList<RunConfiguration> &found)
     using Kind = RunConfiguration::Kind;
     if (exists(folder, QStringLiteral("CMakePresets.json")) ||
         exists(folder, QStringLiteral("CMakeUserPresets.json"))) {
-        for (const QString &name : cmakePresets(folder, QStringLiteral("buildPresets")))
-            found.append(make(QStringLiteral("CMake: build %1").arg(name), Kind::Build,
-                              QStringLiteral("cmake --build --preset %1").arg(name)));
-        for (const QString &name : cmakePresets(folder, QStringLiteral("configurePresets")))
+        for (const QJsonObject &preset : cmakePresets(folder, QStringLiteral("buildPresets")))
+            found.append(make(QStringLiteral("CMake: build %1").arg(presetName(preset)), Kind::Build,
+                              cmakeBuildCommand(preset)));
+        for (const QJsonObject &preset : cmakePresets(folder, QStringLiteral("configurePresets"))) {
+            const QString name = presetName(preset);
             found.append(make(QStringLiteral("CMake: configure %1").arg(name), Kind::Build,
                               QStringLiteral("cmake --preset %1").arg(name)));
-        for (const QString &name : cmakePresets(folder, QStringLiteral("testPresets")))
+        }
+        for (const QJsonObject &preset : cmakePresets(folder, QStringLiteral("testPresets"))) {
+            const QString name = presetName(preset);
             found.append(
                 make(QStringLiteral("CTest: %1").arg(name), Kind::Test, QStringLiteral("ctest --preset %1").arg(name)));
+        }
         return;
     }
     if (!exists(folder, QStringLiteral("CMakeLists.txt")))
