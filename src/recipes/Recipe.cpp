@@ -51,7 +51,7 @@ RecipeEnvironment environmentOf(const QJsonObject &object)
 // it has none for them.
 std::optional<QJsonObject> platformDownload(const QJsonObject &downloads)
 {
-    const QString system = Recipes::currentSystem();
+    const QString system = Host::systemName();
     const QString processor = system + QLatin1Char('-') + ToolCatalog::currentPlatform().arch;
     for (const QString &key : {processor, system, QStringLiteral("any")}) {
         if (downloads.contains(key))
@@ -124,7 +124,7 @@ QList<RecipeRequirement> requirementsOf(const QJsonValue &value)
     for (const QJsonValue &item : value.toArray()) {
         const QJsonObject object = item.toObject();
         const QStringList systems = stringsOf(object.value(QStringLiteral("systems")));
-        if (!systems.isEmpty() && !systems.contains(Recipes::currentSystem()))
+        if (!systems.isEmpty() && !systems.contains(Host::systemName()))
             continue;
         const RecipeRequirement requirement = requirementOf(object);
         if (!requirement.tool.tool.isEmpty())
@@ -212,19 +212,6 @@ std::optional<RunConfiguration> Recipe::setupConfigurationFor(const QString &ide
 }
 
 namespace Recipes {
-
-QString currentSystem()
-{
-    switch (Host::operatingSystem()) {
-    case OperatingSystem::Windows:
-        return QStringLiteral("windows");
-    case OperatingSystem::MacOS:
-        return QStringLiteral("macos");
-    case OperatingSystem::Linux:
-        return QStringLiteral("linux");
-    }
-    return {};
-}
 
 std::optional<Recipe> parse(const QByteArray &recipeJson, const QString &folder, QString *error)
 {

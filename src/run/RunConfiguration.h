@@ -6,6 +6,7 @@
 #include <QList>
 #include <QMap>
 #include <QString>
+#include <QStringList>
 
 // A command the project is built, run, debugged or tested with, in the manner of
 // IntelliJ's run configurations: run by the system's shell in a terminal
@@ -23,6 +24,8 @@ struct RunConfiguration {
     QString command;                    // a shell command line ("cmake --build build")
     QString folder;                     // relative to the project; empty: its root
     QMap<QString, QString> environment; // added to the editor's
+    // Those of Host::systemName() it is offered on; empty: every system.
+    QStringList systems;
     // Found in the project's build files rather than written in
     // .duet/run.json.
     bool detected = false;
@@ -42,19 +45,23 @@ QString filePath(const QString &projectFolder);
 // The configurations of a run.json:
 //   {"configurations": [{"name": "Build", "kind": "build",
 //                        "command": "cmake --build build", "folder": "",
-//                        "env": {"VERBOSE": "1"}}]}
+//                        "env": {"VERBOSE": "1"}, "systems": ["linux", "macos"]}]}
 // An entry without a name or a command is skipped; `error` says what is
 // wrong with a file that cannot be read.
 QList<RunConfiguration> parse(const QByteArray &json, QString *error = nullptr);
 QByteArray serialize(const QList<RunConfiguration> &configurations);
 
+// Whether `configuration` is offered on the system Duet runs on.
+bool isForThisSystem(const RunConfiguration &configuration);
+
 // The configurations the build files at the project's root offer:
-// CMakePresets.json (or CMakeLists.txt), package.json scripts, Maven,
-// Cargo, Makefile. Builds first.
+// package.json scripts, Maven, Cargo, Makefile. Builds first. CMake
+// projects offer none: their builds are those of .duet/run.json.
 QList<RunConfiguration> detect(const QString &projectFolder);
 
-// Those of .duet/run.json, then the detected ones whose name the file does
-// not reuse (a configuration of the file replaces the detected one).
+// Those of .duet/run.json for this system, then the detected ones whose
+// name they do not reuse (a configuration of the file replaces the detected
+// one).
 QList<RunConfiguration> all(const QString &projectFolder, QString *error = nullptr);
 
 } // namespace RunConfigurations

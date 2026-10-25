@@ -99,23 +99,72 @@
     ],
     "run": [
         {
-            "name": "Build",
+            "name": "Configure default",
             "kind": "build",
-            "command": "cmake --build build"
+            "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release",
+            "systems": [
+                "linux",
+                "macos"
+            ]
         },
         {
-            "name": "Run",
+            "name": "Configure debug",
+            "kind": "build",
+            "command": "cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug",
+            "systems": [
+                "linux",
+                "macos"
+            ]
+        },
+        {
+            "name": "Build default",
+            "kind": "build",
+            "command": "cmake --build build",
+            "systems": [
+                "linux",
+                "macos"
+            ]
+        },
+        {
+            "name": "Build debug",
+            "kind": "build",
+            "command": "cmake --build build-debug",
+            "systems": [
+                "linux",
+                "macos"
+            ]
+        },
+        {
+            "name": "Run default",
             "kind": "run",
-            "command": "build/{{identifier}}"
+            "command": "build/{{identifier}}",
+            "systems": [
+                "linux",
+                "macos"
+            ]
+        },
+        {
+            "name": "Run debug",
+            "kind": "run",
+            "command": "build-debug/{{identifier}}",
+            "systems": [
+                "linux",
+                "macos"
+            ]
         },
         {
             "name": "Debug",
             "kind": "debug",
-            "command": "gdb build/{{identifier}}"
+            "command": "gdb build-debug/{{identifier}}",
+            "systems": [
+                "linux",
+                "macos"
+            ]
         }
     ],
     "setup": [
-        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug"
+        "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release",
+        "cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug"
     ],
     "prompts": [
         {

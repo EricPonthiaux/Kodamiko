@@ -9,6 +9,7 @@
 #include "recipes/RecipeSchema.h"
 #include "recipes/RecipeSetup.h"
 #include "run/RunConfiguration.h"
+#include "system/Host.h"
 #include "terminal/ProcessSpec.h"
 #include "toolchains/ToolCatalog.h"
 #include "toolchains/Toolchains.h"
@@ -51,7 +52,7 @@ Recipe builtIn(const QString &id)
 QString recipeOfFamily(const QString &family)
 {
     if (family == QLatin1String("cpp"))
-        return Recipes::currentSystem() == QLatin1String("windows") ? "cpp-cmake-msvc" : "cpp-cmake";
+        return Host::systemName() == QLatin1String("windows") ? "cpp-cmake-msvc" : "cpp-cmake";
     if (family == QLatin1String("java"))
         return "java-maven";
     if (family == QLatin1String("javascript"))
@@ -183,8 +184,8 @@ private slots:
         write(dir.filePath("broken/recipe.json"), R"({"description": "no title"})");
         QStringList problems;
 
-        const QList<Recipe> recipes = RecipeLibrary::available({.builtIn = dir.path(), .user = {}, .project = {}},
-                                                               Recipes::currentSystem(), &problems);
+        const QList<Recipe> recipes =
+            RecipeLibrary::available({.builtIn = dir.path(), .user = {}, .project = {}}, Host::systemName(), &problems);
 
         QCOMPARE(ids(recipes), QStringList{"odd"});
         QCOMPARE(problems.size(), 2);
@@ -314,13 +315,39 @@ private slots:
             RunConfigurations::parse(read(RunConfigurations::filePath(dir.filePath("My App"))), &error);
 
         QVERIFY2(error.isEmpty(), qPrintable(error));
+        // Each kind once, in that order: a recipe can offer several of one.
         QList<RunConfiguration::Kind> kinds;
-        for (const RunConfiguration &configuration : configurations)
-            kinds.append(configuration.kind);
+        for (const RunConfiguration &configuration : configurations) {
+            if (kinds.isEmpty() || kinds.last() != configuration.kind)
+                kinds.append(configuration.kind);
+        }
         const QList<RunConfiguration::Kind> expected{RunConfiguration::Kind::Build, RunConfiguration::Kind::Run,
                                                      RunConfiguration::Kind::Debug};
         QCOMPARE(kinds, expected);
         QVERIFY(!configurations.last().command.contains("{{"));
+    }
+
+    void cppRecipeConfiguresBuildsAndRunsDefaultAndDebug_data()
+    {
+        QTest::addColumn<QString>("id");
+        for (const Recipe &recipe : RecipeLibrary::available(RecipeLibrary::defaultSources())) {
+            if (recipe.language == QLatin1String("cpp"))
+                QTest::newRow(qPrintable(recipe.id)) << recipe.id;
+        }
+    }
+
+    void cppRecipeConfiguresBuildsAndRunsDefaultAndDebug()
+    {
+        QFETCH(QString, id);
+
+        const QList<RunConfiguration> configurations = builtIn(id).runConfigurationsFor("demo");
+
+        QStringList names;
+        for (const RunConfiguration &configuration : configurations)
+            names.append(configuration.name);
+        const QStringList expected{"Configure default", "Configure debug", "Build default", "Build debug",
+                                   "Run default",       "Run debug",       "Debug"};
+        QCOMPARE(names, expected);
     }
 
     void namesTheRecipeFilesAfterTheFolder()
@@ -400,11 +427,11 @@ private slots:
 
     void keepsTheRequirementsOfThisSystem()
     {
-        const QString other = Recipes::currentSystem() == "linux" ? "macos" : "linux";
+        const QString other = Host::systemName() == "linux" ? "macos" : "linux";
         const QString json = QString(R"({"title": "Qt", "requires": [
             {"tool": "qt", "kit": "here", "systems": ["%1"]}, {"tool": "qt", "kit": "there", "systems": ["%2"]},
             {"tool": "cmake"}]})")
-                                 .arg(Recipes::currentSystem(), other);
+                                 .arg(Host::systemName(), other);
         QString error;
 
         const std::optional<Recipe> recipe = Recipes::parse(json.toUtf8(), "/recipes/x", &error);
@@ -426,7 +453,7 @@ private slots:
         const QJsonObject maven{{"tool", "maven"},
                                 {"version", "3.9.16"},
                                 {"program", "mvn"},
-                                {"download", QJsonObject{{Recipes::currentSystem(), forThisSystem}, {"any", forAny}}}};
+                                {"download", QJsonObject{{Host::systemName(), forThisSystem}, {"any", forAny}}}};
         QString error;
 
         const std::optional<Recipe> recipe = Recipes::parse(recipeJson({maven}), "/recipes/x", &error);

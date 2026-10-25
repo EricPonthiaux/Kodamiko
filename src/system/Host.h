@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <QString>
+
 // The systems Duet runs on; Linux stands for the Unixes other than macOS.
 enum class OperatingSystem {
     Windows,
@@ -16,5 +18,8 @@ enum class OperatingSystem {
 namespace Host {
 
 OperatingSystem operatingSystem();
+// "windows", "macos" or "linux": the system's name in recipes and
+// run.json.
+QString systemName();
 
 } // namespace Host

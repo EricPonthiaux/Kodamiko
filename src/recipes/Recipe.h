@@ -87,7 +87,7 @@ struct Recipe {
     // The folder of the recipe's skills for the agent (--plugin-dir), empty
     // when it has none.
     QString pluginFolder() const;
-    // Whether it is made for `system` (Recipes::currentSystem()'s names).
+    // Whether it is made for `system` (Host::systemName()'s names).
     bool isFor(const QString &system) const;
     // Its run configurations with {{identifier}} replaced.
     QList<RunConfiguration> runConfigurationsFor(const QString &identifier) const;
@@ -111,9 +111,6 @@ constexpr auto versionPlaceholder = "{{version}}";
 constexpr auto urlPlaceholder = "{{url}}";
 // The name of the setup configuration, its terminal's title.
 constexpr auto setupName = "Recipe Setup";
-
-// "windows", "linux" or "macos".
-QString currentSystem();
 
 // The recipe of `recipeJson`, found in `folder`:
 //   {"title": "...", "description": "...", "systems": ["windows"], "language": "cpp",

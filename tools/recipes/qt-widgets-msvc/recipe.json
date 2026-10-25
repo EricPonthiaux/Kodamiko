@@ -46,23 +46,65 @@
     ],
     "run": [
         {
-            "name": "Build",
+            "name": "Configure default",
             "kind": "build",
-            "command": "cmake --build build"
+            "command": "cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release",
+            "systems": [
+                "windows"
+            ]
         },
         {
-            "name": "Run",
+            "name": "Configure debug",
+            "kind": "build",
+            "command": "cmake -S . -B build-debug -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Debug",
+            "systems": [
+                "windows"
+            ]
+        },
+        {
+            "name": "Build default",
+            "kind": "build",
+            "command": "cmake --build build",
+            "systems": [
+                "windows"
+            ]
+        },
+        {
+            "name": "Build debug",
+            "kind": "build",
+            "command": "cmake --build build-debug",
+            "systems": [
+                "windows"
+            ]
+        },
+        {
+            "name": "Run default",
             "kind": "run",
-            "command": "build\\{{identifier}}.exe"
+            "command": "build\\{{identifier}}.exe",
+            "systems": [
+                "windows"
+            ]
+        },
+        {
+            "name": "Run debug",
+            "kind": "run",
+            "command": "build-debug\\{{identifier}}.exe",
+            "systems": [
+                "windows"
+            ]
         },
         {
             "name": "Debug",
             "kind": "debug",
-            "command": "devenv /DebugExe build\\{{identifier}}.exe"
+            "command": "devenv /DebugExe build-debug\\{{identifier}}.exe",
+            "systems": [
+                "windows"
+            ]
         }
     ],
     "setup": [
-        "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=cl"
+        "cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release",
+        "cmake -S . -B build-debug -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Debug"
     ],
     "prompts": [
         {

@@ -1,14 +1,120 @@
 {
   "configurations": [
     {
-      "command": "cmake --preset debug && cmake --build --preset debug",
+      "name": "Configure default",
       "kind": "build",
-      "name": "Build"
+      "command": "cmake --preset default",
+      "systems": [
+        "linux",
+        "macos"
+      ]
     },
     {
-      "command": "cmake --build --preset default",
+      "name": "Configure default",
       "kind": "build",
-      "name": "CMake: build default"
+      "command": "cmake --preset windows",
+      "systems": [
+        "windows"
+      ]
+    },
+    {
+      "name": "Configure debug",
+      "kind": "build",
+      "command": "cmake --preset debug",
+      "systems": [
+        "linux",
+        "macos"
+      ]
+    },
+    {
+      "name": "Configure debug",
+      "kind": "build",
+      "command": "cmake --preset windows-debug",
+      "systems": [
+        "windows"
+      ]
+    },
+    {
+      "name": "Build default",
+      "kind": "build",
+      "command": "cmake --build --preset default",
+      "systems": [
+        "linux",
+        "macos"
+      ]
+    },
+    {
+      "name": "Build default",
+      "kind": "build",
+      "command": "cmake --build --preset windows",
+      "systems": [
+        "windows"
+      ]
+    },
+    {
+      "name": "Build debug",
+      "kind": "build",
+      "command": "cmake --build --preset debug",
+      "systems": [
+        "linux",
+        "macos"
+      ]
+    },
+    {
+      "name": "Build debug",
+      "kind": "build",
+      "command": "cmake --build --preset windows-debug",
+      "systems": [
+        "windows"
+      ]
+    },
+    {
+      "name": "Run default",
+      "kind": "run",
+      "command": "build/bin/Duet.app/Contents/MacOS/Duet",
+      "systems": [
+        "macos"
+      ]
+    },
+    {
+      "name": "Run default",
+      "kind": "run",
+      "command": "build/bin/duet",
+      "systems": [
+        "linux"
+      ]
+    },
+    {
+      "name": "Run default",
+      "kind": "run",
+      "command": "build-win\\bin\\duet.exe",
+      "systems": [
+        "windows"
+      ]
+    },
+    {
+      "name": "Run debug",
+      "kind": "run",
+      "command": "build-debug/bin/Duet.app/Contents/MacOS/Duet",
+      "systems": [
+        "macos"
+      ]
+    },
+    {
+      "name": "Run debug",
+      "kind": "run",
+      "command": "build-debug/bin/duet",
+      "systems": [
+        "linux"
+      ]
+    },
+    {
+      "name": "Run debug",
+      "kind": "run",
+      "command": "build-win-debug\\bin\\duet.exe",
+      "systems": [
+        "windows"
+      ]
     }
   ]
 }

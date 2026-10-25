@@ -4,6 +4,7 @@
 #include "run/BuildOutputParser.h"
 #include "run/RunConfiguration.h"
 #include "run/Runner.h"
+#include "system/Host.h"
 #include "system/Shell.h"
 #include "terminal/TerminalWidget.h"
 
@@ -123,57 +124,32 @@ private slots:
         QVERIFY(!error.isEmpty());
     }
 
-    void detectsCMakePresets()
+    void hidesTheConfigurationsOfAnotherSystem()
     {
         const QTemporaryDir dir;
-        write(dir.path() + "/CMakeLists.txt", "project(x)\n");
-        write(dir.path() + "/CMakePresets.json", R"({
-            "version": 3,
-            "configurePresets": [{"name": "base", "hidden": true}, {"name": "default", "inherits": "base"}],
-            "buildPresets": [{"name": "fast", "configurePreset": "default"}],
-            "testPresets": [{"name": "default", "configurePreset": "default"}]
-        })");
-        const QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
-        QCOMPARE(names(found), (QStringList{"CMake: build fast", "CMake: configure default", "CTest: default"}));
-        // Configured first: `cmake --build` does not create the build folder.
-        QCOMPARE(found.at(0).command, QString("cmake --preset default && cmake --build --preset fast"));
-        QCOMPARE(found.at(2).kind, RunConfiguration::Kind::Test);
-        QVERIFY(found.at(0).detected);
+        const QString other = Host::systemName() == "linux" ? "macos" : "linux";
+        write(dir.path() + "/.duet/run.json", QStringLiteral(R"({"configurations": [
+            {"name": "Here", "command": "a", "systems": ["%1"]},
+            {"name": "Elsewhere", "command": "b", "systems": ["%2"]},
+            {"name": "Everywhere", "command": "c"}]})")
+                                                  .arg(Host::systemName(), other)
+                                                  .toUtf8());
+
+        const QList<RunConfiguration> all = RunConfigurations::all(dir.path());
+
+        QCOMPARE(names(all), (QStringList{"Here", "Everywhere"}));
+        QCOMPARE(all.first().systems, QStringList{Host::systemName()});
     }
 
-    void hidesTheCMakePresetsOfAnotherSystem()
+    void offersNoConfigurationForCMake()
     {
         const QTemporaryDir dir;
         write(dir.path() + "/CMakeLists.txt", "project(x)\n");
-        write(dir.path() + "/CMakePresets.json", R"({
-            "version": 6,
-            "configurePresets": [
-                {"name": "here"},
-                {"name": "elsewhere",
-                 "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "NoSuchSystem"}},
-                {"name": "elsewhere-debug", "inherits": "elsewhere"},
-                {"name": "not-elsewhere", "inherits": "elsewhere",
-                 "condition": {"type": "not", "condition": {"type": "inList", "string": "${hostSystemName}",
-                                                            "list": ["NoSuchSystem"]}}}
-            ],
-            "buildPresets": [{"name": "here", "configurePreset": "here"},
-                             {"name": "elsewhere", "configurePreset": "elsewhere"}],
-            "testPresets": [{"name": "elsewhere-debug", "configurePreset": "elsewhere-debug"}]
-        })");
+        write(dir.path() + "/CMakePresets.json", R"({"version": 3, "configurePresets": [{"name": "default"}]})");
 
         const QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
 
-        QCOMPARE(names(found),
-                 (QStringList{"CMake: build here", "CMake: configure here", "CMake: configure not-elsewhere"}));
-    }
-
-    void detectsCMakeWithoutPresets()
-    {
-        const QTemporaryDir dir;
-        write(dir.path() + "/CMakeLists.txt", "project(x)\n");
-        const QList<RunConfiguration> found = RunConfigurations::detect(dir.path());
-        QCOMPARE(names(found), (QStringList{"CMake: build", "CTest"}));
-        QCOMPARE(found.first().kind, RunConfiguration::Kind::Build);
+        QVERIFY(found.isEmpty());
     }
 
     void detectsPackageScripts()
@@ -210,18 +186,18 @@ private slots:
     void runJsonReplacesDetectedConfigurations()
     {
         const QTemporaryDir dir;
-        write(dir.path() + "/CMakeLists.txt", "project(x)\n");
+        write(dir.path() + "/Makefile", "all: main\n\ntest: all\n");
         write(dir.path() + "/.duet/run.json",
-              R"({"configurations": [{"name": "CTest", "kind": "test", "command": "ctest -j8"},
+              R"({"configurations": [{"name": "make test", "kind": "test", "command": "make -j8 test"},
                                      {"name": "Serve", "command": "./serve"}]})");
         const QList<RunConfiguration> all = RunConfigurations::all(dir.path());
-        QCOMPARE(names(all), (QStringList{"CTest", "Serve", "CMake: build"}));
-        QCOMPARE(all.first().command, QString("ctest -j8"));
+        QCOMPARE(names(all), (QStringList{"make test", "Serve", "make"}));
+        QCOMPARE(all.first().command, QString("make -j8 test"));
         QVERIFY(!all.first().detected);
 
         write(dir.path() + "/.duet/run.json", "{");
         QString error;
-        QCOMPARE(names(RunConfigurations::all(dir.path(), &error)), (QStringList{"CMake: build", "CTest"}));
+        QCOMPARE(names(RunConfigurations::all(dir.path(), &error)), (QStringList{"make", "make test"}));
         QVERIFY(error.startsWith(".duet/run.json"));
     }
 

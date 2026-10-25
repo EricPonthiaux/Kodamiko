@@ -4,6 +4,7 @@
 
 #include "Recipe.h"
 #include "projects/ProjectConfig.h"
+#include "system/Host.h"
 
 #include <QList>
 #include <QString>
@@ -29,12 +30,12 @@ constexpr auto emptyId = "empty";
 // is set), the user's, and `projectFolder`'s (none when it is empty).
 RecipeSources defaultSources(const QString &projectFolder = {});
 
-// The recipes for `system` (Recipes::currentSystem()'s names): the empty
+// The recipes for `system` (Host::systemName()'s names): the empty
 // one first, then by title. A folder whose recipe.json cannot be read is
 // skipped, its reason added to `problems` when given, as are the
 // departures from the schema of those read (Recipes::load's warnings).
 QList<Recipe> available(const RecipeSources &sources,
-                        const QString &system = Recipes::currentSystem(),
+                        const QString &system = Host::systemName(),
                         QStringList *problems = nullptr);
 // Those of `recipes` attached to `family` (Recipe::language), in order.
 QList<Recipe> forLanguage(const QList<Recipe> &recipes, const QString &family);

@@ -2,7 +2,7 @@
 
 #include "RunConfiguration.h"
 
-#include "CMakePresets.h"
+#include "system/Host.h"
 #include "system/Shell.h"
 
 #include <QDir>
@@ -41,44 +41,6 @@ RunConfiguration make(const QString &name, RunConfiguration::Kind kind, const QS
     configuration.command = command;
     configuration.detected = true;
     return configuration;
-}
-
-// `cmake --build` fails until the build folder is configured, so the build configures first:
-// quick when it already is. A build preset that inherits its configure preset is only built.
-QString cmakeBuildCommand(const CMakePreset &buildPreset)
-{
-    const QString build = QStringLiteral("cmake --build --preset %1").arg(buildPreset.name);
-    if (buildPreset.configurePreset.isEmpty())
-        return build;
-    return QStringLiteral("cmake --preset %1 && %2").arg(buildPreset.configurePreset, build);
-}
-
-void detectCMake(const QString &folder, QList<RunConfiguration> &found)
-{
-    using Kind = RunConfiguration::Kind;
-    if (exists(folder, QStringLiteral("CMakePresets.json")) ||
-        exists(folder, QStringLiteral("CMakeUserPresets.json"))) {
-        const CMakePresetLists presets = CMakePresets::forThisSystem(folder);
-        for (const CMakePreset &preset : presets.build)
-            found.append(
-                make(QStringLiteral("CMake: build %1").arg(preset.name), Kind::Build, cmakeBuildCommand(preset)));
-        for (const CMakePreset &preset : presets.configure) {
-            found.append(make(QStringLiteral("CMake: configure %1").arg(preset.name), Kind::Build,
-                              QStringLiteral("cmake --preset %1").arg(preset.name)));
-        }
-        for (const CMakePreset &preset : presets.test) {
-            found.append(make(QStringLiteral("CTest: %1").arg(preset.name), Kind::Test,
-                              QStringLiteral("ctest --preset %1").arg(preset.name)));
-        }
-        return;
-    }
-    if (!exists(folder, QStringLiteral("CMakeLists.txt")))
-        return;
-    // Configured on the first build; later configurations are quick.
-    found.append(make(QStringLiteral("CMake: build"), Kind::Build,
-                      QStringLiteral("cmake -S . -B build && cmake --build build")));
-    found.append(
-        make(QStringLiteral("CTest"), Kind::Test, QStringLiteral("ctest --test-dir build --output-on-failure")));
 }
 
 RunConfiguration::Kind scriptKind(const QString &script)
@@ -238,6 +200,8 @@ QList<RunConfiguration> parse(const QByteArray &json, QString *error)
         const QJsonObject environment = object.value(QStringLiteral("env")).toObject();
         for (auto it = environment.constBegin(); it != environment.constEnd(); ++it)
             configuration.environment.insert(it.key(), it.value().toVariant().toString());
+        for (const QJsonValue &system : object.value(QStringLiteral("systems")).toArray())
+            configuration.systems.append(system.toString());
         if (!configuration.name.isEmpty() && !configuration.command.isEmpty())
             configurations.append(configuration);
     }
@@ -259,15 +223,21 @@ QByteArray serialize(const QList<RunConfiguration> &configurations)
                 environment.insert(it.key(), it.value());
             object.insert(QStringLiteral("env"), environment);
         }
+        if (!configuration.systems.isEmpty())
+            object.insert(QStringLiteral("systems"), QJsonArray::fromStringList(configuration.systems));
         array.append(object);
     }
     return QJsonDocument(QJsonObject{{QStringLiteral("configurations"), array}}).toJson(QJsonDocument::Indented);
 }
 
+bool isForThisSystem(const RunConfiguration &configuration)
+{
+    return configuration.systems.isEmpty() || configuration.systems.contains(Host::systemName());
+}
+
 QList<RunConfiguration> detect(const QString &projectFolder)
 {
     QList<RunConfiguration> found;
-    detectCMake(projectFolder, found);
     detectJava(projectFolder, found);
     detectPackageJson(projectFolder, found);
     detectOthers(projectFolder, found);
@@ -287,6 +257,7 @@ QList<RunConfiguration> all(const QString &projectFolder, QString *error)
         if (!parseError.isEmpty() && error)
             *error = QStringLiteral("%1: %2").arg(QStringLiteral(".duet/run.json"), parseError);
     }
+    configurations.removeIf([](const RunConfiguration &configuration) { return !isForThisSystem(configuration); });
     QSet<QString> names;
     for (const RunConfiguration &configuration : configurations)
         names.insert(configuration.name);

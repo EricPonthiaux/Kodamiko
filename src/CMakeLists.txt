@@ -8,7 +8,7 @@ duet_enable_warnings(duet_log)
 # The system's ways (shells, executables, file names...), shared by the
 # editor and its helper programs: an interface per concept, and one source
 # per system implementing it.
-add_library(duet_system STATIC system/Executables.cpp)
+add_library(duet_system STATIC system/Executables.cpp system/Host.cpp)
 if(WIN32)
     target_sources(duet_system PRIVATE
         system/ExecutablesWindows.cpp
@@ -229,7 +229,6 @@ add_library(duet_core STATIC
     recipes/RecipeSchema.cpp
     recipes/RecipeSetup.cpp
     run/BuildOutputParser.cpp
-    run/CMakePresets.cpp
     run/RunConfiguration.cpp
     run/RunConfigurationMenu.cpp
     run/Runner.cpp

@@ -52,6 +52,18 @@
                 "env": {
                     "description": "Variables added to the editor's environment.",
                     "$ref": "#/definitions/variables"
+                },
+                "systems": {
+                    "description": "The systems it is offered on: Duet hides it on the others. Every system when it is not given.",
+                    "type": "array",
+                    "items": {
+                        "enum": [
+                            "windows",
+                            "linux",
+                            "macos"
+                        ]
+                    },
+                    "uniqueItems": true
                 }
             },
             "additionalProperties": false

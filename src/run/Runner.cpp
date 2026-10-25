@@ -71,6 +71,8 @@ QList<RunConfiguration> Runner::configurations(QString *error) const
         return {};
     QList<RunConfiguration> all = RunConfigurations::all(project_.path, error);
     for (const RunConfiguration &configuration : recipeConfigurations_) {
+        if (!RunConfigurations::isForThisSystem(configuration))
+            continue;
         const bool isNamed = std::ranges::any_of(
             all, [&configuration](const RunConfiguration &other) { return other.name == configuration.name; });
         if (!isNamed)
