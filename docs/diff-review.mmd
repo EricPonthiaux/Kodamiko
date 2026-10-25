@@ -1,0 +1,50 @@
+flowchart TB
+    diff[Mode Diff : fichiers modifiés et diff]
+    stage[Stager fichiers, blocs ou lignes]
+    ask[Bouton Review ou Review Again]
+    unsaved{Fichiers non enregistrés ?}
+    save[Message : enregistrer d'abord]
+    read[Lire les changements stagés en un patch]
+    empty{Rien de stagé ?}
+    nothing[Message : stager d'abord]
+    step{Étape Review activée ?}
+    modeReview[Mode Review : page de la review]
+    modeDiff[Reste en mode Diff : barre de progression]
+    hasCheck{Le projet a une vérification ?}
+    check[Lancer la vérification du projet]
+    passed{Vérification réussie ?}
+    failed[Vérification échouée]
+    anyway[Review Anyway]
+    reviewer[Agent relecteur séparé, lecture seule, lit le patch]
+    answer{Réponse valide ?}
+    error[Review échouée]
+    findings[Constats : notes dans le diff, panneau Problems]
+    grid[Grille des constats sur le diff]
+    act{Que faire d'un constat ?}
+    dismiss[Ignorer]
+    send[Envoyer au prompt de la session]
+    fix[Faire corriger par la session]
+    commit[Commit]
+
+    diff --> stage --> ask --> unsaved
+    unsaved -- oui --> save
+    unsaved -- non --> read --> empty
+    empty -- oui --> nothing
+    empty -- non --> step
+    step -- oui --> modeReview --> hasCheck
+    step -- non --> modeDiff --> hasCheck
+    hasCheck -- non --> reviewer
+    hasCheck -- oui --> check --> passed
+    passed -- oui --> reviewer
+    passed -- non --> failed --> anyway --> reviewer
+    reviewer --> answer
+    answer -- non --> error
+    answer -- oui --> findings
+    findings -- sans étape Review --> grid
+    findings --> act
+    grid --> act
+    act --> dismiss
+    act --> send
+    act --> fix
+    fix --> stage
+    dismiss --> commit
