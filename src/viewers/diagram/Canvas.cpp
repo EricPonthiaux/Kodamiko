@@ -185,7 +185,8 @@ void Canvas::fadeOutRemoved(const QList<const Shape *> &shapes, const QList<cons
 
 Canvas::~Canvas()
 {
-    board_->setTextEditor({});
+    if (board_)
+        board_->setTextEditor({});
 }
 
 void Canvas::setGridVisible(bool visible)

@@ -269,7 +269,9 @@ private:
     void createElement(const ElementPreset &preset, QPointF point, const QString &from);
     void insertSource(const QString &text);
 
-    Board *board_;
+    // Not owned. A QPointer: the view that owns both may delete the board
+    // first, its children being deleted in the order they were created.
+    QPointer<Board> board_;
     Camera camera_;
     bool gridVisible_ = true;
     bool needsFit_ = false;

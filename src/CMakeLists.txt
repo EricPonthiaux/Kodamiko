@@ -498,6 +498,15 @@ if(APPLE)
                 $<TARGET_FILE_DIR:duet>/../Resources/recipes)
 endif()
 
+# Windows has no rpath: without Qt's DLLs next to it, the built executable
+# does not start. windeployqt only copies what changed since the last build.
+if(WIN32)
+    add_custom_command(TARGET duet POST_BUILD
+        COMMAND $<TARGET_FILE:Qt6::windeployqt> --no-translations --no-compiler-runtime
+                $<TARGET_FILE:duet>
+        COMMENT "Deploying Qt next to duet.exe")
+endif()
+
 # "duet" component: the dependencies (libgit2) declare their own
 # install rules, which we do not want in the packages.
 #   cmake --install build --component duet --prefix <folder>
