@@ -60,7 +60,8 @@ public:
 
     // Window controls (frameless window); otherwise the system draws them.
     void setWindowControlsVisible(bool visible);
-    // Room left free at the left: macOS keeps its traffic lights there.
+    // Room left free at the left: macOS keeps its traffic lights there, in
+    // the logo's place, which the bar then hides.
     void setLeadingSpace(int pixels);
     void applyTheme(const Theme &theme);
 
@@ -106,7 +107,6 @@ private:
     QHBoxLayout *layout_;
     QSpacerItem *leftBalance_;  // owned by layout_
     QSpacerItem *rightBalance_; // owned by layout_
-    QWidget *leadingSpace_;
     QWidget *logo_;
     QPointer<QTabBar> logoColumn_;
     QMenuBar *menuBar_;

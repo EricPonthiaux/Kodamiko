@@ -19,12 +19,12 @@ flowchart TB
   send["Send to the session's prompt"]
   fix["Have the session fix it"]
   commit["Commit"]
-  diff["Diff mode: changed files and diff"]
   stage["Stage files, hunks or lines"]
   read["Read the staged changes as one patch"]
   save["Message: save first"]
   empty{"Nothing staged?"}
   unsaved{"Unsaved files?"}
+  diff["Diff mode: changed files and diff"]
   diff --> stage
   stage --> ask
   ask --> unsaved
@@ -77,12 +77,12 @@ flowchart TB
 %% duet {"key":"send","x":274.5,"y":2753.8}
 %% duet {"key":"fix","x":544,"y":2753.8}
 %% duet {"key":"commit","x":111,"y":2872.8}
-%% duet {"fill":"#1565c0","key":"diff","x":425.5,"y":0}
 %% duet {"key":"stage","x":541.6,"y":118.9}
 %% duet {"key":"read","x":308,"y":554.9}
 %% duet {"key":"save","x":113,"y":558.9}
 %% duet {"key":"empty","x":264.5,"y":681.9}
 %% duet {"fill":"#ad1457","key":"unsaved","x":303,"y":356.9}
+%% duet {"fill":"#1565c0","key":"diff","x":425.5,"y":0}
 %% duet {"c":[568.6,60.3,580.4,75.4,594.7,93.8,607.3,110],"e":[614,118.6],"link":"diff>stage","n":0}
 %% duet {"c":[590.5,179.2,566,195.1,535.8,214.5,510,231.2],"e":[500.3,237.4],"link":"stage>ask","n":0}
 %% duet {"c":[447.3,298.1,444.5,313.1,440.9,332,437.5,350.2],"e":[435.4,361.5],"link":"ask>unsaved","n":0}

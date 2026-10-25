@@ -4,6 +4,9 @@ project(Duet
     VERSION 0.1.0
     DESCRIPTION "C/C++/Java/JavaScript source editor with an integrated Claude terminal"
     LANGUAGES C CXX)
+if(APPLE)
+    enable_language(OBJCXX) # the AppKit calls Qt has no API for
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

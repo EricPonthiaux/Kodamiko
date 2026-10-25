@@ -85,11 +85,6 @@ TitleBar::TitleBar(QWidget *parent)
 {
     setAttribute(Qt::WA_StyledBackground, false);
 
-    leadingSpace_ = new QWidget(this);
-    leadingSpace_->setFixedWidth(0);
-    leadingSpace_->setAttribute(Qt::WA_TransparentForMouseEvents);
-    leadingSpace_->hide();
-
     menuBar_ = new QMenuBar(this);
     menuBar_->setNativeMenuBar(false);
     menuBar_->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
@@ -109,7 +104,6 @@ TitleBar::TitleBar(QWidget *parent)
     layout_ = new QHBoxLayout(this);
     layout_->setContentsMargins(0, 0, 0, 0);
     layout_->setSpacing(groupSpacing);
-    layout_->addWidget(leadingSpace_);
     logo_ = new BrandLogo(&theme_, this);
     layout_->addWidget(logo_, 0, Qt::AlignVCenter);
     layout_->addWidget(menuBar_, 0, Qt::AlignVCenter);
@@ -319,9 +313,9 @@ void TitleBar::updateResponsiveLayout()
     // Measure the expanded controls at their bounded widths, independent of
     // which groups were hidden or how far the labels grew on the previous
     // resize.
-    int fixed = UiMetrics::scaled(dragSpace);
+    int fixed = UiMetrics::scaled(dragSpace) + layout_->contentsMargins().left();
     int groups = 0;
-    const std::initializer_list<const QWidget *> fixedWidgets{leadingSpace_, logo_, controlsDivider_, controls_};
+    const std::initializer_list<const QWidget *> fixedWidgets{logo_, controlsDivider_, controls_};
     for (const QWidget *widget : fixedWidgets) {
         if (widget->isHidden())
             continue;
@@ -348,7 +342,9 @@ void TitleBar::updateResponsiveLayout()
     spare -= project_->widenInto(spare);
     run_->widenInto(runBlock_->isHidden() ? 0 : spare);
     const int minimumWithLogo = layout_->minimumSize().width() + (logo_->isHidden() ? hintedWidth(logo_) + gap : 0);
-    logo_->setVisible(width() >= minimumWithLogo);
+    // macOS's traffic lights take the logo's place, over the column.
+    const bool hasLeadingSpace = layout_->contentsMargins().left() > 0;
+    logo_->setVisible(!hasLeadingSpace && width() >= minimumWithLogo);
     centerProjectGroup();
 }
 
@@ -363,7 +359,7 @@ int TitleBar::sideWidth(std::initializer_list<const QWidget *> widgets) const
 
 void TitleBar::centerProjectGroup()
 {
-    const int left = sideWidth({leadingSpace_, logo_, menuBar_, menuButton_});
+    const int left = layout_->contentsMargins().left() + sideWidth({logo_, menuBar_, menuButton_});
     const int right = sideWidth({actionGroup_, controlsDivider_, controls_});
     int center = project_->sizeHint().width();
     if (!runBlock_->isHidden())
@@ -426,8 +422,7 @@ void TitleBar::setWindowControlsVisible(bool visible)
 
 void TitleBar::setLeadingSpace(int pixels)
 {
-    leadingSpace_->setFixedWidth(pixels);
-    leadingSpace_->setVisible(pixels > 0);
+    layout_->setContentsMargins(pixels, 0, 0, 0);
     scheduleLayout();
 }
 

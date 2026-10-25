@@ -469,6 +469,14 @@ qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/MainWindowReview.cpp
     app/MainWindowRun.cpp
     app/MainWindowSettings.cpp)
+if(WIN32)
+    target_sources(duet PRIVATE app/MainWindowTitleBarWindows.cpp)
+elseif(APPLE)
+    target_sources(duet PRIVATE app/MainWindowTitleBarMacOS.mm)
+    target_link_libraries(duet PRIVATE "-framework AppKit")
+else()
+    target_sources(duet PRIVATE app/MainWindowTitleBarLinux.cpp)
+endif()
 duet_enable_warnings(duet)
 # Installed, it still finds the libraries linked from outside the system's
 # paths (Graphviz's plugins, in a directory of their own).

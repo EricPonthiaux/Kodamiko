@@ -97,11 +97,6 @@
 
 namespace {
 
-#if defined(Q_OS_MACOS) && QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-// The room macOS's traffic lights take at the left of the title bar.
-constexpr int trafficLightsWidthPx = 72;
-#endif
-
 QColor problemsIconColor(int errorCount, int warningCount, const Theme &theme)
 {
     if (errorCount > 0)
@@ -926,26 +921,6 @@ void MainWindow::updateTerminalWindowControls()
                                                 : tr("Move the terminals to a window of their own"));
 }
 
-void MainWindow::setSystemTitleBar(bool system)
-{
-#ifdef Q_OS_MACOS
-    Q_UNUSED(system);
-    // Duet's bar under the transparent system title bar, the traffic
-    // lights at its left (Qt 6.9 and later).
-    titleBar_->setWindowControlsVisible(false);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-    setWindowFlag(Qt::ExpandedClientAreaHint, true);
-    setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
-    titleBar_->setLeadingSpace(isFullScreen() ? 0 : trafficLightsWidthPx);
-#endif
-#else
-    frame_->setFrameless(!system);
-    terminalWindow_->setFrameless(!system);
-    titleBar_->setWindowControlsVisible(!system);
-    statusBar()->setSizeGripEnabled(system); // Duet's frame resizes from its edges
-#endif
-}
-
 // Line icons of the modes, side panel and terminals, in the theme's colors.
 void MainWindow::updateTabIcons()
 {
@@ -986,11 +961,8 @@ void MainWindow::updateTabIcons()
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
-#if defined(Q_OS_MACOS) && QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-    // In full screen, macOS hides the traffic lights: their room goes too.
     if (event->type() == QEvent::WindowStateChange)
-        titleBar_->setLeadingSpace(isFullScreen() ? 0 : trafficLightsWidthPx);
-#endif
+        fitTitleBarToWindowState();
     if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow() && trayIcon_)
             trayIcon_->hide();

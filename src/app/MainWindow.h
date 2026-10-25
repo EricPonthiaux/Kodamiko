@@ -376,7 +376,11 @@ private:
     void updateTabIcons();
     // Duet's frame and title bar, or the system's (View ▸ Use System
     // Title Bar). On macOS, the system's traffic lights over Duet's bar.
+    // One implementation per system: MainWindowTitleBar<System>.
     void setSystemTitleBar(bool system);
+    // The title bar after the window entered or left full screen, was
+    // maximized or restored.
+    void fitTitleBarToWindowState();
     // Projects menu of the title bar, recent folders first.
     void updateProjectMenu();
     // Tells AgentActivity whether the user is looking at the session.
