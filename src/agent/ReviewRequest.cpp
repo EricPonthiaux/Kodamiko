@@ -64,4 +64,13 @@ QString followUp(const QString &agentName, const QString &subject, const QString
         .arg(agentName, subject, review);
 }
 
+QString fixRequest(const QString &agentName, const QString &subject, const QString &review)
+{
+    return QStringLiteral("A separate %1 session, which did not see this conversation, reviewed %2 and reports "
+                          "the problems below. Check each one against the code. Fix those that are real, then tell "
+                          "me what you changed; for those you think are wrong, change nothing and tell me "
+                          "why.\n\n%3")
+        .arg(agentName, subject, review);
+}
+
 } // namespace ReviewRequest

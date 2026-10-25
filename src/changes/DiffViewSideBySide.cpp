@@ -87,6 +87,8 @@ void DiffView::createOldSide()
     oldSide_->numbers_ = NumberColumns::OldOnly;
     // The keys act on the new side, which keeps the focus.
     oldSide_->setFocusPolicy(Qt::NoFocus);
+    // Blank space facing the notes of the new side, without their boxes.
+    oldSide_->SendScintilla(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_STANDARD));
     oldSide_->setFrameShape(QFrame::NoFrame);
     oldSide_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     oldSide_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);

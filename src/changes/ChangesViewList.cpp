@@ -245,7 +245,7 @@ void ChangesView::onCurrentItemChanged()
     if (!item || !status_)
         return;
     const int file = shownFileOf(item);
-    diff_->setFirstVisibleLine(file >= 0 ? diff_->fileStart(file) : 0);
+    diff_->scrollToTop(file >= 0 ? diff_->fileStart(file) : 0);
 }
 
 void ChangesView::onSelectionChanged()

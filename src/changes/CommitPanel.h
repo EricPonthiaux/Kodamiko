@@ -51,6 +51,8 @@ signals:
     void statusMessage(const QString &message);
     // `request`, to type in the agent session's prompt.
     void messageRequested(const QString &request);
+    // Review: a review of the staged changes.
+    void reviewRequested();
 
 private:
     void onAmendToggled(bool amend);
@@ -66,6 +68,7 @@ private:
     QPlainTextEdit *message_;
     QCheckBox *amend_;
     QPushButton *generateButton_;
+    QPushButton *reviewButton_;
     QString agentName_;
     QString agentIconName_;
     QPushButton *commitButton_;

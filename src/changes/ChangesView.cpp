@@ -8,6 +8,7 @@
 #include "DiffView.h"
 #include "DiscardConfirmation.h"
 #include "HunkActions.h"
+#include "agent/ReviewFindingsPanel.h"
 #include "git/ChangeKindStyle.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
@@ -163,6 +164,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
 
     connect(commitPanel_, &CommitPanel::statusMessage, this, &ChangesView::statusMessage);
     connect(commitPanel_, &CommitPanel::messageRequested, this, &ChangesView::commitMessageRequested);
+    connect(commitPanel_, &CommitPanel::reviewRequested, this, &ChangesView::reviewRequested);
 
     // The column: the file actions, then the list and the commit area,
     // which share its height as the user likes.
@@ -198,13 +200,16 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
         refresh();
     });
 
-    // The diff under its header, which follows the file at the top.
+    // The diff under its header, which follows the file at the top, and
+    // the review's bar.
     auto *right = new QWidget(this);
     auto *rightLayout = new QVBoxLayout(right);
     rightLayout->setContentsMargins(0, 0, 0, 0);
     rightLayout->setSpacing(0);
     rightLayout->addWidget(diffHeader_);
+    rightLayout->addWidget(createReviewArea());
     rightLayout->addWidget(diff_, 1);
+    createFindingsPanel(right);
 
     splitter_->addWidget(fileColumn_);
     splitter_->addWidget(right);
@@ -407,6 +412,7 @@ void ChangesView::showDiff()
         diff_->setFiles(shown);
     else
         diff_->showMessage(emptyDiffMessage());
+    showFindings();
 }
 
 QString ChangesView::emptyDiffMessage() const
@@ -628,6 +634,7 @@ void ChangesView::applyTheme(const Theme &theme)
     foldedList_->applyTheme(theme);
     commitPanel_->applyTheme(theme);
     diffHeader_->applyTheme(theme);
+    findingsPanel_->applyTheme(theme);
     alignBars(theme);
 }
 

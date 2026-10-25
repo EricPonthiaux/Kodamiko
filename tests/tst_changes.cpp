@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "agent/ReviewBar.h"
+#include "agent/ReviewFindingsPanel.h"
+#include "agent/ReviewFindingsTable.h"
+#include "agent/ReviewSession.h"
+#include "agent/vendor/claude/ClaudeCodeProvider.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangeTree.h"
 #include "changes/ChangesView.h"
@@ -20,6 +25,7 @@
 #include "git/RepositoryStatus.h"
 #include "git/Snapshots.h"
 #include "git/Stashes.h"
+#include "support/FakeReviewer.h"
 #include "ui/FoldedPane.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
@@ -135,6 +141,16 @@ QToolButton *buttonWithToolTip(const QWidget *parent, const QString &toolTip)
 {
     for (QToolButton *button : parent->findChildren<QToolButton *>()) {
         if (button->toolTip() == toolTip)
+            return button;
+    }
+    return nullptr;
+}
+
+// The push button of `parent` that says `text`; nullptr if none.
+QPushButton *buttonWithText(const QWidget *parent, const QString &text)
+{
+    for (QPushButton *button : parent->findChildren<QPushButton *>()) {
+        if (button->text() == text)
             return button;
     }
     return nullptr;
@@ -413,6 +429,128 @@ private slots:
         QCOMPARE(diffParts(view), QStringList({"c.txt  modified  ·  staged", "c.txt  modified  ·  unstaged"}));
         QCOMPARE(fileList(view)->selectedItems(), {fileList(view)->topLevelItem(0)->child(2)});
         QVERIFY(!nextFile->isEnabled()); // the last file
+    }
+
+    void aFailingCheckStopsTheReviewInItsBarOverTheDiff()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        const ClaudeCodeProvider agent;
+        auto *session = new ReviewSession(
+            {.workDir = project.path(), .subject = "the staged changes", .checkCommand = "exit 3", .agent = &agent},
+            &view);
+        const auto *bar = view.findChild<ReviewBar *>();
+
+        view.setReview(session, ChangesView::ReviewDisplay::OverTheDiff);
+        session->start();
+
+        QVERIFY(bar->isVisible());
+        QTRY_COMPARE(session->state(), ReviewSession::State::CheckFailed);
+        const auto *reviewAnyway = buttonWithText(bar, "Review Anyway");
+        QVERIFY(reviewAnyway && reviewAnyway->isVisible());
+        const QSignalSpy closing(&view, &ChangesView::reviewCloseRequested);
+        buttonWithText(bar, "Close")->click();
+        QCOMPARE(closing.size(), 1);
+        view.setReview(nullptr, ChangesView::ReviewDisplay::OverTheDiff);
+        QVERIFY(!bar->isVisible());
+    }
+
+    void aReviewWithAStepOfItsOwnLeavesOnlyItsNotesInTheDiff()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ReviewSession session({.workDir = project.path(), .subject = "the code", .agent = &agent});
+
+        view.setReview(&session, ChangesView::ReviewDisplay::NotesOnly);
+        session.start();
+
+        QTRY_COMPARE(session.state(), ReviewSession::State::Finished);
+        QVERIFY(!view.findChild<ReviewBar *>()->isVisible());
+        QVERIFY(!view.findChild<ReviewFindingsPanel *>()->isVisible());
+    }
+
+    void theFindingsCoverTheDiffAtItsSizeUntilClosed()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.resize(900, 500);
+        view.show();
+        view.setFolder(project.path());
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        auto *session = new ReviewSession({.workDir = project.path(), .subject = "the code", .agent = &agent}, &view);
+        const auto *panel = view.findChild<ReviewFindingsPanel *>();
+        const auto *diff = view.findChild<DiffView *>();
+
+        view.setReview(session, ChangesView::ReviewDisplay::OverTheDiff);
+        session->start();
+
+        QTRY_VERIFY(panel->isVisible());
+        QCOMPARE(panel->geometry(), diff->geometry());
+        view.resize(1300, 700);
+        QTRY_COMPARE(panel->geometry(), diff->geometry());
+        QVERIFY(panel->width() > 900);
+        panel->findChild<QToolButton *>()->click();
+        QVERIFY(!panel->isVisible());
+    }
+
+    void resolveHandsAFindingToBeFixed()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        auto *session = new ReviewSession({.workDir = project.path(), .subject = "the code", .agent = &agent}, &view);
+        view.setReview(session, ChangesView::ReviewDisplay::OverTheDiff);
+        session->start();
+        QTRY_COMPARE(session->state(), ReviewSession::State::Finished);
+        const auto *table = view.findChild<ReviewFindingsTable *>();
+        const auto resolveButton = [table] {
+            return table->cellWidget(0, table->columnCount() - 1)->findChild<QPushButton *>();
+        };
+        const QSignalSpy resolved(session, &ReviewSession::resolveRequested);
+
+        resolveButton()->click();
+
+        QCOMPARE(resolved.size(), 1);
+        QVERIFY(resolved.first().first().toString().contains("Off by one."));
+        QCOMPARE(resolveButton()->text(), QString("Sent"));
+        QVERIFY(!resolveButton()->isEnabled());
+    }
+
+    void reviewAgainAsksForANewReviewOfTheStagedChanges()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::dark(), &commands);
+        view.show();
+        view.setFolder(project.path());
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        auto *session = new ReviewSession({.workDir = project.path(), .subject = "the code", .agent = &agent}, &view);
+        view.setReview(session, ChangesView::ReviewDisplay::OverTheDiff);
+        session->start();
+        QTRY_COMPARE(session->state(), ReviewSession::State::Finished);
+        const QSignalSpy requested(&view, &ChangesView::reviewRequested);
+        const QSignalSpy restarted(session, &ReviewSession::stateChanged);
+
+        buttonWithText(view.findChild<ReviewBar *>(), "Review Again")->click();
+
+        QCOMPARE(requested.size(), 1);
+        QCOMPARE(restarted.size(), 0); // its patch is that of the changes as they were
     }
 
     void theDiffOfOneFileKeepsItsButtons()
@@ -839,6 +977,85 @@ private slots:
         QCOMPARE(zoom(*oldSide), 2);
         oldSide->zoomOut();
         QCOMPARE(zoom(diff), 1);
+    }
+
+    void diffShowsANoteUnderItsLine()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+
+        diff.setNotes({{.file = 0, .newLine = 2, .text = "c is wrong\nwhen empty"}});
+
+        const int lineOfC = 5;
+        QCOMPARE(diff.displayedLines()[lineOfC].newNumber, 2);
+        QCOMPARE(diff.notesAt(lineOfC), QList<int>({0}));
+        QCOMPARE(diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETLINES, lineOfC), 2);
+    }
+
+    void diffShowsANoteOfALineItHidesUnderItsFileTitle()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+
+        diff.setNotes({{.file = 0, .newLine = 40, .text = "wrong"}});
+
+        const int title = diff.fileStart(0);
+        QCOMPARE(diff.notesAt(title), QList<int>({0}));
+        QByteArray text(qsizetype(diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETTEXT, title,
+                                                     static_cast<char *>(nullptr))),
+                        '\0');
+        diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETTEXT, title, text.data());
+        QCOMPARE(QString::fromUtf8(text), QString("Line 40 · wrong"));
+    }
+
+    void diffDropsItsNotesWithItsFiles()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+        diff.setNotes({{.file = 0, .newLine = 2, .text = "wrong"}});
+
+        diff.setFiles({{"src/two.cpp", "modified", FilePatch::parse(patch)}});
+
+        QVERIFY(diff.notesAt(5).isEmpty());
+        QCOMPARE(diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETLINES, 5), 0);
+    }
+
+    void sideBySideTheOldSideLeavesTheRoomOfANote()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.setMode(DiffView::Mode::SideBySide);
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+        const auto *oldSide = diff.findChild<DiffView *>();
+
+        diff.setNotes({{.file = 0, .newLine = 2, .text = "c is wrong\nwhen empty"}});
+
+        // The row of c, the last one: a and b face each other above it.
+        const int rowOfC = diff.lines() - 1;
+        QCOMPARE(diff.notesAt(rowOfC), QList<int>({0}));
+        QCOMPARE(oldSide->SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETLINES, rowOfC), 2);
+    }
+
+    void f8GoesToTheNextNote()
+    {
+        const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
+        DiffView diff(Theme::dark());
+        diff.resize(600, 300);
+        diff.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&diff));
+        diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
+        diff.setNotes({{.file = 0, .newLine = 2, .text = "wrong"}});
+        diff.setCursorPosition(0, 0);
+
+        QTest::keyClick(&diff, Qt::Key_F8);
+
+        int line = 0;
+        int index = 0;
+        diff.getCursorPosition(&line, &index);
+        QCOMPARE(line, 5);
     }
 
     void theOldSideDraggedToItsMinimumGrowsWithTheView()

@@ -9,7 +9,7 @@ class QProcess;
 
 // The project's check (ProjectConfig::agentCheckCommand: a build, the tests,
 // a linter…), run by the system's shell in a folder: before an agent's
-// commits are merged (AgentMergeQueue), before a review (ReviewView). One
+// commits are merged (AgentMergeQueue), before a review (ReviewSession). One
 // run at a time; start() again stops the previous one.
 class ProjectCheck : public QObject {
     Q_OBJECT

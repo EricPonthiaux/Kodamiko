@@ -41,6 +41,7 @@ DiffView::DiffView(const Theme &theme, QWidget *parent)
     setMarginWidth(stripMargin, 3);
     for (int margin = 2; margin < 5; ++margin)
         setMarginWidth(margin, 0);
+    SendScintilla(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_BOXED));
     applyTheme(theme);
     addShortcuts();
     // Queued: the arrow's lines replace the text Scintilla is handling the
@@ -56,6 +57,8 @@ void DiffView::addShortcuts()
     };
     add(QKeySequence(Qt::Key_F7), [this] { goToChange(Direction::Next); });
     add(QKeySequence(Qt::SHIFT | Qt::Key_F7), [this] { goToChange(Direction::Previous); });
+    add(QKeySequence(Qt::Key_F8), [this] { goToNote(Direction::Next); });
+    add(QKeySequence(Qt::SHIFT | Qt::Key_F8), [this] { goToNote(Direction::Previous); });
     add(QKeySequence(Qt::ALT | Qt::Key_Down), [this] { goToFile(Direction::Next); });
     add(QKeySequence(Qt::ALT | Qt::Key_Up), [this] { goToFile(Direction::Previous); });
 }
@@ -63,6 +66,7 @@ void DiffView::addShortcuts()
 void DiffView::setFiles(const QList<DiffFile> &files)
 {
     files_ = files;
+    notes_.clear();
     summaries_.clear();
     for (const DiffFile &file : files)
         summaries_.append({file.path, file.status, file.patch.addedLines(), file.patch.removedLines()});
@@ -127,6 +131,7 @@ void DiffView::showMessage(const QString &message)
     lines_.clear();
     fileStarts_.clear();
     files_.clear();
+    notes_.clear();
     summaries_.clear();
     if (!message.isEmpty()) {
         DiffLine note;
@@ -183,15 +188,22 @@ void DiffView::setListPosition(std::optional<ListPosition> position)
     emit contentChanged();
 }
 
-std::optional<int> DiffView::nextLineOfKind(DiffLineKind kind, Direction direction) const
+int DiffView::searchStart() const
 {
     int cursorLine = 0;
     int index = 0;
     getCursorPosition(&cursorLine, &index);
-    const int top = firstVisibleLine();
-    const bool isCursorInView = cursorLine >= top && cursorLine < top + int(SendScintilla(SCI_LINESONSCREEN));
+    const int top = int(SendScintilla(SCI_DOCLINEFROMVISIBLE, firstVisibleLine()));
+    const int bottom =
+        int(SendScintilla(SCI_DOCLINEFROMVISIBLE, firstVisibleLine() + SendScintilla(SCI_LINESONSCREEN)));
+    const bool isCursorInView = cursorLine >= top && cursorLine < bottom;
+    return isCursorInView ? cursorLine : top;
+}
+
+std::optional<int> DiffView::nextLineOfKind(DiffLineKind kind, Direction direction) const
+{
     const int step = direction == Direction::Next ? 1 : -1;
-    for (int i = (isCursorInView ? cursorLine : top) + step; i >= 0 && i < lines_.size(); i += step) {
+    for (int i = searchStart() + step; i >= 0 && i < lines_.size(); i += step) {
         if (lines_[i].kind == kind)
             return i;
     }
@@ -201,7 +213,13 @@ std::optional<int> DiffView::nextLineOfKind(DiffLineKind kind, Direction directi
 void DiffView::showAtTop(int line)
 {
     setCursorPosition(line, 0); // scrolls to the cursor: first
-    setFirstVisibleLine(line);
+    scrollToTop(line);
+}
+
+void DiffView::scrollToTop(int line)
+{
+    // The notes' boxes above take rows of their own.
+    setFirstVisibleLine(int(SendScintilla(SCI_VISIBLEFROMDOCLINE, line)));
 }
 
 int DiffView::newFileLine(int line) const
@@ -250,6 +268,7 @@ void DiffView::render()
     DiffSyntaxHighlighter highlighter(*this, theme_, lines_);
     for (int file = 0; file < fileStarts_.size(); ++file)
         highlighter.highlightFile(fileStarts_[file], files_.value(file).path);
+    showNotes();
 
     // No numbers to show (a message): no margin.
     const bool numbered = std::any_of(lines_.begin(), lines_.end(),
@@ -375,9 +394,10 @@ void DiffView::applyTheme(const Theme &theme)
     setMarginsFont(theme.font);
     ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     DiffStyles::define(*this, theme);
-    render(); // the styles of the text are set line by line
+    // The old side first: rendering this side sets the old side's blank notes.
     if (oldSide_)
         oldSide_->applyTheme(theme);
+    render(); // the styles of the text are set line by line
     // Side by side, the view's background shows between the two sides.
     QPalette rule = palette();
     rule.setColor(QPalette::Window, theme.line);

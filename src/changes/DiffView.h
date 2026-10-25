@@ -3,6 +3,7 @@
 #pragma once
 
 #include "DiffLayout.h"
+#include "diagnostics/Diagnostic.h"
 #include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
@@ -10,6 +11,15 @@
 #include <optional>
 
 class SideBySideDivider;
+
+// A remark on a line of a file's new version (a review's finding), shown in
+// a box under the line.
+struct DiffNote {
+    int file = 0;    // among the files shown
+    int newLine = 1; // from 1
+    Diagnostic::Severity severity = Diagnostic::Severity::Error;
+    QString text;
+};
 
 // Diff without git's notation, for reading: a title bar per file with its
 // added and removed line counts, a separator per block of changes ("⋯ lines
@@ -25,7 +35,8 @@ class SideBySideDivider;
 // version shows in a pane at the left, row for row with the new one: the
 // view's lines, numbers and locations are then those of the new side; the
 // line between the two drags to share the width otherwise. Either side
-// scrolled or zoomed, the other follows.
+// scrolled or zoomed, the other follows. Notes (setNotes()) show in a box
+// under their lines; F8 and Shift+F8 go to the next and previous one.
 class DiffView : public QsciScintilla {
     Q_OBJECT
 
@@ -58,14 +69,24 @@ public:
     explicit DiffView(const Theme &theme, QWidget *parent = nullptr);
 
     // Shows `files`, with the unchanged lines revealed in files of the same
-    // path until hideUnchangedLines().
+    // path until hideUnchangedLines(), without notes.
     void setFiles(const QList<DiffFile> &files);
+    // Shows `notes` under their lines, until the files change. A note on a
+    // line the view does not show goes under its file's title bar, its line
+    // number first.
+    void setNotes(QList<DiffNote> notes);
+    // The notes under displayed line `line`, as indexes in setNotes()'s list.
+    QList<int> notesAt(int line) const;
+    // Scrolls note `note` into view, the cursor on its line.
+    void showNote(int note);
+    // The next (or previous) note after the cursor, as goToChange().
+    void goToNote(Direction direction);
     // Back to the blocks alone, for files that are no longer the same.
     void hideUnchangedLines();
     // Shows lines that the separator at displayed line `line` hides; the
     // view keeps its place.
     void revealLines(int line, Reveal reveal);
-    // Nothing to show but a message in gray (or nothing).
+    // Nothing to show but a message in gray (or nothing), without notes.
     void showMessage(const QString &message);
     // Unified at first.
     void setMode(Mode mode);
@@ -78,6 +99,8 @@ public:
     QList<DiffLocation> locations(int line) const;
     // Line of a file's title bar.
     int fileStart(int file) const;
+    // Scrolls displayed line `line` to the top, the cursor where it is.
+    void scrollToTop(int line);
 
     const QList<FileSummary> &fileSummaries() const { return summaries_; }
 
@@ -143,9 +166,17 @@ private:
     // The first displayed line of `kind` after (or before) the cursor or the
     // top of the view, see goToChange().
     std::optional<int> nextLineOfKind(DiffLineKind kind, Direction direction) const;
+    // Where a search for the next line of a kind starts: the cursor when it
+    // is in view, otherwise the top of the view.
+    int searchStart() const;
     // Scrolls displayed line `line` to the top with the cursor on it.
     void showAtTop(int line);
     void render();
+    // The notes' boxes; side by side, blank ones as high on the old side,
+    // that the rows keep facing each other.
+    void showNotes();
+    // The displayed line of `note`: its line, or its file's title bar.
+    int lineOfNote(const DiffNote &note) const;
     // Markers and margin text of displayed line `line`; returns the style of its text.
     int decorateLine(int line);
     void styleLine(int line, int style);
@@ -165,6 +196,8 @@ private:
     int numberWidth_ = 3; // digits of the largest line number
     Mode mode_ = Mode::Unified;
     std::optional<ListPosition> listPosition_;
+    QList<DiffNote> notes_;
+    QList<int> noteLines_; // the displayed line of each note; -1 for a file not shown
     NumberColumns numbers_ = NumberColumns::Both;
     DiffView *oldSide_ = nullptr;          // side by side, at the left; a child of the view
     SideBySideDivider *divider_ = nullptr; // between the two sides; a child of the view

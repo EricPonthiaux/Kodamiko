@@ -37,6 +37,7 @@
 #include <QTreeWidget>
 
 #include <algorithm>
+#include <array>
 #include <functional>
 
 void MainWindow::createMenus()
@@ -131,8 +132,14 @@ void MainWindow::createClaudeMenu()
             claude->addAction(tr("&Draw a Diagram…"), this, [this] { fileTree_->generateDiagram(); }));
     claude->addSeparator();
     createCodeRequestActions(claude);
-    claude->addAction(tr("Review &Changes"), this, &MainWindow::reviewChanges)
-        ->setToolTip(tr("Have a separate session review the uncommitted changes of the project"));
+    claude->addAction(tr("Review Staged &Changes"), this, &MainWindow::reviewStagedChanges)
+        ->setToolTip(tr("Have a separate session review the staged changes, its findings shown in the diff"));
+    QAction *reviewStep = claude->addAction(tr("Review &Step Before the Diff"));
+    reviewStep->setCheckable(true);
+    reviewStep->setChecked(isReviewStepOn());
+    reviewStep->setToolTip(tr("A Review mode between Edit and Diff, where the staged changes are reviewed before "
+                              "the diff and the commit"));
+    connect(reviewStep, &QAction::toggled, this, &MainWindow::setReviewStep);
     QMenu *reviewerModel = claude->addMenu(tr("Reviewer &Model"));
     connect(reviewerModel, &QMenu::aboutToShow, this, [this, reviewerModel] { fillReviewerModelMenu(reviewerModel); });
     claude->addSeparator();
@@ -193,17 +200,29 @@ void MainWindow::createViewMenu()
     }
     view->addSeparator();
 
-    // Ctrl+1/2/3/4 remain active from a terminal (see TerminalWidget::event).
+    // Ctrl+1 to 5 remain active from a terminal (see TerminalWidget::event).
+    // In the order of Mode; Review keeps the key after the others, which
+    // kept theirs when it came.
+    struct ModeAction {
+        QString name;
+        Qt::Key key;
+    };
+
+    const std::array<ModeAction, 5> modeActions{{{tr("&Terminal Mode"), Qt::Key_1},
+                                                 {tr("&Edit Mode"), Qt::Key_2},
+                                                 {tr("&Review Mode"), Qt::Key_5},
+                                                 {tr("&Diff Mode"), Qt::Key_3},
+                                                 {tr("&History Mode"), Qt::Key_4}}};
     modeActions_ = new QActionGroup(this);
-    const QStringList modeNames{tr("&Terminal Mode"), tr("&Edit Mode"), tr("&Diff Mode"), tr("&History Mode")};
-    for (int i = 0; i < modeNames.size(); ++i) {
-        QAction *action = view->addAction(modeNames[i]);
+    for (int i = 0; i < int(modeActions.size()); ++i) {
+        QAction *action = view->addAction(modeActions.at(i).name);
         action->setCheckable(true);
-        action->setShortcut(QKeySequence(Qt::CTRL | static_cast<Qt::Key>(Qt::Key_1 + i)));
+        action->setShortcut(QKeySequence(Qt::CTRL | modeActions.at(i).key));
         action->setShortcutContext(Qt::ApplicationShortcut);
         modeActions_->addAction(action);
         connect(action, &QAction::triggered, this, [this, i] { setMode(static_cast<Mode>(i)); });
     }
+    modeActions_->actions().at(int(Mode::Review))->setVisible(isReviewStepOn());
     modeActions_->actions().at(static_cast<int>(mode_))->setChecked(true);
     QAction *toggleTerminal = view->addAction(tr("Switch to Terminal"));
     toggleTerminal->setShortcut(QKeySequence(Qt::Key_F11));

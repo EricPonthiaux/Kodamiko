@@ -184,6 +184,7 @@ void ChangesView::showDiffMenu(const QPoint &position)
         openFileAt(line);
     })->setEnabled(status_ && diff_->locate(line).file >= 0);
     menu->insertSeparator(first);
+    addFindingActions(menu, first, line);
     ContextMenus::exec(*menu, *diff_, diff_->viewport()->mapToGlobal(position));
     delete menu;
 }

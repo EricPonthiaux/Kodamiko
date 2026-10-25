@@ -2,11 +2,14 @@
 
 #pragma once
 
+#include "agent/ReviewReport.h"
+#include "agent/ReviewSession.h"
 #include "git/FilePatch.h"
 #include "git/RepositoryStatus.h"
 #include "ui/GripSplitter.h"
 #include "ui/Theme.h"
 
+#include <QPointer>
 #include <QSet>
 #include <QThreadPool>
 #include <QWidget>
@@ -14,6 +17,9 @@
 #include <optional>
 
 class CommitPanel;
+class QMenu;
+class ReviewBar;
+class ReviewFindingsPanel;
 class DiffHeaderBar;
 class HunkActions;
 class DiffView;
@@ -38,11 +44,24 @@ class QTreeWidgetItem;
 // staged. In the diff, Space stages (or unstages) the selected lines or the
 // block at the cursor and Delete discards them, unless the diff hides
 // whitespace changes; F4 opens the file at the cursor's line.
+//
+// A review of the staged changes (setReview()) shows its findings under
+// their lines in the diff: F8 and Shift+F8 go from one to the next, the
+// diff's menu sends one to the agent or dismisses it. Without a review step
+// of its own (ReviewDisplay::OverTheDiff), the review also tells its
+// progress in a bar over the diff, then shows its findings in a grid that
+// covers the diff until it is closed (ReviewFindingsPanel).
 class ChangesView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(ChangesView)
 
 public:
+    // Where a review shows besides its notes in the diff.
+    enum class ReviewDisplay {
+        OverTheDiff, // its bar and its grid, over the diff
+        NotesOnly    // elsewhere: the Review mode
+    };
+
     ChangesView(const Theme &theme, GitCommands *commands, QWidget *parent = nullptr);
     ~ChangesView() override;
 
@@ -63,12 +82,22 @@ public:
     void generateCommitMessage();
     // Puts `message`, written by Claude, in the commit field.
     void showCommitMessage(const QString &message);
+    // Shows `session` as `display` says, in place of the review shown
+    // before; null: none. Not owned: its owner sets another, or null,
+    // before destroying it.
+    void setReview(ReviewSession *session, ReviewDisplay display);
+    // The diff at `finding`: its file selected first when the diff does not
+    // show it, the editor when it is not among the changes.
+    void goToFinding(const ReviewReport::Finding &finding);
 
     void applyTheme(const Theme &theme);
     // The agent that writes commit messages (see CommitPanel::setAgent()).
     void setAgent(const QString &name, const QString &iconName);
 
     QSplitter *splitter() const { return splitter_; }
+
+    // Keeps the findings' grid at the diff's place and size.
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
     // The file column's splitter: the list, the commit area.
     QSplitter *fileSplitter() const { return fileSplitter_; }
@@ -91,6 +120,11 @@ signals:
     void statusMessage(const QString &message);
     // `request`, to type in the Claude session's prompt.
     void commitMessageRequested(const QString &request);
+    // The commit area's Review, or Review Again over the diff: a review of
+    // the staged changes as they are now, for setReview().
+    void reviewRequested();
+    // Cancel or Close in the review's bar: the review is over.
+    void reviewCloseRequested();
     // The state read by refresh() is shown.
     void refreshed();
     // The operation in progress (merge, rebase…): go on, leave out the
@@ -220,6 +254,24 @@ private:
     void openFileAt(int line);
     void showDiffMenu(const QPoint &position);
     void showListMenu(const QPoint &position);
+    // The review's bar, under the diff's header, hidden without a review.
+    QWidget *createReviewArea();
+    // The findings' grid, in `diffPane` over the diff, hidden.
+    void createFindingsPanel(QWidget *diffPane);
+    void showFindingsPanel();
+    void hideFindingsPanel();
+    // Finished with findings: the grid shown; running again: hidden.
+    void onReviewStateChanged(ReviewSession::State state);
+    // The findings of the review in the shown files, as the diff's notes.
+    void showFindings();
+    // The shown part of `finding`'s file whose new version is the file on
+    // disk, which the reviewer read: its unstaged part, else its staged
+    // one; -1 when the diff does not show the file.
+    int shownPartOf(const ReviewReport::Finding &finding) const;
+    // Send and Dismiss for the findings under displayed line `line`, in the
+    // diff's `menu` before `before`.
+    void addFindingActions(QMenu *menu, QAction *before, int line);
+
     // The file actions and the diff's header, side by side, take the same
     // height, and their rules make one line across the handle between them.
     void alignBars(const Theme &theme);
@@ -260,6 +312,12 @@ private:
     QToolButton *discardButton_;
     QToolButton *refreshButton_;
     CommitPanel *commitPanel_;
+    QWidget *reviewArea_ = nullptr; // the review's bar and its margins, hidden together
+    ReviewBar *reviewBar_ = nullptr;
+    ReviewFindingsPanel *findingsPanel_ = nullptr; // over the diff, at its size
+    QPointer<ReviewSession> review_;               // see setReview()
+    ReviewDisplay reviewDisplay_ = ReviewDisplay::OverTheDiff;
+    QList<ReviewReport::Finding> noteFindings_; // the finding of each of the diff's notes
 
     // Displayed diff: the files' parts, staged or unstaged, and their patches.
     QList<FileRef> shownFiles_;

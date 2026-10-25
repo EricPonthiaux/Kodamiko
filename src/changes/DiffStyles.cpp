@@ -19,6 +19,8 @@ struct DiffColors {
     QColor hunkHeader;
     QColor filler;
     QColor muted;
+    QColor errorNote;
+    QColor warningNote;
 };
 
 struct StyleLook {
@@ -46,6 +48,7 @@ DiffColors colorsFor(const Theme &theme)
 {
     const QColor green = theme.isDark ? QColor("#3fb950") : QColor("#1a7f37");
     const QColor red = theme.isDark ? QColor("#f85149") : QColor("#cf222e");
+    const QColor amber = theme.isDark ? QColor("#d29922") : QColor("#9a6700");
     return {mix(theme.background, green, theme.isDark ? 0.13 : 0.10),
             mix(theme.background, red, theme.isDark ? 0.13 : 0.09),
             mix(theme.background, green, theme.isDark ? 0.34 : 0.28),
@@ -55,7 +58,9 @@ DiffColors colorsFor(const Theme &theme)
             mix(theme.background, theme.foreground, theme.isDark ? 0.07 : 0.05),
             mix(theme.background, theme.foreground, theme.isDark ? 0.035 : 0.03),
             mix(theme.background, theme.foreground, theme.isDark ? 0.02 : 0.025),
-            theme.mutedText};
+            theme.mutedText,
+            mix(theme.background, red, theme.isDark ? 0.22 : 0.14),
+            mix(theme.background, amber, theme.isDark ? 0.22 : 0.16)};
 }
 
 DiffFonts fontsFor(const Theme &theme)
@@ -104,6 +109,9 @@ void defineTextStyles(const QsciScintilla &view, const Theme &theme, const DiffC
     defineStyle(view, fileMarginStyle, {colors.muted, colors.fileHeader, theme.font});
     defineStyle(view, hunkMarginStyle, {colors.muted, colors.hunkHeader, theme.font});
     defineStyle(view, revealStyle, {theme.accent, colors.hunkHeader, fonts.name});
+    defineStyle(view, noteErrorStyle, {theme.foreground, colors.errorNote, fonts.label});
+    defineStyle(view, noteWarningStyle, {theme.foreground, colors.warningNote, fonts.label});
+    defineStyle(view, noteFillerStyle, {theme.foreground, colors.filler, fonts.label});
     view.SendScintilla(QsciScintillaBase::SCI_STYLESETHOTSPOT, revealStyle, 1L);
     view.SendScintilla(QsciScintillaBase::SCI_SETHOTSPOTACTIVEFORE, 1L, theme.foreground);
     view.SendScintilla(QsciScintillaBase::SCI_SETHOTSPOTACTIVEUNDERLINE, 0L);

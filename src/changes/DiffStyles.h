@@ -24,6 +24,10 @@ constexpr int removedStatsStyle = 48;
 constexpr int fileMarginStyle = 49;
 constexpr int hunkMarginStyle = 50;
 constexpr int revealStyle = 51; // a separator's arrows, clickable
+// Notes under the lines (DiffNote), and the blank facing them side by side.
+constexpr int noteErrorStyle = 52;
+constexpr int noteWarningStyle = 53;
+constexpr int noteFillerStyle = 54;
 
 constexpr int firstSyntaxStyle = 64;
 constexpr int lastSyntaxStyle = 255;

@@ -7,6 +7,7 @@
 #include "agent/AgentProviders.h"
 #include "agent/DiagramRequestPopup.h"
 #include "agent/NewAgentPopup.h"
+#include "agent/ReviewPage.h"
 #include "agent/mcp/DuetTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "agent/vendor/claude/ClaudeLinter.h"
@@ -92,6 +93,7 @@
 
 #include <algorithm>
 #include <array>
+#include <utility>
 
 namespace {
 
@@ -114,6 +116,39 @@ QList<QAction *> menuCommands(const QWidget *menu)
             commands.append(action);
     }
     return commands;
+}
+
+// The modes by the names QSettings keeps them under ("mode").
+const std::array<std::pair<MainWindow::Mode, QLatin1StringView>, 5> modeNames{{
+    {MainWindow::Mode::Terminal, QLatin1StringView("terminal")},
+    {MainWindow::Mode::Edit, QLatin1StringView("edit")},
+    {MainWindow::Mode::Review, QLatin1StringView("review")},
+    {MainWindow::Mode::Diff, QLatin1StringView("diff")},
+    {MainWindow::Mode::History, QLatin1StringView("history")},
+}};
+
+// The mode the window was closed in: by its name, or by the number the
+// versions before the Review mode kept ("viewMode"); Edit by default.
+MainWindow::Mode savedMode(const QSettings &settings)
+{
+    using Mode = MainWindow::Mode;
+    const QString name = settings.value(QStringLiteral("mode")).toString();
+    for (const auto &[mode, modeName] : modeNames) {
+        if (name == modeName)
+            return mode;
+    }
+    constexpr std::array<Mode, 4> modesBeforeReview{Mode::Terminal, Mode::Edit, Mode::Diff, Mode::History};
+    const int number = settings.value(QStringLiteral("viewMode"), 1).toInt();
+    return modesBeforeReview.at(std::clamp(number, 0, int(modesBeforeReview.size()) - 1));
+}
+
+QString nameOf(MainWindow::Mode mode)
+{
+    for (const auto &[each, name] : modeNames) {
+        if (each == mode)
+            return name;
+    }
+    return {};
 }
 
 } // namespace
@@ -150,8 +185,8 @@ MainWindow::MainWindow(const QString &folder, const Preferences &preferences, QW
         statusBar()->showMessage(
             tr("%1 tracking unavailable: %2").arg(agentProvider_->name(), hookServer_.errorString()));
     openFolder(ProjectStore::startFolder(folder));
-    setMode(static_cast<Mode>(
-        std::clamp(QSettings().value(QStringLiteral("viewMode"), static_cast<int>(Mode::Edit)).toInt(), 0, 3)));
+    setReviewStep(isReviewStepOn());
+    setMode(savedMode(QSettings()));
 
     if (!Prerequisites::allFound())
         QTimer::singleShot(0, this, &MainWindow::showPrerequisites);
@@ -255,6 +290,8 @@ void MainWindow::createGitViews()
     });
     connect(changesView_, &ChangesView::statusMessage, this, &MainWindow::showStatus);
     connect(changesView_, &ChangesView::commitMessageRequested, this, &MainWindow::askClaudeForCommitMessage);
+    connect(changesView_, &ChangesView::reviewRequested, this, &MainWindow::reviewStagedChanges);
+    connect(changesView_, &ChangesView::reviewCloseRequested, this, &MainWindow::closeStagedReview);
     connect(changesView_, &ChangesView::continueRequested, gitActions_, &GitActions::continueOperation);
     connect(changesView_, &ChangesView::skipRequested, gitActions_, &GitActions::skipCommit);
     connect(changesView_, &ChangesView::abortRequested, gitActions_, &GitActions::abortOperation);
@@ -272,6 +309,7 @@ void MainWindow::createCentralWidget(const Preferences &preferences)
     modes_ = new QStackedWidget(this);
     modes_->addWidget(createTerminalPage());
     modes_->addWidget(createEditPage());
+    modes_->addWidget(createReviewPage());
     modes_->addWidget(changesView_);
     modes_->addWidget(historyView_);
 
@@ -664,12 +702,16 @@ void MainWindow::createModeTabs()
     modeTabs_->setElideMode(Qt::ElideNone);
     modeTabs_->addTab(tr("Terminal"));
     modeTabs_->addTab(tr("Edit"));
+    modeTabs_->addTab(tr("Review"));
     modeTabs_->addTab(tr("Diff"));
     modeTabs_->addTab(tr("History"));
-    modeTabs_->setTabToolTip(0, tr("Full-screen terminals (Ctrl+1)"));
-    modeTabs_->setTabToolTip(1, tr("File tree and code editor (Ctrl+2)"));
-    modeTabs_->setTabToolTip(2, tr("Pending changes, staging and commit (Ctrl+3)"));
-    modeTabs_->setTabToolTip(3, tr("Past commits, their files and their diffs (Ctrl+4)"));
+    modeTabs_->setTabToolTip(int(Mode::Terminal), tr("Full-screen terminals (Ctrl+1)"));
+    modeTabs_->setTabToolTip(int(Mode::Edit), tr("File tree and code editor (Ctrl+2)"));
+    modeTabs_->setTabToolTip(
+        int(Mode::Review), tr("A separate session reviews the staged changes before the diff and the commit (Ctrl+5)"));
+    modeTabs_->setTabToolTip(int(Mode::Diff), tr("Pending changes, staging and commit (Ctrl+3)"));
+    modeTabs_->setTabToolTip(int(Mode::History), tr("Past commits, their files and their diffs (Ctrl+4)"));
+    modeTabs_->setTabVisible(int(Mode::Review), false); // see setReviewStep()
     connect(modeTabs_, &QTabBar::currentChanged, this, [this](int index) { setMode(static_cast<Mode>(index)); });
     createStatusBar();
 }
@@ -773,7 +815,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     settings.setValue(QStringLiteral("historySplitter"), historyView_->saveState());
     settings.setValue(QStringLiteral("showSidebar"), sidebar_->isPanelVisible());
     settings.setValue(QStringLiteral("sidebarTab"), sidebar_->tabBar()->currentIndex());
-    settings.setValue(QStringLiteral("viewMode"), static_cast<int>(mode_));
+    settings.setValue(QStringLiteral("mode"), nameOf(mode_));
     settings.setValue(QStringLiteral("lastFolder"), folder_);
 
     if (closingProject_)
@@ -791,6 +833,8 @@ void MainWindow::setMode(Mode mode)
         showTerminals();
         return;
     }
+    if (mode == Mode::Review && !isReviewStepOn())
+        mode = Mode::Diff;
     if (mode != Mode::Terminal)
         modeBeforeTerminal_ = mode;
     mode_ = mode;
@@ -810,6 +854,9 @@ void MainWindow::setMode(Mode mode)
         break;
     case Mode::History:
         historyView_->refresh();
+        break;
+    case Mode::Review:
+        reviewPage_->setFocus();
         break;
     case Mode::Edit:
         if (QWidget *editor = editorTabs_->currentWidget())
@@ -898,7 +945,7 @@ void MainWindow::setSystemTitleBar(bool system)
 void MainWindow::updateTabIcons()
 {
     const QColor color = theme_.mutedText;
-    constexpr std::array<const char *, 4> modes{"terminal", "code", "diff", "history"};
+    constexpr std::array<const char *, 5> modes{"terminal", "code", "check", "diff", "history"};
     for (std::size_t i = 1; i < modes.size(); ++i)
         modeTabs_->setTabIcon(static_cast<int>(i), UiIcons::icon(QLatin1String(modes.at(i)), color));
     // Hidden, QTabBar does not report that its icons widened it: the status

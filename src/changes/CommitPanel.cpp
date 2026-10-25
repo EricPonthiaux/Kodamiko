@@ -30,6 +30,7 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
     , message_(new QPlainTextEdit(this))
     , amend_(new QCheckBox(tr("Amend"), this))
     , generateButton_(new QPushButton(this))
+    , reviewButton_(new QPushButton(tr("Review"), this))
     , commitButton_(new QPushButton(tr("Commit"), this))
 {
     setObjectName(QStringLiteral("commitPanel"));
@@ -48,12 +49,14 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
     connect(amend_, &QCheckBox::toggled, this, &CommitPanel::onAmendToggled);
     connect(commitButton_, &QPushButton::clicked, this, &CommitPanel::commit);
     connect(generateButton_, &QPushButton::clicked, this, &CommitPanel::generateMessage);
+    connect(reviewButton_, &QPushButton::clicked, this, &CommitPanel::reviewRequested);
 
     // Amend at the left; the secondary action, then the main one, at the right.
     auto *actions = new QHBoxLayout;
     actions->setSpacing(6);
     actions->addWidget(amend_);
     actions->addStretch();
+    actions->addWidget(reviewButton_);
     actions->addWidget(generateButton_);
     actions->addWidget(commitButton_);
 
@@ -90,6 +93,7 @@ void CommitPanel::updateActions()
     const bool hasLastCommit = status_ && !status_->info.unborn;
     commitButton_->setEnabled(!commands_->isBusy() && hasChanges);
     generateButton_->setEnabled(hasChanges);
+    reviewButton_->setEnabled(status_ && !status_->staged.isEmpty());
     amend_->setEnabled(hasChanges && hasLastCommit);
     if (!hasChanges)
         amend_->setChecked(false); // the changes it was for are gone
@@ -224,6 +228,8 @@ void CommitPanel::setAgent(const QString &name, const QString &iconName)
     generateButton_->setToolTip(
         tr("Have the %1 session in the terminal write the commit message from the changes to commit (Ctrl+Alt+G)")
             .arg(name));
+    reviewButton_->setToolTip(
+        tr("Have a separate %1 session review the staged changes, its findings shown in the diff").arg(name));
 }
 
 void CommitPanel::applyTheme(const Theme &theme)

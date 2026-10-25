@@ -9,6 +9,7 @@
 #include "agent/CloseAgentPopup.h"
 #include "agent/DiagramRequestPopup.h"
 #include "agent/NewAgentPopup.h"
+#include "agent/ReviewPage.h"
 #include "changes/ChangesView.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
@@ -117,6 +118,7 @@ void MainWindow::setAgentProvider(const AgentProvider &provider)
         terminalTabs_->setTabText(terminalTabs_->indexOf(claudeTerminal_), provider.name());
     filesPanel_->setAgentName(provider.name());
     changesView_->setAgent(provider.name(), provider.iconName());
+    reviewPage_->setAgentName(provider.name());
     changesView_->applyTheme(theme_);
     for (QAction *action : std::as_const(drawDiagramActions_))
         action->setVisible(provider.features().hasFileRuns);

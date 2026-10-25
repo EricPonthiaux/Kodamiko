@@ -8,6 +8,7 @@
 #include "agent/DiagramRequestPopup.h"
 #include "agent/EditorContext.h"
 #include "agent/NewAgentPopup.h"
+#include "agent/ReviewPage.h"
 #include "agent/mcp/DuetTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/BranchesPopup.h"
@@ -86,6 +87,7 @@ void MainWindow::setTheme(const QString &name)
             terminal->applyTheme(theme_);
     }
     changesView_->applyTheme(theme_);
+    reviewPage_->applyTheme(theme_);
     historyView_->applyTheme(theme_);
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);

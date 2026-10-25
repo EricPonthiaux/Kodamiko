@@ -58,9 +58,15 @@ add_library(duet_core STATIC
     agent/mcp/WorkspaceTools.cpp
     agent/NewAgentPopup.cpp
     agent/ProjectCheck.cpp
+    agent/ReviewBar.cpp
     agent/ReviewFindingCard.cpp
+    agent/ReviewFindingsPanel.cpp
+    agent/ReviewFindingsTable.cpp
+    agent/ReviewPage.cpp
     agent/ReviewReport.cpp
     agent/ReviewRequest.cpp
+    agent/ReviewSession.cpp
+    agent/ReviewText.cpp
     agent/ReviewView.cpp
     agent/vendor/claude/ClaudeCodeProvider.cpp
     agent/vendor/claude/ClaudeConfig.cpp
@@ -80,6 +86,7 @@ add_library(duet_core STATIC
     changes/ChangesView.cpp
     changes/ChangesViewDiff.cpp
     changes/ChangesViewList.cpp
+    changes/ChangesViewReview.cpp
     changes/CommitPanel.cpp
     changes/DiffHeaderBar.cpp
     changes/DiffLayout.cpp
@@ -88,6 +95,7 @@ add_library(duet_core STATIC
     changes/DiffStyles.cpp
     changes/DiffSyntaxHighlighter.cpp
     changes/DiffView.cpp
+    changes/DiffViewNotes.cpp
     changes/DiffViewSideBySide.cpp
     changes/DiscardConfirmation.cpp
     changes/FileChangeDelegate.cpp
@@ -458,6 +466,7 @@ qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/MainWindowMenus.cpp
     app/MainWindowProject.cpp
     app/MainWindowRecipe.cpp
+    app/MainWindowReview.cpp
     app/MainWindowRun.cpp
     app/MainWindowSettings.cpp)
 duet_enable_warnings(duet)

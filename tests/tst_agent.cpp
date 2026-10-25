@@ -5,12 +5,34 @@
 #include "agent/AgentProviders.h"
 #include "agent/HookServer.h"
 #include "agent/ProjectCheck.h"
+#include "agent/ReviewBar.h"
+#include "agent/ReviewFindingsPanel.h"
+#include "agent/ReviewPage.h"
+#include "agent/ReviewSession.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
+#include "support/FakeReviewer.h"
 
+#include <QLabel>
 #include <QLocalSocket>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
+
+namespace {
+
+// The texts of the labels of `widget` shown.
+QStringList shownTexts(const QWidget &widget)
+{
+    QStringList texts;
+    for (const QLabel *label : widget.findChildren<QLabel *>()) {
+        if (label->isVisible())
+            texts.append(label->text());
+    }
+    return texts;
+}
+
+} // namespace
 
 class TestAgent : public QObject {
     Q_OBJECT
@@ -121,6 +143,77 @@ private slots:
         QCOMPARE(result.exitCode, 3);
         QVERIFY(!result.hasPassed());
         QCOMPARE(result.lastLines(1), QStringLiteral("checked"));
+    }
+
+    void reviewAnywayGoesOnTimingFromTheCheck()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ReviewSession session({.workDir = folder.path(),
+                               .subject = "the code",
+                               .checkCommand = QStringLiteral("echo checked && exit 3"),
+                               .agent = &agent});
+        session.start();
+        QTRY_COMPARE(session.state(), ReviewSession::State::CheckFailed);
+        const std::chrono::milliseconds checkTime = session.elapsed();
+        QVERIFY(checkTime.count() > 0);
+
+        session.reviewAnyway();
+
+        QVERIFY(session.elapsed() >= checkTime);
+        QTRY_COMPARE(session.state(), ReviewSession::State::Finished);
+        QVERIFY(session.elapsed() >= checkTime);
+    }
+
+    void aReviewKeepsItsSummaryOnceTheLastFindingIsDismissed()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ReviewSession session({.workDir = folder.path(), .subject = "the code", .agent = &agent});
+        ReviewBar bar;
+        ReviewFindingsPanel panel;
+        bar.setSession(&session);
+        panel.setSession(&session);
+        bar.show();
+        panel.show();
+        session.start();
+        QTRY_COMPARE(session.state(), ReviewSession::State::Finished);
+        QCOMPARE(session.findings().size(), 1);
+
+        session.dismiss({session.findings().first()});
+
+        QVERIFY(shownTexts(panel).contains("Mostly sound."));
+        const QString shown = (shownTexts(bar) + shownTexts(panel)).join('\n');
+        QVERIFY(!shown.contains("No problems found."));
+    }
+
+    void reviewPageInvitesToAReviewThenShowsItsFindings()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ReviewSession session({.workDir = folder.path(), .subject = "the code", .agent = &agent});
+        ReviewPage page;
+        page.show();
+        QPushButton *start = nullptr;
+        for (QPushButton *button : page.findChildren<QPushButton *>()) {
+            if (button->text() == "Review the Staged Changes")
+                start = button;
+        }
+        const auto *findings = page.findChild<ReviewFindingsPanel *>();
+        QVERIFY(start && start->isVisible());
+        QVERIFY(!findings->isVisible());
+        const QSignalSpy requested(&page, &ReviewPage::reviewRequested);
+        start->click();
+        QCOMPARE(requested.size(), 1);
+
+        page.setSession(&session);
+        session.start();
+
+        QVERIFY(!start->isVisible());
+        QTRY_VERIFY(findings->isVisible());
+        page.setSession(nullptr);
+        QVERIFY(start->isVisible());
+        QVERIFY(!findings->isVisible());
     }
 
     void projectCheckKeepsTheLastLinesOfItsOutput()

@@ -5,6 +5,7 @@
 #include "ClaudeFileRun.h"
 #include "ClaudeLauncher.h"
 
+#include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
 
@@ -113,6 +114,13 @@ std::optional<ProcessSpec> ClaudeCodeProvider::sessionProcess(const QString &wor
 std::optional<ProcessSpec> ClaudeCodeProvider::fileRunProcess(const AgentFileRun &run, QString *error) const
 {
     const QString hook = run.hookServerName.isEmpty() ? QString() : ClaudeLauncher::hookCommand();
+    // The hook is what checks the file: a run without it would take an
+    // unreadable file for a success.
+    if (!run.hookServerName.isEmpty() && hook.isEmpty()) {
+        *error =
+            QCoreApplication::translate("ClaudeLauncher", "The duet-hook program is missing from the editor's folder.");
+        return std::nullopt;
+    }
     std::optional<ProcessSpec> spec = ClaudeLauncher::printProcess(
         run.workingDirectory,
         ClaudeFileRun::arguments(run.prompt, run.relativePath, ClaudeLauncher::pluginPath(), hook), error);

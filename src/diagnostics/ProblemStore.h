@@ -13,7 +13,7 @@ class LanguageServers;
 // Every problem of the project: those the language servers report, those
 // read in the output of the builds (one set per run configuration,
 // replaced by its next run), and the findings of the reviews (one set per
-// review, see ReviewView). A build's problem on a line where a server
+// review, see ReviewSession). A build's problem on a line where a server
 // reports one of the same severity is the same problem told twice: only
 // the server's, which follows the text as it is typed, is kept. A review's
 // findings are always kept: they are not what a compiler says.

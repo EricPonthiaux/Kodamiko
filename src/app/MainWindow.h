@@ -8,6 +8,7 @@
 #include "agent/AgentSessions.h"
 #include "agent/CloseAgentPopup.h"
 #include "agent/HookServer.h"
+#include "agent/ReviewSession.h"
 #include "agent/mcp/McpRegistry.h"
 #include "agent/vendor/claude/CodeRequest.h"
 #include "navigation/RecentFiles.h"
@@ -21,6 +22,7 @@
 #include <QElapsedTimer>
 #include <QJsonObject>
 #include <QMainWindow>
+#include <QPointer>
 #include <QSet>
 
 #include <memory>
@@ -30,6 +32,7 @@ class AgentCheckPopup;
 class AskpassServer;
 class BranchesPopup;
 class ChangesView;
+class ReviewPage;
 class ClaudeConfigView;
 class AgentIndicator;
 class CodeIntelligence;
@@ -102,9 +105,12 @@ class MainWindow : public QMainWindow {
     Q_DISABLE_COPY_MOVE(MainWindow)
 
 public:
+    // In the order of the mode tabs; Review shows only with the review step
+    // (setReviewStep()).
     enum class Mode {
         Terminal,
         Edit,
+        Review,
         Diff,
         History
     };
@@ -417,17 +423,35 @@ private:
     // the editor's context menu and the Claude menu.
     void createCodeRequestActions(QMenu *claude);
     void askClaude(CodeRequest::Kind kind);
-    // Reviews in a separate agent process (ReviewView), not in the session:
-    // the code at the cursor or selection, or files and folders of the tree.
-    // The files must be saved, as the reviewer reads them from the disk.
+    // Reviews in a separate agent process (ReviewSession), not in the
+    // session: the code at the cursor or selection, or files and folders of
+    // the tree, in a tab (ReviewView). The files must be saved, as the
+    // reviewer reads them from the disk.
     void reviewCode();
     void reviewPaths(const QStringList &paths);
-    // Claude ▸ Review Changes: the uncommitted changes of the project.
-    void reviewChanges();
+    // Claude ▸ Review Staged Changes, the commit area's Review and the
+    // Review mode's: the staged changes, in the Review mode with the review
+    // step, over the diff otherwise.
+    void reviewStagedChanges();
+    // `session`, a review of the staged changes, in place of the one shown;
+    // owned from now on.
+    void showStagedReview(ReviewSession *session);
+    void closeStagedReview();
+    // The review step: the Review mode between Edit and Diff, where the
+    // staged changes are reviewed before the diff and the commit. Off by
+    // default; Claude ▸ Review Step turns it on.
+    bool isReviewStepOn() const;
+    void setReviewStep(bool on);
+    QWidget *createReviewPage();
     // The review tab of `subject` (a CodeRequest::describe() result), named
-    // after `title`; `patch`, a unified diff, holds the changes to review
-    // (empty: the code as it is). The project's check runs first.
-    void openReview(const QString &subject, const QString &title, const QByteArray &patch = {});
+    // after `title`. The project's check runs first.
+    void openReview(const QString &subject, const QString &title);
+    // What a review of `subject` is asked; `patch`, a unified diff, holds
+    // the changes to review (empty: the code as it is).
+    ReviewSession::Request reviewRequest(const QString &subject, const QByteArray &patch = {}) const;
+    // The findings `session` sends go in the writing session's prompt; those
+    // it resolves are submitted to it, to fix.
+    void sendReviewsToPrompt(ReviewSession *session);
     // Claude ▸ Reviewer Model: the agent's default or one of its models.
     void fillReviewerModelMenu(QMenu *menu);
     void addCodeToClaudePrompt();
@@ -558,6 +582,8 @@ private:
     QAction *detachTerminalsAction_ = nullptr;     // View menu
     ChangesView *changesView_ = nullptr;
     HistoryView *historyView_ = nullptr;
+    ReviewPage *reviewPage_ = nullptr;
+    QPointer<ReviewSession> stagedReview_; // a child; null without a review of the staged changes
     GitCommands *gitCommands_ = nullptr;
     AgentMergeQueue *agentMerges_ = nullptr;
     GitActions *gitActions_ = nullptr;

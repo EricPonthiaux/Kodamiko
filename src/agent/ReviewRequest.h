@@ -38,4 +38,9 @@ QString prompt(const Request &request);
 // apply nothing until the user agrees.
 QString followUp(const QString &agentName, const QString &subject, const QString &review);
 
+// The request submitted to the writing session that hands it `review`,
+// findings of a review of `subject` by `agentName`, to fix: check each one,
+// fix the real ones, change nothing for the others and say why.
+QString fixRequest(const QString &agentName, const QString &subject, const QString &review);
+
 } // namespace ReviewRequest
