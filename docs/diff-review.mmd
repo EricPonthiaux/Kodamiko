@@ -1,50 +1,115 @@
 flowchart TB
-    diff[Mode Diff : fichiers modifiés et diff]
-    stage[Stager fichiers, blocs ou lignes]
-    ask[Bouton Review ou Review Again]
-    unsaved{Fichiers non enregistrés ?}
-    save[Message : enregistrer d'abord]
-    read[Lire les changements stagés en un patch]
-    empty{Rien de stagé ?}
-    nothing[Message : stager d'abord]
-    step{Étape Review activée ?}
-    modeReview[Mode Review : page de la review]
-    modeDiff[Reste en mode Diff : barre de progression]
-    hasCheck{Le projet a une vérification ?}
-    check[Lancer la vérification du projet]
-    passed{Vérification réussie ?}
-    failed[Vérification échouée]
-    anyway[Review Anyway]
-    reviewer[Agent relecteur séparé, lecture seule, lit le patch]
-    answer{Réponse valide ?}
-    error[Review échouée]
-    findings[Constats : notes dans le diff, panneau Problems]
-    grid[Grille des constats sur le diff]
-    act{Que faire d'un constat ?}
-    dismiss[Ignorer]
-    send[Envoyer au prompt de la session]
-    fix[Faire corriger par la session]
-    commit[Commit]
+  ask["Review or Review Again button"]
+  nothing["Message: stage first"]
+  step{"Review step enabled?"}
+  modeReview["Review mode: review page"]
+  modeDiff["Stays in Diff mode: progress bar"]
+  hasCheck{"Does the project have a check?"}
+  check["Run the project's check"]
+  passed{"Check passed?"}
+  failed["Check failed"]
+  anyway["Review Anyway"]
+  reviewer["Separate read-only reviewer agent reads the patch"]
+  answer{"Valid answer?"}
+  error["Review failed"]
+  findings["Findings: notes in the diff, Problems panel"]
+  grid["Grid of findings over the diff"]
+  act{"What to do with a finding?"}
+  dismiss["Dismiss"]
+  send["Send to the session's prompt"]
+  fix["Have the session fix it"]
+  commit["Commit"]
+  diff["Diff mode: changed files and diff"]
+  stage["Stage files, hunks or lines"]
+  read["Read the staged changes as one patch"]
+  save["Message: save first"]
+  empty{"Nothing staged?"}
+  unsaved{"Unsaved files?"}
+  diff --> stage
+  stage --> ask
+  ask --> unsaved
+  unsaved -->|yes| save
+  unsaved -->|no| read
+  read --> empty
+  empty -->|yes| nothing
+  empty -->|no| step
+  step -->|yes| modeReview
+  modeReview --> hasCheck
+  step -->|no| modeDiff
+  modeDiff --> hasCheck
+  hasCheck -->|no| reviewer
+  hasCheck -->|yes| check
+  check --> passed
+  passed -->|yes| reviewer
+  passed -->|no| failed
+  failed --> anyway
+  anyway --> reviewer
+  reviewer --> answer
+  answer -->|no| error
+  answer -->|yes| findings
+  findings -->|without Review step| grid
+  findings --> act
+  grid --> act
+  act --> dismiss
+  act --> send
+  act --> fix
+  fix --> stage
+  dismiss --> commit
 
-    diff --> stage --> ask --> unsaved
-    unsaved -- oui --> save
-    unsaved -- non --> read --> empty
-    empty -- oui --> nothing
-    empty -- non --> step
-    step -- oui --> modeReview --> hasCheck
-    step -- non --> modeDiff --> hasCheck
-    hasCheck -- non --> reviewer
-    hasCheck -- oui --> check --> passed
-    passed -- oui --> reviewer
-    passed -- non --> failed --> anyway --> reviewer
-    reviewer --> answer
-    answer -- non --> error
-    answer -- oui --> findings
-    findings -- sans étape Review --> grid
-    findings --> act
-    grid --> act
-    act --> dismiss
-    act --> send
-    act --> fix
-    fix --> stage
-    dismiss --> commit
+%% Layout kept by Duet (positions, sizes, colors, curves)
+%% duet {"key":"ask","x":338,"y":237.9}
+%% duet {"key":"nothing","x":30.5,"y":909.9}
+%% duet {"key":"step","x":232,"y":879.9}
+%% duet {"key":"modeReview","x":67.5,"y":1077.9}
+%% duet {"key":"modeDiff","x":311.5,"y":1077.9}
+%% duet {"key":"hasCheck","x":94.5,"y":1196.9}
+%% duet {"key":"check","x":59,"y":1410.9}
+%% duet {"key":"passed","x":0,"y":1529.9}
+%% duet {"key":"failed","x":40,"y":1727.9}
+%% duet {"key":"anyway","x":30.5,"y":1865.9}
+%% duet {"key":"reviewer","x":101,"y":1984.9}
+%% duet {"key":"answer","x":106,"y":2111.9}
+%% duet {"key":"error","x":115,"y":2313.9}
+%% duet {"key":"findings","x":278.5,"y":2309.9}
+%% duet {"key":"grid","x":169,"y":2455.8}
+%% duet {"key":"act","x":180,"y":2574.8}
+%% duet {"key":"dismiss","x":111,"y":2753.8}
+%% duet {"key":"send","x":274.5,"y":2753.8}
+%% duet {"key":"fix","x":544,"y":2753.8}
+%% duet {"key":"commit","x":111,"y":2872.8}
+%% duet {"fill":"#1565c0","key":"diff","x":425.5,"y":0}
+%% duet {"key":"stage","x":541.6,"y":118.9}
+%% duet {"key":"read","x":308,"y":554.9}
+%% duet {"key":"save","x":113,"y":558.9}
+%% duet {"key":"empty","x":264.5,"y":681.9}
+%% duet {"fill":"#ad1457","key":"unsaved","x":303,"y":356.9}
+%% duet {"c":[568.6,60.3,580.4,75.4,594.7,93.8,607.3,110],"e":[614,118.6],"link":"diff>stage","n":0}
+%% duet {"c":[590.5,179.2,566,195.1,535.8,214.5,510,231.2],"e":[500.3,237.4],"link":"stage>ask","n":0}
+%% duet {"c":[447.3,298.1,444.5,313.1,440.9,332,437.5,350.2],"e":[435.4,361.5],"link":"ask>unsaved","n":0}
+%% duet {"c":[375.5,453,335.6,482,279.8,522.7,239.6,552],"e":[230.5,558.6],"link":"unsaved>save","lp":[314.9,515.9],"n":0}
+%% duet {"c":[425,477.1,425,498.8,425,522.9,425,543.2],"e":[425,554.6],"link":"unsaved>read","lp":[438,515.9],"n":0}
+%% duet {"c":[419.6,623.2,417.2,638.3,414.4,656.6,411.6,674.3],"e":[409.8,685.5],"link":"read>empty","n":0}
+%% duet {"c":[346.9,778.7,294.8,814.2,216.3,867.6,164.1,903.1],"e":[154.7,909.5],"link":"empty>nothing","lp":[279.2,840.9],"n":0}
+%% duet {"c":[401,802.4,401,823.1,401,846.5,401,868],"e":[401,879.4],"link":"empty>step","lp":[414,840.9],"n":0}
+%% duet {"c":[344.9,980.4,306.6,1007.9,256.4,1044.1,219.3,1070.9],"e":[210.1,1077.5],"link":"step>modeReview","lp":[285.5,1039],"n":0}
+%% duet {"c":[188.8,1138.2,201.1,1156.1,217.3,1179.5,232.3,1201.3],"e":[238.6,1210.6],"link":"modeReview>hasCheck","n":0}
+%% duet {"c":[410.1,996.8,413.8,1019.6,417.9,1045.4,421.3,1066.4],"e":[423.1,1077.5],"link":"step>modeDiff","lp":[431.5,1039],"n":0}
+%% duet {"c":[398.7,1138.2,379.9,1157.5,355,1183.3,332.5,1206.5],"e":[324.6,1214.6],"link":"modeDiff>hasCheck","n":0}
+%% duet {"c":[271.6,1331.5,261.6,1482.1,237.5,1845.6,229,1973.5],"e":[228.3,1984.8],"link":"hasCheck>reviewer","lp":[326,1688.9],"n":0}
+%% duet {"c":[237.2,1318.7,218,1345.3,195.2,1376.8,177.7,1401.2],"e":[170.9,1410.5],"link":"hasCheck>check","lp":[219.9,1371.9],"n":0}
+%% duet {"c":[143.9,1471.1,141.4,1486.1,138.3,1504.8,135.2,1523],"e":[133.3,1534.2],"link":"check>passed","n":0}
+%% duet {"c":[140.5,1642.3,148.1,1667,156.8,1697,163.7,1724.2,185.9,1811.9,206.5,1915.6,217.6,1973.7],"e":[219.7,1984.6],"link":"passed>reviewer","lp":[220.6,1826.9],"n":0}
+%% duet {"c":[115.9,1646.3,112.6,1669.3,108.9,1695.4,105.9,1716.6],"e":[104.3,1727.8],"link":"passed>failed","lp":[123.6,1688.9],"n":0}
+%% duet {"c":[99.1,1788.2,98.5,1807.6,97.8,1833.1,97.2,1854.4],"e":[96.9,1865.7],"link":"failed>anyway","n":0}
+%% duet {"c":[128.1,1926.3,144.3,1941.6,164.1,1960.4,181.7,1977],"e":[189.6,1984.5],"link":"anyway>reviewer","n":0}
+%% duet {"c":[226,2053.2,226,2067.2,226,2083.9,226,2100.2],"e":[226,2111.5],"link":"reviewer>answer","n":0}
+%% duet {"c":[210.4,2224.4,203,2249.5,194.2,2279,187.3,2302.4],"e":[184,2313.4],"link":"answer>error","lp":[212,2270.9],"n":0}
+%% duet {"c":[267.7,2211.3,296.3,2238.3,334.1,2274.1,363.3,2301.6],"e":[371.7,2309.5],"link":"answer>findings","lp":[353.6,2270.9],"n":0}
+%% duet {"c":[375.8,2378.2,356.2,2399.1,331.3,2425.8,311,2447.4],"e":[303.3,2455.6],"link":"findings>grid","lp":[352.5,2416.9],"n":0}
+%% duet {"c":[404.1,2378.1,398.9,2423.9,389.6,2506.2,382.9,2565.3],"e":[381.6,2576.4],"link":"findings>act","n":0}
+%% duet {"c":[295.2,2516,306.7,2533,321.3,2554.9,335,2575.3],"e":[341.4,2584.8],"link":"grid>act","n":0}
+%% duet {"c":[316.8,2677.3,286.8,2699.2,250.6,2725.7,221.8,2746.7],"e":[212.7,2753.4],"link":"act>dismiss","n":0}
+%% duet {"c":[377.8,2694.2,378.5,2710.2,379.3,2727.2,380,2742],"e":[380.6,2753.4],"link":"act>send","n":0}
+%% duet {"c":[442.4,2674.4,481.2,2697.2,529.7,2725.6,567.5,2747.8],"e":[577.4,2753.6],"link":"act>fix","n":0}
+%% duet {"c":[629.1,2753.8,630,2485.4,636.5,502.8,637.5,190.3],"e":[637.5,179.1],"link":"fix>stage","n":0}
+%% duet {"c":[171,2814.2,171,2828.4,171,2845.7,171,2861.1],"e":[171,2872.5],"link":"dismiss>commit","n":0}
