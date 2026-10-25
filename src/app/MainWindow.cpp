@@ -97,6 +97,11 @@
 
 namespace {
 
+#if defined(Q_OS_MACOS) && QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+// The room macOS's traffic lights take at the left of the title bar.
+constexpr int trafficLightsWidthPx = 72;
+#endif
+
 QColor problemsIconColor(int errorCount, int warningCount, const Theme &theme)
 {
     if (errorCount > 0)
@@ -931,7 +936,7 @@ void MainWindow::setSystemTitleBar(bool system)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
     setWindowFlag(Qt::ExpandedClientAreaHint, true);
     setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
-    titleBar_->setLeadingSpace(72);
+    titleBar_->setLeadingSpace(isFullScreen() ? 0 : trafficLightsWidthPx);
 #endif
 #else
     frame_->setFrameless(!system);
@@ -981,6 +986,11 @@ void MainWindow::updateTabIcons()
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
+#if defined(Q_OS_MACOS) && QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    // In full screen, macOS hides the traffic lights: their room goes too.
+    if (event->type() == QEvent::WindowStateChange)
+        titleBar_->setLeadingSpace(isFullScreen() ? 0 : trafficLightsWidthPx);
+#endif
     if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow() && trayIcon_)
             trayIcon_->hide();
