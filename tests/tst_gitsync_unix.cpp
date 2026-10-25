@@ -3,6 +3,8 @@
 #include "git/CredentialCache.h"
 #include "git/FileChange.h"
 #include "git/GitProcess.h"
+#include "git/Remotes.h"
+#include "git/RepositoryStatus.h"
 
 #include <QDir>
 #include <QFile>
@@ -81,6 +83,26 @@ private slots:
         QVERIFY_THROWS_EXCEPTION(GitError, Git::run(other.path(), {"credential", "fill"}, question));
 
         Git::run(project.path(), {"credential-cache", "exit", "--socket=" + socket});
+    }
+
+    void forgettingCredentialsErasesThoseOfThePushRemote()
+    {
+        qunsetenv("GIT_ASKPASS");
+        qunsetenv("SSH_ASKPASS");
+        QTemporaryDir project;
+        git(project, {"init", "-q", "-b", "main"});
+        git(project, {"remote", "add", "origin", "https://example.com/u/r.git"});
+        Git::run(project.path(), {"credential", "approve"},
+                 "protocol=https\nhost=example.com\nusername=u\npassword=s3cret\n\n");
+        const std::optional<RepositoryInfo> repository = RepositoryInfo::read(project.path());
+        QVERIFY(repository);
+
+        Remotes::forgetCredentials(*repository);
+
+        QVERIFY_THROWS_EXCEPTION(
+            GitError, Git::run(project.path(), {"credential", "fill"}, "protocol=https\nhost=example.com\n\n"));
+        Git::run(project.path(),
+                 {"credential-cache", "exit", "--socket=" + CredentialCache::socketPath(project.path())});
     }
 
 private:

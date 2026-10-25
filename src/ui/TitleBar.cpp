@@ -3,7 +3,7 @@
 #include "TitleBar.h"
 
 #include "AppFonts.h"
-#include "BrandMark.h"
+#include "BrandLogo.h"
 #include "ElidingToolButton.h"
 #include "FileIcons.h"
 #include "UiIcons.h"
@@ -19,6 +19,9 @@
 #include <QTabBar>
 #include <QToolButton>
 #include <QWindow>
+
+#include <algorithm>
+#include <optional>
 
 namespace {
 
@@ -44,38 +47,33 @@ int hintedWidth(const QWidget *widget)
     return qBound(widget->minimumWidth(), widget->sizeHint().width(), widget->maximumWidth());
 }
 
-} // namespace
-
-namespace {
-
-// Duet's mark at the bar's start, without the app icon's tile, drawn at the
-// screen's resolution. Clicks go through: dragging it moves the window, like
-// the bar.
-class BrandLogo : public QWidget {
-public:
-    BrandLogo(const Theme *theme, QWidget *parent)
-        : QWidget(parent)
-        , theme_(theme)
-    {
-        setObjectName(QStringLiteral("brandLogo"));
-        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        AppFonts::followApplicationFont(this, [this] { setFixedHeight(controlHeight()); });
-        setAttribute(Qt::WA_TransparentForMouseEvents);
-        setToolTip(QStringLiteral("Duet"));
-    }
-
-    QSize sizeHint() const override { return {controlHeight(), controlHeight()}; }
-
-protected:
-    void paintEvent(QPaintEvent *) override
-    {
-        QPainter painter(this);
-        BrandMark::paint(&painter, contentsRect(), BrandMark::caretColorFor(*theme_));
-    }
-
-private:
-    const Theme *theme_; // the title bar's, which owns the logo
+// Where the menu titles' texts lie in `menuBar`: from the menu bar's left
+// edge to the first text, and from one text to the next. Empty without two
+// visible menus.
+struct MenuTitleSpacing {
+    int firstTextLeft = 0;
+    int textGap = 0;
 };
+
+std::optional<MenuTitleSpacing> menuTitleSpacing(QMenuBar *menuBar)
+{
+    QList<QAction *> menus = menuBar->actions();
+    menus.removeIf([](const QAction *action) { return !action->isVisible() || action->isSeparator(); });
+    if (menus.size() < 2)
+        return std::nullopt;
+    // The style pads each title equally on both sides of its text.
+    const auto padding = [menuBar](QAction *action) {
+        const int textWidth = menuBar->fontMetrics().size(Qt::TextShowMnemonic, action->text()).width();
+        return (menuBar->actionGeometry(action).width() - textWidth) / 2;
+    };
+    const QRect first = menuBar->actionGeometry(menus[0]);
+    const QRect second = menuBar->actionGeometry(menus[1]);
+    const int firstPadding = padding(menus[0]);
+    return MenuTitleSpacing{
+        .firstTextLeft = first.left() + firstPadding,
+        .textGap = second.left() - first.right() - 1 + firstPadding + padding(menus[1]),
+    };
+}
 
 } // namespace
 
@@ -152,7 +150,7 @@ void TitleBar::updateLogoAlignment()
         return;
     // The tab bar can have spare width to the right of its actual tabs.
     const QRect tab = logoColumn_->tabRect(0);
-    logo_->setFixedWidth(2 * tab.x() + tab.width());
+    logo_->setPlaceWidth(2 * tab.x() + tab.width());
 }
 
 ElidingToolButton *TitleBar::addChip()
@@ -280,8 +278,6 @@ void TitleBar::applyMetrics()
     run_->setFixedHeight(control - runBlockInset);
     run_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
     runDivider_->setFixedSize(1, control - 2 * dividerInset);
-    const int logoInset = qRound(control * (1 - logoScale_) / 2);
-    logo_->setContentsMargins(logoInset, logoInset, logoInset, logoInset);
     controlsDivider_->setFixedSize(1, control - 2 * dividerInset);
     for (const ActionButton &entry : std::as_const(actionButtons_))
         sizeActionButton(entry);
@@ -312,6 +308,7 @@ int TitleBar::boundedRunBlockWidth() const
 void TitleBar::updateResponsiveLayout()
 {
     layout_->setSpacing(UiMetrics::scaled(width() < UiMetrics::scaled(600) ? groupSpacing / 2 : groupSpacing));
+    fitLogoToMenuTitles();
     // Measure the expanded controls at their bounded widths, independent of
     // which groups were hidden or how far the labels grew on the previous
     // resize.
@@ -348,6 +345,15 @@ void TitleBar::updateResponsiveLayout()
     const bool hasLeadingSpace = layout_->contentsMargins().left() > 0;
     logo_->setVisible(!hasLeadingSpace && width() >= minimumWithLogo);
     centerProjectGroup();
+}
+
+void TitleBar::fitLogoToMenuTitles()
+{
+    const std::optional<MenuTitleSpacing> titles = menuTitleSpacing(menuBar_);
+    if (!titles)
+        return;
+    const int textLeftOfMenuBar = layout_->spacing() + titles->firstTextLeft;
+    logo_->setTrailingGap(std::max(0, titles->textGap - textLeftOfMenuBar));
 }
 
 int TitleBar::sideWidth(std::initializer_list<const QWidget *> widgets) const
@@ -440,9 +446,7 @@ void TitleBar::setTrailingSpace(int pixels)
 
 void TitleBar::setLogoScale(qreal scale)
 {
-    Q_ASSERT(scale > 0 && scale <= 1);
-    logoScale_ = scale;
-    applyMetrics();
+    logo_->setScale(scale);
 }
 
 WindowButton *TitleBar::windowButton(WindowButton::Kind kind) const

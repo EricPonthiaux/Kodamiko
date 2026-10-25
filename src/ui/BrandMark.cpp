@@ -7,14 +7,23 @@
 
 namespace BrandMark {
 
-void paint(QPainter *painter, const QRectF &area, const QColor &caret, const QColor &block)
+namespace {
+
+// The rectangle (`x`, `y`, `w`, `h`) of the 64-unit grid of
+// packaging/brand/duet-mark.svg, fitted in the square `area`.
+QRectF gridRect(const QRectF &area, qreal x, qreal y, qreal w, qreal h)
 {
-    // The shapes on a 64-unit grid, as in packaging/brand/duet-mark.svg.
     const qreal unit = std::min(area.width(), area.height()) / 64.0;
     const QPointF origin = area.center() - QPointF(32 * unit, 32 * unit);
-    const auto rect = [&](qreal x, qreal y, qreal w, qreal h) {
-        return QRectF(origin.x() + x * unit, origin.y() + y * unit, w * unit, h * unit);
-    };
+    return {origin.x() + x * unit, origin.y() + y * unit, w * unit, h * unit};
+}
+
+} // namespace
+
+void paint(QPainter *painter, const QRectF &area, const QColor &caret, const QColor &block)
+{
+    const qreal unit = std::min(area.width(), area.height()) / 64.0;
+    const auto rect = [&](qreal x, qreal y, qreal w, qreal h) { return gridRect(area, x, y, w, h); };
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
     painter->setPen(Qt::NoPen);
@@ -23,6 +32,12 @@ void paint(QPainter *painter, const QRectF &area, const QColor &caret, const QCo
     painter->setBrush(block);
     painter->drawRoundedRect(rect(31, 24, 16, 28), 4 * unit, 4 * unit);
     painter->restore();
+}
+
+QRectF inkRect(const QRectF &area)
+{
+    // From the caret's left to the block's right, the shapes' tops to bottoms.
+    return gridRect(area, 17, 12, 30, 40);
 }
 
 QColor caretColorFor(const Theme &theme)

@@ -36,6 +36,12 @@ QString pull(const RepositoryInfo &repository, const Git::Feedback &feedback);
 // someone pushed others since the last fetch (--force-with-lease).
 QString push(const RepositoryInfo &repository, const Git::Feedback &feedback, bool force = false);
 
+// Has git forget the credentials saved for the server the current branch
+// is pushed to, so the next fetch, pull or push asks for others: what to do
+// after a GitError::Kind::AccessDenied, which fetch, pull, push and sync
+// throw when the remote refuses the account. Throws GitError.
+void forgetCredentials(const RepositoryInfo &repository);
+
 // Fetch, then pull if the upstream has new commits, then push if the
 // branch has commits the upstream lacks.
 QString sync(const RepositoryInfo &repository, const Git::Feedback &feedback);

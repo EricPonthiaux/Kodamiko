@@ -264,6 +264,7 @@ add_library(duet_core STATIC
     toolchains/ToolCatalog.cpp
     toolchains/Toolchains.cpp
     ui/AppFonts.cpp
+    ui/BrandLogo.cpp
     ui/BrandMark.cpp
     ui/ClickableCursors.cpp
     ui/ContextMenus.cpp

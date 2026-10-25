@@ -7,9 +7,9 @@
 #include <QColor>
 #include <QIcon>
 #include <QPixmap>
+#include <QRectF>
 
 class QPainter;
-class QRectF;
 
 // Duet's mark: a thin text caret (the editor) next to a block cursor (the
 // terminal where Claude runs). Drawn rather than loaded, so it is sharp at
@@ -26,6 +26,9 @@ inline const QColor tileColor{0x1f, 0x23, 0x2c};
 
 // The two shapes, fitted in the square `area`.
 void paint(QPainter *painter, const QRectF &area, const QColor &caret = caretColor, const QColor &block = blockColor);
+// The part of the square `area` the two shapes cover: the mark's visible
+// edges, inside the blank margin of its grid.
+QRectF inkRect(const QRectF &area);
 // The caret's color on the interface of `theme`.
 QColor caretColorFor(const Theme &theme);
 // The mark alone, `size` pixels square, for the interface of `theme`: no

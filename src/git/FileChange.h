@@ -36,6 +36,7 @@ public:
         Unmerged,     // branch deletion refused: its commits are merged nowhere
         InWorktree,   // branch deletion refused: a worktree has it checked out
         NoIdentity,   // commit refused: git has no user.name or user.email
+        AccessDenied, // the remote refused the account git signed in with (HTTP 403)
     };
 
     explicit GitError(const QString &message, Kind kind = Kind::General)

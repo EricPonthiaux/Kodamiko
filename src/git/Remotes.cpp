@@ -34,6 +34,41 @@ void requireBranch(const RepositoryInfo &repository)
         throw GitError(QObject::tr("The branch %1 has no commits yet").arg(repository.branch));
 }
 
+// GitHub and GitLab answer 403 when the account git signed in with cannot
+// write to the repository, or read it. Unlike after a 401, git then keeps
+// the credentials its helpers saved, and sends them again at every try.
+bool isAccessDenied(const GitError &error)
+{
+    const QString message = error.message();
+    return message.contains(QLatin1String("The requested URL returned error: 403")) ||
+           message.contains(QLatin1String("Write access to repository not granted"));
+}
+
+QByteArray runOnRemote(const QString &workDir, const QStringList &arguments, const Git::Feedback &feedback)
+{
+    try {
+        return Git::run(workDir, arguments, options(feedback));
+    } catch (const GitError &error) {
+        if (error.kind() == GitError::Kind::General && isAccessDenied(error)) {
+            throw GitError(QObject::tr("The remote refused the account git signed in with: it cannot write to "
+                                       "this repository, or cannot read it"),
+                           GitError::Kind::AccessDenied);
+        }
+        throw;
+    }
+}
+
+// The remote the current branch is pushed to: the one it tracks, else the
+// default remote.
+QString pushRemote(const RepositoryInfo &repository)
+{
+    const std::optional<QString> tracked =
+        configValue(repository.workDir, QStringLiteral("branch.%1.remote").arg(repository.branch));
+    if (tracked && !tracked->isEmpty())
+        return *tracked;
+    return defaultRemote(names(repository.workDir));
+}
+
 RepositoryInfo reread(const RepositoryInfo &repository)
 {
     const std::optional<RepositoryInfo> info = RepositoryInfo::read(repository.workDir);
@@ -61,10 +96,10 @@ QString fetch(const RepositoryInfo &repository, const Git::Feedback &feedback)
 {
     if (names(repository.workDir).isEmpty())
         throw GitError(QObject::tr("The repository has no remote"));
-    Git::run(
+    runOnRemote(
         repository.workDir,
         {QStringLiteral("fetch"), QStringLiteral("--all"), QStringLiteral("--prune"), QStringLiteral("--progress")},
-        options(feedback));
+        feedback);
     const RepositoryInfo after = reread(repository);
     if (after.upstream.isEmpty() || after.behind == 0)
         return QObject::tr("Fetched: nothing new for %1").arg(after.branch.isEmpty() ? after.headId : after.branch);
@@ -87,7 +122,7 @@ QString pull(const RepositoryInfo &repository, const Git::Feedback &feedback)
     if (!configured)
         arguments.append(QStringLiteral("--ff-only"));
     try {
-        Git::run(repository.workDir, arguments, options(feedback));
+        runOnRemote(repository.workDir, arguments, feedback);
     } catch (const GitError &error) {
         if (error.kind() == GitError::Kind::General &&
             (error.message().contains(QLatin1String("Not possible to fast-forward")) ||
@@ -125,7 +160,7 @@ QString push(const RepositoryInfo &repository, const Git::Feedback &feedback, bo
         destination = remote + QLatin1Char('/') + repository.branch;
     }
     try {
-        Git::run(repository.workDir, arguments, options(feedback));
+        runOnRemote(repository.workDir, arguments, feedback);
     } catch (const GitError &error) {
         if (error.kind() == GitError::Kind::General && error.message().contains(QLatin1String("[rejected]"))) {
             throw GitError(QObject::tr("%1 has commits that %2 lacks: pull them first, or overwrite them")
@@ -135,6 +170,21 @@ QString push(const RepositoryInfo &repository, const Git::Feedback &feedback, bo
         throw;
     }
     return QObject::tr("Pushed %1 to %2").arg(repository.branch, destination);
+}
+
+void forgetCredentials(const RepositoryInfo &repository)
+{
+    const QString remote = pushRemote(repository);
+    if (remote.isEmpty())
+        return;
+    const QString url =
+        QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("remote"), QStringLiteral("get-url"),
+                                                        QStringLiteral("--push"), remote}))
+            .trimmed();
+    // "reject" has every helper erase what it saved for that server: Duet's
+    // cache and the user's own (macOS Keychain, Git Credential Manager…).
+    Git::run(repository.workDir, {QStringLiteral("credential"), QStringLiteral("reject")},
+             QStringLiteral("url=%1\n\n").arg(url).toUtf8());
 }
 
 QString sync(const RepositoryInfo &repository, const Git::Feedback &feedback)

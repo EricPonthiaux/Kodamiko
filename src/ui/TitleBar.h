@@ -11,6 +11,7 @@
 
 #include <initializer_list>
 
+class BrandLogo;
 class ElidingToolButton;
 class QFrame;
 class QHBoxLayout;
@@ -96,6 +97,9 @@ private:
     void applyMetrics();
     void sizeActionButton(const ActionButton &entry);
     void updateLogoAlignment();
+    // Ends the logo so that the first menu title's text follows the mark as
+    // each title's text follows the one before it.
+    void fitLogoToMenuTitles();
     void updateResponsiveLayout();
     // Sizes the balances so that the project and the run block sit in the
     // middle of the bar, as far as the room left allows.
@@ -111,7 +115,7 @@ private:
     QHBoxLayout *layout_;
     QSpacerItem *leftBalance_;  // owned by layout_
     QSpacerItem *rightBalance_; // owned by layout_
-    QWidget *logo_;
+    BrandLogo *logo_;
     QPointer<QTabBar> logoColumn_;
     QMenuBar *menuBar_;
     QToolButton *menuButton_;
@@ -128,7 +132,6 @@ private:
     QWidget *actionGroup_;
     QList<QAction *> secondaryActions_;
     bool layoutScheduled_ = false;
-    qreal logoScale_ = 1;
 
     QList<ActionButton> actionButtons_;
     QFrame *controlsDivider_;

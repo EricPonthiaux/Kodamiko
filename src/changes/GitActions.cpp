@@ -27,6 +27,11 @@ RepositoryInfo repositoryOf(const QString &folder)
     return *repository;
 }
 
+QString pushBranch(const RepositoryInfo &repository, const Git::Feedback &feedback)
+{
+    return Remotes::push(repository, feedback);
+}
+
 } // namespace
 
 GitActions::GitActions(GitCommands *commands, QWidget *window, std::function<QString()> folder, QObject *parent)
@@ -64,7 +69,7 @@ void GitActions::run(const QString &title, Operation operation, std::function<bo
 }
 
 void GitActions::runRemote(const QString &title,
-                           std::function<QString(const RepositoryInfo &, const Git::Feedback &)> operation,
+                           RemoteOperation operation,
                            std::function<bool(const GitError &)> onFailure,
                            std::function<void()> onSuccess)
 {
@@ -110,28 +115,33 @@ void GitActions::confirm(const QString &title,
 
 void GitActions::fetch()
 {
-    runRemote(tr("Fetch"), &Remotes::fetch);
+    runRemote(tr("Fetch"), &Remotes::fetch,
+              [this](const GitError &error) { return offerSignInAgain(error, tr("Fetch"), &Remotes::fetch, {}); });
 }
 
 void GitActions::pull()
 {
-    runRemote(tr("Pull"), &Remotes::pull, [this](const GitError &error) { return onPullFailed(error); });
+    runRemote(tr("Pull"), &Remotes::pull, [this](const GitError &error) {
+        return onPullFailed(error) || offerSignInAgain(error, tr("Pull"), &Remotes::pull, {});
+    });
 }
 
 void GitActions::push()
 {
+    const auto onSuccess = [this] { onPushed(); };
     runRemote(
-        tr("Push"),
-        [](const RepositoryInfo &repository, const Git::Feedback &feedback) {
-            return Remotes::push(repository, feedback);
+        tr("Push"), &pushBranch,
+        [this, onSuccess](const GitError &error) {
+            return onPushFailed(error) || offerSignInAgain(error, tr("Push"), &pushBranch, onSuccess);
         },
-        [this](const GitError &error) { return onPushFailed(error); }, [this] { onPushed(); });
+        onSuccess);
 }
 
 void GitActions::sync()
 {
-    runRemote(tr("Sync"), &Remotes::sync,
-              [this](const GitError &error) { return onPullFailed(error) || onPushFailed(error); });
+    runRemote(tr("Sync"), &Remotes::sync, [this](const GitError &error) {
+        return onPullFailed(error) || onPushFailed(error) || offerSignInAgain(error, tr("Sync"), &Remotes::sync, {});
+    });
 }
 
 bool GitActions::onPullFailed(const GitError &error)
@@ -172,6 +182,38 @@ bool GitActions::onPushFailed(const GitError &error)
                                    .details = tr("Pull brings their commits in first. Overwriting deletes them from "
                                                  "the remote, unless someone pushed others since the last fetch.")},
                                   {{tr("Pull"), [this] { pull(); }}, {tr("Overwrite"), overwrite}}, window_);
+    popup->popup();
+    return true;
+}
+
+bool GitActions::offerSignInAgain(const GitError &error,
+                                  const QString &title,
+                                  const RemoteOperation &operation,
+                                  const std::function<void()> &onSuccess)
+{
+    if (error.kind() != GitError::Kind::AccessDenied)
+        return false;
+    const auto signInAgain = [this, title, operation, onSuccess] {
+        runRemote(
+            title,
+            [operation](const RepositoryInfo &repository, const Git::Feedback &feedback) {
+                Remotes::forgetCredentials(repository);
+                return operation(repository, feedback);
+            },
+            [this, title, operation, onSuccess](const GitError &retryError) {
+                return offerSignInAgain(retryError, title, operation, onSuccess);
+            },
+            onSuccess);
+    };
+    auto *popup = new ChoicePopup(
+        {.title = title,
+         .location = location(),
+         .message = error.message(),
+         .details = tr("git keeps sending the credentials saved for this server, by Duet and by your credential "
+                       "helper (such as the macOS Keychain). Sign In Again forgets them and tries again: git then "
+                       "asks for a user name and a password. On GitHub, the password is a token that can write to "
+                       "the repository.")},
+        {{tr("Sign In Again"), signInAgain}}, window_);
     popup->popup();
     return true;
 }

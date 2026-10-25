@@ -62,10 +62,11 @@ signals:
 
 private:
     using Operation = std::function<QString(const RepositoryInfo &repository)>;
+    using RemoteOperation = std::function<QString(const RepositoryInfo &, const Git::Feedback &)>;
 
     void run(const QString &title, Operation operation, std::function<bool(const GitError &)> onFailure = {});
     void runRemote(const QString &title,
-                   std::function<QString(const RepositoryInfo &, const Git::Feedback &)> operation,
+                   RemoteOperation operation,
                    std::function<bool(const GitError &)> onFailure = {},
                    std::function<void()> onSuccess = {});
     // The open folder's name, under the popups' titles.
@@ -87,6 +88,13 @@ private:
     // bar, which is easily missed after a long wait.
     void onPushed();
     bool onPullFailed(const GitError &error);
+    // When the remote refused the account git signed in with, offers to
+    // forget the saved credentials and run `operation` again, so git asks
+    // for a user name and a password.
+    bool offerSignInAgain(const GitError &error,
+                          const QString &title,
+                          const RemoteOperation &operation,
+                          const std::function<void()> &onSuccess);
     bool onDeleteBranchFailed(const GitError &error, const QString &name);
     // Deletes the worktree that has the branch `name` checked out, then the
     // branch.
