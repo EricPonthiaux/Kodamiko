@@ -219,10 +219,11 @@ One strategy per layer:
   `src/system`; a feature's own in its package
   (`git/CredentialCacheUnix.cpp`). A constant that only names the system
   is a `switch` on `Host::operatingSystem()`. A feature that exists on one
-  system only (Visual Studio) has no stand-in elsewhere: its source is
-  compiled there alone, and its caller has the `#ifdef`. `#ifdef Q_OS_…`
-  stays for that, UI conventions (macOS's keys and title bar) and system
-  headers.
+  system only (Spaces, the Dock, App Nap) still has a source per system,
+  which does nothing where the feature does not exist
+  (`ui/DesktopIntegration.h`): its callers have no `#ifdef`. `#ifdef
+  Q_OS_…` stays for system headers and the code that predates this rule
+  (Visual Studio).
 
 ---
 
