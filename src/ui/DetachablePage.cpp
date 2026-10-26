@@ -2,6 +2,8 @@
 
 #include "DetachablePage.h"
 
+#include "DesktopIntegration.h"
+#include "StrayWindowCheck.h"
 #include "WindowFrame.h"
 #include "WindowTitleBar.h"
 
@@ -78,6 +80,7 @@ void DetachablePage::detach()
 
     // No parent: an independent window, which the main one does not cover.
     window_ = std::make_unique<QWidget>();
+    StrayWindowCheck::allow(window_.get());
     window_->setWindowTitle(texts_.windowTitle);
     window_->addActions(windowActions_);
     frame_ = new WindowFrame(window_.get());
@@ -96,6 +99,7 @@ void DetachablePage::detach()
         window_->move(stack_->mapToGlobal(QPoint(windowOffsetPx, windowOffsetPx)));
     }
     window_->installEventFilter(this);
+    DesktopIntegration::followActiveSpace(window_.get());
     window_->show();
     raiseWindow();
     saveState();
@@ -148,6 +152,9 @@ void DetachablePage::setFrameless(bool frameless)
         return;
     frame_->setFrameless(frameless);
     titleBar_->setVisible(frameless);
+    // The new window flags recreated the native window, shown again.
+    if (window_->isVisible())
+        DesktopIntegration::followActiveSpace(window_.get());
 }
 
 void DetachablePage::applyTheme(const Theme &theme)

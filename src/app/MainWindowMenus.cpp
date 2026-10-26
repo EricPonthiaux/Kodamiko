@@ -21,6 +21,7 @@
 #include "refactor/RefactoringHistory.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
+#include "system/Host.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/TitleBar.h"
 #include "viewers/DiagramKinds.h"
@@ -39,6 +40,23 @@
 #include <algorithm>
 #include <array>
 #include <functional>
+
+namespace {
+
+// macOS's own full-screen key; F11, the others', switches to the terminal.
+QKeySequence fullScreenShortcut()
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::MacOS:
+        return QKeySequence(Qt::META | Qt::CTRL | Qt::Key_F); // ⌃⌘F
+    case OperatingSystem::Windows:
+    case OperatingSystem::Linux:
+        return QKeySequence(Qt::SHIFT | Qt::Key_F11);
+    }
+    return {};
+}
+
+} // namespace
 
 void MainWindow::createMenus()
 {
@@ -233,6 +251,8 @@ void MainWindow::createViewMenu()
     detachTerminalsAction_->setCheckable(true);
     detachTerminalsAction_->setToolTip(tr("The terminal tabs in a window of their own, to put on another screen"));
     connect(detachTerminalsAction_, &QAction::toggled, this, &MainWindow::setTerminalsDetached);
+    fullScreenAction_ = view->addAction(tr("&Full Screen"), fullScreenShortcut(), this, &MainWindow::toggleFullScreen);
+    fullScreenAction_->setCheckable(true);
     view->addSeparator();
     view->addAction(tr("File &Outline"), QKeySequence(tr("Ctrl+Shift+O")), this, &MainWindow::showOutline);
     view->addAction(tr("&Problems"), QKeySequence(tr("Alt+6")), this, [this] {

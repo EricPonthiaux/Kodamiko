@@ -289,6 +289,7 @@ add_library(duet_core STATIC
     ui/PopupWidgets.cpp
     ui/PopupMotion.cpp
     ui/Spinner.cpp
+    ui/StrayWindowCheck.cpp
     ui/Theme.cpp
     ui/ThemeStyle.cpp
     ui/ToolTipPlacement.cpp
@@ -337,7 +338,8 @@ if(WIN32)
         recipes/VisualStudio.cpp
         setup/SystemSetupWindows.cpp
         terminal/ConPty.cpp
-        toolchains/SystemJdksWindows.cpp)
+        toolchains/SystemJdksWindows.cpp
+        ui/DesktopIntegrationWindows.cpp)
     # Public: ConPty.h includes <windows.h>, and so does every source that
     # includes it. WIN32_LEAN_AND_MEAN leaves out rpcndr.h, whose `small`
     # macro breaks a field of vterm.h.
@@ -350,12 +352,15 @@ else()
         target_sources(duet_core PRIVATE
             setup/SystemSetupMacOS.cpp
             terminal/PtyForegroundMacOS.cpp
-            toolchains/SystemJdksMacOS.cpp)
+            toolchains/SystemJdksMacOS.cpp
+            ui/DesktopIntegrationMacOS.mm)
+        target_link_libraries(duet_core PRIVATE "-framework AppKit")
     else()
         target_sources(duet_core PRIVATE
             setup/SystemSetupLinux.cpp
             terminal/PtyForegroundLinux.cpp
-            toolchains/SystemJdksLinux.cpp)
+            toolchains/SystemJdksLinux.cpp
+            ui/DesktopIntegrationLinux.cpp)
     endif()
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_link_libraries(duet_core PRIVATE util) # forkpty() before glibc 2.34

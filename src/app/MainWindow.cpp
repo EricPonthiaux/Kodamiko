@@ -894,6 +894,12 @@ void MainWindow::toggleTerminalMode()
     setMode(mode_ == Mode::Terminal ? modeBeforeTerminal_ : Mode::Terminal);
 }
 
+// Leaving full screen gives the window back maximized if it was.
+void MainWindow::toggleFullScreen()
+{
+    setWindowState(windowState() ^ Qt::WindowFullScreen);
+}
+
 // Ctrl+Shift+O: Outline panel, with the filter ready for typing.
 void MainWindow::showOutline()
 {
@@ -979,8 +985,10 @@ void MainWindow::updateTabIcons()
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
-    if (event->type() == QEvent::WindowStateChange)
+    if (event->type() == QEvent::WindowStateChange) {
         fitTitleBarToWindowState();
+        fullScreenAction_->setChecked(isFullScreen());
+    }
     if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow() && trayIcon_)
             trayIcon_->hide();

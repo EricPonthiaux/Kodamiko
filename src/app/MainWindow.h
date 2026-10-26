@@ -367,6 +367,7 @@ private:
     static QString savedThemeName();
     void setMode(Mode mode);
     void toggleTerminalMode();
+    void toggleFullScreen();
     void showOutline();
     void updateTerminalPage();
     // The terminals to the front: their window when they are in one, else
@@ -593,6 +594,7 @@ private:
     DetachablePage *terminalWindow_ = nullptr;     // terminalPage_ in a window of its own
     QToolButton *detachTerminalsButton_ = nullptr; // at the right of the terminal tabs
     QAction *detachTerminalsAction_ = nullptr;     // View menu
+    QAction *fullScreenAction_ = nullptr;          // View menu
     ChangesView *changesView_ = nullptr;
     HistoryView *historyView_ = nullptr;
     ReviewPage *reviewPage_ = nullptr;

@@ -11,6 +11,7 @@
 #include "ui/BrandMark.h"
 #include "ui/ClickableCursors.h"
 #include "ui/Motion.h"
+#include "ui/StrayWindowCheck.h"
 #include "ui/ToolTipPlacement.h"
 #include "ui/UiMetrics.h"
 #include "welcome/WelcomeWindow.h"
@@ -156,6 +157,7 @@ void openProject(const QString &folder)
 {
     auto *window = new MainWindow(folder);
     window->setAttribute(Qt::WA_DeleteOnClose);
+    StrayWindowCheck::allow(window);
     QObject::connect(window, &MainWindow::projectClosed, [] { showWelcome(); });
     window->show();
 }
@@ -165,6 +167,7 @@ void showWelcome()
 {
     auto *welcome = new WelcomeWindow;
     welcome->setAttribute(Qt::WA_DeleteOnClose);
+    StrayWindowCheck::allow(welcome);
     QObject::connect(welcome, &WelcomeWindow::projectChosen, welcome, [welcome](const ProjectConfig &project) {
         if (!ProjectWindows::raise(project.path))
             openProject(project.path);
@@ -182,6 +185,7 @@ int main(int argc, char *argv[])
     PreviewSite::registerScheme();
     const QApplication app(argc, argv);
     ClickableCursors::install();
+    StrayWindowCheck::install();
 
     const libgit2::Session git;
     QApplication::setApplicationName(QStringLiteral("Duet"));
