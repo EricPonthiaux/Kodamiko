@@ -93,6 +93,123 @@
                 },
                 "additionalProperties": false
             }
+        },
+        "parameters": {
+            "description": "Choices the new project is made with, offered when it is created and kept in the project. {{name}} stands for the value chosen, and the value's variables for theirs, in the recipe's files, requirements, commands, prompts, instructions and servers.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "values"
+                ],
+                "properties": {
+                    "name": {
+                        "description": "Its placeholder's name, e.g. \"angular\" for {{angular}}.",
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                    },
+                    "title": {
+                        "description": "Its label in the New Project form; the name when it is not given.",
+                        "type": "string"
+                    },
+                    "values": {
+                        "description": "The values offered, the first one by default: a value, or a value with the placeholders it sets.",
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "value"
+                                    ],
+                                    "properties": {
+                                        "value": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "variables": {
+                                            "description": "Placeholders set with the value, e.g. {\"typescript\": \"~6.0.0\"} for {{typescript}}.",
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                }
+                            ]
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "languageServers": {
+            "description": "Language servers for languages Duet has none for (Angular's templates): a Node script of a tool the recipe requires.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "tool",
+                    "script",
+                    "languages"
+                ],
+                "properties": {
+                    "name": {
+                        "description": "Its name in the preferences and the messages.",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "tool": {
+                        "description": "The requirement that installs it.",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "script": {
+                        "description": "The script run with Node, in the tool's folder.",
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "arguments": {
+                        "description": "Its arguments; {{home}} stands for the tool's folder, {{project}} for the project's.",
+                        "$ref": "#/definitions/strings"
+                    },
+                    "languages": {
+                        "description": "The languages it serves, e.g. \"html\".",
+                        "$ref": "#/definitions/strings"
+                    },
+                    "triggerCharacters": {
+                        "description": "The characters after which it completes.",
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "serverOptions": {
+            "description": "What the recipe adds to the options of a server Duet knows, by its name (\"typescript-language-server\"): objects merged key by key, anything else replaced. {{project}} in their texts stands for the project's folder.",
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "initialization": {
+                        "description": "Its initializationOptions.",
+                        "type": "object"
+                    },
+                    "settings": {
+                        "description": "Its workspace settings.",
+                        "type": "object"
+                    }
+                },
+                "additionalProperties": false
+            }
         }
     },
     "additionalProperties": false,
@@ -169,24 +286,32 @@
             "additionalProperties": false
         },
         "download": {
-            "description": "An archive of the tool and how to check it. One without a checksum or a known format is not installed.",
+            "description": "An archive of the tool and how to check it, or npm packages. An archive without a checksum or a known format is not installed.",
             "type": "object",
-            "required": [
-                "url"
-            ],
             "anyOf": [
                 {
                     "required": [
+                        "url",
                         "checksum"
                     ]
                 },
                 {
                     "required": [
+                        "url",
                         "checksumUrl"
+                    ]
+                },
+                {
+                    "required": [
+                        "npm"
                     ]
                 }
             ],
             "properties": {
+                "npm": {
+                    "description": "Packages installed with npm in the tool's folder instead of an archive; {{version}} stands for the requirement's version.",
+                    "$ref": "#/definitions/strings"
+                },
                 "url": {
                     "description": "The archive's address; {{version}} stands for the requirement's version.",
                     "type": "string",

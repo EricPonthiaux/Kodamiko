@@ -51,6 +51,20 @@ void write(const QString &path, const QByteArray &content)
     file.write(content);
 }
 
+QByteArray read(const QString &path)
+{
+    QFile file(path);
+    return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+}
+
+// Selects the first recipe of `list` whose title starts with `title`.
+void selectRecipe(QListWidget *list, const QString &title)
+{
+    const QList<QListWidgetItem *> items = list->findItems(title, Qt::MatchStartsWith);
+    QVERIFY2(!items.isEmpty(), qPrintable(title));
+    list->setCurrentItem(items.first());
+}
+
 // The executables ToolCatalog looks for in Duet's installs of a JDK and a Node.
 const QString javaExecutable = Executables::fileName(QStringLiteral("bin/java"));
 const QString nodeExecutable = QStringLiteral("bin/node");
@@ -886,6 +900,7 @@ private slots:
         project.languages = {{"python", false, "3.12", "/usr/bin/python3", "pyright", "system", "python-uv"}};
         project.agentCheckCommand = "make check";
         project.needsRecipeSetup = true;
+        project.recipeValues = {{"angular", "21"}};
 
         const ProjectConfig saved = ProjectConfig::fromVariant(project.path, project.toVariant());
 
@@ -895,6 +910,7 @@ private slots:
         QCOMPARE(saved.languages, project.languages);
         QCOMPARE(saved.agentCheckCommand, project.agentCheckCommand);
         QCOMPARE(saved.needsRecipeSetup, project.needsRecipeSetup);
+        QCOMPARE(saved.recipeValues, project.recipeValues);
     }
 
     void groupsLanguagesIntoTheirFamilies()
@@ -982,7 +998,7 @@ private slots:
         NewProjectForm form;
         form.nameEdit()->setText("demo");
         form.locationEdit()->setText(dir.path());
-        form.recipeList()->setCurrentRow(1); // C++
+        selectRecipe(form.recipeList(), "C++");
         form.gitCheck()->setChecked(true);
         QSignalSpy created(&form, &NewProjectForm::created);
 
@@ -1000,6 +1016,34 @@ private slots:
         QVERIFY(project->language("cpp"));
         QVERIFY(project->needsRecipeSetup); // CMake configures at the first opening
         QVERIFY(ClaudeTrust::isTrusted(dir.filePath("demo")));
+    }
+
+    void newProjectFormMakesTheProjectWithTheValuesChosen()
+    {
+        const QTemporaryDir dir;
+        NewProjectForm form;
+        form.nameEdit()->setText("web");
+        form.locationEdit()->setText(dir.path());
+        form.gitCheck()->setChecked(false);
+        selectRecipe(form.recipeList(), "Angular");
+        QCOMPARE(form.parameterBoxes().size(), 1);
+        form.parameterBoxes().first()->setCurrentText("21");
+
+        form.createButton()->click();
+
+        QVERIFY(read(dir.filePath("web/package.json")).contains(R"("@angular/core": "^21.0.0")"));
+        const std::optional<ProjectConfig> project = ProjectStore::find(dir.filePath("web"));
+        QVERIFY(project.has_value());
+        QCOMPARE(project->recipeValues.value("angular"), QString("21"));
+    }
+
+    void newProjectFormShowsNoParametersForARecipeWithout()
+    {
+        NewProjectForm form;
+
+        selectRecipe(form.recipeList(), "C++");
+
+        QVERIFY(form.parameterBoxes().isEmpty());
     }
 
     void aProjectWhoseRecipeHasNoSetupCommandsStillGetsItsToolsAtTheFirstOpening()

@@ -26,6 +26,11 @@ struct LanguageServerSpec {
     QStringList arguments;
     QStringList languages;     // LanguageRegistry identifiers it serves
     QString triggerCharacters; // characters after which it completes members
+    // A recipe's server: `program` is the absolute path of a script Duet
+    // installed, run with Node.
+    bool isNodeScript = false;
+
+    bool operator==(const LanguageServerSpec &) const = default;
 };
 
 // The language servers of the open folder: one per kind (clangd for C and
@@ -33,12 +38,35 @@ struct LanguageServerSpec {
 // needs it, and stopped when the folder changes. Keeps each server's copy
 // of the open files up to date. With a project's setup, each language uses
 // the server and version it chose (Duet's download, or the PATH's), run
-// for the project's runtime (its JDK, Python, C++ standard).
+// for the project's runtime (its JDK, Python, C++ standard). Its recipes
+// add servers of their own (Angular's, for the templates) and options to
+// Duet's (tsserver's Angular plugin).
 class LanguageServers : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(LanguageServers)
 
 public:
+    // What a server is told about the project's setup: its
+    // initializationOptions and its workspace settings.
+    struct Options {
+        QJsonObject initialization;
+        QJsonObject settings;
+
+        bool operator==(const Options &) const = default;
+    };
+
+    // What the project's recipes add (see RecipeServers).
+    struct Additions {
+        // Servers of languages no server Duet knows serves (Angular's
+        // templates), chosen before those of the PATH.
+        QList<LanguageServerSpec> servers;
+        // Merged into the options of the server of that name: objects
+        // merged key by key, anything else replaced.
+        QHash<QString, Options> options;
+
+        bool operator==(const Additions &) const = default;
+    };
+
     explicit LanguageServers(QObject *parent = nullptr);
     ~LanguageServers() override;
 
@@ -51,9 +79,10 @@ public:
     // Stops the servers: they worked on the previous folder. Without a
     // project setup: the first server of each language in the PATH.
     void setFolder(const QString &folder);
-    // The project's folder and setup; `toolchains` finds Duet's downloads
-    // and the runtimes. Stops the servers if either changed.
-    void setProject(const ProjectConfig &project, Toolchains *toolchains);
+    // The project's folder and setup, and what its recipes add;
+    // `toolchains` finds Duet's downloads and the runtimes. Stops the
+    // servers if any of them changed.
+    void setProject(const ProjectConfig &project, Toolchains *toolchains, const Additions &additions = {});
     void setEnabled(bool enabled);
     // Stops every server and clears their diagnostics and tasks, which
     // emits diagnosticsChanged and tasksChanged. Called by the destructor:
@@ -148,18 +177,15 @@ public:
                                              const std::optional<JavaRuntime> &java,
                                              QString *error);
 
-    // What a server is told about the project's setup: its
-    // initializationOptions and its workspace settings. Public for tests.
-    struct Options {
-        QJsonObject initialization;
-        QJsonObject settings;
-    };
-
     // `runtimeHome` and `runtimeExecutable` are the project's JDK or Python.
+    // Public for tests.
     static Options optionsFor(const QString &server,
                               const LanguageSetup &setup,
                               const QString &runtimeHome,
                               const QString &runtimeExecutable);
+    // `options` with `added` merged in, as Additions::options are. Public
+    // for tests.
+    static Options merged(Options options, const Options &added);
 
 signals:
     void statusMessage(const QString &message);
@@ -173,6 +199,8 @@ signals:
 
 private:
     QString programPath(const QString &program) const;
+    // The servers Duet knows, then the recipes'.
+    QList<LanguageServerSpec> allSpecs() const;
     // The project's setup of `languageId`'s family, if it has one.
     const LanguageSetup *setupFor(const QString &languageId) const;
     // The command of `spec` for the project: Duet's download of the chosen
@@ -204,6 +232,7 @@ private:
 
     QString folder_;
     ProjectConfig project_;
+    Additions additions_;
     Toolchains *toolchains_ = nullptr;
     bool enabled_ = true;
     QHash<QString, LspClient *> clients_;                       // by server name

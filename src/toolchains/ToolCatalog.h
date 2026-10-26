@@ -60,6 +60,9 @@ struct DownloadSource {
     QString checksum;
     ChecksumAlgorithm algorithm = ChecksumAlgorithm::Sha256;
     ArchiveFormat format = ArchiveFormat::TarGz;
+    // ArchiveFormat::Npm: the packages installed ("@angular/language-server@22");
+    // empty: the ToolCatalog tool's npmPackages.
+    QStringList npmPackages;
     // Why it cannot be downloaded (no build for this platform...).
     QString error;
 

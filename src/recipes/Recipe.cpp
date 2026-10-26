@@ -15,6 +15,8 @@
 #include <QObject>
 #include <QUrl>
 
+#include <algorithm>
+
 namespace {
 
 QStringList stringsOf(const QJsonValue &value)
@@ -76,8 +78,22 @@ QString textOf(const QJsonObject &object, const char *key)
     return object.value(QLatin1String(key)).toString().trimmed();
 }
 
+// Packages npm installs, and checks: no archive, no checksum.
+DownloadSource npmSourceOf(const QJsonObject &entry, const QString &version)
+{
+    DownloadSource source;
+    source.format = ArchiveFormat::Npm;
+    for (QString package : stringsOf(entry.value(QStringLiteral("npm"))))
+        source.npmPackages.append(package.replace(QLatin1String(Recipes::versionPlaceholder), version));
+    if (source.npmPackages.isEmpty())
+        source.error = QObject::tr("its download has no npm package");
+    return source;
+}
+
 DownloadSource sourceOf(const QJsonObject &entry, const QString &version)
 {
+    if (entry.contains(QStringLiteral("npm")))
+        return npmSourceOf(entry, version);
     DownloadSource source;
     const QString url = textOf(entry, "url").replace(QLatin1String(Recipes::versionPlaceholder), version);
     source.url = QUrl(url);
@@ -146,6 +162,142 @@ QList<RecipePrompt> promptsOf(const QJsonValue &value)
     return prompts;
 }
 
+RecipeParameterValue parameterValueOf(const QJsonValue &item)
+{
+    if (!item.isObject())
+        return {.value = item.toVariant().toString().trimmed(), .variables = {}};
+    const QJsonObject object = item.toObject();
+    return {.value = textOf(object, "value"),
+            .variables = variablesOf(object.value(QStringLiteral("variables")).toObject())};
+}
+
+QList<RecipeParameter> parametersOf(const QJsonValue &value)
+{
+    QList<RecipeParameter> parameters;
+    for (const QJsonValue &item : value.toArray()) {
+        const QJsonObject object = item.toObject();
+        RecipeParameter parameter{.name = textOf(object, "name"), .title = textOf(object, "title"), .values = {}};
+        for (const QJsonValue &choice : object.value(QStringLiteral("values")).toArray()) {
+            if (const RecipeParameterValue entry = parameterValueOf(choice); !entry.value.isEmpty())
+                parameter.values.append(entry);
+        }
+        if (parameter.name.isEmpty() || parameter.values.isEmpty())
+            continue;
+        if (parameter.title.isEmpty())
+            parameter.title = parameter.name;
+        parameters.append(parameter);
+    }
+    return parameters;
+}
+
+QList<RecipeLanguageServer> languageServersOf(const QJsonValue &value)
+{
+    QList<RecipeLanguageServer> servers;
+    for (const QJsonValue &item : value.toArray()) {
+        const QJsonObject object = item.toObject();
+        const RecipeLanguageServer server{.name = textOf(object, "name"),
+                                          .tool = textOf(object, "tool"),
+                                          .script = textOf(object, "script"),
+                                          .arguments = stringsOf(object.value(QStringLiteral("arguments"))),
+                                          .languages = stringsOf(object.value(QStringLiteral("languages"))),
+                                          .triggerCharacters =
+                                              object.value(QStringLiteral("triggerCharacters")).toString()};
+        const bool isComplete =
+            !server.name.isEmpty() && !server.tool.isEmpty() && !server.script.isEmpty() && !server.languages.isEmpty();
+        if (isComplete)
+            servers.append(server);
+    }
+    return servers;
+}
+
+QMap<QString, RecipeServerOptions> serverOptionsOf(const QJsonObject &object)
+{
+    QMap<QString, RecipeServerOptions> options;
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        const QJsonObject server = it.value().toObject();
+        options.insert(it.key(), {.initialization = server.value(QStringLiteral("initialization")).toObject(),
+                                  .settings = server.value(QStringLiteral("settings")).toObject()});
+    }
+    return options;
+}
+
+// `text` with each {{name}} of `values` replaced.
+QString filled(QString text, const QMap<QString, QString> &values)
+{
+    for (auto it = values.cbegin(); it != values.cend(); ++it)
+        text.replace(QStringLiteral("{{%1}}").arg(it.key()), it.value());
+    return text;
+}
+
+QStringList filled(QStringList texts, const QMap<QString, QString> &values)
+{
+    for (QString &text : texts)
+        text = filled(text, values);
+    return texts;
+}
+
+QMap<QString, QString> filled(QMap<QString, QString> map, const QMap<QString, QString> &values)
+{
+    for (QString &text : map)
+        text = filled(text, values);
+    return map;
+}
+
+QJsonValue filled(const QJsonValue &json, const QMap<QString, QString> &values);
+
+QJsonObject filled(QJsonObject object, const QMap<QString, QString> &values)
+{
+    for (auto it = object.begin(); it != object.end(); ++it)
+        it.value() = filled(it.value(), values);
+    return object;
+}
+
+QJsonValue filled(const QJsonValue &json, const QMap<QString, QString> &values)
+{
+    if (json.isString())
+        return filled(json.toString(), values);
+    if (json.isObject())
+        return filled(json.toObject(), values);
+    if (!json.isArray())
+        return json;
+    QJsonArray array;
+    for (const QJsonValue &item : json.toArray())
+        array.append(filled(item, values));
+    return array;
+}
+
+void fillDownload(DownloadSource &source, const QMap<QString, QString> &values)
+{
+    source.url = QUrl(filled(source.url.toString(), values));
+    source.fileName = filled(source.fileName, values);
+    source.checksumUrl = QUrl(filled(source.checksumUrl.toString(), values));
+    source.npmPackages = filled(source.npmPackages, values);
+}
+
+void fillRequirement(RecipeRequirement &requirement, const QMap<QString, QString> &values)
+{
+    requirement.tool.version = filled(requirement.tool.version, values);
+    requirement.tool.check = filled(requirement.tool.check, values);
+    if (requirement.tool.download)
+        fillDownload(*requirement.tool.download, values);
+    requirement.pathFolders = filled(requirement.pathFolders, values);
+    requirement.variables = filled(requirement.variables, values);
+}
+
+// The placeholders of `parameters` for the values `chosen` gives them.
+QMap<QString, QString> placeholdersOf(const QList<RecipeParameter> &parameters, const QMap<QString, QString> &chosen)
+{
+    QMap<QString, QString> placeholders;
+    for (const RecipeParameter &parameter : parameters) {
+        const QString wanted = chosen.value(parameter.name);
+        const auto found = std::ranges::find(parameter.values, wanted, &RecipeParameterValue::value);
+        const RecipeParameterValue &value = found != parameter.values.end() ? *found : parameter.values.first();
+        placeholders.insert(parameter.name, value.value);
+        placeholders.insert(value.variables);
+    }
+    return placeholders;
+}
+
 // The "run" array, read as .duet/run.json's "configurations".
 QList<RunConfiguration> runConfigurationsOf(const QJsonValue &value)
 {
@@ -211,6 +363,33 @@ std::optional<RunConfiguration> Recipe::setupConfigurationFor(const QString &ide
                             .detected = false};
 }
 
+Recipe Recipe::withValues(const QMap<QString, QString> &chosen) const
+{
+    Recipe recipe = *this;
+    recipe.values = placeholdersOf(parameters, chosen);
+    const QMap<QString, QString> &placeholders = recipe.values;
+    if (placeholders.isEmpty())
+        return recipe;
+    for (RecipeRequirement &requirement : recipe.requirements)
+        fillRequirement(requirement, placeholders);
+    for (RunConfiguration &configuration : recipe.runConfigurations) {
+        configuration.command = filled(configuration.command, placeholders);
+        configuration.folder = filled(configuration.folder, placeholders);
+        configuration.environment = filled(configuration.environment, placeholders);
+    }
+    recipe.setupCommands = filled(recipe.setupCommands, placeholders);
+    for (RecipePrompt &prompt : recipe.prompts)
+        prompt.text = filled(prompt.text, placeholders);
+    recipe.instructions = filled(recipe.instructions, placeholders);
+    for (RecipeLanguageServer &server : recipe.languageServers)
+        server.arguments = filled(server.arguments, placeholders);
+    for (RecipeServerOptions &options : recipe.serverOptions) {
+        options.initialization = filled(options.initialization, placeholders);
+        options.settings = filled(options.settings, placeholders);
+    }
+    return recipe;
+}
+
 namespace Recipes {
 
 std::optional<Recipe> parse(const QByteArray &recipeJson, const QString &folder, QString *error)
@@ -238,6 +417,9 @@ std::optional<Recipe> parse(const QByteArray &recipeJson, const QString &folder,
     recipe.runConfigurations = runConfigurationsOf(object.value(QStringLiteral("run")));
     recipe.setupCommands = stringsOf(object.value(QStringLiteral("setup")));
     recipe.prompts = promptsOf(object.value(QStringLiteral("prompts")));
+    recipe.parameters = parametersOf(object.value(QStringLiteral("parameters")));
+    recipe.languageServers = languageServersOf(object.value(QStringLiteral("languageServers")));
+    recipe.serverOptions = serverOptionsOf(object.value(QStringLiteral("serverOptions")).toObject());
     return recipe;
 }
 

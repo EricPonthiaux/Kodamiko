@@ -4,6 +4,7 @@
 
 #include <QDateTime>
 #include <QList>
+#include <QMap>
 #include <QString>
 #include <QStringList>
 #include <QVariantMap>
@@ -47,6 +48,10 @@ struct ProjectConfig {
     // the tools the recipe requires downloaded, then its setup commands
     // succeeded (see Recipe::setupCommands).
     bool needsRecipeSetup = false;
+    // The values its recipes' parameters were given when it was created,
+    // by parameter ("angular": "22"); a parameter left out takes its
+    // first value (see Recipe::withValues).
+    QMap<QString, QString> recipeValues;
 
     // The ids of the recipes attached to its enabled languages, in their
     // order.

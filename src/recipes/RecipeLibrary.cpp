@@ -104,7 +104,7 @@ QList<Recipe> recipesOf(const ProjectConfig &project, QStringList *missing)
     QList<Recipe> recipes;
     for (const QString &id : project.recipes()) {
         if (const auto found = byId.constFind(id); found != byId.cend())
-            recipes.append(*found);
+            recipes.append(found->withValues(project.recipeValues));
         else if (missing)
             missing->append(id);
     }

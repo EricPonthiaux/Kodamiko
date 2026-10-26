@@ -42,7 +42,8 @@ QList<Recipe> forLanguage(const QList<Recipe> &recipes, const QString &family);
 // The recipe `id`, whatever its systems; nullopt when no folder has it.
 std::optional<Recipe> find(const RecipeSources &sources, const QString &id);
 // The recipes of `project`'s enabled languages (ProjectConfig::recipes),
-// found in its default sources. The ids no folder has are added to
+// found in its default sources, with the values of its parameters
+// (ProjectConfig::recipeValues). The ids no folder has are added to
 // `missing` when given.
 QList<Recipe> recipesOf(const ProjectConfig &project, QStringList *missing = nullptr);
 // The requirements of `project`'s recipes, in their order; none for a

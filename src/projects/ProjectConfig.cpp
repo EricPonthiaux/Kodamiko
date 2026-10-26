@@ -51,6 +51,15 @@ constexpr QLatin1StringView configuredKey("configured");
 constexpr QLatin1StringView languagesKey("languages");
 constexpr QLatin1StringView needsRecipeSetupKey("needsRecipeSetup");
 constexpr QLatin1StringView agentCheckCommandKey("agentCheckCommand");
+constexpr QLatin1StringView recipeValuesKey("recipeValues");
+
+QVariantMap variantOf(const QMap<QString, QString> &map)
+{
+    QVariantMap variant;
+    for (auto it = map.cbegin(); it != map.cend(); ++it)
+        variant.insert(it.key(), it.value());
+    return variant;
+}
 
 } // namespace
 
@@ -109,6 +118,7 @@ QVariantMap ProjectConfig::toVariant() const
         {languagesKey, list},
         {agentCheckCommandKey, agentCheckCommand},
         {needsRecipeSetupKey, needsRecipeSetup},
+        {recipeValuesKey, variantOf(recipeValues)},
     };
 }
 
@@ -123,6 +133,9 @@ ProjectConfig ProjectConfig::fromVariant(const QString &path, const QVariantMap 
         config.languages.append(LanguageSetup::fromVariant(entry.toMap()));
     config.agentCheckCommand = map.value(agentCheckCommandKey).toString();
     config.needsRecipeSetup = map.value(needsRecipeSetupKey).toBool();
+    const QVariantMap values = map.value(recipeValuesKey).toMap();
+    for (auto it = values.cbegin(); it != values.cend(); ++it)
+        config.recipeValues.insert(it.key(), it.value().toString());
     return config;
 }
 

@@ -14,6 +14,7 @@
 #include "workspace/ChoicePopup.h"
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDir>
 #include <QEvent>
 #include <QFileDialog>
@@ -25,6 +26,8 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace {
 
@@ -51,6 +54,8 @@ NewProjectForm::NewProjectForm(QWidget *parent)
     , location_(new QLineEdit(this))
     , recipeList_(new QListWidget(this))
     , description_(new QLabel(this))
+    , parametersLabel_(fieldLabel(tr("With"), this))
+    , parameters_(new QWidget(this))
     , git_(new QCheckBox(tr("Create a Git repository"), this))
 {
     connect(header_, &PopupHeader::closeRequested, this, &NewProjectForm::cancelled);
@@ -89,6 +94,13 @@ QWidget *NewProjectForm::createBody()
     for (const QLineEdit *field : {name_, location_})
         connect(field, &QLineEdit::textChanged, this, &NewProjectForm::updateState);
     connect(recipeList_, &QListWidget::currentItemChanged, this, &NewProjectForm::updateState);
+    connect(recipeList_, &QListWidget::currentItemChanged, this, &NewProjectForm::showParameters);
+    auto *parameterRow = new QHBoxLayout(parameters_);
+    parameterRow->setContentsMargins(0, 0, 0, 0);
+    parameterRow->setSpacing(8);
+    // No stretch to keep them left: deleting the boxes empties the row.
+    parameterRow->setAlignment(Qt::AlignLeft);
+    showParameters();
     connect(name_, &QLineEdit::returnPressed, this, &NewProjectForm::create);
 
     auto *grid = new QGridLayout(body);
@@ -103,7 +115,9 @@ QWidget *NewProjectForm::createBody()
     grid->addWidget(fieldLabel(tr("Start with"), body), 2, 0, Qt::AlignTop);
     grid->addWidget(recipeList_, 2, 1, 1, 2);
     grid->addWidget(description_, 3, 1, 1, 2);
-    grid->addWidget(git_, 4, 1, 1, 2);
+    grid->addWidget(parametersLabel_, 4, 0);
+    grid->addWidget(parameters_, 4, 1, 1, 2);
+    grid->addWidget(git_, 5, 1, 1, 2);
     grid->setRowStretch(2, 1);
     grid->setColumnStretch(1, 1);
     return body;
@@ -190,14 +204,45 @@ const Recipe *NewProjectForm::selectedRecipe() const
     return row >= 0 && row < recipes_.size() ? &recipes_.at(row) : nullptr;
 }
 
+void NewProjectForm::showParameters()
+{
+    // Deleted, a widget leaves its layout.
+    qDeleteAll(parameters_->findChildren<QWidget *>(Qt::FindDirectChildrenOnly));
+    parameterBoxes_.clear();
+    const Recipe *recipe = selectedRecipe();
+    const QList<RecipeParameter> parameters = recipe ? recipe->parameters : QList<RecipeParameter>();
+    for (const RecipeParameter &parameter : parameters) {
+        auto *box = new QComboBox(parameters_);
+        for (const RecipeParameterValue &value : parameter.values)
+            box->addItem(value.value);
+        parameters_->layout()->addWidget(new QLabel(parameter.title, parameters_));
+        parameters_->layout()->addWidget(box);
+        parameterBoxes_.append(box);
+    }
+    parametersLabel_->setVisible(!parameters.isEmpty());
+    parameters_->setVisible(!parameters.isEmpty());
+}
+
+QMap<QString, QString> NewProjectForm::chosenValues() const
+{
+    QMap<QString, QString> values;
+    const Recipe *recipe = selectedRecipe();
+    if (!recipe)
+        return values;
+    for (qsizetype i = 0; i < std::min(recipe->parameters.size(), parameterBoxes_.size()); ++i)
+        values.insert(recipe->parameters.at(i).name, parameterBoxes_.at(i)->currentText());
+    return values;
+}
+
 void NewProjectForm::create()
 {
     const Recipe *recipe = selectedRecipe();
     if (!recipe || !problem().isEmpty())
         return;
     const QString folder = targetFolder();
+    const QMap<QString, QString> values = chosenValues();
     QString error;
-    if (!ProjectCreation::create(*recipe, folder, &error)) {
+    if (!ProjectCreation::create(recipe->withValues(values), folder, &error)) {
         Paragraph::setText(summary_, error);
         return;
     }
@@ -214,6 +259,7 @@ void NewProjectForm::create()
         setup.language = recipe->language;
         setup.recipe = recipe->id;
         project.languages.append(setup);
+        project.recipeValues = values;
         project.needsRecipeSetup = true;
         ProjectStore::save(project);
     }

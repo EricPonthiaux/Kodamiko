@@ -24,12 +24,14 @@
 #include "projects/NewInstance.h"
 #include "projects/ProjectStore.h"
 #include "recipes/RecipeLibrary.h"
+#include "recipes/RecipeServers.h"
 #include "run/Runner.h"
 #include "search/FindInFilesPopup.h"
 #include "settings/PreferencesPopup.h"
 #include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/InstallPlan.h"
+#include "toolchains/Toolchains.h"
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/UiIcons.h"
@@ -46,6 +48,16 @@
 #include <QSettings>
 
 #include <algorithm>
+
+namespace {
+
+// The servers and server options of `project`'s recipes.
+LanguageServers::Additions recipeServers(const ProjectConfig &project, const Toolchains &toolchains)
+{
+    return RecipeServers::additionsOf(RecipeLibrary::recipesOf(project), project.path, toolchains);
+}
+
+} // namespace
 
 void MainWindow::openFolder(const QString &folder)
 {
@@ -73,7 +85,7 @@ void MainWindow::openFolder(const QString &folder)
         project_.configured = true;
         ProjectStore::save(project_);
     }
-    languageServers_->setProject(project_, toolchains_.get());
+    languageServers_->setProject(project_, toolchains_.get(), recipeServers(project_, *toolchains_));
     warmUpLanguageServers();
     if (preferencesPopup_)
         preferencesPopup_->setInstalledServers(languageServers_->installed());
@@ -261,7 +273,7 @@ void MainWindow::applyProject(const ProjectConfig &project)
         return; // another project's downloads, finished after a switch
     const bool recipesChanged = project.recipes() != project_.recipes();
     project_ = project;
-    languageServers_->setProject(project_, toolchains_.get());
+    languageServers_->setProject(project_, toolchains_.get(), recipeServers(project_, *toolchains_));
     runner_->setProject(project_, toolchains_.get());
     // Its runtimes may have been downloaded just now.
     loadProjectRecipes();

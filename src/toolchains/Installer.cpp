@@ -55,6 +55,18 @@ void makeExecutable(const QString &path)
     QFile::setPermissions(path, QFile::permissions(path) | QFile::ExeOwner | QFile::ExeGroup | QFile::ExeOther);
 }
 
+// What npm installs: a recipe's packages, else the catalog's `spec` at
+// `version`.
+QStringList npmPackagesOf(const DownloadSource &source, const ToolSpec *spec, const QString &version)
+{
+    if (!source.npmPackages.isEmpty() || !spec)
+        return source.npmPackages;
+    QStringList packages;
+    for (QString package : spec->npmPackages)
+        packages.append(package.replace(QStringLiteral("{version}"), version));
+    return packages;
+}
+
 } // namespace
 
 Installer::Installer(Toolchains *toolchains, QObject *parent)
@@ -208,7 +220,7 @@ void Installer::download(const DownloadSource &source)
         return;
     }
     if (source.format == ArchiveFormat::Npm) {
-        installNpm();
+        installNpm(source);
         return;
     }
     if (!source.checksum.isEmpty() || source.checksumUrl.isEmpty()) {
@@ -319,15 +331,20 @@ void Installer::extract(const DownloadSource &source, const QString &archive)
     process->start(command.first(), command.mid(1));
 }
 
-void Installer::installNpm()
+void Installer::installNpm(const DownloadSource &source)
 {
     const InstallStep step = steps_.at(index_);
     const ToolSpec *spec = ToolCatalog::find(step.tool);
     const int minimumNode = spec ? spec->minimumRuntime : 0;
     const std::optional<RuntimeInstall> node = toolchains_->runtimeAtLeast(QStringLiteral("node"), minimumNode);
     const QString npm = node ? Toolchains::npmScript(*node) : QString();
-    if (!spec || !node || npm.isEmpty()) {
+    if (!node || npm.isEmpty()) {
         fail(tr("%1 needs Node.js %2 or newer with npm").arg(step.tool).arg(minimumNode));
+        return;
+    }
+    const QStringList packages = npmPackagesOf(source, spec, step.version);
+    if (packages.isEmpty()) {
+        fail(tr("Duet does not know which npm packages make %1").arg(step.tool));
         return;
     }
     const QString content = stagingFolder() + QStringLiteral("/content");
@@ -339,8 +356,7 @@ void Installer::installNpm()
                           QStringLiteral("--no-audit"),
                           QStringLiteral("--no-fund"),
                           QStringLiteral("--loglevel=error")};
-    for (QString package : spec->npmPackages)
-        arguments.append(package.replace(QStringLiteral("{version}"), step.version));
+    arguments.append(packages);
 
     auto *process = new QProcess(this);
     process_ = process;

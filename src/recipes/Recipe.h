@@ -6,6 +6,7 @@
 #include "toolchains/InstallPlan.h"
 
 #include <QByteArray>
+#include <QJsonObject>
 #include <QList>
 #include <QMap>
 #include <QString>
@@ -48,6 +49,53 @@ struct RecipePrompt {
     bool operator==(const RecipePrompt &) const = default;
 };
 
+// One value a recipe's parameter offers, and the placeholders it sets with
+// it: Angular 22 comes with TypeScript 6.0, Angular 21 with 5.9.
+struct RecipeParameterValue {
+    QString value;                    // "22"
+    QMap<QString, QString> variables; // {"typescript": "~6.0.0"}
+
+    bool operator==(const RecipeParameterValue &) const = default;
+};
+
+// A choice the new project is made with ("angular": the Angular version),
+// offered when it is created and kept in the project
+// (ProjectConfig::recipeValues). {{name}} stands for the value chosen, in
+// the recipe's files, requirements, commands and servers.
+struct RecipeParameter {
+    QString name;                       // "angular"
+    QString title;                      // "Angular"
+    QList<RecipeParameterValue> values; // the first one by default
+
+    bool operator==(const RecipeParameter &) const = default;
+};
+
+// A language server the recipe brings for languages Duet has none for
+// (Angular's templates): a Node script of a tool the recipe requires.
+struct RecipeLanguageServer {
+    QString name; // "angular"
+    QString tool; // the requirement that installs it
+    // In the tool's folder, run with Node.
+    QString script;
+    // "{{home}}" stands for the tool's folder, "{{project}}" for the
+    // project's.
+    QStringList arguments;
+    QStringList languages; // LanguageRegistry identifiers: "html"
+    QString triggerCharacters;
+
+    bool operator==(const RecipeLanguageServer &) const = default;
+};
+
+// What a recipe adds to the options of a server Duet knows (the plugin
+// of tsserver); "{{project}}" in their texts stands for the project's
+// folder.
+struct RecipeServerOptions {
+    QJsonObject initialization;
+    QJsonObject settings;
+
+    bool operator==(const RecipeServerOptions &) const = default;
+};
+
 // How to make one kind of project on one system (a Qt Widgets application
 // with MSVC on Windows, a Python package...): its first files, its
 // commands, its environment, and what the agent is told and can do there.
@@ -83,6 +131,13 @@ struct Recipe {
     QStringList setupCommands;
     QList<RecipePrompt> prompts;
     QString instructions;
+    QList<RecipeParameter> parameters;
+    // The placeholders withValues() replaced, by name ("angular": "22",
+    // "typescript": "~6.0.0"): the new project's files get them too.
+    QMap<QString, QString> values;
+    QList<RecipeLanguageServer> languageServers;
+    // By the name of a server Duet knows ("typescript-language-server").
+    QMap<QString, RecipeServerOptions> serverOptions;
 
     // The folder of the recipe's skills for the agent (--plugin-dir), empty
     // when it has none.
@@ -96,6 +151,11 @@ struct Recipe {
     // Its setup commands as one configuration, run in the project's root
     // with {{identifier}} replaced; nullopt when it has none.
     std::optional<RunConfiguration> setupConfigurationFor(const QString &identifier) const;
+    // The recipe with each parameter's placeholders replaced, in its
+    // requirements, commands, prompts, instructions and servers: by the
+    // value `chosen` gives the parameter when it is one of its values, else
+    // by its first value. Kept in `values` for the files.
+    Recipe withValues(const QMap<QString, QString> &chosen) const;
 };
 
 namespace Recipes {
@@ -109,6 +169,9 @@ constexpr auto homePlaceholder = "{{home}}";
 // "checksumUrl".
 constexpr auto versionPlaceholder = "{{version}}";
 constexpr auto urlPlaceholder = "{{url}}";
+// The placeholder of the project's folder in a server's arguments and
+// options.
+constexpr auto projectPlaceholder = "{{project}}";
 // The name of the setup configuration, its terminal's title.
 constexpr auto setupName = "Recipe Setup";
 
@@ -128,12 +191,20 @@ constexpr auto setupName = "Recipe Setup";
 //                  "systems": ["linux"], "path": ["{{home}}/bin"],
 //                  "variables": {"CMAKE_PREFIX_PATH": "{{home}}"}}],
 //    "run": [run.json configurations], "setup": ["npm install"],
-//    "prompts": [{"title", "text"}]}
+//    "prompts": [{"title", "text"}],
+//    "parameters": [{"name": "angular", "title": "Angular",
+//                    "values": [{"value": "22", "variables": {"typescript": "~6.0.0"}}, "21"]}],
+//    "languageServers": [{"name": "angular", "tool": "angular-language-server",
+//                         "script": "node_modules/@angular/language-server/index.js",
+//                         "arguments": ["--stdio"], "languages": ["html"], "triggerCharacters": "<."}],
+//    "serverOptions": {"typescript-language-server": {"initialization": {...}, "settings": {...}}}}
 // A download is chosen for this system and processor: "windows-x64",
 // "linux-aarch64"..., else "windows", "linux", "macos", else "any". It
 // gives a "checksum" (the hash itself) or a "checksumUrl"; "algorithm" is
 // "sha256" (the default) or "sha512"; "format" ("zip", "tar.gz", "7z") is
-// read from the URL when it is not given. A download without a checksum
+// read from the URL when it is not given. A download of "npm" packages
+// ({{version}} in their names) is installed with npm, checked by npm. A
+// download without a checksum
 // or a known format is kept with its error, which the install plan shows.
 // Nullopt, with `error` saying why, when it is not a JSON object with a
 // title.

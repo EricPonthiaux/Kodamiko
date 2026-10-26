@@ -228,6 +228,7 @@ add_library(duet_core STATIC
     recipes/Recipe.cpp
     recipes/RecipeLibrary.cpp
     recipes/RecipeSchema.cpp
+    recipes/RecipeServers.cpp
     recipes/RecipeSetup.cpp
     run/BuildOutputParser.cpp
     run/RunConfiguration.cpp

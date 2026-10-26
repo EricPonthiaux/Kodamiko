@@ -9,8 +9,10 @@
   <link rel="icon" href="assets/duet-icon.svg" type="image/svg+xml">
   <link rel="alternate" hreflang="en" href="./">
   <link rel="alternate" hreflang="fr" href="fr/">
-  <link rel="preload" href="assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/site.js" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -27,17 +29,72 @@
 
   <main>
     <section class="hero">
+      <div class="hero-dots" aria-hidden="true"></div>
       <div class="container">
-        <p class="eyebrow">Free and open source code editor</p>
-        <h1>Built around Claude Code, <span class="accent">not added later</span></h1>
-        <p class="lead">Most editors were designed for a human typing code, and AI was added later: a chat panel on the side, or an agent in a terminal that cannot see your editor. Duet starts from the other end: a full code editor built around Claude Code, where Claude sees what you see, and you see everything Claude changes.</p>
+        <a class="badge" href="https://github.com/EricPonthiaux/Duet"><span class="badge-tag">GPL v3</span>Free and open source · Linux, Windows and macOS</a>
+        <h1>Built around Claude Code,<br> <span class="accent">not added later</span><span class="cursor" aria-hidden="true"></span></h1>
+        <p class="lead">A full code editor designed for Claude from the start. Claude sees what you see — the open file, the selection, the errors — and you see everything Claude changes, before it lands.</p>
         <div class="actions">
           <a class="button primary" href="#get-started">Get started</a>
-          <a class="button" href="https://github.com/EricPonthiaux/Duet">View on GitHub</a>
+          <div class="clone">
+            <code>git clone https://github.com/EricPonthiaux/Duet.git</code>
+            <button class="copy" type="button" aria-label="Copy the command" data-command="git clone https://github.com/EricPonthiaux/Duet.git">
+              <svg class="idle" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <svg class="done" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            </button>
+          </div>
         </div>
-        <p class="platforms">Open source · Linux, Windows and macOS</p>
-        <figure class="screenshot">
-          <img src="assets/screenshots/edit.png" width="1600" height="1000" alt="Duet's Edit mode: the project tree, a C++ file with syntax highlighting, and the Claude Code session beside it.">
+        <figure class="demo" role="img" aria-label="Duet at work: asked to “fix this”, Claude reads the error under the cursor, finds the right symbol, fixes the line, rebuilds without errors and offers to review the diff.">
+          <div class="demo-titlebar">
+            <div class="demo-lights"><span></span><span></span><span></span></div>
+            <div class="demo-modes"><span class="current">Edit</span><span>Diff</span><span>Diagram</span></div>
+            <span class="demo-path">duet — ~/src/duet</span>
+          </div>
+          <div class="demo-workspace">
+            <div class="demo-tree">
+              <div class="folder">▾ src</div>
+              <div style="--depth: 1">▸ agent</div>
+              <div class="folder" style="--depth: 1">▾ editor</div>
+              <div style="--depth: 2">Document.cpp</div>
+              <div class="current" style="--depth: 2">EditorWidget.cpp</div>
+              <div style="--depth: 2">EditorWidget.h</div>
+              <div style="--depth: 1">▸ git</div>
+              <div style="--depth: 1">▸ diagram</div>
+              <div style="--depth: 1">▸ terminal</div>
+              <div>▸ tests</div>
+              <div>CMakeLists.txt</div>
+            </div>
+            <div class="demo-code">
+              <div class="demo-tabs"><span class="current">EditorWidget.cpp</span><span>Document.h</span></div>
+              <div class="demo-source">
+                <div><span class="ln">38</span><span class="kw">void</span> <span class="ty">EditorWidget</span>::<span class="fn">highlightOccurrences</span>()</div>
+                <div><span class="ln">39</span>{</div>
+                <div><span class="ln">40</span>    <span class="kw">const</span> <span class="ty">QString</span> name = wordAtCursor();</div>
+                <div><span class="ln">41</span>    <span class="kw">if</span> (name.isEmpty())</div>
+                <div><span class="ln">42</span>        <span class="kw">return</span>;</div>
+                <div class="removed"><span class="ln">43</span>    <span class="kw">const auto</span> ranges = findOccurrences(name, <span class="error">lineCount</span>);</div>
+                <div class="added"><span class="ln">+</span>    <span class="kw">const auto</span> ranges = findOccurrences(name, document()-&gt;lineCount());</div>
+                <div><span class="ln">44</span>    <span class="kw">for</span> (<span class="kw">const auto</span> &amp;range : ranges)</div>
+                <div><span class="ln">45</span>        indicate(range, <span class="ty">Indicator</span>::Occurrence);</div>
+                <div><span class="ln">46</span>}</div>
+              </div>
+            </div>
+            <div class="demo-claude">
+              <div class="demo-claude-header">Claude Code<span class="context">sees EditorWidget.cpp:43</span></div>
+              <div class="demo-transcript">
+                <div class="demo-prompt"><span style="--chars: 8">fix this</span></div>
+                <div class="demo-tool demo-step-1"><span><b>get_diagnostics</b><br>1 error · ‘lineCount’ was not declared</span></div>
+                <div class="demo-tool demo-step-2"><span><b>find_symbol</b> lineCount<br>→ Document::lineCount()</span></div>
+                <div class="demo-tool demo-step-3"><span><b>edit</b> EditorWidget.cpp <span class="plus">+1</span> <span class="minus">−1</span></span></div>
+                <div class="demo-tool demo-step-4"><span><b>run_command</b> Build debug<br>0 errors, 0 warnings</span></div>
+                <div class="demo-answer demo-step-5">
+                  Fixed: <code>lineCount()</code> belongs to the document, not the widget. A snapshot was taken first.
+                  <div class="demo-answer-actions"><span class="primary">Review diff</span><span>Undo all</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-statusbar"><span>⎇ main</span><span>clangd</span><span class="position">Ln 43, Col 52</span><span>C++</span></div>
         </figure>
       </div>
     </section>

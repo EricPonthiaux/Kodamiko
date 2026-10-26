@@ -66,7 +66,7 @@ private:
                        const QString &archive,
                        const QString &expectedChecksum);
     void extract(const DownloadSource &source, const QString &archive);
-    void installNpm();
+    void installNpm(const DownloadSource &source);
     void installQt();
     // Moves `content` to `target` and marks it complete.
     void complete(const QString &content, const QString &target);

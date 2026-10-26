@@ -1,0 +1,104 @@
+{
+    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
+    "title": "Angular · TypeScript",
+    "language": "javascript",
+    "description": "An Angular application of the version chosen below (standalone components, signals, no zone.js), built with the Angular CLI and Node.js 24 (downloaded if the machine has none). Angular's language server completes and checks the .html templates. Debug serves the development build, with source maps, and opens it in the browser.",
+    "parameters": [
+        {
+            "name": "angular",
+            "title": "Angular",
+            "values": [
+                {
+                    "value": "22",
+                    "variables": {
+                        "typescript": "~6.0.0"
+                    }
+                },
+                {
+                    "value": "21",
+                    "variables": {
+                        "typescript": "~5.9.0"
+                    }
+                },
+                {
+                    "value": "20",
+                    "variables": {
+                        "typescript": "~5.9.0"
+                    }
+                }
+            ]
+        }
+    ],
+    "requires": [
+        {
+            "tool": "node",
+            "version": "24",
+            "path": [
+                "{{home}}/bin",
+                "{{home}}"
+            ]
+        },
+        {
+            "tool": "angular-language-server",
+            "version": "{{angular}}",
+            "download": {
+                "any": {
+                    "npm": [
+                        "@angular/language-server@{{version}}"
+                    ],
+                    "check": "node_modules/@angular/language-server/index.js"
+                }
+            }
+        }
+    ],
+    "languageServers": [
+        {
+            "name": "angular",
+            "tool": "angular-language-server",
+            "script": "node_modules/@angular/language-server/index.js",
+            "arguments": [
+                "--stdio",
+                "--tsProbeLocations",
+                "{{project}},{{home}}",
+                "--ngProbeLocations",
+                "{{project}},{{home}}"
+            ],
+            "languages": [
+                "html"
+            ],
+            "triggerCharacters": "<.*[($|@"
+        }
+    ],
+    "serverOptions": {
+        "typescript-language-server": {
+            "initialization": {
+                "plugins": [
+                    {
+                        "name": "@angular/language-service",
+                        "location": "{{project}}"
+                    }
+                ]
+            }
+        }
+    },
+    "run": [
+        {
+            "name": "Build",
+            "kind": "build",
+            "command": "npm run build"
+        },
+        {
+            "name": "Run",
+            "kind": "run",
+            "command": "npm start"
+        },
+        {
+            "name": "Debug",
+            "kind": "debug",
+            "command": "npm start -- --open"
+        }
+    ],
+    "setup": [
+        "npm install"
+    ]
+}

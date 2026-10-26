@@ -25,17 +25,25 @@ bool writeFile(const QString &path, const QByteArray &content, QString *error)
     return true;
 }
 
-// `content` with the placeholder replaced; a binary file (an icon) as is.
-QByteArray filled(const QByteArray &content, const QString &identifier)
+// `text` with each {{name}} of `placeholders` replaced.
+QString filled(QString text, const QMap<QString, QString> &placeholders)
+{
+    for (auto it = placeholders.cbegin(); it != placeholders.cend(); ++it)
+        text.replace(QStringLiteral("{{%1}}").arg(it.key()), it.value());
+    return text;
+}
+
+// `content` with the placeholders replaced; a binary file (an icon) as is.
+QByteArray filled(const QByteArray &content, const QMap<QString, QString> &placeholders)
 {
     if (content.contains('\0'))
         return content;
-    return QString::fromUtf8(content).replace(QLatin1String(Recipes::identifierPlaceholder), identifier).toUtf8();
+    return filled(QString::fromUtf8(content), placeholders).toUtf8();
 }
 
-// Copies the files of `source` into `folder`, the placeholder replaced in
+// Copies the files of `source` into `folder`, the placeholders replaced in
 // their paths and texts.
-bool copyFiles(const QString &source, const QString &folder, const QString &identifier, QString *error)
+bool copyFiles(const QString &source, const QString &folder, const QMap<QString, QString> &placeholders, QString *error)
 {
     QDirIterator files(source, QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (files.hasNext()) {
@@ -45,9 +53,8 @@ bool copyFiles(const QString &source, const QString &folder, const QString &iden
             *error = QObject::tr("Cannot read %1: %2").arg(QDir::toNativeSeparators(path), file.errorString());
             return false;
         }
-        const QString relative =
-            QDir(source).relativeFilePath(path).replace(QLatin1String(Recipes::identifierPlaceholder), identifier);
-        if (!writeFile(QDir(folder).filePath(relative), filled(file.readAll(), identifier), error))
+        const QString relative = filled(QDir(source).relativeFilePath(path), placeholders);
+        if (!writeFile(QDir(folder).filePath(relative), filled(file.readAll(), placeholders), error))
             return false;
     }
     return true;
@@ -87,8 +94,10 @@ QString identifierOf(const QString &name)
     return identifier;
 }
 
-bool create(const Recipe &recipe, const QString &folder, QString *error)
+bool create(const Recipe &given, const QString &folder, QString *error)
 {
+    // The values given, else the parameters' first ones.
+    const Recipe recipe = given.withValues(given.values);
     if (!isFreeFolder(folder)) {
         *error = QObject::tr("%1 already exists and is not an empty folder").arg(QDir::toNativeSeparators(folder));
         return false;
@@ -98,7 +107,10 @@ bool create(const Recipe &recipe, const QString &folder, QString *error)
         return false;
     }
     const QString identifier = identifierOf(QFileInfo(folder).fileName());
-    if (!copyFiles(QDir(recipe.folder).filePath(QStringLiteral("files")), folder, identifier, error))
+    // {{identifier}} and the parameters' values ({{angular}}).
+    QMap<QString, QString> placeholders = recipe.values;
+    placeholders.insert(QStringLiteral("identifier"), identifier);
+    if (!copyFiles(QDir(recipe.folder).filePath(QStringLiteral("files")), folder, placeholders, error))
         return false;
     const QString runFile = RunConfigurations::filePath(folder);
     if (recipe.runConfigurations.isEmpty() || QFileInfo::exists(runFile))

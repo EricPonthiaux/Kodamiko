@@ -18,6 +18,7 @@
 #include <QUrl>
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 
 namespace {
@@ -53,6 +54,18 @@ QString jdtlsConfiguration(OperatingSystem system)
         return QStringLiteral("config_linux");
     }
     return {};
+}
+
+// The first of `specs` serving `languageId` whose program `programOf`
+// finds.
+std::optional<LanguageServerSpec> firstServing(const QList<LanguageServerSpec> &specs,
+                                               const QString &languageId,
+                                               const std::function<QString(const LanguageServerSpec &)> &programOf)
+{
+    const auto found = std::ranges::find_if(specs, [&](const LanguageServerSpec &spec) {
+        return spec.languages.contains(languageId) && !programOf(spec).isEmpty();
+    });
+    return found == specs.end() ? std::nullopt : std::optional(*found);
 }
 
 } // namespace
@@ -115,8 +128,15 @@ const LanguageSetup *LanguageServers::setupFor(const QString &languageId) const
     return family.isEmpty() ? nullptr : project_.language(family);
 }
 
+QList<LanguageServerSpec> LanguageServers::allSpecs() const
+{
+    return known() + additions_.servers;
+}
+
 QString LanguageServers::programFor(const LanguageServerSpec &spec) const
 {
+    if (spec.isNodeScript)
+        return QFileInfo::exists(spec.program) ? spec.program : QString();
     for (const LanguageSetup &setup : project_.languages) {
         if (setup.server != spec.name || !toolchains_ ||
             setup.serverVersion == QLatin1String(ProjectLanguages::systemVersion))
@@ -142,24 +162,24 @@ std::optional<LanguageServerSpec> LanguageServers::findSpec(const QString &langu
         // The project chose: that server or none.
         if (!setup->enabled || setup->server.isEmpty())
             return std::nullopt;
-        for (const LanguageServerSpec &spec : known()) {
-            if (spec.name == setup->server && spec.languages.contains(languageId) && !programFor(spec).isEmpty())
-                return spec;
-        }
-        return std::nullopt;
+        return firstServing(known(), languageId, [&](const LanguageServerSpec &spec) {
+            return spec.name == setup->server ? programFor(spec) : QString();
+        });
     }
-    for (const LanguageServerSpec &spec : known()) {
-        if (spec.languages.contains(languageId) && !programPath(spec.program).isEmpty())
-            return spec;
-    }
-    return std::nullopt;
+    // The project's recipes chose theirs.
+    if (std::optional<LanguageServerSpec> spec = firstServing(
+            additions_.servers, languageId, [this](const LanguageServerSpec &server) { return programFor(server); }))
+        return spec;
+    return firstServing(known(), languageId,
+                        [this](const LanguageServerSpec &spec) { return programPath(spec.program); });
 }
 
 QStringList LanguageServers::installed() const
 {
     QStringList names;
-    for (const LanguageServerSpec &spec : known()) {
-        if (!programPath(spec.program).isEmpty() && !names.contains(spec.name))
+    for (const LanguageServerSpec &spec : allSpecs()) {
+        const QString path = spec.isNodeScript ? programFor(spec) : programPath(spec.program);
+        if (!path.isEmpty() && !names.contains(spec.name))
             names.append(spec.name);
     }
     if (toolchains_) {
@@ -178,10 +198,11 @@ void LanguageServers::setFolder(const QString &folder)
     stopAll();
     folder_ = folder;
     project_ = {};
+    additions_ = {};
     specs_.clear();
 }
 
-void LanguageServers::setProject(const ProjectConfig &project, Toolchains *toolchains)
+void LanguageServers::setProject(const ProjectConfig &project, Toolchains *toolchains, const Additions &additions)
 {
     // Downloads made meanwhile are seen (Duet's installs are listed from
     // disk each time). The machine's runtimes are not probed again: that
@@ -190,11 +211,12 @@ void LanguageServers::setProject(const ProjectConfig &project, Toolchains *toolc
     specs_.clear();
     toolchains_ = toolchains;
     const QString folder = QDir(project.path).absolutePath();
-    if (folder == folder_ && project.languages == project_.languages)
+    if (folder == folder_ && project.languages == project_.languages && additions == additions_)
         return;
     stopAll();
     folder_ = folder;
     project_ = project;
+    additions_ = additions;
 }
 
 void LanguageServers::setEnabled(bool enabled)
@@ -244,8 +266,8 @@ void LanguageServers::retry(const QString &languageId)
 QStringList LanguageServers::describe() const
 {
     QStringList lines;
-    for (const LanguageServerSpec &spec : known()) {
-        const QString path = programPath(spec.program);
+    for (const LanguageServerSpec &spec : allSpecs()) {
+        const QString path = spec.isNodeScript ? programFor(spec) : programPath(spec.program);
         if (path.isEmpty())
             continue;
         QString state;
@@ -376,16 +398,18 @@ bool LanguageServers::runScriptWithNode(const LanguageServerSpec &spec, ServerCo
 {
     // Duet's npm installs are scripts, run with a Node recent enough.
     const ToolSpec *tool = ToolCatalog::find(spec.name);
-    const bool isDuetScript =
+    const bool isCatalogScript =
         tool && tool->script && toolchains_ && command.program.startsWith(toolchains_->root() + QLatin1Char('/'));
-    if (!isDuetScript)
+    if (!isCatalogScript && !spec.isNodeScript)
         return true;
+    // A recipe's server: the newest Node, which its recipe requires.
+    const int minimumNode = tool ? tool->minimumRuntime : 0;
     const std::optional<RuntimeInstall> node =
-        toolchains_->runtimeAtLeast(QStringLiteral("node"), tool->minimumRuntime);
+        toolchains_ ? toolchains_->runtimeAtLeast(QStringLiteral("node"), minimumNode) : std::nullopt;
     if (!node) {
         fail(spec, tr("%1 needs Node.js %2 or newer: open the project settings to download it.")
                        .arg(spec.name)
-                       .arg(tool->minimumRuntime));
+                       .arg(minimumNode));
         return false;
     }
     command.arguments.prepend(command.program);
@@ -436,8 +460,9 @@ LspClient *LanguageServers::startClient(const LanguageServerSpec &spec,
     auto *client = new LspClient(command.program, command.arguments, folder_, this);
     client->setEnvironment(command.environment);
     // Without a project setup too: how completion behaves.
-    const Options options = optionsFor(name, setup ? *setup : LanguageSetup(), runtime ? runtime->home : QString(),
-                                       runtime ? runtime->executable : QString());
+    const Options own = optionsFor(name, setup ? *setup : LanguageSetup(), runtime ? runtime->home : QString(),
+                                   runtime ? runtime->executable : QString());
+    const Options options = merged(own, additions_.options.value(name));
     if (!options.initialization.isEmpty())
         client->setInitializationOptions(options.initialization);
     if (!options.settings.isEmpty())
@@ -593,7 +618,27 @@ QJsonObject typescriptInitialization()
     };
 }
 
+// `object` with `added` merged in: objects key by key, anything else
+// replaced.
+QJsonObject mergedObject(QJsonObject object, const QJsonObject &added)
+{
+    for (auto it = added.constBegin(); it != added.constEnd(); ++it) {
+        const QJsonValue own = object.value(it.key());
+        const bool bothObjects = own.isObject() && it.value().isObject();
+        object.insert(it.key(),
+                      bothObjects ? QJsonValue(mergedObject(own.toObject(), it.value().toObject())) : it.value());
+    }
+    return object;
+}
+
 } // namespace
+
+LanguageServers::Options LanguageServers::merged(Options options, const Options &added)
+{
+    options.initialization = mergedObject(options.initialization, added.initialization);
+    options.settings = mergedObject(options.settings, added.settings);
+    return options;
+}
 
 LanguageServers::Options LanguageServers::optionsFor(const QString &server,
                                                      const LanguageSetup &setup,

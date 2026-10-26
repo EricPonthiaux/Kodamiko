@@ -1,21 +1,21 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 
-/* Inter, subset to Latin, is served with the site so that every visitor sees
-   the same type; its license is fonts/OFL.txt. */
+/* Geist and Geist Mono are served with the site so that every visitor sees
+   the same type; their license is fonts/OFL.txt. */
 @font-face {
-  font-family: "Inter";
+  font-family: "Geist";
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("fonts/InterVariable.woff2") format("woff2");
+  src: url("fonts/Geist-Variable.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "Inter";
-  font-style: italic;
+  font-family: "Geist Mono";
+  font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("fonts/InterVariable-Italic.woff2") format("woff2");
+  src: url("fonts/GeistMono-Variable.woff2") format("woff2");
 }
 
 /* The brand colors come from packaging/brand/duet-icon.svg. The site is dark
@@ -37,8 +37,9 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 30px 80px -20px rgba(0, 0, 0, 0.7);
   --radius: 10px;
   --content-width: 1120px;
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  --dot: rgba(255, 255, 255, 0.09);
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -58,6 +59,7 @@
     --glow: rgba(52, 97, 216, 0.1);
     --code-bg: #12151b;
     --shadow: 0 1px 2px rgba(15, 20, 30, 0.06), 0 30px 70px -24px rgba(15, 20, 30, 0.28);
+    --dot: rgba(15, 20, 30, 0.12);
     color-scheme: light;
   }
 }
@@ -79,7 +81,6 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
-  font-feature-settings: "cv11", "ss01";
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -143,9 +144,10 @@ code {
 .eyebrow {
   margin: 0 0 14px;
   color: var(--accent-strong);
-  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -220,81 +222,115 @@ code {
   }
 }
 
-/* Hero: a soft glow of the brand color rises behind the screenshot. */
+/* Hero: a dot grid fades out around the title, and below it a demo of the
+   editor plays what the title promises. */
 
 .hero {
   position: relative;
-  padding: 96px 0 24px;
+  padding: 88px 0 24px;
   text-align: center;
   overflow: hidden;
 }
 
-.hero::before {
-  content: "";
+.hero-dots {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(60% 45% at 50% 0%, var(--glow), transparent 70%),
-    radial-gradient(50% 35% at 50% 75%, var(--glow), transparent 70%);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 25%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 55% at 50% 25%, #000 30%, transparent 75%);
   pointer-events: none;
 }
 
 .hero .container {
   position: relative;
-}
-
-.hero .eyebrow {
-  display: inline-block;
-  margin-bottom: 24px;
-  padding: 5px 14px;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: var(--accent-soft);
-  font-size: 0.78rem;
-}
-
-/* The title stays on one line: its size follows the container's width.
-   --title-em is the title's width in em, measured in Inter SemiBold with its
-   tracking, plus a margin; on a phone, each half gets its own line. */
-.hero .container {
   container-type: inline-size;
 }
 
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 5px 14px 5px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-raised) 60%, transparent);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.badge:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.badge-tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 500;
+}
+
+/* The first line of the title fills the container at most: --title-em is its
+   width in em, in Geist SemiBold with its tracking, plus a margin. On a phone
+   it may wrap. */
 .hero h1 {
-  --title-em: 19.5;
-  margin: 0 auto 24px;
-  font-size: min(3.5rem, 100cqi / var(--title-em));
-  line-height: 1.1;
-  letter-spacing: -0.035em;
-  white-space: nowrap;
+  --title-em: 13.5;
+  margin: 28px auto 0;
+  font-size: min(5.75rem, 100cqi / var(--title-em));
+  line-height: 1;
+  letter-spacing: -0.045em;
 }
 
 .hero h1:lang(fr) {
-  --title-em: 26;
+  --title-em: 16.5;
 }
 
 .hero h1 .accent {
-  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--text-subtle);
+}
+
+/* The block cursor of Duet's icon, blinking at the end of the title */
+.cursor {
+  display: inline-block;
+  width: 0.42em;
+  height: 0.76em;
+  margin-left: 0.08em;
+  border-radius: 0.06em;
+  background: var(--accent);
+  vertical-align: -0.04em;
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.hero .lead {
+  margin: 28px auto 0;
+  max-width: 640px;
+  color: var(--text-muted);
+  font-size: 1.15rem;
+  line-height: 1.6;
 }
 
 @media (max-width: 719px) {
   .hero {
-    padding-top: 64px;
+    padding-top: 56px;
   }
 
   .hero h1 {
-    --title-em: 12.3;
+    --title-em: 8;
   }
 
   .hero h1:lang(fr) {
-    --title-em: 15.6;
-  }
-
-  .hero h1 .accent {
-    display: block;
+    --title-em: 9.5;
   }
 
   .hero .lead {
@@ -302,19 +338,612 @@ code {
   }
 }
 
-.hero .lead {
-  margin: 0 auto 36px;
-  max-width: 660px;
-  color: var(--text-muted);
-  font-size: 1.125rem;
-  line-height: 1.7;
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px;
+}
+
+.hero .actions {
+  margin-top: 36px;
+}
+
+.hero .button {
+  height: 46px;
+  padding: 0 22px;
+  font-size: 0.95rem;
+}
+
+.hero .button.primary::after {
+  content: "\2192";
+}
+
+/* The clone command, with a button that copies it (assets/site.js) */
+.clone {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  height: 46px;
+  padding: 0 6px 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-raised) 60%, transparent);
+  font-size: 0.84rem;
+}
+
+.clone code {
+  min-width: 0;
+  overflow: hidden;
+  font-size: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.clone code::before {
+  content: "$ ";
+  color: var(--accent-strong);
+}
+
+.copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.copy:hover {
+  color: var(--text);
+}
+
+.copy .done,
+.copy.copied .idle {
+  display: none;
+}
+
+.copy.copied .done {
+  display: block;
+  color: #3fb37a;
+}
+
+/* The demo: Claude fixes a build error in a mock of the editor. It keeps the
+   editor's dark colors in both themes, like a screenshot. Its steps appear in
+   turn over a 12 s loop, or all at once when the visitor asks for less
+   motion. */
+
+.demo {
+  --demo-bg: #0e1015;
+  --demo-chrome: #0b0d11;
+  --demo-line: rgba(255, 255, 255, 0.07);
+  --demo-text: #c9cdd6;
+  --demo-bright: #eceef3;
+  --demo-muted: #8b92a2;
+  --demo-gutter: #565c6a;
+  --demo-accent: #84a3f7;
+  --demo-type: #d7b46a;
+  --demo-added: #7ed39b;
+  --demo-removed: #f07178;
+  color-scheme: dark;
+  margin: 64px auto 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--demo-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), var(--shadow);
+  overflow: hidden;
+  color: var(--demo-text);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.demo-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 42px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--demo-line);
+  background: var(--demo-chrome);
+}
+
+.demo-lights {
+  display: flex;
+  gap: 7px;
+}
+
+.demo-lights span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #2a2e38;
+}
+
+.demo-modes {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--demo-muted);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+}
+
+.demo-modes span {
+  padding: 3px 12px;
+  border-radius: 6px;
+}
+
+.demo-modes .current {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--demo-bright);
+}
+
+.demo-path {
+  margin-left: auto;
+  color: var(--demo-muted);
+  font-size: 0.75rem;
+}
+
+.demo-workspace {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 340px;
+  min-height: 400px;
+}
+
+.demo-tree {
+  padding: 14px 0;
+  border-right: 1px solid var(--demo-line);
+  color: var(--demo-muted);
+  font-size: 0.78rem;
+  line-height: 26px;
+}
+
+.demo-tree div {
+  padding: 0 16px 0 calc(16px + var(--depth, 0) * 14px);
+  white-space: nowrap;
+}
+
+.demo-tree .folder {
+  color: var(--demo-text);
+}
+
+.demo-tree .current {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--demo-bright);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.demo-code {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.demo-tabs {
+  display: flex;
+  height: 36px;
+  border-bottom: 1px solid var(--demo-line);
+  font-size: 0.78rem;
+}
+
+.demo-tabs span {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: var(--demo-muted);
+}
+
+.demo-tabs .current {
+  border-right: 1px solid var(--demo-line);
+  color: var(--demo-bright);
+  box-shadow: inset 0 -1px 0 var(--accent);
+}
+
+/* Ligatures off: C++ reads "->", not an arrow. */
+.demo-source {
+  flex: 1;
+  padding: 14px 0;
+  overflow-x: auto;
+  scrollbar-color: #2a2e38 transparent;
+  scrollbar-width: thin;
+  font-variant-ligatures: none;
+  line-height: 24px;
+}
+
+.demo-source div {
+  white-space: pre;
+}
+
+.demo-source .ln {
+  display: inline-block;
+  width: 52px;
+  padding-right: 16px;
+  color: var(--demo-gutter);
+  text-align: right;
+  user-select: none;
+}
+
+.demo-source .kw {
+  color: var(--demo-accent);
+}
+
+.demo-source .ty {
+  color: var(--demo-type);
+}
+
+.demo-source .fn {
+  color: var(--demo-bright);
+}
+
+.demo-source .error {
+  text-decoration: underline wavy var(--demo-removed);
+  text-underline-offset: 4px;
+  animation: demo-error 12s infinite;
+}
+
+.demo-source .removed {
+  animation: demo-removed 12s infinite;
+}
+
+.demo-source .added {
+  overflow: hidden;
+  background: rgba(126, 211, 155, 0.1);
+  animation: demo-added 12s infinite;
+}
+
+.demo-source .added .ln {
+  color: var(--demo-added);
+}
+
+.demo-claude {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--demo-line);
+  background: var(--demo-chrome);
+}
+
+.demo-claude-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--demo-line);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+}
+
+.demo-claude-header::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--demo-added);
+}
+
+.demo-claude-header .context {
+  margin-left: auto;
+  color: var(--demo-muted);
+}
+
+.demo-transcript {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+/* --chars is the length of the typed request, which the mono font makes
+   exactly that many ch wide. */
+.demo-prompt {
+  align-self: flex-end;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--demo-bright);
+}
+
+.demo-prompt span {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  animation: demo-type 12s steps(var(--chars)) infinite;
+}
+
+.demo-tool {
+  display: flex;
+  gap: 10px;
+  color: var(--demo-muted);
+}
+
+.demo-tool::before {
+  content: "\25CF";
+  color: var(--demo-accent);
+}
+
+.demo-tool b {
+  color: var(--demo-bright);
+  font-weight: 400;
+}
+
+.demo-tool .plus {
+  color: var(--demo-added);
+}
+
+.demo-tool .minus {
+  color: var(--demo-removed);
+}
+
+.demo-answer {
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+}
+
+.demo-answer code {
+  color: var(--demo-bright);
+}
+
+.demo-answer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.demo-answer-actions span {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.demo-answer-actions .primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.demo-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 28px;
+  padding: 0 14px;
+  border-top: 1px solid var(--demo-line);
+  background: var(--demo-chrome);
+  color: var(--demo-muted);
+  font-size: 0.72rem;
+}
+
+.demo-statusbar .position {
+  margin-left: auto;
+}
+
+.demo-step-1 {
+  animation: demo-step-1 12s infinite;
+}
+
+.demo-step-2 {
+  animation: demo-step-2 12s infinite;
+}
+
+.demo-step-3 {
+  animation: demo-step-3 12s infinite;
+}
+
+.demo-step-4 {
+  animation: demo-step-4 12s infinite;
+}
+
+.demo-step-5 {
+  animation: demo-step-5 12s infinite;
+}
+
+@keyframes demo-type {
+  0% {
+    width: 0;
+  }
+  10%,
+  94% {
+    width: calc(var(--chars) * 1ch);
+  }
+  100% {
+    width: 0;
+  }
+}
+
+@keyframes demo-step-1 {
+  0%,
+  15% {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  19%,
+  94% {
+    opacity: 1;
+    translate: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes demo-step-2 {
+  0%,
+  26% {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  30%,
+  94% {
+    opacity: 1;
+    translate: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes demo-step-3 {
+  0%,
+  38% {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  42%,
+  94% {
+    opacity: 1;
+    translate: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes demo-step-4 {
+  0%,
+  52% {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  56%,
+  94% {
+    opacity: 1;
+    translate: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes demo-step-5 {
+  0%,
+  66% {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  70%,
+  94% {
+    opacity: 1;
+    translate: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Claude's edit lands with the third step. */
+@keyframes demo-error {
+  0%,
+  40% {
+    text-decoration-color: var(--demo-removed);
+  }
+  44%,
+  94% {
+    text-decoration-color: transparent;
+  }
+}
+
+@keyframes demo-removed {
+  0%,
+  40% {
+    background: transparent;
+  }
+  44%,
+  94% {
+    background: rgba(240, 113, 120, 0.12);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes demo-added {
+  0%,
+  40% {
+    opacity: 0;
+    max-height: 0;
+  }
+  44%,
+  94% {
+    opacity: 1;
+    max-height: 24px;
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+  }
+}
+
+@media (max-width: 1000px) {
+  .demo-workspace {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+
+  .demo-tree {
+    display: none;
+  }
+}
+
+@media (max-width: 719px) {
+  .demo {
+    margin-top: 48px;
+  }
+
+  .demo-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .demo-claude {
+    border-top: 1px solid var(--demo-line);
+    border-left: none;
+  }
+
+  .demo-modes,
+  .demo-path {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor,
+  .demo-prompt span,
+  .demo-step-1,
+  .demo-step-2,
+  .demo-step-3,
+  .demo-step-4,
+  .demo-step-5,
+  .demo-source .error,
+  .demo-source .removed,
+  .demo-source .added {
+    animation: none;
+  }
+
+  .demo-source .error {
+    text-decoration-color: transparent;
+  }
+
+  .demo-source .removed {
+    background: rgba(240, 113, 120, 0.12);
+  }
 }
 
 /* The primary button is filled with the text color, the secondary one is a
@@ -360,12 +989,6 @@ code {
 .button.primary:hover {
   background: var(--text);
   opacity: 0.88;
-}
-
-.platforms {
-  margin-top: 20px;
-  color: var(--text-subtle);
-  font-size: 0.85rem;
 }
 
 /* A screenshot sits in a thin bezel, like a window on a desk. */

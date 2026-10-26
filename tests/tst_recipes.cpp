@@ -7,6 +7,7 @@
 #include "recipes/Recipe.h"
 #include "recipes/RecipeLibrary.h"
 #include "recipes/RecipeSchema.h"
+#include "recipes/RecipeServers.h"
 #include "recipes/RecipeSetup.h"
 #include "run/RunConfiguration.h"
 #include "system/Host.h"
@@ -489,6 +490,110 @@ private slots:
         QVERIFY(recipe->requirements.at(1).tool.download->error.contains("format"));
         QVERIFY(recipe->requirements.at(2).tool.download->error.isEmpty());
         QCOMPARE(recipe->requirements.at(2).tool.download->format, ArchiveFormat::TarGz);
+    }
+
+    void aParameterValueFillsTheRecipe()
+    {
+        QString error;
+        const std::optional<Recipe> recipe = Recipes::parse(R"({
+            "title": "Web",
+            "parameters": [{"name": "angular", "title": "Angular",
+                            "values": [{"value": "22", "variables": {"typescript": "~6.0.0"}},
+                                       {"value": "21", "variables": {"typescript": "~5.9.0"}}]}],
+            "requires": [{"tool": "angular-language-server", "version": "{{angular}}",
+                          "download": {"any": {"npm": ["@angular/language-server@{{version}}"],
+                                               "check": "node_modules/@angular/language-server/index.js"}}}],
+            "setup": ["npm install typescript@{{typescript}}"],
+            "languageServers": [{"name": "angular", "tool": "angular-language-server", "script": "index.js",
+                                 "arguments": ["--version", "{{angular}}"], "languages": ["html"]}]})",
+                                                            "/recipes/web", &error);
+        QVERIFY2(recipe, qPrintable(error));
+
+        const Recipe filled = recipe->withValues({{"angular", "21"}});
+
+        const ToolRequirement tool = filled.requirements.first().tool;
+        QCOMPARE(tool.version, QString("21"));
+        QVERIFY(tool.download);
+        QCOMPARE(tool.download->format, ArchiveFormat::Npm);
+        QVERIFY(tool.download->error.isEmpty());
+        QCOMPARE(tool.download->npmPackages, QStringList{"@angular/language-server@21"});
+        QCOMPARE(filled.setupCommands, QStringList{"npm install typescript@~5.9.0"});
+        QCOMPARE(filled.languageServers.first().arguments, (QStringList{"--version", "21"}));
+        const QMap<QString, QString> values{{"angular", "21"}, {"typescript", "~5.9.0"}};
+        QCOMPARE(filled.values, values);
+    }
+
+    void aParameterWithoutAKnownValueTakesItsFirst()
+    {
+        QString error;
+        const std::optional<Recipe> recipe = Recipes::parse(
+            R"({"title": "Web", "parameters": [{"name": "angular", "values": ["22", "21"]}]})", "/recipes/web", &error);
+        QVERIFY2(recipe, qPrintable(error));
+
+        const Recipe filled = recipe->withValues({{"angular", "9"}});
+
+        QCOMPARE(filled.values.value("angular"), QString("22"));
+        QCOMPARE(recipe->parameters.first().title, QString("angular"));
+    }
+
+    void creationFillsTheParametersInTheFiles()
+    {
+        const QTemporaryDir dir;
+        const QString folder = dir.filePath("web");
+        write(folder + "/recipe.json",
+              R"({"title": "Web", "parameters": [{"name": "angular", "values": ["22", "21"]}]})");
+        write(folder + "/files/package.json", R"({"name": "{{identifier}}", "core": "^{{angular}}.0.0"})");
+        QString error;
+        const std::optional<Recipe> recipe = Recipes::load(folder, &error);
+        QVERIFY2(recipe, qPrintable(error));
+
+        QVERIFY2(ProjectCreation::create(recipe->withValues({{"angular", "21"}}), dir.filePath("Chosen"), &error),
+                 qPrintable(error));
+        QVERIFY2(ProjectCreation::create(*recipe, dir.filePath("Default"), &error), qPrintable(error));
+
+        QCOMPARE(read(dir.filePath("Chosen/package.json")), QByteArray(R"({"name": "chosen", "core": "^21.0.0"})"));
+        QCOMPARE(read(dir.filePath("Default/package.json")), QByteArray(R"({"name": "default", "core": "^22.0.0"})"));
+    }
+
+    void theAngularRecipeMakesAProjectOfTheVersionChosen()
+    {
+        const QTemporaryDir dir;
+        QString error;
+
+        QVERIFY2(
+            ProjectCreation::create(builtIn("angular").withValues({{"angular", "21"}}), dir.filePath("My App"), &error),
+            qPrintable(error));
+
+        const QByteArray package = read(dir.filePath("My App/package.json"));
+        QVERIFY(package.contains(R"("@angular/core": "^21.0.0")"));
+        QVERIFY(package.contains(R"("typescript": "~5.9.0")"));
+        QVERIFY(!package.contains("{{"));
+        QVERIFY(read(dir.filePath("My App/angular.json")).contains(R"("my_app": {)"));
+    }
+
+    void recipeServersNeedTheirToolInstalled()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.filePath("tools"), false);
+        const Recipe recipe = builtIn("angular").withValues({{"angular", "21"}});
+        const QString project = dir.filePath("project");
+
+        QVERIFY(RecipeServers::additionsOf({recipe}, project, toolchains).servers.isEmpty());
+
+        const QString home = toolchains.installFolder("angular-language-server", "21");
+        write(home + "/.complete", "");
+        const LanguageServers::Additions additions = RecipeServers::additionsOf({recipe}, project, toolchains);
+
+        QCOMPARE(additions.servers.size(), 1);
+        const LanguageServerSpec server = additions.servers.first();
+        QCOMPARE(server.name, QString("angular"));
+        QVERIFY(server.isNodeScript);
+        QCOMPARE(server.program, home + "/node_modules/@angular/language-server/index.js");
+        QCOMPARE(server.languages, QStringList{"html"});
+        QVERIFY(server.arguments.contains(project + "," + home));
+        const QJsonArray plugins =
+            additions.options.value("typescript-language-server").initialization.value("plugins").toArray();
+        QCOMPARE(plugins.first().toObject().value("location").toString(), project);
     }
 
     void aRequiredToolGoesWhereTheRecipeSays()

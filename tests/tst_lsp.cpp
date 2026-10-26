@@ -129,6 +129,66 @@ private slots:
         QVERIFY(LspClient::settingAt(ts.settings, "completions.completeFunctionCalls").toBool());
     }
 
+    void aRecipeServerServesTheLanguagesNoKnownServerServes()
+    {
+        const QTemporaryDir dir;
+        const QString script = dir.filePath("tool/index.js");
+        QDir().mkpath(dir.filePath("tool"));
+        QFile file(script);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.close();
+        const LanguageServerSpec angular{.name = "angular",
+                                         .program = script,
+                                         .arguments = {"--stdio"},
+                                         .languages = {"html"},
+                                         .triggerCharacters = "<",
+                                         .isNodeScript = true};
+        ProjectConfig project;
+        project.path = dir.path();
+        LanguageServers servers;
+
+        servers.setProject(project, nullptr, {.servers = {angular}, .options = {}});
+
+        QCOMPARE(servers.specFor("html"), std::optional(angular));
+        QVERIFY(servers.installed().contains("angular"));
+    }
+
+    void aRecipeServerWhoseScriptIsMissingServesNothing()
+    {
+        const QTemporaryDir dir;
+        const LanguageServerSpec angular{.name = "angular",
+                                         .program = dir.filePath("not-installed/index.js"),
+                                         .arguments = {},
+                                         .languages = {"html"},
+                                         .triggerCharacters = {},
+                                         .isNodeScript = true};
+        ProjectConfig project;
+        project.path = dir.path();
+        LanguageServers servers;
+
+        servers.setProject(project, nullptr, {.servers = {angular}, .options = {}});
+
+        QCOMPARE(servers.specFor("html"), std::nullopt);
+    }
+
+    void recipeOptionsAreMergedIntoTheServersOwn()
+    {
+        const LanguageServers::Options own =
+            LanguageServers::optionsFor("typescript-language-server", LanguageSetup(), {}, {});
+        const QJsonArray plugins{QJsonObject{{"name", "@angular/language-service"}, {"location", "/p"}}};
+        const LanguageServers::Options added{
+            .initialization = {{"plugins", plugins}, {"preferences", QJsonObject{{"quotePreference", "single"}}}},
+            .settings = {}};
+
+        const LanguageServers::Options merged = LanguageServers::merged(own, added);
+
+        QCOMPARE(merged.initialization.value("plugins").toArray(), plugins);
+        const QJsonObject preferences = merged.initialization.value("preferences").toObject();
+        QCOMPARE(preferences.value("quotePreference").toString(), QString("single"));
+        QVERIFY(preferences.value("includeCompletionsForModuleExports").toBool());
+        QCOMPARE(merged.settings, own.settings);
+    }
+
     void editsBeforeThePrefixReplaceFromTheirStart()
     {
         // tsserver: "a." becomes "a?.name"; a scoped package replaces its "@".
