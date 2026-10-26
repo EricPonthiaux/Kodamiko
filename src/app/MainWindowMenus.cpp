@@ -136,7 +136,9 @@ void MainWindow::createFileMenu()
     file->addAction(tr("Save &All"), QKeySequence(tr("Ctrl+Alt+S")), editorTabs_, &EditorTabs::saveAll);
     file->addAction(tr("&Close Tab"), QKeySequence::Close, editorTabs_, &EditorTabs::closeCurrent);
     file->addSeparator();
-    file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
+    QAction *quit = file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
+    quit->setMenuRole(QAction::QuitRole);
+    nativeMenuBar_ = DesktopIntegration::createNativeMenuBar({preferences, quit});
 }
 
 void MainWindow::createClaudeMenu()

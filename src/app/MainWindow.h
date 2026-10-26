@@ -71,6 +71,7 @@ class ProjectSettingsPopup;
 class QAction;
 class QActionGroup;
 class QLabel;
+class QMenuBar;
 class QSettings;
 class QSplitter;
 class QStackedWidget;
@@ -653,6 +654,8 @@ private:
     RecentFiles recentFiles_;
     PrerequisitesPopup *prerequisitesPopup_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;
+    // The system's menu bar where it is separate (macOS); null elsewhere.
+    std::unique_ptr<QMenuBar> nativeMenuBar_;
     QAction *snapshotBeforePrompt_ = nullptr;
     QAction *shareEditorContext_ = nullptr;
     // Also in the editor's context menu (createEditorContextActions()).

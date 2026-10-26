@@ -2,7 +2,13 @@
 
 #pragma once
 
+#include <QList>
+
+#include <memory>
+
+class QAction;
 class QMenu;
+class QMenuBar;
 class QString;
 class QWidget;
 
@@ -20,6 +26,12 @@ void followActiveSpace(QWidget *window);
 // Makes `menu` the menu of the application's icon in the Dock (macOS),
 // above the system's own items. Not owned: it must outlive its use there.
 void setDockMenu(QMenu *menu);
+
+// The system's menu bar where it is separate from the windows (macOS),
+// holding `actions`: those with a menu role (Preferences, Quit) go to the
+// application menu, where the system expects them. Null elsewhere, where
+// the window's own menu bar is enough. The actions are not owned.
+std::unique_ptr<QMenuBar> createNativeMenuBar(const QList<QAction *> &actions);
 
 // Keeps the system from slowing the process down while it is in the
 // background (macOS's App Nap throttles its timers and its sockets): for

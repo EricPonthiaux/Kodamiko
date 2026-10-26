@@ -4,6 +4,7 @@
 
 #include <QGuiApplication>
 #include <QMenu>
+#include <QMenuBar>
 #include <QString>
 #include <QWidget>
 
@@ -41,6 +42,16 @@ void DesktopIntegration::followActiveSpace(QWidget *window)
 void DesktopIntegration::setDockMenu(QMenu *menu)
 {
     menu->setAsDockMenu();
+}
+
+// Without a parent, a QMenuBar is the native one, shared by the windows
+// of the process.
+std::unique_ptr<QMenuBar> DesktopIntegration::createNativeMenuBar(const QList<QAction *> &actions)
+{
+    auto bar = std::make_unique<QMenuBar>();
+    QMenu *menu = bar->addMenu(QStringLiteral("Duet"));
+    menu->addActions(actions);
+    return bar;
 }
 
 // The system may still sleep when idle: only Duet's own work is kept going.
