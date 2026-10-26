@@ -503,6 +503,24 @@ add_dependencies(duet duet-hook duet-mcp duet-askpass)
 # plugin and recipes in Contents/Resources.
 if(APPLE)
     set_target_properties(duet PROPERTIES OUTPUT_NAME Duet)
+    # The bundle's identity: notifications, privacy permissions and Spaces
+    # assignment are tied to its identifier.
+    set(duet_icon ${PROJECT_SOURCE_DIR}/packaging/macos/duet.icns)
+    set_source_files_properties(${duet_icon} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(duet PRIVATE ${duet_icon})
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(DUET_MACOS_MINIMUM_VERSION ${CMAKE_OSX_DEPLOYMENT_TARGET})
+    else()
+        set(DUET_MACOS_MINIMUM_VERSION ${QT_SUPPORTED_MIN_MACOS_VERSION})
+    endif()
+    set_target_properties(duet PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/packaging/macos/Info.plist.in
+        MACOSX_BUNDLE_GUI_IDENTIFIER io.github.ericponthiaux.duet
+        MACOSX_BUNDLE_BUNDLE_NAME Duet
+        MACOSX_BUNDLE_ICON_FILE duet.icns
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+        MACOSX_BUNDLE_COPYRIGHT "Licensed under the GNU GPL version 3.")
     add_custom_command(TARGET duet POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-mcp> $<TARGET_FILE_DIR:duet>
