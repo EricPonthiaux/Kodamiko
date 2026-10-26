@@ -101,13 +101,18 @@ bool NativeNotifications::show(const QString &title, const QString &message, std
     }
     // The first notification waits for the user's answer. Refused, the
     // next ones go through the tray.
+    // A block captures a C++ reference as a reference: copies, so that the
+    // answer, which comes later in another thread, does not read the
+    // caller's strings once they are gone.
+    const QString titleCopy = title;
+    const QString messageCopy = message;
     const UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound;
     [center requestAuthorizationWithOptions:options
                           completionHandler:^(BOOL granted, NSError *) {
-                            runInMainThread([granted, center, title, message] {
+                            runInMainThread([granted, center, titleCopy, messageCopy] {
                                 permission = granted ? Permission::Granted : Permission::Refused;
                                 if (granted)
-                                    post(center, title, message);
+                                    post(center, titleCopy, messageCopy);
                             });
                           }];
     return true;
