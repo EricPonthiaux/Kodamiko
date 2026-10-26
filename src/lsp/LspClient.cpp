@@ -30,7 +30,7 @@ QJsonObject clientCapabilities()
         {"completionItem", completionItem},
         {"contextSupport", true},
     };
-    const QJsonObject synchronization{{"didSave", false}, {"willSave", false}, {"dynamicRegistration", false}};
+    const QJsonObject synchronization{{"didSave", true}, {"willSave", false}, {"dynamicRegistration", false}};
     // Quick fixes and refactorings, as edits or as commands the server
     // carries out (it then sends "workspace/applyEdit").
     const QJsonObject codeAction{

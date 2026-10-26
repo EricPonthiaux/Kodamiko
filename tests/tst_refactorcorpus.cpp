@@ -10,8 +10,9 @@
 //   case.json: {"moves": [["from", "to"], …]}
 // - moveClass/: Move Class to Its Own File at the cursor.
 //   case.json: {"source": "the header's source, if any"}
-// - textual/: a rename's occurrences in comments, strings and non-code
-//   files (RenameAnalysis without a server's edit).
+// - textual/: a rename's occurrences in comments and strings
+//   (RenameAnalysis, as if the server's edit changed every file but
+//   none of their text).
 //   case.json: {"name": "…", "newName": "…"}
 // - rename/: a rename through the language server, the whole way
 //   (popup, server, comments and strings, preview, Undo Refactoring);
@@ -464,8 +465,9 @@ private slots:
         const Tree before = readTree(folder + QStringLiteral("/before"));
         const QTemporaryDir dir;
         copyTree(before, dir.path());
-        OccurrenceIndex index;
-        indexFolder(index, dir.path());
+        WorkspaceEdit everyFile;
+        for (const QString &path : before.keys())
+            everyFile.changes.append(DocumentEdit{dir.filePath(path), std::nullopt, {}});
         const QJsonObject description = caseOf(folder);
         EditorTabs tabs(Theme::dark());
         LanguageServers servers;
@@ -473,8 +475,7 @@ private slots:
         const RenameAnalysis::Result analysis = RenameAnalysis::analyze({
             .name = description.value("name").toString(),
             .newName = description.value("newName").toString(),
-            .codeEdit = {},
-            .index = &index.store(),
+            .codeEdit = everyFile,
             .unsavedTexts = {},
             .projectFolder = dir.path(),
             .searchesCommentsAndStrings = true,

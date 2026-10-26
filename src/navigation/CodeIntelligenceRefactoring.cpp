@@ -12,9 +12,11 @@
 #include "refactor/FileReferences.h"
 #include "refactor/RefactoringHistory.h"
 #include "refactor/RefactoringPreviewPopup.h"
+#include "syntax/LanguageRegistry.h"
 
 #include <QApplication>
 #include <QFileInfo>
+#include <QKeyEvent>
 #include <QPointer>
 #include <QThreadPool>
 
@@ -81,7 +83,9 @@ void CodeIntelligence::showRenamePopup(EditorWidget *editor, int bytePosition, c
         [this, target, bytePosition, name](const RenameSymbolPopup::Choice &choice) -> QString {
             if (choice.newName.isEmpty())
                 return tr("Specify a new name");
-            if (target && choice.newName != name)
+            if (choice.newName == name)
+                return tr("Type a name other than “%1”").arg(name);
+            if (target)
                 requestRename({target->filePath(), lspPosition(target, bytePosition), name, choice, {}});
             return {};
         },
@@ -112,6 +116,7 @@ void CodeIntelligence::requestRename(const Rename &rename)
         finish(rename.done, {.messages = {message}});
         return;
     }
+    emit refactoringStarted(tr("Rename “%1” to “%2”: looking for the usages…").arg(rename.name, rename.choice.newName));
     const QJsonObject params{
         {"textDocument", QJsonObject{{"uri", uriOf(rename.path)}}},
         {"position", toJson(rename.position)},
@@ -123,6 +128,7 @@ void CodeIntelligence::requestRename(const Rename &rename)
             if (!error.isEmpty() || edit.isEmpty()) {
                 const QString message = error.isEmpty() ? tr("Nothing to rename here")
                                                         : tr("Cannot rename “%1”: %2").arg(rename.name, error);
+                emit refactoringFinished();
                 emit statusMessage(message);
                 finish(rename.done, {.messages = {message}});
                 return;
@@ -137,7 +143,6 @@ void CodeIntelligence::analyzeRename(const WorkspaceEdit &edit, const Rename &re
         .name = rename.name,
         .newName = rename.choice.newName,
         .codeEdit = edit,
-        .index = index_,
         .unsavedTexts = tabs_->unsavedTexts(),
         .projectFolder = servers_->folder(),
         .searchesCommentsAndStrings = rename.choice.inCommentsAndStrings,
@@ -176,10 +181,12 @@ void CodeIntelligence::completeAnalyzedRename(const WorkspaceEdit &edit,
     // As IntelliJ: what is not plain code is shown before it is changed.
     const bool needsReview = rename.choice.mode == RenameSymbolPopup::Mode::Preview ||
                              !proposal.textualEdit.isEmpty() || !proposal.conflicts.isEmpty();
-    if (needsReview)
+    if (needsReview) {
         review(proposal, report);
-    else
+        emit refactoringFinished();
+    } else {
         complete(proposal.title, proposal.edit, report);
+    }
 }
 
 QStringList CodeIntelligence::busyServers() const
@@ -196,10 +203,17 @@ QStringList CodeIntelligence::busyServers() const
 
 void CodeIntelligence::complete(const QString &title, const WorkspaceEdit &edit, const RefactoringDone &done)
 {
-    const WorkspaceEditing::Outcome outcome = applyEdit(edit, title);
-    const bool isApplied = outcome.errors.isEmpty() && outcome.filesChanged > 0;
-    finish(done, {isApplied ? RefactoringOutcome::Status::Applied : RefactoringOutcome::Status::Failed, edit,
-                  outcome.filesChanged, outcome.errors});
+    const qsizetype fileCount = edit.filePaths().size();
+    emit refactoringStarted(fileCount == 1 ? tr("%1: changing 1 file…").arg(title)
+                                           : tr("%1: changing %2 files…").arg(title).arg(fileCount));
+    WorkspaceEditing::applyInBackground(
+        edit, targets(), this, [this, title, edit, done](const WorkspaceEditing::Outcome &outcome) {
+            recordEdit(outcome, title);
+            emit refactoringFinished();
+            const bool isApplied = outcome.errors.isEmpty() && outcome.filesChanged > 0;
+            finish(done, {isApplied ? RefactoringOutcome::Status::Applied : RefactoringOutcome::Status::Failed, edit,
+                          outcome.filesChanged, outcome.errors});
+        });
 }
 
 void CodeIntelligence::review(const Proposal &proposal, const RefactoringDone &done)
@@ -304,10 +318,53 @@ int CodeIntelligence::applyWorkspaceEdit(const WorkspaceEdit &edit, const QStrin
 WorkspaceEditing::Outcome CodeIntelligence::applyEdit(const WorkspaceEdit &edit, const QString &description)
 {
     WorkspaceEditing::Outcome outcome = WorkspaceEditing::apply(edit, targets());
+    recordEdit(outcome, description);
+    return outcome;
+}
+
+void CodeIntelligence::recordEdit(const WorkspaceEditing::Outcome &outcome, const QString &description)
+{
+    syncServersAfterEdit();
     if (!outcome.errors.isEmpty())
         emit statusMessage(outcome.errors.join(QLatin1Char(' ')));
     history_->record(description, outcome.journal);
-    return outcome;
+}
+
+void CodeIntelligence::syncServersAfterEdit()
+{
+    for (const QString &path : tabs_->openFilePaths()) {
+        const EditorWidget *editor = tabs_->editorFor(path);
+        LspClient *client = editor ? servers_->runningClientFor(editor->languageId()) : nullptr;
+        if (client)
+            servers_->syncDocument(client, path, editor->languageId(), editor->utf8Bytes().toByteArray());
+    }
+    for (const QString &path : servers_->openDocuments()) {
+        const bool changedOnDisk = !tabs_->editorFor(path) && syncFromDisk(path);
+        if (changedOnDisk)
+            servers_->notifySaved(path);
+    }
+}
+
+bool CodeIntelligence::syncFromDisk(const QString &path)
+{
+    const QString languageId = LanguageRegistry::languageForFile(path);
+    LspClient *client = servers_->runningClientFor(languageId);
+    if (!client)
+        return false;
+    QString error;
+    const std::optional<DecodedText> decoded = TextFile::load(path, &error);
+    return decoded && servers_->syncDocument(client, path, languageId, decoded->text.toUtf8());
+}
+
+void CodeIntelligence::notifySaved(const QString &path)
+{
+    // The text saved first: the editor sends its changes only after a pause
+    // (see attach()).
+    const EditorWidget *editor = tabs_->editorFor(path);
+    LspClient *client = editor ? servers_->runningClientFor(editor->languageId()) : nullptr;
+    if (client)
+        servers_->syncDocument(client, path, editor->languageId(), editor->utf8Bytes().toByteArray());
+    servers_->notifySaved(path);
 }
 
 void CodeIntelligence::undoRefactoring()
@@ -318,5 +375,37 @@ void CodeIntelligence::undoRefactoring()
         return;
     }
     const QStringList errors = history_->undoLast(targets());
+    syncServersAfterEdit();
     emit statusMessage(errors.isEmpty() ? tr("Undid “%1”").arg(description) : errors.join(QLatin1Char(' ')));
+}
+
+void CodeIntelligence::redoRefactoring()
+{
+    const QString description = history_->nextRedoDescription();
+    if (description.isEmpty()) {
+        emit statusMessage(tr("No refactoring to redo"));
+        return;
+    }
+    const QStringList errors = history_->redoLast(targets());
+    syncServersAfterEdit();
+    emit statusMessage(errors.isEmpty() ? tr("Redid “%1”").arg(description) : errors.join(QLatin1Char(' ')));
+}
+
+bool CodeIntelligence::eventFilter(QObject *watched, QEvent *event)
+{
+    const auto *editor = qobject_cast<EditorWidget *>(watched);
+    if (!editor || event->type() != QEvent::KeyPress)
+        return QObject::eventFilter(watched, event);
+    // The system's keys: Cmd+Z and Cmd+Shift+Z on macOS, Ctrl+Z and Ctrl+Y
+    // or Ctrl+Shift+Z on Windows and Linux.
+    const auto *key = static_cast<QKeyEvent *>(event);
+    if (key->matches(QKeySequence::Undo) && history_->isLeftByLast(editor->filePath(), editor->text())) {
+        undoRefactoring();
+        return true;
+    }
+    if (key->matches(QKeySequence::Redo) && history_->isFoundByNextRedo(editor->filePath(), editor->text())) {
+        redoRefactoring();
+        return true;
+    }
+    return QObject::eventFilter(watched, event);
 }

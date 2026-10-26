@@ -268,6 +268,7 @@ add_library(duet_core STATIC
     ui/AppFonts.cpp
     ui/BrandLogo.cpp
     ui/BrandMark.cpp
+    ui/BusyIndicator.cpp
     ui/ClickableCursors.cpp
     ui/ContextMenus.cpp
     ui/DetachablePage.cpp
@@ -487,12 +488,12 @@ qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/MainWindowRun.cpp
     app/MainWindowSettings.cpp)
 if(WIN32)
-    target_sources(duet PRIVATE app/MainWindowTitleBarWindows.cpp app/NativeNotificationsWindows.cpp)
+    target_sources(duet PRIVATE app/windows/MainWindowTitleBarWindows.cpp app/windows/NativeNotificationsWindows.cpp)
 elseif(APPLE)
-    target_sources(duet PRIVATE app/MainWindowTitleBarMacOS.mm app/NativeNotificationsMacOS.mm)
+    target_sources(duet PRIVATE app/osx/MainWindowTitleBarMacOS.mm app/osx/NativeNotificationsMacOS.mm)
     target_link_libraries(duet PRIVATE "-framework AppKit" "-framework UserNotifications")
 else()
-    target_sources(duet PRIVATE app/MainWindowTitleBarLinux.cpp app/NativeNotificationsLinux.cpp)
+    target_sources(duet PRIVATE app/linux/MainWindowTitleBarLinux.cpp app/linux/NativeNotificationsLinux.cpp)
 endif()
 duet_enable_warnings(duet)
 # Installed, it still finds the libraries linked from outside the system's

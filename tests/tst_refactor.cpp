@@ -29,6 +29,8 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include <optional>
+
 using namespace LspProtocol;
 using Kind = FileOperation::Kind;
 
@@ -159,6 +161,52 @@ private slots:
         QVERIFY(outcome.journal.isEmpty());
         QCOMPARE(editor->text(), QString("int total;\n"));
         QCOMPARE(read(project.path("closed.h")), QByteArray("int total;\n"));
+    }
+
+    void changesTheOpenFilesAtOnceAndTheClosedOnesInTheBackground()
+    {
+        Project project;
+        write(project.path("open.h"), "int total;\n");
+        write(project.path("closed.h"), "int total;\n");
+        const auto *editor = EditorTabs::editorIn(project.tabs.openFile(project.path("open.h")));
+        QVERIFY(editor);
+        const WorkspaceEdit edit{{
+            DocumentEdit{project.path("open.h"), {}, {replacing(0, 4, 9, "sum")}},
+            DocumentEdit{project.path("closed.h"), {}, {replacing(0, 4, 9, "sum")}},
+        }};
+        std::optional<WorkspaceEditing::Outcome> outcome;
+
+        WorkspaceEditing::applyInBackground(
+            edit, project.targets(), &project.tabs,
+            [&outcome](const WorkspaceEditing::Outcome &applied) { outcome = applied; });
+
+        QCOMPARE(editor->text(), QString("int sum;\n"));
+        QTRY_VERIFY(outcome);
+        QVERIFY2(outcome->errors.isEmpty(), qPrintable(outcome->errors.join('\n')));
+        QCOMPARE(outcome->filesChanged, 2);
+        QCOMPARE(read(project.path("closed.h")), QByteArray("int sum;\n"));
+    }
+
+    void undoesTheOpenFilesWhenAClosedOneCannotBeChangedInTheBackground()
+    {
+        Project project;
+        write(project.path("open.h"), "int total;\n");
+        const auto *editor = EditorTabs::editorIn(project.tabs.openFile(project.path("open.h")));
+        QVERIFY(editor);
+        const WorkspaceEdit edit{{
+            DocumentEdit{project.path("open.h"), {}, {replacing(0, 4, 9, "sum")}},
+            DocumentEdit{project.path("missing.h"), {}, {replacing(0, 4, 9, "sum")}},
+        }};
+        std::optional<WorkspaceEditing::Outcome> outcome;
+
+        WorkspaceEditing::applyInBackground(
+            edit, project.targets(), &project.tabs,
+            [&outcome](const WorkspaceEditing::Outcome &applied) { outcome = applied; });
+
+        QTRY_VERIFY(outcome);
+        QVERIFY(!outcome->errors.isEmpty());
+        QCOMPARE(outcome->filesChanged, 0);
+        QCOMPARE(editor->text(), QString("int total;\n"));
     }
 
     void undoesARefactoringInOpenAndClosedFiles()
@@ -327,44 +375,58 @@ private slots:
         QVERIFY(!choices[0].inCommentsAndStrings);
     }
 
-    void findsTheNameInCommentsStringsAndTextOutsideTheServersEdit()
+    void findsTheNameInTheCommentsAndStringsOfTheServersFilesOutsideItsEdit()
     {
         const Project project;
         write(project.path("a.cpp"), "// total of all\nint total = 0; // é total\nconst char *s = \"total\";\n");
-        write(project.path("notes.md"), "The total is kept.\n");
-        write(project.path("other.cpp"), "int unrelated;\n");
-        OccurrenceStore index;
-        index.setFiles({{project.path("a.cpp"), {1, 1}, {{"total", 3, 0, OccurrenceRole::Comment}}},
-                        {project.path("notes.md"), {1, 1}, {{"total", 4, 0, OccurrenceRole::Text}}}});
         // The server renames the variable on line 1.
         const WorkspaceEdit codeEdit{{DocumentEdit{project.path("a.cpp"), {}, {replacing(1, 4, 9, "sum")}}}};
 
         const RenameAnalysis::Result result = RenameAnalysis::analyze({.name = "total",
                                                                        .newName = "sum",
                                                                        .codeEdit = codeEdit,
-                                                                       .index = &index,
                                                                        .unsavedTexts = {},
                                                                        .projectFolder = project.dir.path(),
                                                                        .searchesCommentsAndStrings = true});
 
-        QCOMPARE(result.textualEdit.changes.size(), 2);
+        QCOMPARE(result.textualEdit.changes.size(), 1);
         const auto &inSource = std::get<DocumentEdit>(result.textualEdit.changes[0]);
         QCOMPARE(inSource.filePath, project.path("a.cpp"));
         QCOMPARE(inSource.edits, (QList<TextEdit>{replacing(0, 3, 8, "sum"), replacing(1, 20, 25, "sum"),
                                                   replacing(2, 17, 22, "sum")})); // "é" is one UTF-16 unit
-        QCOMPARE(std::get<DocumentEdit>(result.textualEdit.changes[1]).filePath, project.path("notes.md"));
         QVERIFY(result.conflicts.isEmpty());
+    }
+
+    void leavesTheNameInFilesTheServerDoesNotChange()
+    {
+        const Project project;
+        write(project.path("a.cpp"), "int total = 0;\n");
+        write(project.path("other.cpp"), "// total of another\n");
+        write(project.path("style.css"), ".total { color: red; }\n");
+        write(project.path("notes.md"), "The total is kept.\n");
+        const WorkspaceEdit codeEdit{{DocumentEdit{project.path("a.cpp"), {}, {replacing(0, 4, 9, "sum")}}}};
+
+        const RenameAnalysis::Result result = RenameAnalysis::analyze({.name = "total",
+                                                                       .newName = "sum",
+                                                                       .codeEdit = codeEdit,
+                                                                       .unsavedTexts = {},
+                                                                       .projectFolder = project.dir.path(),
+                                                                       .searchesCommentsAndStrings = true});
+
+        QVERIFY(result.textualEdit.isEmpty());
     }
 
     void findsTheNameInAnUnsavedText()
     {
         const Project project;
+        write(project.path("a.cpp"), "int total;\n");
+        const WorkspaceEdit codeEdit{{DocumentEdit{project.path("a.cpp"), {}, {replacing(1, 4, 9, "sum")}}}};
+
         const RenameAnalysis::Result result =
             RenameAnalysis::analyze({.name = "total",
                                      .newName = "sum",
-                                     .codeEdit = {},
-                                     .index = nullptr,
-                                     .unsavedTexts = {{project.path("a.cpp"), "/* total */\n"}},
+                                     .codeEdit = codeEdit,
+                                     .unsavedTexts = {{project.path("a.cpp"), "/* total */\nint total;\n"}},
                                      .projectFolder = project.dir.path(),
                                      .searchesCommentsAndStrings = true});
 
@@ -386,7 +448,6 @@ private slots:
         const RenameAnalysis::Result result = RenameAnalysis::analyze({.name = "total",
                                                                        .newName = "sum",
                                                                        .codeEdit = codeEdit,
-                                                                       .index = nullptr,
                                                                        .unsavedTexts = {},
                                                                        .projectFolder = project.dir.path(),
                                                                        .searchesCommentsAndStrings = false});

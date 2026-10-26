@@ -55,6 +55,7 @@
 #include "system/Host.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
+#include "ui/BusyIndicator.h"
 #include "ui/DetachablePage.h"
 #include "ui/ElidingToolButton.h"
 #include "ui/GripSplitter.h"
@@ -774,7 +775,11 @@ void MainWindow::createStatusBar()
     usageLabel_->hide();
     editorStatus_ = new EditorStatus(this);
     auto *serverTasks = new ServerTasksLabel(languageServers_, this);
+    auto *refactoring = new BusyIndicator(this);
+    connect(intelligence_, &CodeIntelligence::refactoringStarted, refactoring, &BusyIndicator::start);
+    connect(intelligence_, &CodeIntelligence::refactoringFinished, refactoring, &BusyIndicator::finish);
 
+    bar->addGroup(tr("Refactoring"), {refactoring});
     bar->addGroup(tr("Language Servers"), {serverTasks});
     bar->addGroup(tr("Agent Usage"), {usageLabel_});
     bar->addGroup(tr("Editor"), {editorStatus_});

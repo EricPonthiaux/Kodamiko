@@ -12,7 +12,8 @@ class Spinner : public QWidget {
     Q_OBJECT
 
 public:
-    explicit Spinner(QWidget *parent);
+    // 40 px across by default; smaller for a line of text (a status bar).
+    explicit Spinner(QWidget *parent, int diameterPx = 40);
 
     // Shows it turning, or hides it.
     void setSpinning(bool spinning);
@@ -24,6 +25,7 @@ private:
     void updateMotion();
 
     QTimer *timer_;
+    int penWidthPx_;
     int angle_ = 0;
     bool spinning_ = false;
 };

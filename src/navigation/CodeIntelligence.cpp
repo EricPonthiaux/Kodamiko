@@ -129,6 +129,7 @@ CodeIntelligence::CodeIntelligence(const Services &services, QObject *parent)
         return QJsonValue(QJsonObject{{"applied", false}, {"failureReason", outcome.errors.join(QLatin1Char(' '))}});
     });
     connect(tabs_, &EditorTabs::openFilesChanged, this, &CodeIntelligence::closeDocumentsOfClosedTabs);
+    connect(tabs_, &EditorTabs::fileSaved, this, &CodeIntelligence::notifySaved);
     connect(problems_, &ProblemStore::changed, this, &CodeIntelligence::showProblems);
 }
 
@@ -172,6 +173,7 @@ void CodeIntelligence::attach(EditorWidget *editor)
             servers_->syncDocument(client, editor->filePath(), editor->languageId(), editor->utf8Bytes().toByteArray());
     });
     showProblems(editor->filePath());
+    editor->installEventFilter(this); // Undo and Redo of a refactoring
 
     editor->SendScintilla(QsciScintillaBase::SCI_SETMOUSEDWELLTIME, hoverDelayMs);
     connect(editor, &QsciScintillaBase::SCN_DWELLSTART, this, [this, editor](int position, int x, int y) {

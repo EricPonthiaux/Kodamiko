@@ -13,7 +13,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QPointer>
 #include <QSet>
+#include <QThreadPool>
 
 #include <algorithm>
 #include <optional>
@@ -96,19 +98,17 @@ LineEnding lineEndingOfNewFiles(const WorkspaceEdit &edit, const EditTargets &ta
     return TextFile::decode({}).format.lineEnding;
 }
 
-// Changes the text of `edit`'s file, recording it in `journal`. An empty
-// file gets `newFileLineEnding`.
-QString editText(const DocumentEdit &edit,
-                 const EditTargets &targets,
-                 EditJournal &journal,
-                 LineEnding newFileLineEnding)
+void editOpenFile(EditorWidget *editor, const DocumentEdit &edit, EditJournal &journal)
 {
-    if (EditorWidget *editor = targets.tabs->editorFor(edit.filePath)) {
-        const QString before = editor->text();
-        editInEditor(editor, edit.edits);
-        journal.record(EditJournal::TextChange{edit.filePath, before, editor->text()});
-        return {};
-    }
+    const QString before = editor->text();
+    editInEditor(editor, edit.edits);
+    journal.record(EditJournal::TextChange{edit.filePath, before, editor->text()});
+}
+
+// Changes the text of `edit`'s file on disk, recording it in `journal`. An
+// empty file gets `newFileLineEnding`. Touches no widget: thread-safe.
+QString editFileOnDisk(const DocumentEdit &edit, EditJournal &journal, LineEnding newFileLineEnding)
+{
     QString error;
     const std::optional<DecodedText> decoded = TextFile::load(edit.filePath, &error);
     if (!decoded)
@@ -124,6 +124,37 @@ QString editText(const DocumentEdit &edit,
         return tr("Could not change %1: %2").arg(nameOf(edit.filePath), error);
     journal.record(EditJournal::TextChange{edit.filePath, decoded->text, after});
     return {};
+}
+
+// Changes the text of `edit`'s file, in its editor or on disk.
+QString editText(const DocumentEdit &edit,
+                 const EditTargets &targets,
+                 EditJournal &journal,
+                 LineEnding newFileLineEnding)
+{
+    if (EditorWidget *editor = targets.tabs->editorFor(edit.filePath)) {
+        editOpenFile(editor, edit, journal);
+        return {};
+    }
+    return editFileOnDisk(edit, journal, newFileLineEnding);
+}
+
+// The text changes made on disk by a worker thread, up to the first that
+// failed, if one did.
+struct DiskChanges {
+    EditJournal journal;
+    QString error;
+};
+
+DiskChanges editFilesOnDisk(const QList<DocumentEdit> &edits, LineEnding newFileLineEnding)
+{
+    DiskChanges changes;
+    for (const DocumentEdit &edit : edits) {
+        changes.error = editFileOnDisk(edit, changes.journal, newFileLineEnding);
+        if (!changes.error.isEmpty())
+            break;
+    }
+    return changes;
 }
 
 Room makeRoom(const FileOperation &operation, const QString &target, const EditTargets &targets, EditJournal &journal)
@@ -228,32 +259,88 @@ int changedFileCount(const EditJournal &journal)
     return int(changed.size());
 }
 
+Outcome staleOutcome(const QStringList &stale)
+{
+    Outcome outcome;
+    for (const QString &path : stale)
+        outcome.errors.append(tr("%1 changed meanwhile: nothing was changed, try again").arg(nameOf(path)));
+    return outcome;
+}
+
+// The outcome of the changes in `journal`, made up to `error` if there is
+// one: then all or nothing, they are reverted.
+Outcome conclude(EditJournal journal, const QString &error, const EditTargets &targets)
+{
+    Outcome outcome;
+    if (error.isEmpty()) {
+        outcome.filesChanged = changedFileCount(journal);
+        outcome.journal = std::move(journal);
+        return outcome;
+    }
+    outcome.errors.append(error);
+    outcome.errors.append(journal.revert(targets));
+    if (!journal.isEmpty())
+        outcome.errors.append(tr("The changes already made were undone"));
+    return outcome;
+}
+
+bool hasFileOperations(const WorkspaceEdit &edit)
+{
+    return std::ranges::any_of(
+        edit.changes, [](const DocumentChange &change) { return std::holds_alternative<FileOperation>(change); });
+}
+
 } // namespace
 
 Outcome apply(const WorkspaceEdit &edit, const EditTargets &targets)
 {
-    Outcome outcome;
-    if (const QStringList stale = staleFiles(edit, targets); !stale.isEmpty()) {
-        for (const QString &path : stale)
-            outcome.errors.append(tr("%1 changed meanwhile: nothing was changed, try again").arg(nameOf(path)));
-        return outcome;
-    }
+    if (const QStringList stale = staleFiles(edit, targets); !stale.isEmpty())
+        return staleOutcome(stale);
     const LineEnding newFileLineEnding = lineEndingOfNewFiles(edit, targets);
     EditJournal journal;
     for (const DocumentChange &change : edit.changes) {
         const QString error = perform(change, targets, journal, newFileLineEnding);
-        if (error.isEmpty())
-            continue;
-        outcome.errors.append(error);
-        // All or nothing.
-        outcome.errors.append(journal.revert(targets));
-        if (!journal.isEmpty())
-            outcome.errors.append(tr("The changes already made were undone"));
-        return outcome;
+        if (!error.isEmpty())
+            return conclude(std::move(journal), error, targets);
     }
-    outcome.filesChanged = changedFileCount(journal);
-    outcome.journal = std::move(journal);
-    return outcome;
+    return conclude(std::move(journal), {}, targets);
+}
+
+void applyInBackground(const WorkspaceEdit &edit, const EditTargets &targets, const QObject *context, Applied applied)
+{
+    if (hasFileOperations(edit)) {
+        applied(apply(edit, targets));
+        return;
+    }
+    if (const QStringList stale = staleFiles(edit, targets); !stale.isEmpty()) {
+        applied(staleOutcome(stale));
+        return;
+    }
+    const LineEnding newFileLineEnding = lineEndingOfNewFiles(edit, targets);
+    EditJournal journal;
+    QList<DocumentEdit> onDisk;
+    for (const DocumentChange &change : edit.changes) {
+        const auto &documentEdit = std::get<DocumentEdit>(change);
+        if (EditorWidget *editor = targets.tabs->editorFor(documentEdit.filePath))
+            editOpenFile(editor, documentEdit, journal);
+        else
+            onDisk.append(documentEdit);
+    }
+    QThreadPool::globalInstance()->start([guard = QPointer<const QObject>(context), targets,
+                                          journal = std::move(journal), onDisk = std::move(onDisk), newFileLineEnding,
+                                          applied = std::move(applied)] mutable {
+        const DiskChanges disk = editFilesOnDisk(onDisk, newFileLineEnding);
+        QMetaObject::invokeMethod(
+            qApp,
+            [guard, targets, journal = std::move(journal), disk, applied = std::move(applied)] mutable {
+                if (!guard)
+                    return;
+                for (const EditJournal::Entry &entry : disk.journal.entries())
+                    journal.record(entry);
+                applied(conclude(std::move(journal), disk.error, targets));
+            },
+            Qt::QueuedConnection);
+    });
 }
 
 } // namespace WorkspaceEditing

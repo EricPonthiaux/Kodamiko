@@ -26,12 +26,13 @@ namespace {
 // (header insertion), and symbols of every namespace are offered, qualified
 // (all scopes). Parsing always: otherwise, while the file's headers are being
 // read, clangd answers with mere words (the local providers already give
-// those, at once).
+// those, at once). A rename reaches every file, however many: clangd refuses
+// one past 50 files by default, and a widely used type goes past.
 QStringList clangdArguments()
 {
-    QStringList arguments = {QStringLiteral("--background-index"), QStringLiteral("--header-insertion=iwyu"),
-                             QStringLiteral("--all-scopes-completion"), QStringLiteral("--pch-storage=memory"),
-                             QStringLiteral("--completion-parse=always")};
+    QStringList arguments = {QStringLiteral("--background-index"),        QStringLiteral("--header-insertion=iwyu"),
+                             QStringLiteral("--all-scopes-completion"),   QStringLiteral("--pch-storage=memory"),
+                             QStringLiteral("--completion-parse=always"), QStringLiteral("--rename-file-limit=0")};
     // On Windows, LLVM runs the default "low" priority in
     // THREAD_MODE_BACKGROUND_BEGIN, which also drops the threads' I/O and
     // memory priority: indexing a project's thousands of headers crawls.
@@ -687,6 +688,24 @@ void LanguageServers::closeDocument(const QString &path)
         client->notify(QStringLiteral("textDocument/didClose"),
                        QJsonObject{{"textDocument", QJsonObject{{"uri", QUrl::fromLocalFile(path).toString()}}}});
     documents_.erase(it);
+}
+
+void LanguageServers::notifySaved(const QString &path)
+{
+    const auto it = documents_.constFind(path);
+    if (it == documents_.cend())
+        return;
+    LspClient *client = clients_.value(it.value().server);
+    if (!client)
+        return;
+    // A number (the kind of change) or an object whose "save" is true or
+    // options.
+    const QJsonValue save = client->capabilities().value("textDocumentSync").toObject().value("save");
+    const bool wantsSaves = save.toBool() || save.isObject();
+    if (!wantsSaves)
+        return;
+    client->notify(QStringLiteral("textDocument/didSave"),
+                   QJsonObject{{"textDocument", QJsonObject{{"uri", QUrl::fromLocalFile(path).toString()}}}});
 }
 
 QStringList LanguageServers::filesWithDiagnostics() const

@@ -23,7 +23,7 @@ class CommitPanel : public QFrame {
     Q_OBJECT
 
 public:
-    explicit CommitPanel(GitCommands *commands, QWidget *parent = nullptr);
+    explicit CommitPanel(GitCommands *gitCommands, QWidget *parent = nullptr);
 
     // The changes to commit, in `pathspec` (the open folder within the
     // repository); nullptr outside a repository. Not owned: call again
@@ -66,7 +66,7 @@ private:
     const RepositoryStatus *status_ = nullptr;
     QString pathspec_;
     QPlainTextEdit *message_;
-    QCheckBox *amend_;
+    QCheckBox *amendCheckbox_;
     QPushButton *generateButton_;
     QPushButton *reviewButton_;
     QString agentName_;

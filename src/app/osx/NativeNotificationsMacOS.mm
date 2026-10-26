@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "NativeNotifications.h"
+#include "app/NativeNotifications.h"
 
 #include <QCoreApplication>
 #include <QMetaObject>

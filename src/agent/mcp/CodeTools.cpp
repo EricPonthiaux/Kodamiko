@@ -79,10 +79,8 @@ LspClient *serverFor(const DuetToolContext &context, const QString &path, QStrin
             failure.isEmpty() ? QStringLiteral("No language server for %1 files in Duet").arg(languageId) : failure;
         return nullptr;
     }
-    const bool changed =
-        context.languageServers->syncDocument(client, path, languageId, textOf(context, path).toUtf8());
-    if (sent)
-        *sent = changed;
+    // The open files first: `path` is then checked with their text (a
+    // header changed in an editor), which clangd would not check again.
     if (const std::optional<LanguageServerSpec> spec = context.languageServers->specFor(languageId)) {
         for (const QString &open : context.tabs->openFilePaths()) {
             const EditorWidget *editor = context.tabs->editorFor(open);
@@ -91,6 +89,10 @@ LspClient *serverFor(const DuetToolContext &context, const QString &path, QStrin
                                                       editor->utf8Bytes().toByteArray());
         }
     }
+    const bool changed =
+        context.languageServers->syncDocument(client, path, languageId, textOf(context, path).toUtf8());
+    if (sent)
+        *sent = changed;
     return client;
 }
 
@@ -695,7 +697,8 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
          .inputSchema = positionSchema(
              {{QStringLiteral("newName"), string(QStringLiteral("The new name"))},
               {QStringLiteral("commentsAndStrings"),
-               boolean(QStringLiteral("Also rename the name in comments, strings and non-code files (default false)"))},
+               boolean(QStringLiteral("Also rename the name in the comments and strings of the files the rename "
+                                      "changes (default false)"))},
               {QStringLiteral("preview"), boolean(QStringLiteral("Show the user the changes first (default false)"))}},
              {QStringLiteral("commentsAndStrings"), QStringLiteral("preview")})},
         handledBy(context, renameSymbol)));

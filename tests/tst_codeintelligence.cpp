@@ -124,6 +124,23 @@ void indexProject(ClangdProject &project)
     QTRY_VERIFY(!indexed.isEmpty());
 }
 
+// "total" renamed to "sum" by a refactoring, in open.h, open, and in
+// closed.h, not; open.h's editor, or nullptr if the rename failed.
+EditorWidget *openRenamedInTwoFiles(ClangdProject &project)
+{
+    write(project.dir.filePath("open.h"), "int total;\n");
+    write(project.dir.filePath("closed.h"), "int total;\n");
+    auto *editor = EditorTabs::editorIn(project.tabs.openFile(project.dir.filePath("open.h")));
+    const LspProtocol::Range total{{0, 4}, {0, 9}};
+    const LspProtocol::WorkspaceEdit edit{{
+        LspProtocol::DocumentEdit{project.dir.filePath("open.h"), {}, {{total, "sum"}}},
+        LspProtocol::DocumentEdit{project.dir.filePath("closed.h"), {}, {{total, "sum"}}},
+    }};
+    if (!editor || project.intelligence.applyWorkspaceEdit(edit, "Rename “total” to “sum”") != 2)
+        return nullptr;
+    return editor;
+}
+
 } // namespace
 
 class TestCodeIntelligence : public QObject {
@@ -206,6 +223,43 @@ private slots:
         QCOMPARE(outcome.filesChanged, 0);
         QCOMPARE(outcome.errors.size(), 1);
         QCOMPARE(editor->text(), QString("int total = 0;\n"));
+    }
+
+    void theUndoKeyUndoesTheWholeRefactoring()
+    {
+        ClangdProject project;
+        EditorWidget *editor = openRenamedInTwoFiles(project);
+        QVERIFY(editor);
+
+        QTest::keySequence(editor, QKeySequence::Undo);
+
+        QCOMPARE(editor->text(), QString("int total;\n"));
+        QCOMPARE(read(project.dir.filePath("closed.h")), QByteArray("int total;\n"));
+    }
+
+    void theRedoKeyRedoesTheWholeRefactoring()
+    {
+        ClangdProject project;
+        EditorWidget *editor = openRenamedInTwoFiles(project);
+        QVERIFY(editor);
+        QTest::keySequence(editor, QKeySequence::Undo);
+
+        QTest::keySequence(editor, QKeySequence::Redo);
+
+        QCOMPARE(editor->text(), QString("int sum;\n"));
+        QCOMPARE(read(project.dir.filePath("closed.h")), QByteArray("int sum;\n"));
+    }
+
+    void theUndoKeyDoesNotBringBackPartOfAnUndoneRefactoring()
+    {
+        ClangdProject project;
+        EditorWidget *editor = openRenamedInTwoFiles(project);
+        QVERIFY(editor);
+        QTest::keySequence(editor, QKeySequence::Undo);
+
+        QTest::keySequence(editor, QKeySequence::Undo);
+
+        QCOMPARE(editor->text(), QString("int total;\n"));
     }
 
     void appliesEditsFromTheEnd()
@@ -441,6 +495,24 @@ private slots:
         QVERIFY(!QApplication::activePopupWidget()); // no name asked
     }
 
+    void checksAgainTheFilesIncludingAHeaderOnceItIsSavedWithClangd()
+    {
+        if (QStandardPaths::findExecutable("clangd").isEmpty())
+            QSKIP("clangd is not installed");
+        ClangdProject project;
+        write(project.dir.filePath("a.h"), "struct A { int old_; };\n");
+        const EditorWidget *source = project.open("a.cpp", "#include \"a.h\"\nint f(A a) { return a.renamed_; }\n");
+        QVERIFY(source);
+        QTRY_VERIFY_WITH_TIMEOUT(!project.problems.problems(source->filePath()).isEmpty(), 30000);
+        auto *header = EditorTabs::editorIn(project.tabs.openFile(project.dir.filePath("a.h")));
+        QVERIFY(header);
+        header->setText("struct A { int renamed_; };\n");
+
+        QVERIFY(project.tabs.saveCurrent());
+
+        QTRY_VERIFY_WITH_TIMEOUT(project.problems.problems(source->filePath()).isEmpty(), 30000);
+    }
+
     void renamesThroughThePreviewThenUndoesWithClangd()
     {
         if (QStandardPaths::findExecutable("clangd").isEmpty())
@@ -460,8 +532,8 @@ private slots:
         QCOMPARE(editor->text(), QString("int count = 0;\nint next() { return ++count; }\n")); // not yet
         preview->accept();
 
-        QCOMPARE(editor->text(), QString("int total = 0;\nint next() { return ++total; }\n"));
-        QCOMPARE(project.intelligence.history()->lastDescription(), QString("Rename “count” to “total”"));
+        QTRY_COMPARE(editor->text(), QString("int total = 0;\nint next() { return ++total; }\n"));
+        QTRY_COMPARE(project.intelligence.history()->lastDescription(), QString("Rename “count” to “total”"));
         project.intelligence.undoRefactoring();
         QCOMPARE(editor->text(), QString("int count = 0;\nint next() { return ++count; }\n"));
     }
@@ -486,7 +558,7 @@ private slots:
         auto *preview = project.tabs.window()->findChild<RefactoringPreviewPopup *>();
         QCOMPARE(preview->files()->count(), 2); // the code, then the comment
         preview->accept();
-        QCOMPARE(editor->text(), QString("// total of the calls\nint total = 0;\n"));
+        QTRY_COMPARE(editor->text(), QString("// total of the calls\nint total = 0;\n"));
     }
 
     void findsTheUsagesOfANameByKindWithClangd()
@@ -578,7 +650,7 @@ private slots:
         QVERIFY(preview);
         preview->accept();
 
-        QCOMPARE(read(project.dir.filePath("Circle.h")), QByteArray("#pragma once\n\nclass Circle {};\n"));
+        QTRY_COMPARE(read(project.dir.filePath("Circle.h")), QByteArray("#pragma once\n\nclass Circle {};\n"));
         QCOMPARE(editor->text(), QString("#pragma once\n#include \"Circle.h\"\n\nclass Square {};\n\n"));
         QCOMPARE(project.tabs.currentFilePath(), project.dir.filePath("Circle.h")); // opened
         project.intelligence.undoRefactoring();

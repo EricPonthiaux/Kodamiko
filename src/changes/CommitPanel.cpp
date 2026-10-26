@@ -24,11 +24,11 @@ constexpr int messageHeight = 84;
 
 } // namespace
 
-CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
+CommitPanel::CommitPanel(GitCommands *gitCommands, QWidget *parent)
     : QFrame(parent)
-    , commands_(commands)
+    , commands_(gitCommands)
     , message_(new QPlainTextEdit(this))
-    , amend_(new QCheckBox(tr("Amend"), this))
+    , amendCheckbox_(new QCheckBox(tr("Amend"), this))
     , generateButton_(new QPushButton(this))
     , reviewButton_(new QPushButton(tr("Review"), this))
     , commitButton_(new QPushButton(tr("Commit"), this))
@@ -37,7 +37,7 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
     message_->setTabChangesFocus(true);
     message_->setMinimumHeight(messageHeight);
     message_->setPlaceholderText(tr("Commit message (Ctrl+Enter to commit)"));
-    amend_->setToolTip(tr("Replace the last commit with the staged changes and this message"));
+    amendCheckbox_->setToolTip(tr("Replace the last commit with the staged changes and this message"));
     generateButton_->setText(tr("Generate"));
     commitButton_->setDefault(true);
     commitButton_->setToolTip(tr("Commit the staged changes (Ctrl+Enter)"));
@@ -46,7 +46,7 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
             new QShortcut(QKeySequence(Qt::CTRL | key), message_, nullptr, nullptr, Qt::WidgetShortcut);
         connect(shortcut, &QShortcut::activated, this, &CommitPanel::commit);
     }
-    connect(amend_, &QCheckBox::toggled, this, &CommitPanel::onAmendToggled);
+    connect(amendCheckbox_, &QCheckBox::toggled, this, &CommitPanel::onAmendToggled);
     connect(commitButton_, &QPushButton::clicked, this, &CommitPanel::commit);
     connect(generateButton_, &QPushButton::clicked, this, &CommitPanel::generateMessage);
     connect(reviewButton_, &QPushButton::clicked, this, &CommitPanel::reviewRequested);
@@ -54,7 +54,7 @@ CommitPanel::CommitPanel(GitCommands *commands, QWidget *parent)
     // Amend at the left; the secondary action, then the main one, at the right.
     auto *actions = new QHBoxLayout;
     actions->setSpacing(6);
-    actions->addWidget(amend_);
+    actions->addWidget(amendCheckbox_);
     actions->addStretch();
     actions->addWidget(reviewButton_);
     actions->addWidget(generateButton_);
@@ -83,8 +83,8 @@ void CommitPanel::setStatus(const RepositoryStatus *status, const QString &paths
 void CommitPanel::reset()
 {
     message_->clear();
-    const QSignalBlocker blocker(amend_);
-    amend_->setChecked(false);
+    const QSignalBlocker blocker(amendCheckbox_);
+    amendCheckbox_->setChecked(false);
 }
 
 void CommitPanel::updateActions()
@@ -94,9 +94,9 @@ void CommitPanel::updateActions()
     commitButton_->setEnabled(!commands_->isBusy() && hasChanges);
     generateButton_->setEnabled(hasChanges);
     reviewButton_->setEnabled(status_ && !status_->staged.isEmpty());
-    amend_->setEnabled(hasChanges && hasLastCommit);
+    amendCheckbox_->setEnabled(hasChanges && hasLastCommit);
     if (!hasChanges)
-        amend_->setChecked(false); // the changes it was for are gone
+        amendCheckbox_->setChecked(false); // the changes it was for are gone
 }
 
 void CommitPanel::focusMessage()
@@ -120,7 +120,7 @@ void CommitPanel::generateMessage()
     if (!status_)
         return;
     // As commit(): with nothing staged, everything will be.
-    const bool isAmend = amend_->isChecked();
+    const bool isAmend = amendCheckbox_->isChecked();
     const bool stagesEverything = status_->staged.isEmpty() && !isAmend;
     if (stagesEverything && status_->unstaged.isEmpty()) {
         emit statusMessage(tr("Nothing to commit"));
@@ -151,7 +151,7 @@ void CommitPanel::commit()
     if (!status_ || commands_->isBusy())
         return;
     const QString message = message_->toPlainText().trimmed();
-    const bool amend = amend_->isChecked();
+    const bool amend = amendCheckbox_->isChecked();
     if (message.isEmpty()) {
         emit statusMessage(tr("Write the commit message first"));
         message_->setFocus();
@@ -189,8 +189,8 @@ void CommitPanel::runCommit(const QString &message, bool amend, bool stageEveryt
             return amend ? QObject::tr("Last commit replaced by %1").arg(id) : QObject::tr("Created commit %1").arg(id);
         },
         [this] {
-            const QSignalBlocker blocker(amend_);
-            amend_->setChecked(false);
+            const QSignalBlocker blocker(amendCheckbox_);
+            amendCheckbox_->setChecked(false);
             message_->clear();
         },
         [this, message, amend, stageEverything](const GitError &error) {

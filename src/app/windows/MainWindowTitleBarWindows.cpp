@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "MainWindow.h"
+#include "app/MainWindow.h"
 #include "ui/DetachablePage.h"
 #include "ui/TitleBar.h"
 #include "ui/WindowFrame.h"

@@ -35,7 +35,7 @@ using RefactoringDone = std::function<void(const RefactoringOutcome &outcome)>;
 struct Proposal {
     QString title; // "Rename “total” to “sum”"
     LspProtocol::WorkspaceEdit edit;
-    // In comments, strings and non-code files (see RenameAnalysis).
+    // In comments and strings (see RenameAnalysis).
     LspProtocol::WorkspaceEdit textualEdit;
     QStringList conflicts;
 };

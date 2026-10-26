@@ -52,7 +52,7 @@ public:
         LanguageServers *servers = nullptr;
         CodeNavigator *navigator = nullptr;
         ProblemStore *problems = nullptr;
-        // Where to look for a renamed name in comments and strings;
+        // Where to look for usages and for references to moved files;
         // nullptr: only in the unsaved texts. Thread-safe.
         const OccurrenceStore *index = nullptr;
     };
@@ -118,6 +118,13 @@ public:
     void updateReferencesToMovedFile(const QString &from, const QString &to);
     // Undoes the last refactoring in every file it changed.
     void undoRefactoring();
+    // Redoes the refactoring undone last in every file it changed.
+    void redoRefactoring();
+
+    // On an editor attach() was given: the system's Undo key, in a file the
+    // last refactoring left as it is, undoes the whole refactoring rather
+    // than its part in that file; its Redo key redoes it the same way.
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
     // What Claude's rename_symbol asks.
     struct RenameRequest {
@@ -165,6 +172,11 @@ public:
 
 signals:
     void statusMessage(const QString &message);
+    // A refactoring makes the user wait: for the server and the analysis
+    // before its preview, or while its files are written. Each started is
+    // followed by a finished, or by another started that replaces it.
+    void refactoringStarted(const QString &description);
+    void refactoringFinished();
     void usagesFound(const UsageResults &results);
     void hierarchyFound(const Hierarchy &hierarchy);
 
@@ -177,6 +189,8 @@ private:
 
     // applyWorkspaceEdit(), with its errors.
     WorkspaceEditing::Outcome applyEdit(const LspProtocol::WorkspaceEdit &edit, const QString &description);
+    // The errors of an edit made, said; the edit, for Undo Refactoring.
+    void recordEdit(const WorkspaceEditing::Outcome &outcome, const QString &description);
     QJsonObject positionParams(EditorWidget *editor, int bytePosition) const;
     // Goes to the `method` locations at the cursor, if the server has the
     // `capability` ("implementationProvider"); says `noneFound` if none.
@@ -192,6 +206,16 @@ private:
     // rename or a search for usages covers them, unsaved changes included,
     // even before the server has indexed the project.
     void syncOpenEditors(LspClient *client, const QString &languageId);
+    // After an edit of several files (a refactoring, its undo or redo): the
+    // servers learn the texts it left at once rather than when next asked.
+    // The open editors first, so that a file checked after them sees their
+    // headers' new text; then the files the servers have open that changed
+    // on disk, saved: clangd then checks again the files that include them.
+    void syncServersAfterEdit();
+    // Sends `path`'s text on disk to its server; whether it was new there.
+    bool syncFromDisk(const QString &path);
+    // `path` was saved: its server checks again what depends on it.
+    void notifySaved(const QString &path);
 
     // A rename asked in the popup.
     // A rename asked in the popup, or by Claude.

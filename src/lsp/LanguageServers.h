@@ -116,6 +116,10 @@ public:
     // Tells its server `path` is closed ("didClose"): the server reads it
     // from disk again (it was closed in Duet, renamed or deleted).
     void closeDocument(const QString &path);
+    // Tells its server `path`, open there, was saved ("didSave"), if the
+    // server wants to know: clangd then checks again the open files that
+    // include it, which a didChange alone does not.
+    void notifySaved(const QString &path);
 
     // The problems the servers last reported for `path` (LSP Diagnostic
     // objects), and the files they reported problems for.

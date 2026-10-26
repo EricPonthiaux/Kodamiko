@@ -4,7 +4,6 @@
 
 #include "editor/TextFile.h"
 #include "index/OccurrenceScanner.h"
-#include "index/OccurrenceStore.h"
 #include "syntax/LanguageRegistry.h"
 
 #include <QCoreApplication>
@@ -22,8 +21,7 @@ namespace RenameAnalysis {
 namespace {
 
 // The occurrences that a rename in comments and strings replaces.
-constexpr std::initializer_list<OccurrenceRole> textualRoles = {OccurrenceRole::Comment, OccurrenceRole::String,
-                                                                OccurrenceRole::Text};
+constexpr std::initializer_list<OccurrenceRole> textualRoles = {OccurrenceRole::Comment, OccurrenceRole::String};
 
 // A file's text, read once, with where its lines start.
 struct ReadFile {
@@ -107,22 +105,10 @@ QList<TextEdit> textualEditsIn(const QString &path, const ReadFile &file, const 
     return edits;
 }
 
-// The files where the name may occur: the index's, and the unsaved texts.
-QStringList candidateFiles(const Input &input)
-{
-    QStringList files = input.index ? input.index->filesContaining(input.name.toUtf8()) : QStringList();
-    for (auto it = input.unsavedTexts.cbegin(); it != input.unsavedTexts.cend(); ++it) {
-        if (!files.contains(it.key()))
-            files.append(it.key());
-    }
-    files.sort();
-    return files;
-}
-
 WorkspaceEdit textualEdit(const Input &input)
 {
     WorkspaceEdit edit;
-    for (const QString &path : candidateFiles(input)) {
+    for (const QString &path : input.codeEdit.filePaths()) {
         const std::optional<ReadFile> file = readFile(path, input.unsavedTexts);
         if (!file)
             continue;

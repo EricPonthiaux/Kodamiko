@@ -366,6 +366,17 @@ void MainWindow::createEditMenu()
     connect(intelligence_->history(), &RefactoringHistory::changed, this, updateUndoRefactoring);
     updateUndoRefactoring();
     undoRefactoringAction_ = undoRefactoring;
+    QAction *redoRefactoring =
+        edit->addAction(tr("&Redo Refactoring"), this, inCode(&CodeIntelligence::redoRefactoring));
+    Keymap::setStableName(redoRefactoring, QStringLiteral("Redo Refactoring"));
+    const auto updateRedoRefactoring = [this, redoRefactoring] {
+        const QString next = intelligence_->history()->nextRedoDescription();
+        redoRefactoring->setEnabled(!next.isEmpty());
+        redoRefactoring->setVisible(!next.isEmpty());
+        redoRefactoring->setText(next.isEmpty() ? tr("&Redo Refactoring") : tr("&Redo %1").arg(next));
+    };
+    connect(intelligence_->history(), &RefactoringHistory::changed, this, updateRedoRefactoring);
+    updateRedoRefactoring();
     edit->addAction(tr("F&ormat Document"), QKeySequence(tr("Ctrl+Alt+L")), this, [this] {
         if (mode_ == Mode::Edit)
             editorTabs_->formatCurrent();

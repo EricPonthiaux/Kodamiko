@@ -21,7 +21,7 @@ class QPushButton;
 // it changes, each checked, and the diff of the selected one. A file with
 // only text edits can be unchecked to leave it as it is; one the
 // refactoring creates, renames or deletes cannot. The name's occurrences
-// in comments, strings and non-code files come after, a file each, and
+// in comments and strings come after, a file each, and
 // the conflicts above. Do Refactor makes the changes of the checked
 // files, Cancel or Escape none. The popup follows the applied theme and
 // deletes itself once dismissed.
@@ -34,7 +34,7 @@ public:
         QString root;  // the paths are shown relative to it
         LspProtocol::WorkspaceEdit edit;
         QList<RefactoredFile> files; // EditPreview::simulate(edit)
-        // In comments, strings and non-code files (see RenameAnalysis).
+        // In comments and strings (see RenameAnalysis).
         LspProtocol::WorkspaceEdit textualEdit = {};
         QList<RefactoredFile> textualFiles;
         QStringList conflicts;
