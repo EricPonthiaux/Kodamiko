@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "agent/vendor/claude/ClaudeTrust.h"
+#include "projects/NewInstance.h"
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
 #include "projects/ProjectStore.h"
-#include "projects/NewInstance.h"
 #include "projects/ProjectWindowServer.h"
 #include "recipes/RecipeLibrary.h"
 #include "support/SystemFixtures.h"
