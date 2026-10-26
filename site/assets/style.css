@@ -1,36 +1,63 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 
-/* The brand colors come from packaging/brand/duet-icon.svg. */
+/* Inter, subset to Latin, is served with the site so that every visitor sees
+   the same type; its license is fonts/OFL.txt. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/InterVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/InterVariable-Italic.woff2") format("woff2");
+}
+
+/* The brand colors come from packaging/brand/duet-icon.svg. The site is dark
+   by default, like the editor its screenshots show. */
 :root {
-  --bg: #15181f;
-  --surface: #1f232c;
-  --surface-raised: #272c37;
-  --border: #323846;
-  --text: #e7e9ef;
-  --text-muted: #a3a9b8;
+  --bg: #0d0f13;
+  --surface: #12151b;
+  --surface-raised: #181c24;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #eceef3;
+  --text-muted: #9ba2b1;
+  --text-subtle: #6f7686;
   --accent: #4f7cf0;
-  --accent-strong: #7096f5;
-  --code-bg: #0f1116;
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-  --radius: 12px;
+  --accent-strong: #84a3f7;
+  --accent-soft: rgba(79, 124, 240, 0.12);
+  --glow: rgba(79, 124, 240, 0.16);
+  --code-bg: #0a0c10;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+  --radius: 10px;
   --content-width: 1120px;
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f6f7fa;
-    --surface: #ffffff;
-    --surface-raised: #eef0f5;
-    --border: #dde1ea;
-    --text: #1f232c;
-    --text-muted: #555c6c;
+    --bg: #fbfbfc;
+    --surface: #f4f5f8;
+    --surface-raised: #ffffff;
+    --border: rgba(15, 20, 30, 0.09);
+    --border-strong: rgba(15, 20, 30, 0.16);
+    --text: #12151b;
+    --text-muted: #555c6b;
+    --text-subtle: #808797;
     --accent: #3461d8;
-    --accent-strong: #2a50b8;
-    --code-bg: #1f232c;
-    --shadow: 0 24px 60px rgba(31, 35, 44, 0.18);
+    --accent-strong: #2a52c4;
+    --accent-soft: rgba(52, 97, 216, 0.08);
+    --glow: rgba(52, 97, 216, 0.1);
+    --code-bg: #12151b;
+    --shadow: 0 1px 2px rgba(15, 20, 30, 0.06), 0 30px 70px -24px rgba(15, 20, 30, 0.28);
     color-scheme: light;
   }
 }
@@ -43,6 +70,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 72px;
 }
 
 body {
@@ -50,9 +78,23 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 17px;
-  line-height: 1.6;
+  font-size: 16px;
+  font-feature-settings: "cv11", "ss01";
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 img {
@@ -64,10 +106,19 @@ img {
 a {
   color: var(--accent-strong);
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 a:hover {
   text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a:focus-visible,
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
 code {
@@ -88,14 +139,24 @@ code {
   }
 }
 
+/* A small label above a title, naming the section */
+.eyebrow {
+  margin: 0 0 14px;
+  color: var(--accent-strong);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* Header */
 
 .site-header {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px);
   border-bottom: 1px solid var(--border);
 }
 
@@ -104,7 +165,7 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 60px;
+  height: 56px;
 }
 
 .brand {
@@ -112,8 +173,9 @@ code {
   align-items: center;
   gap: 10px;
   color: var(--text);
-  font-weight: 700;
-  font-size: 1.15rem;
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
 }
 
 .brand:hover {
@@ -121,15 +183,15 @@ code {
 }
 
 .brand img {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
 }
 
 .site-nav {
   display: flex;
   align-items: center;
-  gap: 20px;
-  font-size: 0.95rem;
+  gap: 24px;
+  font-size: 0.875rem;
 }
 
 .site-nav a {
@@ -142,68 +204,110 @@ code {
 }
 
 .site-nav .lang {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 0.85rem;
+  padding: 3px 10px;
+  font-size: 0.8rem;
 }
 
 @media (max-width: 640px) {
+  .site-nav {
+    gap: 16px;
+  }
+
   .site-nav .optional {
     display: none;
   }
 }
 
-/* Hero */
+/* Hero: a soft glow of the brand color rises behind the screenshot. */
 
 .hero {
-  padding: 72px 0 40px;
+  position: relative;
+  padding: 96px 0 24px;
   text-align: center;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 45% at 50% 0%, var(--glow), transparent 70%),
+    radial-gradient(50% 35% at 50% 75%, var(--glow), transparent 70%);
+  pointer-events: none;
+}
+
+.hero .container {
+  position: relative;
+}
+
+.hero .eyebrow {
+  display: inline-block;
+  margin-bottom: 24px;
+  padding: 5px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 0.78rem;
 }
 
 /* The title stays on one line: its size follows the container's width.
-   --title-em is the title's width in em, measured in Noto Sans Bold, one of
-   the widest system fonts; on a phone, each half gets its own line. */
+   --title-em is the title's width in em, measured in Inter SemiBold with its
+   tracking, plus a margin; on a phone, each half gets its own line. */
 .hero .container {
   container-type: inline-size;
 }
 
 .hero h1 {
-  --title-em: 20.5;
-  margin: 0 auto 20px;
-  font-size: min(3.4rem, 100cqi / var(--title-em));
-  line-height: 1.12;
-  letter-spacing: -0.02em;
+  --title-em: 19.5;
+  margin: 0 auto 24px;
+  font-size: min(3.5rem, 100cqi / var(--title-em));
+  line-height: 1.1;
+  letter-spacing: -0.035em;
   white-space: nowrap;
 }
 
 .hero h1:lang(fr) {
-  --title-em: 27;
+  --title-em: 26;
 }
 
 .hero h1 .accent {
-  color: var(--accent-strong);
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @media (max-width: 719px) {
+  .hero {
+    padding-top: 64px;
+  }
+
   .hero h1 {
-    --title-em: 13;
+    --title-em: 12.3;
   }
 
   .hero h1:lang(fr) {
-    --title-em: 16.5;
+    --title-em: 15.6;
   }
 
   .hero h1 .accent {
     display: block;
   }
+
+  .hero .lead {
+    font-size: 1.02rem;
+  }
 }
 
 .hero .lead {
-  margin: 0 auto 32px;
-  max-width: 680px;
+  margin: 0 auto 36px;
+  max-width: 660px;
   color: var(--text-muted);
-  font-size: 1.2rem;
+  font-size: 1.125rem;
+  line-height: 1.7;
 }
 
 .actions {
@@ -213,141 +317,177 @@ code {
   gap: 12px;
 }
 
+/* The primary button is filled with the text color, the secondary one is a
+   hairline outline: no color or glow competes with the screenshot. */
 .button {
-  display: inline-block;
-  padding: 11px 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  background: transparent;
   color: var(--text);
-  font-weight: 600;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: border-color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
 }
 
 .button:hover {
   text-decoration: none;
-  border-color: var(--accent);
+  border-color: var(--text-subtle);
+  background: var(--accent-soft);
+}
+
+.button:not(.primary)::after {
+  content: "\2192";
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.button:not(.primary):hover::after {
+  transform: translateX(2px);
 }
 
 .button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #ffffff;
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
 }
 
 .button.primary:hover {
-  background: var(--accent-strong);
+  background: var(--text);
+  opacity: 0.88;
 }
 
 .platforms {
-  margin-top: 18px;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  margin-top: 20px;
+  color: var(--text-subtle);
+  font-size: 0.85rem;
 }
 
+/* A screenshot sits in a thin bezel, like a window on a desk. */
 .screenshot {
-  margin: 48px auto 0;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
+  margin: 56px auto 0;
+  padding: 6px;
+  border-radius: calc(var(--radius) + 6px);
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
   box-shadow: var(--shadow);
-  overflow: hidden;
-  background: var(--surface);
 }
 
-/* Sections */
+.screenshot img {
+  border-radius: var(--radius);
+  outline: 1px solid var(--border);
+}
+
+/* Sections, separated by a hairline */
 
 section {
-  padding: 72px 0;
+  padding: 104px 0;
+}
+
+section + section {
+  border-top: 1px solid var(--border);
 }
 
 section.alt {
   background: var(--surface);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+}
+
+@media (max-width: 719px) {
+  section {
+    padding: 72px 0;
+  }
 }
 
 .section-title {
-  margin: 0 0 12px;
-  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+  max-width: 760px;
+  font-size: clamp(1.65rem, 3.4vw, 2.35rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 
 .section-lead {
-  margin: 0 0 40px;
-  max-width: 720px;
+  margin: 0 0 48px;
+  max-width: 680px;
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: 1.06rem;
+  line-height: 1.7;
 }
 
-/* Pillars: the four promises, side by side on wide screens */
+/* Pillars: the promises, side by side on wide screens, numbered */
 
 .pillars {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  counter-reset: pillar;
 }
 
 .pillar {
-  padding: 24px;
+  padding: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
-}
-
-section.alt .pillar {
-  background: var(--surface-raised);
+  background: linear-gradient(180deg, var(--surface-raised), var(--bg));
+  counter-increment: pillar;
 }
 
 .pillar h3 {
-  margin: 0 0 8px;
-  font-size: 1.1rem;
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 
 .pillar p {
   margin: 0;
   color: var(--text-muted);
+  font-size: 0.95rem;
 }
 
 .pillar .mark {
   display: inline-block;
-  width: 10px;
-  height: 22px;
-  margin-bottom: 14px;
-  border-radius: 3px;
-  background: var(--accent);
+  margin-bottom: 20px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
 }
 
-/* Showcase: text beside a screenshot, alternating sides */
+.pillar .mark::before {
+  content: counter(pillar, decimal-leading-zero);
+}
+
+/* Showcase: text beside a screenshot */
 
 .showcase {
   display: grid;
-  gap: 32px;
+  gap: 40px;
   align-items: center;
-}
-
-.showcase + .showcase {
-  margin-top: 72px;
 }
 
 @media (min-width: 900px) {
   .showcase {
     grid-template-columns: 2fr 3fr;
-    gap: 48px;
-  }
-
-  .showcase.reverse .showcase-text {
-    order: 2;
+    gap: 64px;
   }
 }
 
 .showcase-text h3 {
-  margin: 0 0 12px;
-  font-size: 1.5rem;
-  line-height: 1.25;
+  margin: 0 0 16px;
+  font-size: clamp(1.45rem, 2.6vw, 1.9rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 
 .showcase-text p {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: var(--text-muted);
 }
 
@@ -355,25 +495,39 @@ section.alt .pillar {
   margin: 0;
 }
 
-/* Feature list */
+/* Feature list: a grid of short entries under a hairline */
 
 .features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px 40px;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 8px 48px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .features li {
-  padding: 16px 0;
+  padding: 20px 0;
   border-top: 1px solid var(--border);
+  font-size: 0.95rem;
 }
 
 .features strong {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.features strong::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 10px 2px 0;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 .features span {
@@ -383,7 +537,7 @@ section.alt .pillar {
 /* The diagram exchanges, under their screenshot; the quoted requests stand
    out as what the user would type. */
 .exchanges {
-  margin-top: 48px;
+  margin-top: 56px;
 }
 
 .exchanges em {
@@ -402,56 +556,92 @@ section.alt .pillar {
 }
 
 .recipes li {
-  padding: 6px 14px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  padding: 8px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
   background: var(--surface-raised);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  font-weight: 500;
 }
 
-/* Getting started */
+/* Getting started: the commands in a terminal window */
 
 .code-block {
-  margin: 0 0 20px;
-  padding: 20px 24px;
+  margin: 0 0 24px;
+  padding: 0 24px 22px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--code-bg);
   color: #e7e9ef;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: 0.92rem;
-  line-height: 1.7;
+  font-size: 0.88rem;
+  line-height: 1.8;
+}
+
+.code-block::before {
+  content: "";
+  display: block;
+  height: 38px;
+  margin: 0 -24px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background:
+    radial-gradient(circle, #3a3f4b 5px, transparent 5.5px) 16px 50% / 18px 18px no-repeat,
+    radial-gradient(circle, #3a3f4b 5px, transparent 5.5px) 36px 50% / 18px 18px no-repeat,
+    radial-gradient(circle, #3a3f4b 5px, transparent 5.5px) 56px 50% / 18px 18px no-repeat;
 }
 
 .code-block .comment {
-  color: #8a91a3;
+  color: #7d8496;
 }
 
 .requirements {
+  max-width: 760px;
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
 }
 
-/* Audience */
+/* Audience: the closing call to action */
 
 .audience {
+  position: relative;
   text-align: center;
+  overflow: hidden;
+}
+
+.audience::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(50% 70% at 50% 100%, var(--glow), transparent 70%);
+  pointer-events: none;
+}
+
+.audience .container {
+  position: relative;
 }
 
 .audience p {
-  margin: 0 auto 28px;
-  max-width: 700px;
-  font-size: 1.3rem;
-  line-height: 1.5;
+  margin: 0 auto 32px;
+  max-width: 680px;
+  font-size: clamp(1.25rem, 2.4vw, 1.55rem);
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 /* Footer */
 
 .site-footer {
-  padding: 32px 0;
+  padding: 28px 0;
   border-top: 1px solid var(--border);
+  color: var(--text-subtle);
+  font-size: 0.85rem;
+}
+
+.site-footer a {
   color: var(--text-muted);
-  font-size: 0.9rem;
 }
 
 .site-footer .container {
@@ -459,4 +649,10 @@ section.alt .pillar {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
