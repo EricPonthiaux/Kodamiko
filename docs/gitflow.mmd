@@ -1,0 +1,48 @@
+flowchart TB
+  user(["Utilisateur<br/>menu Git, panneau Changes"])
+  outside(["Terminal ou Claude<br/>modifient le dépôt"])
+  actions["GitActions<br/>commit, fetch, pull, push,<br/>merge, stash…"]
+  kind{"Opération distante ?"}
+  queue["File GitCommands<br/>une opération à la fois,<br/>hors du thread UI"]
+  busy["Barre d'état occupée<br/>progression + Annuler"]
+  run["Git::run<br/>lance le process git"]
+  env["Environnement<br/>pas de terminal, pas d'éditeur,<br/>messages en anglais"]
+  creds{"Identifiants<br/>en cache ?"}
+  askpass["duet-askpass<br/>demande à l'utilisateur"]
+  cancel{"Annulé ?"}
+  kill["git tué<br/>erreur Annulé"]
+  result{"git a réussi ?"}
+  back["Résultat renvoyé<br/>au thread UI"]
+  success["Message dans<br/>la barre d'état"]
+  recover{"Erreur récupérable ?<br/>rejeté, divergé,<br/>changements locaux…"}
+  wayout["Dialogue avec<br/>une porte de sortie"]
+  failed["Dialogue d'erreur"]
+  refresh["Mise à jour du dépôt<br/>branche, ↑↓, statuts"]
+  watcher["RepositoryWatcher<br/>surveille le dossier .git"]
+  views["Rafraîchit Changes,<br/>Historique, index"]
+  user --> actions
+  actions --> kind
+  kind -->|non| queue
+  kind -->|oui, runLong| busy
+  busy --> queue
+  queue --> run
+  run --> env
+  env --> creds
+  creds -->|non| askpass
+  askpass --> cancel
+  creds -->|oui| cancel
+  cancel -->|oui| kill
+  cancel -->|non| result
+  kill --> back
+  result --> back
+  back -->|succès| success
+  back -->|échec| recover
+  recover -->|oui| wayout
+  wayout -->|nouvelle tentative| queue
+  recover -->|non| failed
+  success --> refresh
+  failed --> refresh
+  outside --> watcher
+  run -.->|écrit dans .git| watcher
+  watcher --> refresh
+  refresh --> views

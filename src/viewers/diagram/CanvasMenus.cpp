@@ -12,6 +12,18 @@
 
 namespace diagram {
 
+namespace {
+
+// A menu whose actions show the element or relation they create: the style
+// sheet draws its icons larger than a menu's 16 px, where the shapes are
+// specks that cannot be told apart.
+void showPresetIcons(QMenu &menu)
+{
+    menu.setObjectName(QStringLiteral("diagramPresets"));
+}
+
+} // namespace
+
 void Canvas::chooseElement(QPointF screen, QPointF point, const QString &from)
 {
     const Family *family = board_->family();
@@ -22,6 +34,7 @@ void Canvas::chooseElement(QPointF screen, QPointF point, const QString &from)
         return;
     }
     QMenu menu(this);
+    showPresetIcons(menu);
     menu.setToolTipsVisible(true);
     const Style &style = board_->style();
     for (const ElementPreset &preset : family->elements) {
@@ -81,6 +94,7 @@ void Canvas::chooseRelation(QPointF screen, const QString &from, const QString &
 {
     const Family *family = board_->family();
     QMenu menu(this);
+    showPresetIcons(menu);
     menu.setToolTipsVisible(true);
     const Shape *a = board_->shape(from);
     const Shape *b = board_->shape(to);
@@ -272,6 +286,7 @@ void Canvas::addCanvasActions(QMenu &menu, QPointF point)
     const Family *family = board_->family();
     if (family && !family->elements.isEmpty()) {
         QMenu *add = menu.addMenu(tr("Add"));
+        showPresetIcons(*add);
         for (const ElementPreset &preset : family->elements) {
             connect(add->addAction(presetIcon(*family, preset, board_->style()), preset.label), &QAction::triggered,
                     this, [this, preset, point] { createElement(preset, point, {}); });

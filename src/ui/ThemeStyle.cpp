@@ -147,6 +147,7 @@ QMenu::icon { padding-left: 32px; }
 QMenu::item:selected { color: @text; background: @slate; }
 QMenu::item:disabled { color: @muted; }
 QMenu::separator { height: 1px; background: @separator; margin: 6px 10px; }
+QMenu#diagramPresets { icon-size: 32px; }
 QLineEdit, QPlainTextEdit, QTextBrowser { background: @base; border: 1px solid @border; border-radius: 3px; padding: 4px 8px; selection-background-color: @highlight; }
 QLineEdit:focus, QPlainTextEdit:focus { border: 1px solid @accent; }
 QPushButton { background: @button; border: 1px solid @border; border-radius: 3px; padding: 4px 14px; }
