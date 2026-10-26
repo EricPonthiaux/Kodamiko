@@ -1,0 +1,462 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+/* The brand colors come from packaging/brand/duet-icon.svg. */
+:root {
+  --bg: #15181f;
+  --surface: #1f232c;
+  --surface-raised: #272c37;
+  --border: #323846;
+  --text: #e7e9ef;
+  --text-muted: #a3a9b8;
+  --accent: #4f7cf0;
+  --accent-strong: #7096f5;
+  --code-bg: #0f1116;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --radius: 12px;
+  --content-width: 1120px;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7fa;
+    --surface: #ffffff;
+    --surface-raised: #eef0f5;
+    --border: #dde1ea;
+    --text: #1f232c;
+    --text-muted: #555c6c;
+    --accent: #3461d8;
+    --accent-strong: #2a50b8;
+    --code-bg: #1f232c;
+    --shadow: 0 24px 60px rgba(31, 35, 44, 0.18);
+    color-scheme: light;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+a {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.container {
+  width: 100%;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (min-width: 720px) {
+  .container {
+    padding: 0 32px;
+  }
+}
+
+/* Header */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 60px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brand img {
+  width: 30px;
+  height: 30px;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 0.95rem;
+}
+
+.site-nav a {
+  color: var(--text-muted);
+}
+
+.site-nav a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.site-nav .lang {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .site-nav .optional {
+    display: none;
+  }
+}
+
+/* Hero */
+
+.hero {
+  padding: 72px 0 40px;
+  text-align: center;
+}
+
+/* The title stays on one line: its size follows the container's width.
+   --title-em is the title's width in em, measured in Noto Sans Bold, one of
+   the widest system fonts; on a phone, each half gets its own line. */
+.hero .container {
+  container-type: inline-size;
+}
+
+.hero h1 {
+  --title-em: 20.5;
+  margin: 0 auto 20px;
+  font-size: min(3.4rem, 100cqi / var(--title-em));
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.hero h1:lang(fr) {
+  --title-em: 27;
+}
+
+.hero h1 .accent {
+  color: var(--accent-strong);
+}
+
+@media (max-width: 719px) {
+  .hero h1 {
+    --title-em: 13;
+  }
+
+  .hero h1:lang(fr) {
+    --title-em: 16.5;
+  }
+
+  .hero h1 .accent {
+    display: block;
+  }
+}
+
+.hero .lead {
+  margin: 0 auto 32px;
+  max-width: 680px;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.button {
+  display: inline-block;
+  padding: 11px 22px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.button:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+}
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.button.primary:hover {
+  background: var(--accent-strong);
+}
+
+.platforms {
+  margin-top: 18px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.screenshot {
+  margin: 48px auto 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* Sections */
+
+section {
+  padding: 72px 0;
+}
+
+section.alt {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.section-lead {
+  margin: 0 0 40px;
+  max-width: 720px;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
+/* Pillars: the four promises, side by side on wide screens */
+
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.pillar {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+section.alt .pillar {
+  background: var(--surface-raised);
+}
+
+.pillar h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.pillar p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.pillar .mark {
+  display: inline-block;
+  width: 10px;
+  height: 22px;
+  margin-bottom: 14px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+/* Showcase: text beside a screenshot, alternating sides */
+
+.showcase {
+  display: grid;
+  gap: 32px;
+  align-items: center;
+}
+
+.showcase + .showcase {
+  margin-top: 72px;
+}
+
+@media (min-width: 900px) {
+  .showcase {
+    grid-template-columns: 2fr 3fr;
+    gap: 48px;
+  }
+
+  .showcase.reverse .showcase-text {
+    order: 2;
+  }
+}
+
+.showcase-text h3 {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
+
+.showcase-text p {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+}
+
+.showcase .screenshot {
+  margin: 0;
+}
+
+/* Feature list */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.features li {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.features strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.features span {
+  color: var(--text-muted);
+}
+
+/* The diagram exchanges, under their screenshot; the quoted requests stand
+   out as what the user would type. */
+.exchanges {
+  margin-top: 48px;
+}
+
+.exchanges em {
+  color: var(--text);
+}
+
+/* Recipes */
+
+.recipes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipes li {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  font-size: 0.95rem;
+}
+
+/* Getting started */
+
+.code-block {
+  margin: 0 0 20px;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: #e7e9ef;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.code-block .comment {
+  color: #8a91a3;
+}
+
+.requirements {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* Audience */
+
+.audience {
+  text-align: center;
+}
+
+.audience p {
+  margin: 0 auto 28px;
+  max-width: 700px;
+  font-size: 1.3rem;
+  line-height: 1.5;
+}
+
+/* Footer */
+
+.site-footer {
+  padding: 32px 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.site-footer .container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}

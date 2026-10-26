@@ -1,0 +1,175 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duet — the editor built around Claude Code</title>
+  <meta name="description" content="Most editors were designed for a human typing code, and AI was added later. Duet starts from the other end: a full code editor built around Claude Code, where Claude sees what you see and you see everything Claude changes. Open source, for Linux, Windows and macOS.">
+  <link rel="icon" href="assets/duet-icon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="./">
+  <link rel="alternate" hreflang="fr" href="fr/">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="./"><img src="assets/duet-icon.svg" alt="">Duet</a>
+      <nav class="site-nav" aria-label="Main">
+        <a class="optional" href="#features">Features</a>
+        <a class="optional" href="#get-started">Get started</a>
+        <a href="https://github.com/EricPonthiaux/Duet">GitHub</a>
+        <a class="lang" href="fr/" hreflang="fr" lang="fr">Français</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>Built around Claude Code, <span class="accent">not added later</span></h1>
+        <p class="lead">Most editors were designed for a human typing code, and AI was added later: a chat panel on the side, or an agent in a terminal that cannot see your editor. Duet starts from the other end: a full code editor built around Claude Code, where Claude sees what you see, and you see everything Claude changes.</p>
+        <div class="actions">
+          <a class="button primary" href="#get-started">Get started</a>
+          <a class="button" href="https://github.com/EricPonthiaux/Duet">View on GitHub</a>
+        </div>
+        <p class="platforms">Open source · Linux, Windows and macOS</p>
+        <figure class="screenshot">
+          <img src="assets/screenshots/edit.png" width="1600" height="1000" alt="Duet's Edit mode: the project tree, a C++ file with syntax highlighting, and the Claude Code session beside it.">
+        </figure>
+      </div>
+    </section>
+
+    <section class="alt">
+      <div class="container">
+        <h2 class="section-title">Starting from the other end</h2>
+        <p class="section-lead">In Duet, Claude is not a guest of the editor: the editor was designed for it. Three things follow.</p>
+        <div class="pillars">
+          <article class="pillar">
+            <span class="mark" aria-hidden="true"></span>
+            <h3>It understands what you are looking at</h3>
+            <p>Claude already knows which file is open, where the cursor is, what is selected and which errors are underlined. Type “fix this” and it knows what you mean: no more pasting code or spelling out file paths.</p>
+          </article>
+          <article class="pillar">
+            <span class="mark" aria-hidden="true"></span>
+            <h3>It acts with the editor's tools</h3>
+            <p>Claude does more than suggest text. It goes to definitions, renames a function everywhere it is used, runs the build and reads the errors, shows a diff, draws a diagram — with the same tools as you. Nothing changes your repository without your approval.</p>
+          </article>
+          <article class="pillar">
+            <span class="mark" aria-hidden="true"></span>
+            <h3>You stay in control</h3>
+            <p>Every change Claude makes appears before your eyes, file by file. A snapshot of the project can be taken before each request, and one click undoes it all. You delegate without risk.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="diagrams">
+      <div class="container">
+        <h2 class="section-title">A diagram is worth a thousand lines of terminal</h2>
+        <p class="section-lead">When Claude explains a module, a flow or a refactoring plan, a wall of text scrolling by in a terminal is the hardest way to follow it. In Duet, Claude draws instead, and the diagram becomes a space you share: you both read it, point at it and change it. The conversation goes both ways.</p>
+        <figure class="screenshot">
+          <img src="assets/screenshots/diagram.png" srcset="assets/screenshots/diagram.png 1x, assets/screenshots/diagram-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Duet's diagram editor showing a flowchart of the diff review, laid out.">
+        </figure>
+        <ul class="features exchanges">
+          <li><strong>You ask, Claude draws</strong><span><em>“Draw the login flow in src/auth.”</em> Claude reads the code first, then writes the diagram in Mermaid or PlantUML: flowchart, sequence, class, state, data model, C4 or mind map. It opens laid out, ready to read.</span></li>
+          <li><strong>You point, Claude understands</strong><span>Select three boxes and type <em>“merge these into one service”</em>. Claude sees what is selected in the diagram, just as it sees the selection in a file.</span></li>
+          <li><strong>Claude points, you see</strong><span><em>“Where is the token checked?”</em> Rather than a paragraph, Claude answers by selecting the right elements in the diagram in front of you.</span></li>
+          <li><strong>You arrange, Claude keeps it</strong><span>Move the boxes where they make sense to you. When Claude changes the diagram, every element keeps its place, new ones go beside their neighbors, and one Undo cancels its change.</span></li>
+          <li><strong>From the diagram back to the code</strong><span><em>“Implement this state machine.”</em> <em>“Does the code still match this diagram?”</em> Once you agree on the picture, it becomes the specification Claude works from.</span></li>
+          <li><strong>Ready for the docs</strong><span>A diagram is a text file in your repository, reviewed like code, and Claude can export it as SVG or PNG for the documentation.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="alt">
+      <div class="container">
+        <h2 class="section-title">More than fifty tools in Claude's hands</h2>
+        <p class="section-lead">An agent in a terminal reads and rewrites text. In Duet, Claude works through the editor itself: the language servers, the refactorings, Git, the terminals and the diagrams. The same tools as you, with the same precision.</p>
+        <ul class="features">
+          <li><strong>Understand the code</strong><span>Go to a definition, find every reference, read a symbol's type and documentation, list the errors and warnings, and apply a quick fix.</span></li>
+          <li><strong>Refactor across the project</strong><span>Rename a symbol or a file, or change a function's signature, through the language server rather than search and replace, and undone in one step.</span></li>
+          <li><strong>Find its way</strong><span>Search files, symbols and text across the whole project, and read a file's outline before opening it.</span></li>
+          <li><strong>Drive Git</strong><span>Status, history, branches, staging, merge, stash, pull and push; continue or abort a rebase; write the commit message.</span></li>
+          <li><strong>Build and run</strong><span>Run the project's build and run configurations, type into a terminal and read what it prints, compiler errors included.</span></li>
+          <li><strong>Show you its work</strong><span>Open a file at the right line, show a diff, draw and lay out a diagram, and tell you when a long task is done.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="container">
+        <div class="showcase">
+          <div class="showcase-text">
+            <h3>Follow every change, review before you commit</h3>
+            <p>Open files reload as Claude edits them, and the Diff view updates after each step. Stage by file, hunk or line, and let Claude write the commit message in the style of your history.</p>
+            <p>Before committing, a separate, read-only reviewer can go over the staged changes and leave its findings right in the diff.</p>
+          </div>
+          <figure class="screenshot">
+            <img src="assets/screenshots/diff.png" width="1600" height="1000" alt="Duet's Diff mode: the list of changed files and a diff with staged and unstaged hunks.">
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="alt">
+      <div class="container">
+        <h2 class="section-title">A professional editor, without the clutter</h2>
+        <p class="section-lead">Over the years, editors have piled up panels, menus, settings and extensions, until using one became a skill of its own. Duet makes a clean sweep: it keeps what a professional really needs, in a few clear places. And what you would once have hunted for in a menu, you can simply ask Claude.</p>
+        <ul class="features">
+          <li><strong>Understand the code</strong><span>Smart completion, live diagnostics and quick fixes, through language servers and Tree-sitter highlighting.</span></li>
+          <li><strong>Navigate the project</strong><span>Definitions, usages and call hierarchies, an outline, find in files and a command palette.</span></li>
+          <li><strong>Refactor with confidence</strong><span>Rename, change a signature, move a class — with a preview before applying and a one-step undo, and still fast on very large projects.</span></li>
+          <li><strong>Git built in</strong><span>Line-level staging, history, branches, merge and rebase, pull, push and stash, without leaving the editor.</span></li>
+          <li><strong>Commit messages by Claude</strong><span>Written in the style of your team's history, for you to review before committing.</span></li>
+          <li><strong>Markdown and diagrams</strong><span>A rendered Markdown viewer and a diagram editor for Mermaid and PlantUML.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <h2 class="section-title">Start a project in seconds</h2>
+        <p class="section-lead">Recipes create a ready-to-use project. Each recipe brings the right tools, the right configuration, and what Claude needs to know to work in that project.</p>
+        <ul class="recipes">
+          <li>Qt Widgets application</li>
+          <li>C++ with CMake</li>
+          <li>Python package</li>
+          <li>Java with Maven</li>
+          <li>TypeScript with Node</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="alt" id="get-started">
+      <div class="container">
+        <h2 class="section-title">Open and cross-platform</h2>
+        <p class="section-lead">Duet is open source (GPL v3) and runs on Linux, Windows and macOS. It is written in C++ to be fast, and it uses your own Claude Code installation without touching your configuration.</p>
+        <pre class="code-block"><code><span class="comment"># Build and run from source</span>
+git clone https://github.com/EricPonthiaux/Duet.git
+cd Duet
+cmake --preset default
+cmake --build --preset default
+./build/bin/duet [project-folder]</code></pre>
+        <p class="requirements">Requires Qt 6.10+, CMake 3.24+, Ninja and a C++23 compiler (GCC 13+, Clang 17+, Apple Clang 16+ or MSVC 2022). The other dependencies are downloaded and built on the first configuration. See the <a href="https://github.com/EricPonthiaux/Duet#getting-started">README</a> for the details.</p>
+      </div>
+    </section>
+
+    <section class="audience">
+      <div class="container">
+        <p>For developers who want the power of an AI assistant without giving up a serious editor, or control of their code.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/EricPonthiaux/Duet">Get Duet on GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>Duet is free software, released under the GPL v3.</span>
+      <a href="https://github.com/EricPonthiaux/Duet">github.com/EricPonthiaux/Duet</a>
+    </div>
+  </footer>
+</body>
+</html>
