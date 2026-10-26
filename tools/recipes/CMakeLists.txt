@@ -6,7 +6,7 @@ foreach(file ${DUET_RECIPE_FILES})
     configure_file(${file} ${CMAKE_BINARY_DIR}/bin/recipes/${file} COPYONLY)
 endforeach()
 
-# On macOS, they are copied into the editor's bundle (see src/CMakeLists.txt).
+# On macOS, they are copied into the editor's bundle (duet-bundle, see src/CMakeLists.txt).
 if(NOT APPLE)
     include(GNUInstallDirs)
     install(DIRECTORY ${CMAKE_BINARY_DIR}/bin/recipes/

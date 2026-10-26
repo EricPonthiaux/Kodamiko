@@ -531,14 +531,6 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_COPYRIGHT "Licensed under the GNU GPL version 3.")
-    add_custom_command(TARGET duet POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-mcp> $<TARGET_FILE_DIR:duet>
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-askpass> $<TARGET_FILE_DIR:duet>
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/claude-plugin
-                $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/recipes
-                $<TARGET_FILE_DIR:duet>/../Resources/recipes)
 
     # macOS identifies an ad-hoc signed application by its code's hash: each
     # rebuild asks again for the protected folders (Desktop, Documents…),
@@ -547,16 +539,38 @@ if(APPLE)
     # asks once. The helpers first, then the bundle that holds them.
     set(DUET_CODESIGN_IDENTITY "" CACHE STRING
         "Identity that signs Duet.app on macOS, as codesign names it (empty: ad-hoc)")
+    set(duet_signing)
     if(DUET_CODESIGN_IDENTITY)
         set(duet_codesign codesign --force --timestamp=none --sign ${DUET_CODESIGN_IDENTITY})
-        add_custom_command(TARGET duet POST_BUILD
+        set(duet_signing
             COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-hook
             COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-mcp
             COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-askpass
-            COMMAND ${duet_codesign} $<TARGET_BUNDLE_DIR:duet>
-            COMMENT "Signing Duet.app as ${DUET_CODESIGN_IDENTITY}"
-            VERBATIM)
+            COMMAND ${duet_codesign} $<TARGET_BUNDLE_DIR:duet>)
     endif()
+
+    # The helpers, the plugin and the recipes go into the bundle whenever
+    # one of them changes, not only when duet links: a step of its own, after
+    # duet. Signing comes last, as a change to a signed bundle breaks its
+    # seal.
+    file(GLOB_RECURSE duet_bundle_resources CONFIGURE_DEPENDS
+        ${PROJECT_SOURCE_DIR}/tools/claude-plugin/*
+        ${PROJECT_SOURCE_DIR}/tools/recipes/*/*)
+    set(duet_bundle_stamp ${CMAKE_CURRENT_BINARY_DIR}/duet-bundle.stamp)
+    add_custom_command(OUTPUT ${duet_bundle_stamp}
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-mcp> $<TARGET_FILE_DIR:duet>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-askpass> $<TARGET_FILE_DIR:duet>
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/claude-plugin
+                $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/recipes
+                $<TARGET_FILE_DIR:duet>/../Resources/recipes
+        ${duet_signing}
+        COMMAND ${CMAKE_COMMAND} -E touch ${duet_bundle_stamp}
+        DEPENDS duet duet-hook duet-mcp duet-askpass ${duet_bundle_resources}
+        COMMENT "Copying the helpers, the plugin and the recipes into Duet.app"
+        VERBATIM)
+    add_custom_target(duet-bundle ALL DEPENDS ${duet_bundle_stamp})
 endif()
 
 # Windows has no rpath: without Qt's DLLs next to it, the built executable

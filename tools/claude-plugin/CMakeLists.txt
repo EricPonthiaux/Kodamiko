@@ -8,7 +8,7 @@ foreach(file ${DUET_PLUGIN_FILES})
     configure_file(${file} ${CMAKE_BINARY_DIR}/bin/claude-plugin/${file} COPYONLY)
 endforeach()
 
-# On macOS, it is copied into the editor's bundle (see src/CMakeLists.txt).
+# On macOS, it is copied into the editor's bundle (duet-bundle, see src/CMakeLists.txt).
 if(NOT APPLE)
     include(GNUInstallDirs)
     install(DIRECTORY ${CMAKE_BINARY_DIR}/bin/claude-plugin/
