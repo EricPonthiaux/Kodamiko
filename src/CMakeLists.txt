@@ -335,6 +335,7 @@ add_library(duet_core STATIC
 if(WIN32)
     target_sources(duet_core PRIVATE
         git/CredentialCacheWindows.cpp
+        projects/NewInstanceWindows.cpp
         recipes/VisualStudio.cpp
         setup/SystemSetupWindows.cpp
         terminal/ConPty.cpp
@@ -350,6 +351,7 @@ else()
         terminal/UnixPty.cpp)
     if(APPLE)
         target_sources(duet_core PRIVATE
+            projects/NewInstanceMacOS.cpp
             setup/SystemSetupMacOS.cpp
             terminal/PtyForegroundMacOS.cpp
             toolchains/SystemJdksMacOS.cpp
@@ -357,6 +359,7 @@ else()
         target_link_libraries(duet_core PRIVATE "-framework AppKit")
     else()
         target_sources(duet_core PRIVATE
+            projects/NewInstanceLinux.cpp
             setup/SystemSetupLinux.cpp
             terminal/PtyForegroundLinux.cpp
             toolchains/SystemJdksLinux.cpp

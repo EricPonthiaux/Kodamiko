@@ -4,6 +4,7 @@
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectDetector.h"
 #include "projects/ProjectStore.h"
+#include "projects/NewInstance.h"
 #include "projects/ProjectWindowServer.h"
 #include "recipes/RecipeLibrary.h"
 #include "support/SystemFixtures.h"
@@ -1097,6 +1098,16 @@ private slots:
         QVERIFY(QFileInfo(dir.filePath("demo")).isDir());
         QVERIFY(!QFileInfo::exists(dir.filePath("demo/.git")));
         QVERIFY(window.findChild<ProjectSetupPanel *>()->isVisibleTo(&window));
+    }
+
+    void newInstanceStartsOnTheFolderGiven()
+    {
+        const QString folder = QDir::temp().filePath("project");
+
+        const NewInstance::Command command = NewInstance::command(folder);
+
+        QVERIFY(!command.program.isEmpty());
+        QCOMPARE(command.arguments.last(), folder);
     }
 
     void raisesTheWindowThatHasTheProjectOpen()

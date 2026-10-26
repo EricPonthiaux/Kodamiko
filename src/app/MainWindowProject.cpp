@@ -21,6 +21,7 @@
 #include "navigation/GoToPopup.h"
 #include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
+#include "projects/NewInstance.h"
 #include "projects/ProjectStore.h"
 #include "recipes/RecipeLibrary.h"
 #include "run/Runner.h"
@@ -38,7 +39,6 @@
 #include "workspace/ChoicePopup.h"
 #include "workspace/FileTreeView.h"
 
-#include <QCoreApplication>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -204,17 +204,14 @@ void MainWindow::openProjectHere(const QString &folder, AfterOpening after)
 
 void MainWindow::openProjectInNewWindow(const QString &folder)
 {
-    // In an AppImage, the executable lives in a mount that goes away with
-    // this process: the new one starts from the image itself.
-    const QString appImage = qEnvironmentVariable("APPIMAGE");
-    const QString program = appImage.isEmpty() ? QCoreApplication::applicationFilePath() : appImage;
-    if (QProcess::startDetached(program, {QDir(folder).absolutePath()})) {
+    const NewInstance::Command command = NewInstance::command(QDir(folder).absolutePath());
+    if (QProcess::startDetached(command.program, command.arguments)) {
         showStatus(tr("Opening %1 in a new window").arg(QFileInfo(folder).fileName()));
         return;
     }
     showNotice({.title = tr("Open Project"),
                 .location = QDir::toNativeSeparators(folder),
-                .message = tr("Duet could not start a new window: %1 did not run.").arg(program),
+                .message = tr("Duet could not start a new window: %1 did not run.").arg(command.program),
                 .details = {}},
                this);
 }
