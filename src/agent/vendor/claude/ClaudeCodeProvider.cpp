@@ -25,7 +25,7 @@ bool waitsForUser(const QString &notificationType)
 }
 
 // The files an editing tool works on.
-QStringList editedFiles(const QJsonObject &event)
+QStringList findEditedFiles(const QJsonObject &event)
 {
     const QJsonObject input = event.value(QLatin1String("tool_input")).toObject();
     QStringList paths;
@@ -43,7 +43,7 @@ std::optional<HookEvent> afterToolUse(HookEvent event, const QJsonObject &object
         event.kind = HookEvent::Kind::CommandFinished;
         return event;
     }
-    event.filePaths = editedFiles(object);
+    event.filePaths = findEditedFiles(object);
     if (event.filePaths.isEmpty())
         return std::nullopt;
     event.kind = HookEvent::Kind::FilesEdited;
@@ -53,7 +53,7 @@ std::optional<HookEvent> afterToolUse(HookEvent event, const QJsonObject &object
 // PreToolUse: Claude is about to edit files; other tools do not concern us.
 std::optional<HookEvent> beforeToolUse(HookEvent event, const QJsonObject &object)
 {
-    event.filePaths = editedFiles(object);
+    event.filePaths = findEditedFiles(object);
     if (event.filePaths.isEmpty())
         return std::nullopt;
     event.kind = HookEvent::Kind::EditRequested;

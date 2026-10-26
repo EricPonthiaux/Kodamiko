@@ -9,7 +9,8 @@ class PopupHeader;
 
 // About Duet: its mark, which grows in each time the popup opens, its name,
 // its version, the author's email addresses (they open the user's mail
-// program) and "Made with love" beside a beating heart.
+// program), a rotating quotation about writing software and "Made with love"
+// beside a beating heart.
 class AboutPopup : public OverlayPopup {
     Q_OBJECT
 

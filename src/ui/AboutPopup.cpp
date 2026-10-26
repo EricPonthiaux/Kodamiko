@@ -8,6 +8,7 @@
 #include "PopupFooter.h"
 #include "PopupMetrics.h"
 #include "PopupWidgets.h"
+#include "RotatingQuote.h"
 
 #include <QCoreApplication>
 #include <QHBoxLayout>
@@ -172,7 +173,7 @@ private:
 };
 
 AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
-    : OverlayPopup(QStringLiteral("about"), QSizeF(0.3, 0.3), QSize(440, 320), parent)
+    : OverlayPopup(QStringLiteral("about"), QSizeF(0.3, 0.3), QSize(440, 400), parent)
     , header_(new PopupHeader(QStringLiteral("document"), tr("About Duet"), this))
     , mark_(new Mark(this))
 {
@@ -207,6 +208,7 @@ AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
     body->setSpacing(20);
     body->addLayout(brand);
     body->addWidget(contact);
+    body->addWidget(new RotatingQuote(this));
     body->addStretch();
     body->addLayout(love);
 

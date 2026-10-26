@@ -293,6 +293,7 @@ add_library(duet_core STATIC
     ui/PopupSearchField.cpp
     ui/PopupWidgets.cpp
     ui/PopupMotion.cpp
+    ui/RotatingQuote.cpp
     ui/Spinner.cpp
     ui/StrayWindowCheck.cpp
     ui/Theme.cpp

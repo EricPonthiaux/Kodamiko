@@ -9,22 +9,22 @@ flowchart TB
   failed["Check failed"]
   anyway["Review Anyway"]
   reviewer["Separate read-only reviewer agent reads the patch"]
-  error["Review failed"]
   dismiss["Dismiss"]
   send["Send to the session's prompt"]
   commit["Commit"]
   empty{"Nothing staged?"}
-  diff["Diff mode: changed files and diff"]
+  read["Read the staged changes as one patch"]
+  act{"What to do with a finding?"}
+  answer{"Valid answer?"}
+  save["Message: save first"]
+  unsaved{"Unsaved files?"}
   ask["Review or Review Again button"]
   stage["Stage files, hunks or lines"]
-  save["Message: save first"]
-  read["Read the staged changes as one patch"]
-  unsaved{"Unsaved files?"}
+  diff["Diff mode: changed files and diff"]
   fix["Have the session fix it"]
-  act{"What to do with a finding?"}
   grid["Grid of findings over the diff"]
   findings["Findings: notes in the diff, Problems panel"]
-  answer{"Valid answer?"}
+  error["Review failed"]
   diff --> stage
   stage --> ask
   ask --> unsaved
@@ -67,28 +67,28 @@ flowchart TB
 %% duet {"key":"failed","x":40,"y":1727.9}
 %% duet {"key":"anyway","x":30.5,"y":1865.9}
 %% duet {"key":"reviewer","x":101,"y":1984.9}
-%% duet {"key":"error","x":115,"y":2313.9}
 %% duet {"key":"dismiss","x":111,"y":2753.8}
 %% duet {"key":"send","x":274.5,"y":2753.8}
 %% duet {"key":"commit","x":111,"y":2872.8}
 %% duet {"key":"empty","x":264.5,"y":681.9}
-%% duet {"fill":"#1565c0","key":"diff","x":392,"y":-2.7}
-%% duet {"key":"ask","x":338,"y":237.9}
-%% duet {"fill":"#d84315","key":"stage","x":606.8,"y":116.3}
-%% duet {"key":"save","x":88,"y":518.2}
 %% duet {"key":"read","x":368.5,"y":545.3}
-%% duet {"fill":"#ad1457","key":"unsaved","x":280.1,"y":346.7}
-%% duet {"key":"fix","x":572.6,"y":2726}
 %% duet {"fill":"#4527a0","key":"act","x":180,"y":2574.8}
-%% duet {"fill":"#d1c4e9","key":"grid","x":169,"y":2455.8}
-%% duet {"fill":"#bbdefb","key":"findings","x":278.5,"y":2309.9}
 %% duet {"key":"answer","x":30,"y":2128.1}
-%% duet {"c":[560.3,57.6,585.9,73.6,617.5,93.2,644.4,110],"e":[654.1,116],"link":"diff>stage","n":0}
-%% duet {"c":[640.4,176.7,605.5,193.7,561.9,214.9,525.5,232.6],"e":[515.5,237.5],"link":"stage>ask","n":0}
-%% duet {"c":[441.8,298.4,436.8,312.1,430.7,328.9,424.7,345.1],"e":[420.9,355.6],"link":"ask>unsaved","n":0}
-%% duet {"c":[346.6,439.7,310.2,461.4,262.5,489.7,225,512],"e":[215.2,517.8],"link":"unsaved>save","n":0}
-%% duet {"c":[425.6,455.3,437.7,480.3,452.3,510.6,464.1,535],"e":[468.9,545.1],"link":"unsaved>read","n":0}
-%% duet {"c":[467.5,613.8,457.2,633.8,443.8,659.5,431.8,682.6],"e":[426.6,692.7],"link":"read>empty","n":0}
+%% duet {"key":"save","x":90.1,"y":470.5}
+%% duet {"fill":"#ad1457","key":"unsaved","x":284.1,"y":343.9}
+%% duet {"key":"ask","x":331.7,"y":217.6}
+%% duet {"fill":"#d84315","key":"stage","x":590.3,"y":113.2}
+%% duet {"fill":"#1565c0","key":"diff","x":321.6,"y":-0.8}
+%% duet {"key":"fix","x":661.6,"y":2507.7}
+%% duet {"fill":"#d1c4e9","key":"grid","x":70,"y":2454.7}
+%% duet {"fill":"#bbdefb","key":"findings","x":342.3,"y":2278.5}
+%% duet {"key":"error","x":98.6,"y":2318.9}
+%% duet {"c":[506.5,59.6,538.6,74.5,577.5,92.6,610.9,108.1],"e":[621.1,112.9],"link":"diff>stage","n":0}
+%% duet {"c":[616.3,173.7,588.3,185.9,555.8,200,526.8,212.7],"e":[516.3,217.2],"link":"stage>ask","n":0}
+%% duet {"c":[438.9,277.7,434.3,295.2,428.4,318,422.9,339.4],"e":[420,350.4],"link":"ask>unsaved","n":0}
+%% duet {"c":[338.6,431.1,311.7,441.9,280.4,454.5,251.9,466],"e":[241.5,470.1],"link":"unsaved>save","n":0}
+%% duet {"c":[428.4,453.2,440,478.9,454.1,509.9,465.4,534.8],"e":[470,545.1],"link":"unsaved>read","n":0}
+%% duet {"c":[467.6,613.8,457.2,633.8,443.9,659.5,431.8,682.6],"e":[426.6,692.7],"link":"read>empty","n":0}
 %% duet {"c":[347,778.7,294.8,814.2,216.3,867.6,164.1,903.1],"e":[154.7,909.5],"link":"empty>nothing","lp":[279.2,840.9],"n":0}
 %% duet {"c":[401,802.4,401,823.1,401,846.5,401,868.1],"e":[401,879.5],"link":"empty>step","lp":[414,840.9],"n":0}
 %% duet {"c":[344.9,980.4,306.7,1007.9,256.4,1044.2,219.3,1070.9],"e":[210.1,1077.5],"link":"step>modeReview","lp":[285.5,1039],"n":0}
@@ -102,14 +102,14 @@ flowchart TB
 %% duet {"c":[116,1646.3,112.7,1669.3,108.9,1695.4,105.9,1716.6],"e":[104.3,1727.8],"link":"passed>failed","lp":[123.6,1688.9],"n":0}
 %% duet {"c":[99.1,1788.2,98.6,1807.6,97.8,1833.1,97.2,1854.4],"e":[96.9,1865.7],"link":"failed>anyway","n":0}
 %% duet {"c":[128.1,1926.3,144.3,1941.6,164.2,1960.4,181.8,1977],"e":[189.6,1984.5],"link":"anyway>reviewer","n":0}
-%% duet {"c":[210.6,2053.2,200.9,2074.8,188.1,2103.3,176.8,2128.6],"e":[172.1,2138.8],"link":"reviewer>answer","n":0}
-%% duet {"c":[159,2243.9,162.1,2263.3,165.5,2284.6,168.4,2302.5],"e":[170.2,2313.8],"link":"answer>error","n":0}
-%% duet {"c":[204.7,2221.1,244.7,2245.3,299,2278.1,341.5,2303.7],"e":[351.1,2309.6],"link":"answer>findings","n":0}
-%% duet {"c":[375.8,2378.3,356.3,2399.1,331.3,2425.8,311.1,2447.3],"e":[303.3,2455.6],"link":"findings>grid","n":0}
-%% duet {"c":[404.1,2378.1,398.9,2423.9,389.6,2506.2,382.9,2565.3],"e":[381.6,2576.4],"link":"findings>act","n":0}
-%% duet {"c":[295.2,2516,306.7,2533,321.4,2554.9,335,2575.2],"e":[341.4,2584.8],"link":"grid>act","n":0}
+%% duet {"c":[210.6,2053.2,200.9,2074.8,188.1,2103.4,176.7,2128.6],"e":[172.1,2138.9],"link":"reviewer>answer","n":0}
+%% duet {"c":[153.2,2247.1,154.2,2267.1,155.4,2289,156.4,2307.3],"e":[157,2318.8],"link":"answer>error","n":0}
+%% duet {"c":[218.3,2214.5,263,2231.8,322.3,2254.7,372.3,2274],"e":[382.9,2278.1],"link":"answer>findings","n":0}
+%% duet {"c":[412.7,2346.9,362,2376.4,289.2,2418.8,237.8,2448.8],"e":[228.1,2454.4],"link":"findings>grid","n":0}
+%% duet {"c":[461.6,2346.7,445.7,2399.3,415.1,2501.2,394.9,2568.6],"e":[391.6,2579.5],"link":"findings>act","n":0}
+%% duet {"c":[216.3,2515.1,243,2535.2,278.5,2562.1,309.3,2585.2],"e":[318.2,2592],"link":"grid>act","n":0}
 %% duet {"c":[316.8,2677.3,286.8,2699.2,250.7,2725.6,221.8,2746.7],"e":[212.7,2753.3],"link":"act>dismiss","n":0}
 %% duet {"c":[377.8,2694.1,378.5,2710.1,379.3,2727.1,380,2742],"e":[380.6,2753.3],"link":"act>send","n":0}
-%% duet {"c":[457.1,2670,494.7,2686.1,539,2705.1,576.4,2721.2],"e":[586.8,2725.6],"link":"act>fix","n":0}
-%% duet {"c":[658.2,2725.8,662.8,2458.4,696.7,498.5,702.1,187.8],"e":[702.3,176.6],"link":"fix>stage","n":0}
+%% duet {"c":[481,2607.1,534.4,2593.2,598.6,2576.4,650.5,2562.9],"e":[661.4,2560],"link":"act>fix","n":0}
+%% duet {"c":[745.8,2507.5,739.4,2253.6,694.8,481,687.3,185],"e":[687.1,173.6],"link":"fix>stage","n":0}
 %% duet {"c":[171,2814.2,171,2828.4,171,2845.7,171,2861.1],"e":[171,2872.5],"link":"dismiss>commit","n":0}
