@@ -143,7 +143,9 @@ int SidePanel::addView(QWidget *view, const QIcon &icon, const QString &title)
 {
     addWidget(view);
     const QSignalBlocker blocker(tabBar_); // no unfolding while being built
-    return tabBar_->addTab(icon, title);
+    const int index = tabBar_->addTab(icon, title);
+    tabBar_->updateGeometry();
+    return index;
 }
 
 QTabBar *SidePanel::tabBar() const
@@ -159,6 +161,9 @@ void SidePanel::applyTheme(const Theme &theme)
 void SidePanel::setViewIcon(QWidget *view, const QIcon &icon)
 {
     tabBar_->setTabIcon(indexOf(view), icon);
+    // Hidden, QTabBar does not report that its icons lengthened it: the strip
+    // would keep its old height, shorter than the tabs, and scroll them.
+    tabBar_->updateGeometry();
 }
 
 void SidePanel::showView(QWidget *view)
