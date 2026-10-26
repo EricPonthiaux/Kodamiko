@@ -533,6 +533,24 @@ if(APPLE)
                 $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/recipes
                 $<TARGET_FILE_DIR:duet>/../Resources/recipes)
+
+    # macOS identifies an ad-hoc signed application by its code's hash: each
+    # rebuild asks again for the protected folders (Desktop, Documents…),
+    # for Duet and the processes it starts. Signed with a stable identity
+    # (a development certificate, or a self-signed one in the keychain), it
+    # asks once. The helpers first, then the bundle that holds them.
+    set(DUET_CODESIGN_IDENTITY "" CACHE STRING
+        "Identity that signs Duet.app on macOS, as codesign names it (empty: ad-hoc)")
+    if(DUET_CODESIGN_IDENTITY)
+        set(duet_codesign codesign --force --timestamp=none --sign ${DUET_CODESIGN_IDENTITY})
+        add_custom_command(TARGET duet POST_BUILD
+            COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-hook
+            COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-mcp
+            COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-askpass
+            COMMAND ${duet_codesign} $<TARGET_BUNDLE_DIR:duet>
+            COMMENT "Signing Duet.app as ${DUET_CODESIGN_IDENTITY}"
+            VERBATIM)
+    endif()
 endif()
 
 # Windows has no rpath: without Qt's DLLs next to it, the built executable

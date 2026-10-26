@@ -72,6 +72,16 @@ ctest --preset windows
 build-win\bin\duet.exe [project-folder]
 ```
 
+On macOS, each rebuild of an ad-hoc signed `Duet.app` asks again for
+access to the Desktop and Documents folders. Signed with a stable identity,
+it asks once: create a code-signing certificate in *Keychain Access ▸
+Certificate Assistant ▸ Create a Certificate…* (type *Code Signing*), or
+use an Apple Development one, then configure with its name:
+
+```sh
+cmake --preset default -DDUET_CODESIGN_IDENTITY="Duet Development"
+```
+
 At runtime Duet needs [Claude Code](https://claude.com/claude-code) 2.1+
 and git 2.23+. If either is missing, *Help ▸ Check Prerequisites* opens on
 startup and offers to install it.
