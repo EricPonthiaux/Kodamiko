@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "FileOpenRouter.h"
 #include "MainWindow.h"
 #include "editor/PreviewSite.h"
 #include "git/LibGit2.h"
@@ -176,6 +177,18 @@ void showWelcome()
     welcome->show();
 }
 
+// A folder the system asks this process to open while it has no project
+// window: it takes the welcome window's place.
+void openInPlaceOfWelcome(const QString &folder)
+{
+    openProject(folder);
+    const QWidgetList windows = QApplication::topLevelWidgets();
+    for (QWidget *window : windows) {
+        if (auto *welcome = qobject_cast<WelcomeWindow *>(window))
+            welcome->close();
+    }
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -211,6 +224,7 @@ int main(int argc, char *argv[])
     parser.addVersionOption();
     parser.addPositionalArgument(QStringLiteral("folder"), QStringLiteral("Project folder to open"));
     parser.process(app);
+    new FileOpenRouter(openInPlaceOfWelcome, qApp);
 
     const QStringList arguments = parser.positionalArguments();
     if (arguments.isEmpty()) {

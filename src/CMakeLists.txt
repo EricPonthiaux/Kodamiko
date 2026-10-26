@@ -467,6 +467,7 @@ duet_enable_warnings(duet_core)
 
 qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/main.cpp
+    app/FileOpenRouter.cpp
     app/MainWindow.cpp
     app/MainWindowAgentProvider.cpp
     app/MainWindowAgents.cpp
