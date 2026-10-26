@@ -3,11 +3,17 @@
 #include "DesktopIntegration.h"
 
 #include <QGuiApplication>
+#include <QMenu>
+#include <QString>
 #include <QWidget>
 
 #import <AppKit/AppKit.h>
 
 namespace {
+
+// The NSProcessInfo activity while one is going on, retained; nil
+// otherwise.
+id<NSObject> backgroundActivity = nil;
 
 // Nil without the Cocoa platform (offscreen tests): messages to nil do
 // nothing.
@@ -30,4 +36,28 @@ void DesktopIntegration::followActiveSpace(QWidget *window)
     nsWindow.collectionBehavior = (nsWindow.collectionBehavior & ~NSWindowCollectionBehaviorFullScreenPrimary)
                                   | NSWindowCollectionBehaviorFullScreenAuxiliary
                                   | NSWindowCollectionBehaviorMoveToActiveSpace;
+}
+
+void DesktopIntegration::setDockMenu(QMenu *menu)
+{
+    menu->setAsDockMenu();
+}
+
+// The system may still sleep when idle: only Duet's own work is kept going.
+void DesktopIntegration::beginBackgroundActivity(const QString &reason)
+{
+    if (backgroundActivity)
+        return;
+    backgroundActivity =
+        [[NSProcessInfo.processInfo beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
+                                                      reason:reason.toNSString()] retain];
+}
+
+void DesktopIntegration::endBackgroundActivity()
+{
+    if (!backgroundActivity)
+        return;
+    [NSProcessInfo.processInfo endActivity:backgroundActivity];
+    [backgroundActivity release];
+    backgroundActivity = nil;
 }

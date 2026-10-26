@@ -23,6 +23,7 @@
 #include "settings/Preferences.h"
 #include "system/Host.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/DesktopIntegration.h"
 #include "ui/TitleBar.h"
 #include "viewers/DiagramKinds.h"
 #include "workspace/CommandPalette.h"
@@ -42,6 +43,9 @@
 #include <functional>
 
 namespace {
+
+// The other projects that the Projects and Dock menus list.
+constexpr int recentProjectCount = 10;
 
 // macOS's own full-screen key; F11, the others', switches to the terminal.
 QKeySequence fullScreenShortcut()
@@ -69,6 +73,7 @@ void MainWindow::createMenus()
     createViewMenu();
     createHelpMenu();
     createEditorContextActions();
+    createDockMenu();
 
     // Actions at the right of the title bar.
     titleBar_->setRunActions(runAction_, stopAction_);
@@ -474,6 +479,35 @@ void MainWindow::applyKeymap(const Keymap::Overrides &overrides)
     EditorWidget::setReservedKeys(Keymap::shortcutsInUse(commands));
 }
 
+int MainWindow::addRecentProjects(QMenu *menu)
+{
+    int listed = 0;
+    for (const ProjectConfig &project : ProjectStore::all()) {
+        if (project.path == folder_ || !QFileInfo(project.path).isDir() || listed == recentProjectCount)
+            continue;
+        const QString folder = project.path;
+        QAction *action = menu->addAction(QFileInfo(folder).fileName(), this,
+                                          [this, folder] { askToOpenProject(folder, AfterOpening::Nothing); });
+        action->setToolTip(QDir::toNativeSeparators(folder));
+        ++listed;
+    }
+    menu->setToolTipsVisible(true);
+    return listed;
+}
+
+// The Dock icon's menu (macOS): the other projects, listed when it opens.
+void MainWindow::createDockMenu()
+{
+    auto *dock = new QMenu(this);
+    connect(dock, &QMenu::aboutToShow, this, [this, dock] {
+        dock->clear();
+        if (addRecentProjects(dock) > 0)
+            dock->addSeparator();
+        dock->addAction(tr("Open Folder…"), this, &MainWindow::chooseFolder);
+    });
+    DesktopIntegration::setDockMenu(dock);
+}
+
 void MainWindow::updateProjectMenu()
 {
     projectMenu_->clear();
@@ -485,18 +519,7 @@ void MainWindow::updateProjectMenu()
     }
     addRecipePrompts(projectMenu_);
     projectMenu_->addSeparator();
-    int listed = 0;
-    for (const ProjectConfig &project : ProjectStore::all()) {
-        if (project.path == folder_ || !QFileInfo(project.path).isDir() || listed == 10)
-            continue;
-        const QString folder = project.path;
-        QAction *action = projectMenu_->addAction(QFileInfo(folder).fileName(), this,
-                                                  [this, folder] { askToOpenProject(folder, AfterOpening::Nothing); });
-        action->setToolTip(QDir::toNativeSeparators(folder));
-        ++listed;
-    }
-    projectMenu_->setToolTipsVisible(true);
-    if (listed > 0)
+    if (addRecentProjects(projectMenu_) > 0)
         projectMenu_->addSeparator();
     projectMenu_->addAction(tr("New Project…"), this, &MainWindow::showNewProject);
     projectMenu_->addAction(tr("Open Folder…"), QKeySequence(tr("Ctrl+K, Ctrl+O")), this, &MainWindow::chooseFolder);

@@ -173,6 +173,10 @@ private:
     void createFileMenu();
     void createClaudeMenu();
     void createViewMenu();
+    void createDockMenu();
+    // Adds the recent projects other than this one, at most 10, to `menu`;
+    // returns how many.
+    int addRecentProjects(QMenu *menu);
 
     // A checkable menu entry for a setting on by default, kept in QSettings
     // under `key`.
@@ -395,8 +399,15 @@ private:
     void updateProjectMenu();
     // Tells AgentActivity whether the user is looking at the session.
     void updateClaudeWatched();
-    // Taskbar alert and, when the window is inactive, desktop notification.
+    // Taskbar alert and, when the window is inactive, a badge on the
+    // application icon and a desktop notification (the system's, else the
+    // tray's).
     void notify(const QString &title, const QString &message);
+    void showTrayNotification(const QString &title, const QString &message);
+    void bringClaudeSessionToFront();
+    void clearNotifications();
+    // Keeps App Nap from slowing Duet down while the agent works.
+    void keepAwakeWhileAgentWorks();
     // Snapshot of the pending changes, so that the state before a prompt
     // can be restored.
     void snapshotBeforePrompt(const QString &prompt);

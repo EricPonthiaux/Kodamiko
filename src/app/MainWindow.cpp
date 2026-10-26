@@ -193,6 +193,7 @@ MainWindow::MainWindow(const QString &folder, const Preferences &preferences, QW
     connect(&projectWindowServer_, &ProjectWindowServer::raiseRequested, this, &MainWindow::bringToFront);
     registerMcpTools();
     connect(&agentActivity_, &AgentActivity::stateChanged, this, &MainWindow::updateAgentIndicator);
+    connect(&agentActivity_, &AgentActivity::stateChanged, this, &MainWindow::keepAwakeWhileAgentWorks);
     connect(&agentActivity_, &AgentActivity::attentionRequested, this, &MainWindow::notify);
     connect(&agentSessions_, &AgentSessions::activityChanged, this, &MainWindow::updateAgentTab);
     connect(&agentSessions_, &AgentSessions::attentionRequested, this, &MainWindow::notify);
@@ -991,8 +992,8 @@ void MainWindow::changeEvent(QEvent *event)
         fullScreenAction_->setChecked(isFullScreen());
     }
     if (event->type() == QEvent::ActivationChange) {
-        if (isActiveWindow() && trayIcon_)
-            trayIcon_->hide();
+        if (isActiveWindow())
+            clearNotifications();
         if (isActiveWindow()) // the configuration may have changed elsewhere
             claudeConfigView_->scheduleRefresh();
         updateClaudeWatched();

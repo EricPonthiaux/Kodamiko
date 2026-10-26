@@ -4,6 +4,7 @@
 // the requests sent to the agent from the editor.
 
 #include "MainWindow.h"
+#include "NativeNotifications.h"
 #include "agent/AgentIndicator.h"
 #include "agent/DiagramRequestPopup.h"
 #include "agent/EditorContext.h"
@@ -21,6 +22,7 @@
 #include "git/Snapshots.h"
 #include "navigation/CodeNavigator.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/DesktopIntegration.h"
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
 #include "ui/TitleBar.h"
@@ -390,7 +392,22 @@ void MainWindow::notify(const QString &title, const QString &message)
     QApplication::alert(this);
     // In the window, the dot on the tabs is enough.
     const bool isDuetActive = isActiveWindow() || (claudeTerminal_ && claudeTerminal_->isActiveWindow());
-    if (isDuetActive || !QSystemTrayIcon::isSystemTrayAvailable() || !QSystemTrayIcon::supportsMessages())
+    if (isDuetActive)
+        return;
+    qApp->setBadgeNumber(1); // cleared when the window comes back
+    const QPointer<MainWindow> window(this);
+    const auto clicked = [window] {
+        if (window)
+            window->bringClaudeSessionToFront();
+    };
+    if (NativeNotifications::show(title, message, clicked))
+        return;
+    showTrayNotification(title, message);
+}
+
+void MainWindow::showTrayNotification(const QString &title, const QString &message)
+{
+    if (!QSystemTrayIcon::isSystemTrayAvailable() || !QSystemTrayIcon::supportsMessages())
         return;
     if (!trayIcon_) {
         QIcon icon = QApplication::windowIcon();
@@ -398,17 +415,36 @@ void MainWindow::notify(const QString &title, const QString &message)
             icon = style()->standardIcon(QStyle::SP_MessageBoxInformation);
         trayIcon_ = new QSystemTrayIcon(icon, this);
         trayIcon_->setToolTip(QStringLiteral("Duet"));
-        const auto showSession = [this] {
-            showNormal();
-            raise();
-            activateWindow();
-            showClaudeSession();
-        };
-        connect(trayIcon_, &QSystemTrayIcon::messageClicked, this, showSession);
-        connect(trayIcon_, &QSystemTrayIcon::activated, this, showSession);
+        connect(trayIcon_, &QSystemTrayIcon::messageClicked, this, &MainWindow::bringClaudeSessionToFront);
+        connect(trayIcon_, &QSystemTrayIcon::activated, this, &MainWindow::bringClaudeSessionToFront);
     }
     trayIcon_->show();
     trayIcon_->showMessage(title, message, QSystemTrayIcon::Information, notificationMs);
+}
+
+void MainWindow::bringClaudeSessionToFront()
+{
+    showNormal();
+    raise();
+    activateWindow();
+    showClaudeSession();
+}
+
+void MainWindow::keepAwakeWhileAgentWorks()
+{
+    if (agentActivity_.state() == AgentActivity::State::Working)
+        DesktopIntegration::beginBackgroundActivity(tr("%1 is working").arg(agentProvider_->name()));
+    else
+        DesktopIntegration::endBackgroundActivity();
+}
+
+// The window is back: what called the user to it goes.
+void MainWindow::clearNotifications()
+{
+    if (trayIcon_)
+        trayIcon_->hide();
+    NativeNotifications::clear();
+    qApp->setBadgeNumber(0);
 }
 
 void MainWindow::registerMcpTools()
