@@ -2,9 +2,11 @@
 
 #include "TerminalPreferencesPage.h"
 
+#include "system/Host.h"
 #include "ui/Paragraph.h"
 #include "ui/PopupWidgets.h"
 
+#include <QCheckBox>
 #include <QDir>
 #include <QFileDialog>
 #include <QHBoxLayout>
@@ -24,6 +26,19 @@ QListWidgetItem *folderItem(const QString &folder)
     auto *item = new QListWidgetItem(QDir::toNativeSeparators(folder));
     item->setFlags(item->flags() | Qt::ItemIsEditable);
     return item;
+}
+
+// Only macOS's Option key composes characters; Alt is Meta elsewhere.
+bool hasOptionKey()
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::MacOS:
+        return true;
+    case OperatingSystem::Windows:
+    case OperatingSystem::Linux:
+        return false;
+    }
+    return false;
 }
 
 } // namespace
@@ -55,7 +70,36 @@ TerminalPreferencesPage::TerminalPreferencesPage(QWidget *parent)
     layout->addWidget(card);
     layout->addSpacing(8);
     layout->addWidget(description);
+    layout->addWidget(createKeyboardSection());
     updateButtons();
+}
+
+QWidget *TerminalPreferencesPage::createKeyboardSection()
+{
+    auto *section = new QWidget(this);
+    optionAsMeta_ = new QCheckBox;
+    auto *card = new SettingsCard;
+    card->addRow(tr("Use Option as Meta key"),
+                 tr("Option sends Escape before the key (Option+B moves back a word in a shell) instead of "
+                    "typing the character it gives, such as { on a French keyboard."),
+                 optionAsMeta_);
+    auto *layout = new QVBoxLayout(section);
+    layout->setContentsMargins(0, 16, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(sectionHeading(tr("Keyboard")));
+    layout->addWidget(card);
+    section->setVisible(hasOptionKey());
+    return section;
+}
+
+void TerminalPreferencesPage::setOptionKey(OptionKey optionKey)
+{
+    optionAsMeta_->setChecked(optionKey == OptionKey::Meta);
+}
+
+OptionKey TerminalPreferencesPage::optionKey() const
+{
+    return optionAsMeta_->isChecked() ? OptionKey::Meta : OptionKey::Compose;
 }
 
 QWidget *TerminalPreferencesPage::createButtons()

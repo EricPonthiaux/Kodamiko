@@ -149,6 +149,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     const Preferences previous = Preferences::load();
     preferences.save();
     applyTerminalEnvironment(preferences.terminalPathFolders);
+    TerminalWidget::setOptionKey(preferences.terminalOptionKey);
     Motion::policy().setEnabled(preferences.animations);
     FontSettings::apply(preferences, previous, this);
     if (preferences.theme != previous.theme || preferences.codeFont() != previous.codeFont() ||

@@ -756,6 +756,7 @@ void PreferencesPopup::load(const Preferences &preferences,
     exposeTools_->setChecked(preferences.exposeTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     terminalPage_->setPathFolders(preferences.terminalPathFolders);
+    terminalPage_->setOptionKey(preferences.terminalOptionKey);
 
     commands_ = commands;
     overrides_ = overrides;
@@ -813,6 +814,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.exposeTools = exposeTools_->isChecked();
     preferences.claudeNotifications = claudeNotifications_->isChecked();
     preferences.terminalPathFolders = terminalPage_->pathFolders();
+    preferences.terminalOptionKey = terminalPage_->optionKey();
     return preferences;
 }
 

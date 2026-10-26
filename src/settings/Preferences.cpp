@@ -72,6 +72,8 @@ Preferences Preferences::load()
     preferences.claudeNotifications = settings.value(QStringLiteral("claudeNotifications"), true).toBool();
 
     preferences.terminalPathFolders = settings.value(QStringLiteral("terminal/pathFolders")).toStringList();
+    const bool optionIsMeta = settings.value(QStringLiteral("terminal/optionIsMeta"), false).toBool();
+    preferences.terminalOptionKey = optionIsMeta ? OptionKey::Meta : OptionKey::Compose;
     return preferences;
 }
 
@@ -110,6 +112,7 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("claudeNotifications"), claudeNotifications);
 
     settings.setValue(QStringLiteral("terminal/pathFolders"), terminalPathFolders);
+    settings.setValue(QStringLiteral("terminal/optionIsMeta"), terminalOptionKey == OptionKey::Meta);
 }
 
 QFont Preferences::codeFont() const

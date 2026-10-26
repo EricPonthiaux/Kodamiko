@@ -3,6 +3,7 @@
 #pragma once
 
 #include "editor/EditorWidget.h"
+#include "terminal/OptionKey.h"
 #include "ui/AppFonts.h"
 
 #include <QFont>
@@ -61,6 +62,8 @@ struct Preferences {
     // Put first in the PATH of every program Duet launches in a terminal,
     // in this order.
     QStringList terminalPathFolders;
+    // macOS only: Option composes characters, or acts as Meta.
+    OptionKey terminalOptionKey = OptionKey::Compose;
 
     static constexpr int minimumFontSize = 6;
     static constexpr int maximumFontSize = 32;

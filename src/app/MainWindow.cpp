@@ -182,6 +182,7 @@ MainWindow::MainWindow(const QString &folder, const Preferences &preferences, QW
 {
     preferences.applyTypography(theme_);
     ThemeStyle::apply(theme_);
+    TerminalWidget::setOptionKey(preferences.terminalOptionKey);
     createWidgets(preferences);
     createMenus();
     applyKeymap(Keymap::loadOverrides());

@@ -2,38 +2,14 @@
 
 #include "VtScreen.h"
 
+#include "KeyModifiers.h"
+
 #include <algorithm>
 #include <utility>
 
 namespace {
 
 constexpr size_t maxScrollbackLines = 10000;
-
-// VTermModifier is a set of bit flags: combinations such as Shift+Ctrl are
-// valid values even though the C enum does not name them.
-VTermModifier modifierFromBits(int bits)
-{
-    return static_cast<VTermModifier>(bits); // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange): bit flags
-}
-
-VTermModifier toVTermModifier(Qt::KeyboardModifiers modifiers)
-{
-    int result = VTERM_MOD_NONE;
-    if (modifiers & Qt::ShiftModifier)
-        result |= VTERM_MOD_SHIFT;
-    if (modifiers & Qt::AltModifier)
-        result |= VTERM_MOD_ALT;
-    // On macOS, Qt calls the Cmd key "Control" and the real Ctrl key "Meta":
-    // the latter is the one that produces the terminal's Ctrl+C.
-#ifdef Q_OS_MACOS
-    if (modifiers & Qt::MetaModifier)
-        result |= VTERM_MOD_CTRL;
-#else
-    if (modifiers & Qt::ControlModifier)
-        result |= VTERM_MOD_CTRL;
-#endif
-    return modifierFromBits(result);
-}
 
 VTermKey toVTermKey(int key)
 {
@@ -260,12 +236,12 @@ QString VtScreen::lineText(int row) const
     return text;
 }
 
-bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text)
+bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text, OptionKey optionKey)
 {
-    const VTermModifier modifier = toVTermModifier(modifiers);
+    const VTermModifier modifier = KeyModifiers::toVTerm(modifiers);
 
     if (key == Qt::Key_Backtab) {
-        vterm_keyboard_key(terminal_, VTERM_KEY_TAB, modifierFromBits(modifier | VTERM_MOD_SHIFT));
+        vterm_keyboard_key(terminal_, VTERM_KEY_TAB, KeyModifiers::fromBits(modifier | VTERM_MOD_SHIFT));
         return true;
     }
     if (const VTermKey special = toVTermKey(key); special != VTERM_KEY_NONE) {
@@ -276,14 +252,15 @@ bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &
     // Ctrl+letter: libvterm computes the control code itself (Ctrl+C → 0x03).
     if ((modifier & VTERM_MOD_CTRL) && key >= Qt::Key_A && key <= Qt::Key_Z) {
         const auto letter = static_cast<uint32_t>('a' + (key - Qt::Key_A));
-        vterm_keyboard_unichar(terminal_, letter, modifierFromBits(modifier & ~VTERM_MOD_SHIFT));
+        vterm_keyboard_unichar(terminal_, letter, KeyModifiers::fromBits(modifier & ~VTERM_MOD_SHIFT));
         return true;
     }
 
     if (text.isEmpty())
         return false;
     // Uppercase letters and symbols already carry the effect of Shift: don't send it again.
-    const VTermModifier withoutShift = modifierFromBits(modifier & ~VTERM_MOD_SHIFT);
+    const VTermModifier withoutShift =
+        KeyModifiers::fromBits(KeyModifiers::forText(modifier, optionKey) & ~VTERM_MOD_SHIFT);
     for (const char32_t codePoint : text.toUcs4()) {
         if (codePoint < 0x20 && !(modifier & VTERM_MOD_CTRL))
             continue; // control character produced by the platform, already handled
@@ -297,7 +274,7 @@ bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &
 // line breaks.
 void VtScreen::sendWheel(int row, int column, bool up, Qt::KeyboardModifiers modifiers)
 {
-    const VTermModifier modifier = toVTermModifier(modifiers);
+    const VTermModifier modifier = KeyModifiers::toVTerm(modifiers);
     vterm_mouse_move(terminal_, row, column, modifier);
     // Buttons 4 and 5: the wheel, a press without release.
     vterm_mouse_button(terminal_, up ? 4 : 5, true, modifier);
@@ -305,19 +282,19 @@ void VtScreen::sendWheel(int row, int column, bool up, Qt::KeyboardModifiers mod
 
 void VtScreen::sendLeftButtonPress(QPoint cell, Qt::KeyboardModifiers modifiers)
 {
-    const VTermModifier modifier = toVTermModifier(modifiers);
+    const VTermModifier modifier = KeyModifiers::toVTerm(modifiers);
     vterm_mouse_move(terminal_, cell.y(), cell.x(), modifier);
     vterm_mouse_button(terminal_, 1, true, modifier);
 }
 
 void VtScreen::sendMouseMove(QPoint cell, Qt::KeyboardModifiers modifiers)
 {
-    vterm_mouse_move(terminal_, cell.y(), cell.x(), toVTermModifier(modifiers));
+    vterm_mouse_move(terminal_, cell.y(), cell.x(), KeyModifiers::toVTerm(modifiers));
 }
 
 void VtScreen::sendLeftButtonRelease(QPoint cell, Qt::KeyboardModifiers modifiers)
 {
-    const VTermModifier modifier = toVTermModifier(modifiers);
+    const VTermModifier modifier = KeyModifiers::toVTerm(modifiers);
     vterm_mouse_move(terminal_, cell.y(), cell.x(), modifier);
     vterm_mouse_button(terminal_, 1, false, modifier);
 }

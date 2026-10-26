@@ -29,6 +29,8 @@ constexpr int initialColumns = 80;
 // Blank space between the viewport's edges and the grid, so that the text
 // does not touch the panel's border.
 constexpr int gridMarginPx = 6;
+// A preference of the whole application (TerminalWidget::setOptionKey).
+OptionKey terminalOptionKey = OptionKey::Compose;
 
 // Terminal-specific copy/paste: Ctrl+C and Ctrl+V must remain available to
 // the program (Ctrl+C interrupts Claude).
@@ -358,6 +360,11 @@ bool TerminalWidget::isModeShortcut(const QKeyEvent &event)
 #endif
 }
 
+void TerminalWidget::setOptionKey(OptionKey optionKey)
+{
+    terminalOptionKey = optionKey;
+}
+
 bool TerminalWidget::isApplicationShortcut(const QKeyEvent &event)
 {
     if (event.key() == Qt::Key_F11 || isModeShortcut(event))
@@ -554,7 +561,7 @@ void TerminalWidget::keyPressEvent(QKeyEvent *event)
         pasteClipboard();
         return;
     }
-    if (screen_->sendKey(event->key(), event->modifiers(), event->text())) {
+    if (screen_->sendKey(event->key(), event->modifiers(), event->text(), terminalOptionKey)) {
         scrollToBottom();
         event->accept();
         return;
@@ -566,7 +573,7 @@ void TerminalWidget::keyPressEvent(QKeyEvent *event)
 void TerminalWidget::inputMethodEvent(QInputMethodEvent *event)
 {
     if (!event->commitString().isEmpty())
-        screen_->sendKey(0, Qt::NoModifier, event->commitString());
+        screen_->sendKey(0, Qt::NoModifier, event->commitString(), terminalOptionKey);
     event->accept();
 }
 
@@ -752,7 +759,7 @@ void TerminalWidget::pressEnter()
 {
     if (!screen_)
         return;
-    screen_->sendKey(Qt::Key_Return, Qt::NoModifier, QStringLiteral("\r"));
+    screen_->sendKey(Qt::Key_Return, Qt::NoModifier, QStringLiteral("\r"), terminalOptionKey);
     scrollToBottom();
 }
 

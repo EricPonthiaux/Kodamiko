@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "OptionKey.h"
 #include "ProcessSpec.h"
 
 #include <QAbstractScrollArea>
@@ -64,6 +65,8 @@ public:
     // Ctrl+Shift+… and Ctrl+Alt+… (Cmd+… on macOS), except the terminal's
     // copy and paste.
     static bool isApplicationShortcut(const QKeyEvent &event);
+    // What macOS's Option key does in every terminal (Compose until set).
+    static void setOptionKey(OptionKey optionKey);
 
 signals:
     void titleChanged(const QString &title);

@@ -252,6 +252,8 @@ add_library(duet_core STATIC
     syntax/TreeSitterGrammars.cpp
     syntax/TreeSitterHighlighter.cpp
     terminal/IPty.h
+    terminal/KeyModifiers.h
+    terminal/OptionKey.h
     terminal/ProcessSpec.cpp
     terminal/TerminalWidget.cpp
     terminal/VtScreen.cpp
@@ -339,6 +341,7 @@ if(WIN32)
         recipes/VisualStudio.cpp
         setup/SystemSetupWindows.cpp
         terminal/ConPty.cpp
+        terminal/KeyModifiersWindows.cpp
         toolchains/SystemJdksWindows.cpp
         ui/DesktopIntegrationWindows.cpp)
     # Public: ConPty.h includes <windows.h>, and so does every source that
@@ -353,6 +356,7 @@ else()
         target_sources(duet_core PRIVATE
             projects/NewInstanceMacOS.cpp
             setup/SystemSetupMacOS.cpp
+            terminal/KeyModifiersMacOS.cpp
             terminal/PtyForegroundMacOS.cpp
             toolchains/SystemJdksMacOS.cpp
             ui/DesktopIntegrationMacOS.mm)
@@ -361,6 +365,7 @@ else()
         target_sources(duet_core PRIVATE
             projects/NewInstanceLinux.cpp
             setup/SystemSetupLinux.cpp
+            terminal/KeyModifiersLinux.cpp
             terminal/PtyForegroundLinux.cpp
             toolchains/SystemJdksLinux.cpp
             ui/DesktopIntegrationLinux.cpp)

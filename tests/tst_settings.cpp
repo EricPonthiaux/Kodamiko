@@ -286,6 +286,7 @@ private slots:
         preferences.ligatures = true;
         preferences.animations = false;
         preferences.terminalPathFolders = {"C:/tools/bin", "/opt/cmake/bin"};
+        preferences.terminalOptionKey = OptionKey::Meta;
         QWidget window;
         PreferencesPopup popup(Theme::dark(), &window);
         popup.load(preferences, {}, {});
@@ -309,6 +310,16 @@ private slots:
         page.folderList()->item(0)->setText("  ");
 
         QCOMPARE(page.pathFolders(), QStringList{"/b"});
+    }
+
+    void keepsWhatTheOptionKeyDoes()
+    {
+        Preferences preferences;
+        preferences.terminalOptionKey = OptionKey::Meta;
+
+        preferences.save();
+
+        QCOMPARE(Preferences::load().terminalOptionKey, OptionKey::Meta);
     }
 
     void dialogMovesAShortcutToTheSelectedCommand()

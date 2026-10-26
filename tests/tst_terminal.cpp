@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "system/Host.h"
 #include "terminal/TerminalWidget.h"
 #include "terminal/VtScreen.h"
 
@@ -166,8 +167,31 @@ private slots:
         VtScreen screen(2, 10);
         QByteArray output;
         connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
-        QVERIFY(screen.sendKey(key, Qt::KeyboardModifiers(modifiers), text));
+        QVERIFY(screen.sendKey(key, Qt::KeyboardModifiers(modifiers), text, OptionKey::Compose));
         QCOMPARE(output, expected);
+    }
+
+    void typesWhatOptionComposesOnMacOSAndSendsAltAsMetaElsewhere()
+    {
+        VtScreen screen(2, 10);
+        QByteArray output;
+        connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
+
+        QVERIFY(screen.sendKey(Qt::Key_BraceLeft, Qt::AltModifier, QStringLiteral("{"), OptionKey::Compose));
+
+        const bool isMacOS = Host::operatingSystem() == OperatingSystem::MacOS;
+        QCOMPARE(output, isMacOS ? QByteArray("{") : QByteArray("\x1b{"));
+    }
+
+    void sendsOptionAsMetaWhenAsked()
+    {
+        VtScreen screen(2, 10);
+        QByteArray output;
+        connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
+
+        QVERIFY(screen.sendKey(Qt::Key_B, Qt::AltModifier, QStringLiteral("b"), OptionKey::Meta));
+
+        QCOMPARE(output, QByteArray("\033b"));
     }
 
     void letsModeShortcutsThrough()

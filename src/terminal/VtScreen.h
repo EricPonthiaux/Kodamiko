@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "OptionKey.h"
+
 #include <QColor>
 #include <QObject>
 #include <QPoint>
@@ -74,9 +76,10 @@ public:
     // themselves, such as Claude Code's).
     bool isMouseReporting() const { return mouseReporting_; }
 
-    // Key press. `key`: Qt::Key, `text`: produced text (QKeyEvent::text).
+    // Key press. `key`: Qt::Key, `text`: produced text (QKeyEvent::text);
+    // `optionKey` says whether macOS's Option composed it or acts as Meta.
     // Returns false if the key has no terminal equivalent.
-    bool sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text);
+    bool sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text, OptionKey optionKey);
     void paste(const QString &text);
     // A wheel notch at a screen cell, in the encoding the program asked for.
     void sendWheel(int row, int column, bool up, Qt::KeyboardModifiers modifiers);
