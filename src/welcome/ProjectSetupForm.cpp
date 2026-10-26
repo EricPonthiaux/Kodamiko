@@ -9,6 +9,7 @@
 #include "ui/Paragraph.h"
 #include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
+#include "ui/TreeMetrics.h"
 #include "ui/UiIcons.h"
 
 #include <QCheckBox>
@@ -158,6 +159,7 @@ QWidget *ProjectSetupForm::createSidebar()
     list_ = new QListWidget(sidebar);
     list_->setObjectName(QStringLiteral("popupNav"));
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    applyTreeRowHeight(list_);
     connect(list_, &QListWidget::currentItemChanged, this, [this](const QListWidgetItem *current) {
         if (current)
             selectLanguage(current->data(familyRole).toString());
@@ -392,7 +394,6 @@ void ProjectSetupForm::fillList(const QString &keep)
                 continue;
             auto *entry = new QListWidgetItem(list_);
             entry->setData(familyRole, page.family);
-            entry->setSizeHint(QSize(0, 30));
             updateListItem(page);
         }
     }

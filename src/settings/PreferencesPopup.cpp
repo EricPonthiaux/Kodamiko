@@ -239,6 +239,7 @@ QWidget *PreferencesPopup::createSidebar()
     UiMetrics::setScaledIconSize(pageList_);
     pageList_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     pageList_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    applyTreeRowHeight(pageList_);
     connect(pageList_, &QListWidget::currentRowChanged, pages_, &QStackedWidget::setCurrentIndex);
 
     auto *layout = new QVBoxLayout(sidebar);
@@ -249,8 +250,7 @@ QWidget *PreferencesPopup::createSidebar()
 
 void PreferencesPopup::addPage(const QString &icon, const QString &title, QWidget *page)
 {
-    auto *item = new QListWidgetItem(title, pageList_);
-    item->setSizeHint(QSize(0, 30));
+    new QListWidgetItem(title, pageList_);
     pageIcons_.append(icon);
     pages_->addWidget(page);
 }
@@ -584,8 +584,7 @@ QWidget *PreferencesPopup::createKeymapPage()
     commandList_->setHeaderHidden(true);
     commandList_->setRootIsDecorated(false);
     commandList_->setUniformRowHeights(true);
-    // Rows spaced as the file tree's: a long list read at a glance.
-    applyTreeMetrics(commandList_, commandList_->font());
+    applyTreeRowHeight(commandList_);
     commandList_->setItemDelegateForColumn(1, new KeycapDelegate(commandList_));
     commandList_->header()->setStretchLastSection(false);
     commandList_->header()->setSectionResizeMode(0, QHeaderView::Stretch);

@@ -9,6 +9,7 @@
 #include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
+#include "ui/TreeMetrics.h"
 
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -53,6 +54,7 @@ RefactoringPreviewPopup::RefactoringPreviewPopup(Preview preview, Apply apply, Q
     list_->setObjectName(QStringLiteral("refactoredFiles"));
     list_->setTextElideMode(Qt::ElideMiddle);
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    applyTreeRowHeight(list_);
     addItems();
     conflicts_->setObjectName(QStringLiteral("refactoringConflicts"));
     Paragraph::setText(conflicts_, tr("Conflicts:\n%1").arg(preview_.conflicts.join(QLatin1Char('\n'))));

@@ -11,6 +11,7 @@
 #include "ui/PopupRows.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
+#include "ui/TreeMetrics.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
 
@@ -187,6 +188,7 @@ QWidget *SnapshotsPopup::createDetails()
     files_->setTextElideMode(Qt::ElideMiddle);
     UiMetrics::setScaledIconSize(files_);
     files_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    applyTreeRowHeight(files_);
 
     commit_ = new QLabel(card);
     commit_->setObjectName(QStringLiteral("snapshotCommit"));

@@ -2,6 +2,7 @@
 
 #include "TreeMetrics.h"
 
+#include <QAbstractItemView>
 #include <QFontMetrics>
 #include <QStyledItemDelegate>
 #include <QTreeView>
@@ -38,15 +39,20 @@ void applyTreeMetrics(QTreeView *tree, const QFont &font)
     tree->setIconSize(QSize(textHeight, textHeight));
     tree->setIndentation(qRound(textHeight * indentRatio));
 
+    applyTreeRowHeight(tree);
+}
+
+void applyTreeRowHeight(QAbstractItemView *view)
+{
     // Only the standard delegate is replaced: a custom one (file tree,
     // changes, history…) paints and sizes its rows itself, and code may
     // rely on its type.
-    const QAbstractItemDelegate *previous = tree->itemDelegate();
+    const QAbstractItemDelegate *previous = view->itemDelegate();
     // The exact type: subclasses without Q_OBJECT share the base's metaObject.
     if (previous && typeid(*previous) != typeid(QStyledItemDelegate))
         return;
-    tree->setItemDelegate(new RowHeightDelegate(tree));
-    if (previous && previous->parent() == tree)
+    view->setItemDelegate(new RowHeightDelegate(view));
+    if (previous && previous->parent() == view)
         delete previous;
 }
 
