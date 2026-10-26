@@ -6,6 +6,7 @@
 #include "EditorWidget.h"
 #include "MarkdownHtml.h"
 #include "PreviewSite.h"
+#include "WebZoom.h"
 #include "syntax/LanguageRegistry.h"
 #include "ui/AppFonts.h"
 #include "ui/ContextMenus.h"
@@ -131,6 +132,7 @@ MarkdownPreview::MarkdownPreview(QWidget *parent)
     , colorizer_(std::make_unique<CodeColorizer>())
 {
     setPage(new LinkRoutingPage(this, [this](const QString &path) { emit openFileRequested(path); }));
+    WebZoom::attach(this);
     // The page's color before it is loaded, not the view's default white.
     page()->setBackgroundColor(MarkdownHtml::pageColor());
     connect(page(), &QWebEnginePage::loadFinished, this, [this] {
@@ -220,6 +222,7 @@ HtmlPreview::HtmlPreview(const QString &servedFolder, QWidget *parent)
     auto *routing = new LinkRoutingPage(this, [this](const QString &path) { emit openFileRequested(path); });
     routing->setSite(&site_);
     setPage(routing);
+    WebZoom::attach(this);
     // The page's own scripts; its site keeps them away from other files.
     page()->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
     // As in a browser, a page without a background of its own is white.

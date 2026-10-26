@@ -338,6 +338,7 @@ add_library(duet_core STATIC
 # system. The PTY is ConPTY on Windows, forkpty elsewhere.
 if(WIN32)
     target_sources(duet_core PRIVATE
+        editor/windows/WebZoomWindows.cpp
         git/windows/CredentialCacheWindows.cpp
         projects/windows/NewInstanceWindows.cpp
         recipes/windows/VisualStudio.cpp
@@ -356,6 +357,7 @@ else()
         terminal/unix/UnixPty.cpp)
     if(APPLE)
         target_sources(duet_core PRIVATE
+            editor/osx/WebZoomMacOS.cpp
             projects/osx/NewInstanceMacOS.cpp
             setup/osx/SystemSetupMacOS.cpp
             terminal/osx/KeyModifiersMacOS.cpp
@@ -365,6 +367,7 @@ else()
         target_link_libraries(duet_core PRIVATE "-framework AppKit")
     else()
         target_sources(duet_core PRIVATE
+            editor/linux/WebZoomLinux.cpp
             projects/linux/NewInstanceLinux.cpp
             setup/linux/SystemSetupLinux.cpp
             terminal/linux/KeyModifiersLinux.cpp
