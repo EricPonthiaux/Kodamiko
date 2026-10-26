@@ -208,13 +208,15 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         QStringLiteral("get_editor_state"),
         QStringLiteral("Editor state"),
         QStringLiteral("What the user has in front of them in Duet: the current file, the cursor, the selection "
-                       "(with its text), the problems of that file, and the files with unsaved changes. Use it "
-                       "when the user says \"this\", \"here\" or \"the selection\"."),
+                       "(with its text), the problems of that file, or the diagram in front and the elements "
+                       "selected in it, and the files with unsaved changes. Use it when the user says \"this\", "
+                       "\"here\" or \"the selection\"."),
         object({}),
         object({{QStringLiteral("file"), string(QStringLiteral("Current file"))},
                 {QStringLiteral("line"), integer(QStringLiteral("Cursor line, 1-based"))},
                 {QStringLiteral("column"), integer(QStringLiteral("Cursor column, 1-based"))},
                 {QStringLiteral("selection"), QJsonObject{{QStringLiteral("type"), QStringLiteral("object")}}},
+                {QStringLiteral("diagram"), QJsonObject{{QStringLiteral("type"), QStringLiteral("object")}}},
                 {QStringLiteral("problems"), QJsonObject{{QStringLiteral("type"), QStringLiteral("array")}}},
                 {QStringLiteral("unsavedFiles"), QJsonObject{{QStringLiteral("type"), QStringLiteral("array")}}}}),
         true,

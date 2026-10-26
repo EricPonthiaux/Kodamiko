@@ -112,12 +112,11 @@ void EditorTabs::paintEmptyMark()
     QRectF area(0, 0, size, size);
     area.moveCenter(QRectF(rect()).center());
 
-    // In the theme's colors rather than the icon's: the icon's light caret
-    // would vanish on a light background.
+    // A watermark: the caret muted, unlike the other marks' text color.
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setOpacity(emptyMarkOpacity);
-    BrandMark::paint(&painter, area, theme_.mutedText, theme_.accent);
+    BrandMark::paint(&painter, area, {.caret = theme_.mutedText, .block = theme_.accent});
 }
 
 void EditorTabs::tabInserted(int index)

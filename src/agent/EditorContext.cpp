@@ -5,6 +5,12 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 
+#ifdef DUET_WITH_DIAGRAMS
+#include "viewers/DiagramView.h"
+#include "viewers/diagram/Board.h"
+#include "viewers/diagram/Shape.h"
+#endif
+
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -50,6 +56,46 @@ QStringList describeProblems(const QList<EditorContext::Problem> &problems)
     return lines;
 }
 
+QStringList describeDiagramSelection(const QList<EditorContext::DiagramElement> &elements)
+{
+    QStringList lines{QStringLiteral("- Selected in the diagram (key: text):")};
+    for (qsizetype i = 0; i < elements.size() && i < EditorContext::maximumDiagramSelection; ++i) {
+        const EditorContext::DiagramElement &element = elements.at(i);
+        const QString text = element.text.simplified();
+        lines.append(text.isEmpty() ? QStringLiteral("  - %1").arg(element.key)
+                                    : QStringLiteral("  - %1: %2").arg(element.key, text));
+    }
+    if (elements.size() > EditorContext::maximumDiagramSelection)
+        lines.append(QStringLiteral("  - and %1 more").arg(elements.size() - EditorContext::maximumDiagramSelection));
+    return lines;
+}
+
+#ifdef DUET_WITH_DIAGRAMS
+// How the source names a shape: its key, else its id (as the diagram MCP tools do).
+QString keyOf(const diagram::Shape &shape)
+{
+    return shape.key.isEmpty() ? shape.id : shape.key;
+}
+
+QList<EditorContext::DiagramElement> selectionOf(const diagram::Board &board)
+{
+    QList<EditorContext::DiagramElement> elements;
+    for (const auto &shape : board.shapes()) {
+        if (board.selection().contains(shape->id))
+            elements.append({keyOf(*shape), shape->displayText()});
+    }
+    const auto endKey = [&board](const QString &id) {
+        const diagram::Shape *shape = board.shape(id);
+        return shape ? keyOf(*shape) : id;
+    };
+    for (const auto &link : board.links()) {
+        if (board.linkSelection().contains(link->id))
+            elements.append({QStringLiteral("%1 -> %2").arg(endKey(link->from), endKey(link->to)), link->label});
+    }
+    return elements;
+}
+#endif
+
 // "src/b.cpp:120" for an open file, "src/b.cpp" for one no longer open.
 QString describeRecentFile(const EditorTabs &tabs, const QString &path, const QString &relativePath)
 {
@@ -80,6 +126,11 @@ QString EditorContext::describe() const
             lines += describeSelection(*this);
         if (!problems.isEmpty())
             lines += describeProblems(problems);
+    }
+    if (!diagramPath.isEmpty()) {
+        lines.append(QStringLiteral("- Diagram open in the editor: %1").arg(diagramPath));
+        if (!diagramSelection.isEmpty())
+            lines += describeDiagramSelection(diagramSelection);
     }
     if (!recentFiles.isEmpty())
         lines.append(
@@ -129,11 +180,18 @@ EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFo
                 {problemLine + 1, diagnostic.severity == Diagnostic::Severity::Error, diagnostic.message});
         }
     }
-    const EditorWidget *current = tabs.currentEditor();
+#ifdef DUET_WITH_DIAGRAMS
+    const DiagramView *diagram = tabs.currentEditor() ? nullptr : tabs.diagramViewFor(tabs.currentFilePath());
+    if (diagram) {
+        context.diagramPath = relative(diagram->filePath());
+        context.diagramSelection = selectionOf(*diagram->board());
+    }
+#endif
+    const QString currentPath = tabs.currentFilePath();
     for (const QString &path : recentlyOpened) {
         if (context.recentFiles.size() == maximumRecentFiles)
             break;
-        const bool isCurrent = current && current->filePath() == path;
+        const bool isCurrent = !currentPath.isEmpty() && currentPath == path;
         if (!isCurrent && QFileInfo::exists(path))
             context.recentFiles.append(describeRecentFile(tabs, path, relative(path)));
     }
@@ -155,6 +213,13 @@ QJsonObject EditorContext::toJson() const
         json.insert(QLatin1String("selection"), QJsonObject{{QLatin1String("startLine"), selectionStartLine},
                                                             {QLatin1String("endLine"), selectionEndLine},
                                                             {QLatin1String("text"), selectedText}});
+    }
+    if (!diagramPath.isEmpty()) {
+        QJsonArray selection;
+        for (const DiagramElement &element : diagramSelection)
+            selection.append(QJsonObject{{QLatin1String("key"), element.key}, {QLatin1String("text"), element.text}});
+        json.insert(QLatin1String("diagram"),
+                    QJsonObject{{QLatin1String("file"), diagramPath}, {QLatin1String("selection"), selection}});
     }
     QJsonArray problemList;
     for (const Problem &problem : problems)

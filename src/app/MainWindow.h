@@ -64,6 +64,7 @@ class NoticeBar;
 class OutlineView;
 class PreferencesPopup;
 class PrerequisitesPopup;
+class AboutPopup;
 class ProblemStore;
 class ProblemsView;
 class UsagesView;
@@ -172,7 +173,8 @@ private:
     void createModeTabs();
     void createStatusBar();
     void createMenus();
-    void createFileMenu();
+    // Returns the actions macOS puts in the application menu.
+    QList<QAction *> createFileMenu();
     void createClaudeMenu();
     void createViewMenu();
     void createDockMenu();
@@ -207,7 +209,8 @@ private:
     // editorContextActions_, from the menus' actions.
     void createEditorContextActions();
     void createRunMenu();
-    void createHelpMenu();
+    // Returns Help ▸ About, which macOS puts in the application menu.
+    QAction *createHelpMenu();
     void restoreSettings();
     // Before the window first shows: the frame changes the native window.
     void restoreTitleBarFrame(const QSettings &settings);
@@ -371,6 +374,8 @@ private:
     // "duet" or one of Duet's Material themes, "duet-slate"… (see Theme::all),
     // applied everywhere.
     void setTheme(const QString &name);
+    // The app icon (windows, Dock, taskbar, tray) in the colors of theme_.
+    void applyThemeToAppIcon();
     static QString savedThemeName();
     void setMode(Mode mode);
     void toggleTerminalMode();
@@ -522,6 +527,8 @@ private:
     std::optional<QString> askCredentials(const QString &prompt);
     // Help ▸ Check Prerequisites, also shown at startup if git or claude is missing.
     void showPrerequisites();
+    // Help ▸ About Duet.
+    void showAbout();
     // File ▸ Preferences.
     void showPreferences();
     void applyPreferences(const Preferences &preferences);
@@ -663,6 +670,7 @@ private:
     MessagePopup *agentMessage_ = nullptr;
     RecentFiles recentFiles_;
     PrerequisitesPopup *prerequisitesPopup_ = nullptr;
+    AboutPopup *aboutPopup_ = nullptr;
     QSystemTrayIcon *trayIcon_ = nullptr;
     // The system's menu bar where it is separate (macOS); null elsewhere.
     std::unique_ptr<QMenuBar> nativeMenuBar_;

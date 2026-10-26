@@ -34,6 +34,8 @@
 #include "settings/PreferencesPopup.h"
 #include "setup/PrerequisitesPopup.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/AboutPopup.h"
+#include "ui/BrandMark.h"
 #include "ui/DetachablePage.h"
 #include "ui/MessagePopup.h"
 #include "ui/Motion.h"
@@ -49,12 +51,21 @@
 #include "workspace/SidePanel.h"
 
 #include <QActionGroup>
+#include <QApplication>
 #include <QSettings>
+#include <QSystemTrayIcon>
 #include <QToolButton>
 
 QString MainWindow::savedThemeName()
 {
     return Preferences::load().theme;
+}
+
+void MainWindow::applyThemeToAppIcon()
+{
+    QApplication::setWindowIcon(BrandMark::windowIcon(theme_));
+    if (trayIcon_)
+        trayIcon_->setIcon(QApplication::windowIcon());
 }
 
 void MainWindow::setTheme(const QString &name)
@@ -64,6 +75,7 @@ void MainWindow::setTheme(const QString &name)
     for (QAction *action : themeActions_->actions())
         action->setChecked(action->data().toString() == theme_.name);
     ThemeStyle::apply(theme_);
+    applyThemeToAppIcon();
     titleBar_->applyTheme(theme_);
     agentIndicator_->applyTheme(theme_);
     frame_->applyTheme(theme_);
@@ -112,6 +124,8 @@ void MainWindow::setTheme(const QString &name)
     agentMessage_->applyTheme(theme_);
     if (prerequisitesPopup_)
         prerequisitesPopup_->applyTheme(theme_);
+    if (aboutPopup_)
+        aboutPopup_->applyTheme(theme_);
     if (modeTabs_) {
         updateTabIcons();
         updateAgentIndicator();

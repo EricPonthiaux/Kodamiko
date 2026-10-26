@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
 
     QApplication::setFont(Preferences::load().interfaceFont());
 
-    QApplication::setWindowIcon(BrandMark::windowIcon());
+    QApplication::setWindowIcon(BrandMark::windowIcon(Theme::named(Preferences::load().theme)));
     QGuiApplication::setDesktopFileName(QStringLiteral("duet"));
 
     QCommandLineParser parser;

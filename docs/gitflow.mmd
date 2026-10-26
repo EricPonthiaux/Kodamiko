@@ -1,11 +1,5 @@
 flowchart TB
-  user(["Utilisateur<br/>menu Git, panneau Changes"])
-  outside(["Terminal ou Claude<br/>modifient le dépôt"])
-  actions["GitActions<br/>commit, fetch, pull, push,<br/>merge, stash…"]
   kind{"Opération distante ?"}
-  queue["File GitCommands<br/>une opération à la fois,<br/>hors du thread UI"]
-  busy["Barre d'état occupée<br/>progression + Annuler"]
-  run["Git::run<br/>lance le process git"]
   env["Environnement<br/>pas de terminal, pas d'éditeur,<br/>messages en anglais"]
   creds{"Identifiants<br/>en cache ?"}
   askpass["duet-askpass<br/>demande à l'utilisateur"]
@@ -18,8 +12,14 @@ flowchart TB
   wayout["Dialogue avec<br/>une porte de sortie"]
   failed["Dialogue d'erreur"]
   refresh["Mise à jour du dépôt<br/>branche, ↑↓, statuts"]
-  watcher["RepositoryWatcher<br/>surveille le dossier .git"]
   views["Rafraîchit Changes,<br/>Historique, index"]
+  busy["Barre d'état occupée<br/>progression + Annuler"]
+  queue["File GitCommands<br/>une opération à la fois,<br/>hors du thread UI"]
+  watcher["RepositoryWatcher<br/>surveille le dossier .git"]
+  outside(["Terminal ou Claude<br/>modifient le dépôt"])
+  run["Git::run<br/>lance le process git"]
+  actions["GitActions<br/>commit, fetch, pull, push,<br/>merge, stash…"]
+  user(["Utilisateur<br/>menu Git, panneau Changes"])
   user --> actions
   actions --> kind
   kind -->|non| queue
@@ -46,3 +46,52 @@ flowchart TB
   run -.->|écrit dans .git| watcher
   watcher --> refresh
   refresh --> views
+
+%% Layout kept by Duet (positions, sizes, colors, curves)
+%% duet {"key":"kind","x":368,"y":274}
+%% duet {"key":"env","x":269.5,"y":891.9}
+%% duet {"key":"creds","x":260.5,"y":1038.9}
+%% duet {"key":"askpass","x":345,"y":1252.9}
+%% duet {"key":"cancel","x":258.5,"y":1398.9}
+%% duet {"key":"kill","x":133,"y":1622.9}
+%% duet {"key":"result","x":297.5,"y":1596.9}
+%% duet {"key":"back","x":165.5,"y":1775.9}
+%% duet {"key":"success","x":58.5,"y":2126.8}
+%% duet {"key":"recover","x":184,"y":1921.8}
+%% duet {"key":"wayout","x":477.5,"y":2223.8}
+%% duet {"key":"failed","x":213.5,"y":2227.8}
+%% duet {"key":"refresh","x":37.5,"y":2350.8}
+%% duet {"key":"views","x":42,"y":2477.7}
+%% duet {"key":"busy","x":610.4,"y":468.2}
+%% duet {"key":"queue","x":383.9,"y":562.6}
+%% duet {"key":"watcher","x":-14.2,"y":900.1}
+%% duet {"key":"outside","x":37.5,"y":739.2}
+%% duet {"key":"run","x":304,"y":745.9}
+%% duet {"key":"actions","x":458.2,"y":126.1}
+%% duet {"key":"user","x":400.4,"y":1.4}
+%% duet {"c":[517.5,69.7,522.6,83.5,528.5,99.8,534.1,115.2],"e":[538,125.6],"link":"user>actions","n":0}
+%% duet {"c":[547.5,214.4,545.2,230.2,542.4,248.4,539.8,265.7],"e":[538.1,277],"link":"actions>kind","n":0}
+%% duet {"c":[517.7,390.2,507.9,437.3,493.9,504.1,484,551],"e":[481.7,562.2],"link":"kind>queue","n":0}
+%% duet {"c":[573.5,378.2,598.7,403.5,630.1,435.1,654.9,460],"e":[662.7,467.9],"link":"kind>busy","n":0}
+%% duet {"c":[622.8,536.7,606.3,544.3,588.6,552.6,571.4,560.6],"e":[561.3,565.3],"link":"busy>queue","n":0}
+%% duet {"c":[449,650.8,435.2,676.8,417.8,709.6,404,735.7],"e":[398.7,745.7],"link":"queue>run","n":0}
+%% duet {"c":[380.5,814.2,380.5,833.6,380.5,858.3,380.5,880.4],"e":[380.5,891.7],"link":"run>env","n":0}
+%% duet {"c":[380.5,980.4,380.5,994.8,380.5,1011.2,380.5,1027.4],"e":[380.5,1038.5],"link":"env>creds","n":0}
+%% duet {"c":[397.7,1165.4,405,1190.1,413.4,1218.6,420.2,1241.7],"e":[423.4,1252.6],"link":"creds>askpass","lp":[431.4,1213.9],"n":0}
+%% duet {"c":[422.5,1321.3,415.6,1342.8,406.6,1371,398.5,1396.3],"e":[395.1,1406.9],"link":"askpass>cancel","n":0}
+%% duet {"c":[360.9,1164.3,353.1,1190,345.2,1220.8,341.3,1249.2,336.8,1282.4,336.8,1291.4,341.3,1324.6,344.6,1348.5,350.9,1374.2,357.5,1396.6],"e":[360.7,1407.3],"link":"creds>cancel","lp":[309,1286.9],"n":0}
+%% duet {"c":[340.2,1499.9,308.9,1533.4,265,1580.4,233.4,1614.2],"e":[225.6,1622.5],"link":"cancel>kill","lp":[306.1,1557.9],"n":0}
+%% duet {"c":[389.3,1513.8,394,1537.6,399.5,1565.7,404.5,1590.7],"e":[406.7,1601.9],"link":"cancel>result","lp":[415.7,1557.9],"n":0}
+%% duet {"c":[202.9,1691.2,208.9,1712.9,216.6,1741.1,223.1,1764.6],"e":[226.1,1775.7],"link":"kill>back","n":0}
+%% duet {"c":[372.5,1694.7,345.9,1717.1,312.2,1745.4,284.9,1768.4],"e":[276.2,1775.7],"link":"result>back","n":0}
+%% duet {"c":[224.2,1844.2,203.1,1907.9,158,2044.4,134.5,2115.5],"e":[130.9,2126.4],"link":"back>success","lp":[211.4,1882.9],"n":0}
+%% duet {"c":[257,1844.3,272.2,1868.7,293.3,1902.4,312.5,1933],"e":[318.3,1942.4],"link":"back>recover","lp":[308.8,1882.9],"n":0}
+%% duet {"c":[410.2,2073.4,444.8,2117.6,490.1,2175.4,520.6,2214.5],"e":[527.6,2223.5],"link":"recover>wayout","lp":[517,2160.8],"n":0}
+%% duet {"c":[554,2223.5,552.6,2131.9,548.3,1874.4,541.8,1660.1,536.3,1477.4,536.8,1431.6,525.7,1249.2,512.4,1031.8,488.5,773.6,477.8,662.2],"e":[476.7,651],"link":"wayout>queue","n":0}
+%% duet {"c":[337.3,2086.6,324.3,2129.5,308.7,2181.2,298,2216.5],"e":[294.7,2227.4],"link":"recover>failed","lp":[337,2160.8],"n":0}
+%% duet {"c":[119.5,2194.8,119.5,2233.3,119.5,2296.2,119.5,2339],"e":[119.5,2350.5],"link":"success>refresh","n":0}
+%% duet {"c":[245.7,2288.2,224,2304.8,196.9,2325.6,173.3,2343.6],"e":[164.5,2350.4],"link":"failed>refresh","n":0}
+%% duet {"c":[105.5,807.3,99.3,831,91,862.9,84.2,888.7],"e":[81.3,899.8],"link":"outside>watcher","n":0}
+%% duet {"c":[311.7,814.3,264.2,838.1,200.8,869.8,151.2,894.6],"e":[141.1,899.7],"link":"run>watcher","n":0}
+%% duet {"c":[71.6,968.2,68.8,1109.7,58.2,1665.9,54.8,2123.1,54.6,2156.6,49.2,2165.5,54.8,2198.5,63.2,2248.4,83.5,2302.9,99.1,2339.9],"e":[103.6,2350.4],"link":"watcher>refresh","n":0}
+%% duet {"c":[119.5,2419.2,119.5,2433.5,119.5,2450.5,119.5,2465.9],"e":[119.5,2477.3],"link":"refresh>views","n":0}

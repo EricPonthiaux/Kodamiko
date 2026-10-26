@@ -867,6 +867,20 @@ private slots:
                  QStringLiteral("- Files viewed before, most recent first: src/b.cpp:120, src/c.h"));
     }
 
+    void describesTheElementsSelectedInTheDiagram()
+    {
+        EditorContext context;
+        context.diagramPath = QStringLiteral("docs/gitflow.mmd");
+        context.diagramSelection = {{QStringLiteral("develop"), QStringLiteral("Develop\nbranch")},
+                                    {QStringLiteral("develop -> main"), QString()}};
+
+        QCOMPARE(context.describe().section(QLatin1Char('\n'), 1),
+                 QStringLiteral("- Diagram open in the editor: docs/gitflow.mmd\n"
+                                "- Selected in the diagram (key: text):\n"
+                                "  - develop: Develop branch\n"
+                                "  - develop -> main"));
+    }
+
     void reportsOnlyTheErrorsAnEditBrought()
     {
         const auto diagnostic = [](int line, const char *message, int severity) {

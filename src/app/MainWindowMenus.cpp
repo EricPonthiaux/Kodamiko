@@ -23,6 +23,7 @@
 #include "settings/Preferences.h"
 #include "system/Host.h"
 #include "terminal/TerminalWidget.h"
+#include "ui/AboutPopup.h"
 #include "ui/DesktopIntegration.h"
 #include "ui/TitleBar.h"
 #include "viewers/DiagramKinds.h"
@@ -64,14 +65,16 @@ QKeySequence fullScreenShortcut()
 
 void MainWindow::createMenus()
 {
-    createFileMenu();
+    const QList<QAction *> fileApplicationActions = createFileMenu();
     createEditMenu();
     createClaudeMenu();
     createNavigateMenu();
     createRunMenu();
     createGitMenu();
     createViewMenu();
-    createHelpMenu();
+    // About first, where macOS applications have it.
+    nativeMenuBar_ =
+        DesktopIntegration::createNativeMenuBar(QList<QAction *>{createHelpMenu()} + fileApplicationActions);
     createEditorContextActions();
     createDockMenu();
 
@@ -98,7 +101,7 @@ void MainWindow::createEditorContextActions()
     editorContextActions_ << separator() << quickFixesAction_ << undoRefactoringAction_;
 }
 
-void MainWindow::createFileMenu()
+QList<QAction *> MainWindow::createFileMenu()
 {
     QMenu *file = titleBar_->menuBar()->addMenu(tr("&File"));
     file->addAction(tr("New &Project…"), this, &MainWindow::showNewProject);
@@ -138,7 +141,7 @@ void MainWindow::createFileMenu()
     file->addSeparator();
     QAction *quit = file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
     quit->setMenuRole(QAction::QuitRole);
-    nativeMenuBar_ = DesktopIntegration::createNativeMenuBar({preferences, quit});
+    return {preferences, quit};
 }
 
 void MainWindow::createClaudeMenu()
@@ -482,10 +485,21 @@ void MainWindow::createNavigateMenu()
     navigate->addAction(tr("R&ollback Lines"), QKeySequence(tr("Ctrl+Alt+Z")), this, &MainWindow::rollbackChange);
 }
 
-void MainWindow::createHelpMenu()
+QAction *MainWindow::createHelpMenu()
 {
     QMenu *help = titleBar_->menuBar()->addMenu(tr("&Help"));
     help->addAction(tr("Check &Prerequisites…"), this, &MainWindow::showPrerequisites);
+    help->addSeparator();
+    QAction *about = help->addAction(tr("&About Duet"), this, &MainWindow::showAbout);
+    about->setMenuRole(QAction::AboutRole);
+    return about;
+}
+
+void MainWindow::showAbout()
+{
+    if (!aboutPopup_)
+        aboutPopup_ = new AboutPopup(theme_, this);
+    aboutPopup_->popup();
 }
 
 void MainWindow::applyKeymap(const Keymap::Overrides &overrides)

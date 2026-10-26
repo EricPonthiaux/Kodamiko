@@ -265,6 +265,7 @@ add_library(duet_core STATIC
     toolchains/QtRepository.cpp
     toolchains/ToolCatalog.cpp
     toolchains/Toolchains.cpp
+    ui/AboutPopup.cpp
     ui/AppFonts.cpp
     ui/BrandLogo.cpp
     ui/BrandMark.cpp

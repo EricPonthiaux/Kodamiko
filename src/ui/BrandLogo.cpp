@@ -57,7 +57,7 @@ QSize BrandLogo::sizeHint() const
 void BrandLogo::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
-    BrandMark::paint(&painter, markArea(), BrandMark::caretColorFor(*theme_));
+    BrandMark::paint(&painter, markArea(), BrandMark::colorsFor(*theme_));
 }
 
 QRectF BrandLogo::markArea() const
