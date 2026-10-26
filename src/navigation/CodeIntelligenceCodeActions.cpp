@@ -7,8 +7,6 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "lsp/LspClient.h"
-#include "refactor/EditPreview.h"
-#include "refactor/RefactoringPreviewPopup.h"
 
 #include <QAction>
 #include <QJsonArray>

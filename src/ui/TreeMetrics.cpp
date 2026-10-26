@@ -8,8 +8,7 @@
 #include <QTreeView>
 
 #include <algorithm>
-#include <cmath>
-#include <typeinfo>
+#include <typeinfo> // IWYU pragma: keep (typeid needs it)
 
 namespace {
 

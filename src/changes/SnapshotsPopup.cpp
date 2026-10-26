@@ -10,7 +10,6 @@
 #include "ui/PopupMetrics.h"
 #include "ui/PopupRows.h"
 #include "ui/PopupWidgets.h"
-#include "ui/ThemeStyle.h"
 #include "ui/TreeMetrics.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
