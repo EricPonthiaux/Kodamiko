@@ -4,7 +4,8 @@
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
 #include "syntax/TreeSitterGrammars.h"
-#include "ui/KdeThemes.h"
+#include "ui/MaterialPalette.h"
+#include "ui/MaterialThemes.h"
 #include "ui/Theme.h"
 
 #include <Qsci/qsciscintilla.h>
@@ -54,15 +55,15 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        // Duet's first, then those from VS Code, then KDE's.
-        QCOMPARE(names.mid(0, 9), QStringList({"duet", "dark", "purple", "light", "one-dark-pro", "dracula",
-                                               "github-dark", "tokyo-night", "catppuccin-mocha"}));
-        QVERIFY(std::ranges::all_of(names.mid(9), [](const QString &name) { return name.startsWith("kde-"); }));
-        const Theme purple = Theme::named("purple");
-        QVERIFY(purple.isDark);
-        QVERIFY(purple.accent.isValid() && purple.window.isValid() && purple.findHighlight.isValid());
-        QVERIFY(purple.syntaxStyleIndex(u"function.method") >= 0);
-        QVERIFY(!Theme::named("light").isDark);
+        // Duet's first, then its Material ones.
+        QCOMPARE(names.size(), 21);
+        QCOMPARE(names.first(), QString("duet"));
+        QVERIFY(std::ranges::all_of(names.mid(1), [](const QString &name) { return name.startsWith("duet-"); }));
+        const Theme amethyst = Theme::named("duet-amethyst");
+        QVERIFY(amethyst.isDark);
+        QVERIFY(amethyst.accent.isValid() && amethyst.window.isValid() && amethyst.findHighlight.isValid());
+        QVERIFY(amethyst.syntaxStyleIndex(u"function.method") >= 0);
+        QVERIFY(!Theme::named("duet-paper").isDark);
         // Every theme has the interface colors the controls' style sheet uses.
         for (const Theme &theme : Theme::all()) {
             for (const QColor &color : {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent,
@@ -73,35 +74,42 @@ private slots:
         QCOMPARE(Theme::named("unknown").name, QString("duet"));
     }
 
-    void vsCodeThemesTakeTheirOwnInterfaceColors()
+    void materialThemesTakeOnlyMaterialDesignColors()
     {
-        const Theme dracula = Theme::named("dracula");
-        QCOMPARE(dracula.title, QString("Dracula"));
-        QVERIFY(dracula.isDark && !dracula.isKde());
-        QCOMPARE(dracula.background, QColor("#282a36"));
-        // The workbench's own colors, not shades of the editor's.
-        QCOMPARE(dracula.window, QColor("#21222c"));
-        QCOMPARE(dracula.accent, QColor("#ff79c6"));
-        const TextStyle &parameter = dracula.syntaxStyles.at(dracula.syntaxStyleIndex(u"variable.parameter")).second;
-        QCOMPARE(parameter.foreground, QColor("#ffb86c"));
-        QVERIFY(parameter.italic);
-    }
-
-    void kdeThemesTakeKateColors()
-    {
-        // Those of KSyntaxHighlighting's data/themes, embedded.
-        QCOMPARE(KdeThemes::all().size(), 30);
-        const Theme breeze = Theme::named("kde-breeze-dark");
-        QCOMPARE(breeze.title, QString("Breeze Dark"));
-        QVERIFY(breeze.isDark && breeze.isKde());
-        QCOMPARE(breeze.background, QColor("#232629"));
-        QCOMPARE(breeze.selection, QColor("#2d5c76"));
-        const TextStyle &keyword = breeze.syntaxStyles.at(breeze.syntaxStyleIndex(u"keyword")).second;
-        QCOMPARE(keyword.foreground, QColor("#cfcfc2"));
-        QVERIFY(keyword.bold);
-        QVERIFY(!Theme::named("kde-solarized-light").isDark);
-        // Unreadable: no theme.
-        QVERIFY(!KdeThemes::fromJson("{}", "kde-none"));
+        const QList<Theme> themes = MaterialThemes::all();
+        QCOMPARE(themes.size(), 20);
+        const auto isMaterial = [](const QColor &color) {
+            return std::ranges::any_of(MaterialPalette::all,
+                                       [&color](const char *swatch) { return QColor(swatch) == color; });
+        };
+        for (const Theme &theme : themes) {
+            QVERIFY2(theme.title.startsWith("Duet-"), qPrintable(theme.title));
+            for (const QColor &color : {theme.background,
+                                        theme.foreground,
+                                        theme.caret,
+                                        theme.caretLine,
+                                        theme.selection,
+                                        theme.marginBackground,
+                                        theme.marginForeground,
+                                        theme.currentLineNumber,
+                                        theme.braceMatch,
+                                        theme.findHighlight,
+                                        theme.error,
+                                        theme.warning,
+                                        theme.window,
+                                        theme.button,
+                                        theme.alternateBase,
+                                        theme.highlight,
+                                        theme.accent,
+                                        theme.accentText,
+                                        theme.mutedText,
+                                        theme.border,
+                                        theme.line,
+                                        theme.hover})
+                QVERIFY2(isMaterial(color), qPrintable(theme.name + ": " + color.name()));
+            for (const auto &[capture, style] : theme.syntaxStyles)
+                QVERIFY2(isMaterial(style.foreground), qPrintable(theme.name + ": " + capture));
+        }
     }
 
     void languageForFile_data()
@@ -162,7 +170,7 @@ private slots:
 
     void highlightsC()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         QsciScintilla editor;
         const auto h = highlight(editor, "c", "int main(void) {\n  // note\n  return puts(\"hi\");\n}\n", theme);
         QCOMPARE(styleOfWord(editor, "int"), styleFor(theme, "type"));
@@ -174,7 +182,7 @@ private slots:
 
     void highlightsCppOverC()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         QsciScintilla editor;
         const auto h = highlight(editor, "cpp", "namespace app { class Foo {}; }\n", theme);
         QCOMPARE(styleOfWord(editor, "namespace"), styleFor(theme, "keyword"));
@@ -183,7 +191,7 @@ private slots:
 
     void highlightsTemplateTypes()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         QsciScintilla editor;
         const auto h = highlight(
             editor, "cpp", "// éléments\ntemplate <typename T>\nT sum(T a) { T total{}; return total; }\n", theme);
@@ -195,7 +203,7 @@ private slots:
 
     void highlightsJava()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         QsciScintilla editor;
         const auto h = highlight(editor, "java", "public class App { static final int MAX = 3; }\n", theme);
         QCOMPARE(styleOfWord(editor, "public"), styleFor(theme, "keyword"));
@@ -205,7 +213,7 @@ private slots:
 
     void highlightsJavaScript()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         QsciScintilla editor;
         const auto h = highlight(editor, "javascript", "const greet = (name) => console.log(`hi ${name}`);\n", theme);
         QCOMPARE(styleOfWord(editor, "const"), styleFor(theme, "keyword"));
@@ -215,7 +223,7 @@ private slots:
 
     void restylesAfterEdit()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         QsciScintilla editor;
         const auto h = highlight(editor, "c", "int x;\n", theme);
         QCOMPARE(styleOfWord(editor, "x"), styleFor(theme, "variable"));
@@ -228,7 +236,7 @@ private slots:
 
     void fallsBackToLexerForJson()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         QsciScintilla editor;
         const auto h = highlight(editor, "json", "{\"key\": \"value\"}\n", theme);
         QVERIFY(editor.lexer() != nullptr);
@@ -252,7 +260,7 @@ private slots:
                                  "#endif\n"            // 11
                                  "int z(int a,\n"      // 12: two lines, nothing to hide
                                  "      int b);\n",
-                                 Theme::dark());
+                                 Theme::duet());
         const auto depth = [&editor](int line) {
             return static_cast<int>((editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) &
                                      QsciScintillaBase::SC_FOLDLEVELNUMBERMASK) -

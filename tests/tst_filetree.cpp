@@ -162,7 +162,7 @@ private slots:
         const QTemporaryDir dir;
         for (const char *name : {"a.txt", "b.txt", "c.txt"})
             write(dir.filePath(name), "text\n");
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
 
         QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
         QVERIFY(tabs.tabBar()->property("preview").toBool());
@@ -185,7 +185,7 @@ private slots:
         const QTemporaryDir dir;
         for (const char *name : {"a.txt", "b.txt"})
             write(dir.filePath(name), "text\n");
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
         tabs.editorFor(dir.filePath("a.txt"))->insert("x");
         QVERIFY(!tabs.tabBar()->property("preview").toBool());
@@ -198,7 +198,7 @@ private slots:
         const QTemporaryDir dir;
         for (const char *name : {"kept.txt", "a.txt", "b.txt"})
             write(dir.filePath(name), "text\n");
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         QVERIFY(tabs.openFile(dir.filePath("kept.txt")));
         QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
         QStringList shown;
@@ -215,7 +215,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "text\n");
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         QVERIFY(tabs.openPreview(dir.filePath("a.txt")));
 
         QVERIFY(!tabs.openPreview(dir.filePath("missing.txt")));
@@ -227,7 +227,7 @@ private slots:
     void closingAllTabsShowsNoOtherTabMeanwhile()
     {
         const QTemporaryDir dir;
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         for (const char *name : {"a.txt", "b.txt", "c.txt"}) {
             write(dir.filePath(name), "text\n");
             QVERIFY(tabs.openFile(dir.filePath(name)));
@@ -245,7 +245,7 @@ private slots:
     void deletingAFolderShowsNoneOfItsFilesMeanwhile()
     {
         const QTemporaryDir dir;
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         for (const char *name : {"folder/a.txt", "folder/b.txt", "kept.txt"}) {
             write(dir.filePath(name), "text\n");
             QVERIFY(tabs.openFile(dir.filePath(name)));

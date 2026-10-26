@@ -100,7 +100,7 @@ using ChangeSignature::Parameter;
 // A project folder with its editors and (idle) language servers.
 struct Project {
     QTemporaryDir dir;
-    EditorTabs tabs{Theme::dark()};
+    EditorTabs tabs{Theme::duet()};
     LanguageServers servers;
 
     QString path(const QString &name) const { return dir.filePath(name); }

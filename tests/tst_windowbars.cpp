@@ -143,7 +143,7 @@ private slots:
         QFont font = QApplication::font();
         font.setPointSize(fontSize);
         QApplication::setFont(font);
-        const Theme theme = dark ? Theme::duet() : Theme::light();
+        const Theme theme = dark ? Theme::duet() : Theme::named("duet-paper");
         ThemeStyle::apply(theme);
         Window window(theme);
         window.show(width);

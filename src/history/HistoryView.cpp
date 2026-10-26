@@ -192,7 +192,7 @@ QWidget *HistoryView::createDiffPane()
 {
     auto *pane = new QFrame(this);
     pane->setObjectName(QStringLiteral("historyPane"));
-    diff_ = new DiffView(Theme::dark(), pane);
+    diff_ = new DiffView(Theme::duet(), pane);
     diff_->setToolTip({});
     diffHeader_ = new DiffHeaderBar(diff_, pane);
     connect(diffHeader_, &DiffHeaderBar::whitespaceChanged, this, &HistoryView::rereadCommit);

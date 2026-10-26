@@ -72,7 +72,7 @@ std::optional<MenuTitleSpacing> menuTitleSpacing(QMenuBar *menuBar)
 
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
-    , theme_(Theme::dark())
+    , theme_(Theme::duet())
 {
     setAttribute(Qt::WA_StyledBackground, false);
 

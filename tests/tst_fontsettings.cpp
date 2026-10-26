@@ -116,7 +116,7 @@ private slots:
     {
         QSettings().clear();
         QApplication::setFont(Preferences().interfaceFont());
-        ThemeStyle::apply(Theme::dark());
+        ThemeStyle::apply(Theme::duet());
     }
 
     void cleanup() { QSettings().clear(); }
@@ -224,7 +224,7 @@ private slots:
         const Window window;
         applyPreferences(withSizes(14, 16), window);
 
-        ThemeStyle::apply(Theme::light());
+        ThemeStyle::apply(Theme::named("duet-paper"));
 
         QCOMPARE(preferencePoints(window.outline->font()), 16);
         QCOMPARE(preferencePoints(window.files->tree()->font()), 16);
@@ -242,7 +242,7 @@ private slots:
         platformFont.setPointSize(7);
         QApplication::setFont(platformFont, "QMenuBar");
 
-        ThemeStyle::apply(Theme::light());
+        ThemeStyle::apply(Theme::named("duet-paper"));
 
         QCOMPARE(preferencePoints(window.titleBar->menuBar()->font()), 14);
     }
@@ -250,7 +250,7 @@ private slots:
     void dialogSizesAreSavedAndApplied()
     {
         Window window;
-        PreferencesPopup popup(Theme::dark(), &window.root);
+        PreferencesPopup popup(Theme::duet(), &window.root);
         popup.load(withSizes(15, 17), {}, {});
 
         applyPreferences(popup.preferences(), window);

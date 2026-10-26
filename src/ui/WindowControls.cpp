@@ -28,7 +28,7 @@ constexpr qreal roundedRadiusPx = 4;
 WindowButton::WindowButton(Kind kind, QWidget *parent)
     : QAbstractButton(parent)
     , kind_(kind)
-    , theme_(Theme::dark())
+    , theme_(Theme::duet())
 {
     setFocusPolicy(Qt::NoFocus);
 }

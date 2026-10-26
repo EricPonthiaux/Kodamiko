@@ -116,7 +116,7 @@ private slots:
         QWidget window;
         window.resize(1000, 800);
         window.show(); // the popup is a panel inside it
-        FindInFilesPopup popup(Theme::dark(), &window);
+        FindInFilesPopup popup(Theme::duet(), &window);
         popup.setFolder(dir.path());
         QSignalSpy chosen(&popup, &FindInFilesPopup::matchChosen);
         popup.popup("needle");

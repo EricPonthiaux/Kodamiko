@@ -17,6 +17,7 @@
 #include "ui/UiMetrics.h"
 #include "welcome/WelcomeWindow.h"
 
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDir>
@@ -27,9 +28,30 @@
 #include <QStyleFactory>
 #include <QStyleOption>
 
+#include <algorithm>
+
 namespace {
 
 constexpr int closeButtonWidth = 20 + 8;
+// The arrows of a spin box, for an 11 pt interface font: Fusion's 14 px are
+// hard to hit with the mouse.
+constexpr int spinBoxButtonWidth = 22;
+
+// `fusionRect`, a part of a spin box laid out by Fusion, with buttons wider
+// by `extra`: the edit field gives them the room.
+QRect widenSpinBoxButtons(QRect fusionRect, QStyle::SubControl part, int extra, Qt::LayoutDirection direction)
+{
+    const bool buttonsOnRight = direction == Qt::LeftToRight;
+    switch (part) {
+    case QStyle::SC_SpinBoxUp:
+    case QStyle::SC_SpinBoxDown:
+        return buttonsOnRight ? fusionRect.adjusted(-extra, 0, 0, 0) : fusionRect.adjusted(0, 0, extra, 0);
+    case QStyle::SC_SpinBoxEditField:
+        return buttonsOnRight ? fusionRect.adjusted(0, 0, -extra, 0) : fusionRect.adjusted(extra, 0, 0, 0);
+    default:
+        return fusionRect;
+    }
+}
 
 class AppStyle : public QProxyStyle {
 public:
@@ -99,10 +121,26 @@ public:
         case CT_MenuBarItem:
             result += QSize(12, 6);
             break;
+        case CT_SpinBox:
+            if (const auto *spinBox = qstyleoption_cast<const QStyleOptionSpinBox *>(option))
+                result.rwidth() += spinBoxExtraWidth(spinBox, widget);
+            break;
         default:
             break;
         }
         return result;
+    }
+
+    QRect subControlRect(ComplexControl control,
+                         const QStyleOptionComplex *option,
+                         SubControl part,
+                         const QWidget *widget) const override
+    {
+        const QRect rect = QProxyStyle::subControlRect(control, option, part, widget);
+        const auto *spinBox = qstyleoption_cast<const QStyleOptionSpinBox *>(option);
+        if (control != CC_SpinBox || !spinBox)
+            return rect;
+        return widenSpinBoxButtons(rect, part, spinBoxExtraWidth(spinBox, widget), spinBox->direction);
     }
 
     void drawControl(ControlElement element,
@@ -120,6 +158,16 @@ public:
             }
         }
         QProxyStyle::drawControl(element, option, painter, widget);
+    }
+
+private:
+    // How much wider than Fusion's the buttons of `spinBox` are drawn.
+    int spinBoxExtraWidth(const QStyleOptionSpinBox *spinBox, const QWidget *widget) const
+    {
+        if (spinBox->buttonSymbols == QAbstractSpinBox::NoButtons)
+            return 0;
+        const int fusionWidth = QProxyStyle::subControlRect(CC_SpinBox, spinBox, SC_SpinBoxUp, widget).width();
+        return std::max(0, UiMetrics::scaled(spinBoxButtonWidth) - fusionWidth);
     }
 };
 

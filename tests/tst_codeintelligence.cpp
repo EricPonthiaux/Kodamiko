@@ -71,7 +71,7 @@ int caretLine(EditorWidget *editor)
 
 struct ClangdProject {
     QTemporaryDir dir;
-    EditorTabs tabs{Theme::dark()};
+    EditorTabs tabs{Theme::duet()};
     SymbolIndex index;
     LanguageServers servers;
     CodeNavigator navigator{&tabs, &index};
@@ -205,7 +205,7 @@ private slots:
         const QTemporaryDir dir;
         const QString path = dir.filePath("a.cpp");
         write(path, "int total;\n");
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         LanguageServers servers;
         servers.setFolder(dir.path());
         auto *editor = EditorTabs::editorIn(tabs.openFile(path));
@@ -289,7 +289,7 @@ private slots:
 
     void rendersDocumentationInTheEditorTheme()
     {
-        const Theme theme = Theme::dark();
+        const Theme theme = Theme::duet();
         CodeColorizer colorizer;
         const QString html = MarkdownToolTip::html("### `open`\n\nOpens a **file**, see `path`.\n\n```\nint f();\n```",
                                                    {theme, &colorizer, "cpp"});
@@ -331,7 +331,7 @@ private slots:
 
     void convertsPositions()
     {
-        EditorWidget editor(Theme::dark());
+        EditorWidget editor(Theme::duet());
         editor.setText("é x\nlast");
         QCOMPARE(CodeIntelligence::positionOf(&editor, {0, 2}), 3); // "é" is two bytes
         QCOMPARE(CodeIntelligence::lspPosition(&editor, 3), (Position{0, 2}));
@@ -352,7 +352,7 @@ private slots:
         write(root + "/total.cpp", "#include \"total.h\"\nint total(int count, int step) { return count * step; }\n");
         write(root + "/main.cpp", "#include \"total.h\"\nint main() {\n  return total(2, 3) + total(4, 5);\n}\n");
 
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         tabs.show();
         SymbolIndex index;
         index.setFolder(root);
@@ -707,7 +707,7 @@ private slots:
         write(root + "/count.cpp", "int count = 0; // count\n"
                                    "int next() { return ++count; }\n"
                                    "int other() { int count = 2; return count; }\n");
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         tabs.show();
         SymbolIndex index;
         index.setFolder(root);

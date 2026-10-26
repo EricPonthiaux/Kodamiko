@@ -20,7 +20,7 @@ struct TextStyle {
 };
 
 struct Theme {
-    QString name;  // "duet", "dark", "purple", "light", "kde-breeze-dark"…
+    QString name;  // "duet", "duet-slate", "duet-paper"…
     QString title; // as shown in View ▸ Theme
     bool isDark = true;
     QFont font;
@@ -52,14 +52,9 @@ struct Theme {
     QList<std::pair<QString, TextStyle>> syntaxStyles;
 
     static Theme duet();
-    static Theme dark();
 
-    static Theme purple();
-    static Theme light();
-
+    // Duet's theme, then its Material ones (MaterialThemes).
     static QList<Theme> all();
-
-    bool isKde() const { return name.startsWith(QLatin1String("kde-")); }
 
     static Theme named(const QString &name);
 

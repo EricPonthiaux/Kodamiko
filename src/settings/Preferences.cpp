@@ -16,8 +16,8 @@ Preferences Preferences::load()
     if (settings.contains(QStringLiteral("theme")))
         preferences.theme = settings.value(QStringLiteral("theme")).toString();
     else if (settings.contains(QStringLiteral("darkTheme"))) // before the theme menu: a "Dark Theme" checkbox
-        preferences.theme =
-            settings.value(QStringLiteral("darkTheme")).toBool() ? QStringLiteral("dark") : QStringLiteral("light");
+        preferences.theme = settings.value(QStringLiteral("darkTheme")).toBool() ? QStringLiteral("duet")
+                                                                                 : QStringLiteral("duet-paper");
     preferences.codeFontFamily = settings.value(QStringLiteral("codeFont/family")).toString();
     preferences.codeFontSize =
         std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(), minimumFontSize, maximumFontSize);

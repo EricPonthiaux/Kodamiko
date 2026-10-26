@@ -222,7 +222,7 @@ private slots:
         file.write("int first() { return 1; }\n\nint second() {\n  return 2;\n}\n");
         file.close();
 
-        EditorWidget editor(Theme::dark());
+        EditorWidget editor(Theme::duet());
         QString error;
         QVERIFY(editor.load(path, &error));
         editor.show(); // QScintilla reports the cursor move when shown
@@ -259,7 +259,7 @@ private slots:
         file.write("int " + QByteArray(120, 'n') + "() { return 1; }\nint short_() { return 2; }\n");
         file.close();
 
-        EditorWidget editor(Theme::dark());
+        EditorWidget editor(Theme::duet());
         QString error;
         QVERIFY(editor.load(path, &error));
 

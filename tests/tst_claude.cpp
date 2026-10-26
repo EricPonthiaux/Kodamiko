@@ -371,7 +371,7 @@ private slots:
     void newAgentPopupChecksTheName()
     {
         QWidget window;
-        NewAgentPopup popup(Theme::dark(), &window);
+        NewAgentPopup popup(Theme::duet(), &window);
         popup.load("agent-1", NewAgentPopup::UncommittedChanges::None);
         QSignalSpy requested(&popup, &NewAgentPopup::startRequested);
         QVERIFY(popup.startButton()->isEnabled()); // the suggested name
@@ -393,7 +393,7 @@ private slots:
     void closeAgentPopupReportsTheChosenFateOfTheWorktreeAskedFor()
     {
         QWidget window;
-        CloseAgentPopup popup(Theme::dark(), &window);
+        CloseAgentPopup popup(Theme::duet(), &window);
         popup.load({.name = "agent-1", .path = "/repo/.claude/worktrees/agent-1", .branch = "duet/agent-1"});
         QString chosenName;
         std::optional<CloseAgentPopup::WorktreeFate> chosenFate;
@@ -412,7 +412,7 @@ private slots:
     void closeAgentPopupAsksForEachWorktreeOnceInTurn()
     {
         QWidget window;
-        CloseAgentPopup popup(Theme::dark(), &window);
+        CloseAgentPopup popup(Theme::duet(), &window);
         QStringList chosen;
         connect(&popup, &CloseAgentPopup::fateChosen, this,
                 [&](const Worktree &worktree, CloseAgentPopup::WorktreeFate) { chosen.append(worktree.name); });
@@ -434,7 +434,7 @@ private slots:
     void closeAgentPopupReportsTheCancelledWorktreeOnly()
     {
         QWidget window;
-        CloseAgentPopup popup(Theme::dark(), &window);
+        CloseAgentPopup popup(Theme::duet(), &window);
         QStringList cancelled;
         connect(&popup, &CloseAgentPopup::cancelled, this,
                 [&](const Worktree &worktree) { cancelled.append(worktree.name); });
@@ -450,7 +450,7 @@ private slots:
     void messagePopupShowsTheWaitingMessagesInTurn()
     {
         QWidget window;
-        MessagePopup popup(QStringLiteral("claude"), QStringLiteral("testMessage"), Theme::dark(), &window);
+        MessagePopup popup(QStringLiteral("claude"), QStringLiteral("testMessage"), Theme::duet(), &window);
 
         popup.load("Merge agent-1", "Conflicts");
         popup.load("Merge agent-1", "Conflicts"); // repeated
@@ -467,7 +467,7 @@ private slots:
     void agentCheckPopupSavesTheTrimmedCommand()
     {
         QWidget window;
-        AgentCheckPopup popup(Theme::dark(), &window);
+        AgentCheckPopup popup(Theme::duet(), &window);
         QSignalSpy saved(&popup, &AgentCheckPopup::saved);
         popup.commandField()->setText("  ctest --test-dir build ");
 
@@ -701,7 +701,7 @@ private slots:
         QDir(project.path()).mkpath("src");
         const QString path = project.filePath("src/a.cpp");
         writeFile(path, "int a;\nint b;\nint c;\nint d;\n");
-        EditorWidget editor(Theme::dark());
+        EditorWidget editor(Theme::duet());
         QVERIFY(editor.load(path, nullptr));
         editor.setSelection(1, 0, 3, 0); // whole lines 2 and 3
 
@@ -718,7 +718,7 @@ private slots:
         const QTemporaryDir project;
         const QString path = project.filePath("a.cpp");
         writeFile(path, "int parse();\n");
-        EditorWidget editor(Theme::dark());
+        EditorWidget editor(Theme::duet());
         QVERIFY(editor.load(path, nullptr));
         editor.setCursorPosition(0, 6);
 
@@ -737,7 +737,7 @@ private slots:
         const QTemporaryDir project;
         const QString path = project.filePath("a.cpp");
         writeFile(path, "int a;\n");
-        EditorWidget editor(Theme::dark());
+        EditorWidget editor(Theme::duet());
         QVERIFY(editor.load(path, nullptr));
         editor.insertAt(QStringLiteral("// new\n"), 0, 0);
 
@@ -817,7 +817,7 @@ private slots:
 
     void codeRequestNeedsAFile()
     {
-        EditorWidget view(Theme::dark());
+        EditorWidget view(Theme::duet());
         view.showReadOnlyText(QStringLiteral("diff"), QString());
         QVERIFY(!CodeRequest::targetIn(view, QString()));
     }

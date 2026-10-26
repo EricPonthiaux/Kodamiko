@@ -7,8 +7,6 @@ Copied as published, without changes to their content:
 | `github-markdown-css/` | [sindresorhus/github-markdown-css](https://github.com/sindresorhus/github-markdown-css) (npm `github-markdown-css`) | 5.9.0 | MIT |
 | `octicons/` | [primer/octicons](https://github.com/primer/octicons) (npm `@primer/octicons`, `build/svg/`) | 19.40.0 | MIT |
 | `schemastore/claude-code-settings.json` | [SchemaStore/schemastore](https://github.com/SchemaStore/schemastore) (`https://json.schemastore.org/claude-code-settings.json`) | 2026-10-17 | Apache 2.0 |
-| `ksyntaxhighlighting-themes/` | [KDE's syntax-highlighting](https://invent.kde.org/frameworks/syntax-highlighting) (`data/themes/`), the editor themes of Kate and KDevelop; each file names its authors | master 03107845 (2026-10-17) | MIT |
-| `vscode-themes/LICENSE.md` | The notices of the five VS Code themes whose colors `src/ui/VsCodeThemes.cpp` reproduces (One Dark Pro, Dracula, GitHub Dark, Tokyo Night, Catppuccin Mocha); versions and sources in the file | see the file | MIT |
 | `fonts/UbuntuSans-*.ttf` | [canonical/Ubuntu-Sans-fonts](https://github.com/canonical/Ubuntu-Sans-fonts) (variable fonts, upright and italic) | 1.006 | Ubuntu Font Licence 1.0 (`fonts/UbuntuSans-UFL.txt`) |
 | `fonts/UbuntuSansMono-*.ttf` | [canonical/Ubuntu-Sans-Mono-fonts](https://github.com/canonical/Ubuntu-Sans-Mono-fonts) (variable fonts, upright and italic) | 1.100 | Ubuntu Font Licence 1.0 (`fonts/UbuntuSans-UFL.txt`) |
 | `fonts/DroidSansMono.ttf` | [Android Open Source Project](https://android.googlesource.com/platform/frameworks/base/+/android-2.3.7_r1/data/fonts/) (`data/fonts/`, regular) | android-2.3.7_r1 | Apache 2.0 (`fonts/Droid-NOTICE.txt`) |

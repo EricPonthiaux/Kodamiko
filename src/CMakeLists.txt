@@ -278,8 +278,8 @@ add_library(duet_core STATIC
     ui/GripSplitter.cpp
     ui/HoverCloseButtons.cpp
     ui/HoverProgress.cpp
-    ui/KdeThemes.cpp
     ui/LetterBadges.cpp
+    ui/MaterialThemes.cpp
     ui/MessagePopup.cpp
     ui/ModeTabBar.cpp
     ui/Motion.cpp
@@ -305,7 +305,6 @@ add_library(duet_core STATIC
     ui/UiIcons.cpp
     ui/UiMetrics.cpp
     ui/ViewHeader.cpp
-    ui/VsCodeThemes.cpp
     ui/WindowControls.cpp
     ui/WindowFrame.cpp
     ui/WindowTitleBar.cpp
@@ -413,13 +412,6 @@ qt_add_resources(duet_core duet_schemas
     FILES
         ${PROJECT_SOURCE_DIR}/tools/schemas/recipe.schema.json
         ${PROJECT_SOURCE_DIR}/tools/schemas/run.schema.json)
-
-# KDE's editor themes, those of Kate and KDevelop (see KdeThemes).
-file(GLOB kde_themes CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/third_party/ksyntaxhighlighting-themes/*.theme)
-qt_add_resources(duet_core kde_themes
-    PREFIX /themes/kde
-    BASE ${PROJECT_SOURCE_DIR}/third_party/ksyntaxhighlighting-themes
-    FILES ${kde_themes})
 
 # Interface and code fonts, the same on every system: Ubuntu Sans and
 # Droid Sans Mono by default; Ubuntu Sans Mono is also offered. JetBrains

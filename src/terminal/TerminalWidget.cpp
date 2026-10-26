@@ -203,7 +203,7 @@ TerminalWidget::TerminalWidget(QWidget *parent)
         viewport()->update();
     });
 
-    applyTheme(Theme::dark());
+    applyTheme(Theme::duet());
 }
 
 TerminalWidget::~TerminalWidget() = default;

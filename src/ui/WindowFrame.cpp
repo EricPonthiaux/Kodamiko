@@ -19,7 +19,7 @@ constexpr int cornerGrip = 6;
 WindowFrame::WindowFrame(QWidget *window)
     : QObject(window)
     , window_(window)
-    , theme_(Theme::dark())
+    , theme_(Theme::duet())
 {
     window_->installEventFilter(this);
 }

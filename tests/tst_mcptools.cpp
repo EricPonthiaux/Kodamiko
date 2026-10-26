@@ -47,7 +47,7 @@ void write(const QTemporaryDir &dir, const QString &path, const QByteArray &cont
 struct Editor {
     Q_DISABLE_COPY_MOVE(Editor)
     QTemporaryDir folder;
-    EditorTabs tabs{Theme::dark()};
+    EditorTabs tabs{Theme::duet()};
     SymbolIndex symbols;
     CodeNavigator navigator{&tabs, &symbols};
     McpRegistry registry;
@@ -130,7 +130,7 @@ struct Editor {
 struct CodeEditor {
     Q_DISABLE_COPY_MOVE(CodeEditor)
     QTemporaryDir folder;
-    EditorTabs tabs{Theme::dark()};
+    EditorTabs tabs{Theme::duet()};
     SymbolIndex symbols;
     CodeNavigator navigator{&tabs, &symbols};
     LanguageServers servers;

@@ -36,7 +36,7 @@ int utf8Length(const QString &text, qsizetype index, qsizetype *characters)
 // own color, which tells, read back, which category a style is.
 CodeColorizer::CodeColorizer()
 {
-    Theme probe = Theme::dark();
+    Theme probe = Theme::duet();
     probe.foreground = QColor(1, 2, 3);
     for (int i = 0; i < probe.syntaxStyles.size(); ++i) {
         categories_.append(probe.syntaxStyles[i].first);

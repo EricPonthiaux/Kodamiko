@@ -914,7 +914,7 @@ private slots:
         QWidget window;
         window.resize(1200, 800);
         window.show();
-        ProjectSettingsPopup popup(&toolchains, Theme::dark(), &window);
+        ProjectSettingsPopup popup(&toolchains, Theme::duet(), &window);
         const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
         popup.popup(cppProject(dir.path(), toolchains));
         const auto *panel = popup.findChild<ProjectSetupPanel *>();
@@ -935,7 +935,7 @@ private slots:
         Toolchains toolchains(dir.filePath("toolchains"), false);
         QWidget window;
         window.show();
-        ProjectSettingsPopup popup(&toolchains, Theme::dark(), &window);
+        ProjectSettingsPopup popup(&toolchains, Theme::duet(), &window);
         const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
         popup.popup(cppProject(dir.path(), toolchains));
 
@@ -1073,8 +1073,8 @@ private slots:
         QWidget host;
         host.resize(1200, 900);
         host.show();
-        auto *popup = new NewProjectPopup(Theme::dark(), &host);
-        ThemeStyle::apply(Theme::dark()); // pads the templates once they are laid out
+        auto *popup = new NewProjectPopup(Theme::duet(), &host);
+        ThemeStyle::apply(Theme::duet()); // pads the templates once they are laid out
 
         popup->popup();
 

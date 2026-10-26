@@ -367,7 +367,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "a created", {{"src/a.txt", "a\n"}});
         commit(dir, "b created", {{"b.txt", "b\n"}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
 
@@ -385,7 +385,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "both", {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.setPathFilter("a.txt");
@@ -408,7 +408,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "a\n"}, {"b.txt", "b c\n"}});
         commit(dir, "second", {{"a.txt", "z\n"}, {"b.txt", "b   c\n"}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.refresh();
@@ -440,7 +440,7 @@ private slots:
         commit(dir, "create", {{"old.txt", longText("1")}});
         QVERIFY(QFile::remove(dir.filePath("old.txt")));
         commit(dir, "rename", {{"new.txt", longText("1")}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.setPathFilter("new.txt");
@@ -459,7 +459,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         importCommits(dir, 1200);
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -480,7 +480,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         importCommits(dir, 1200);
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -593,7 +593,7 @@ private slots:
         commit(dir, "add", {{"a.txt", "needle\n"}});
         commit(dir, "other", {{"b.txt", "hay\n"}});
         git(dir, {"commit", "-q", "--allow-empty", "-m", "by bob", "--author", "Bob <bob@example.org>"});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -620,7 +620,7 @@ private slots:
         commit(dir, "on topic", {{"b.txt", "b\n"}});
         git(dir, {"checkout", "-q", "main"});
         commit(dir, "on main", {{"c.txt", "c\n"}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -653,7 +653,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "all", {{"src/a.txt", "a\n"}, {"src/b.txt", "b\n"}, {"c.txt", "c\n"}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.setPathFilter("src");
@@ -676,7 +676,7 @@ private slots:
         commit(dir, "first", {{"a.txt", "a\n"}});
         commit(dir, "second", {{"a.txt", "b\n"}, {"b.txt", "b\n"}});
 
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.refresh(); // off the UI thread
@@ -729,7 +729,7 @@ private slots:
 
     void widePanesStandSideBySide()
     {
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(1400, 700);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -749,7 +749,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "a\n"}});
         commit(dir, "second", {{"a.txt", "b\n"}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -782,7 +782,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "both", {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -815,7 +815,7 @@ private slots:
     void theFoldedCommitSitsBetweenTheCommitsAndTheDiff()
     {
         QFETCH(const int, width);
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(width, 700);
         view.show();
         const auto *commits = view.findChild<QTreeWidget *>("commits");
@@ -836,7 +836,7 @@ private slots:
 
     void foldingAPaneWidensOnlyTheDiff()
     {
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(1400, 700);
         view.show();
         QTRY_VERIFY(view.isWide());
@@ -853,7 +853,7 @@ private slots:
 
     void foldedButtonsLineUpWithThoseOfThePaneBars()
     {
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         view.resize(1400, 700);
         view.show();
         const QToolButton *hide = toolButton(view, "Hide the commits");
@@ -868,10 +868,10 @@ private slots:
 
     void foldsAreKeptInTheSavedState()
     {
-        HistoryView folded(Theme::dark());
+        HistoryView folded(Theme::duet());
         folded.setCommitListFolded(true);
         folded.setCommitPaneFolded(true);
-        HistoryView restored(Theme::dark());
+        HistoryView restored(Theme::duet());
 
         restored.restoreState(folded.saveState());
 
@@ -893,7 +893,7 @@ private slots:
     {
         QFETCH(const int, paneWidth);
         QFETCH(const int, fontSize);
-        HistoryView view(Theme::dark());
+        HistoryView view(Theme::duet());
         QFont font = view.font();
         font.setPointSize(fontSize);
         view.setFont(font);

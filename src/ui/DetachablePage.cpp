@@ -30,7 +30,7 @@ DetachablePage::DetachablePage(QStackedWidget *stack, QWidget *page, QString set
     , settingsKey_(std::move(settingsKey))
     , texts_(std::move(texts))
     , placeholder_(createPlaceholder())
-    , theme_(Theme::dark())
+    , theme_(Theme::duet())
 {
     Q_ASSERT(stack_->indexOf(page_) >= 0);
 }

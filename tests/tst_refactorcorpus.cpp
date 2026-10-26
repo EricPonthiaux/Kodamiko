@@ -240,7 +240,7 @@ std::optional<LanguageSetup> serverSetup(const QString &languageId, const Toolch
 struct ServerProject {
     QTemporaryDir dir;
     Toolchains toolchains{userToolchains(), true};
-    EditorTabs tabs{Theme::dark()};
+    EditorTabs tabs{Theme::duet()};
     SymbolIndex symbols;
     LanguageServers servers;
     CodeNavigator navigator{&tabs, &symbols};
@@ -404,7 +404,7 @@ private slots:
                 moves.append({from, to});
         }
         const Tree moved = readTree(dir.path());
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         LanguageServers servers;
 
         const WorkspaceEdit edit = FileReferences::update({moves, dir.path(), &index.store(), {}});
@@ -431,7 +431,7 @@ private slots:
         const QString language = LanguageRegistry::languageForFile(path);
         const QString source = caseOf(folder).value("source").toString();
         const Tree unmarked = withoutMarker(before);
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         LanguageServers servers;
 
         const MoveClass::Result result =
@@ -469,7 +469,7 @@ private slots:
         for (const QString &path : before.keys())
             everyFile.changes.append(DocumentEdit{dir.filePath(path), std::nullopt, {}});
         const QJsonObject description = caseOf(folder);
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         LanguageServers servers;
 
         const RenameAnalysis::Result analysis = RenameAnalysis::analyze({

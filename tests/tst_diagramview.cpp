@@ -235,7 +235,7 @@ private slots:
         QVERIFY(graphviz::autoArrange(placed, {}));
         const QString path = writeFile(dir, QStringLiteral("gestures.mmd"), document::save(placed, *loaded.codec));
 
-        DiagramView view(Theme::dark());
+        DiagramView view(Theme::duet());
         view.resize(1000, 700);
         QString error;
         QVERIFY2(view.load(path, &error), qPrintable(error));
@@ -357,7 +357,7 @@ private slots:
         QVERIFY(DiagramView::isDiagramFile(dir.filePath(QStringLiteral("old.flow"))));
         QVERIFY(!DiagramView::isDiagramFile(dir.filePath(QStringLiteral("notes.md"))));
 
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         auto *view = qobject_cast<DiagramView *>(tabs.openFile(path));
         QVERIFY(view);
         QCOMPARE(view->filePath(), QFileInfo(path).absoluteFilePath());
@@ -371,7 +371,7 @@ private slots:
     void refusesInvalidDiagrams()
     {
         const QTemporaryDir dir;
-        DiagramView view(Theme::dark());
+        DiagramView view(Theme::duet());
         QString error;
         QVERIFY(!view.load(writeFile(dir, QStringLiteral("broken.flow"), "{ not json"), &error));
         QVERIFY(!error.isEmpty());
@@ -379,7 +379,7 @@ private slots:
         QVERIFY(!view.load(pie, &error));
 
         // In a tab, such a file opens as text.
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         QSignalSpy messages(&tabs, &EditorTabs::statusMessage);
         QWidget *page = tabs.openFile(pie);
         QVERIFY(page && !qobject_cast<DiagramView *>(page));
@@ -391,7 +391,7 @@ private slots:
     {
         const QTemporaryDir dir;
         const QString path = writeFile(dir, QStringLiteral("process.mmd"), kMermaid);
-        DiagramView view(Theme::dark());
+        DiagramView view(Theme::duet());
         QString error;
         QVERIFY2(view.load(path, &error), qPrintable(error));
         QVERIFY(view.matchesDisk());
@@ -416,7 +416,7 @@ private slots:
     {
         const QTemporaryDir dir;
         const QString path = writeFile(dir, QStringLiteral("new.mmd"), QByteArray());
-        DiagramView view(Theme::dark());
+        DiagramView view(Theme::duet());
         QString error;
         QVERIFY2(view.load(path, &error), qPrintable(error));
         QVERIFY(!view.isModified());
@@ -431,7 +431,7 @@ private slots:
         const QTemporaryDir dir;
         const QString first = writeFile(dir, QStringLiteral("a.mmd"), kMermaid);
         const QString second = writeFile(dir, QStringLiteral("b.flow"), kFlowboard);
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         QVERIFY(qobject_cast<DiagramView *>(tabs.openFile(first)));
         QVERIFY(qobject_cast<DiagramView *>(tabs.openFile(second)));
         QCOMPARE(tabs.count(), 2);

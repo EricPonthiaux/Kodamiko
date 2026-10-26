@@ -171,12 +171,10 @@ Third-party components:
 | cmark-gfm | built and linked statically | BSD 2-Clause |
 | Graphviz (optional, diagram editor) | linked from the system; on Windows, its release's DLLs ship with Duet | Eclipse Public License 1.0 |
 | github-markdown-css, Octicons (in `third_party/`) | embedded | MIT |
-| KDE's editor themes (in `third_party/ksyntaxhighlighting-themes/`) | embedded | MIT |
 | SchemaStore's Claude Code settings schema (in `third_party/schemastore/`) | embedded | Apache 2.0 |
 | Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | embedded | Ubuntu Font Licence 1.0 |
 | Droid Sans Mono (in `third_party/fonts/`) | embedded | Apache 2.0 |
 | JetBrains Mono (in `third_party/fonts/`) | embedded | SIL Open Font License 1.1 |
-| One Dark Pro, Dracula, GitHub, Tokyo Night and Catppuccin theme colors (notices in `third_party/vscode-themes/`) | reproduced | MIT |
 
 The versions of the downloaded components are pinned in
 `cmake/Dependencies.cmake`; those of the embedded files in

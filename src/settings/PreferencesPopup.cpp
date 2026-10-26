@@ -335,8 +335,6 @@ QWidget *PreferencesPopup::createAppearancePage()
         return QString::compare(a.title, b.title, Qt::CaseInsensitive) < 0;
     });
     addGroup(layout, tr("Theme"), themeGrid(sortedThemes));
-    layout->addWidget(mutedLabel(tr("Besides Duet's own, the editor themes of Kate and KDevelop; the panels around "
-                                    "the editor take their colors.")));
 
     systemTitleBar_ = new QCheckBox(content);
 #ifdef Q_OS_MACOS

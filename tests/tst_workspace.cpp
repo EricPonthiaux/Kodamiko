@@ -329,8 +329,8 @@ private slots:
         auto *frame = new WindowFrame(&window);
         frame->setFrameless(true);
         window.show();
-        ThemeStyle::apply(Theme::purple());
-        ThemeStyle::apply(Theme::light());
+        ThemeStyle::apply(Theme::named("duet-amethyst"));
+        ThemeStyle::apply(Theme::named("duet-paper"));
         QCoreApplication::processEvents();
         const int shadow = OverlayPopup::shadowWidth;
         QCOMPARE(popup.contentsMargins(), QMargins(shadow, shadow, shadow, shadow));
@@ -397,9 +397,9 @@ private slots:
         TitleBar bar;
         const auto *chip = bar.findChild<QToolButton *>("projectChip");
 
-        bar.applyTheme(Theme::dark());
+        bar.applyTheme(Theme::duet());
         QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(true).cacheKey());
-        bar.applyTheme(Theme::light());
+        bar.applyTheme(Theme::named("duet-paper"));
         QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(false).cacheKey());
     }
 
@@ -428,7 +428,7 @@ private slots:
         QFont font = previousFont;
         font.setPointSize(fontSize);
         QApplication::setFont(font);
-        const Theme theme = dark ? Theme::duet() : Theme::light();
+        const Theme theme = dark ? Theme::duet() : Theme::named("duet-paper");
         ThemeStyle::apply(theme);
         TitleBar bar;
         bar.applyTheme(theme);
@@ -477,13 +477,13 @@ private slots:
 
     void agentIndicatorTakesItsColorsFromTheTheme()
     {
-        for (const Theme &theme : {Theme::duet(), Theme::purple(), Theme::light()}) {
+        for (const Theme &theme : {Theme::duet(), Theme::named("duet-amethyst"), Theme::named("duet-paper")}) {
             QCOMPARE(agentStatusColor(AgentStatus::Working, theme), theme.warning);
             QCOMPARE(agentStatusColor(AgentStatus::NeedsYou, theme), theme.accent);
             QCOMPARE(agentStatusColor(AgentStatus::Ready, theme), theme.mutedText);
         }
-        QVERIFY(agentStatusColor(AgentStatus::Done, Theme::light()) !=
-                agentStatusColor(AgentStatus::Done, Theme::dark()));
+        QVERIFY(agentStatusColor(AgentStatus::Done, Theme::named("duet-paper")) !=
+                agentStatusColor(AgentStatus::Done, Theme::duet()));
     }
 
     void frameAndTitleBarFollowTheWindow()
@@ -1101,7 +1101,7 @@ private slots:
             QVERIFY(file.open(QIODevice::WriteOnly));
             file.write("one\ntwo\nthree\n");
         }
-        EditorTabs tabs(Theme::dark());
+        EditorTabs tabs(Theme::duet());
         QVERIFY(tabs.openFile(dir.filePath("src/a.txt")));
         QVERIFY(tabs.openFile(dir.filePath("b.txt")));
         tabs.editorFor(dir.filePath("src/a.txt"))->setCursorPosition(2, 1);
@@ -1227,8 +1227,8 @@ private slots:
 
     void terminalTabsAreAsTallAsEditorTabs()
     {
-        ThemeStyle::apply(Theme::dark());
-        EditorTabs editors(Theme::dark());
+        ThemeStyle::apply(Theme::duet());
+        EditorTabs editors(Theme::duet());
         editors.addTab(new QLabel("code"), "main.cpp");
         QTabWidget terminals;
         terminals.setObjectName("terminalTabs");

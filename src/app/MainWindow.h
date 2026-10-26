@@ -368,7 +368,8 @@ private:
     void setRunTabIcon(TerminalWidget *terminal, const QString &iconName, const QColor &color);
     // F2 / Shift+F2: the next or previous problem of the current file.
     void goToProblem(bool forward);
-    // "duet", "dark", "purple" or "light" (see Theme::all), applied everywhere.
+    // "duet" or one of Duet's Material themes, "duet-slate"… (see Theme::all),
+    // applied everywhere.
     void setTheme(const QString &name);
     static QString savedThemeName();
     void setMode(Mode mode);

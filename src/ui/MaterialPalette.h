@@ -1,0 +1,188 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+#pragma once
+
+#include <array>
+
+// The colors of Material Design's palette (material.io, "The color system",
+// 2014) that Duet's Material themes use (MaterialThemes): a hue and a shade,
+// from 50, the palest, to 900, the deepest, and the accents A100 to A700.
+namespace MaterialPalette {
+
+inline constexpr const char *red200 = "#ef9a9a";
+inline constexpr const char *red300 = "#e57373";
+inline constexpr const char *red400 = "#ef5350";
+inline constexpr const char *red700 = "#d32f2f";
+inline constexpr const char *red800 = "#c62828";
+inline constexpr const char *redA100 = "#ff8a80";
+inline constexpr const char *pink50 = "#fce4ec";
+inline constexpr const char *pink100 = "#f8bbd0";
+inline constexpr const char *pink200 = "#f48fb1";
+inline constexpr const char *pink600 = "#d81b60";
+inline constexpr const char *pink700 = "#c2185b";
+inline constexpr const char *pink900 = "#880e4f";
+inline constexpr const char *pinkA100 = "#ff80ab";
+inline constexpr const char *purple50 = "#f3e5f5";
+inline constexpr const char *purple100 = "#e1bee7";
+inline constexpr const char *purple200 = "#ce93d8";
+inline constexpr const char *purple300 = "#ba68c8";
+inline constexpr const char *purple600 = "#8e24aa";
+inline constexpr const char *purple700 = "#7b1fa2";
+inline constexpr const char *purple800 = "#6a1b9a";
+inline constexpr const char *purple900 = "#4a148c";
+inline constexpr const char *purpleA100 = "#ea80fc";
+inline constexpr const char *deepPurple50 = "#ede7f6";
+inline constexpr const char *deepPurple100 = "#d1c4e9";
+inline constexpr const char *deepPurple200 = "#b39ddb";
+inline constexpr const char *deepPurple400 = "#7e57c2";
+inline constexpr const char *deepPurple500 = "#673ab7";
+inline constexpr const char *deepPurple600 = "#5e35b1";
+inline constexpr const char *deepPurple700 = "#512da8";
+inline constexpr const char *deepPurple800 = "#4527a0";
+inline constexpr const char *deepPurple900 = "#311b92";
+inline constexpr const char *deepPurpleA100 = "#b388ff";
+inline constexpr const char *indigo50 = "#e8eaf6";
+inline constexpr const char *indigo100 = "#c5cae9";
+inline constexpr const char *indigo200 = "#9fa8da";
+inline constexpr const char *indigo400 = "#5c6bc0";
+inline constexpr const char *indigo500 = "#3f51b5";
+inline constexpr const char *indigo600 = "#3949ab";
+inline constexpr const char *indigo700 = "#303f9f";
+inline constexpr const char *indigo800 = "#283593";
+inline constexpr const char *indigo900 = "#1a237e";
+inline constexpr const char *indigoA100 = "#8c9eff";
+inline constexpr const char *blue50 = "#e3f2fd";
+inline constexpr const char *blue100 = "#bbdefb";
+inline constexpr const char *blue200 = "#90caf9";
+inline constexpr const char *blue300 = "#64b5f6";
+inline constexpr const char *blue600 = "#1e88e5";
+inline constexpr const char *blue700 = "#1976d2";
+inline constexpr const char *blue800 = "#1565c0";
+inline constexpr const char *blue900 = "#0d47a1";
+inline constexpr const char *blueA100 = "#82b1ff";
+inline constexpr const char *lightBlue50 = "#e1f5fe";
+inline constexpr const char *lightBlue100 = "#b3e5fc";
+inline constexpr const char *lightBlue200 = "#81d4fa";
+inline constexpr const char *lightBlue300 = "#4fc3f7";
+inline constexpr const char *lightBlue700 = "#0288d1";
+inline constexpr const char *lightBlue800 = "#0277bd";
+inline constexpr const char *lightBlue900 = "#01579b";
+inline constexpr const char *lightBlueA100 = "#80d8ff";
+inline constexpr const char *lightBlueA200 = "#40c4ff";
+inline constexpr const char *cyan100 = "#b2ebf2";
+inline constexpr const char *cyan200 = "#80deea";
+inline constexpr const char *cyan800 = "#00838f";
+inline constexpr const char *cyanA100 = "#84ffff";
+inline constexpr const char *cyanA400 = "#00e5ff";
+inline constexpr const char *teal50 = "#e0f2f1";
+inline constexpr const char *teal100 = "#b2dfdb";
+inline constexpr const char *teal200 = "#80cbc4";
+inline constexpr const char *teal300 = "#4db6ac";
+inline constexpr const char *teal400 = "#26a69a";
+inline constexpr const char *teal600 = "#00897b";
+inline constexpr const char *teal700 = "#00796b";
+inline constexpr const char *teal800 = "#00695c";
+inline constexpr const char *teal900 = "#004d40";
+inline constexpr const char *tealA100 = "#a7ffeb";
+inline constexpr const char *tealA200 = "#64ffda";
+inline constexpr const char *green300 = "#81c784";
+inline constexpr const char *green700 = "#388e3c";
+inline constexpr const char *green800 = "#2e7d32";
+inline constexpr const char *green900 = "#1b5e20";
+inline constexpr const char *greenA100 = "#b9f6ca";
+inline constexpr const char *lightGreen50 = "#f1f8e9";
+inline constexpr const char *lightGreen100 = "#dcedc8";
+inline constexpr const char *lightGreen200 = "#c5e1a5";
+inline constexpr const char *lightGreen300 = "#aed581";
+inline constexpr const char *lightGreen800 = "#558b2f";
+inline constexpr const char *lightGreen900 = "#33691e";
+inline constexpr const char *lightGreenA100 = "#ccff90";
+inline constexpr const char *lime200 = "#e6ee9c";
+inline constexpr const char *lime300 = "#dce775";
+inline constexpr const char *lime900 = "#827717";
+inline constexpr const char *yellow50 = "#fffde7";
+inline constexpr const char *yellow100 = "#fff9c4";
+inline constexpr const char *yellow200 = "#fff59d";
+inline constexpr const char *yellowA100 = "#ffff8d";
+inline constexpr const char *amber50 = "#fff8e1";
+inline constexpr const char *amber100 = "#ffecb3";
+inline constexpr const char *amber200 = "#ffe082";
+inline constexpr const char *amber300 = "#ffd54f";
+inline constexpr const char *amber400 = "#ffca28";
+inline constexpr const char *amber600 = "#ffb300";
+inline constexpr const char *amber800 = "#ff8f00";
+inline constexpr const char *amber900 = "#ff6f00";
+inline constexpr const char *amberA100 = "#ffe57f";
+inline constexpr const char *orange50 = "#fff3e0";
+inline constexpr const char *orange100 = "#ffe0b2";
+inline constexpr const char *orange200 = "#ffcc80";
+inline constexpr const char *orange300 = "#ffb74d";
+inline constexpr const char *orange800 = "#ef6c00";
+inline constexpr const char *orange900 = "#e65100";
+inline constexpr const char *orangeA100 = "#ffd180";
+inline constexpr const char *deepOrange100 = "#ffccbc";
+inline constexpr const char *deepOrange200 = "#ffab91";
+inline constexpr const char *deepOrange300 = "#ff8a65";
+inline constexpr const char *deepOrange600 = "#f4511e";
+inline constexpr const char *deepOrange800 = "#d84315";
+inline constexpr const char *deepOrange900 = "#bf360c";
+inline constexpr const char *deepOrangeA200 = "#ff6e40";
+inline constexpr const char *brown50 = "#efebe9";
+inline constexpr const char *brown100 = "#d7ccc8";
+inline constexpr const char *brown200 = "#bcaaa4";
+inline constexpr const char *brown300 = "#a1887f";
+inline constexpr const char *brown400 = "#8d6e63";
+inline constexpr const char *brown500 = "#795548";
+inline constexpr const char *brown600 = "#6d4c41";
+inline constexpr const char *brown700 = "#5d4037";
+inline constexpr const char *brown800 = "#4e342e";
+inline constexpr const char *brown900 = "#3e2723";
+inline constexpr const char *grey50 = "#fafafa";
+inline constexpr const char *grey100 = "#f5f5f5";
+inline constexpr const char *grey200 = "#eeeeee";
+inline constexpr const char *grey300 = "#e0e0e0";
+inline constexpr const char *grey400 = "#bdbdbd";
+inline constexpr const char *grey500 = "#9e9e9e";
+inline constexpr const char *grey600 = "#757575";
+inline constexpr const char *grey700 = "#616161";
+inline constexpr const char *grey800 = "#424242";
+inline constexpr const char *grey900 = "#212121";
+inline constexpr const char *blueGrey50 = "#eceff1";
+inline constexpr const char *blueGrey100 = "#cfd8dc";
+inline constexpr const char *blueGrey200 = "#b0bec5";
+inline constexpr const char *blueGrey300 = "#90a4ae";
+inline constexpr const char *blueGrey400 = "#78909c";
+inline constexpr const char *blueGrey500 = "#607d8b";
+inline constexpr const char *blueGrey600 = "#546e7a";
+inline constexpr const char *blueGrey700 = "#455a64";
+inline constexpr const char *blueGrey800 = "#37474f";
+inline constexpr const char *blueGrey900 = "#263238";
+inline constexpr const char *black = "#000000";
+inline constexpr const char *white = "#ffffff";
+
+// Every color above, for the tests to check that a theme takes only these.
+inline constexpr std::array all = {
+    red200,        red300,        red400,        red700,         red800,        redA100,        pink50,
+    pink100,       pink200,       pink600,       pink700,        pink900,       pinkA100,       purple50,
+    purple100,     purple200,     purple300,     purple600,      purple700,     purple800,      purple900,
+    purpleA100,    deepPurple50,  deepPurple100, deepPurple200,  deepPurple400, deepPurple500,  deepPurple600,
+    deepPurple700, deepPurple800, deepPurple900, deepPurpleA100, indigo50,      indigo100,      indigo200,
+    indigo400,     indigo500,     indigo600,     indigo700,      indigo800,     indigo900,      indigoA100,
+    blue50,        blue100,       blue200,       blue300,        blue600,       blue700,        blue800,
+    blue900,       blueA100,      lightBlue50,   lightBlue100,   lightBlue200,  lightBlue300,   lightBlue700,
+    lightBlue800,  lightBlue900,  lightBlueA100, lightBlueA200,  cyan100,       cyan200,        cyan800,
+    cyanA100,      cyanA400,      teal50,        teal100,        teal200,       teal300,        teal400,
+    teal600,       teal700,       teal800,       teal900,        tealA100,      tealA200,       green300,
+    green700,      green800,      green900,      greenA100,      lightGreen50,  lightGreen100,  lightGreen200,
+    lightGreen300, lightGreen800, lightGreen900, lightGreenA100, lime200,       lime300,        lime900,
+    yellow50,      yellow100,     yellow200,     yellowA100,     amber50,       amber100,       amber200,
+    amber300,      amber400,      amber600,      amber800,       amber900,      amberA100,      orange50,
+    orange100,     orange200,     orange300,     orange800,      orange900,     orangeA100,     deepOrange100,
+    deepOrange200, deepOrange300, deepOrange600, deepOrange800,  deepOrange900, deepOrangeA200, brown50,
+    brown100,      brown200,      brown300,      brown400,       brown500,      brown600,       brown700,
+    brown800,      brown900,      grey50,        grey100,        grey200,       grey300,        grey400,
+    grey500,       grey600,       grey700,       grey800,        grey900,       blueGrey50,     blueGrey100,
+    blueGrey200,   blueGrey300,   blueGrey400,   blueGrey500,    blueGrey600,   blueGrey700,    blueGrey800,
+    blueGrey900,   black,         white};
+
+} // namespace MaterialPalette
