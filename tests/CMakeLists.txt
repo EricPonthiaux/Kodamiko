@@ -7,16 +7,22 @@ file(MAKE_DIRECTORY ${DUET_TEST_LOG_DIR})
 # What the tests need of each system's programs and shell: one source per
 # system.
 if(WIN32)
-    add_library(duet_test_support STATIC support/SystemFixturesWindows.cpp)
+    add_library(duet_test_support STATIC support/windows/SystemFixturesWindows.cpp)
 else()
-    add_library(duet_test_support STATIC support/SystemFixturesUnix.cpp)
+    add_library(duet_test_support STATIC support/unix/SystemFixturesUnix.cpp)
 endif()
 target_include_directories(duet_test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(duet_test_support PUBLIC Qt6::Core)
 duet_enable_warnings(duet_test_support)
 
+# The test `name`, from <folder>/<name>.cpp when a folder follows: unix or
+# windows, for a test of one system.
 function(duet_add_test name)
-    add_executable(${name} ${name}.cpp)
+    set(source ${name}.cpp)
+    if(ARGC GREATER 1)
+        set(source ${ARGV1}/${name}.cpp)
+    endif()
+    add_executable(${name} ${source})
     duet_enable_warnings(${name})
     target_link_libraries(${name} PRIVATE duet_core duet_test_support Qt6::Test)
     add_test(NAME ${name} COMMAND ${name} -o -,txt -o ${DUET_TEST_LOG_DIR}/${name}.txt,txt)
@@ -33,13 +39,13 @@ function(duet_add_test name)
 endfunction()
 
 # The test of a feature of the system, for the system the build is for:
-# tst_<name>_windows.cpp or tst_<name>_unix.cpp; tst_<name>.cpp, when there
-# is one, holds the behavior every system shares.
+# windows/tst_<name>_windows.cpp or unix/tst_<name>_unix.cpp; tst_<name>.cpp,
+# when there is one, holds the behavior every system shares.
 function(duet_add_system_test name)
     if(WIN32)
-        duet_add_test(${name}_windows)
+        duet_add_test(${name}_windows windows)
     else()
-        duet_add_test(${name}_unix)
+        duet_add_test(${name}_unix unix)
     endif()
 endfunction()
 
@@ -55,7 +61,7 @@ duet_add_test(tst_changes)
 duet_add_test(tst_git)
 # The hooks are shell scripts; Windows has no test of its own yet.
 if(NOT WIN32)
-    duet_add_test(tst_git_unix)
+    duet_add_test(tst_git_unix unix)
 endif()
 duet_add_test(tst_gitsync)
 duet_add_system_test(tst_gitsync)
@@ -82,7 +88,7 @@ duet_add_test(tst_projects)
 duet_add_test(tst_recipes)
 # Visual Studio exists on Windows only.
 if(WIN32)
-    duet_add_test(tst_recipes_windows)
+    duet_add_test(tst_recipes_windows windows)
 endif()
 # Duet's own recipes, from the source tree.
 foreach(test tst_projects tst_recipes)

@@ -6,7 +6,7 @@ identity, the terminal (ConPTY, keyboard), paths, packaging and signing. Only
 the fixes that apply to Duet's architecture (Qt 6 Widgets, one process per
 project window, Duet's own frame and title bar) are kept.
 
-Sources: Duet's code (`src/ui/WindowFrame.cpp`, `src/terminal/ConPty.cpp`,
+Sources: Duet's code (`src/ui/WindowFrame.cpp`, `src/terminal/windows/ConPty.cpp`,
 `src/app/MainWindowProject.cpp`, `src/CMakeLists.txt`…), Qt 6.10's Windows
 plugin (`qwindowswindow.cpp`, `qwindowscontext.cpp`) and the references at the
 end. Items marked *to confirm* are read from the code, not yet seen on a
@@ -166,7 +166,7 @@ Today `packaging/windows/duet.rc` holds the icon only.
 
 ### 5.1 ConPTY
 
-`ConPty` (`src/terminal/ConPty.cpp`) uses the system's ConPTY
+`ConPty` (`src/terminal/windows/ConPty.cpp`) uses the system's ConPTY
 (`kernel32`), the version of the installed Windows: on Windows 10 it lags
 years behind Windows Terminal's (resize reflow, sequences passed through,
 performance).

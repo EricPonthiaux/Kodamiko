@@ -2,7 +2,7 @@
 
 #include "RecipeSetup.h"
 
-#include "VisualStudio.h"
+#include "recipes/windows/VisualStudio.h"
 #include "toolchains/QtRepository.h"
 #include "toolchains/Toolchains.h"
 

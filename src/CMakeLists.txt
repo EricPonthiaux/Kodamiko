@@ -11,21 +11,21 @@ duet_enable_warnings(duet_log)
 add_library(duet_system STATIC system/Executables.cpp system/Host.cpp)
 if(WIN32)
     target_sources(duet_system PRIVATE
-        system/ExecutablesWindows.cpp
-        system/FilePathsWindows.cpp
-        system/HostWindows.cpp
-        system/ShellWindows.cpp
-        system/StandardStreamsWindows.cpp)
+        system/windows/ExecutablesWindows.cpp
+        system/windows/FilePathsWindows.cpp
+        system/windows/HostWindows.cpp
+        system/windows/ShellWindows.cpp
+        system/windows/StandardStreamsWindows.cpp)
 else()
     target_sources(duet_system PRIVATE
-        system/ExecutablesUnix.cpp
-        system/FilePathsUnix.cpp
-        system/ShellUnix.cpp
-        system/StandardStreamsUnix.cpp)
+        system/unix/ExecutablesUnix.cpp
+        system/unix/FilePathsUnix.cpp
+        system/unix/ShellUnix.cpp
+        system/unix/StandardStreamsUnix.cpp)
     if(APPLE)
-        target_sources(duet_system PRIVATE system/HostMacOS.cpp)
+        target_sources(duet_system PRIVATE system/osx/HostMacOS.cpp)
     else()
-        target_sources(duet_system PRIVATE system/HostLinux.cpp)
+        target_sources(duet_system PRIVATE system/linux/HostLinux.cpp)
     endif()
 endif()
 target_include_directories(duet_system PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -338,39 +338,39 @@ add_library(duet_core STATIC
 # system. The PTY is ConPTY on Windows, forkpty elsewhere.
 if(WIN32)
     target_sources(duet_core PRIVATE
-        git/CredentialCacheWindows.cpp
-        projects/NewInstanceWindows.cpp
-        recipes/VisualStudio.cpp
-        setup/SystemSetupWindows.cpp
-        terminal/ConPty.cpp
-        terminal/KeyModifiersWindows.cpp
-        toolchains/SystemJdksWindows.cpp
-        ui/DesktopIntegrationWindows.cpp)
+        git/windows/CredentialCacheWindows.cpp
+        projects/windows/NewInstanceWindows.cpp
+        recipes/windows/VisualStudio.cpp
+        setup/windows/SystemSetupWindows.cpp
+        terminal/windows/ConPty.cpp
+        terminal/windows/KeyModifiersWindows.cpp
+        toolchains/windows/SystemJdksWindows.cpp
+        ui/windows/DesktopIntegrationWindows.cpp)
     # Public: ConPty.h includes <windows.h>, and so does every source that
     # includes it. WIN32_LEAN_AND_MEAN leaves out rpcndr.h, whose `small`
     # macro breaks a field of vterm.h.
     target_compile_definitions(duet_core PUBLIC _WIN32_WINNT=0x0A00 NOMINMAX WIN32_LEAN_AND_MEAN)
 else()
     target_sources(duet_core PRIVATE
-        git/CredentialCacheUnix.cpp
-        terminal/UnixPty.cpp)
+        git/unix/CredentialCacheUnix.cpp
+        terminal/unix/UnixPty.cpp)
     if(APPLE)
         target_sources(duet_core PRIVATE
-            projects/NewInstanceMacOS.cpp
-            setup/SystemSetupMacOS.cpp
-            terminal/KeyModifiersMacOS.cpp
-            terminal/PtyForegroundMacOS.cpp
-            toolchains/SystemJdksMacOS.cpp
-            ui/DesktopIntegrationMacOS.mm)
+            projects/osx/NewInstanceMacOS.cpp
+            setup/osx/SystemSetupMacOS.cpp
+            terminal/osx/KeyModifiersMacOS.cpp
+            terminal/osx/PtyForegroundMacOS.cpp
+            toolchains/osx/SystemJdksMacOS.cpp
+            ui/osx/DesktopIntegrationMacOS.mm)
         target_link_libraries(duet_core PRIVATE "-framework AppKit")
     else()
         target_sources(duet_core PRIVATE
-            projects/NewInstanceLinux.cpp
-            setup/SystemSetupLinux.cpp
-            terminal/KeyModifiersLinux.cpp
-            terminal/PtyForegroundLinux.cpp
-            toolchains/SystemJdksLinux.cpp
-            ui/DesktopIntegrationLinux.cpp)
+            projects/linux/NewInstanceLinux.cpp
+            setup/linux/SystemSetupLinux.cpp
+            terminal/linux/KeyModifiersLinux.cpp
+            terminal/linux/PtyForegroundLinux.cpp
+            toolchains/linux/SystemJdksLinux.cpp
+            ui/linux/DesktopIntegrationLinux.cpp)
     endif()
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_link_libraries(duet_core PRIVATE util) # forkpty() before glibc 2.34

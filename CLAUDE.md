@@ -217,7 +217,11 @@ One strategy per layer:
   `ShellUnix.cpp` (`Unix` for macOS and Linux together, `MacOS` and
   `Linux` when they differ). The ways every package shares live in
   `src/system`; a feature's own in its package
-  (`git/CredentialCacheUnix.cpp`). A constant that only names the system
+  (`git/unix/CredentialCacheUnix.cpp`). A source built for some systems
+  only lives in its package's folder for them, `windows/`, `unix/`,
+  `osx/` or `linux/` (`system/windows/ShellWindows.cpp`,
+  `terminal/unix/UnixPty.cpp`), and includes the package's headers by
+  their path (`"system/Shell.h"`). A constant that only names the system
   is a `switch` on `Host::operatingSystem()`. A feature that exists on one
   system only (Spaces, the Dock, App Nap) still has a source per system,
   which does nothing where the feature does not exist
@@ -272,10 +276,11 @@ Configured in `.clang-format`, `.clang-tidy` and `cmake/CodeQuality.cmake`:
   without a display).
 - **Tests by system**: a feature of the system (pty, processes and shells,
   git and credentials, toolchains, file system) has one test file per
-  system, added by CMake (`if(WIN32)`…): `tst_terminal_windows.cpp` beside
-  `tst_terminal_unix.cpp`, the behavior they share in `tst_terminal.cpp`. A
-  UI test gets a variant only when a system needs one, as an `#ifdef` in
-  the test itself.
+  system, added by CMake (`if(WIN32)`…), in `tests/windows/` or
+  `tests/unix/`: `windows/tst_terminal_windows.cpp` beside
+  `unix/tst_terminal_unix.cpp`, the behavior they share in
+  `tst_terminal.cpp`. A UI test gets a variant only when a system needs
+  one, as an `#ifdef` in the test itself.
 
 ---
 
