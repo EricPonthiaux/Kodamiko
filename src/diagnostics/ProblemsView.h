@@ -2,11 +2,16 @@
 
 #pragma once
 
+#include "Problem.h"
+
+#include <QList>
 #include <QSet>
 #include <QTimer>
 #include <QWidget>
 
 class ProblemStore;
+class QAction;
+class QPoint;
 class QLabel;
 class QStackedWidget;
 class QTreeWidget;
@@ -31,6 +36,14 @@ public:
 
     QTreeWidget *tree() const { return tree_; }
 
+    // The actions of the context menu of a problem or a file, about
+    // selectedProblems(). Not owned.
+    void setContextActions(const QList<QAction *> &actions) { contextActions_ = actions; }
+
+    // The selected problem, or every problem of the selected file; none
+    // without a selection.
+    Problems selectedProblems() const;
+
     int errorCount() const { return errors_; }
 
     int warningCount() const { return warnings_; }
@@ -44,6 +57,7 @@ private:
     void scheduleRefresh();
     void refresh();
     void activate(QTreeWidgetItem *item);
+    void showContextMenu(const QPoint &position);
     // Every file; remembered as for a click on each.
     void setAllExpanded(bool expanded);
 
@@ -54,6 +68,7 @@ private:
     int errors_ = 0;
     int warnings_ = 0;
     QSet<QString> collapsedFiles_;
+    QList<QAction *> contextActions_;
 
     ViewHeader *header_;
     QTreeWidget *tree_;

@@ -88,6 +88,10 @@ private slots:
         const QJsonObject block = claude.blockReply(QStringLiteral("fix it"));
         QCOMPARE(block["decision"].toString(), QStringLiteral("block"));
         QCOMPARE(block["reason"].toString(), QStringLiteral("fix it"));
+
+        const QJsonObject edit = claude.editContextReply(QStringLiteral("errors"))["hookSpecificOutput"].toObject();
+        QCOMPARE(edit["hookEventName"].toString(), QStringLiteral("PostToolUse"));
+        QCOMPARE(edit["additionalContext"].toString(), QStringLiteral("errors"));
     }
 
     void claudeMarkTwinklesOnceThenStaysStill()

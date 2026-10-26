@@ -128,6 +128,7 @@ private:
     QCheckBox *alwaysSelectOpenedFile_ = nullptr;
     QCheckBox *snapshotBeforePrompt_ = nullptr;
     QCheckBox *shareEditorContext_ = nullptr;
+    QCheckBox *reportEditErrors_ = nullptr;
     QCheckBox *exposeTools_ = nullptr;
     QCheckBox *claudeNotifications_ = nullptr;
     TerminalPreferencesPage *terminalPage_ = nullptr;

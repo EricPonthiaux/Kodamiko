@@ -27,20 +27,28 @@ struct EditorContext {
     QString selectedText;
     QStringList unsavedFiles; // differ from the disk, relative paths
     QList<Problem> problems;  // of the current file
+    // The files viewed before the current one, most recent first, with
+    // the line of the cursor when they are open: "src/b.cpp:120". "The
+    // function from before" needs no @path either.
+    QStringList recentFiles;
 
     // Longest selection sent as is; a longer one is cut.
     static constexpr int maximumSelectionLength = 8000;
     static constexpr int maximumProblems = 20;
+    static constexpr int maximumRecentFiles = 5;
 
-    bool isEmpty() const { return filePath.isEmpty() && unsavedFiles.isEmpty(); }
+    bool isEmpty() const { return filePath.isEmpty() && unsavedFiles.isEmpty() && recentFiles.isEmpty(); }
 
     // The text added to the prompt; empty when there is nothing to tell.
     QString describe() const;
 
     // What `tabs` show: the current editor's file, cursor, selection and
-    // problems, the unsaved files; paths relative to `projectFolder` when
-    // inside it.
-    static EditorContext of(const EditorTabs &tabs, const QString &projectFolder);
+    // problems, the unsaved files, and the files of `recentlyOpened`
+    // (absolute paths, most recent first, see RecentFiles) still there;
+    // paths relative to `projectFolder` when inside it.
+    static EditorContext of(const EditorTabs &tabs,
+                            const QString &projectFolder,
+                            const QStringList &recentlyOpened = {});
     // As JSON, for the editor's MCP tools (the selection is not cut).
     QJsonObject toJson() const;
 };

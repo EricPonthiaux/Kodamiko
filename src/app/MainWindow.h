@@ -42,6 +42,7 @@ class CompletionService;
 class DetachablePage;
 class EditorStatus;
 class EditorTabs;
+class EditErrorCheck;
 class EditorWidget;
 class FileStatusReader;
 class FileTreeView;
@@ -418,6 +419,9 @@ private:
     // Asks about the next sensitive tool Claude wants to run.
     void showToolRequest();
     void guardUnsavedEdits(const QStringList &paths);
+    // Tells the agent the errors its edit of `paths` brought, once their
+    // language servers have reported them.
+    void reportEditErrors(const QStringList &paths);
     void followDiagramEdits(const QStringList &paths);
     // Asks what Claude should draw in `folder`, then shows the drawing.
     void generateDiagram(const QString &folder);
@@ -449,6 +453,10 @@ private:
     // the editor's context menu and the Claude menu.
     void createCodeRequestActions(QMenu *claude);
     void askClaude(CodeRequest::Kind kind);
+    // Asks the agent to fix the problems on the editor's selected lines,
+    // or the cursor's.
+    void askClaudeToFixProblemsHere();
+    void askClaudeToFix(const Problems &problems);
     // Reviews in a separate agent process (ReviewSession), not in the
     // session: the code at the cursor or selection, or files and folders of
     // the tree, in a tab (ReviewView). The files must be saved, as the
@@ -552,6 +560,7 @@ private:
     CompletionService *completion_ = nullptr;
     LocalFullLineModel *fullLineModel_ = nullptr;
     LanguageServers *languageServers_ = nullptr;
+    EditErrorCheck *editErrorCheck_ = nullptr;
     std::unique_ptr<Toolchains> toolchains_;
     ProjectConfig project_;
     QList<Recipe> recipes_; // those of the project's languages that are installed
@@ -658,6 +667,7 @@ private:
     std::unique_ptr<QMenuBar> nativeMenuBar_;
     QAction *snapshotBeforePrompt_ = nullptr;
     QAction *shareEditorContext_ = nullptr;
+    QAction *reportEditErrors_ = nullptr;
     // Also in the editor's context menu (createEditorContextActions()).
     QList<QAction *> codeRequestActions_;
     QAction *renameAction_ = nullptr;

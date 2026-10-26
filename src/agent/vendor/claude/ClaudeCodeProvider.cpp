@@ -218,3 +218,12 @@ QJsonObject ClaudeCodeProvider::blockReply(const QString &reason) const
 {
     return QJsonObject{{QLatin1String("decision"), QLatin1String("block")}, {QLatin1String("reason"), reason}};
 }
+
+QJsonObject ClaudeCodeProvider::editContextReply(const QString &context) const
+{
+    return QJsonObject{
+        {QLatin1String("hookSpecificOutput"), QJsonObject{
+                                                  {QLatin1String("hookEventName"), QLatin1String("PostToolUse")},
+                                                  {QLatin1String("additionalContext"), context},
+                                              }}};
+}

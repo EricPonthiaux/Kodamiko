@@ -46,6 +46,7 @@ add_library(duet_core STATIC
     agent/CommitMessage.cpp
     agent/DiagramRequest.cpp
     agent/DiagramRequestPopup.cpp
+    agent/EditErrors.cpp
     agent/EditorContext.cpp
     agent/HookServer.cpp
     agent/mcp/CodeTools.cpp

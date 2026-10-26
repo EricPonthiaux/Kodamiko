@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "diagnostics/Problem.h"
+
 #include <QString>
 #include <QStringList>
 
@@ -43,6 +45,15 @@ QString mention(const Target &target);
 
 // The prompt asking Claude for `kind` about `target`.
 QString prompt(Kind kind, const Target &target);
+
+// Longest list of problems a fix prompt names; the rest is counted.
+constexpr int maximumProblemsToFix = 20;
+
+// The prompt asking Claude to fix `problems` (at least one), each named
+// with its file mention and its message; their paths relative to
+// `projectFolder` when inside it. `unsaved`: some of their files have
+// unsaved changes in the editor.
+QString fixPrompt(const Problems &problems, const QString &projectFolder, bool unsaved);
 
 // What a review is about, in words, for its prompt and its tab:
 // "src/a.cpp, lines 2-3", "`parse` in a.cpp, line 1".

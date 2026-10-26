@@ -175,6 +175,9 @@ void MainWindow::createClaudeMenu()
     shareEditorContext_ = addAgentSettingToggle(
         claude, {tr("Share &Editor Context With Each Prompt"), QStringLiteral("shareEditorContext"),
                  tr("Tell %1 the open file, the cursor, the selection, the problems shown and the unsaved files")});
+    reportEditErrors_ = addAgentSettingToggle(
+        claude, {tr("Report E&rrors After Each Edit"), QStringLiteral("reportEditErrors"),
+                 tr("Tell %1 the errors the language servers find in the code it has just edited")});
     exposeTools_ = addAgentSettingToggle(
         claude, {tr("E&xpose Duet's Tools to %1"), QStringLiteral("exposeTools"),
                  tr("Let %1 read and act in the editor through Duet's MCP server (next session)")});

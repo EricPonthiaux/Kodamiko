@@ -6,6 +6,7 @@
 #include "agent/AgentIndicator.h"
 #include "agent/AgentProviders.h"
 #include "agent/DiagramRequestPopup.h"
+#include "agent/EditErrors.h"
 #include "agent/NewAgentPopup.h"
 #include "agent/ReviewPage.h"
 #include "agent/mcp/DuetTools.h"
@@ -247,6 +248,7 @@ void MainWindow::createCodeServices(const Preferences &preferences)
     languageServers_ = new LanguageServers(this);
     languageServers_->setEnabled(preferences.languageServers);
     connect(languageServers_, &LanguageServers::statusMessage, this, &MainWindow::showStatus);
+    editErrorCheck_ = new EditErrorCheck(languageServers_, this);
 
     problemStore_ = new ProblemStore(languageServers_, this);
     runner_ = new Runner(problemStore_, this);

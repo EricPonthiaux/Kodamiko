@@ -160,6 +160,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     formatOnSave_->setChecked(preferences.formatOnSave);
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
     shareEditorContext_->setChecked(preferences.shareEditorContext);
+    reportEditErrors_->setChecked(preferences.reportEditErrors);
     exposeTools_->setChecked(preferences.exposeTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     editorTabs_->setEditorOptions(preferences.editor);

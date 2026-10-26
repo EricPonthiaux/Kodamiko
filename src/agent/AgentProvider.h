@@ -159,4 +159,7 @@ public:
     // The reply to a FilesEdited hook that sends `reason` back to the agent
     // to fix what it wrote.
     virtual QJsonObject blockReply(const QString &reason) const = 0;
+    // The reply to a FilesEdited hook that tells the agent `context` along
+    // with the edit's result, without refusing anything.
+    virtual QJsonObject editContextReply(const QString &context) const = 0;
 };

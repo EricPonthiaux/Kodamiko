@@ -54,6 +54,8 @@ struct Preferences {
     QString defaultAgentProvider = QStringLiteral("claude-code");
     bool snapshotBeforePrompt = true;
     bool shareEditorContext = true;
+    // The errors an edit brought, told to the agent right after it.
+    bool reportEditErrors = true;
     // The editor's MCP server (tools, resources, prompts) in its sessions.
     bool exposeTools = true;
     bool claudeNotifications = true;

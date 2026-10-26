@@ -6,6 +6,7 @@
 #include "agent/CloseAgentPopup.h"
 #include "agent/CommitMessage.h"
 #include "agent/DiagramRequest.h"
+#include "agent/EditErrors.h"
 #include "agent/EditorContext.h"
 #include "agent/HookEvent.h"
 #include "agent/HookServer.h"
@@ -640,6 +641,34 @@ private slots:
         QCOMPARE(specific.value("additionalContext").toString(), QStringLiteral("Open file: a.cpp"));
     }
 
+    // The answer can come once the slot has returned: after the language
+    // servers have checked an edit.
+    void hookPrintsTheEditorsDeferredAnswer()
+    {
+        HookServer server;
+        server.setProvider(&claude_);
+        QVERIFY(server.listen());
+        std::function<void(const QJsonObject &)> respond;
+        connect(&server, &HookServer::hookReceived, this, [&] { respond = server.deferResponse(); });
+
+        QProcess hook;
+        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("DUET_SOCKET", server.serverName());
+        hook.setProcessEnvironment(environment);
+        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        QVERIFY(hook.waitForStarted());
+        hook.write(R"({"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"/a.cpp"}})");
+        hook.closeWriteChannel();
+
+        QTRY_VERIFY(respond);
+        respond(claude_.editContextReply(QStringLiteral("a.cpp:1:1: error")));
+        QTRY_COMPARE_WITH_TIMEOUT(hook.state(), QProcess::NotRunning, 5000);
+        const QJsonObject output = QJsonDocument::fromJson(hook.readAllStandardOutput()).object();
+        const QJsonObject specific = output.value("hookSpecificOutput").toObject();
+        QCOMPARE(specific.value("hookEventName").toString(), QStringLiteral("PostToolUse"));
+        QCOMPARE(specific.value("additionalContext").toString(), QStringLiteral("a.cpp:1:1: error"));
+    }
+
     // A slot that opens a popup runs an event loop, during which the hook
     // can give up waiting: its socket is gone when the slot returns.
     void hookThatGivesUpDuringTheSlotIsNotAnswered()
@@ -827,6 +856,68 @@ private slots:
         const QString text = context.describe();
         QVERIFY(text.contains(QStringLiteral("(line 1, cut)")));
         QVERIFY(!text.contains(QString(EditorContext::maximumSelectionLength + 1, QLatin1Char('x'))));
+    }
+
+    void describesTheFilesViewedBefore()
+    {
+        EditorContext context;
+        context.recentFiles = {QStringLiteral("src/b.cpp:120"), QStringLiteral("src/c.h")};
+
+        QCOMPARE(context.describe().section(QLatin1Char('\n'), 1),
+                 QStringLiteral("- Files viewed before, most recent first: src/b.cpp:120, src/c.h"));
+    }
+
+    void reportsOnlyTheErrorsAnEditBrought()
+    {
+        const auto diagnostic = [](int line, const char *message, int severity) {
+            return QJsonObject{{"range", QJsonObject{{"start", QJsonObject{{"line", line}, {"character", 0}}},
+                                                     {"end", QJsonObject{{"line", line}, {"character", 1}}}}},
+                               {"severity", severity},
+                               {"message", message}};
+        };
+        const QJsonArray before{diagnostic(3, "unknown type 'Foo'", 1)};
+        const QJsonArray after{diagnostic(5, "unknown type 'Foo'", 1), diagnostic(8, "unused variable 'x'", 2),
+                               diagnostic(9, "no member named 'bar'", 1)};
+
+        const QJsonArray brought = EditErrors::introduced(before, after);
+
+        QCOMPARE(brought.size(), 1);
+        QCOMPARE(brought.first()["message"].toString(), QStringLiteral("no member named 'bar'"));
+    }
+
+    void describesTheErrorsAnEditBroughtWithTheirPlace()
+    {
+        QJsonArray errors;
+        for (int i = 0; i < EditErrors::maximumErrorsPerFile + 2; ++i)
+            errors.append(QJsonObject{{"range", QJsonObject{{"start", QJsonObject{{"line", 41}, {"character", 6}}}}},
+                                      {"message", "no member named 'bar'"},
+                                      {"source", "clangd"}});
+
+        const QString report = EditErrors::describe({{QStringLiteral("src/a.cpp"), errors}});
+
+        QVERIFY(report.contains(QStringLiteral("\n- src/a.cpp:42:7: no member named 'bar' (clangd)")));
+        QVERIFY(report.endsWith(QStringLiteral("\n- and 2 more in src/a.cpp")));
+        QVERIFY(EditErrors::describe({{QStringLiteral("src/a.cpp"), {}}}).isEmpty());
+    }
+
+    void fixPromptNamesEachProblemWithItsMention()
+    {
+        const Problem error{.path = QStringLiteral("/project/src/a.cpp"),
+                            .line = 41,
+                            .message = QStringLiteral("no member named 'bar'"),
+                            .source = QStringLiteral("clangd")};
+        Problem warning = error;
+        warning.line = 7;
+        warning.severity = Diagnostic::Severity::Warning;
+        warning.message = QStringLiteral("unused variable 'x'");
+        warning.source.clear();
+
+        QCOMPARE(CodeRequest::fixPrompt({error}, QStringLiteral("/project"), false),
+                 QDir::toNativeSeparators("Fix this error at @src/a.cpp#L42: no member named 'bar' (clangd)."));
+        const QString both = CodeRequest::fixPrompt({error, warning}, QStringLiteral("/project"), true);
+        QVERIFY(both.startsWith(QStringLiteral("Fix these problems:\n- error at ")));
+        QVERIFY(both.contains(QDir::toNativeSeparators("\n- warning at @src/a.cpp#L8: unused variable 'x'\n")));
+        QVERIFY(both.contains(QStringLiteral("unsaved changes")));
     }
 
     void statusLineIsForwardedAndPrinted()

@@ -55,6 +55,23 @@ QString unsavedNote(const Target &target)
                           "there, which Duet's get_file_text tool returns.");
 }
 
+// "error at @src/a.cpp#L42: use of undeclared identifier 'x' (clangd)"
+QString describeProblem(const Problem &problem, const QString &projectFolder)
+{
+    const Target at{.path = relativePath(problem.path, projectFolder),
+                    .firstLine = problem.line + 1,
+                    .lastLine = problem.line + 1,
+                    .symbol = {},
+                    .unsaved = false};
+    QString text =
+        QStringLiteral("%1 at %2: %3")
+            .arg(problem.severity == Diagnostic::Severity::Error ? QStringLiteral("error") : QStringLiteral("warning"),
+                 mention(at), problem.message.simplified());
+    if (!problem.source.isEmpty())
+        text += QStringLiteral(" (%1)").arg(problem.source);
+    return text;
+}
+
 } // namespace
 
 std::optional<Target> targetIn(const EditorWidget &editor, const QString &projectFolder)
@@ -110,6 +127,26 @@ QString prompt(Kind kind, const Target &target)
         break;
     }
     return request.arg(subject(target)) + unsavedNote(target);
+}
+
+QString fixPrompt(const Problems &problems, const QString &projectFolder, bool unsaved)
+{
+    Q_ASSERT(!problems.isEmpty());
+    QStringList lines;
+    if (problems.size() == 1) {
+        lines.append(QStringLiteral("Fix this %1.").arg(describeProblem(problems.first(), projectFolder)));
+    } else {
+        lines.append(QStringLiteral("Fix these problems:"));
+        for (qsizetype i = 0; i < problems.size() && i < maximumProblemsToFix; ++i)
+            lines.append(QStringLiteral("- %1").arg(describeProblem(problems.at(i), projectFolder)));
+        if (problems.size() > maximumProblemsToFix)
+            lines.append(QStringLiteral("- and %1 more").arg(problems.size() - maximumProblemsToFix));
+    }
+    // Claude reads the files from disk: the line numbers would not match.
+    if (unsaved)
+        lines.append(QStringLiteral("The files have unsaved changes in the editor: the line numbers refer to their "
+                                    "text there, which Duet's get_file_text tool returns."));
+    return lines.join(QLatin1Char('\n'));
 }
 
 QString describe(const Target &target)

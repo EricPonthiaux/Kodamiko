@@ -8,6 +8,7 @@
 #include "ui/PopupFooter.h"
 #include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
+#include "ui/TreeMetrics.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
 
@@ -537,6 +538,7 @@ QWidget *PreferencesPopup::createClaudePage()
     auto *session = new SettingsCard;
     snapshotBeforePrompt_ = new QCheckBox;
     shareEditorContext_ = new QCheckBox;
+    reportEditErrors_ = new QCheckBox;
     exposeTools_ = new QCheckBox;
     claudeNotifications_ = new QCheckBox;
     session->addRow(tr("Snapshot before each prompt"),
@@ -547,6 +549,10 @@ QWidget *PreferencesPopup::createClaudePage()
                     tr("Tells Claude the open file, the cursor, the selection, the problems shown and the unsaved "
                        "files, so that \u201cthis\u201d needs no @path."),
                     shareEditorContext_);
+    session->addRow(tr("Report errors after each edit"),
+                    tr("Tells Claude the errors the language servers find in the code it has just edited, so "
+                       "that it fixes them before going on."),
+                    reportEditErrors_);
     session->addRow(tr("Expose Duet's tools to Claude"),
                     tr("Lets Claude read and act in the editor (open files with their unsaved changes, problems, "
                        "diagrams, terminals, git) through Duet's MCP server. Applies to the next session."),
@@ -578,6 +584,8 @@ QWidget *PreferencesPopup::createKeymapPage()
     commandList_->setHeaderHidden(true);
     commandList_->setRootIsDecorated(false);
     commandList_->setUniformRowHeights(true);
+    // Rows spaced as the file tree's: a long list read at a glance.
+    applyTreeMetrics(commandList_, commandList_->font());
     commandList_->setItemDelegateForColumn(1, new KeycapDelegate(commandList_));
     commandList_->header()->setStretchLastSection(false);
     commandList_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -753,6 +761,7 @@ void PreferencesPopup::load(const Preferences &preferences,
     alwaysSelectOpenedFile_->setChecked(preferences.alwaysSelectOpenedFile);
     snapshotBeforePrompt_->setChecked(preferences.snapshotBeforePrompt);
     shareEditorContext_->setChecked(preferences.shareEditorContext);
+    reportEditErrors_->setChecked(preferences.reportEditErrors);
     exposeTools_->setChecked(preferences.exposeTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     terminalPage_->setPathFolders(preferences.terminalPathFolders);
@@ -811,6 +820,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.alwaysSelectOpenedFile = alwaysSelectOpenedFile_->isChecked();
     preferences.snapshotBeforePrompt = snapshotBeforePrompt_->isChecked();
     preferences.shareEditorContext = shareEditorContext_->isChecked();
+    preferences.reportEditErrors = reportEditErrors_->isChecked();
     preferences.exposeTools = exposeTools_->isChecked();
     preferences.claudeNotifications = claudeNotifications_->isChecked();
     preferences.terminalPathFolders = terminalPage_->pathFolders();

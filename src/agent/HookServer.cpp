@@ -92,6 +92,20 @@ std::function<void()> HookServer::deferReply()
     };
 }
 
+std::function<void(const QJsonObject &output)> HookServer::deferResponse()
+{
+    if (!receiving_)
+        return [](const QJsonObject &) { };
+    replyDeferred_ = true;
+    return [socket = QPointer<QLocalSocket>(receiving_)](const QJsonObject &output) {
+        if (!socket)
+            return;
+        if (!output.isEmpty())
+            socket->setProperty(outputProperty, QJsonDocument(output).toJson(QJsonDocument::Compact));
+        reply(socket);
+    };
+}
+
 void HookServer::respond(const QJsonObject &output)
 {
     if (receiving_)

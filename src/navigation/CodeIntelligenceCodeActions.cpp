@@ -3,14 +3,18 @@
 // CodeIntelligence: the server's quick fixes and refactorings (code actions).
 
 #include "CodeIntelligence.h"
+#include "diagnostics/ProblemStore.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "lsp/LspClient.h"
 #include "refactor/EditPreview.h"
 #include "refactor/RefactoringPreviewPopup.h"
 
+#include <QAction>
 #include <QJsonArray>
 #include <QPointer>
+
+#include <algorithm>
 
 using namespace LspProtocol;
 
@@ -38,9 +42,15 @@ bool isRefactoring(const QJsonObject &action)
 void CodeIntelligence::showQuickFixes()
 {
     EditorWidget *editor = tabs_->currentEditor();
-    LspClient *client = serverFor(editor);
-    if (!client || editor->isReadOnly())
+    if (!editor || editor->isReadOnly())
         return;
+    // Without a server, a build's problem can still be fixed by the agent.
+    LspClient *client = serverFor(editor, problemFixFor(editor) != nullptr);
+    if (!client) {
+        if (problemFixFor(editor))
+            chooseQuickFix(editor, nullptr, {});
+        return;
+    }
     const int from = int(editor->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONSTART));
     const int to = int(editor->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONEND));
     const QJsonObject params{
@@ -64,16 +74,43 @@ void CodeIntelligence::showQuickFixes()
 void CodeIntelligence::chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions)
 {
     const QList<QJsonObject> actions = usableActions(codeActions);
-    if (actions.isEmpty()) {
+    QAction *problemFix = problemFixFor(editor);
+    if (actions.isEmpty() && !problemFix) {
         emit statusMessage(tr("No quick fixes or refactorings here"));
         return;
     }
     QStringList titles;
     for (const QJsonObject &action : actions)
         titles.append(action.value("title").toString());
+    if (problemFix)
+        titles.append(QString(problemFix->text()).remove(QLatin1Char('&')));
     const int chosen = chooseFrom(editor, titles);
-    if (chosen >= 0)
+    if (chosen < 0)
+        return;
+    if (chosen < actions.size())
         applyCodeAction(server, actions.at(chosen));
+    else
+        problemFix->trigger();
+}
+
+QAction *CodeIntelligence::problemFixFor(const EditorWidget *editor) const
+{
+    if (!problemFixAction_ || !problemFixAction_->isEnabled() || editor->filePath().isEmpty())
+        return nullptr;
+    int firstLine = 0;
+    int lastLine = 0;
+    int index = 0;
+    if (editor->hasSelectedText()) {
+        editor->getSelection(&firstLine, &index, &lastLine, &index);
+    } else {
+        editor->getCursorPosition(&firstLine, &index);
+        lastLine = firstLine;
+    }
+    const Problems problems = problems_->problems(editor->filePath());
+    const bool hasProblem = std::ranges::any_of(problems, [firstLine, lastLine](const Problem &problem) {
+        return problem.line >= firstLine && problem.line <= lastLine;
+    });
+    return hasProblem ? problemFixAction_ : nullptr;
 }
 
 void CodeIntelligence::applyCodeAction(LspClient *server, const QJsonObject &action)

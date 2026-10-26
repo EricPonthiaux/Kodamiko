@@ -7,6 +7,7 @@
 #include "NativeNotifications.h"
 #include "agent/AgentIndicator.h"
 #include "agent/DiagramRequestPopup.h"
+#include "agent/EditErrors.h"
 #include "agent/EditorContext.h"
 #include "agent/mcp/DuetTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
@@ -15,11 +16,14 @@
 #include "agent/vendor/claude/UnsavedEditGuard.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
+#include "diagnostics/ProblemStore.h"
+#include "diagnostics/ProblemsView.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
 #include "git/Snapshots.h"
+#include "navigation/CodeIntelligence.h"
 #include "navigation/CodeNavigator.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/DesktopIntegration.h"
@@ -37,6 +41,7 @@
 #include "viewers/DiagramView.h"
 #endif
 
+#include <QAction>
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -52,6 +57,7 @@
 #include <QTabWidget>
 #include <QTimer>
 
+#include <algorithm>
 #include <utility>
 
 namespace {
@@ -300,11 +306,13 @@ void MainWindow::onHookReceived(const HookEvent &event)
         break;
     case HookEvent::Kind::EditRequested:
         guardUnsavedEdits(event.filePaths);
+        editErrorCheck_->rememberErrorsBefore(event.filePaths);
         break;
     case HookEvent::Kind::FilesEdited:
     case HookEvent::Kind::CommandFinished: {
         if (event.kind == HookEvent::Kind::FilesEdited) {
             followDiagramEdits(event.filePaths);
+            reportEditErrors(event.filePaths);
             recentFiles_.markEditedByClaude(event.filePaths);
             for (const QString &path : event.filePaths)
                 claudeTouched_.insert(QDir::cleanPath(path));
@@ -524,7 +532,7 @@ void MainWindow::shareEditorContext()
 {
     if (!shareEditorContext_->isChecked())
         return;
-    const EditorContext context = EditorContext::of(*editorTabs_, folder_);
+    const EditorContext context = EditorContext::of(*editorTabs_, folder_, recentFiles_.opened());
     const QString description = context.describe();
     if (!description.isEmpty())
         hookServer_.respond(agentProvider_->promptContextReply(description));
@@ -549,6 +557,18 @@ void MainWindow::guardUnsavedEdits(const QStringList &paths)
             .arg(agent, files),
         tr("Save All"));
     showStatus(tr("Edit by %1 refused, unsaved changes in %2").arg(agent, files));
+}
+
+void MainWindow::reportEditErrors(const QStringList &paths)
+{
+    if (!reportEditErrors_->isChecked())
+        return;
+    // The agent waits for the report before going on, as it would for a
+    // compiler.
+    editErrorCheck_->checkAfterEdit(
+        paths, [respond = hookServer_.deferResponse(), provider = agentProvider_](const QString &report) {
+            respond(report.isEmpty() ? QJsonObject() : provider->editContextReply(report));
+        });
 }
 
 void MainWindow::followDiagramEdits(const QStringList &paths)
@@ -694,14 +714,50 @@ void MainWindow::createCodeRequestActions(QMenu *claude)
     add(tr("&Explain This Code"), {}, [this] { askClaude(CodeRequest::Kind::Explain); });
     add(tr("Re&view This Code"), {}, [this] { reviewCode(); });
     add(tr("Write T&ests for This Code"), {}, [this] { askClaude(CodeRequest::Kind::WriteTests); });
+    add(tr("Ask %1 to &Fix the Problems Here"), {}, [this] { askClaudeToFixProblemsHere(); });
+    nameAfterAgent(codeRequestActions_.last(), tr("Ask %1 to &Fix the Problems Here"));
+    intelligence_->setProblemFixAction(codeRequestActions_.last());
     add(tr("&Add to %1's Prompt"), QKeySequence(tr("Ctrl+Alt+K")), [this] { addCodeToClaudePrompt(); });
     nameAfterAgent(codeRequestActions_.last(), tr("&Add to %1's Prompt"));
+
+    auto *fixSelected = new QAction(this);
+    connect(fixSelected, &QAction::triggered, this, [this] { askClaudeToFix(problemsView_->selectedProblems()); });
+    nameAfterAgent(fixSelected, tr("Ask %1 to &Fix"));
+    problemsView_->setContextActions({fixSelected});
 }
 
 void MainWindow::askClaude(CodeRequest::Kind kind)
 {
     if (const std::optional<CodeRequest::Target> target = currentCodeTarget())
         typeInClaudePrompt(CodeRequest::prompt(kind, *target), PromptEntry::Submitted);
+}
+
+void MainWindow::askClaudeToFixProblemsHere()
+{
+    const std::optional<CodeRequest::Target> target = currentCodeTarget();
+    if (!target)
+        return;
+    const QString path = editorTabs_->currentEditor()->filePath();
+    Problems here;
+    for (const Problem &problem : problemStore_->problems(path)) {
+        if (problem.line + 1 >= target->firstLine && problem.line + 1 <= target->lastLine)
+            here.append(problem);
+    }
+    if (here.isEmpty()) {
+        showStatus(target->firstLine == target->lastLine ? tr("No problem on this line")
+                                                         : tr("No problem on the selected lines"));
+        return;
+    }
+    askClaudeToFix(here);
+}
+
+void MainWindow::askClaudeToFix(const Problems &problems)
+{
+    if (problems.isEmpty())
+        return;
+    const bool unsaved = std::ranges::any_of(
+        problems, [this](const Problem &problem) { return editorTabs_->hasUnsavedChangesUnder(problem.path); });
+    typeInClaudePrompt(CodeRequest::fixPrompt(problems, folder_, unsaved), PromptEntry::Submitted);
 }
 
 void MainWindow::addCodeToClaudePrompt()

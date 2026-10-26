@@ -48,6 +48,9 @@ public:
     // function is called (once), not when the slot returns. The hook gives
     // up waiting after a few seconds.
     std::function<void()> deferReply();
+    // The same, the reply carrying the JSON passed to the returned function
+    // (as respond() would), or none for an empty object.
+    std::function<void(const QJsonObject &output)> deferResponse();
 
     // Only from a hookReceived() slot: the JSON the hook prints on its
     // standard output, sent with the reply (deferred or not).

@@ -6,6 +6,7 @@
 #include "editor/EditorWidget.h"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QJsonArray>
 
 namespace {
@@ -49,6 +50,18 @@ QStringList describeProblems(const QList<EditorContext::Problem> &problems)
     return lines;
 }
 
+// "src/b.cpp:120" for an open file, "src/b.cpp" for one no longer open.
+QString describeRecentFile(const EditorTabs &tabs, const QString &path, const QString &relativePath)
+{
+    const EditorWidget *editor = tabs.editorFor(path);
+    if (!editor)
+        return relativePath;
+    int line = 0;
+    int index = 0;
+    editor->getCursorPosition(&line, &index);
+    return QStringLiteral("%1:%2").arg(relativePath).arg(line + 1);
+}
+
 } // namespace
 
 QString EditorContext::describe() const
@@ -68,13 +81,16 @@ QString EditorContext::describe() const
         if (!problems.isEmpty())
             lines += describeProblems(problems);
     }
+    if (!recentFiles.isEmpty())
+        lines.append(
+            QStringLiteral("- Files viewed before, most recent first: %1").arg(recentFiles.join(QStringLiteral(", "))));
     if (!unsavedFiles.isEmpty())
         lines.append(QStringLiteral("- Unsaved changes in the editor (the files on disk are older): %1")
                          .arg(unsavedFiles.join(QStringLiteral(", "))));
     return lines.join(QLatin1Char('\n'));
 }
 
-EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFolder)
+EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFolder, const QStringList &recentlyOpened)
 {
     const QDir project(projectFolder);
     const auto relative = [&project, &projectFolder](const QString &path) {
@@ -113,6 +129,14 @@ EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFo
                 {problemLine + 1, diagnostic.severity == Diagnostic::Severity::Error, diagnostic.message});
         }
     }
+    const EditorWidget *current = tabs.currentEditor();
+    for (const QString &path : recentlyOpened) {
+        if (context.recentFiles.size() == maximumRecentFiles)
+            break;
+        const bool isCurrent = current && current->filePath() == path;
+        if (!isCurrent && QFileInfo::exists(path))
+            context.recentFiles.append(describeRecentFile(tabs, path, relative(path)));
+    }
     for (const QString &path : tabs.unsavedTexts().keys())
         context.unsavedFiles.append(relative(path));
     context.unsavedFiles.sort();
@@ -139,6 +163,7 @@ QJsonObject EditorContext::toJson() const
                         {QLatin1String("severity"), problem.error ? QLatin1String("error") : QLatin1String("warning")},
                         {QLatin1String("message"), problem.message}});
     json.insert(QLatin1String("problems"), problemList);
+    json.insert(QLatin1String("recentFiles"), QJsonArray::fromStringList(recentFiles));
     json.insert(QLatin1String("unsavedFiles"), QJsonArray::fromStringList(unsavedFiles));
     return json;
 }

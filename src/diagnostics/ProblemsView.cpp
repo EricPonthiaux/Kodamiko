@@ -3,6 +3,7 @@
 #include "ProblemsView.h"
 
 #include "ProblemStore.h"
+#include "ui/ContextMenus.h"
 #include "ui/FileIcons.h"
 #include "ui/TreeColumnFit.h"
 #include "ui/ViewHeader.h"
@@ -11,6 +12,7 @@
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMenu>
 #include <QPainter>
 #include <QScrollBar>
 #include <QStackedWidget>
@@ -197,6 +199,8 @@ ProblemsView::ProblemsView(ProblemStore *problems, QWidget *parent)
     columnFit_ = new TreeColumnFit(tree_);
     connect(tree_, &QTreeWidget::itemClicked, this, &ProblemsView::activate);
     connect(tree_, &QTreeWidget::itemActivated, this, &ProblemsView::activate);
+    tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(tree_, &QWidget::customContextMenuRequested, this, &ProblemsView::showContextMenu);
     connect(tree_, &QTreeWidget::itemCollapsed, this,
             [this](QTreeWidgetItem *item) { collapsedFiles_.insert(item->data(0, pathRole).toString()); });
     connect(tree_, &QTreeWidget::itemExpanded, this,
@@ -218,6 +222,35 @@ ProblemsView::ProblemsView(ProblemStore *problems, QWidget *parent)
     connect(&refreshTimer_, &QTimer::timeout, this, &ProblemsView::refresh);
     connect(problems_, &ProblemStore::changed, this, &ProblemsView::scheduleRefresh);
     refresh();
+}
+
+Problems ProblemsView::selectedProblems() const
+{
+    const QTreeWidgetItem *current = tree_->currentItem();
+    if (!current)
+        return {};
+    const Problems problems = problems_->problems(current->data(0, pathRole).toString());
+    const bool isFile = current->parent() == nullptr;
+    if (isFile)
+        return problems;
+    const Selection selection = selectionOf(current);
+    const auto selected = std::ranges::find_if(problems, [&selection](const Problem &problem) {
+        return selection.isProblem(problem.path, problem.line, problemToolTip(problem));
+    });
+    if (selected == problems.end())
+        return {};
+    return {*selected};
+}
+
+void ProblemsView::showContextMenu(const QPoint &position)
+{
+    QTreeWidgetItem *item = tree_->itemAt(position);
+    if (!item || contextActions_.isEmpty())
+        return;
+    tree_->setCurrentItem(item);
+    QMenu menu(tree_);
+    menu.addActions(contextActions_);
+    ContextMenus::exec(menu, *tree_, tree_->viewport()->mapToGlobal(position));
 }
 
 void ProblemsView::setProjectFolder(const QString &folder)

@@ -31,6 +31,7 @@ class LspClient;
 class OccurrenceStore;
 class ProblemStore;
 class RefactoringHistory;
+class QAction;
 class QJsonArray;
 class QPoint;
 
@@ -85,8 +86,15 @@ public:
     void showTypeHierarchy();
     void rename();
     // The server's code actions at the cursor: its quick fixes, made at
-    // once, and its refactorings, shown in the preview first.
+    // once, and its refactorings, shown in the preview first. Then the
+    // problem fix action, when the cursor's or the selection's lines show
+    // a problem.
     void showQuickFixes();
+
+    // Offered after the server's quick fixes on a line with a problem
+    // (asking the agent to fix it). Not owned; null for none.
+    void setProblemFixAction(QAction *action) { problemFixAction_ = action; }
+
     // The class at the cursor (C++, Java) in a file of its own, its
     // members' definitions too, after a preview.
     void moveClassToOwnFile();
@@ -255,6 +263,9 @@ private:
     // Offers the server's `codeActions` in a menu, and carries out the
     // chosen one.
     void chooseQuickFix(EditorWidget *editor, LspClient *server, const QJsonArray &codeActions);
+    // The problem fix action when the selection's lines in `editor` show a
+    // problem; null otherwise.
+    QAction *problemFixFor(const EditorWidget *editor) const;
     // A server's code action: its edit (after a preview for a
     // refactoring), then its command.
     void applyCodeAction(LspClient *server, const QJsonObject &action);
@@ -286,4 +297,5 @@ private:
     std::unique_ptr<CodeColorizer> colorizer_;
     int hoverGeneration_ = 0; // answers for an older position are dropped
     int signatureGeneration_ = 0;
+    QAction *problemFixAction_ = nullptr;
 };

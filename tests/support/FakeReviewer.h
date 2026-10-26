@@ -76,6 +76,8 @@ public:
 
     QJsonObject blockReply(const QString &reason) const override { return claude_.blockReply(reason); }
 
+    QJsonObject editContextReply(const QString &context) const override { return claude_.editContextReply(context); }
+
 private:
     ClaudeCodeProvider claude_;
     QString answer_;
