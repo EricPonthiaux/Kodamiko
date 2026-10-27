@@ -14,6 +14,15 @@ enum class ChangeKind {
     Conflicted
 };
 
+// What the version on disk of a conflicted file holds, which tells how it
+// can be resolved.
+enum class ConflictContent {
+    None,      // not a conflict
+    Markers,   // text with conflict markers, resolved in an editor
+    NoMarkers, // text without markers (deleted on one side…), or no file
+    Binary,    // resolved by taking one side's version
+};
+
 // File changed between two states of the repository (last commit, index, disk).
 // Paths relative to the project root, "/" separators.
 struct FileChange {

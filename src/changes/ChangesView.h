@@ -5,6 +5,7 @@
 #include "agent/ReviewReport.h"
 #include "agent/ReviewSession.h"
 #include "git/FilePatch.h"
+#include "git/Integration.h"
 #include "git/RepositoryStatus.h"
 #include "ui/GripSplitter.h"
 #include "ui/Theme.h"
@@ -254,6 +255,18 @@ private:
     void openFileAt(int line);
     void showDiffMenu(const QPoint &position);
     void showListMenu(const QPoint &position);
+
+    // The conflicted files among `refs`, each once.
+    QList<FileRef> conflictedFiles(const QList<FileRef> &refs) const;
+    // Accept Current, Accept Incoming and Mark as Resolved for the
+    // conflicted files of `selection`, at the end of `menu`; nothing
+    // without one.
+    void addConflictActions(QMenu &menu, const QList<FileRef> &selection);
+    // Resolves the conflicted files by taking their version on `side`.
+    void acceptVersion(const QList<FileRef> &refs, Integration::ConflictSide side);
+    // Stages the conflicted files, which marks them resolved, unless one
+    // still has conflict markers on disk.
+    void markResolved(const QList<FileRef> &refs);
     // The review's bar, under the diff's header, hidden without a review.
     QWidget *createReviewArea();
     // The findings' grid, in `diffPane` over the diff, hidden.

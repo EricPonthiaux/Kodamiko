@@ -2,6 +2,7 @@
 
 #include "agent/AgentMergeQueue.h"
 #include "git/Branches.h"
+#include "git/ConflictMarkers.h"
 #include "git/FilePatch.h"
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
@@ -204,6 +205,33 @@ private slots:
         QVERIFY(find(result.unstaged, "data.csv")->isTooLarge);
         QVERIFY(!find(result.unstaged, "small.txt")->isTooLarge);
         QVERIFY(find(result.unstaged, "small.txt")->patch.contains("+s"));
+    }
+
+    void statusTellsWhatAConflictedFileHolds()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"text.txt", "a\n"}, {"logo.bin", QByteArray("\x89PNG\0base", 9)}, {"gone.txt", "a\n"}});
+        git(dir, {"switch", "-qc", "other"});
+        write(dir, "text.txt", "other\n");
+        write(dir, "logo.bin", QByteArray("\x89PNG\0other", 10));
+        git(dir, {"rm", "-q", "gone.txt"});
+        git(dir, {"commit", "-qam", "other"});
+        git(dir, {"switch", "-q", "main"});
+        write(dir, "text.txt", "main\n");
+        write(dir, "logo.bin", QByteArray("\x89PNG\0main", 9));
+        write(dir, "gone.txt", "main\n");
+        git(dir, {"commit", "-qam", "main"});
+        QVERIFY_THROWS_EXCEPTION(GitError, git(dir, {"merge", "other"}));
+
+        const RepositoryStatus result = status(dir);
+
+        const auto conflictOf = [&result](const QString &path) {
+            const FileDiff *diff = find(result.unstaged, path);
+            return diff ? diff->conflict : ConflictContent::None;
+        };
+        QCOMPARE(conflictOf("text.txt"), ConflictContent::Markers);
+        QCOMPARE(conflictOf("logo.bin"), ConflictContent::Binary);
+        QCOMPARE(conflictOf("gone.txt"), ConflictContent::NoMarkers);
     }
 
     void statusOfASubfolderUsesRelativePaths()
@@ -1226,6 +1254,77 @@ private slots:
                               "Please commit your changes or stash them before you merge.\nAborting";
 
         QCOMPARE(Worktrees::blockingFiles(repository, error), QStringList({"/repo/a.txt", "/repo/src/b.cpp"}));
+    }
+
+    void findsTheSidesOfAConflict()
+    {
+        const QByteArray text = "a\n<<<<<<< HEAD\nmine\n=======\ntheirs\nmore\n>>>>>>> other\nz\n";
+
+        const QList<ConflictMarkers::Conflict> conflicts = ConflictMarkers::find(text);
+
+        QCOMPARE(conflicts.size(), 1);
+        const ConflictMarkers::Conflict &conflict = conflicts.first();
+        QCOMPARE(conflict.startLine, 1);
+        QCOMPARE(conflict.separatorLine, 3);
+        QCOMPARE(conflict.endLine, 6);
+        QVERIFY(!conflict.baseLine);
+        QCOMPARE(conflict.currentLabel, QString("HEAD"));
+        QCOMPARE(conflict.incomingLabel, QString("other"));
+        const auto bytes = [&text](ConflictMarkers::Section section) {
+            return text.sliced(section.start, section.end - section.start);
+        };
+        QCOMPARE(bytes(conflict.current), QByteArray("mine\n"));
+        QCOMPARE(bytes(conflict.incoming), QByteArray("theirs\nmore\n"));
+        QCOMPARE(bytes(conflict.span), text.sliced(2, text.size() - 4));
+    }
+
+    void findsTheBaseOfADiff3ConflictWithWindowsLineEndings()
+    {
+        const QByteArray text = "<<<<<<< HEAD\r\nmine\r\n||||||| base\r\nold\r\n=======\r\ntheirs\r\n>>>>>>> other\r\n";
+
+        const QList<ConflictMarkers::Conflict> conflicts = ConflictMarkers::find(text);
+
+        QCOMPARE(conflicts.size(), 1);
+        QCOMPARE(conflicts.first().baseLine, std::optional(2));
+        QCOMPARE(conflicts.first().incomingLabel, QString("other"));
+        const ConflictMarkers::Section current = conflicts.first().current;
+        QCOMPARE(text.sliced(current.start, current.end - current.start), QByteArray("mine\r\n"));
+    }
+
+    void ignoresMarkersOutOfSequence()
+    {
+        // A Markdown heading's underline, an unclosed conflict, an end
+        // marker alone, a longer run of the marker's character.
+        const QByteArray text = "Title\n=======\n>>>>>>> x\n<<<<<<<< no\n<<<<<<< HEAD\nmine\n=======\n";
+
+        QVERIFY(ConflictMarkers::find(text).isEmpty());
+    }
+
+    void startsAgainAtAStartMarkerInsideAConflict()
+    {
+        const QByteArray text = "<<<<<<< a\nx\n<<<<<<< b\ny\n=======\nz\n>>>>>>> c\n";
+
+        const QList<ConflictMarkers::Conflict> conflicts = ConflictMarkers::find(text);
+
+        QCOMPARE(conflicts.size(), 1);
+        QCOMPARE(conflicts.first().startLine, 2);
+        QCOMPARE(conflicts.first().currentLabel, QString("b"));
+    }
+
+    void resolvesAConflictByKeepingOneSideOrBoth()
+    {
+        const QByteArray text = "<<<<<<< HEAD\nmine\n||||||| base\nold\n=======\ntheirs\n>>>>>>> other\nend\n";
+        const ConflictMarkers::Conflict conflict = ConflictMarkers::find(text).first();
+        const auto resolved = [&](ConflictMarkers::Resolution resolution) {
+            const ConflictMarkers::Replacement replacement = ConflictMarkers::resolve(text, conflict, resolution);
+            QByteArray result = text;
+            return result.replace(replacement.span.start, replacement.span.end - replacement.span.start,
+                                  replacement.text);
+        };
+
+        QCOMPARE(resolved(ConflictMarkers::Resolution::Current), QByteArray("mine\nend\n"));
+        QCOMPARE(resolved(ConflictMarkers::Resolution::Incoming), QByteArray("theirs\nend\n"));
+        QCOMPARE(resolved(ConflictMarkers::Resolution::Both), QByteArray("mine\ntheirs\nend\n"));
     }
 
 private:

@@ -427,6 +427,44 @@ private slots:
         QCOMPARE(git(project, {"rev-list", "--merges", "--count", "HEAD"}).trimmed(), QByteArray("1"));
     }
 
+    void acceptVersionResolvesTheConflictWithOneSide()
+    {
+        const QTemporaryDir project;
+        git(project, {"init", "-q", "-b", "main"});
+        commit(project, "a.txt", "a\n", "init");
+        git(project, {"switch", "-qc", "other"});
+        commit(project, "a.txt", "other\n", "other");
+        git(project, {"switch", "-q", "main"});
+        commit(project, "a.txt", "main\n", "main");
+        QVERIFY_THROWS_EXCEPTION(GitError, Integration::merge(info(project), "other"));
+
+        Integration::acceptVersion(info(project), {"a.txt"}, Integration::ConflictSide::Incoming);
+
+        QCOMPARE(read(project, "a.txt"), QByteArray("other\n"));
+        QVERIFY(git(project, {"ls-files", "-u"}).isEmpty()); // resolved in the index
+        QCOMPARE(Snapshots::list(project.path()).size(), 1);
+        Integration::continueOperation(info(project));
+        QVERIFY(info(project).operation.isEmpty());
+    }
+
+    void acceptVersionDeletesAFileThatSideDeleted()
+    {
+        const QTemporaryDir project;
+        git(project, {"init", "-q", "-b", "main"});
+        commit(project, "a.txt", "a\n", "init");
+        git(project, {"switch", "-qc", "other"});
+        git(project, {"rm", "-q", "a.txt"});
+        git(project, {"commit", "-qm", "delete"});
+        git(project, {"switch", "-q", "main"});
+        commit(project, "a.txt", "main\n", "main");
+        QVERIFY_THROWS_EXCEPTION(GitError, Integration::merge(info(project), "other"));
+
+        Integration::acceptVersion(info(project), {"a.txt"}, Integration::ConflictSide::Incoming);
+
+        QVERIFY(!QFile::exists(project.filePath("a.txt")));
+        QVERIFY(git(project, {"ls-files", "-u"}).isEmpty());
+    }
+
     void mergeAndRebaseWithoutConflicts()
     {
         const QTemporaryDir project;

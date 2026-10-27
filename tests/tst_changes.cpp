@@ -159,6 +159,22 @@ QPushButton *buttonWithText(const QWidget *parent, const QString &text)
 // A line added after line 29 of 49: line 30 of 50.
 const QByteArray oneAddedLine = "@@ -27,6 +27,7 @@\n n27\n n28\n n29\n+n30\n n31\n n32\n n33\n";
 
+// A merge of "other" into "main" stopped on a conflict in a.txt.
+void stopMergeOnConflict(const QTemporaryDir &project)
+{
+    write(project, "a.txt", "a\n");
+    Git::run(project.path(), {"init", "-q", "-b", "main"});
+    Git::run(project.path(), {"add", "-A"});
+    Git::run(project.path(), {"commit", "-qm", "init"});
+    Git::run(project.path(), {"switch", "-qc", "other"});
+    write(project, "a.txt", "other\n");
+    Git::run(project.path(), {"commit", "-qam", "other"});
+    Git::run(project.path(), {"switch", "-q", "main"});
+    write(project, "a.txt", "main\n");
+    Git::run(project.path(), {"commit", "-qam", "main"});
+    QVERIFY_THROWS_EXCEPTION(GitError, Git::run(project.path(), {"merge", "other"}));
+}
+
 } // namespace
 
 class TestChanges : public QObject {
@@ -1706,17 +1722,7 @@ private slots:
     void operationBarDuringAMerge()
     {
         const QTemporaryDir project;
-        write(project, "a.txt", "a\n");
-        Git::run(project.path(), {"init", "-q", "-b", "main"});
-        Git::run(project.path(), {"add", "-A"});
-        Git::run(project.path(), {"commit", "-qm", "init"});
-        Git::run(project.path(), {"switch", "-qc", "other"});
-        write(project, "a.txt", "other\n");
-        Git::run(project.path(), {"commit", "-qam", "other"});
-        Git::run(project.path(), {"switch", "-q", "main"});
-        write(project, "a.txt", "main\n");
-        Git::run(project.path(), {"commit", "-qam", "main"});
-        QVERIFY_THROWS_EXCEPTION(GitError, Git::run(project.path(), {"merge", "other"}));
+        stopMergeOnConflict(project);
 
         GitCommands commands;
         ChangesView view(Theme::duet(), &commands);
@@ -1743,6 +1749,26 @@ private slots:
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 3);
         QVERIFY(!view.operationBar()->isVisible());
+    }
+
+    void operationBarKeepsTheHeightOfItsText()
+    {
+        const QTemporaryDir project;
+        stopMergeOnConflict(project);
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        view.resize(1200, 900);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        QCoreApplication::processEvents();
+
+        // The list and the diff take the height, not the bar.
+        QVERIFY2(view.operationBar()->height() < 2 * view.operationBar()->sizeHint().height(),
+                 qPrintable(QString::number(view.operationBar()->height())));
     }
 
     void generateAsksTheClaudeSessionForTheMessage()

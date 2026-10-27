@@ -11,6 +11,7 @@
 #include "agent/ReviewSession.h"
 #include "agent/mcp/McpRegistry.h"
 #include "agent/vendor/claude/CodeRequest.h"
+#include "editor/MergeConflicts.h"
 #include "navigation/RecentFiles.h"
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectWindowServer.h"
@@ -451,6 +452,8 @@ private:
     // Next or previous change mark, or the one at the cursor rolled back.
     void goToChange(bool forward);
     void rollbackChange();
+    // The next or previous merge conflict of the current file.
+    void goToConflict(MergeConflicts::Direction direction);
     // Alt+F1: the current file in the Files tree.
     void selectOpenedFile();
     // File tree commands.

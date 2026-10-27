@@ -19,6 +19,7 @@ class QAction;
 class QPainter;
 
 class ChangeGutter;
+class MergeConflicts;
 class SymbolOccurrences;
 class ISyntaxHighlighter;
 
@@ -107,7 +108,8 @@ public:
     void setFileActions(const QList<QAction *> &actions) { fileActions_ = actions; }
 
     // The context menu: QScintilla's without Undo and Redo, with the file
-    // actions on top.
+    // actions on top, and above them, inside a merge conflict, the ways to
+    // resolve it.
     std::unique_ptr<QMenu> createContextMenu();
 
     const EditorOptions &options() const { return options_; }
@@ -146,6 +148,9 @@ public:
     // The occurrences of the name at the cursor, highlighted.
     SymbolOccurrences *symbolOccurrences() const { return symbolOccurrences_; }
 
+    // The conflicts a merge left in the text, and their resolution.
+    MergeConflicts *mergeConflicts() const { return mergeConflicts_; }
+
     void applyTheme(const Theme &theme);
 
     const Theme &theme() const { return theme_; }
@@ -168,6 +173,9 @@ protected:
 
 private:
     void configureEditing();
+    // Accept Current, Incoming or Both for the conflict at the cursor, on
+    // top of `menu`; nothing outside a conflict.
+    void addConflictActions(QMenu &menu);
     // Releases the reserved keys from QScintilla's commands, which keep
     // their other keys.
     void releaseReservedKeys();
@@ -200,6 +208,7 @@ private:
     std::unique_ptr<ISyntaxHighlighter> highlighter_;
     ChangeGutter *changeGutter_;
     SymbolOccurrences *symbolOccurrences_;
+    MergeConflicts *mergeConflicts_;
     EditorOptions options_;
     Diagnostics diagnostics_;
     bool openFoldMarksShown_ = false;

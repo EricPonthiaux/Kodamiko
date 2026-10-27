@@ -81,8 +81,28 @@ DiffLine fileTitle(const DiffFile &file, int fileIndex)
     return title;
 }
 
+// How a conflicted file is resolved; empty for the other files.
+QString conflictNote(ConflictContent conflict)
+{
+    switch (conflict) {
+    case ConflictContent::None:
+        return {};
+    case ConflictContent::Markers:
+        return translate("In conflict: resolve it in the editor (F4), or accept a version from the list's menu");
+    case ConflictContent::NoMarkers:
+        return translate("In conflict, without conflict markers: accept a version from the list's menu, "
+                         "or edit the file and mark it as resolved");
+    case ConflictContent::Binary:
+        return translate("Binary file in conflict: accept the current or the incoming version from the list's "
+                         "menu");
+    }
+    return {};
+}
+
 QString noTextReason(const DiffFile &file)
 {
+    if (const QString note = conflictNote(file.conflict); !note.isEmpty())
+        return note;
     if (file.isTooLarge)
         return translate("File too large to show");
     const QList<QByteArray> &header = file.patch.header;

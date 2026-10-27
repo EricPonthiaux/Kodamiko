@@ -483,6 +483,12 @@ void MainWindow::createNavigateMenu()
     navigate->addAction(tr("&Previous Change"), QKeySequence(tr("Ctrl+Alt+Shift+Up")), this,
                         [this] { goToChange(false); });
     navigate->addAction(tr("R&ollback Lines"), QKeySequence(tr("Ctrl+Alt+Z")), this, &MainWindow::rollbackChange);
+    navigate->addSeparator();
+    // F7, as IntelliJ's next difference.
+    navigate->addAction(tr("Next Conflict"), QKeySequence(tr("F7")), this,
+                        [this] { goToConflict(MergeConflicts::Direction::Next); });
+    navigate->addAction(tr("Previous Conflict"), QKeySequence(tr("Shift+F7")), this,
+                        [this] { goToConflict(MergeConflicts::Direction::Previous); });
 }
 
 QAction *MainWindow::createHelpMenu()

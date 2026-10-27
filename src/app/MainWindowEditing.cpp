@@ -12,6 +12,7 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/FindBar.h"
+#include "editor/MergeConflicts.h"
 #include "lsp/LanguageServers.h"
 #include "navigation/GoToPopup.h"
 #include "search/FindInFilesPopup.h"
@@ -139,6 +140,16 @@ void MainWindow::goToChange(bool forward)
     ChangeGutter *gutter = editor->changeGutter();
     if (!(forward ? gutter->goToNext() : gutter->goToPrevious()))
         showStatus(gutter->hasBase() ? tr("No changes in this file") : tr("This file is not tracked by git"));
+}
+
+void MainWindow::goToConflict(MergeConflicts::Direction direction)
+{
+    EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
+    if (!editor)
+        return;
+    editorTabs_->revealEditor(editor);
+    if (!editor->mergeConflicts()->goTo(direction))
+        showStatus(tr("No merge conflicts in this file"));
 }
 
 void MainWindow::rollbackChange()

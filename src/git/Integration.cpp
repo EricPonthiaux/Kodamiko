@@ -3,10 +3,12 @@
 #include "Integration.h"
 
 #include "FileChange.h"
+#include "GitOperations.h"
 #include "GitProcess.h"
 #include "Snapshots.h"
 
 #include <QObject>
+#include <QSet>
 
 namespace Integration {
 namespace {
@@ -49,6 +51,37 @@ QString integrate(const RepositoryInfo &repository, const QStringList &arguments
     }
 }
 
+// The index stage of each side of a conflict (1 is the common ancestor).
+int stageOf(ConflictSide side)
+{
+    switch (side) {
+    case ConflictSide::Current:
+        return 2;
+    case ConflictSide::Incoming:
+        return 3;
+    }
+    return 2;
+}
+
+// The conflicted files among `paths` that have a version at `stage`: the
+// others were deleted on that side.
+QSet<QString> pathsWithStage(const RepositoryInfo &repository, const QStringList &paths, int stage)
+{
+    // "<mode> <object> <stage>\t<path>" for each version of a conflicted file.
+    const QStringList entries =
+        Git::splitNul(Git::run(repository.workDir, QStringList{QStringLiteral("ls-files"), QStringLiteral("-u"),
+                                                               QStringLiteral("-z"), QStringLiteral("--")} +
+                                                       paths));
+    QSet<QString> result;
+    for (const QString &entry : entries) {
+        const qsizetype tab = entry.indexOf(QLatin1Char('\t'));
+        const bool isAtStage = tab > 0 && entry.at(tab - 1).digitValue() == stage;
+        if (isAtStage)
+            result.insert(entry.mid(tab + 1));
+    }
+    return result;
+}
+
 } // namespace
 
 QString merge(const RepositoryInfo &repository, const QString &branch)
@@ -78,6 +111,30 @@ void skipCommit(const RepositoryInfo &repository)
     if (!canSkip(repository.operation))
         throw GitError(QObject::tr("Only a rebase, cherry-pick or revert can skip a commit"));
     Git::run(repository.workDir, {commandOrThrow(repository), QStringLiteral("--skip")});
+}
+
+void acceptVersion(const RepositoryInfo &repository, const QStringList &paths, ConflictSide side)
+{
+    if (paths.isEmpty())
+        return;
+    const QString reason = side == ConflictSide::Current ? QObject::tr("Before accepting the current version")
+                                                         : QObject::tr("Before accepting the incoming version");
+    Snapshots::create(repository, reason, paths);
+    const QSet<QString> kept = pathsWithStage(repository, paths, stageOf(side));
+    QStringList checkedOut;
+    QStringList deleted;
+    for (const QString &path : paths)
+        (kept.contains(path) ? checkedOut : deleted).append(path);
+    if (!checkedOut.isEmpty()) {
+        const QString option = side == ConflictSide::Current ? QStringLiteral("--ours") : QStringLiteral("--theirs");
+        Git::run(repository.workDir,
+                 QStringList{QStringLiteral("checkout"), option, QStringLiteral("--")} + checkedOut);
+        GitOperations::stage(repository, checkedOut);
+    }
+    if (!deleted.isEmpty())
+        Git::run(repository.workDir,
+                 QStringList{QStringLiteral("rm"), QStringLiteral("-q"), QStringLiteral("-f"), QStringLiteral("--")} +
+                     deleted);
 }
 
 bool canContinue(const QString &operation)

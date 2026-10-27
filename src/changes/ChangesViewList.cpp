@@ -340,6 +340,7 @@ void ChangesView::showListMenu(const QPoint &position)
     };
 
     QMenu menu;
+    addConflictActions(menu, selection);
     if (count(Section::Unstaged) > 0) {
         menu.addAction(tr("Stage"), this, [this, selection] { stageFiles(selection); })->setEnabled(!busy);
         menu.addAction(tr("Discard Changes…"), this, [this, selection] { discardFiles(selection); })->setEnabled(!busy);

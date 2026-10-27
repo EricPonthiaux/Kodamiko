@@ -2,6 +2,7 @@
 
 #include "RepositoryStatus.h"
 
+#include "ConflictMarkers.h"
 #include "LibGit2.h"
 
 #include <QDir>
@@ -161,6 +162,20 @@ QByteArray newTextOf(git_repository *repository, const git_diff_delta *delta)
     return file.readAll();
 }
 
+// What the version on disk of `delta`'s conflicted file holds. Binary as
+// git tells it: a null byte among the first 8000.
+ConflictContent conflictContentOf(const git_repository *repository, const git_diff_delta *delta)
+{
+    constexpr qsizetype binaryCheckBytes = 8000;
+    QFile file(QString::fromUtf8(git_repository_workdir(repository)) + QString::fromUtf8(delta->new_file.path));
+    if (!file.open(QIODevice::ReadOnly))
+        return ConflictContent::NoMarkers;
+    const QByteArray content = file.readAll();
+    if (content.first(std::min(content.size(), binaryCheckBytes)).contains('\0'))
+        return ConflictContent::Binary;
+    return ConflictMarkers::find(content).isEmpty() ? ConflictContent::NoMarkers : ConflictContent::Markers;
+}
+
 } // namespace
 
 namespace libgit2 {
@@ -205,7 +220,10 @@ QList<FileDiff> fileDiffs(git_diff *diff, const QString &prefix)
         const git_diff_delta *patched = git_patch_get_delta(patch);
         const QByteArray newText =
             hasUnchangedLines(patched) ? newTextOf(git_patch_owner(patch), patched) : QByteArray();
-        result.append({fileChangeOf(delta, prefix), text, false, newText});
+        const ConflictContent conflict = delta->status == GIT_DELTA_CONFLICTED
+                                             ? conflictContentOf(git_patch_owner(patch), delta)
+                                             : ConflictContent::None;
+        result.append({fileChangeOf(delta, prefix), text, false, newText, conflict});
     }
     return result;
 }

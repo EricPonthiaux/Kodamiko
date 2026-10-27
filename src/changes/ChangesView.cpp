@@ -234,7 +234,8 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     layout->setSpacing(0);
     layout->addWidget(titleBar);
     layout->addWidget(operationArea_);
-    layout->addLayout(columns);
+    // The columns take the height: the bar keeps that of its text.
+    layout->addLayout(columns, 1);
 
     connect(commands_, &GitCommands::busyChanged, this, [this](bool busy) {
         updateActions();
@@ -399,7 +400,7 @@ void ChangesView::showDiff()
             stagedFiles.insert(int(shown.size()));
         shownPatches_.append(FilePatch::parse(diff.patch));
         shown.append({diff.change.path, status.arg(changeStatusText(diff.change)), shownPatches_.last(),
-                      diff.isTooLarge, diff.newText});
+                      diff.isTooLarge, diff.newText, diff.conflict});
     }
     hunkActions_->setStagedFiles(stagedFiles);
     // One file selected: the pager and Alt+Down go through the list's files.
@@ -515,9 +516,10 @@ void ChangesView::showOperation()
     if (!Integration::canContinue(operation)) {
         operationText_->setText(tr("%1 in progress: finish it from a terminal.").arg(name));
     } else if (conflicts > 0) {
-        operationText_->setText((conflicts == 1 ? tr("%1 in progress · 1 conflict.").arg(name)
-                                                : tr("%1 in progress · %2 conflicts.").arg(name).arg(conflicts)) +
-                                tr(" Edit the files, stage them once resolved, then continue."));
+        operationText_->setText(
+            (conflicts == 1 ? tr("%1 in progress · 1 conflict.").arg(name)
+                            : tr("%1 in progress · %2 conflicts.").arg(name).arg(conflicts)) +
+            tr(" Resolve them in the editor, or accept a version from the list's menu, then continue."));
     } else {
         operationText_->setText(tr("%1 in progress · no conflicts left. Continue to commit the result.").arg(name));
     }

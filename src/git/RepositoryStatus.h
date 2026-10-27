@@ -62,6 +62,9 @@ struct FileDiff {
     // around the blocks: only for a text file modified or renamed, where the
     // diff holds a part of it.
     QByteArray newText;
+    // For a conflicted file, which has no patch: what its version on disk
+    // holds.
+    ConflictContent conflict = ConflictContent::None;
 
     bool operator==(const FileDiff &) const = default;
 };

@@ -4,6 +4,7 @@
 
 #include "ChangeGutter.h"
 #include "CodeFormatter.h"
+#include "MergeConflicts.h"
 #include "SymbolOccurrences.h"
 #include "syntax/HighlighterFactory.h"
 #include "syntax/ISyntaxHighlighter.h"
@@ -201,6 +202,7 @@ EditorWidget::EditorWidget(const Theme &theme, QWidget *parent)
     , theme_(theme)
     , changeGutter_(new ChangeGutter(this))
     , symbolOccurrences_(new SymbolOccurrences(this, theme))
+    , mergeConflicts_(new MergeConflicts(this, theme))
 {
     configureEditing();
     installHighlighter(LanguageRegistry::plainText);
@@ -413,7 +415,27 @@ std::unique_ptr<QMenu> EditorWidget::createContextMenu()
         menu->insertActions(first, fileActions_);
         menu->insertSeparator(first);
     }
+    addConflictActions(*menu);
     return menu;
+}
+
+void EditorWidget::addConflictActions(QMenu &menu)
+{
+    using ConflictMarkers::Resolution;
+    mergeConflicts_->refreshNow();
+    const std::optional<int> conflict = mergeConflicts_->conflictAt(static_cast<int>(SendScintilla(SCI_GETCURRENTPOS)));
+    if (!conflict || isReadOnly())
+        return;
+    QAction *first = menu.actions().value(0);
+    for (const auto &[text, resolution] : {std::pair{tr("Accept Current Change"), Resolution::Current},
+                                           std::pair{tr("Accept Incoming Change"), Resolution::Incoming},
+                                           std::pair{tr("Accept Both Changes"), Resolution::Both}}) {
+        auto *action = new QAction(text, &menu);
+        connect(action, &QAction::triggered, this,
+                [this, index = *conflict, resolution] { mergeConflicts_->resolve(index, resolution); });
+        menu.insertAction(first, action);
+    }
+    menu.insertSeparator(first);
 }
 
 void EditorWidget::removeUndoRedo(QMenu &menu)
@@ -708,6 +730,7 @@ void EditorWidget::applyTheme(const Theme &theme)
     highlighter_->applyTheme(theme);
     changeGutter_->applyTheme(theme);
     symbolOccurrences_->applyTheme(theme);
+    mergeConflicts_->applyTheme(theme);
 
     // After the highlighter: a QScintilla lexer resets these colors.
     setCaretForegroundColor(theme.caret);

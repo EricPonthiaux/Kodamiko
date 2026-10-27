@@ -5,6 +5,7 @@
 #include "RepositoryStatus.h"
 
 #include <QString>
+#include <QStringList>
 
 // Bringing another branch's commits into the current branch (merge,
 // rebase), and finishing or giving up the operation in progress when it
@@ -28,6 +29,18 @@ QString rebase(const RepositoryInfo &repository, const QString &onto);
 void continueOperation(const RepositoryInfo &repository);
 void abortOperation(const RepositoryInfo &repository);
 void skipCommit(const RepositoryInfo &repository);
+
+// A side of the conflicts of the operation in progress (see
+// ConflictMarkers): the branch checked out, or what is brought into it.
+enum class ConflictSide {
+    Current,
+    Incoming,
+};
+
+// Resolves the conflicted files `paths` (repository paths) by taking their
+// version on `side` whole, and marks them resolved in the index. A file that
+// side deleted is deleted. A snapshot of the files is taken first.
+void acceptVersion(const RepositoryInfo &repository, const QStringList &paths, ConflictSide side);
 
 // Whether `operation` can be continued, aborted and skipped from the editor.
 bool canContinue(const QString &operation);

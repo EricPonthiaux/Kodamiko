@@ -3,6 +3,7 @@
 #pragma once
 
 #include "WordDiff.h"
+#include "git/FileChange.h"
 #include "git/FilePatch.h"
 
 #include <QHash>
@@ -21,6 +22,8 @@ struct DiffFile {
     // The new version, for the unchanged lines around the blocks (see
     // FileDiff::newText); without it, they stay hidden.
     QByteArray newText;
+    // In conflict: the note in place of the empty diff says how to resolve it.
+    ConflictContent conflict = ConflictContent::None;
 };
 
 enum class DiffLineKind {

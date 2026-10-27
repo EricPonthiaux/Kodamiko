@@ -4,12 +4,14 @@
 #include "editor/ClangFormatStyle.h"
 #include "editor/CodeColorizer.h"
 #include "editor/CodeFormatter.h"
+#include "editor/ConflictActionBar.h"
 #include "editor/EditorStatus.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 #include "editor/FileWatcher.h"
 #include "editor/FindBar.h"
 #include "editor/MarkdownHtml.h"
+#include "editor/MergeConflicts.h"
 #include "editor/PreviewPage.h"
 #include "editor/PreviewSite.h"
 #include "editor/ScrollBarMarks.h"
@@ -34,6 +36,8 @@
 #include <QWheelEvent>
 #include <Qsci/qscicommandset.h>
 #include <QtTest>
+
+#include <algorithm>
 
 namespace {
 
@@ -347,9 +351,9 @@ private slots:
         // Whole words, the comment's too, but not "counter".
         using Range = SymbolOccurrences::Range;
         QCOMPARE(occurrences->occurrences(), (QList<Range>{{4, 9}, {15, 20}, {30, 35}}));
-        const auto *marks = editor.verticalScrollBar()->findChild<ScrollBarMarks *>();
-        QVERIFY(marks);
-        QCOMPARE(marks->marks().size(), 3);
+        // Beside the merge conflicts' marks, empty here.
+        const QList<ScrollBarMarks *> marks = editor.verticalScrollBar()->findChildren<ScrollBarMarks *>();
+        QVERIFY(std::ranges::any_of(marks, [](const ScrollBarMarks *each) { return each->marks().size() == 3; }));
     }
 
     void clearsTheOccurrencesOffAName()
@@ -954,6 +958,81 @@ private slots:
         QVERIFY(visible(1));
         editor.foldBlock(true);
         QVERIFY(visible(1));
+    }
+
+    void resolvesAConflictFromItsLinksInOneUndoableEdit()
+    {
+        EditorWidget editor(Theme::duet());
+        const QString text = "a\n<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\nz\n";
+        editor.setText(text);
+        MergeConflicts *conflicts = editor.mergeConflicts();
+        conflicts->refreshNow();
+        QCOMPARE(conflicts->conflicts().size(), 1);
+        QVERIFY(conflicts->actionBar(0));
+
+        conflicts->actionBar(0)->button(ConflictMarkers::Resolution::Incoming)->click();
+
+        QCOMPARE(editor.text(), QString("a\ntheirs\nz\n"));
+        QVERIFY(conflicts->conflicts().isEmpty());
+        editor.undo();
+        QCOMPARE(editor.text(), text);
+    }
+
+    void contextMenuResolvesTheConflictAtTheCursor()
+    {
+        EditorWidget editor(Theme::duet());
+        editor.setText("<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\n");
+        editor.setCursorPosition(1, 1);
+
+        const std::unique_ptr<QMenu> menu = editor.createContextMenu();
+        QAction *both = menu->actions().value(2);
+        QVERIFY(both);
+        QCOMPARE(both->text(), QString("Accept Both Changes"));
+        both->trigger();
+
+        QCOMPARE(editor.text(), QString("mine\ntheirs\n"));
+        editor.setCursorPosition(0, 0);
+        QCOMPARE(editor.createContextMenu()->actions().value(0)->text().contains("Accept"), false);
+    }
+
+    void goesFromConflictToConflictWrappingAround()
+    {
+        EditorWidget editor(Theme::duet());
+        const QString conflict = "<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\n";
+        editor.setText("a\n" + conflict + "b\n" + conflict + "c\n"); // conflicts at lines 1 and 7
+        MergeConflicts *conflicts = editor.mergeConflicts();
+        const auto cursorLine = [&editor] {
+            int line = 0;
+            int index = 0;
+            editor.getCursorPosition(&line, &index);
+            return line;
+        };
+        editor.setCursorPosition(0, 0);
+
+        QVERIFY(conflicts->goTo(MergeConflicts::Direction::Next));
+        QCOMPARE(cursorLine(), 1);
+        QVERIFY(conflicts->goTo(MergeConflicts::Direction::Next));
+        QCOMPARE(cursorLine(), 7);
+        QVERIFY(conflicts->goTo(MergeConflicts::Direction::Next));
+        QCOMPARE(cursorLine(), 1); // wrapped
+        QVERIFY(conflicts->goTo(MergeConflicts::Direction::Previous));
+        QCOMPARE(cursorLine(), 7); // wrapped back
+
+        editor.setText("no conflict\n");
+        QVERIFY(!conflicts->goTo(MergeConflicts::Direction::Next));
+    }
+
+    void readOnlyEditorShowsConflictsWithoutLinks()
+    {
+        EditorWidget editor(Theme::duet());
+        editor.setText("<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\n");
+        editor.setReadOnly(true);
+
+        editor.mergeConflicts()->refreshNow();
+
+        QCOMPARE(editor.mergeConflicts()->conflicts().size(), 1);
+        QVERIFY(!editor.mergeConflicts()->actionBar(0));
+        QVERIFY(editor.markersAtLine(1) != 0); // the current side's background
     }
 
     void menuShortcutsWinOverQScintilla()

@@ -85,6 +85,7 @@ add_library(duet_core STATIC
     changes/BranchesPopup.cpp
     changes/ChangeTree.cpp
     changes/ChangesView.cpp
+    changes/ChangesViewConflicts.cpp
     changes/ChangesViewDiff.cpp
     changes/ChangesViewList.cpp
     changes/ChangesViewReview.cpp
@@ -133,6 +134,7 @@ add_library(duet_core STATIC
     editor/CodeColorizer.cpp
     editor/ClangFormatStyle.cpp
     editor/CodeFormatter.cpp
+    editor/ConflictActionBar.cpp
     editor/EditorStatus.cpp
     editor/EditorTabs.cpp
     editor/EditorWidget.cpp
@@ -140,6 +142,7 @@ add_library(duet_core STATIC
     editor/FindBar.cpp
     editor/MarkdownHtml.cpp
     editor/MarkdownToolTip.cpp
+    editor/MergeConflicts.cpp
     editor/PreviewPage.cpp
     editor/PreviewSite.cpp
     editor/PreviewTab.cpp
@@ -149,6 +152,7 @@ add_library(duet_core STATIC
     git/Askpass.cpp
     git/Branches.cpp
     git/CommitLog.cpp
+    git/ConflictMarkers.cpp
     git/ContentMatcher.cpp
     git/CredentialCache.cpp
     git/FilePatch.cpp
