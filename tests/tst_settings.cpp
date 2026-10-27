@@ -53,7 +53,7 @@ private slots:
     {
         Preferences preferences;
         QCOMPARE(Preferences::load(), preferences); // the defaults
-        preferences.theme = QStringLiteral("duet-paper");
+        preferences.theme = QStringLiteral("duet-cocoa");
         preferences.codeFontSize = 14;
         preferences.interfaceFontSize = 12;
         preferences.treeFontSize = 15;
@@ -68,7 +68,7 @@ private slots:
         QCOMPARE(Preferences::load(), preferences);
         // The menu commands' keys.
         QCOMPARE(QSettings().value("claudeNotifications").toBool(), false);
-        QCOMPARE(QSettings().value("theme").toString(), QString("duet-paper"));
+        QCOMPARE(QSettings().value("theme").toString(), QString("duet-cocoa"));
     }
 
     void fontSizesHaveDefaults()
@@ -149,7 +149,7 @@ private slots:
     void oldDarkThemeSettingIsRead()
     {
         QSettings().setValue("darkTheme", false);
-        QCOMPARE(Preferences::load().theme, QString("duet-paper"));
+        QCOMPARE(Preferences::load().theme, QString("duet"));
     }
 
     void keymapListsMenuCommands()
@@ -297,7 +297,7 @@ private slots:
         animations->setChecked(true);
         QVERIFY(popup.preferences().animations);
         preferences.animations = true;
-        preferences.theme = "duet-paper";
+        preferences.theme = "duet-cocoa";
         popup.load(preferences, {}, {}); // reopened with other settings
         QCOMPARE(popup.preferences(), preferences);
     }

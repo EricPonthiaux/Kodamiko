@@ -175,6 +175,7 @@ Third-party components:
 | Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | embedded | Ubuntu Font Licence 1.0 |
 | Droid Sans Mono (in `third_party/fonts/`) | embedded | Apache 2.0 |
 | JetBrains Mono (in `third_party/fonts/`) | embedded | SIL Open Font License 1.1 |
+| Dracula, Nord, Night Owl, Palenight, Tokyo Night (VS Code themes) | their colors, moved to Material's palette, in `src/ui/MaterialThemes.cpp` | MIT |
 
 The versions of the downloaded components are pinned in
 `cmake/Dependencies.cmake`; those of the embedded files in

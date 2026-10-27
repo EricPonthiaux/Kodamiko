@@ -124,15 +124,15 @@ private slots:
     {
         QTest::addColumn<int>("width");
         QTest::addColumn<int>("fontSize");
-        QTest::addColumn<bool>("dark");
-        QTest::newRow("dark-11pt-480px") << 480 << 11 << true;
-        QTest::newRow("light-15pt-480px") << 480 << 15 << false;
-        for (bool dark : {true, false}) {
+        QTest::addColumn<QString>("themeName");
+        QTest::newRow("duet-11pt-480px") << 480 << 11 << QStringLiteral("duet");
+        QTest::newRow("duet-slate-15pt-480px") << 480 << 15 << QStringLiteral("duet-slate");
+        for (const QString &themeName : {QStringLiteral("duet"), QStringLiteral("duet-slate")}) {
             for (int fontSize : {11, 15, 22}) {
                 for (int width : {640, 800, 1024, 1440, 1920}) {
                     const QByteArray name =
-                        QStringLiteral("%1-%2pt-%3px").arg(dark ? "dark" : "light").arg(fontSize).arg(width).toUtf8();
-                    QTest::newRow(name.constData()) << width << fontSize << dark;
+                        QStringLiteral("%1-%2pt-%3px").arg(themeName).arg(fontSize).arg(width).toUtf8();
+                    QTest::newRow(name.constData()) << width << fontSize << themeName;
                 }
             }
         }
@@ -142,11 +142,11 @@ private slots:
     {
         QFETCH(int, width);
         QFETCH(int, fontSize);
-        QFETCH(bool, dark);
+        QFETCH(QString, themeName);
         QFont font = QApplication::font();
         font.setPointSize(fontSize);
         QApplication::setFont(font);
-        const Theme theme = dark ? Theme::duet() : Theme::named("duet-paper");
+        const Theme theme = Theme::named(themeName);
         ThemeStyle::apply(theme);
         Window window(theme);
         window.show(width);
