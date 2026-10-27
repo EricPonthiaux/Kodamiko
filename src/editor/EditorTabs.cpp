@@ -26,6 +26,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPointer>
+#include <QRhiWidget>
 #include <QTabBar>
 #include <QTimer>
 
@@ -96,6 +97,18 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     new HoverCloseButtons(tabBar());
     baseLine_ = new TabBarBaseLine(tabBar());
     baseLine_->setColor(theme_.line);
+    composeWithGpuFromTheStart();
+}
+
+void EditorTabs::composeWithGpuFromTheStart()
+{
+    // The first preview's web view switches its window from raster to GPU
+    // composition, which destroys and recreates the native window: the whole
+    // window disappears for a moment. A hidden RHI widget makes the window
+    // compose with the GPU from its creation, with the platform's default
+    // graphics API, the one Qt WebEngine uses (Direct3D 11 on Windows).
+    auto *gpuComposition = new QRhiWidget(this);
+    gpuComposition->hide();
 }
 
 void EditorTabs::paintEvent(QPaintEvent *event)
