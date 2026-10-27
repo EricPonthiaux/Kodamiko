@@ -17,7 +17,6 @@
 
 class ChangeMap;
 class CommitDelegate;
-class CommitHeader;
 class DiffFileStrip;
 class DiffHeaderBar;
 class DiffView;
@@ -28,16 +27,18 @@ class HistorySearchField;
 class QLabel;
 class QToolButton;
 class QTreeWidget;
+class QTreeWidgetItem;
 class ViewHeader;
 
 // "History" mode: commits of HEAD (those touching the open folder),
 // searchable (HistorySearchField): the commits read are filtered as the
 // query is typed; a search of their changes reads the history again. Two
-// panes: the commits, and the chosen commit, whole: its summary, author,
-// date, ID and message (CommitHeader), the strip of its files
-// (DiffFileStrip), and the diff of all of them against the first parent,
-// with nothing more to choose. The commits fold away into a thin bar at
-// the left edge; folded, the title bar names the chosen commit. A file's
+// panes: the commits, and the chosen commit's changes, whole: the strip of
+// its files (DiffFileStrip) and the diff of all of them against the first
+// parent, with nothing more to choose. A click on a commit also unfolds its
+// row to show its message, folding the one unfolded before; a second click
+// folds it. The commits fold away into a thin bar at the left edge; folded,
+// the title bar names the chosen commit. A file's
 // history can show its lines by age instead of the diff (Lines by Age,
 // FileLens), the chosen commit's lines lit. The repository is only read.
 class HistoryView : public QWidget {
@@ -77,6 +78,8 @@ signals:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    // The list resized: its unfolded message wraps again.
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     QWidget *createCommitListPane();
@@ -134,6 +137,10 @@ private:
     void headDays();
     void updateSummary();
     void onCommitSelectionChanged();
+    // Clicked: `item` unfolds, the others fold; unfolded already, it folds.
+    void toggleUnfolded(QTreeWidgetItem *item);
+    // Only `item` unfolded; nullptr: none.
+    void unfoldOnly(QTreeWidgetItem *item);
     void showCommit(const QString &id);
     void forgetCommit();
     QString diffPlaceholder() const;
@@ -181,6 +188,7 @@ private:
     int graphLanes_ = 0;    // of the list's graph; 0 without one
     QString detailsWanted_; // commit whose details are being read
     QString fileToKeep_;    // scrolled to again once the commit is read again
+    QString unfoldedId_;    // the commit whose row shows its message; empty: none
 
     // The diff's share of the view's width.
     double diffShare_ = 0.6;
@@ -194,7 +202,6 @@ private:
     QWidget *commitListPane_ = nullptr; // the commits under their header
     FoldedPane *foldedCommits_;
     GripSplitter *splitter_; // the commits, the commit
-    CommitHeader *commitHeader_ = nullptr;
     DiffHeaderBar *diffHeader_ = nullptr;
     DiffFileStrip *fileStrip_ = nullptr;
     DiffView *diff_ = nullptr;

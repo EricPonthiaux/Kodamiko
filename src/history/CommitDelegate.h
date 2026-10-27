@@ -19,7 +19,8 @@ struct GraphRow;
 // carries the day's heading above it ("Today", "Yesterday", "Thursday"),
 // the graph's lines running through it; a commit made with Claude (its
 // author, or a Co-Authored-By: Claude trailer) has Claude's mark before its
-// ID.
+// ID. An unfolded row (setUnfolded()) shows the message's body under its
+// two lines, the graph's lines running through it too.
 class CommitDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
@@ -30,6 +31,10 @@ public:
     static void setGraphRow(QTreeWidgetItem *item, const GraphRow &row);
     // The heading of the day `item` starts, above it; empty: none.
     static void setDayHeading(QTreeWidgetItem *item, const QString &heading);
+    // Unfolded, the row shows the commit's message under its two lines
+    // (its body, then the email and the full date). Folded at first.
+    static void setUnfolded(QTreeWidgetItem *item, bool unfolded);
+    static bool isUnfolded(const QTreeWidgetItem *item);
     // The commit's day, for setDayHeading().
     static QDate day(const QTreeWidgetItem *item);
     // The lanes of the graph column; 0 hides it.
@@ -77,6 +82,14 @@ private:
                                 const QStyleOptionViewItem &option,
                                 const QString &heading,
                                 QRect rect);
+    // The height of the summary's line and the details' line.
+    static int twoLinesHeight(const QFontMetrics &metrics);
+    // Where the text starts in a row, from its left: after the graph and the avatar.
+    int textLeft(const QModelIndex &index) const;
+    // An unfolded row's message, wrapped at `width`: its height.
+    static int messageHeight(const QStyleOptionViewItem &option, const QModelIndex &index, int width);
+    // The body, then the email and the full date, in `area`.
+    static void paintMessage(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index, QRect area);
     // The second line: author · time at the left, Claude's mark and the ID
     // at the right.
     static void paintDetails(QPainter *painter,

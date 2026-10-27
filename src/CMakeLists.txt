@@ -174,7 +174,6 @@ add_library(duet_core STATIC
     git/Stashes.cpp
     git/Worktrees.cpp
     history/CommitDelegate.cpp
-    history/CommitHeader.cpp
     history/CommitGraph.cpp
     history/CommitQuery.cpp
     history/CommitTrack.cpp

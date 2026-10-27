@@ -4,7 +4,6 @@
 
 #include "CommitDelegate.h"
 #include "CommitGraph.h"
-#include "CommitHeader.h"
 #include "FileLens.h"
 #include "HistorySearchField.h"
 #include "changes/ChangeMap.h"
@@ -145,6 +144,10 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     // The selection, not the current item: the view makes an item current
     // when it takes focus, without the user having chosen anything.
     connect(commits_, &QTreeWidget::itemSelectionChanged, this, &HistoryView::onCommitSelectionChanged);
+    // A click unfolds the commit's message in its row, a second folds it.
+    connect(commits_, &QTreeWidget::itemClicked, this, &HistoryView::toggleUnfolded);
+    // Narrower or wider, the unfolded message wraps again.
+    commits_->viewport()->installEventFilter(this);
     connect(commits_, &QTreeWidget::customContextMenuRequested, this, &HistoryView::showCommitMenu);
     // Scrolled down, or rows hidden by the filter: the end may come into view.
     connect(commits_->verticalScrollBar(), &QScrollBar::valueChanged, this, &HistoryView::loadMoreIfAtEnd);
@@ -190,14 +193,12 @@ QWidget *HistoryView::createCommitListPane()
     return pane;
 }
 
-// The chosen commit, whole: its header, then the diff's header, the strip of
-// its files and the diff of all of them, the change map beside it. The lens
-// takes the place of all but the commit's header.
+// The chosen commit's changes: the diff's header, the strip of its files and
+// the diff of all of them, the change map beside it; or the lens.
 QWidget *HistoryView::createDiffPane()
 {
     auto *pane = new QFrame(this);
     pane->setObjectName(QStringLiteral("historyPane"));
-    commitHeader_ = new CommitHeader(pane);
     diff_ = new DiffView(Theme::duet(), pane);
     diff_->setToolTip({});
     diffHeader_ = new DiffHeaderBar(diff_, pane);
@@ -213,13 +214,12 @@ QWidget *HistoryView::createDiffPane()
     auto *layout = new QGridLayout(pane);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(commitHeader_, 0, 0, 1, 2);
-    layout->addWidget(diffHeader_, 1, 0, 1, 2);
-    layout->addWidget(fileStrip_, 2, 0, 1, 2);
-    layout->addWidget(diff_, 3, 0);
-    layout->addWidget(changeMap_, 3, 1);
-    layout->addWidget(lens_, 1, 0, 3, 2);
-    layout->setRowStretch(3, 1);
+    layout->addWidget(diffHeader_, 0, 0, 1, 2);
+    layout->addWidget(fileStrip_, 1, 0, 1, 2);
+    layout->addWidget(diff_, 2, 0);
+    layout->addWidget(changeMap_, 2, 1);
+    layout->addWidget(lens_, 0, 0, 3, 2);
+    layout->setRowStretch(2, 1);
     layout->setColumnStretch(0, 1);
     return pane;
 }
@@ -396,6 +396,7 @@ void HistoryView::rebuildList()
     for (const CommitSummary &commit : std::as_const(log_->commits)) {
         auto *item = new QTreeWidgetItem;
         CommitDelegate::setCommit(item, commit);
+        CommitDelegate::setUnfolded(item, commit.id == unfoldedId_); // read again, still unfolded
         item->setData(0, idRole, commit.id);
         items.append(item);
     }
@@ -479,9 +480,37 @@ void HistoryView::updateSummary()
     summary_->setText(summary);
 }
 
+void HistoryView::toggleUnfolded(QTreeWidgetItem *item)
+{
+    unfoldOnly(CommitDelegate::isUnfolded(item) ? nullptr : item);
+}
+
+void HistoryView::unfoldOnly(QTreeWidgetItem *item)
+{
+    unfoldedId_ = item ? item->data(0, idRole).toString() : QString();
+    for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *row = commits_->topLevelItem(i);
+        CommitDelegate::setUnfolded(row, row == item);
+    }
+    if (item)
+        commits_->scrollToItem(item); // its message in view
+}
+
+bool HistoryView::eventFilter(QObject *watched, QEvent *event)
+{
+    const bool isListResized = watched == commits_->viewport() && event->type() == QEvent::Resize;
+    if (isListResized && !unfoldedId_.isEmpty())
+        commits_->doItemsLayout();
+    return QWidget::eventFilter(watched, event);
+}
+
 void HistoryView::onCommitSelectionChanged()
 {
     const QList<QTreeWidgetItem *> selected = commits_->selectedItems();
+    // Another commit chosen (the keyboard): the unfolded one folds.
+    const bool isUnfoldedChosen = !selected.isEmpty() && selected.first()->data(0, idRole).toString() == unfoldedId_;
+    if (!unfoldedId_.isEmpty() && !isUnfoldedChosen)
+        unfoldOnly(nullptr);
     if (selected.isEmpty())
         forgetCommit();
     else
@@ -522,7 +551,6 @@ void HistoryView::applyTheme(const Theme &theme)
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
     allBranches_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme.foreground));
     filter_->applyTheme(theme);
-    commitHeader_->applyTheme(theme);
     fileStrip_->applyTheme(theme);
     commitsHeader_->setIconColor(theme.foreground);
     foldedCommits_->applyTheme(theme);

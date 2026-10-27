@@ -40,6 +40,8 @@
 
 namespace {
 
+constexpr int windowWidth = 1152;
+constexpr int windowHeight = 640;
 constexpr int sideWidth = 248;
 constexpr int brandMarkSize = 44;
 constexpr int emptyMarkSize = 72;
@@ -103,7 +105,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     preferences.applyTypography(theme_);
     ThemeStyle::apply(theme_);
     setWindowTitle(tr("Welcome to Duet"));
-    resize(960, 640);
+    resize(windowWidth, windowHeight);
 
     pages_->addWidget(createProjectsPage());
     pages_->addWidget(setup_);

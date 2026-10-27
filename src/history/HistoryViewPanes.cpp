@@ -2,7 +2,6 @@
 
 // HistoryView: the panes' proportions, and the commits folded away.
 
-#include "CommitHeader.h"
 #include "HistoryView.h"
 #include "changes/DiffHeaderBar.h"
 #include "ui/FoldedPane.h"
@@ -60,9 +59,9 @@ void HistoryView::alignBars()
     foldedCommits_->setButtonRowHeight(height);
     // Its controls hidden, the diff's header would be as high as its hint.
     diffHeader_->setMinimumHeight(height);
-    // The diff's header at the top while no commit is shown: its rule and the
-    // commits' meet across the handle while they are as high.
-    const bool meets = commitHeader_->isHidden() && diffHeader_->height() == height;
+    // The rules under the two headers meet across the handle while they are
+    // as high (the diff's hint can wrap).
+    const bool meets = diffHeader_->height() == height;
     splitter_->setHandleRule(1, {height - 1, meets ? Qt::LeftEdge | Qt::RightEdge : Qt::LeftEdge, ruleColor_});
 }
 

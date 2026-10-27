@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// HistoryView: the reading of the chosen commit's details, its header, and
-// the diff of its files.
+// HistoryView: the reading of the chosen commit's details, and the diff of
+// its files.
 
-#include "CommitHeader.h"
 #include "HistoryView.h"
 #include "changes/DiffFileStrip.h"
 #include "changes/DiffHeaderBar.h"
@@ -72,11 +71,11 @@ void HistoryView::chooseFile(const QString &path)
         diff_->scrollToTop(diff_->fileStart(int(file - files.begin())));
 }
 
-// What to choose for a diff to show: a commit, said for a file's history,
-// whose commits' header does not show.
+// What to choose for a diff to show: a commit.
 QString HistoryView::diffPlaceholder() const
 {
-    return filtersOnFile_ ? tr("Choose a commit to see its changes to %1").arg(pathFilter_) : QString();
+    return filtersOnFile_ ? tr("Choose a commit to see its changes to %1").arg(pathFilter_)
+                          : tr("Choose a commit to see its message and changes");
 }
 
 void HistoryView::forgetCommit()
@@ -130,19 +129,13 @@ void HistoryView::onDetailsRead(const DetailsRequest &request,
     details_ = details;
     showDetails();
     if (!details)
-        commitHeader_->showHint(error);
-    alignBars();
+        diffHeader_->setPlaceholder(error); // why the commit cannot be read
 }
 
 void HistoryView::showDetails()
 {
     diff_->hideUnchangedLines(); // those of the previous commit
-    if (details_)
-        commitHeader_->showCommit(*details_);
-    else
-        commitHeader_->showHint(filtersOnFile_ ? QString() : tr("Choose a commit to see its message and changes."));
     showCommitFiles();
     if (!fileToKeep_.isEmpty())
         chooseFile(std::exchange(fileToKeep_, {}));
-    alignBars();
 }

@@ -6,6 +6,7 @@
 #include "git/CommitLog.h"
 #include "ui/AppFonts.h"
 
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QHash>
 #include <QLocale>
@@ -33,6 +34,13 @@ constexpr int refsRole = Qt::UserRole + 63;
 constexpr int graphRole = Qt::UserRole + 64;
 constexpr int dayHeadingRole = Qt::UserRole + 65;
 constexpr int madeWithClaudeRole = Qt::UserRole + 66;
+constexpr int bodyRole = Qt::UserRole + 67;  // the message after its summary
+constexpr int notesRole = Qt::UserRole + 68; // "ada@example.org · Thursday, October 22, 2026 10:42"
+constexpr int unfoldedRole = Qt::UserRole + 69;
+
+// Unfolded, the message under the two lines, then a margin.
+constexpr int messageGap = 6;
+constexpr int messageBottomMargin = 10;
 
 // A day's heading takes this many lines of text, above its first row.
 constexpr qreal dayHeadingLines = 1.9;
@@ -109,9 +117,21 @@ void CommitDelegate::setCommit(QTreeWidgetItem *item, const CommitSummary &commi
     item->setData(0, shortIdRole, commit.shortId);
     item->setData(0, refsRole, commit.refs);
     item->setData(0, madeWithClaudeRole, isMadeWithClaude(commit));
-    item->setToolTip(0, QStringLiteral("%1\n%2 <%3>\n%4")
-                            .arg(commit.summary, commit.author, commit.email,
-                                 QLocale().toString(commit.date.toLocalTime(), QLocale::LongFormat)));
+    const QString longDate = QLocale().toString(commit.date.toLocalTime(), QLocale::LongFormat);
+    item->setData(0, bodyRole, commit.message.section(QLatin1Char('\n'), 1).trimmed());
+    item->setData(0, notesRole, QStringLiteral("%1  ·  %2").arg(commit.email, longDate));
+    item->setToolTip(0, QStringLiteral("%1\n%2 <%3>\n%4").arg(commit.summary, commit.author, commit.email, longDate));
+}
+
+void CommitDelegate::setUnfolded(QTreeWidgetItem *item, bool unfolded)
+{
+    if (isUnfolded(item) != unfolded)
+        item->setData(0, unfoldedRole, unfolded);
+}
+
+bool CommitDelegate::isUnfolded(const QTreeWidgetItem *item)
+{
+    return item->data(0, unfoldedRole).toBool();
 }
 
 void CommitDelegate::setGraphRow(QTreeWidgetItem *item, const GraphRow &row)
@@ -240,7 +260,54 @@ QSize CommitDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelI
     const QFontMetrics metrics(option.font);
     const bool startsADay = !index.data(dayHeadingRole).toString().isEmpty();
     const int heading = startsADay ? qRound(metrics.height() * dayHeadingLines) : 0;
-    return {QStyledItemDelegate::sizeHint(option, index).width(), metrics.height() * 2 + 18 + heading};
+    int message = 0;
+    if (index.data(unfoldedRole).toBool()) {
+        // The view's width: the rect of a size hint is not the row's.
+        const auto *view = qobject_cast<const QAbstractItemView *>(option.widget);
+        const int rowWidth = view ? view->viewport()->width() : option.rect.width();
+        message = messageHeight(option, index, rowWidth - 1 - textLeft(index) - padding);
+    }
+    return {QStyledItemDelegate::sizeHint(option, index).width(), twoLinesHeight(metrics) + heading + message};
+}
+
+int CommitDelegate::twoLinesHeight(const QFontMetrics &metrics)
+{
+    return metrics.height() * 2 + 18;
+}
+
+int CommitDelegate::textLeft(const QModelIndex &index) const
+{
+    const bool hasGraph = graphLanes_ > 0 && index.data(graphRole).isValid();
+    // As paint() places it: the avatar, then 10 pixels after its last one.
+    return padding + (hasGraph ? graphLanes_ * laneWidth - 1 : 0) + avatarSize + 9;
+}
+
+int CommitDelegate::messageHeight(const QStyleOptionViewItem &option, const QModelIndex &index, int width)
+{
+    const QFontMetrics metrics(option.font);
+    const QString body = index.data(bodyRole).toString();
+    const int bodyHeight =
+        body.isEmpty() ? 0 : metrics.boundingRect(QRect(0, 0, std::max(1, width), 1 << 20), Qt::TextWordWrap, body).height();
+    return (body.isEmpty() ? 0 : bodyHeight + messageGap) + metrics.height() + messageBottomMargin;
+}
+
+void CommitDelegate::paintMessage(QPainter *painter,
+                                  const QStyleOptionViewItem &option,
+                                  const QModelIndex &index,
+                                  QRect area)
+{
+    const QFontMetrics metrics(option.font);
+    painter->setFont(option.font);
+    const QString body = index.data(bodyRole).toString();
+    if (!body.isEmpty()) {
+        painter->setPen(option.palette.color(QPalette::Text));
+        QRect drawn;
+        painter->drawText(area, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, body, &drawn);
+        area.setTop(drawn.bottom() + 1 + messageGap);
+    }
+    painter->setPen(dimmed(option));
+    painter->drawText(QRect(area.left(), area.top(), area.width(), metrics.height()), Qt::AlignLeft | Qt::AlignVCenter,
+                      metrics.elidedText(index.data(notesRole).toString(), Qt::ElideRight, area.width()));
 }
 
 void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
@@ -260,12 +327,14 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
-    QRect rect = item.rect.adjusted(padding, 0, -padding, 0);
+    const QFontMetrics metrics(option.font);
+    // The two lines at the top; unfolded, the message under them.
+    QRect rect(item.rect.left() + padding, item.rect.top(), item.rect.width() - 2 * padding, twoLinesHeight(metrics));
     if (const QVariant graph = index.data(graphRole); graphLanes_ > 0 && graph.isValid()) {
-        // Through the heading too: the lines go on from the day before.
+        // Through the heading and the message too: the lines go on.
         const QRect column(rect.left() - padding / 2, option.rect.top(), graphLanes_ * laneWidth, option.rect.height());
         paintGraph(painter, option, graph.value<GraphRow>(),
-                   {column, item.rect.top() + item.rect.height() / 2.0, index.data(madeWithClaudeRole).toBool()});
+                   {column, rect.top() + rect.height() / 2.0, index.data(madeWithClaudeRole).toBool()});
         rect.setLeft(column.right() + padding / 2);
     }
     if (!heading.isEmpty())
@@ -275,7 +344,6 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     const QRect avatarRect(rect.left(), rect.center().y() - avatarSize / 2, avatarSize, avatarSize);
     painter->drawPixmap(avatarRect, avatar(author, avatarSize, ratio));
 
-    const QFontMetrics metrics(option.font);
     const int left = avatarRect.right() + 10;
     const int lineHeight = metrics.height();
     const QRect firstLine(left, rect.center().y() - lineHeight - 1, rect.right() - left, lineHeight);
@@ -291,6 +359,8 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     painter->drawText(QRect(firstLine.left(), firstLine.top(), available, lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(summaryFont).elidedText(summary, Qt::ElideRight, available));
     paintDetails(painter, option, index, secondLine);
+    if (index.data(unfoldedRole).toBool())
+        paintMessage(painter, option, index, QRect(left, rect.bottom() + 1, rect.right() - left, item.rect.bottom() - rect.bottom()));
     painter->restore();
 }
 

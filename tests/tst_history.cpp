@@ -8,7 +8,6 @@
 #include "git/GitProcess.h"
 #include "history/CommitDelegate.h"
 #include "history/CommitGraph.h"
-#include "history/CommitHeader.h"
 #include "history/CommitQuery.h"
 #include "history/FileLens.h"
 #include "history/HistorySearchField.h"
@@ -876,28 +875,17 @@ private slots:
         QTRY_COMPARE(refreshed.size(), 1);
         QCOMPARE(view.findChildren<QTreeWidget *>().size(), 1); // the commits: no list of files to choose from
         auto *commits = view.findChild<QTreeWidget *>("commits");
-        const auto *header = view.findChild<CommitHeader *>();
         const auto *diff = view.findChild<DiffView *>();
 
-        // Initially, a hint above an empty diff.
+        // Initially, an empty diff.
         QCOMPARE(commits->topLevelItemCount(), 2);
         QVERIFY(commits->selectedItems().isEmpty());
-        QVERIFY(!header->showsCommit());
         QVERIFY(diff->isVisibleTo(&view));
         QVERIFY(diff->text().isEmpty());
 
-        // A commit chosen: its message above the diff of all its files.
+        // A commit chosen: the diff of all its files.
         commits->setCurrentItem(commits->topLevelItem(0));
         QTRY_COMPARE(diff->fileSummaries().size(), 2);
-        QVERIFY(header->showsCommit());
-        QVERIFY(header->isVisibleTo(&view));
-        const QStringList labels = [header] {
-            QStringList texts;
-            for (const QLabel *label : header->findChildren<QLabel *>())
-                texts.append(label->text());
-            return texts;
-        }();
-        QVERIFY(labels.contains("second"));
         QVERIFY(diff->text().contains("a.txt"));
         QVERIFY(diff->text().contains("b.txt"));
 
@@ -948,6 +936,87 @@ private slots:
         toolButton(view, "Show the commits")->click();
         QVERIFY(commits->isVisible());
         QVERIFY(!titleTexts().contains("first"));
+    }
+
+    void clickingACommitUnfoldsItsMessageAndFoldsTheOneBefore()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "first\n\nWhy the first.", {{"a.txt", "a\n"}});
+        commit(dir, "second\n\nWhy the second, at some length.", {{"a.txt", "b\n"}});
+        HistoryView view(Theme::duet());
+        view.resize(1200, 700);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QTreeWidgetItem *second = commits->topLevelItem(0);
+        QTreeWidgetItem *first = commits->topLevelItem(1);
+        const int foldedHeight = commits->visualItemRect(first).height();
+        const auto click = [commits](QTreeWidgetItem *item) {
+            QTest::mouseClick(commits->viewport(), Qt::LeftButton, {}, commits->visualItemRect(item).center());
+        };
+
+        click(first);
+        QVERIFY(CommitDelegate::isUnfolded(first));
+        QTRY_VERIFY(commits->visualItemRect(first).height() > foldedHeight); // room for the message
+
+        click(second);
+        QVERIFY(CommitDelegate::isUnfolded(second));
+        QVERIFY(!CommitDelegate::isUnfolded(first));
+    }
+
+    void aSecondClickFoldsTheCommit()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "only\n\nBody.", {{"a.txt", "a\n"}});
+        HistoryView view(Theme::duet());
+        view.resize(1200, 700);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QTreeWidgetItem *item = commits->topLevelItem(0);
+        QTest::mouseClick(commits->viewport(), Qt::LeftButton, {}, commits->visualItemRect(item).center());
+        QVERIFY(CommitDelegate::isUnfolded(item));
+
+        QTest::mouseClick(commits->viewport(), Qt::LeftButton, {}, commits->visualItemRect(item).center());
+
+        QVERIFY(!CommitDelegate::isUnfolded(item));
+        QCOMPARE(commits->currentItem(), item); // still the chosen commit
+    }
+
+    void theUnfoldedCommitStaysUnfoldedWhenTheHistoryIsReadAgain()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "first\n\nBody.", {{"a.txt", "a\n"}});
+        HistoryView view(Theme::duet());
+        view.resize(1200, 700);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QTest::mouseClick(commits->viewport(), Qt::LeftButton, {},
+                          commits->visualItemRect(commits->topLevelItem(0)).center());
+
+        commit(dir, "second", {{"a.txt", "b\n"}});
+        view.refresh();
+
+        QTRY_COMPARE(refreshed.size(), 2);
+        QCOMPARE(commits->topLevelItemCount(), 2);
+        QVERIFY(!CommitDelegate::isUnfolded(commits->topLevelItem(0))); // "second"
+        QVERIFY(CommitDelegate::isUnfolded(commits->topLevelItem(1)));  // "first", as it was
     }
 
     void stripHasAChipForEveryFileOfTheCommit()
