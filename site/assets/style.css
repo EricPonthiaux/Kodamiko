@@ -34,7 +34,6 @@
   --accent-soft: rgba(79, 124, 240, 0.12);
   --glow: rgba(79, 124, 240, 0.16);
   --code-bg: #0a0c10;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 30px 80px -20px rgba(0, 0, 0, 0.7);
   --radius: 10px;
   --content-width: 1120px;
   --dot: rgba(255, 255, 255, 0.09);
@@ -58,7 +57,6 @@
     --accent-soft: rgba(52, 97, 216, 0.08);
     --glow: rgba(52, 97, 216, 0.1);
     --code-bg: #12151b;
-    --shadow: 0 1px 2px rgba(15, 20, 30, 0.06), 0 30px 70px -24px rgba(15, 20, 30, 0.28);
     --dot: rgba(15, 20, 30, 0.12);
     color-scheme: light;
   }
@@ -222,8 +220,8 @@ code {
   }
 }
 
-/* Hero: a dot grid fades out around the title, and below it a demo of the
-   editor plays what the title promises. */
+/* Hero: a dot grid fades out around the title, and below it a capture of
+   Duet shows what the title promises. */
 
 .hero {
   position: relative;
@@ -414,535 +412,71 @@ code {
   color: #3fb37a;
 }
 
-/* The demo: Claude fixes a build error in a mock of the editor. It keeps the
-   editor's dark colors in both themes, like a screenshot. Its steps appear in
-   turn over a 12 s loop, or all at once when the visitor asks for less
-   motion. */
+/* A real capture of a main window, with a second window over its lower
+   right corner, as on a desk. The captures carry their own frame and
+   shadow; --pair-ratio sets the height of the pair, --side-width the size of
+   the second window. On a phone, the windows stack. */
 
-.demo {
-  --demo-bg: #0e1015;
-  --demo-chrome: #0b0d11;
-  --demo-line: rgba(255, 255, 255, 0.07);
-  --demo-text: #c9cdd6;
-  --demo-bright: #eceef3;
-  --demo-muted: #8b92a2;
-  --demo-gutter: #565c6a;
-  --demo-accent: #84a3f7;
-  --demo-type: #d7b46a;
-  --demo-added: #7ed39b;
-  --demo-removed: #f07178;
-  color-scheme: dark;
+.hero-shot,
+.pair-shot {
   margin: 64px auto 0;
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  background: var(--demo-bg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), var(--shadow);
-  overflow: hidden;
-  color: var(--demo-text);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  text-align: left;
 }
 
-.demo-titlebar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  height: 42px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--demo-line);
-  background: var(--demo-chrome);
+.window-pair {
+  position: relative;
+  aspect-ratio: var(--pair-ratio);
 }
 
-.demo-lights {
-  display: flex;
-  gap: 7px;
+.window-pair img {
+  position: absolute;
 }
 
-.demo-lights span {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: #2a2e38;
+.window-main {
+  top: 0;
+  left: 0;
+  width: 88%;
 }
 
-.demo-modes {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--demo-muted);
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
+.window-side {
+  right: 0;
+  bottom: 0;
+  width: var(--side-width);
 }
 
-.demo-modes span {
-  padding: 3px 12px;
-  border-radius: 6px;
+.hero-shot figcaption,
+.pair-shot figcaption {
+  max-width: 640px;
+  margin: 20px auto 0;
+  color: var(--text-subtle);
+  font-size: 0.9rem;
+  text-align: center;
 }
 
-.demo-modes .current {
-  background: rgba(255, 255, 255, 0.09);
-  color: var(--demo-bright);
-}
-
-.demo-path {
-  margin-left: auto;
-  color: var(--demo-muted);
-  font-size: 0.75rem;
-}
-
-.demo-workspace {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr) 340px;
-  min-height: 400px;
-}
-
-.demo-tree {
-  padding: 14px 0;
-  border-right: 1px solid var(--demo-line);
-  color: var(--demo-muted);
-  font-size: 0.78rem;
-  line-height: 26px;
-}
-
-.demo-tree div {
-  padding: 0 16px 0 calc(16px + var(--depth, 0) * 14px);
-  white-space: nowrap;
-}
-
-.demo-tree .folder {
-  color: var(--demo-text);
-}
-
-.demo-tree .current {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--demo-bright);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.demo-code {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.demo-tabs {
-  display: flex;
-  height: 36px;
-  border-bottom: 1px solid var(--demo-line);
-  font-size: 0.78rem;
-}
-
-.demo-tabs span {
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  color: var(--demo-muted);
-}
-
-.demo-tabs .current {
-  border-right: 1px solid var(--demo-line);
-  color: var(--demo-bright);
-  box-shadow: inset 0 -1px 0 var(--accent);
-}
-
-/* Ligatures off: C++ reads "->", not an arrow. */
-.demo-source {
-  flex: 1;
-  padding: 14px 0;
-  overflow-x: auto;
-  scrollbar-color: #2a2e38 transparent;
-  scrollbar-width: thin;
-  font-variant-ligatures: none;
-  line-height: 24px;
-}
-
-.demo-source div {
-  white-space: pre;
-}
-
-.demo-source .ln {
-  display: inline-block;
-  width: 52px;
-  padding-right: 16px;
-  color: var(--demo-gutter);
-  text-align: right;
-  user-select: none;
-}
-
-.demo-source .kw {
-  color: var(--demo-accent);
-}
-
-.demo-source .ty {
-  color: var(--demo-type);
-}
-
-.demo-source .fn {
-  color: var(--demo-bright);
-}
-
-.demo-source .error {
-  text-decoration: underline wavy var(--demo-removed);
-  text-underline-offset: 4px;
-  animation: demo-error 12s infinite;
-}
-
-.demo-source .removed {
-  animation: demo-removed 12s infinite;
-}
-
-.demo-source .added {
-  overflow: hidden;
-  background: rgba(126, 211, 155, 0.1);
-  animation: demo-added 12s infinite;
-}
-
-.demo-source .added .ln {
-  color: var(--demo-added);
-}
-
-.demo-claude {
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--demo-line);
-  background: var(--demo-chrome);
-}
-
-.demo-claude-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--demo-line);
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
-}
-
-.demo-claude-header::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--demo-added);
-}
-
-.demo-claude-header .context {
-  margin-left: auto;
-  color: var(--demo-muted);
-}
-
-.demo-transcript {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-}
-
-/* --chars is the length of the typed request, which the mono font makes
-   exactly that many ch wide. */
-.demo-prompt {
-  align-self: flex-end;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--demo-bright);
-}
-
-.demo-prompt span {
-  display: inline-block;
-  overflow: hidden;
-  white-space: nowrap;
-  vertical-align: bottom;
-  animation: demo-type 12s steps(var(--chars)) infinite;
-}
-
-.demo-tool {
-  display: flex;
-  gap: 10px;
-  color: var(--demo-muted);
-}
-
-.demo-tool::before {
-  content: "\25CF";
-  color: var(--demo-accent);
-}
-
-.demo-tool b {
-  color: var(--demo-bright);
-  font-weight: 400;
-}
-
-.demo-tool .plus {
-  color: var(--demo-added);
-}
-
-.demo-tool .minus {
-  color: var(--demo-removed);
-}
-
-.demo-answer {
-  margin-top: 4px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  font-family: var(--font-sans);
-  font-size: 0.84rem;
-}
-
-.demo-answer code {
-  color: var(--demo-bright);
-}
-
-.demo-answer-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.demo-answer-actions span {
-  display: inline-flex;
-  align-items: center;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  font-size: 0.78rem;
-}
-
-.demo-answer-actions .primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #ffffff;
-}
-
-.demo-statusbar {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  height: 28px;
-  padding: 0 14px;
-  border-top: 1px solid var(--demo-line);
-  background: var(--demo-chrome);
-  color: var(--demo-muted);
-  font-size: 0.72rem;
-}
-
-.demo-statusbar .position {
-  margin-left: auto;
-}
-
-.demo-step-1 {
-  animation: demo-step-1 12s infinite;
-}
-
-.demo-step-2 {
-  animation: demo-step-2 12s infinite;
-}
-
-.demo-step-3 {
-  animation: demo-step-3 12s infinite;
-}
-
-.demo-step-4 {
-  animation: demo-step-4 12s infinite;
-}
-
-.demo-step-5 {
-  animation: demo-step-5 12s infinite;
-}
-
-@keyframes demo-type {
-  0% {
-    width: 0;
-  }
-  10%,
-  94% {
-    width: calc(var(--chars) * 1ch);
-  }
-  100% {
-    width: 0;
-  }
-}
-
-@keyframes demo-step-1 {
-  0%,
-  15% {
-    opacity: 0;
-    translate: 0 4px;
-  }
-  19%,
-  94% {
-    opacity: 1;
-    translate: none;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes demo-step-2 {
-  0%,
-  26% {
-    opacity: 0;
-    translate: 0 4px;
-  }
-  30%,
-  94% {
-    opacity: 1;
-    translate: none;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes demo-step-3 {
-  0%,
-  38% {
-    opacity: 0;
-    translate: 0 4px;
-  }
-  42%,
-  94% {
-    opacity: 1;
-    translate: none;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes demo-step-4 {
-  0%,
-  52% {
-    opacity: 0;
-    translate: 0 4px;
-  }
-  56%,
-  94% {
-    opacity: 1;
-    translate: none;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes demo-step-5 {
-  0%,
-  66% {
-    opacity: 0;
-    translate: 0 4px;
-  }
-  70%,
-  94% {
-    opacity: 1;
-    translate: none;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-/* Claude's edit lands with the third step. */
-@keyframes demo-error {
-  0%,
-  40% {
-    text-decoration-color: var(--demo-removed);
-  }
-  44%,
-  94% {
-    text-decoration-color: transparent;
-  }
-}
-
-@keyframes demo-removed {
-  0%,
-  40% {
-    background: transparent;
-  }
-  44%,
-  94% {
-    background: rgba(240, 113, 120, 0.12);
-  }
-  100% {
-    background: transparent;
-  }
-}
-
-@keyframes demo-added {
-  0%,
-  40% {
-    opacity: 0;
-    max-height: 0;
-  }
-  44%,
-  94% {
-    opacity: 1;
-    max-height: 24px;
-  }
-  100% {
-    opacity: 0;
-    max-height: 0;
-  }
-}
-
-@media (max-width: 1000px) {
-  .demo-workspace {
-    grid-template-columns: minmax(0, 1fr) 300px;
-  }
-
-  .demo-tree {
-    display: none;
-  }
+.hero-shot em {
+  color: var(--text-muted);
 }
 
 @media (max-width: 719px) {
-  .demo {
+  .hero-shot,
+  .pair-shot {
     margin-top: 48px;
   }
 
-  .demo-workspace {
-    grid-template-columns: minmax(0, 1fr);
+  .window-pair {
+    display: grid;
+    gap: 12px;
+    aspect-ratio: auto;
   }
 
-  .demo-claude {
-    border-top: 1px solid var(--demo-line);
-    border-left: none;
-  }
-
-  .demo-modes,
-  .demo-path {
-    display: none;
+  .window-pair img {
+    position: static;
+    width: 100%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cursor,
-  .demo-prompt span,
-  .demo-step-1,
-  .demo-step-2,
-  .demo-step-3,
-  .demo-step-4,
-  .demo-step-5,
-  .demo-source .error,
-  .demo-source .removed,
-  .demo-source .added {
+  .cursor {
     animation: none;
-  }
-
-  .demo-source .error {
-    text-decoration-color: transparent;
-  }
-
-  .demo-source .removed {
-    background: rgba(240, 113, 120, 0.12);
   }
 }
 
@@ -991,19 +525,14 @@ code {
   opacity: 0.88;
 }
 
-/* A screenshot sits in a thin bezel, like a window on a desk. */
+/* A screenshot is a capture of Duet's window, which draws its own frame
+   and shadow: no bezel around it. */
 .screenshot {
   margin: 56px auto 0;
-  padding: 6px;
-  border-radius: calc(var(--radius) + 6px);
-  border: 1px solid var(--border-strong);
-  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
-  box-shadow: var(--shadow);
 }
 
-.screenshot img {
-  border-radius: var(--radius);
-  outline: 1px solid var(--border);
+.screenshot.wide {
+  margin-bottom: 40px;
 }
 
 /* Sections, separated by a hairline */
@@ -1116,6 +645,20 @@ section.alt {
 
 .showcase .screenshot {
   margin: 0;
+}
+
+.showcase + .showcase {
+  margin-top: 96px;
+}
+
+@media (min-width: 900px) {
+  .showcase.reverse {
+    grid-template-columns: 3fr 2fr;
+  }
+
+  .showcase.reverse .showcase-text {
+    order: 1;
+  }
 }
 
 /* Feature list: a grid of short entries under a hairline */

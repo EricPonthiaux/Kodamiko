@@ -44,57 +44,12 @@
             </button>
           </div>
         </div>
-        <figure class="demo" role="img" aria-label="Duet at work: asked to “fix this”, Claude reads the error under the cursor, finds the right symbol, fixes the line, rebuilds without errors and offers to review the diff.">
-          <div class="demo-titlebar">
-            <div class="demo-lights"><span></span><span></span><span></span></div>
-            <div class="demo-modes"><span class="current">Edit</span><span>Diff</span><span>Diagram</span></div>
-            <span class="demo-path">duet — ~/src/duet</span>
+        <figure class="hero-shot">
+          <div class="window-pair" style="--pair-ratio: 1120 / 800; --side-width: 48%">
+            <img class="window-main" src="assets/screenshots/hero-editor.png" srcset="assets/screenshots/hero-editor.png 1x, assets/screenshots/hero-editor-2x.png 2x" width="1600" height="1000" alt="Duet in Edit mode on its own source, HistoryView.cpp, at line 151 where Claude has just fixed a call.">
+            <img class="window-side" src="assets/screenshots/hero-claude.png" srcset="assets/screenshots/hero-claude.png 1x, assets/screenshots/hero-claude-2x.png 2x" width="880" height="735" alt="Duet's Terminals window running Claude Code: the request “fix this”, Claude's one-line edit of HistoryView.cpp and its explanation.">
           </div>
-          <div class="demo-workspace">
-            <div class="demo-tree">
-              <div class="folder">▾ src</div>
-              <div style="--depth: 1">▸ agent</div>
-              <div class="folder" style="--depth: 1">▾ editor</div>
-              <div style="--depth: 2">Document.cpp</div>
-              <div class="current" style="--depth: 2">EditorWidget.cpp</div>
-              <div style="--depth: 2">EditorWidget.h</div>
-              <div style="--depth: 1">▸ git</div>
-              <div style="--depth: 1">▸ diagram</div>
-              <div style="--depth: 1">▸ terminal</div>
-              <div>▸ tests</div>
-              <div>CMakeLists.txt</div>
-            </div>
-            <div class="demo-code">
-              <div class="demo-tabs"><span class="current">EditorWidget.cpp</span><span>Document.h</span></div>
-              <div class="demo-source">
-                <div><span class="ln">38</span><span class="kw">void</span> <span class="ty">EditorWidget</span>::<span class="fn">highlightOccurrences</span>()</div>
-                <div><span class="ln">39</span>{</div>
-                <div><span class="ln">40</span>    <span class="kw">const</span> <span class="ty">QString</span> name = wordAtCursor();</div>
-                <div><span class="ln">41</span>    <span class="kw">if</span> (name.isEmpty())</div>
-                <div><span class="ln">42</span>        <span class="kw">return</span>;</div>
-                <div class="removed"><span class="ln">43</span>    <span class="kw">const auto</span> ranges = findOccurrences(name, <span class="error">lineCount</span>);</div>
-                <div class="added"><span class="ln">+</span>    <span class="kw">const auto</span> ranges = findOccurrences(name, document()-&gt;lineCount());</div>
-                <div><span class="ln">44</span>    <span class="kw">for</span> (<span class="kw">const auto</span> &amp;range : ranges)</div>
-                <div><span class="ln">45</span>        indicate(range, <span class="ty">Indicator</span>::Occurrence);</div>
-                <div><span class="ln">46</span>}</div>
-              </div>
-            </div>
-            <div class="demo-claude">
-              <div class="demo-claude-header">Claude Code<span class="context">sees EditorWidget.cpp:43</span></div>
-              <div class="demo-transcript">
-                <div class="demo-prompt"><span style="--chars: 8">fix this</span></div>
-                <div class="demo-tool demo-step-1"><span><b>get_diagnostics</b><br>1 error · ‘lineCount’ was not declared</span></div>
-                <div class="demo-tool demo-step-2"><span><b>find_symbol</b> lineCount<br>→ Document::lineCount()</span></div>
-                <div class="demo-tool demo-step-3"><span><b>edit</b> EditorWidget.cpp <span class="plus">+1</span> <span class="minus">−1</span></span></div>
-                <div class="demo-tool demo-step-4"><span><b>run_command</b> Build debug<br>0 errors, 0 warnings</span></div>
-                <div class="demo-answer demo-step-5">
-                  Fixed: <code>lineCount()</code> belongs to the document, not the widget. A snapshot was taken first.
-                  <div class="demo-answer-actions"><span class="primary">Review diff</span><span>Undo all</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="demo-statusbar"><span>⎇ main</span><span>clangd</span><span class="position">Ln 43, Col 52</span><span>C++</span></div>
+          <figcaption>Real capture: Duet working on its own code, its terminals in a window of their own. You type <em>“fix this”</em>; Claude already knows the file, the line and the error under the cursor, and fixes it.</figcaption>
         </figure>
       </div>
     </section>
@@ -113,12 +68,12 @@
           <article class="pillar">
             <span class="mark" aria-hidden="true"></span>
             <h3>It acts with the editor's tools</h3>
-            <p>Claude does more than suggest text. It goes to definitions, renames a function everywhere it is used, runs the build and reads the errors, shows a diff, draws a diagram — with the same tools as you. Nothing changes your repository without your approval.</p>
+            <p>Claude does more than suggest text. It goes to definitions, renames a function everywhere it is used, runs the build and reads the errors, shows a diff, draws a diagram — with the same tools as you. A commit, a push, a merge or a change of branch waits for your “Allow”.</p>
           </article>
           <article class="pillar">
             <span class="mark" aria-hidden="true"></span>
             <h3>You stay in control</h3>
-            <p>Every change Claude makes appears before your eyes, file by file. A snapshot of the project can be taken before each request, and one click undoes it all. You delegate without risk.</p>
+            <p>Every change Claude makes appears before your eyes: open files reload as it edits them, and the diff marks the blocks it wrote. A snapshot of the project is taken before each prompt, and <em>Restore the State Before a Prompt</em> brings it all back. You delegate without risk.</p>
           </article>
         </div>
       </div>
@@ -129,13 +84,17 @@
         <p class="eyebrow">Diagrams</p>
         <h2 class="section-title">A diagram is worth a thousand lines of terminal</h2>
         <p class="section-lead">When Claude explains a module, a flow or a refactoring plan, a wall of text scrolling by in a terminal is the hardest way to follow it. In Duet, Claude draws instead, and the diagram becomes a space you share: you both read it, point at it and change it. The conversation goes both ways.</p>
-        <figure class="screenshot">
-          <img src="assets/screenshots/diagram.png" srcset="assets/screenshots/diagram.png 1x, assets/screenshots/diagram-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Duet's diagram editor showing a flowchart of the diff review, laid out.">
+        <figure class="pair-shot">
+          <div class="window-pair" style="--pair-ratio: 1120 / 770; --side-width: 40%">
+            <img class="window-main" src="assets/screenshots/diagram.png" srcset="assets/screenshots/diagram.png 1x, assets/screenshots/diagram-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Duet's diagram editor showing the flowchart Claude drew of a prompt's path through Duet, with the box “Snapshot of the working tree” selected.">
+            <img class="window-side" src="assets/screenshots/diagram-claude.png" srcset="assets/screenshots/diagram-claude.png 1x, assets/screenshots/diagram-claude-2x.png 2x" width="780" height="780" loading="lazy" alt="Claude Code in Duet's Terminals window, answering “Where does Claude wait before touching the code? Show me in the diagram.” by selecting the snapshot box.">
+          </div>
+          <figcaption>Claude read Duet's code and drew this flowchart. Asked where it waits before touching the code, it answered by selecting the box in the diagram.</figcaption>
         </figure>
         <ul class="features exchanges">
-          <li><strong>You ask, Claude draws</strong><span><em>“Draw the login flow in src/auth.”</em> Claude reads the code first, then writes the diagram in Mermaid or PlantUML: flowchart, sequence, class, state, data model, C4 or mind map. It opens laid out, ready to read.</span></li>
+          <li><strong>You ask, Claude draws</strong><span><em>“Draw the path of a prompt through Duet.”</em> Claude reads the code first, then writes the diagram in Mermaid or PlantUML: flowchart, sequence, class, state, data model, C4, mind map or user journey. It opens laid out, ready to read.</span></li>
           <li><strong>You point, Claude understands</strong><span>Select three boxes and type <em>“merge these into one service”</em>. Claude sees what is selected in the diagram, just as it sees the selection in a file.</span></li>
-          <li><strong>Claude points, you see</strong><span><em>“Where is the token checked?”</em> Rather than a paragraph, Claude answers by selecting the right elements in the diagram in front of you.</span></li>
+          <li><strong>Claude points, you see</strong><span><em>“Where does Claude wait before touching the code?”</em> Rather than a paragraph, Claude answers by selecting the right elements in the diagram in front of you.</span></li>
           <li><strong>You arrange, Claude keeps it</strong><span>Move the boxes where they make sense to you. When Claude changes the diagram, every element keeps its place, new ones go beside their neighbors, and one Undo cancels its change.</span></li>
           <li><strong>From the diagram back to the code</strong><span><em>“Implement this state machine.”</em> <em>“Does the code still match this diagram?”</em> Once you agree on the picture, it becomes the specification Claude works from.</span></li>
           <li><strong>Ready for the docs</strong><span>A diagram is a text file in your repository, reviewed like code, and Claude can export it as SVG or PNG for the documentation.</span></li>
@@ -165,11 +124,22 @@
           <div class="showcase-text">
             <p class="eyebrow">Review</p>
             <h3>Follow every change, review before you commit</h3>
-            <p>Open files reload as Claude edits them, and the Diff view updates after each step. Stage by file, hunk or line, and let Claude write the commit message in the style of your history.</p>
-            <p>Before committing, a separate, read-only reviewer can go over the staged changes and leave its findings right in the diff.</p>
+            <p>Open files reload as Claude edits them, and the Diff view marks the blocks it wrote. Stage by file, hunk or line, then <em>Generate</em> writes the commit message in the style of your history: a summary within 72 characters, and the why in the body.</p>
+            <p>Before committing, a separate, read-only reviewer goes over the staged changes. Its report opens above the diff, and each finding sits on the lines it concerns, ready to send to Claude or dismiss.</p>
           </div>
           <figure class="screenshot">
-            <img src="assets/screenshots/diff.png" width="1600" height="1000" alt="Duet's Diff mode: the list of changed files and a diff with staged and unstaged hunks.">
+            <img src="assets/screenshots/review.png" srcset="assets/screenshots/review.png 1x, assets/screenshots/review-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Duet's Diff mode: three staged files, the reviewer's report above the diff, and a commit message generated by Claude.">
+          </figure>
+        </div>
+        <div class="showcase reverse">
+          <div class="showcase-text">
+            <p class="eyebrow">History</p>
+            <h3>The history, with Claude's share in it</h3>
+            <p>Commits are grouped by day. A click unfolds a commit's message in its row and shows the diff of all its files at once; the commits made with Claude carry its mark.</p>
+            <p>Search by text, author or date, or by what the changes contain, across every branch.</p>
+          </div>
+          <figure class="screenshot">
+            <img src="assets/screenshots/history.png" srcset="assets/screenshots/history.png 1x, assets/screenshots/history-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Duet's History mode: Duet's own commits grouped by day, one written with Claude unfolded in its row, and its diff.">
           </figure>
         </div>
       </div>
@@ -180,11 +150,14 @@
         <p class="eyebrow">Editor</p>
         <h2 class="section-title">A professional editor, without the clutter</h2>
         <p class="section-lead">Over the years, editors have piled up panels, menus, settings and extensions, until using one became a skill of its own. Duet makes a clean sweep: it keeps what a professional really needs, in a few clear places. And what you would once have hunted for in a menu, you can simply ask Claude.</p>
+        <figure class="screenshot wide">
+          <img src="assets/screenshots/edit.png" srcset="assets/screenshots/edit.png 1x, assets/screenshots/edit-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Duet's Edit mode: the outline of HistoryView.cpp beside the code, and clangd's completion with the signature of the chosen method.">
+        </figure>
         <ul class="features">
           <li><strong>Understand the code</strong><span>Smart completion, live diagnostics and quick fixes, through language servers and Tree-sitter highlighting.</span></li>
           <li><strong>Navigate the project</strong><span>Definitions, usages and call hierarchies, an outline, find in files and a command palette.</span></li>
           <li><strong>Refactor with confidence</strong><span>Rename, change a signature, move a class — with a preview before applying and a one-step undo, and still fast on very large projects.</span></li>
-          <li><strong>Git built in</strong><span>Line-level staging, history, branches, merge and rebase, pull, push and stash, without leaving the editor.</span></li>
+          <li><strong>Git built in</strong><span>Line-level staging, history, branches, merge and rebase, pull, push and stash, and conflicts resolved in the editor, without leaving it.</span></li>
           <li><strong>Commit messages by Claude</strong><span>Written in the style of your team's history, for you to review before committing.</span></li>
           <li><strong>Markdown and diagrams</strong><span>A rendered Markdown viewer and a diagram editor for Mermaid and PlantUML.</span></li>
         </ul>
@@ -202,6 +175,7 @@
           <li>Python package</li>
           <li>Java with Maven</li>
           <li>TypeScript with Node</li>
+          <li>Angular</li>
         </ul>
       </div>
     </section>
