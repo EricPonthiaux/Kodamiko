@@ -116,6 +116,7 @@ private:
     bool isSelected(int contentRow, int column) const;
     QString selectedText() const;
     void copySelection(QClipboard::Mode mode) const;
+    void clearSelection();
     void pasteClipboard();
 
     std::unique_ptr<IPty> pty_;

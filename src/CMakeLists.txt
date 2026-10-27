@@ -347,6 +347,7 @@ if(WIN32)
         editor/windows/WebZoomWindows.cpp
         git/windows/CredentialCacheWindows.cpp
         projects/windows/NewInstanceWindows.cpp
+        projects/windows/WindowForegroundWindows.cpp
         recipes/windows/VisualStudio.cpp
         setup/windows/SystemSetupWindows.cpp
         terminal/windows/ConPty.cpp
@@ -360,6 +361,7 @@ if(WIN32)
 else()
     target_sources(duet_core PRIVATE
         git/unix/CredentialCacheUnix.cpp
+        projects/unix/WindowForegroundUnix.cpp
         terminal/unix/UnixPty.cpp)
     if(APPLE)
         target_sources(duet_core PRIVATE

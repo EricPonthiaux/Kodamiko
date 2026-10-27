@@ -238,6 +238,12 @@ QString VtScreen::lineText(int row) const
 
 bool VtScreen::sendKey(int key, Qt::KeyboardModifiers modifiers, const QString &text, OptionKey optionKey)
 {
+    if (KeyModifiers::isComposedByAltGr(modifiers, text)) {
+        for (const char32_t codePoint : text.toUcs4())
+            vterm_keyboard_unichar(terminal_, codePoint, VTERM_MOD_NONE);
+        return true;
+    }
+
     const VTermModifier modifier = KeyModifiers::toVTerm(modifiers);
 
     if (key == Qt::Key_Backtab) {

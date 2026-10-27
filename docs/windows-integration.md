@@ -89,10 +89,11 @@ foreground: **the window only flashes in the taskbar**, it does not come
 forward. The process allowed to give the foreground away is the one the user
 just started (or the welcome window's).
 
-**Fix:** in `ProjectWindows::raise`, before connecting, the caller grants the
-right: `AllowSetForegroundWindow(ASFW_ANY)` (or the server's process id, read
-with `GetNamedPipeServerProcessId`), in a `ProjectWindowServerWindows.cpp`
-beside an empty `Unix` one.
+**Done:** `ProjectWindows::raise` first calls
+`WindowForeground::allowOtherProcess()` (`src/projects/WindowForeground.h`),
+which is `AllowSetForegroundWindow(ASFW_ANY)` on Windows and nothing
+elsewhere. *To confirm* by opening, from a second Duet, a project already
+open in a minimized or covered window.
 
 ### 2.2 The same folder spelled differently
 
@@ -195,16 +196,20 @@ Ctrl+Alt:
 - for a symbol (AltGr+( → `{`), the character goes with Ctrl+Alt, which
   libvterm encodes as an escape sequence.
 
-*To confirm* on a French keyboard. **Fix:** on Windows, when Ctrl and Alt
-are both held and Qt gives printable text, send the text without modifiers,
-the same rule as `isApplicationShortcut`'s.
+**Done:** `VtScreen::sendKey` first asks
+`KeyModifiers::isComposedByAltGr`: on Windows, Ctrl and Alt both held with
+printable text; the text then goes without modifiers
+(`tests/windows/tst_terminal_windows.cpp`). *To confirm* on a French
+keyboard.
 
 ### 5.3 Copy and paste
 
 Copy is Ctrl+Shift+C and paste Ctrl+Shift+V outside macOS. Windows Terminal
 copies with Ctrl+C **when text is selected** (otherwise Ctrl+C goes to the
-program) and pastes with Ctrl+V; Windows users expect it. **Fix:** on
-Windows, add these two, keeping Ctrl+Shift+C/V.
+program) and pastes with Ctrl+V; Windows users expect it. **Done:** on
+Windows, Ctrl+C with a selection copies it and clears it (the next Ctrl+C
+interrupts), Ctrl+V pastes; Ctrl+Shift+C/V stay. Claude Code pastes images
+with Alt+V on Windows, so Ctrl+V loses nothing there.
 
 ### 5.4 Claude Code and Git Bash
 
@@ -280,8 +285,8 @@ or the VC++ Redistributable in the installer. The helpers (`duet-hook`,
 ## Order of work
 
 1. Installing Qt and the MSVC runtime (§7.1): without it, nothing ships.
-2. Bringing a window forward (`AllowSetForegroundWindow`).
-3. AltGr in the terminal, then Ctrl+C/Ctrl+V with a selection.
+2. ~~Bringing a window forward (`AllowSetForegroundWindow`).~~ Done.
+3. ~~AltGr in the terminal, then Ctrl+C/Ctrl+V with a selection.~~ Done.
 4. Version information, manifest (long paths, UTF-8), AppUserModelID.
 5. The DWM frame: shadow, rounded corners, Snap Layouts.
 6. The drive letter in the language servers' URIs, path comparisons.

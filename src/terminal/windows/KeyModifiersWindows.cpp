@@ -19,3 +19,9 @@ VTermModifier KeyModifiers::forText(VTermModifier modifier, OptionKey /*optionKe
 {
     return modifier;
 }
+
+bool KeyModifiers::isComposedByAltGr(Qt::KeyboardModifiers modifiers, const QString &text)
+{
+    const bool holdsCtrlAndAlt = (modifiers & Qt::ControlModifier) && (modifiers & Qt::AltModifier);
+    return holdsCtrlAndAlt && !text.isEmpty() && text.at(0).isPrint();
+}

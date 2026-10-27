@@ -2,6 +2,8 @@
 
 #include "ProjectWindowServer.h"
 
+#include "WindowForeground.h"
+
 #include <QCryptographicHash>
 #include <QDir>
 #include <QLocalSocket>
@@ -49,6 +51,7 @@ void ProjectWindowServer::onNewConnection()
 
 bool ProjectWindows::raise(const QString &folder)
 {
+    WindowForeground::allowOtherProcess();
     QLocalSocket socket;
     socket.connectToServer(serverName(folder));
     if (!socket.waitForConnected(connectTimeoutMs))

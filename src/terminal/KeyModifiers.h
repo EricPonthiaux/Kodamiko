@@ -5,6 +5,7 @@
 #include "OptionKey.h"
 
 #include <QFlags>
+#include <QString>
 #include <Qt>
 
 #include <vterm.h>
@@ -19,6 +20,12 @@ VTermModifier toVTerm(Qt::KeyboardModifiers modifiers);
 // The modifiers sent with the text a key press produced: on macOS, Option
 // already composed the text unless it acts as Meta.
 VTermModifier forText(VTermModifier modifier, OptionKey optionKey);
+
+// True when `text` is a character the keyboard layout composed with AltGr,
+// which Windows reports as Ctrl+Alt (AltGr+E is "€" on a French keyboard):
+// it is typed as is, without the modifiers. False on the systems where
+// AltGr is a key of its own.
+bool isComposedByAltGr(Qt::KeyboardModifiers modifiers, const QString &text);
 
 // VTermModifier is a set of bit flags: combinations such as Shift+Ctrl are
 // valid values even though the C enum does not name them.

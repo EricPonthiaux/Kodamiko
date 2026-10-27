@@ -19,3 +19,9 @@ VTermModifier KeyModifiers::forText(VTermModifier modifier, OptionKey /*optionKe
 {
     return modifier;
 }
+
+// AltGr is a key of its own (ISO_Level3_Shift): its text comes without Ctrl+Alt.
+bool KeyModifiers::isComposedByAltGr(Qt::KeyboardModifiers /*modifiers*/, const QString & /*text*/)
+{
+    return false;
+}

@@ -27,3 +27,9 @@ VTermModifier KeyModifiers::forText(VTermModifier modifier, OptionKey optionKey)
     }
     return modifier;
 }
+
+// Option composes the characters there (see forText).
+bool KeyModifiers::isComposedByAltGr(Qt::KeyboardModifiers /*modifiers*/, const QString & /*text*/)
+{
+    return false;
+}

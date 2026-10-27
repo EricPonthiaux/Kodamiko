@@ -2,6 +2,7 @@
 
 #include "terminal/IPty.h"
 #include "terminal/ProcessSpec.h"
+#include "terminal/VtScreen.h"
 
 #include <QSignalSpy>
 #include <QtTest>
@@ -29,6 +30,29 @@ private slots:
         // Into the pseudo-console, even when Duet's own output is redirected
         // (ctest's pipe).
         QVERIFY(output.contains("duet-ok"));
+    }
+
+    // AltGr arrives as Ctrl+Alt: its character is text, not Ctrl+letter
+    // nor an Alt escape.
+    void typesWhatAltGrComposes_data()
+    {
+        QTest::addColumn<int>("key");
+        QTest::addColumn<QString>("text");
+        QTest::newRow("letter") << int(Qt::Key_E) << QStringLiteral("€");
+        QTest::newRow("symbol") << int(Qt::Key_BraceLeft) << QStringLiteral("{");
+    }
+
+    void typesWhatAltGrComposes()
+    {
+        QFETCH(const int, key);
+        QFETCH(const QString, text);
+        VtScreen screen(2, 10);
+        QByteArray output;
+        connect(&screen, &VtScreen::outputReady, this, [&output](const QByteArray &data) { output += data; });
+
+        QVERIFY(screen.sendKey(key, Qt::ControlModifier | Qt::AltModifier, text, OptionKey::Compose));
+
+        QCOMPARE(output, text.toUtf8());
     }
 };
 

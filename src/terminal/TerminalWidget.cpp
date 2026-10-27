@@ -5,6 +5,7 @@
 #include "IPty.h"
 #include "VtScreen.h"
 #include "settings/Preferences.h"
+#include "system/Host.h"
 #include "ui/AppFonts.h"
 #include "ui/ContextMenus.h"
 #include "ui/Theme.h"
@@ -43,9 +44,22 @@ bool isCopyShortcut(const QKeyEvent *event)
 #endif
 }
 
+// Windows Terminal's: Ctrl+C copies when text is selected, and goes to the
+// program otherwise (see TerminalWidget::keyPressEvent).
+bool isSelectionCopyShortcut(const QKeyEvent *event)
+{
+    return Host::operatingSystem() == OperatingSystem::Windows && event->key() == Qt::Key_C &&
+           event->modifiers() == Qt::ControlModifier;
+}
+
 bool isPasteShortcut(const QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Insert && event->modifiers() == Qt::ShiftModifier)
+        return true;
+    // Windows Terminal's, which Claude Code expects there (it pastes images with Alt+V).
+    const bool isWindowsPaste = Host::operatingSystem() == OperatingSystem::Windows && event->key() == Qt::Key_V &&
+                                event->modifiers() == Qt::ControlModifier;
+    if (isWindowsPaste)
         return true;
 #ifdef Q_OS_MACOS
     return event->key() == Qt::Key_V && event->modifiers() == Qt::ControlModifier; // Cmd+V
@@ -557,6 +571,11 @@ void TerminalWidget::keyPressEvent(QKeyEvent *event)
         copySelection(QClipboard::Clipboard);
         return;
     }
+    if (isSelectionCopyShortcut(event) && !selectedText().isEmpty()) {
+        copySelection(QClipboard::Clipboard);
+        clearSelection(); // the next Ctrl+C interrupts the program
+        return;
+    }
     if (isPasteShortcut(event)) {
         pasteClipboard();
         return;
@@ -740,6 +759,13 @@ void TerminalWidget::copySelection(QClipboard::Mode mode) const
     const QString text = selectedText();
     if (!text.isEmpty())
         QApplication::clipboard()->setText(text, mode);
+}
+
+void TerminalWidget::clearSelection()
+{
+    selectionAnchor_ = QPoint(-1, 0);
+    selectionEnd_ = selectionAnchor_;
+    viewport()->update();
 }
 
 void TerminalWidget::pasteClipboard()
