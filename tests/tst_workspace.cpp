@@ -329,8 +329,8 @@ private slots:
         auto *frame = new WindowFrame(&window);
         frame->setFrameless(true);
         window.show();
-        ThemeStyle::apply(Theme::named("duet-amethyst"));
-        ThemeStyle::apply(Theme::named("duet-paper"));
+        ThemeStyle::apply(Theme::named("duet-lagoon"));
+        ThemeStyle::apply(Theme::named("duet-slate"));
         QCoreApplication::processEvents();
         const int shadow = OverlayPopup::shadowWidth;
         QCOMPARE(popup.contentsMargins(), QMargins(shadow, shadow, shadow, shadow));
@@ -399,23 +399,21 @@ private slots:
 
         bar.applyTheme(Theme::duet());
         QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(true).cacheKey());
-        bar.applyTheme(Theme::named("duet-paper"));
-        QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(false).cacheKey());
     }
 
     void titleBarOverflowRemainsVisibleAndOpensHiddenMenus_data()
     {
-        QTest::addColumn<bool>("dark");
+        QTest::addColumn<QString>("themeName");
         QTest::addColumn<int>("fontSize");
-        QTest::newRow("dark") << true << 11;
-        QTest::newRow("light") << false << 11;
-        QTest::newRow("dark-large-font") << true << 15;
-        QTest::newRow("light-large-font") << false << 15;
+        QTest::newRow("duet") << QStringLiteral("duet") << 11;
+        QTest::newRow("duet-slate") << QStringLiteral("duet-slate") << 11;
+        QTest::newRow("duet-large-font") << QStringLiteral("duet") << 15;
+        QTest::newRow("duet-slate-large-font") << QStringLiteral("duet-slate") << 15;
     }
 
     void titleBarOverflowRemainsVisibleAndOpensHiddenMenus()
     {
-        QFETCH(const bool, dark);
+        QFETCH(const QString, themeName);
         QFETCH(const int, fontSize);
         const QFont previousFont = QApplication::font();
         const QPalette previousPalette = QApplication::palette();
@@ -428,7 +426,7 @@ private slots:
         QFont font = previousFont;
         font.setPointSize(fontSize);
         QApplication::setFont(font);
-        const Theme theme = dark ? Theme::duet() : Theme::named("duet-paper");
+        const Theme theme = Theme::named(themeName);
         ThemeStyle::apply(theme);
         TitleBar bar;
         bar.applyTheme(theme);
@@ -477,13 +475,11 @@ private slots:
 
     void agentIndicatorTakesItsColorsFromTheTheme()
     {
-        for (const Theme &theme : {Theme::duet(), Theme::named("duet-amethyst"), Theme::named("duet-paper")}) {
+        for (const Theme &theme : {Theme::duet(), Theme::named("duet-lagoon"), Theme::named("duet-cocoa")}) {
             QCOMPARE(agentStatusColor(AgentStatus::Working, theme), theme.warning);
             QCOMPARE(agentStatusColor(AgentStatus::NeedsYou, theme), theme.accent);
             QCOMPARE(agentStatusColor(AgentStatus::Ready, theme), theme.mutedText);
         }
-        QVERIFY(agentStatusColor(AgentStatus::Done, Theme::named("duet-paper")) !=
-                agentStatusColor(AgentStatus::Done, Theme::duet()));
     }
 
     void frameAndTitleBarFollowTheWindow()

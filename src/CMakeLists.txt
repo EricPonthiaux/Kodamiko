@@ -162,6 +162,7 @@ add_library(duet_core STATIC
     git/FilePatch.cpp
     git/FileStatuses.cpp
     git/GitCommands.cpp
+    git/GitIgnoreFile.cpp
     git/GitOperations.cpp
     git/GitProcess.cpp
     git/IgnoreRules.cpp

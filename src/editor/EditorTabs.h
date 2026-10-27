@@ -143,6 +143,8 @@ protected:
     void tabRemoved(int index) override;
 
 private:
+    // Makes the window compose with the GPU before a preview needs it.
+    void composeWithGpuFromTheStart();
     // Duet's mark, centered, when no file is open.
     void paintEmptyMark();
     // Adds a tab, before the preview's.

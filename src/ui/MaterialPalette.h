@@ -18,10 +18,12 @@ inline constexpr const char *redA100 = "#ff8a80";
 inline constexpr const char *pink50 = "#fce4ec";
 inline constexpr const char *pink100 = "#f8bbd0";
 inline constexpr const char *pink200 = "#f48fb1";
+inline constexpr const char *pink300 = "#f06292";
 inline constexpr const char *pink600 = "#d81b60";
 inline constexpr const char *pink700 = "#c2185b";
 inline constexpr const char *pink900 = "#880e4f";
 inline constexpr const char *pinkA100 = "#ff80ab";
+inline constexpr const char *pinkA200 = "#ff4081";
 inline constexpr const char *purple50 = "#f3e5f5";
 inline constexpr const char *purple100 = "#e1bee7";
 inline constexpr const char *purple200 = "#ce93d8";
@@ -34,6 +36,7 @@ inline constexpr const char *purpleA100 = "#ea80fc";
 inline constexpr const char *deepPurple50 = "#ede7f6";
 inline constexpr const char *deepPurple100 = "#d1c4e9";
 inline constexpr const char *deepPurple200 = "#b39ddb";
+inline constexpr const char *deepPurple300 = "#9575cd";
 inline constexpr const char *deepPurple400 = "#7e57c2";
 inline constexpr const char *deepPurple500 = "#673ab7";
 inline constexpr const char *deepPurple600 = "#5e35b1";
@@ -44,6 +47,7 @@ inline constexpr const char *deepPurpleA100 = "#b388ff";
 inline constexpr const char *indigo50 = "#e8eaf6";
 inline constexpr const char *indigo100 = "#c5cae9";
 inline constexpr const char *indigo200 = "#9fa8da";
+inline constexpr const char *indigo300 = "#7986cb";
 inline constexpr const char *indigo400 = "#5c6bc0";
 inline constexpr const char *indigo500 = "#3f51b5";
 inline constexpr const char *indigo600 = "#3949ab";
@@ -64,6 +68,7 @@ inline constexpr const char *lightBlue50 = "#e1f5fe";
 inline constexpr const char *lightBlue100 = "#b3e5fc";
 inline constexpr const char *lightBlue200 = "#81d4fa";
 inline constexpr const char *lightBlue300 = "#4fc3f7";
+inline constexpr const char *lightBlue600 = "#039be5";
 inline constexpr const char *lightBlue700 = "#0288d1";
 inline constexpr const char *lightBlue800 = "#0277bd";
 inline constexpr const char *lightBlue900 = "#01579b";
@@ -85,21 +90,25 @@ inline constexpr const char *teal800 = "#00695c";
 inline constexpr const char *teal900 = "#004d40";
 inline constexpr const char *tealA100 = "#a7ffeb";
 inline constexpr const char *tealA200 = "#64ffda";
+inline constexpr const char *green200 = "#a5d6a7";
 inline constexpr const char *green300 = "#81c784";
 inline constexpr const char *green700 = "#388e3c";
 inline constexpr const char *green800 = "#2e7d32";
 inline constexpr const char *green900 = "#1b5e20";
 inline constexpr const char *greenA100 = "#b9f6ca";
+inline constexpr const char *greenA400 = "#00e676";
 inline constexpr const char *lightGreen50 = "#f1f8e9";
 inline constexpr const char *lightGreen100 = "#dcedc8";
 inline constexpr const char *lightGreen200 = "#c5e1a5";
 inline constexpr const char *lightGreen300 = "#aed581";
+inline constexpr const char *lightGreen400 = "#9ccc65";
 inline constexpr const char *lightGreen800 = "#558b2f";
 inline constexpr const char *lightGreen900 = "#33691e";
 inline constexpr const char *lightGreenA100 = "#ccff90";
 inline constexpr const char *lime200 = "#e6ee9c";
 inline constexpr const char *lime300 = "#dce775";
 inline constexpr const char *lime900 = "#827717";
+inline constexpr const char *limeA100 = "#f4ff81";
 inline constexpr const char *yellow50 = "#fffde7";
 inline constexpr const char *yellow100 = "#fff9c4";
 inline constexpr const char *yellow200 = "#fff59d";
@@ -126,6 +135,7 @@ inline constexpr const char *deepOrange300 = "#ff8a65";
 inline constexpr const char *deepOrange600 = "#f4511e";
 inline constexpr const char *deepOrange800 = "#d84315";
 inline constexpr const char *deepOrange900 = "#bf360c";
+inline constexpr const char *deepOrangeA100 = "#ff9e80";
 inline constexpr const char *deepOrangeA200 = "#ff6e40";
 inline constexpr const char *brown50 = "#efebe9";
 inline constexpr const char *brown100 = "#d7ccc8";
@@ -162,27 +172,28 @@ inline constexpr const char *white = "#ffffff";
 
 // Every color above, for the tests to check that a theme takes only these.
 inline constexpr std::array all = {
-    red200,        red300,        red400,        red700,         red800,        redA100,        pink50,
-    pink100,       pink200,       pink600,       pink700,        pink900,       pinkA100,       purple50,
-    purple100,     purple200,     purple300,     purple600,      purple700,     purple800,      purple900,
-    purpleA100,    deepPurple50,  deepPurple100, deepPurple200,  deepPurple400, deepPurple500,  deepPurple600,
-    deepPurple700, deepPurple800, deepPurple900, deepPurpleA100, indigo50,      indigo100,      indigo200,
-    indigo400,     indigo500,     indigo600,     indigo700,      indigo800,     indigo900,      indigoA100,
-    blue50,        blue100,       blue200,       blue300,        blue600,       blue700,        blue800,
-    blue900,       blueA100,      lightBlue50,   lightBlue100,   lightBlue200,  lightBlue300,   lightBlue700,
-    lightBlue800,  lightBlue900,  lightBlueA100, lightBlueA200,  cyan100,       cyan200,        cyan800,
-    cyanA100,      cyanA400,      teal50,        teal100,        teal200,       teal300,        teal400,
-    teal600,       teal700,       teal800,       teal900,        tealA100,      tealA200,       green300,
-    green700,      green800,      green900,      greenA100,      lightGreen50,  lightGreen100,  lightGreen200,
-    lightGreen300, lightGreen800, lightGreen900, lightGreenA100, lime200,       lime300,        lime900,
-    yellow50,      yellow100,     yellow200,     yellowA100,     amber50,       amber100,       amber200,
-    amber300,      amber400,      amber600,      amber800,       amber900,      amberA100,      orange50,
-    orange100,     orange200,     orange300,     orange800,      orange900,     orangeA100,     deepOrange100,
-    deepOrange200, deepOrange300, deepOrange600, deepOrange800,  deepOrange900, deepOrangeA200, brown50,
-    brown100,      brown200,      brown300,      brown400,       brown500,      brown600,       brown700,
-    brown800,      brown900,      grey50,        grey100,        grey200,       grey300,        grey400,
-    grey500,       grey600,       grey700,       grey800,        grey900,       blueGrey50,     blueGrey100,
-    blueGrey200,   blueGrey300,   blueGrey400,   blueGrey500,    blueGrey600,   blueGrey700,    blueGrey800,
-    blueGrey900,   black,         white};
+    red200,         red300,         red400,        red700,        red800,         redA100,       pink50,
+    pink100,        pink200,        pink300,       pink600,       pink700,        pink900,       pinkA100,
+    pinkA200,       purple50,       purple100,     purple200,     purple300,      purple600,     purple700,
+    purple800,      purple900,      purpleA100,    deepPurple50,  deepPurple100,  deepPurple200, deepPurple300,
+    deepPurple400,  deepPurple500,  deepPurple600, deepPurple700, deepPurple800,  deepPurple900, deepPurpleA100,
+    indigo50,       indigo100,      indigo200,     indigo300,     indigo400,      indigo500,     indigo600,
+    indigo700,      indigo800,      indigo900,     indigoA100,    blue50,         blue100,       blue200,
+    blue300,        blue600,        blue700,       blue800,       blue900,        blueA100,      lightBlue50,
+    lightBlue100,   lightBlue200,   lightBlue300,  lightBlue600,  lightBlue700,   lightBlue800,  lightBlue900,
+    lightBlueA100,  lightBlueA200,  cyan100,       cyan200,       cyan800,        cyanA100,      cyanA400,
+    teal50,         teal100,        teal200,       teal300,       teal400,        teal600,       teal700,
+    teal800,        teal900,        tealA100,      tealA200,      green200,       green300,      green700,
+    green800,       green900,       greenA100,     greenA400,     lightGreen50,   lightGreen100, lightGreen200,
+    lightGreen300,  lightGreen400,  lightGreen800, lightGreen900, lightGreenA100, lime200,       lime300,
+    lime900,        limeA100,       yellow50,      yellow100,     yellow200,      yellowA100,    amber50,
+    amber100,       amber200,       amber300,      amber400,      amber600,       amber800,      amber900,
+    amberA100,      orange50,       orange100,     orange200,     orange300,      orange800,     orange900,
+    orangeA100,     deepOrange100,  deepOrange200, deepOrange300, deepOrange600,  deepOrange800, deepOrange900,
+    deepOrangeA100, deepOrangeA200, brown50,       brown100,      brown200,       brown300,      brown400,
+    brown500,       brown600,       brown700,      brown800,      brown900,       grey50,        grey100,
+    grey200,        grey300,        grey400,       grey500,       grey600,        grey700,       grey800,
+    grey900,        blueGrey50,     blueGrey100,   blueGrey200,   blueGrey300,    blueGrey400,   blueGrey500,
+    blueGrey600,    blueGrey700,    blueGrey800,   blueGrey900,   black,          white};
 
 } // namespace MaterialPalette

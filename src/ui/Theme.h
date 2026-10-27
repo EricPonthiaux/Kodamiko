@@ -20,7 +20,7 @@ struct TextStyle {
 };
 
 struct Theme {
-    QString name;  // "duet", "duet-slate", "duet-paper"…
+    QString name;  // "duet", "duet-night", "duet-slate"…
     QString title; // as shown in View ▸ Theme
     bool isDark = true;
     QFont font;

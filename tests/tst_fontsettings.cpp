@@ -224,7 +224,7 @@ private slots:
         const Window window;
         applyPreferences(withSizes(14, 16), window);
 
-        ThemeStyle::apply(Theme::named("duet-paper"));
+        ThemeStyle::apply(Theme::named("duet-slate"));
 
         QCOMPARE(preferencePoints(window.outline->font()), 16);
         QCOMPARE(preferencePoints(window.files->tree()->font()), 16);
@@ -242,7 +242,7 @@ private slots:
         platformFont.setPointSize(7);
         QApplication::setFont(platformFont, "QMenuBar");
 
-        ThemeStyle::apply(Theme::named("duet-paper"));
+        ThemeStyle::apply(Theme::named("duet-slate"));
 
         QCOMPARE(preferencePoints(window.titleBar->menuBar()->font()), 14);
     }
