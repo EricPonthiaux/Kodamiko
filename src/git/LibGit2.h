@@ -36,6 +36,8 @@ struct Free {
     void operator()(git_tree_entry *p) const { git_tree_entry_free(p); }
 
     void operator()(git_blob *p) const { git_blob_free(p); }
+
+    void operator()(git_blame *p) const { git_blame_free(p); }
 };
 
 template <typename T>

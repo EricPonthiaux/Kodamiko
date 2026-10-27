@@ -312,6 +312,8 @@ void MainWindow::createGitViews()
     });
     connect(changesView_, &ChangesView::statusMessage, this, &MainWindow::showStatus);
     connect(changesView_, &ChangesView::commitMessageRequested, this, &MainWindow::askClaudeForCommitMessage);
+    connect(changesView_, &ChangesView::explanationRequested, this,
+            [this](const QString &request) { typeInClaudePrompt(request, PromptEntry::Submitted); });
     connect(changesView_, &ChangesView::reviewRequested, this, &MainWindow::reviewStagedChanges);
     connect(changesView_, &ChangesView::reviewCloseRequested, this, &MainWindow::closeStagedReview);
     connect(changesView_, &ChangesView::continueRequested, gitActions_, &GitActions::continueOperation);

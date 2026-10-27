@@ -4,7 +4,11 @@
 
 #include "CommitDelegate.h"
 #include "CommitGraph.h"
+#include "CommitHeader.h"
+#include "FileLens.h"
 #include "HistorySearchField.h"
+#include "changes/ChangeMap.h"
+#include "changes/DiffFileStrip.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "ui/AppFonts.h"
@@ -62,10 +66,7 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     , commitsHeader_(new ViewHeader(tr("Commits"), this))
     , commits_(new QTreeWidget(this))
     , foldedCommits_(new FoldedPane(tr("Commits"), QStringLiteral("file-list"), tr("Show the commits"), this))
-    , foldedCommit_(
-          new FoldedPane(tr("Commit"), QStringLiteral("file-list"), tr("Show the commit and its files"), this))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
-    , leftSplitter_(new GripSplitter(Qt::Vertical, this))
 {
     refreshButton_ = new QToolButton(this);
     refreshButton_->setToolTip(tr("Reload the history"));
@@ -94,11 +95,20 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     showAll_->hide();
     connect(showAll_, &QToolButton::clicked, this, [this] { setPathFilter({}); });
 
+    linesByAge_ = new QToolButton(this);
+    linesByAge_->setText(tr("Lines by Age"));
+    linesByAge_->setToolTip(tr("Show the file's lines by the age of the commit that wrote them, instead of the diff"));
+    linesByAge_->setCheckable(true);
+    linesByAge_->setAutoRaise(true);
+    linesByAge_->setFocusPolicy(Qt::NoFocus);
+    linesByAge_->hide();
+    connect(linesByAge_, &QToolButton::toggled, this, &HistoryView::showLinesByAge);
+
     // "History" and the summary; the filter and the reload at the right.
     title_ = new QLabel(tr("History"), this);
-    AppFonts::setInterfaceFont(title_, 1.15);
+    AppFonts::setViewTitleFont(title_);
     summary_->setEnabled(false); // dimmed
-    AppFonts::setInterfaceFont(currentCommit_, 1, QFont::DemiBold);
+    AppFonts::setViewTitleFont(currentCommit_);
     // Clipped rather than pushing the filter away.
     currentCommit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     currentCommit_->hide();
@@ -113,6 +123,7 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     header->addWidget(title_);
     header->addWidget(summary_);
     header->addWidget(showAll_);
+    header->addWidget(linesByAge_);
     header->addWidget(currentCommit_, 1);
     header->addStretch();
     header->addWidget(filter_, 1);
@@ -124,7 +135,8 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     commits_->setObjectName(QStringLiteral("commits"));
     commits_->setHeaderHidden(true);
     commits_->setRootIsDecorated(false);
-    commits_->setUniformRowHeights(true);
+    // The first commit of a day is taller: its heading is above it.
+    commits_->setUniformRowHeights(false);
     commits_->setFrameShape(QFrame::NoFrame);
     commits_->setMouseTracking(true); // hover
     commits_->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -139,22 +151,15 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     connect(commits_->verticalScrollBar(), &QScrollBar::rangeChanged, this, &HistoryView::loadMoreIfAtEnd);
 
     commitListPane_ = createCommitListPane();
-    commitPane_ = createCommitPane();
-    leftSplitter_->addWidget(commitListPane_);
-    leftSplitter_->addWidget(commitPane_);
-    leftSplitter_->setChildrenCollapsible(false);
-    splitter_->addWidget(leftSplitter_);
+    splitter_->addWidget(commitListPane_);
     splitter_->addWidget(createDiffPane());
     splitter_->setChildrenCollapsible(false);
     // Remembers the proportions set with the mouse.
     connect(splitter_, &QSplitter::splitterMoved, this, &HistoryView::rememberShares);
-    connect(leftSplitter_, &QSplitter::splitterMoved, this, &HistoryView::rememberShares);
 
     // The folded commits' bar, then the panes.
     connect(foldedCommits_, &FoldedPane::expandRequested, this, [this] { setCommitListFolded(false); });
-    connect(foldedCommit_, &FoldedPane::expandRequested, this, [this] { setCommitPaneFolded(false); });
     foldedCommits_->hide();
-    foldedCommit_->hide();
     auto *panes = new QHBoxLayout;
     panes->setSpacing(0);
     panes->addWidget(foldedCommits_);
@@ -185,27 +190,37 @@ QWidget *HistoryView::createCommitListPane()
     return pane;
 }
 
-// The chosen file's diff under its header; a hint until one is chosen. The
-// folded commit's bar at its left: right after the commits, whatever the
-// arrangement.
+// The chosen commit, whole: its header, then the diff's header, the strip of
+// its files and the diff of all of them, the change map beside it. The lens
+// takes the place of all but the commit's header.
 QWidget *HistoryView::createDiffPane()
 {
     auto *pane = new QFrame(this);
     pane->setObjectName(QStringLiteral("historyPane"));
+    commitHeader_ = new CommitHeader(pane);
     diff_ = new DiffView(Theme::duet(), pane);
     diff_->setToolTip({});
     diffHeader_ = new DiffHeaderBar(diff_, pane);
     connect(diffHeader_, &DiffHeaderBar::whitespaceChanged, this, &HistoryView::rereadCommit);
     connect(diffHeader_, &DiffHeaderBar::heightChanged, this, &HistoryView::alignBars);
+    fileStrip_ = new DiffFileStrip(diff_, pane);
+    connect(fileStrip_, &DiffFileStrip::fileActivated, this, &HistoryView::openFile);
+    changeMap_ = new ChangeMap(diff_, pane);
+    lens_ = new FileLens(Theme::duet(), pane);
+    lens_->hide();
+    connect(lens_, &FileLens::commitClicked, this, &HistoryView::chooseCommitOfLens);
 
     auto *layout = new QGridLayout(pane);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(foldedCommit_, 0, 0, 2, 1);
-    layout->addWidget(diffHeader_, 0, 1);
-    layout->addWidget(diff_, 1, 1);
-    layout->setRowStretch(1, 1);
-    layout->setColumnStretch(1, 1);
+    layout->addWidget(commitHeader_, 0, 0, 1, 2);
+    layout->addWidget(diffHeader_, 1, 0, 1, 2);
+    layout->addWidget(fileStrip_, 2, 0, 1, 2);
+    layout->addWidget(diff_, 3, 0);
+    layout->addWidget(changeMap_, 3, 1);
+    layout->addWidget(lens_, 1, 0, 3, 2);
+    layout->setRowStretch(3, 1);
+    layout->setColumnStretch(0, 1);
     return pane;
 }
 
@@ -252,12 +267,14 @@ void HistoryView::setPathFilterShown(const QString &relativePath)
 {
     pathFilter_ = relativePath;
     const bool isFiltered = !relativePath.isEmpty();
-    // A file, or a file deleted since: each commit shows only its diff.
+    // A file, or a file deleted since.
     filtersOnFile_ = isFiltered && !QFileInfo(QDir(folder_).filePath(relativePath)).isDir();
-    showPanes();
     title_->setText(isFiltered ? tr("History of %1").arg(QFileInfo(relativePath).fileName()) : tr("History"));
     title_->setToolTip(relativePath);
     showAll_->setVisible(isFiltered);
+    linesByAge_->setVisible(filtersOnFile_);
+    if (!filtersOnFile_)
+        linesByAge_->setChecked(false);
 }
 
 void HistoryView::refresh()
@@ -270,6 +287,8 @@ void HistoryView::refresh()
     }
     reading_ = true;
     refreshPending_ = false;
+    if (linesByAge_->isChecked())
+        readBlame(); // after the log: the pool reads in order
     // A path filter or a content search walks the whole history: off the UI
     // thread.
     const LogOptions options{
@@ -420,9 +439,24 @@ void HistoryView::applyFilter()
     const CommitQuery &query = filter_->query();
     for (int i = 0; i < commits_->topLevelItemCount(); ++i)
         commits_->topLevelItem(i)->setHidden(!query.matches(log_->commits.at(i)));
+    headDays();
     // Rows hidden by the filter would break its lines too.
     commitDelegate_->setGraphLanes(query.keepsEveryCommit() ? graphLanes_ : 0);
     commits_->viewport()->update();
+}
+
+void HistoryView::headDays()
+{
+    const QDate today = QDate::currentDate();
+    QDate previousDay;
+    for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *item = commits_->topLevelItem(i);
+        if (item->isHidden())
+            continue;
+        const QDate day = CommitDelegate::day(item);
+        CommitDelegate::setDayHeading(item, day != previousDay ? CommitDelegate::dayHeading(day, today) : QString());
+        previousDay = day;
+    }
 }
 
 void HistoryView::updateSummary()
@@ -452,6 +486,7 @@ void HistoryView::onCommitSelectionChanged()
         forgetCommit();
     else
         showCommit(selected.first()->data(0, idRole).toString());
+    lens_->setChosenCommit(selected.isEmpty() ? QString() : selected.first()->data(0, idRole).toString());
     showCurrentCommitTitle();
 }
 
@@ -481,22 +516,21 @@ void HistoryView::applyTheme(const Theme &theme)
 {
     ruleColor_ = theme.line;
     diff_->applyTheme(theme);
+    lens_->applyTheme(theme);
+    changeMap_->applyTheme(theme);
     diffHeader_->applyTheme(theme);
     refreshButton_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
     allBranches_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme.foreground));
     filter_->applyTheme(theme);
-    copyId_->setIcon(UiIcons::icon(QStringLiteral("copy"), theme.mutedText));
-    commitId_->setFont(AppFonts::codeFont(font().pointSizeF() * 0.95));
+    commitHeader_->applyTheme(theme);
+    fileStrip_->applyTheme(theme);
     commitsHeader_->setIconColor(theme.foreground);
-    commitHeader_->setIconColor(theme.foreground);
     foldedCommits_->applyTheme(theme);
-    foldedCommit_->applyTheme(theme);
     alignBars();
 }
 
 void HistoryView::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
-    arrangePanes();
-    fitMessage(); // its width changed
+    applyShares();
 }

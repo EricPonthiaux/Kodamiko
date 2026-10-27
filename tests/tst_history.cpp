@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "changes/ChangeTree.h"
+#include "changes/DiffFileStrip.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "git/CommitLog.h"
+#include "git/FileBlame.h"
 #include "git/GitProcess.h"
 #include "history/CommitDelegate.h"
 #include "history/CommitGraph.h"
+#include "history/CommitHeader.h"
 #include "history/CommitQuery.h"
+#include "history/FileLens.h"
+#include "history/HistorySearchField.h"
 #include "history/HistoryView.h"
 #include "ui/FoldedPane.h"
 
+#include <QDataStream>
 #include <QLabel>
 #include <QLineEdit>
 #include <QProcess>
@@ -21,6 +26,7 @@
 #include <QTemporaryFile>
 #include <QToolButton>
 #include <QTreeWidget>
+#include <Qsci/qsciscintilla.h>
 #include <QtTest>
 
 namespace {
@@ -391,15 +397,14 @@ private slots:
         view.setPathFilter("a.txt");
         QTRY_VERIFY(!refreshed.isEmpty());
         auto *commits = view.findChild<QTreeWidget *>("commits");
-        const auto *files = view.findChild<QTreeWidget *>("files");
         const auto *diff = view.findChild<DiffView *>();
 
         commits->setCurrentItem(commits->topLevelItem(0));
 
         QTRY_VERIFY(diff->text().contains("a.txt"));
         QVERIFY(!diff->text().contains("b.txt"));
-        QCOMPARE(files->topLevelItemCount(), 1);
-        QVERIFY(!files->isVisibleTo(&view)); // the commit pane: no list to look through
+        QCOMPARE(diff->fileSummaries().size(), 1);
+        QVERIFY(!view.findChild<DiffFileStrip *>()->isVisibleTo(&view)); // one file: no strip to look through
     }
 
     void hidingWhitespaceKeepsTheChosenFile()
@@ -414,12 +419,10 @@ private slots:
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
         auto *commits = view.findChild<QTreeWidget *>("commits");
-        auto *files = view.findChild<QTreeWidget *>("files");
         const auto *diff = view.findChild<DiffView *>();
         commits->setCurrentItem(commits->topLevelItem(0));
-        QTRY_COMPARE(files->topLevelItemCount(), 2);
-        files->setCurrentItem(files->topLevelItem(1));
-        QTRY_VERIFY(diff->text().contains("b   c"));
+        QTRY_COMPARE(diff->fileSummaries().size(), 2);
+        QVERIFY(diff->text().contains("b   c"));
         QToolButton *whitespace = nullptr;
         for (QToolButton *button : view.findChild<DiffHeaderBar *>()->findChildren<QToolButton *>()) {
             if (button->toolTip() == QLatin1String("Hide whitespace changes"))
@@ -525,6 +528,196 @@ private slots:
         const CommitQuery query = CommitQuery::parse("diff:(unclosed");
         QVERIFY(!query.contents);
         QVERIFY(query.error.contains("(unclosed"));
+    }
+
+    void queryLocatesTheTermsItReads()
+    {
+        const CommitQuery query = CommitQuery::parse("fix author:ada after:7d before:someday");
+
+        // "fix" is a word, "before:someday" could not be read.
+        QCOMPARE(query.termSpans, (QList<CommitQuery::Span>{{4, 10}, {15, 8}}));
+    }
+
+    void dayHeadingsNameTheRecentDaysThenTheDate()
+    {
+        const QDate today(2026, 10, 27); // a Tuesday
+
+        QCOMPARE(CommitDelegate::dayHeading(today, today), QString("Today"));
+        QCOMPARE(CommitDelegate::dayHeading(today.addDays(-1), today), QString("Yesterday"));
+        QCOMPARE(CommitDelegate::dayHeading(today.addDays(-5), today), QLocale().dayName(4));
+        QCOMPARE(CommitDelegate::dayHeading(QDate(2026, 3, 2), today),
+                 QLocale().toString(QDate(2026, 3, 2), QStringLiteral("dddd, MMMM d")));
+        QCOMPARE(CommitDelegate::dayHeading(QDate(2025, 3, 2), today),
+                 QLocale().toString(QDate(2025, 3, 2), QLocale::LongFormat));
+    }
+
+    void aCommitIsMadeWithClaudeByItsAuthorOrACoAuthorTrailer()
+    {
+        CommitSummary commit{.summary = "Fix", .message = "Fix\n\nCo-Authored-By: Claude Opus <noreply@anthropic.com>"};
+        QVERIFY(CommitDelegate::isMadeWithClaude(commit));
+        commit.message = "Fix\n\nAsked Claude about it.";
+        QVERIFY(!CommitDelegate::isMadeWithClaude(commit));
+        commit.author = "Claude";
+        QVERIFY(CommitDelegate::isMadeWithClaude(commit));
+    }
+
+    void aCommitMadeWithClaudeIsMarkedForTheGraph()
+    {
+        const CommitSummary withClaude{.summary = "Fix", .message = "Fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>"};
+        const CommitSummary alone{.summary = "Fix", .message = "Fix"};
+        QTreeWidgetItem withClaudeItem;
+        QTreeWidgetItem aloneItem;
+
+        CommitDelegate::setCommit(&withClaudeItem, withClaude);
+        CommitDelegate::setCommit(&aloneItem, alone);
+
+        QVERIFY(CommitDelegate::isMadeWithClaude(&withClaudeItem));
+        QVERIFY(!CommitDelegate::isMadeWithClaude(&aloneItem));
+    }
+
+    void backspaceAfterATermRemovesTheWholeTerm()
+    {
+        HistorySearchField field;
+        field.setText("fix author:ada after:7d");
+        field.setCursorPosition(int(QString("fix author:ada").size()));
+
+        QTest::keyClick(&field, Qt::Key_Backspace);
+
+        QCOMPARE(field.text(), QString("fix after:7d"));
+        QCOMPARE(field.cursorPosition(), int(QString("fix ").size()));
+        QCOMPARE(field.query().authors, QStringList());
+    }
+
+    void backspaceInsideAWordRemovesOneCharacter()
+    {
+        HistorySearchField field;
+        field.setText("fix author:ada");
+        field.setCursorPosition(3);
+
+        QTest::keyClick(&field, Qt::Key_Backspace);
+
+        QCOMPARE(field.text(), QString("fi author:ada"));
+    }
+
+    void removingATermKeepsTheRestOfTheQuery()
+    {
+        HistorySearchField field;
+        field.setText("author:ada fix after:7d");
+        QCOMPARE(field.query().termSpans.size(), 2);
+
+        field.removeTerm(1); // after:7d
+
+        QCOMPARE(field.text(), QString("author:ada fix"));
+        QCOMPARE(field.query().authors, QStringList({"ada"}));
+        QCOMPARE(field.query().words, QStringList({"fix"}));
+    }
+
+    void theFirstCommitOfEachDayCarriesItsHeading()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "monday", {{"a.txt", "1\n"}});
+        git(dir, {"commit", "-q", "--amend", "--no-edit", "--date", "2026-10-19T10:00:00"});
+        commit(dir, "tuesday morning", {{"a.txt", "2\n"}});
+        git(dir, {"commit", "-q", "--amend", "--no-edit", "--date", "2026-10-20T09:00:00"});
+        commit(dir, "tuesday evening", {{"a.txt", "3\n"}});
+        git(dir, {"commit", "-q", "--amend", "--no-edit", "--date", "2026-10-20T18:00:00"});
+        HistoryView view(Theme::duet());
+        view.resize(1400, 700);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+
+        view.refresh();
+
+        QTRY_COMPARE(refreshed.size(), 1);
+        const auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto heightOf = [commits](int row) {
+            return commits->visualItemRect(commits->topLevelItem(row)).height();
+        };
+        QVERIFY(heightOf(0) > heightOf(1)); // tuesday evening, under "Tuesday"
+        QVERIFY(heightOf(2) > heightOf(1)); // monday, under "Monday"
+    }
+
+    void blameNamesTheCommitThatLastChangedEachLine()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "create", {{"a.txt", "one\ntwo\nthree\n"}});
+        commit(dir, "edit", {{"a.txt", "one\nTWO\nthree\n"}});
+
+        const FileBlame blame = FileBlame::read(dir.path(), "a.txt");
+
+        QCOMPARE(blame.lines, QStringList({"one", "TWO", "three"}));
+        QCOMPARE(blame.commits.size(), 2);
+        QCOMPARE(blame.commits.at(blame.lineCommits.at(0)).summary, QString("create"));
+        QCOMPARE(blame.commits.at(blame.lineCommits.at(1)).summary, QString("edit"));
+        QCOMPARE(blame.commits.at(blame.lineCommits.at(2)).summary, QString("create"));
+    }
+
+    void blameOfAFileHeadDoesNotHaveThrows()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "create", {{"a.txt", "a\n"}});
+
+        QVERIFY_THROWS_EXCEPTION(GitError, FileBlame::read(dir.path(), "missing.txt"));
+    }
+
+    void linesByAgeIsOfferedForAFileHistoryOnly()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "create", {{"a.txt", "a\n"}, {"sub/b.txt", "b\n"}});
+        HistoryView view(Theme::duet());
+        view.resize(1400, 700);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.setPathFilter("a.txt");
+        QTRY_COMPARE(refreshed.size(), 1);
+        QToolButton *linesByAge = toolButton(view, "Show the file's lines by the age of the commit that wrote them, "
+                                                   "instead of the diff");
+        QVERIFY(linesByAge->isVisible());
+
+        linesByAge->click();
+
+        auto *lens = view.findChild<FileLens *>();
+        QVERIFY(lens->isVisible());
+        QVERIFY(!view.findChild<DiffView *>()->isVisible());
+        QTRY_VERIFY(lens->findChild<QsciScintilla *>() && lens->findChild<QsciScintilla *>()->text() == "a");
+        view.setPathFilter("sub");
+        QVERIFY(!linesByAge->isVisible());
+        QVERIFY(!lens->isVisible());
+    }
+
+    void theCommitNameUnderTheMouseStandsOutWithAHand()
+    {
+        const QDateTime date(QDate(2026, 10, 20), QTime(9, 0));
+        FileBlame blame{.lines = {"one", "two", "three"},
+                        .commits = {{.id = "a", .summary = "create", .date = date},
+                                    {.id = "b", .summary = "edit", .date = date.addDays(1)}},
+                        .lineCommits = {0, 0, 1}};
+        FileLens lens(Theme::duet());
+        lens.resize(800, 400);
+        lens.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&lens));
+        lens.showBlame("a.txt", blame);
+        auto *code = lens.findChild<QsciScintilla *>();
+        QWidget *viewport = code->viewport();
+        const auto yOf = [code](int line) {
+            const long position = code->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+            return int(code->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, position)) + 3;
+        };
+
+        QTest::mouseMove(viewport, QPoint(10, yOf(1))); // the second line of "create"'s run
+
+        QTRY_COMPARE(lens.hoveredRun(), 0);
+        QTest::mouseMove(viewport, QPoint(10, yOf(2)));
+        QTRY_COMPARE(lens.hoveredRun(), 2);
+        QTest::mouseMove(viewport, QPoint(viewport->width() - 10, yOf(2))); // over the text
+        QTRY_COMPARE(lens.hoveredRun(), -1);
+        QCOMPARE(code->SendScintilla(QsciScintillaBase::SCI_GETMARGINCURSORN, 0L), 8L); // the hand
     }
 
     void queryMatchesTheMessageBodyTheAuthorAndTheDays()
@@ -659,17 +852,17 @@ private slots:
         view.setPathFilter("src");
         QTRY_VERIFY(!refreshed.isEmpty());
         auto *commits = view.findChild<QTreeWidget *>("commits");
-        const auto *files = view.findChild<QTreeWidget *>("files");
+        const auto *diff = view.findChild<DiffView *>();
 
         commits->setCurrentItem(commits->topLevelItem(0));
 
-        QTRY_COMPARE(files->topLevelItemCount(), 1);
-        QCOMPARE(files->topLevelItem(0)->text(0), QString("src")); // the folder, holding both
-        QCOMPARE(ChangeTree::filesUnder(files->topLevelItem(0)).size(), 2);
-        QVERIFY(files->isVisibleTo(&view));
+        QTRY_COMPARE(diff->fileSummaries().size(), 2);
+        QCOMPARE(diff->fileSummaries().at(0).path, QString("src/a.txt"));
+        QCOMPARE(diff->fileSummaries().at(1).path, QString("src/b.txt"));
+        QVERIFY(view.findChild<DiffFileStrip *>()->isVisibleTo(&view));
     }
 
-    void viewRevealsCommitThenFile()
+    void viewShowsTheChosenCommitWhole()
     {
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
@@ -681,41 +874,38 @@ private slots:
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.refresh(); // off the UI thread
         QTRY_COMPARE(refreshed.size(), 1);
-        QCOMPARE(view.findChildren<QTreeWidget *>().size(), 2);
+        QCOMPARE(view.findChildren<QTreeWidget *>().size(), 1); // the commits: no list of files to choose from
         auto *commits = view.findChild<QTreeWidget *>("commits");
-        auto *files = view.findChild<QTreeWidget *>("files");
-        QVERIFY(commits && files);
+        const auto *header = view.findChild<CommitHeader *>();
         const auto *diff = view.findChild<DiffView *>();
 
-        // Initially, every pane in place, with no commit chosen.
+        // Initially, a hint above an empty diff.
         QCOMPARE(commits->topLevelItemCount(), 2);
         QVERIFY(commits->selectedItems().isEmpty());
-        QVERIFY(!files->isVisibleTo(&view)); // a hint in its place
+        QVERIFY(!header->showsCommit());
         QVERIFY(diff->isVisibleTo(&view));
         QVERIFY(diff->text().isEmpty());
 
-        // A commit chosen: its message and files, no diff yet.
+        // A commit chosen: its message above the diff of all its files.
         commits->setCurrentItem(commits->topLevelItem(0));
-        QTRY_COMPARE(files->topLevelItemCount(), 2);
-        QVERIFY(files->isVisibleTo(&view));
-        const QStringList labels = [&view] {
+        QTRY_COMPARE(diff->fileSummaries().size(), 2);
+        QVERIFY(header->showsCommit());
+        QVERIFY(header->isVisibleTo(&view));
+        const QStringList labels = [header] {
             QStringList texts;
-            for (const QLabel *label : view.findChildren<QLabel *>())
+            for (const QLabel *label : header->findChildren<QLabel *>())
                 texts.append(label->text());
             return texts;
         }();
         QVERIFY(labels.contains("second"));
-        QVERIFY(diff->text().isEmpty());
-
-        // A file chosen: its diff, and only that one.
-        files->setCurrentItem(files->topLevelItem(1));
+        QVERIFY(diff->text().contains("a.txt"));
         QVERIFY(diff->text().contains("b.txt"));
-        QVERIFY(!diff->text().contains("a.txt"));
 
-        // Another commit: the diff empties until a file is chosen.
+        // Another commit: the diff of its own files.
         commits->setCurrentItem(commits->topLevelItem(1));
-        QTRY_COMPARE(files->topLevelItemCount(), 1);
-        QVERIFY(diff->text().isEmpty());
+        QTRY_COMPARE(diff->fileSummaries().size(), 1);
+        QVERIFY(diff->text().contains("a.txt"));
+        QVERIFY(!diff->text().contains("b.txt"));
 
         // A new commit: the selection stays on the chosen commit.
         commit(dir, "third", {{"c.txt", "c\n"}});
@@ -723,24 +913,7 @@ private slots:
         QTRY_COMPARE(refreshed.size(), 2);
         QCOMPARE(commits->topLevelItemCount(), 3);
         QCOMPARE(commits->currentItem()->text(0), QStringLiteral("first"));
-        QCOMPARE(files->topLevelItemCount(), 1);
-        QVERIFY(files->isVisibleTo(&view));
-    }
-
-    void widePanesStandSideBySide()
-    {
-        HistoryView view(Theme::duet());
-        view.resize(1400, 700);
-        view.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&view));
-        QTRY_VERIFY(view.isWide());
-        const auto *files = view.findChild<QTreeWidget *>("files");
-        const auto *commits = view.findChild<QTreeWidget *>("commits");
-        // Side by side: the commit pane starts right of the commits.
-        QVERIFY(files->mapTo(&view, QPoint()).x() > commits->mapTo(&view, QPoint()).x() + commits->width() - 1);
-
-        view.resize(900, 700);
-        QTRY_VERIFY(!view.isWide());
+        QCOMPARE(diff->fileSummaries().size(), 1);
     }
 
     void foldingTheCommitsNamesTheChosenOneInTheTitleBar()
@@ -777,7 +950,82 @@ private slots:
         QVERIFY(!titleTexts().contains("first"));
     }
 
-    void foldingTheCommitShowsAllItsFilesInTheDiff()
+    void stripHasAChipForEveryFileOfTheCommit()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "three", {{"a.txt", "a\n"}, {"src/b.txt", "b\n"}, {"c.txt", "c\n"}});
+        HistoryView view(Theme::duet());
+        view.resize(1400, 700);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *diff = view.findChild<DiffView *>();
+        const auto *strip = view.findChild<DiffFileStrip *>();
+
+        commits->setCurrentItem(commits->topLevelItem(0));
+
+        QTRY_COMPARE(diff->fileSummaries().size(), 3);
+        QVERIFY(strip->isVisible());
+        for (int file = 0; file < 3; ++file)
+            QTRY_VERIFY(!strip->chipRect(file).isEmpty());
+    }
+
+    void clickingAChipScrollsTheDiffToItsFile()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        const QByteArray lines = QByteArray("line\n").repeated(100); // taller than the view
+        commit(dir, "three", {{"a.txt", lines}, {"b.txt", lines}, {"c.txt", lines}});
+        HistoryView view(Theme::duet());
+        view.resize(1400, 700);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        auto *diff = view.findChild<DiffView *>();
+        auto *strip = view.findChild<DiffFileStrip *>();
+        commits->setCurrentItem(commits->topLevelItem(0));
+        QTRY_COMPARE(diff->fileSummaries().size(), 3);
+        QTRY_VERIFY(!strip->chipRect(1).isEmpty());
+
+        QTest::mouseClick(strip, Qt::LeftButton, {}, strip->chipRect(1).center());
+
+        QCOMPARE(int(diff->SendScintilla(QsciScintilla::SCI_GETFIRSTVISIBLELINE)), diff->fileStart(1));
+        QCOMPARE(strip->currentFile(), 1);
+    }
+
+    void theChipOfTheFileAtTheTopIsCurrent()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        const QByteArray lines = QByteArray("line\n").repeated(100); // taller than the view
+        commit(dir, "three", {{"a.txt", lines}, {"b.txt", lines}, {"c.txt", lines}});
+        HistoryView view(Theme::duet());
+        view.resize(1400, 700);
+        view.show();
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        auto *diff = view.findChild<DiffView *>();
+        const auto *strip = view.findChild<DiffFileStrip *>();
+        commits->setCurrentItem(commits->topLevelItem(0));
+        QTRY_COMPARE(diff->fileSummaries().size(), 3);
+        QCOMPARE(strip->currentFile(), 0);
+
+        diff->scrollToTop(diff->fileStart(2) + 5);
+
+        QTRY_COMPARE(strip->currentFile(), 2); // once the diff has updated
+    }
+
+    void doubleClickingAChipOpensTheFile()
     {
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
@@ -790,93 +1038,76 @@ private slots:
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
         auto *commits = view.findChild<QTreeWidget *>("commits");
-        const auto *files = view.findChild<QTreeWidget *>("files");
-        const auto *diff = view.findChild<DiffView *>();
+        auto *strip = view.findChild<DiffFileStrip *>();
         commits->setCurrentItem(commits->topLevelItem(0));
-        QTRY_COMPARE(files->topLevelItemCount(), 2);
-        QVERIFY(diff->fileSummaries().isEmpty()); // no file chosen yet
+        QTRY_VERIFY(!strip->chipRect(1).isEmpty());
+        const QSignalSpy opened(&view, &HistoryView::openFileRequested);
 
-        toolButton(view, "Hide the commit and its files")->click();
+        QTest::mouseDClick(strip, Qt::LeftButton, {}, strip->chipRect(1).center());
 
-        QVERIFY(!files->isVisible());
-        QCOMPARE(diff->fileSummaries().size(), 2);
-        toolButton(view, "Show the commit and its files")->click();
-        QVERIFY(files->isVisible());
-        QVERIFY(diff->fileSummaries().isEmpty());
+        QCOMPARE(opened.size(), 1);
+        QCOMPARE(opened.first().first().toString(), QString("b.txt"));
     }
 
-    void theFoldedCommitSitsBetweenTheCommitsAndTheDiff_data()
+    void theFoldedCommitsSitAtTheLeftOfTheDiff()
     {
-        QTest::addColumn<int>("width");
-        QTest::newRow("wide") << 1400;
-        QTest::newRow("narrow") << 900;
-    }
-
-    void theFoldedCommitSitsBetweenTheCommitsAndTheDiff()
-    {
-        QFETCH(const int, width);
         HistoryView view(Theme::duet());
-        view.resize(width, 700);
+        view.resize(1200, 700);
         view.show();
-        const auto *commits = view.findChild<QTreeWidget *>("commits");
         const auto *diff = view.findChild<DiffView *>();
         const auto xOf = [&view](const QWidget *widget) { return widget->mapTo(&view, QPoint()).x(); };
 
-        view.setCommitPaneFolded(true);
+        view.setCommitListFolded(true);
 
-        const FoldedPane *bar = nullptr;
-        for (const FoldedPane *pane : view.findChildren<FoldedPane *>()) {
-            if (pane->isVisible())
-                bar = pane;
-        }
-        QVERIFY(bar);
-        QTRY_VERIFY(xOf(bar) >= xOf(commits) + commits->width());
-        QVERIFY(xOf(diff) >= xOf(bar) + bar->width());
+        const FoldedPane *bar = view.findChild<FoldedPane *>();
+        QVERIFY(bar->isVisible());
+        QTRY_VERIFY(xOf(diff) >= xOf(bar) + bar->width());
     }
 
-    void foldingAPaneWidensOnlyTheDiff()
+    void foldingTheCommitsWidensTheDiff()
     {
         HistoryView view(Theme::duet());
-        view.resize(1400, 700);
+        view.resize(1200, 700);
         view.show();
-        QTRY_VERIFY(view.isWide());
-        const auto *commits = view.findChild<QTreeWidget *>("commits");
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
         const auto *diff = view.findChild<DiffView *>();
-        const int commitsWidth = commits->width();
         const int diffWidth = diff->width();
 
-        view.setCommitPaneFolded(true);
+        view.setCommitListFolded(true);
 
         QTRY_VERIFY(diff->width() > diffWidth + 100);
-        QCOMPARE(commits->width(), commitsWidth);
     }
 
-    void foldedButtonsLineUpWithThoseOfThePaneBars()
-    {
-        HistoryView view(Theme::duet());
-        view.resize(1400, 700);
-        view.show();
-        const QToolButton *hide = toolButton(view, "Hide the commits");
-        const auto centerY = [&view](const QWidget *widget) {
-            return widget->mapTo(&view, widget->rect().center()).y();
-        };
-
-        view.setCommitPaneFolded(true);
-
-        QTRY_VERIFY(std::abs(centerY(toolButton(view, "Show the commit and its files")) - centerY(hide)) <= 1);
-    }
-
-    void foldsAreKeptInTheSavedState()
+    void theFoldIsKeptInTheSavedState()
     {
         HistoryView folded(Theme::duet());
         folded.setCommitListFolded(true);
-        folded.setCommitPaneFolded(true);
         HistoryView restored(Theme::duet());
 
         restored.restoreState(folded.saveState());
 
         QVERIFY(restored.isCommitListFolded());
-        QVERIFY(restored.isCommitPaneFolded());
+    }
+
+    void aStateSavedWithThreePanesGivesTheDiffTheCommitsPane()
+    {
+        QByteArray state;
+        QDataStream stream(&state, QIODevice::WriteOnly);
+        // The commit's share of the commits and the commit, the diff's of the
+        // whole, a splitter's state, the folds.
+        stream << 0.5 << 0.5 << QByteArray() << false << true;
+        HistoryView view(Theme::duet());
+        view.resize(1200, 700);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        const auto *commits = view.findChild<QTreeWidget *>("commits");
+        const auto *diff = view.findChild<DiffView *>();
+
+        view.restoreState(state);
+
+        QVERIFY(!view.isCommitListFolded());
+        // The commits kept their quarter; the diff took the commit's pane's.
+        QTRY_VERIFY(diff->width() > 2 * commits->width());
     }
 
     void emptyDiffHintUsesThePaneWidthAndWraps_data()
@@ -904,8 +1135,12 @@ private slots:
         QVERIFY(splitter);
         header->setPlaceholder("Choose a file of the commit");
         splitter->setSizes({1100 - paneWidth, paneWidth});
-        const auto *hint = header->findChild<QLabel *>("historyMuted");
-        QVERIFY(hint);
+        // The hint, not the block position that shares its style.
+        const QList<QLabel *> muted = header->findChildren<QLabel *>("historyMuted");
+        const auto found = std::ranges::find_if(
+            muted, [](const QLabel *label) { return label->text() == QLatin1String("Choose a file of the commit"); });
+        QVERIFY(found != muted.end());
+        const QLabel *hint = *found;
 
         // Invisible file controls must leave their width to the whole hint.
         QTRY_VERIFY(hint->width() >= header->width() - 32);

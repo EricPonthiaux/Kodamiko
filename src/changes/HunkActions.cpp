@@ -8,9 +8,10 @@
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
 
+#include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QMouseEvent>
+#include <QLabel>
 #include <QToolButton>
 
 #include <algorithm>
@@ -19,17 +20,6 @@ namespace {
 
 constexpr int rightMargin = 8;
 constexpr int iconSize = 14;
-
-QFrame *actionBar(QWidget *parent)
-{
-    auto *bar = new QFrame(parent);
-    bar->setObjectName(QStringLiteral("hunkActions"));
-    auto *layout = new QHBoxLayout(bar);
-    layout->setContentsMargins(2, 2, 2, 2);
-    layout->setSpacing(2);
-    bar->hide();
-    return bar;
-}
 
 QToolButton *actionButton(QFrame *bar, const QString &text, const QString &toolTip)
 {
@@ -50,91 +40,147 @@ QToolButton *actionButton(QFrame *bar, const QString &text, const QString &toolT
 HunkActions::HunkActions(DiffView *diff)
     : QObject(diff)
     , diff_(diff)
-    , bar_(actionBar(diff->viewport()))
-    , apply_(actionButton(bar_, tr("Stage"), tr("Stage this block")))
-    , discard_(actionButton(bar_, tr("Discard…"), tr("Discard this block (a copy is kept)")))
 {
-    diff_->viewport()->setMouseTracking(true);
-    diff_->viewport()->installEventFilter(this);
-    // The buttons keep the block they were shown for.
-    connect(apply_, &QToolButton::clicked, this, [this] { emit applyRequested(hunkLine_); });
-    connect(discard_, &QToolButton::clicked, this, [this] { emit discardRequested(hunkLine_); });
-    connect(diff_, &DiffView::contentChanged, this, &HunkActions::hide);
-    // However it scrolls (wheel, keys, scroll bar), the blocks move under
-    // the buttons: they would act on a block they no longer face.
-    connect(diff_, &QsciScintillaBase::SCN_UPDATEUI, this, [this](int updated) {
-        if (updated & QsciScintillaBase::SC_UPDATE_V_SCROLL)
-            hide();
-    });
+    diff_->viewport()->installEventFilter(this); // resized
+    connect(diff_, &DiffView::contentChanged, this, &HunkActions::placeBars);
+    // However it scrolls (wheel, keys, scroll bar), the bars follow their blocks.
+    connect(diff_, &QsciScintillaBase::SCN_UPDATEUI, this, &HunkActions::placeBars);
 }
 
 void HunkActions::setStagedFiles(const QSet<int> &files)
 {
     stagedFiles_ = files;
-    hide();
+    placeBars();
 }
 
-void HunkActions::updateButtons()
+void HunkActions::setClaudeFiles(const QSet<int> &files)
 {
-    apply_->setText(staged_ ? tr("Unstage") : tr("Stage"));
-    apply_->setToolTip(staged_ ? tr("Unstage this block") : tr("Stage this block"));
-    apply_->setIcon(staged_ ? unstageIcon_ : stageIcon_);
-    discard_->setVisible(!staged_);
+    claudeFiles_ = files;
+    placeBars();
+}
+
+void HunkActions::setEnabled(bool enabled)
+{
+    isEnabled_ = enabled;
+    for (const Bar &bar : std::as_const(bars_)) {
+        bar.apply->setEnabled(enabled);
+        bar.discard->setEnabled(enabled);
+    }
 }
 
 void HunkActions::applyTheme(const Theme &theme)
 {
     stageIcon_ = UiIcons::icon(QStringLiteral("plus"), theme.mutedText);
     unstageIcon_ = UiIcons::icon(QStringLiteral("minus"), theme.mutedText);
-    apply_->setIcon(staged_ ? unstageIcon_ : stageIcon_);
-    discard_->setIcon(UiIcons::icon(QStringLiteral("discard"), theme.mutedText));
+    discardIcon_ = UiIcons::icon(QStringLiteral("discard"), theme.mutedText);
+    askIcon_ = UiIcons::icon(QStringLiteral("claude"), theme.claude);
+    claudeColor_ = theme.claude;
+    for (Bar &bar : bars_)
+        styleBar(bar);
+    placeBars();
 }
 
-void HunkActions::setEnabled(bool enabled)
+QList<int> HunkActions::shownBlocks() const
 {
-    apply_->setEnabled(enabled);
-    discard_->setEnabled(enabled);
+    QList<int> blocks;
+    for (const Bar &bar : bars_) {
+        if (!bar.frame->isHidden())
+            blocks.append(bar.hunkLine);
+    }
+    return blocks;
 }
 
 bool HunkActions::eventFilter(QObject *watched, QEvent *event)
 {
-    switch (event->type()) {
-    case QEvent::MouseMove:
-        placeAt(static_cast<QMouseEvent *>(event)->position().toPoint().y());
-        break;
-    case QEvent::Leave:
-        // Onto the buttons: they stay.
-        if (!bar_->underMouse())
-            hide();
-        break;
-    default:
-        break;
-    }
+    if (event->type() == QEvent::Resize)
+        placeBars();
     return QObject::eventFilter(watched, event);
 }
 
-void HunkActions::placeAt(int y)
+HunkActions::Bar &HunkActions::barAt(qsizetype index)
 {
-    const int lineHeight = std::max(1, diff_->lineHeight());
-    const int line = diff_->firstVisibleLine() + y / lineHeight;
-    const int hunkLine = diff_->hunkStart(line);
-    if (hunkLine < 0) {
-        hide();
-        return;
+    while (bars_.size() <= index) {
+        Bar bar;
+        bar.frame = new QFrame(diff_->viewport());
+        bar.frame->setObjectName(QStringLiteral("hunkActions"));
+        auto *layout = new QHBoxLayout(bar.frame);
+        layout->setContentsMargins(6, 2, 2, 2);
+        layout->setSpacing(2);
+        bar.claudeMark = new QLabel(tr("✳ Claude"), bar.frame);
+        bar.claudeMark->setToolTip(tr("Claude edited this file since it was last committed"));
+        AppFonts::setInterfaceFont(bar.claudeMark, 0.9, QFont::Normal);
+        layout->addWidget(bar.claudeMark);
+        bar.apply = actionButton(bar.frame, tr("Stage"), tr("Stage this block"));
+        bar.discard = actionButton(bar.frame, tr("Discard…"), tr("Discard this block (a copy is kept)"));
+        bar.ask = actionButton(bar.frame, tr("Ask"), tr("Have the agent's session explain this block"));
+        bar.frame->hide();
+        // The buttons keep the block they were placed for.
+        const qsizetype added = bars_.size();
+        connect(bar.apply, &QToolButton::clicked, this, [this, added] { emit applyRequested(bars_[added].hunkLine); });
+        connect(bar.discard, &QToolButton::clicked, this,
+                [this, added] { emit discardRequested(bars_[added].hunkLine); });
+        connect(bar.ask, &QToolButton::clicked, this, [this, added] { emit askRequested(bars_[added].hunkLine); });
+        styleBar(bar);
+        bars_.append(bar);
     }
-    hunkLine_ = hunkLine;
-    staged_ = stagedFiles_.contains(diff_->locate(hunkLine).file);
-    updateButtons();
-    // Centered on the separator, which it may overlap a little.
-    const int top = std::max(0, diff_->lineTop(hunkLine));
-    bar_->adjustSize();
-    const int barTop = std::max(0, top + (lineHeight - bar_->height()) / 2);
-    bar_->move(diff_->viewport()->width() - rightMargin - bar_->width(), barTop);
-    bar_->show();
-    bar_->raise();
+    return bars_[index];
 }
 
-void HunkActions::hide()
+void HunkActions::styleBar(Bar &bar)
 {
-    bar_->hide();
+    bar.claudeMark->setStyleSheet(QStringLiteral("color: %1").arg(claudeColor_.name()));
+    bar.discard->setIcon(discardIcon_);
+    bar.ask->setIcon(askIcon_);
+    bar.apply->setEnabled(isEnabled_);
+    bar.discard->setEnabled(isEnabled_);
+}
+
+QList<std::pair<int, int>> HunkActions::blocksInView() const
+{
+    const QList<DiffLine> &lines = diff_->displayedLines();
+    const long firstShown = diff_->firstVisibleLine();
+    const int top = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE, firstShown));
+    const int bottom = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE,
+                                                firstShown + diff_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN)));
+    QList<std::pair<int, int>> blocks;
+    // The block at the top, its separator scrolled away: its bar at the top.
+    if (const int scrolledAway = diff_->hunkStart(top); scrolledAway >= 0 && scrolledAway < top)
+        blocks.append({scrolledAway, 0});
+    for (int line = std::max(0, top); line <= bottom && line < lines.size(); ++line) {
+        if (lines.at(line).kind == DiffLineKind::HunkHeader)
+            blocks.append({line, std::max(0, diff_->lineTop(line))});
+    }
+    return blocks;
+}
+
+void HunkActions::placeBars()
+{
+    const QList<std::pair<int, int>> blocks = blocksInView();
+    for (qsizetype i = 0; i < blocks.size(); ++i)
+        placeBar(barAt(i), blocks.at(i).first, blocks.at(i).second);
+    for (qsizetype i = blocks.size(); i < bars_.size(); ++i)
+        bars_[i].frame->hide();
+}
+
+void HunkActions::placeBar(Bar &bar, int hunkLine, int top)
+{
+    bar.hunkLine = hunkLine;
+    const int file = diff_->locate(hunkLine).file;
+    updateButtons(bar, stagedFiles_.contains(file));
+    bar.claudeMark->setVisible(claudeFiles_.contains(file));
+    // Centered on the separator, which it may overlap a little.
+    const int lineHeight = std::max(1, diff_->lineHeight());
+    bar.frame->adjustSize();
+    const int barTop = std::max(0, top + (lineHeight - bar.frame->height()) / 2);
+    bar.frame->move(diff_->viewport()->width() - rightMargin - bar.frame->width(), barTop);
+    bar.frame->show();
+    bar.frame->raise();
+}
+
+void HunkActions::updateButtons(Bar &bar, bool isStaged)
+{
+    bar.apply->setText(isStaged ? tr("Unstage") : tr("Stage"));
+    bar.apply->setToolTip(isStaged ? tr("Unstage this block") : tr("Stage this block"));
+    bar.apply->setIcon(isStaged ? unstageIcon_ : stageIcon_);
+    bar.discard->setVisible(!isStaged);
 }

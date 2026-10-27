@@ -2,8 +2,10 @@
 
 #include "ChangesView.h"
 
+#include "ChangeMap.h"
 #include "ChangeTree.h"
 #include "CommitPanel.h"
+#include "DiffFileStrip.h"
 #include "DiffHeaderBar.h"
 #include "DiffView.h"
 #include "DiscardConfirmation.h"
@@ -106,7 +108,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
 
     // "Changes" and the summary, the refresh at the right.
     auto *title = new QLabel(tr("Changes"), this);
-    AppFonts::setInterfaceFont(title, 1.15);
+    AppFonts::setViewTitleFont(title);
     summary_->setEnabled(false); // dimmed
     // The title bar, a line under it.
     auto *titleBar = new QFrame(this);
@@ -200,15 +202,25 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
         refresh();
     });
 
-    // The diff under its header, which follows the file at the top, and
-    // the review's bar.
+    // The diff under its header, which follows the file at the top, the
+    // strip of its files, and the review's bar.
     auto *right = new QWidget(this);
     auto *rightLayout = new QVBoxLayout(right);
     rightLayout->setContentsMargins(0, 0, 0, 0);
     rightLayout->setSpacing(0);
     rightLayout->addWidget(diffHeader_);
+    fileStrip_ = new DiffFileStrip(diff_, right);
+    connect(fileStrip_, &DiffFileStrip::fileActivated, this, &ChangesView::openShownFile);
+    rightLayout->addWidget(fileStrip_);
     rightLayout->addWidget(createReviewArea());
-    rightLayout->addWidget(diff_, 1);
+    auto *diffRow = new QHBoxLayout;
+    diffRow->setSpacing(0);
+    diffRow->addWidget(diff_, 1);
+    changeMap_ = new ChangeMap(diff_, right);
+    diffRow->addWidget(changeMap_);
+    rightLayout->addLayout(diffRow, 1);
+    rightLayout->addWidget(createReviewFooter(right));
+    connect(hunkActions_, &HunkActions::askRequested, this, &ChangesView::askAboutBlock);
     createFindingsPanel(right);
 
     splitter_->addWidget(fileColumn_);
@@ -259,6 +271,7 @@ void ChangesView::setFolder(const QString &folder)
     pendingSelection_.reset();
     status_.reset();
     error_.clear();
+    claudeEdited_.clear(); // those of the other folder
     rebuildList();
     showDiff();
     showOperation();
@@ -364,6 +377,7 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
     const DiffPosition position = diffPosition();
 
     status_ = std::move(status);
+    forgetCleanClaudeEdits();
     rebuildList();
     restoreSelection(selected, current);
     selectFirstFileIfNone();
@@ -386,23 +400,32 @@ void ChangesView::showDiff()
 {
     const QList<FileRef> selection = selectedFiles();
     const QSet<FileRef> selected(selection.begin(), selection.end());
+    // Only Claude's: the others left out.
+    const bool onlyClaude = onlyClaude_->isChecked();
+    const auto isShown = [this, &selected, onlyClaude](const FileRef &ref) {
+        return selected.contains(ref) && (!onlyClaude || isEditedByClaude(changeOf(ref)));
+    };
     shownFiles_.clear();
-    std::ranges::copy_if(filesInListOrder(), std::back_inserter(shownFiles_),
-                         [&selected](const FileRef &ref) { return selected.contains(ref); });
+    std::ranges::copy_if(filesInListOrder(), std::back_inserter(shownFiles_), isShown);
     shownPatches_.clear();
     QList<DiffFile> shown;
     QSet<int> stagedFiles;
+    QSet<int> claudeFiles;
     for (const FileRef &ref : std::as_const(shownFiles_)) {
         const FileDiff &diff = files(ref.section).at(ref.index);
         const bool isStaged = ref.section == Section::Staged;
         const QString status = isStaged ? tr("%1  ·  staged") : tr("%1  ·  unstaged");
         if (isStaged)
             stagedFiles.insert(int(shown.size()));
+        if (isEditedByClaude(diff.change))
+            claudeFiles.insert(int(shown.size()));
         shownPatches_.append(FilePatch::parse(diff.patch));
         shown.append({diff.change.path, status.arg(changeStatusText(diff.change)), shownPatches_.last(),
                       diff.isTooLarge, diff.newText, diff.conflict});
     }
     hunkActions_->setStagedFiles(stagedFiles);
+    hunkActions_->setClaudeFiles(claudeFiles);
+    updateReviewFooter();
     // One file selected: the pager and Alt+Down go through the list's files.
     const QList<QTreeWidgetItem *> listedFiles = ChangeTree::filesUnder(rootItem());
     std::optional<DiffView::ListPosition> listPosition;
@@ -626,6 +649,8 @@ void ChangesView::setAgent(const QString &name, const QString &iconName)
 void ChangesView::applyTheme(const Theme &theme)
 {
     diff_->applyTheme(theme);
+    changeMap_->applyTheme(theme);
+    fileStrip_->applyTheme(theme);
     hunkActions_->applyTheme(theme);
     const QColor color = theme.foreground;
     stageButton_->setIcon(UiIcons::icon(QStringLiteral("plus"), color));

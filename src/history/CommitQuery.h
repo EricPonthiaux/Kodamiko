@@ -26,6 +26,14 @@
 // Words and terms are all required; quotes keep spaces in a value. Text is
 // matched without case, but contents: and diff: with case, as git does.
 struct CommitQuery {
+    // Where a term is in the text typed.
+    struct Span {
+        qsizetype start = 0;
+        qsizetype length = 0;
+
+        bool operator==(const Span &) const = default;
+    };
+
     QStringList words;
     QStringList authors;
     QStringList messageTexts;
@@ -36,6 +44,9 @@ struct CommitQuery {
     // The first term that could not be read, said for the user; the query
     // goes without it. Empty if every term was read.
     QString error;
+    // The terms read ("author:ada"), in the order typed; not the words, nor
+    // a term that could not be read.
+    QList<Span> termSpans;
 
     // Reads `text`; relative dates count back from `today`.
     static CommitQuery parse(const QString &text, QDate today = QDate::currentDate());

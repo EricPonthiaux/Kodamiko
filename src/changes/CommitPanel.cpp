@@ -12,40 +12,64 @@
 #include <QCheckBox>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QShortcut>
 #include <QTextCursor>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace {
 
-constexpr int messageHeight = 84;
+constexpr int bodyHeight = 60;
+// git's convention for a summary: longer, tools cut it.
+constexpr int summaryLimit = 72;
+constexpr int meterHeightPx = 3;
 
 } // namespace
 
 CommitPanel::CommitPanel(GitCommands *gitCommands, QWidget *parent)
     : QFrame(parent)
     , commands_(gitCommands)
-    , message_(new QPlainTextEdit(this))
+    , summary_(new QLineEdit(this))
+    , summaryCount_(new QLabel(this))
+    , summaryBar_(new QProgressBar(this))
+    , body_(new QPlainTextEdit(this))
     , amendCheckbox_(new QCheckBox(tr("Amend"), this))
     , generateButton_(new QPushButton(this))
     , reviewButton_(new QPushButton(tr("Review"), this))
     , commitButton_(new QPushButton(tr("Commit"), this))
 {
     setObjectName(QStringLiteral("commitPanel"));
-    message_->setTabChangesFocus(true);
-    message_->setMinimumHeight(messageHeight);
-    message_->setPlaceholderText(tr("Commit message (Ctrl+Enter to commit)"));
+    summary_->setObjectName(QStringLiteral("commitSummary"));
+    summary_->setPlaceholderText(tr("Summary, in the imperative (Ctrl+Enter to commit)"));
+    summaryCount_->setObjectName(QStringLiteral("commitSummaryCount"));
+    summaryCount_->setToolTip(tr("Summaries longer than %1 characters are cut by git's tools").arg(summaryLimit));
+    summaryBar_->setRange(0, summaryLimit);
+    summaryBar_->setTextVisible(false);
+    summaryBar_->setFixedHeight(meterHeightPx);
+    body_->setObjectName(QStringLiteral("commitBody"));
+    body_->setTabChangesFocus(true);
+    body_->setMinimumHeight(bodyHeight);
+    body_->setPlaceholderText(tr("Why, not how (optional)"));
     amendCheckbox_->setToolTip(tr("Replace the last commit with the staged changes and this message"));
     generateButton_->setText(tr("Generate"));
     commitButton_->setDefault(true);
     commitButton_->setToolTip(tr("Commit the staged changes (Ctrl+Enter)"));
-    for (const int key : {Qt::Key_Return, Qt::Key_Enter}) {
-        const auto *shortcut =
-            new QShortcut(QKeySequence(Qt::CTRL | key), message_, nullptr, nullptr, Qt::WidgetShortcut);
-        connect(shortcut, &QShortcut::activated, this, &CommitPanel::commit);
+    for (QWidget *field : {static_cast<QWidget *>(summary_), static_cast<QWidget *>(body_)}) {
+        for (const int key : {Qt::Key_Return, Qt::Key_Enter}) {
+            const auto *shortcut =
+                new QShortcut(QKeySequence(Qt::CTRL | key), field, nullptr, nullptr, Qt::WidgetShortcut);
+            connect(shortcut, &QShortcut::activated, this, &CommitPanel::commit);
+        }
     }
+    // The summary is one line: Enter goes on to the body.
+    connect(summary_, &QLineEdit::returnPressed, body_, qOverload<>(&QWidget::setFocus));
+    connect(summary_, &QLineEdit::textChanged, this, &CommitPanel::updateMeter);
     connect(amendCheckbox_, &QCheckBox::toggled, this, &CommitPanel::onAmendToggled);
     connect(commitButton_, &QPushButton::clicked, this, &CommitPanel::commit);
     connect(generateButton_, &QPushButton::clicked, this, &CommitPanel::generateMessage);
@@ -60,12 +84,64 @@ CommitPanel::CommitPanel(GitCommands *gitCommands, QWidget *parent)
     actions->addWidget(generateButton_);
     actions->addWidget(commitButton_);
 
+    // The meter: the count at the left of its track.
+    auto *meter = new QHBoxLayout;
+    meter->setSpacing(8);
+    meter->addWidget(summaryCount_);
+    meter->addWidget(summaryBar_, 1);
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(8, 8, 8, 8);
-    layout->setSpacing(8);
-    // The message takes the height the panel is given; the actions stay below.
-    layout->addWidget(message_, 1);
+    layout->setSpacing(6);
+    layout->addWidget(summary_);
+    layout->addLayout(meter);
+    // The body takes the height the panel is given; the actions stay below.
+    layout->addWidget(body_, 1);
+    layout->addSpacing(2);
     layout->addLayout(actions);
+    updateMeter();
+}
+
+QString CommitPanel::message() const
+{
+    const QString summary = summary_->text().trimmed();
+    const QString body = body_->toPlainText().trimmed();
+    if (body.isEmpty())
+        return summary;
+    return summary + QStringLiteral("\n\n") + body;
+}
+
+void CommitPanel::setMessage(const QString &message)
+{
+    const QString trimmed = message.trimmed();
+    const qsizetype lineEnd = trimmed.indexOf(QLatin1Char('\n'));
+    const QString summary = lineEnd < 0 ? trimmed : trimmed.left(lineEnd).trimmed();
+    const QString body = lineEnd < 0 ? QString() : trimmed.mid(lineEnd + 1).trimmed();
+    // Inserted over a selection rather than set, so that Ctrl+Z undoes it.
+    summary_->selectAll();
+    summary_->insert(summary);
+    QTextCursor cursor(body_->document());
+    cursor.select(QTextCursor::Document);
+    cursor.insertText(body);
+}
+
+void CommitPanel::clearMessage()
+{
+    summary_->clear();
+    body_->clear();
+}
+
+void CommitPanel::updateMeter()
+{
+    const int length = int(summary_->text().size());
+    const bool isOver = length > summaryLimit;
+    summaryCount_->setText(QStringLiteral("%1 / %2").arg(length).arg(summaryLimit));
+    summaryCount_->setStyleSheet(isOver ? QStringLiteral("color: %1").arg(overColor_.name()) : QString());
+    summaryBar_->setValue(std::min(length, summaryLimit));
+    const QColor &fill = isOver ? overColor_ : meterColor_;
+    summaryBar_->setStyleSheet(QStringLiteral("QProgressBar { border: none; border-radius: 1px; background: %1; }"
+                                              "QProgressBar::chunk { border-radius: 1px; background: %2; }")
+                                   .arg(trackColor_.name(QColor::HexArgb), fill.name()));
 }
 
 QSize CommitPanel::sizeHint() const
@@ -82,7 +158,7 @@ void CommitPanel::setStatus(const RepositoryStatus *status, const QString &paths
 
 void CommitPanel::reset()
 {
-    message_->clear();
+    clearMessage();
     const QSignalBlocker blocker(amendCheckbox_);
     amendCheckbox_->setChecked(false);
 }
@@ -101,7 +177,7 @@ void CommitPanel::updateActions()
 
 void CommitPanel::focusMessage()
 {
-    message_->setFocus();
+    summary_->setFocus();
 }
 
 void CommitPanel::onAmendToggled(bool amend)
@@ -109,10 +185,10 @@ void CommitPanel::onAmendToggled(bool amend)
     if (!status_)
         return;
     const QString lastMessage = status_->info.headMessage.trimmed();
-    if (amend && message_->toPlainText().trimmed().isEmpty())
-        message_->setPlainText(lastMessage);
-    else if (!amend && message_->toPlainText().trimmed() == lastMessage)
-        message_->clear();
+    if (amend && message().isEmpty())
+        setMessage(lastMessage);
+    else if (!amend && message() == lastMessage)
+        clearMessage();
 }
 
 void CommitPanel::generateMessage()
@@ -137,12 +213,8 @@ void CommitPanel::generateMessage()
 
 void CommitPanel::showGeneratedMessage(const QString &message)
 {
-    // Through a cursor, so that Ctrl+Z brings back what was written before.
-    QTextCursor cursor(message_->document());
-    cursor.select(QTextCursor::Document);
-    cursor.insertText(message);
-    message_->setTextCursor(cursor);
-    message_->setFocus();
+    setMessage(message);
+    summary_->setFocus();
     emit statusMessage(tr("Commit message written by %1: review it, then commit (Ctrl+Enter)").arg(agentName_));
 }
 
@@ -150,11 +222,11 @@ void CommitPanel::commit()
 {
     if (!status_ || commands_->isBusy())
         return;
-    const QString message = message_->toPlainText().trimmed();
+    const QString message = this->message();
     const bool amend = amendCheckbox_->isChecked();
-    if (message.isEmpty()) {
-        emit statusMessage(tr("Write the commit message first"));
-        message_->setFocus();
+    if (summary_->text().trimmed().isEmpty()) {
+        emit statusMessage(tr("Write the commit's summary first"));
+        summary_->setFocus();
         return;
     }
     if (!status_->staged.isEmpty() || amend) {
@@ -191,7 +263,7 @@ void CommitPanel::runCommit(const QString &message, bool amend, bool stageEveryt
         [this] {
             const QSignalBlocker blocker(amendCheckbox_);
             amendCheckbox_->setChecked(false);
-            message_->clear();
+            clearMessage();
         },
         [this, message, amend, stageEverything](const GitError &error) {
             if (error.kind() != GitError::Kind::NoIdentity)
@@ -235,4 +307,8 @@ void CommitPanel::setAgent(const QString &name, const QString &iconName)
 void CommitPanel::applyTheme(const Theme &theme)
 {
     generateButton_->setIcon(UiIcons::icon(agentIconName_, theme.foreground));
+    meterColor_ = theme.accent;
+    overColor_ = theme.error;
+    trackColor_ = theme.line;
+    updateMeter();
 }

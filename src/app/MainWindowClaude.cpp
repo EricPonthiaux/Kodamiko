@@ -314,6 +314,7 @@ void MainWindow::onHookReceived(const HookEvent &event)
             followDiagramEdits(event.filePaths);
             reportEditErrors(event.filePaths);
             recentFiles_.markEditedByClaude(event.filePaths);
+            changesView_->markEditedByClaude(event.filePaths);
             for (const QString &path : event.filePaths)
                 claudeTouched_.insert(QDir::cleanPath(path));
             updateClaudeMarks();

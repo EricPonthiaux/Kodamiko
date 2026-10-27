@@ -24,6 +24,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     , whitespace_(new QToolButton(this))
     , previous_(new QToolButton(this))
     , next_(new QToolButton(this))
+    , blockPosition_(new QLabel(this))
     , previousFile_(new QToolButton(this))
     , nextFile_(new QToolButton(this))
     , filePager_(new QFrame(this))
@@ -38,6 +39,8 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     details_->setObjectName(QStringLiteral("historyMuted"));
     details_->setMinimumWidth(0);
     details_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    blockPosition_->setObjectName(QStringLiteral("historyMuted"));
+    blockPosition_->setToolTip(tr("The block of changes at the top, of all the blocks shown"));
     for (const auto &[button, toolTip, buttonDirection] :
          {std::tuple{previous_, tr("Previous change (Shift+F7)"), DiffView::Direction::Previous},
           std::tuple{next_, tr("Next change (F7)"), DiffView::Direction::Next}}) {
@@ -86,6 +89,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
     buttons->addWidget(sideBySide_);
     buttons->addWidget(whitespace_);
     buttons->addWidget(previous_);
+    buttons->addWidget(blockPosition_);
     buttons->addWidget(next_);
     layout_->setContentsMargins(12, 6, 6, 6);
     layout_->setSpacing(8);
@@ -177,6 +181,7 @@ void DiffHeaderBar::follow()
     for (QWidget *widget :
          {static_cast<QWidget *>(stats_), static_cast<QWidget *>(previous_), static_cast<QWidget *>(next_)})
         widget->setVisible(hasFile);
+    updateBlockPosition();
     // Checked, it stays: what it hides may be all there was.
     whitespace_->setVisible(hasFile || whitespace_->isChecked());
     sideBySide_->setVisible(hasFile);
@@ -210,6 +215,26 @@ void DiffHeaderBar::follow()
                         .arg(shown.added)
                         .arg(red)
                         .arg(shown.removed));
+}
+
+void DiffHeaderBar::updateBlockPosition()
+{
+    const QList<DiffLine> &lines = diff_->displayedLines();
+    const int top = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE, diff_->firstVisibleLine()));
+    int blockCount = 0;
+    int current = 0;
+    for (qsizetype i = 0; i < lines.size(); ++i) {
+        if (lines.at(i).kind != DiffLineKind::HunkHeader)
+            continue;
+        ++blockCount;
+        if (i <= top)
+            current = blockCount;
+    }
+    blockPosition_->setVisible(blockCount > 1);
+    blockPosition_->setText(QStringLiteral("%1 / %2").arg(std::max(1, current)).arg(blockCount));
+    // As wide as the widest position: the arrows stay put while scrolling.
+    const QString widest = QStringLiteral("%1 / %1").arg(blockCount);
+    blockPosition_->setMinimumWidth(blockPosition_->fontMetrics().horizontalAdvance(widest) + 4);
 }
 
 void DiffHeaderBar::updateFilePager(int file, int fileCount)

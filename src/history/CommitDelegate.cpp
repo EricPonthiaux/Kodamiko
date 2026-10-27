@@ -11,6 +11,7 @@
 #include <QLocale>
 #include <QPainter>
 #include <QPainterPath>
+#include <QRegularExpression>
 #include <QTreeWidgetItem>
 
 #include <algorithm>
@@ -30,6 +31,12 @@ constexpr int dateRole = Qt::UserRole + 61;
 constexpr int shortIdRole = Qt::UserRole + 62;
 constexpr int refsRole = Qt::UserRole + 63;
 constexpr int graphRole = Qt::UserRole + 64;
+constexpr int dayHeadingRole = Qt::UserRole + 65;
+constexpr int madeWithClaudeRole = Qt::UserRole + 66;
+
+// A day's heading takes this many lines of text, above its first row.
+constexpr qreal dayHeadingLines = 1.9;
+const QColor claudeOrange("#d97757");
 
 constexpr int laneWidth = 14;
 constexpr int dotRadius = 4;
@@ -101,6 +108,7 @@ void CommitDelegate::setCommit(QTreeWidgetItem *item, const CommitSummary &commi
     item->setData(0, dateRole, commit.date);
     item->setData(0, shortIdRole, commit.shortId);
     item->setData(0, refsRole, commit.refs);
+    item->setData(0, madeWithClaudeRole, isMadeWithClaude(commit));
     item->setToolTip(0, QStringLiteral("%1\n%2 <%3>\n%4")
                             .arg(commit.summary, commit.author, commit.email,
                                  QLocale().toString(commit.date.toLocalTime(), QLocale::LongFormat)));
@@ -109,6 +117,50 @@ void CommitDelegate::setCommit(QTreeWidgetItem *item, const CommitSummary &commi
 void CommitDelegate::setGraphRow(QTreeWidgetItem *item, const GraphRow &row)
 {
     item->setData(0, graphRole, QVariant::fromValue(row));
+}
+
+void CommitDelegate::setDayHeading(QTreeWidgetItem *item, const QString &heading)
+{
+    // Unchanged: no relayout of the row.
+    if (item->data(0, dayHeadingRole).toString() != heading)
+        item->setData(0, dayHeadingRole, heading.isEmpty() ? QVariant() : QVariant(heading));
+}
+
+QDate CommitDelegate::day(const QTreeWidgetItem *item)
+{
+    return item->data(0, dateRole).toDateTime().toLocalTime().date();
+}
+
+QString CommitDelegate::dayHeading(QDate day, QDate today)
+{
+    const qint64 daysAgo = day.daysTo(today);
+    if (daysAgo == 0)
+        return tr("Today");
+    if (daysAgo == 1)
+        return tr("Yesterday");
+    if (daysAgo > 1 && daysAgo < 7)
+        return QLocale().dayName(day.dayOfWeek());
+    if (day.year() == today.year())
+        return QLocale().toString(day, QStringLiteral("dddd, MMMM d"));
+    return QLocale().toString(day, QLocale::LongFormat);
+}
+
+bool CommitDelegate::isMadeWithClaude(const CommitSummary &commit)
+{
+    static const QRegularExpression coAuthor(QStringLiteral(R"(^Co-Authored-By:\s*Claude\b)"),
+                                             QRegularExpression::CaseInsensitiveOption |
+                                                 QRegularExpression::MultilineOption);
+    return commit.author.startsWith(QLatin1String("Claude")) || coAuthor.match(commit.message).hasMatch();
+}
+
+QColor CommitDelegate::claudeColor()
+{
+    return claudeOrange;
+}
+
+bool CommitDelegate::isMadeWithClaude(const QTreeWidgetItem *item)
+{
+    return item->data(0, madeWithClaudeRole).toBool();
 }
 
 void CommitDelegate::setGraphLanes(int lanes)
@@ -153,9 +205,8 @@ QPixmap CommitDelegate::avatar(const QString &name, int size, qreal ratio)
 QPixmap CommitDelegate::drawAvatar(const QString &name, int size, qreal ratio)
 {
     // Claude in its own orange.
-    const QColor color =
-        muted(name.startsWith(QLatin1String("Claude")) ? QColor("#d97757")
-                                                       : avatarColors.at(qHash(name) % avatarColors.size()));
+    const QColor color = muted(
+        name.startsWith(QLatin1String("Claude")) ? claudeOrange : avatarColors.at(qHash(name) % avatarColors.size()));
     QPixmap pixmap(QSize(size, size) * ratio);
     pixmap.setDevicePixelRatio(ratio);
     pixmap.fill(Qt::transparent);
@@ -187,13 +238,19 @@ QColor CommitDelegate::refColor(const QString &name)
 QSize CommitDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     const QFontMetrics metrics(option.font);
-    return {QStyledItemDelegate::sizeHint(option, index).width(), metrics.height() * 2 + 18};
+    const bool startsADay = !index.data(dayHeadingRole).toString().isEmpty();
+    const int heading = startsADay ? qRound(metrics.height() * dayHeadingLines) : 0;
+    return {QStyledItemDelegate::sizeHint(option, index).width(), metrics.height() * 2 + 18 + heading};
 }
 
 void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
+    const QString heading = index.data(dayHeadingRole).toString();
+    const int headingHeight = heading.isEmpty() ? 0 : qRound(QFontMetrics(option.font).height() * dayHeadingLines);
+    // The commit under its day's heading: only it is highlighted.
     QStyleOptionViewItem item = option;
     initStyleOption(&item, index);
+    item.rect.setTop(option.rect.top() + headingHeight);
     const QWidget *widget = option.widget;
     const QStyle *style = widget ? widget->style() : QApplication::style();
     // A selected row is slate blue (see ThemeStyle): the text keeps its colors.
@@ -203,12 +260,16 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
-    QRect rect = option.rect.adjusted(padding, 0, -padding, 0);
+    QRect rect = item.rect.adjusted(padding, 0, -padding, 0);
     if (const QVariant graph = index.data(graphRole); graphLanes_ > 0 && graph.isValid()) {
+        // Through the heading too: the lines go on from the day before.
         const QRect column(rect.left() - padding / 2, option.rect.top(), graphLanes_ * laneWidth, option.rect.height());
-        paintGraph(painter, option, graph.value<GraphRow>(), column);
+        paintGraph(painter, option, graph.value<GraphRow>(),
+                   {column, item.rect.top() + item.rect.height() / 2.0, index.data(madeWithClaudeRole).toBool()});
         rect.setLeft(column.right() + padding / 2);
     }
+    if (!heading.isEmpty())
+        paintDayHeading(painter, option, heading, QRect(rect.left(), option.rect.top(), rect.width(), headingHeight));
     const QString author = index.data(authorRole).toString();
     const qreal ratio = painter->device()->devicePixelRatioF();
     const QRect avatarRect(rect.left(), rect.center().y() - avatarSize / 2, avatarSize, avatarSize);
@@ -229,32 +290,74 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     const int available = badgesLeft - firstLine.left() - 8;
     painter->drawText(QRect(firstLine.left(), firstLine.top(), available, lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(summaryFont).elidedText(summary, Qt::ElideRight, available));
+    paintDetails(painter, option, index, secondLine);
+    painter->restore();
+}
 
-    // Second line: the ID at the right, author · date before it.
+void CommitDelegate::paintDayHeading(QPainter *painter,
+                                     const QStyleOptionViewItem &option,
+                                     const QString &heading,
+                                     QRect rect)
+{
+    QFont font = option.font;
+    font.setPointSizeF(option.font.pointSizeF() * 0.82);
+    font.setWeight(QFont::DemiBold);
+    font.setCapitalization(QFont::AllUppercase);
+    font.setLetterSpacing(QFont::PercentageSpacing, 106);
+    painter->setFont(font);
+    painter->setPen(dimmed(option));
+    // Near the commit it heads, not centered in its band.
+    rect.setTop(rect.top() + rect.height() / 3);
+    QRect drawn;
+    painter->drawText(rect, Qt::AlignLeft | Qt::AlignVCenter, heading, &drawn);
+    QColor rule = option.palette.color(QPalette::Text);
+    rule.setAlphaF(0.1F);
+    painter->setPen(QPen(rule, 1));
+    const qreal y = drawn.center().y() + 0.5;
+    painter->drawLine(QPointF(drawn.right() + 10, y), QPointF(rect.right(), y));
+}
+
+void CommitDelegate::paintDetails(QPainter *painter,
+                                  const QStyleOptionViewItem &option,
+                                  const QModelIndex &index,
+                                  const QRect &line)
+{
     const QFont idFont = AppFonts::codeFont(option.font.pointSizeF() * 0.88);
     const QString id = index.data(shortIdRole).toString();
-    const int idWidth = QFontMetrics(idFont).horizontalAdvance(id);
+    int right = line.right() - QFontMetrics(idFont).horizontalAdvance(id);
     painter->setFont(idFont);
     painter->setPen(dimmed(option));
-    painter->drawText(secondLine, Qt::AlignRight | Qt::AlignVCenter, id);
+    painter->drawText(line, Qt::AlignRight | Qt::AlignVCenter, id);
     QFont detailFont = option.font;
     detailFont.setPointSizeF(option.font.pointSizeF() * 0.92);
     painter->setFont(detailFont);
-    const QString details = QStringLiteral("%1  ·  %2").arg(author, relativeDate(index.data(dateRole).toDateTime()));
-    const int detailsWidth = secondLine.width() - idWidth - 12;
-    painter->drawText(QRect(secondLine.left(), secondLine.top(), detailsWidth, secondLine.height()),
-                      Qt::AlignLeft | Qt::AlignVCenter,
+    if (index.data(madeWithClaudeRole).toBool()) {
+        // Claude's spark, in its color.
+        const QString mark = tr("✳ Claude");
+        const int markWidth = QFontMetrics(detailFont).horizontalAdvance(mark);
+        right -= markWidth + 10;
+        painter->setPen(claudeOrange);
+        painter->drawText(QRect(right, line.top(), markWidth, line.height()), Qt::AlignLeft | Qt::AlignVCenter, mark);
+    }
+    painter->setPen(dimmed(option));
+    // The day is in the heading: the time is enough.
+    const QDateTime date = index.data(dateRole).toDateTime().toLocalTime();
+    const QString details =
+        QStringLiteral("%1  ·  %2")
+            .arg(index.data(authorRole).toString(), QLocale().toString(date.time(), QLocale::ShortFormat));
+    const int detailsWidth = right - line.left() - 12;
+    painter->drawText(QRect(line.left(), line.top(), detailsWidth, line.height()), Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(detailFont).elidedText(details, Qt::ElideRight, detailsWidth));
-    painter->restore();
 }
 
 void CommitDelegate::paintGraph(QPainter *painter,
                                 const QStyleOptionViewItem &option,
                                 const GraphRow &row,
-                                const QRect &rect)
+                                const GraphArea &area)
 {
+    const QRect &rect = area.column;
+    const qreal middle = area.dotY;
     const auto x = [&rect](int lane) { return rect.left() + lane * laneWidth + laneWidth / 2.0; };
-    const qreal middle = rect.top() + rect.height() / 2.0;
     painter->save();
     painter->setClipRect(rect);
     for (const auto &[half, top, bottom] : {std::tuple{&row.upper, qreal(rect.top()), middle},
@@ -264,8 +367,10 @@ void CommitDelegate::paintGraph(QPainter *painter,
             drawSegment(painter, QPointF(x(segment.from), top), QPointF(x(segment.to), bottom));
         }
     }
-    // The dot, ringed with the row's background to stand out from its lines.
-    painter->setPen(QPen(option.palette.color(QPalette::Base), 2));
+    // The dot, ringed with the row's background to stand out from its lines;
+    // with Claude's color for a commit Claude made.
+    const QColor ring = area.isMadeWithClaude ? claudeOrange : option.palette.color(QPalette::Base);
+    painter->setPen(QPen(ring, 2));
     painter->setBrush(laneColor(row.color));
     painter->drawEllipse(QPointF(x(row.lane), middle), dotRadius + 1, dotRadius + 1);
     painter->restore();

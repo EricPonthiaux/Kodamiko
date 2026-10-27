@@ -33,6 +33,10 @@ QFont interfaceFont();
 // font changes (Preferences ▸ Fonts), which a font set once would not
 // follow.
 void setInterfaceFont(QWidget *widget, qreal scale, QFont::Weight weight = QFont::DemiBold, qreal letterSpacing = 0);
+// The font of what a mode's title bar names (its title, "History of a.txt",
+// the chosen commit): the interface's size in demibold, as the file name of
+// a diff's header, so that every bar at the top reads alike.
+void setViewTitleFont(QWidget *widget);
 // Calls `apply` now and whenever the application font changes, as long as
 // `owner` lives: for what is sized from the font (UiMetrics).
 void followApplicationFont(QObject *owner, std::function<void()> apply);

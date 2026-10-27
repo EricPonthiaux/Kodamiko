@@ -23,11 +23,14 @@ class ReviewBar;
 class ReviewFindingsPanel;
 class DiffHeaderBar;
 class HunkActions;
+class ChangeMap;
+class DiffFileStrip;
 class DiffView;
 class FoldedPane;
 class GitCommands;
 class QFrame;
 class QLabel;
+class QProgressBar;
 class QPushButton;
 class QSplitter;
 class QToolButton;
@@ -45,6 +48,13 @@ class QTreeWidgetItem;
 // staged. In the diff, Space stages (or unstages) the selected lines or the
 // block at the cursor and Delete discards them, unless the diff hides
 // whitespace changes; F4 opens the file at the cursor's line.
+//
+// Each block in view has its buttons (HunkActions): Stage or Unstage,
+// Discard, and Ask, which has the agent's session explain it; a block of a
+// file Claude edited (markEditedByClaude()) carries Claude's mark. Under the
+// diff, how many blocks of all the changes are staged, how many of them
+// Claude wrote, and Only Claude's, which leaves only its files in the diff.
+// A strip above the diff names its files (DiffFileStrip).
 //
 // A review of the staged changes (setReview()) shows its findings under
 // their lines in the diff: F8 and Shift+F8 go from one to the next, the
@@ -94,6 +104,9 @@ public:
     void applyTheme(const Theme &theme);
     // The agent that writes commit messages (see CommitPanel::setAgent()).
     void setAgent(const QString &name, const QString &iconName);
+    // Claude edited the files at `absolutePaths`: their blocks carry its
+    // mark until the file has no more changes (committed, discarded).
+    void markEditedByClaude(const QStringList &absolutePaths);
 
     QSplitter *splitter() const { return splitter_; }
 
@@ -121,6 +134,9 @@ signals:
     void statusMessage(const QString &message);
     // `request`, to type in the Claude session's prompt.
     void commitMessageRequested(const QString &request);
+    // A block's Ask: `request`, asking the session to explain the block, to
+    // type in its prompt.
+    void explanationRequested(const QString &request);
     // The commit area's Review, or Review Again over the diff: a review of
     // the staged changes as they are now, for setReview().
     void reviewRequested();
@@ -253,6 +269,20 @@ private:
     int diffCursorLine() const;
     // The file of displayed line `line` in the editor, at the line facing it.
     void openFileAt(int line);
+    // A file of the diff, double-clicked in the strip, in the editor.
+    void openShownFile(const QString &relativePath);
+
+    // The review of the changes (ChangesViewClaude.cpp): Claude's edits,
+    // the blocks staged so far, Ask.
+    bool isEditedByClaude(const FileChange &change) const;
+    // The files Claude edited that no longer have changes are forgotten.
+    void forgetCleanClaudeEdits();
+    // Under the diff: "3 of 12 blocks staged · 5 by Claude", Only Claude's.
+    QWidget *createReviewFooter(QWidget *parent);
+    void updateReviewFooter();
+    // The block whose separator is displayed line `line`, explained by the
+    // session (explanationRequested()).
+    void askAboutBlock(int line);
     void showDiffMenu(const QPoint &position);
     void showListMenu(const QPoint &position);
 
@@ -313,6 +343,12 @@ private:
     QTreeWidget *fileList_;
     DiffView *diff_;
     DiffHeaderBar *diffHeader_;
+    ChangeMap *changeMap_ = nullptr;      // beside the diff
+    DiffFileStrip *fileStrip_ = nullptr; // above it
+    QSet<QString> claudeEdited_;         // absolute, clean paths
+    QLabel *reviewCount_ = nullptr;
+    QProgressBar *reviewProgress_ = nullptr;
+    QToolButton *onlyClaude_ = nullptr; // checked: only the files Claude edited
     HunkActions *hunkActions_;
     GripSplitter *splitter_;
     GripSplitter *fileSplitter_; // in the file column: the lists and the commit area

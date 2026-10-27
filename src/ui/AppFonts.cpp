@@ -107,6 +107,11 @@ void setInterfaceFont(QWidget *widget, qreal scale, QFont::Weight weight, qreal 
     followApplicationFont(widget, apply);
 }
 
+void setViewTitleFont(QWidget *widget)
+{
+    setInterfaceFont(widget, 1, QFont::DemiBold);
+}
+
 void followApplicationFont(QObject *owner, std::function<void()> apply)
 {
     apply();

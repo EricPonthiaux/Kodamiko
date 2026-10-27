@@ -15,7 +15,8 @@ class QToolButton;
 // The bar above a DiffView, out of its scrolled text: the file at the top
 // of the view as it scrolls (its name, its folder and state, its counts),
 // the buttons that show the two versions side by side and hide whitespace
-// changes, and those that go to the previous or next block of changes. With
+// changes, and those that go to the previous or next block of changes, with
+// the block at the top of the view among them all ("2 / 5"). With
 // several files, a pager ("‹ 3 / 12 ›") goes to the previous or next file:
 // of the view, or of the list the view shows a page of (see
 // DiffView::setListPosition()).
@@ -51,6 +52,8 @@ private:
     void follow();
     QFrame *createFilePager();
     void updateFilePager(int file, int fileCount);
+    // "2 / 5": the block at the top of the view, of the view's blocks.
+    void updateBlockPosition();
 
     DiffView *diff_;
     QString placeholder_;
@@ -61,6 +64,7 @@ private:
     QToolButton *whitespace_;
     QToolButton *previous_;
     QToolButton *next_;
+    QLabel *blockPosition_;
     QToolButton *previousFile_;
     QToolButton *nextFile_;
     QFrame *filePager_;

@@ -104,8 +104,11 @@ CommitQuery CommitQuery::parse(const QString &text, QDate today)
         // Between terms, or "author:" whose value is still being typed.
         if (value.isEmpty())
             continue;
+        const QString errorBefore = query.error;
         if (key.isEmpty() || !addTerm(query, key, value, today))
             query.words.append(key.isEmpty() ? value : term.captured(0));
+        else if (query.error == errorBefore)
+            query.termSpans.append({term.capturedStart(0), term.capturedLength(0)});
     }
     return query;
 }

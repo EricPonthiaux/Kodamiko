@@ -83,13 +83,16 @@ add_library(duet_core STATIC
     agent/vendor/claude/EffectiveSettings.cpp
     agent/vendor/claude/UnsavedEditGuard.cpp
     changes/BranchesPopup.cpp
+    changes/ChangeMap.cpp
     changes/ChangeTree.cpp
     changes/ChangesView.cpp
+    changes/ChangesViewClaude.cpp
     changes/ChangesViewConflicts.cpp
     changes/ChangesViewDiff.cpp
     changes/ChangesViewList.cpp
     changes/ChangesViewReview.cpp
     changes/CommitPanel.cpp
+    changes/DiffFileStrip.cpp
     changes/DiffHeaderBar.cpp
     changes/DiffLayout.cpp
     changes/SideBySide.cpp
@@ -152,6 +155,7 @@ add_library(duet_core STATIC
     git/Askpass.cpp
     git/Branches.cpp
     git/CommitLog.cpp
+    git/FileBlame.cpp
     git/ConflictMarkers.cpp
     git/ContentMatcher.cpp
     git/CredentialCache.cpp
@@ -170,11 +174,15 @@ add_library(duet_core STATIC
     git/Stashes.cpp
     git/Worktrees.cpp
     history/CommitDelegate.cpp
+    history/CommitHeader.cpp
     history/CommitGraph.cpp
     history/CommitQuery.cpp
+    history/CommitTrack.cpp
+    history/FileLens.cpp
     history/HistorySearchField.cpp
     history/HistoryView.cpp
     history/HistoryViewCommit.cpp
+    history/HistoryViewLens.cpp
     history/HistoryViewPanes.cpp
     index/OccurrenceGrammars.cpp
     index/OccurrenceIndex.cpp

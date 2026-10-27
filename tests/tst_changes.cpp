@@ -6,9 +6,11 @@
 #include "agent/ReviewSession.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
 #include "changes/BranchesPopup.h"
+#include "changes/ChangeMap.h"
 #include "changes/ChangeTree.h"
 #include "changes/ChangesView.h"
 #include "changes/CommitPanel.h"
+#include "changes/DiffFileStrip.h"
 #include "changes/DiffHeaderBar.h"
 #include "changes/DiffView.h"
 #include "changes/FileChangeDelegate.h"
@@ -31,6 +33,7 @@
 #include "ui/ThemeStyle.h"
 
 #include <QCheckBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -272,6 +275,55 @@ private slots:
         QCOMPARE(view.locate(5).line, 2);
         QVERIFY(view.text().contains("Binary file"));
         QVERIFY(!view.text().contains("@@"));
+    }
+
+    void clickingTheChangeMapScrollsTheDiffThere()
+    {
+        QWidget window;
+        auto *diff = new DiffView(Theme::duet(), &window);
+        auto *map = new ChangeMap(diff, &window);
+        auto *layout = new QHBoxLayout(&window);
+        layout->addWidget(diff, 1);
+        layout->addWidget(map);
+        QList<DiffFile> files;
+        for (int i = 0; i < 30; ++i)
+            files.append({QString("f%1.cpp").arg(i), "modified", FilePatch::parse(oneAddedLine)});
+        diff->setFiles(files);
+        window.resize(800, 300);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+        QTest::mouseClick(map, Qt::LeftButton, {}, QPoint(map->width() / 2, map->height() - 2));
+
+        QVERIFY(diff->firstVisibleLine() > diff->fileStart(20));
+    }
+
+    void theHeaderSaysWhichBlockIsAtTheTop()
+    {
+        QWidget window;
+        auto *diff = new DiffView(Theme::duet(), &window);
+        auto *header = new DiffHeaderBar(diff, &window);
+        auto *layout = new QVBoxLayout(&window);
+        layout->addWidget(header);
+        layout->addWidget(diff, 1);
+        QList<DiffFile> files;
+        for (int i = 0; i < 30; ++i)
+            files.append({QString("f%1.cpp").arg(i), "modified", FilePatch::parse(oneAddedLine)});
+        diff->setFiles(files);
+        window.resize(800, 300);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        const QLabel *position = nullptr;
+        for (const QLabel *label : header->findChildren<QLabel *>()) {
+            if (label->toolTip() == "The block of changes at the top, of all the blocks shown")
+                position = label;
+        }
+        QVERIFY(position);
+        QCOMPARE(position->text(), QString("1 / 30"));
+
+        diff->scrollToTop(diff->fileStart(2) + 1); // the third file's block
+
+        QTRY_COMPARE(position->text(), QString("3 / 30"));
     }
 
     void separatorsHoldTheUnchangedLinesAroundTheBlocks()
@@ -628,6 +680,27 @@ private slots:
 
         QCOMPARE(before, message->minimumHeight()); // a few lines at first
         QVERIFY(message->height() > before + 100);
+    }
+
+    void theStripHasAChipForEachPartOfTheDiff()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        view.resize(1200, 700);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        const auto *strip = view.findChild<DiffFileStrip *>();
+
+        fileList(view)->setCurrentItem(fileList(view)->topLevelItem(0)->child(2)); // c.txt, staged and not
+
+        QTRY_VERIFY(strip->isVisible());
+        QTRY_VERIFY(!strip->chipRect(0).isEmpty());
+        QVERIFY(!strip->chipRect(1).isEmpty());
     }
 
     void aFileChangedInBothPlacesIsOneRowAndTwoPartsOfTheDiff()
@@ -1204,26 +1277,29 @@ private slots:
         diff.setFiles({{"x.txt", "staged", FilePatch::parse("@@ -1 +1 @@\n-a\n+b\n")},
                        {"x.txt", "unstaged", FilePatch::parse("@@ -1 +1 @@\n-b\n+c\n")}});
         actions.setStagedFiles({0});
-        const auto buttonsOver = [&diff](const QString &text) {
-            const QList<DiffLine> &lines = diff.displayedLines();
-            const auto line = std::ranges::find_if(lines, [&text](const DiffLine &l) { return l.text == text; });
-            const QPoint over(100, diff.lineTop(int(line - lines.begin())) + 2);
-            QMouseEvent move(QEvent::MouseMove, over, diff.viewport()->mapToGlobal(over), Qt::NoButton, Qt::NoButton,
-                             Qt::NoModifier);
-            QApplication::sendEvent(diff.viewport(), &move);
+
+        // Each block's bar, top to bottom: its visible buttons.
+        QList<const QFrame *> bars;
+        for (const QFrame *bar : diff.viewport()->findChildren<QFrame *>("hunkActions")) {
+            if (bar->isVisible())
+                bars.append(bar);
+        }
+        std::ranges::sort(bars, {}, [](const QFrame *bar) { return bar->y(); });
+        const auto buttonsOf = [](const QFrame *bar) {
             QStringList shown;
-            for (const QToolButton *button : diff.viewport()->findChildren<QToolButton *>()) {
+            for (const QToolButton *button : bar->findChildren<QToolButton *>()) {
                 if (button->isVisible())
                     shown.append(button->text());
             }
             return shown;
         };
 
-        QCOMPARE(buttonsOver("a"), QStringList({"Unstage"}));
-        QCOMPARE(buttonsOver("c"), QStringList({"Stage", "Discard…"}));
+        QCOMPARE(bars.size(), 2);
+        QCOMPARE(buttonsOf(bars[0]), QStringList({"Unstage", "Ask"}));
+        QCOMPARE(buttonsOf(bars[1]), QStringList({"Stage", "Discard…", "Ask"}));
     }
 
-    void blockButtonsHideWhenTheDiffScrolls()
+    void blockButtonsFollowTheirBlocksAsTheDiffScrolls()
     {
         const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n@@ -40 +40 @@\n-c\n+d\n@@ -80 +80 @@\n-e\n+f\n";
         DiffView diff(Theme::duet());
@@ -1232,23 +1308,127 @@ private slots:
         diff.show();
         QVERIFY(QTest::qWaitForWindowExposed(&diff));
         diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
-        const int block = diff.hunkStart(diff.fileStart(0) + 2);
-        QVERIFY(block >= 0);
-        const QPoint over(100, diff.lineTop(block + 1) + 2);
-        QMouseEvent move(QEvent::MouseMove, over, diff.viewport()->mapToGlobal(over), Qt::NoButton, Qt::NoButton,
-                         Qt::NoModifier);
-        QApplication::sendEvent(diff.viewport(), &move);
-        const QList<QToolButton *> buttons = diff.viewport()->findChildren<QToolButton *>();
-        const auto anyVisible = [&buttons] {
-            return std::any_of(buttons.begin(), buttons.end(), [](const QToolButton *b) { return b->isVisible(); });
-        };
-        QVERIFY(anyVisible());
+        const int first = diff.hunkStart(diff.fileStart(0) + 2);
+        QTRY_VERIFY(actions.shownBlocks().contains(first));
 
         // As the keyboard scrolls: no wheel, no mouse move.
         diff.goToChange(DiffView::Direction::Next);
         diff.goToChange(DiffView::Direction::Next);
 
-        QTRY_VERIFY(!anyVisible());
+        int last = -1;
+        for (int i = 0; i < diff.displayedLines().size(); ++i) {
+            if (diff.displayedLines()[i].kind == DiffLineKind::HunkHeader)
+                last = i;
+        }
+        QTRY_VERIFY(actions.shownBlocks().contains(last));
+        QVERIFY(!actions.shownBlocks().contains(first)); // scrolled away, its block too
+    }
+
+    void theBlockOfAFileClaudeEditedCarriesItsMark()
+    {
+        DiffView diff(Theme::duet());
+        HunkActions actions(&diff);
+        diff.resize(600, 300);
+        diff.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&diff));
+        diff.setFiles({{"mine.txt", "modified", FilePatch::parse("@@ -1 +1 @@\n-a\n+b\n")},
+                       {"claude.txt", "modified", FilePatch::parse("@@ -1 +1 @@\n-c\n+d\n")}});
+
+        actions.setClaudeFiles({1});
+
+        QList<const QFrame *> bars;
+        for (const QFrame *bar : diff.viewport()->findChildren<QFrame *>("hunkActions")) {
+            if (bar->isVisible())
+                bars.append(bar);
+        }
+        std::ranges::sort(bars, {}, [](const QFrame *bar) { return bar->y(); });
+        QCOMPARE(bars.size(), 2);
+        const auto hasMark = [](const QFrame *bar) {
+            return std::ranges::any_of(bar->findChildren<QLabel *>(),
+                                       [](const QLabel *label) { return label->isVisible(); });
+        };
+        QVERIFY(!hasMark(bars[0]));
+        QVERIFY(hasMark(bars[1]));
+    }
+
+    void theFooterCountsTheStagedBlocksAndClaudes()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project); // a unstaged, b staged, c both
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        view.resize(1200, 700);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        const auto *count = view.findChild<QFrame *>("reviewFooter")->findChild<QLabel *>();
+
+        view.markEditedByClaude({project.filePath("a.txt")});
+
+        QCOMPARE(count->text(), QString("2 of 4 blocks staged · 1 by Claude"));
+    }
+
+    void onlyClaudesLeavesItsFilesInTheDiff()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        view.resize(1200, 700);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        fileList(view)->setCurrentItem(fileList(view)->topLevelItem(0)); // every file
+        const auto *diff = view.findChild<DiffView *>();
+        QCOMPARE(diff->fileSummaries().size(), 4);
+        view.markEditedByClaude({project.filePath("a.txt")});
+        QToolButton *onlyClaude = nullptr;
+        for (QToolButton *button : view.findChildren<QToolButton *>()) {
+            if (button->text() == "Only Claude's")
+                onlyClaude = button;
+        }
+        QVERIFY(onlyClaude && onlyClaude->isVisible());
+
+        onlyClaude->click();
+
+        QCOMPARE(diff->fileSummaries().size(), 1);
+        QCOMPARE(diff->fileSummaries().first().path, QString("a.txt"));
+    }
+
+    void askHasTheSessionExplainTheBlock()
+    {
+        const QTemporaryDir project;
+        commitThenChangeThreeFiles(project);
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        view.resize(1200, 700);
+        view.show();
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        fileList(view)->setCurrentItem(fileList(view)->topLevelItem(0)->child(0)); // a.txt
+        const QSignalSpy requested(&view, &ChangesView::explanationRequested);
+        auto *diff = view.findChild<DiffView *>();
+        QToolButton *ask = nullptr;
+        QTRY_VERIFY([&] {
+            for (QToolButton *button : diff->viewport()->findChildren<QToolButton *>()) {
+                if (button->text() == "Ask" && button->isVisible())
+                    ask = button;
+            }
+            return ask != nullptr;
+        }());
+
+        ask->click();
+
+        QCOMPARE(requested.size(), 1);
+        const QString request = requested.first().at(0).toString();
+        QVERIFY(request.contains("a.txt"));
+        QVERIFY(request.contains("```diff"));
     }
 
     void diffColorsTheCodeAsTheEditor()
@@ -1373,18 +1553,72 @@ private slots:
         QTRY_COMPARE(rowStates(view), QStringList({"a.txt: staged", "new.txt: staged"}));
 
         // The last commit's message is offered for "amend", then removed.
-        auto *message = view.findChild<QPlainTextEdit *>();
+        auto *summary = view.findChild<QLineEdit *>("commitSummary");
         auto *amend = view.findChild<QCheckBox *>();
         amend->setChecked(true);
-        QCOMPARE(message->toPlainText(), QString("init"));
+        QCOMPARE(summary->text(), QString("init"));
         amend->setChecked(false);
-        QVERIFY(message->toPlainText().isEmpty());
+        QVERIFY(summary->text().isEmpty());
 
-        message->setPlainText("second");
+        summary->setText("second");
         commitButton(view)->click();
         QTRY_VERIFY(rowStates(view).isEmpty());
-        QVERIFY(message->toPlainText().isEmpty());
+        QVERIFY(summary->text().isEmpty());
         QCOMPARE(RepositoryInfo::read(project.path())->headMessage, QString("second\n"));
+    }
+
+    void theCommitMessageIsTheSummaryThenTheBody()
+    {
+        const QTemporaryDir project;
+        write(project, "a.txt", "a\n");
+        Git::run(project.path(), {"init", "-q", "-b", "main"});
+        Git::run(project.path(), {"add", "-A"});
+        Git::run(project.path(), {"commit", "-qm", "init"});
+        write(project, "a.txt", "b\n");
+        Git::run(project.path(), {"add", "-A"});
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        view.setFolder(project.path());
+        const QSignalSpy refreshed(&view, &ChangesView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+
+        view.findChild<QLineEdit *>("commitSummary")->setText("Change a");
+        view.findChild<QPlainTextEdit *>("commitBody")->setPlainText("Because b reads better.");
+        commitButton(view)->click();
+
+        QTRY_COMPARE(RepositoryInfo::read(project.path())->headMessage, QString("Change a\n\nBecause b reads better.\n"));
+    }
+
+    void theSummaryMeterTurnsRedPastSeventyTwoCharacters()
+    {
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        auto *summary = view.findChild<QLineEdit *>("commitSummary");
+        const auto *count = view.findChild<QLabel *>("commitSummaryCount");
+
+        summary->setText(QString(72, QLatin1Char('a')));
+        QCOMPARE(count->text(), QString("72 / 72"));
+        QVERIFY(count->styleSheet().isEmpty());
+        summary->setText(QString(73, QLatin1Char('a')));
+
+        QCOMPARE(count->text(), QString("73 / 72"));
+        QVERIFY(count->styleSheet().contains("color"));
+    }
+
+    void enterInTheSummaryGoesOnToTheBody()
+    {
+        GitCommands commands;
+        ChangesView view(Theme::duet(), &commands);
+        view.show();
+        view.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&view));
+        auto *summary = view.findChild<QLineEdit *>("commitSummary");
+        summary->setFocus();
+
+        QTest::keyClick(summary, Qt::Key_Return);
+
+        QVERIFY(view.findChild<QPlainTextEdit *>("commitBody")->hasFocus());
     }
 
     void spaceStagesTheBlockAtTheCursorAndF4OpensItsLine()
@@ -1787,8 +2021,9 @@ private slots:
         view.refresh();
         QTRY_COMPARE(refreshed.size(), 1);
         const QSignalSpy requested(&view, &ChangesView::commitMessageRequested);
-        auto *message = view.findChild<QPlainTextEdit *>();
-        message->setPlainText("mine");
+        auto *summary = view.findChild<QLineEdit *>("commitSummary");
+        auto *body = view.findChild<QPlainTextEdit *>("commitBody");
+        summary->setText("mine");
 
         view.generateCommitMessage(); // nothing staged: every change
         QCOMPARE(requested.size(), 1);
@@ -1797,9 +2032,10 @@ private slots:
         QVERIFY(request.contains("nothing is staged"));
 
         view.showCommitMessage("Change a\n\nBecause.");
-        QCOMPARE(message->toPlainText(), QString("Change a\n\nBecause."));
-        message->undo(); // what was written before comes back
-        QCOMPARE(message->toPlainText(), QString("mine"));
+        QCOMPARE(summary->text(), QString("Change a"));
+        QCOMPARE(body->toPlainText(), QString("Because."));
+        summary->undo(); // what was written before comes back
+        QCOMPARE(summary->text(), QString("mine"));
     }
 
 private:

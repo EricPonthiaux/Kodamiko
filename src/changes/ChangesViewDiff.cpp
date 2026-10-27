@@ -145,6 +145,15 @@ void ChangesView::openFileAt(int line)
         emit openFileRequested(change.path, diff_->newFileLine(line));
 }
 
+void ChangesView::openShownFile(const QString &relativePath)
+{
+    const QList<DiffView::FileSummary> &files = diff_->fileSummaries();
+    const auto file = std::ranges::find_if(
+        files, [&relativePath](const DiffView::FileSummary &each) { return each.path == relativePath; });
+    if (file != files.end())
+        openFileAt(diff_->fileStart(int(file - files.begin())));
+}
+
 void ChangesView::showDiffMenu(const QPoint &position)
 {
     int line = diff_->lineAt(position);

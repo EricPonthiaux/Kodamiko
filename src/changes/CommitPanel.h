@@ -9,16 +9,22 @@
 
 class GitCommands;
 class QCheckBox;
+class QLabel;
+class QLineEdit;
 class QPlainTextEdit;
+class QProgressBar;
 class QPushButton;
 
 // The commit area, at the bottom of the Diff mode's file column under a
-// line: the message, Amend, Generate (the agent's session in the terminal
-// writes the message from the changes) and Commit. Given more height, the
-// message takes it. With nothing staged, Commit offers to stage every
-// change first; when git does not know who commits, it asks for the name
-// and email. Without changes, Commit, Generate and Amend are disabled.
-// Commits go through GitCommands.
+// line, below the files it commits: the message's summary, with a meter of
+// its length against git's 72 characters (red beyond); its body; Amend,
+// Generate (the agent's session in the terminal writes the message from the
+// changes) and Commit. Enter in the summary goes on to the body, Ctrl+Enter
+// in either commits; the message is the summary, a blank line, then the
+// body. Given more height, the body takes it. With nothing staged, Commit
+// offers to stage every change first; when git does not know who commits,
+// it asks for the name and email. Without changes, Commit, Generate and
+// Amend are disabled. Commits go through GitCommands.
 class CommitPanel : public QFrame {
     Q_OBJECT
 
@@ -36,9 +42,12 @@ public:
     // Asks the agent's session for the message of the next commit
     // (messageRequested()); it comes back through showGeneratedMessage().
     void generateMessage();
-    // Replaces the message with `message`, written by the agent; Ctrl+Z brings
-    // back the one before.
+    // Replaces the message with `message`, written by the agent: its first
+    // line as the summary, the rest as the body. Ctrl+Z in either brings back
+    // what it held before.
     void showGeneratedMessage(const QString &message);
+    // The summary, then the body after a blank line; trimmed.
+    QString message() const;
     void applyTheme(const Theme &theme);
     // The agent that writes the message: its name in the tooltip and the
     // messages, its icon on Generate from the next applyTheme().
@@ -55,6 +64,11 @@ signals:
     void reviewRequested();
 
 private:
+    // `message` split into the summary and the body, as Ctrl+Z can undo.
+    void setMessage(const QString &message);
+    void clearMessage();
+    // "12 / 72", red beyond.
+    void updateMeter();
     void onAmendToggled(bool amend);
     void commit();
     void runCommit(const QString &message, bool amend, bool stageEverything);
@@ -65,7 +79,13 @@ private:
     GitCommands *commands_;
     const RepositoryStatus *status_ = nullptr;
     QString pathspec_;
-    QPlainTextEdit *message_;
+    QLineEdit *summary_;
+    QLabel *summaryCount_;
+    QProgressBar *summaryBar_; // the meter's track
+    QPlainTextEdit *body_;
+    QColor meterColor_;
+    QColor overColor_;
+    QColor trackColor_;
     QCheckBox *amendCheckbox_;
     QPushButton *generateButton_;
     QPushButton *reviewButton_;
