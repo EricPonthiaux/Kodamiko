@@ -182,11 +182,9 @@ EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 7px 1
 EditorTabs QTabBar::tab:hover { background: @hover; color: @text; }
 EditorTabs QTabBar::tab:selected { background: @base; color: @accentText; border-color: @line; border-top-color: @accent; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
-QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 0 10px; min-width: 0; border: 1px solid transparent; border-bottom: 2px solid transparent; }
-QTabBar#modeTabs::tab:first { border-bottom-left-radius: 3px; }
-QTabBar#modeTabs::tab:last { border-bottom-right-radius: 3px; }
+QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 0 10px; min-width: 0; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 4px; }
 QTabBar#modeTabs::tab:hover { background: @hover; color: @text; }
-QTabBar#modeTabs::tab:selected { background: @checked; color: @accentText; border-color: @line; border-bottom-color: @accent; border-radius: 4px; }
+QTabBar#modeTabs::tab:selected { background: @checked; color: @accentText; border-color: @line; border-bottom-color: @accent; }
 QTabBar::scroller { width: 56px; }
 QTabBar QToolButton { background: @window; border: none; border-radius: 0; padding: 0; }
 QTabBar QToolButton:hover { background: @button; }

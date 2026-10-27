@@ -10,6 +10,7 @@
 #include <QEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QTabBar>
 
 #include <chrono>
 
@@ -108,13 +109,52 @@ void AgentIndicator::applyTheme(const Theme &theme)
     update();
 }
 
+// As tall as the status bar's text, square whatever the state: the bar
+// keeps its layout as the state changes.
+int AgentIndicator::squareSide() const
+{
+    return std::max(iconPx, fontMetrics().height()) + 2 * paddingPx;
+}
+
 QSize AgentIndicator::sizeHint() const
 {
-    // As tall as the status bar's text, square whatever the state: the bar
-    // keeps its layout as the state changes.
     // The contents margins set the room around it.
-    const int side = std::max(iconPx, fontMetrics().height()) + 2 * paddingPx;
+    const int side = squareSide();
     return QSize(side, side).grownBy(contentsMargins());
+}
+
+void AgentIndicator::alignWith(QTabBar *column)
+{
+    Q_ASSERT(column);
+    if (column_)
+        column_->removeEventFilter(this);
+    column_ = column;
+    column->installEventFilter(this);
+    updateAlignment();
+}
+
+// The left margin puts the square's center under the first tab's: the tab
+// bar can have spare width to the right of its tabs.
+void AgentIndicator::updateAlignment()
+{
+    const bool canMeasure = column_ && column_->count() > 0 && isVisible();
+    if (!canMeasure)
+        return;
+    const int columnCenter = column_->mapTo(window(), column_->tabRect(0).center()).x();
+    const int left = mapTo(window(), QPoint(0, 0)).x();
+    const int margin = std::max(0, columnCenter - left - squareSide() / 2);
+    if (margin != contentsMargins().left())
+        setContentsMargins(margin, 0, 0, 0);
+}
+
+bool AgentIndicator::eventFilter(QObject *watched, QEvent *event)
+{
+    const bool columnChanged = event->type() == QEvent::Resize || event->type() == QEvent::Move ||
+                               event->type() == QEvent::LayoutRequest || event->type() == QEvent::FontChange ||
+                               event->type() == QEvent::StyleChange || event->type() == QEvent::Show;
+    if (watched == column_ && columnChanged)
+        QMetaObject::invokeMethod(this, &AgentIndicator::updateAlignment, Qt::QueuedConnection);
+    return QAbstractButton::eventFilter(watched, event);
 }
 
 bool AgentIndicator::hitButton(const QPoint &pos) const
@@ -174,7 +214,16 @@ void AgentIndicator::leaveEvent(QEvent *event)
 void AgentIndicator::changeEvent(QEvent *event)
 {
     // Preferences ▸ Fonts: the size follows the text.
-    if (event->type() == QEvent::FontChange)
+    if (event->type() == QEvent::FontChange) {
         updateGeometry();
+        QMetaObject::invokeMethod(this, &AgentIndicator::updateAlignment, Qt::QueuedConnection);
+    }
     QAbstractButton::changeEvent(event);
+}
+
+void AgentIndicator::showEvent(QShowEvent *event)
+{
+    QAbstractButton::showEvent(event);
+    // Laid out once shown: measured on the next turn of the event loop.
+    QMetaObject::invokeMethod(this, &AgentIndicator::updateAlignment, Qt::QueuedConnection);
 }

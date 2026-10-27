@@ -7,9 +7,11 @@
 #include "ui/Theme.h"
 
 #include <QAbstractButton>
+#include <QPointer>
 #include <QTimer>
 
 class AgentProvider;
+class QTabBar;
 
 // The agent's state in the status bar: the provider's mark alone (see
 // AgentMark), in a square tinted like the run block in the color of the
@@ -27,8 +29,12 @@ public:
     // The agent shown: its name and mark. Not owned.
     void setProvider(const AgentProvider *provider);
     void applyTheme(const Theme &theme);
+    // Centers the square under the side-tab column, following its width as
+    // the layout or interface font changes. Not owned.
+    void alignWith(QTabBar *column);
 
     QSize sizeHint() const override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -37,12 +43,15 @@ protected:
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void changeEvent(QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private:
     void updateAnimation();
     void paintBackground(QPainter &painter, const QColor &color) const;
     void updateAccessibleName();
     void advanceFrame();
+    int squareSide() const;
+    void updateAlignment();
 
     AgentStatus status_ = AgentStatus::Ready;
     const AgentProvider *provider_ = nullptr;
@@ -50,6 +59,7 @@ private:
     HoverProgress hover_{this};
     int frame_ = 0; // the animation's step since the state changed
     QTimer animationTimer_;
+    QPointer<QTabBar> column_;
 };
 
 // The color of `status` in `theme`: amber (the theme's warning) while the agent
