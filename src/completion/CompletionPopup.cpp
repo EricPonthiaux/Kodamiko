@@ -7,6 +7,7 @@
 #include "ui/Paragraph.h"
 #include "ui/PopupMetrics.h"
 #include "ui/PopupRows.h"
+#include "ui/ThemeStyle.h"
 
 #include <QAbstractListModel>
 #include <QAccessible>
@@ -370,15 +371,13 @@ void CompletionPopup::applyTheme(const Theme &theme)
                        "QLabel#completionHint { color: %3; border-top: 1px solid %4; }")
             .arg(theme.alternateBase.name(), theme.border.name(), theme.mutedText.name(), theme.line.name())
             .arg(PopupMetrics::frameRadius);
-    if (sheet != styleSheet())
-        setStyleSheet(sheet);
+    ThemeStyle::setStyleSheetIfChanged(this, sheet);
     const QString documentationSheet =
         QStringLiteral("QFrame#completionDocumentation { background: %1; border: 1px solid %2; border-radius: %4px; }"
                        "QLabel { color: %3; background: transparent; }")
             .arg(theme.alternateBase.name(), theme.border.name(), theme.foreground.name())
             .arg(PopupMetrics::frameRadius);
-    if (documentationSheet != documentation_->styleSheet())
-        documentation_->setStyleSheet(documentationSheet);
+    ThemeStyle::setStyleSheetIfChanged(documentation_, documentationSheet);
     // The signature in the code font, the text in the interface's.
     documentationTitle_->setFont(theme.font);
     view_->viewport()->update();

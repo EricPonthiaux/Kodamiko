@@ -17,7 +17,7 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QDir>
-#include <QDirIterator>
+#include <QDirListing>
 #include <QDrag>
 #include <QDragEnterEvent>
 #include <QFileInfo>
@@ -62,10 +62,13 @@ bool isInsideItself(const QString &entry, const QString &destination)
 QString deleteFolderQuestion(const QString &path)
 {
     constexpr int countLimit = 1000;
+    using enum QDirListing::IteratorFlag;
     int files = 0;
-    for (QDirIterator it(path, QDir::Files | QDir::Hidden | QDir::System, QDirIterator::Subdirectories);
-         it.hasNext() && files <= countLimit; it.next())
-        ++files;
+    for ([[maybe_unused]] const QDirListing::DirEntry &entry :
+         QDirListing(path, Recursive | IncludeHidden | ExcludeDirs)) {
+        if (++files > countLimit)
+            break;
+    }
     const QString name = QFileInfo(path).fileName();
     if (files == 0)
         return FileTreeView::tr("Delete the empty folder “%1”?").arg(name);

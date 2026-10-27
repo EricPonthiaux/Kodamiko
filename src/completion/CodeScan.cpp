@@ -644,8 +644,9 @@ QString withoutAngleArguments(QString names)
 QString classNameIn(const QString &names)
 {
     static const QSet<QString> skipped = {"final", "sealed", "abstract", "alignas"};
+    static const QRegularExpression separators(QStringLiteral("[^\\w$]+"));
     QString name;
-    for (const QString &word : names.split(QRegularExpression(QStringLiteral("[^\\w$]+")), Qt::SkipEmptyParts)) {
+    for (const QString &word : names.split(separators, Qt::SkipEmptyParts)) {
         if (!skipped.contains(word))
             name = word;
     }
@@ -655,7 +656,8 @@ QString classNameIn(const QString &names)
 // "public ns::Base<T>", "pkg.Base": "Base".
 QString baseName(QString base)
 {
-    base.remove(QRegularExpression(QStringLiteral("\\b(?:public|protected|private|virtual)\\b")));
+    static const QRegularExpression accessSpecifiers(QStringLiteral("\\b(?:public|protected|private|virtual)\\b"));
+    base.remove(accessSpecifiers);
     const int angleOpen = int(base.indexOf(QLatin1Char('<')));
     if (angleOpen >= 0)
         base = base.left(angleOpen);
@@ -670,8 +672,10 @@ QString baseName(QString base)
 // ": public A, B", "extends A implements B": "A", "B".
 QStringList baseNamesIn(QString baseText)
 {
-    baseText.replace(QRegularExpression(QStringLiteral("^:|\\bextends\\b|\\bimplements\\b")), QStringLiteral(","));
-    baseText.replace(QRegularExpression(QStringLiteral("\\bextends\\b|\\bimplements\\b")), QStringLiteral(","));
+    static const QRegularExpression firstBaseIntroducer(QStringLiteral("^:|\\bextends\\b|\\bimplements\\b"));
+    static const QRegularExpression baseIntroducer(QStringLiteral("\\bextends\\b|\\bimplements\\b"));
+    baseText.replace(firstBaseIntroducer, QStringLiteral(","));
+    baseText.replace(baseIntroducer, QStringLiteral(","));
     QStringList bases;
     for (const QString &part : splitTopLevel(baseText)) {
         if (const QString base = baseName(part); !base.isEmpty())
@@ -939,7 +943,8 @@ Function parseFunction(const QString &header)
     const std::optional<ScopeSplit> scoped = splitScope(named.before.trimmed());
     if (!scoped)
         return function;
-    const QStringList words = scoped->before.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    static const QRegularExpression spaces(QStringLiteral("\\s+"));
+    const QStringList words = scoped->before.split(spaces, Qt::SkipEmptyParts);
     function.scope = scoped->scope;
     if (isExpression(scoped->before, words))
         return function;

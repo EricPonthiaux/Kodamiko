@@ -37,8 +37,9 @@ QStringList takeLines(QByteArray &buffer)
 QString withoutProgress(const QByteArray &errorOutput)
 {
     static const QRegularExpression progressLine(QStringLiteral(R"(^(remote: )?[\w ]+: +\d+% \()"));
+    static const QRegularExpression lineBreak(QStringLiteral("[\r\n]"));
     QStringList kept;
-    for (const QString &line : QString::fromUtf8(errorOutput).split(QRegularExpression(QStringLiteral("[\r\n]")))) {
+    for (const QString &line : QString::fromUtf8(errorOutput).split(lineBreak)) {
         if (!line.trimmed().isEmpty() && !progressLine.match(line).hasMatch())
             kept.append(line);
     }

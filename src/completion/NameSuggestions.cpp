@@ -236,7 +236,8 @@ bool isDeclarationStart(const QByteArray &text, int before)
 QString cleanedType(const QString &type)
 {
     QString cleaned = type;
-    cleaned.remove(QRegularExpression(QStringLiteral("\\b(?:const|volatile|struct|enum|union|typename)\\b")));
+    static const QRegularExpression qualifiers(QStringLiteral("\\b(?:const|volatile|struct|enum|union|typename)\\b"));
+    cleaned.remove(qualifiers);
     cleaned.remove(QLatin1Char('*'));
     cleaned.remove(QLatin1Char('&'));
     cleaned = cleaned.simplified();

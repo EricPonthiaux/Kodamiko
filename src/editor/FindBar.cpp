@@ -3,6 +3,7 @@
 #include "FindBar.h"
 
 #include "EditorWidget.h"
+#include "ui/ThemeStyle.h"
 
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -294,10 +295,8 @@ void FindBar::updateCount()
 {
     const bool error = !valid_ || (!search_->text().isEmpty() && matches_.isEmpty());
     // Updated at each keystroke: a style sheet is only set when it changes.
-    const QString sheet =
-        error ? QStringLiteral("QLineEdit { border: 1px solid %1; }").arg(errorColor(theme_)) : QString();
-    if (sheet != search_->styleSheet())
-        search_->setStyleSheet(sheet);
+    ThemeStyle::setStyleSheetIfChanged(
+        search_, error ? QStringLiteral("QLineEdit { border: 1px solid %1; }").arg(errorColor(theme_)) : QString());
     if (!valid_)
         count_->setText(tr("Bad pattern"));
     else if (search_->text().isEmpty())
@@ -308,7 +307,7 @@ void FindBar::updateCount()
         count_->setText(QStringLiteral("%1/%2").arg(current).arg(matches_.size()));
     else
         count_->setText(matches_.size() == 1 ? tr("1 result") : tr("%1 results").arg(matches_.size()));
-    count_->setStyleSheet(error ? QStringLiteral("color: %1").arg(errorColor(theme_)) : QString());
+    ThemeStyle::setStyleSheetIfChanged(count_, error ? QStringLiteral("color: %1").arg(errorColor(theme_)) : QString());
 }
 
 void FindBar::select(const Match &match)

@@ -7,6 +7,8 @@
 #include <QFont>
 #include <QPalette>
 
+class QWidget;
+
 // The editor theme applied to the whole interface.
 namespace ThemeStyle {
 
@@ -31,5 +33,9 @@ QColor selectionColor(const Theme &theme);
 // `base` with `share` (0 to 1) of `tint` mixed in, opaque: the tints of the
 // interface, which follow the theme.
 QColor mixed(const QColor &base, const QColor &tint, qreal share);
+// Sets `sheet` on `widget` only when it differs from the current one:
+// QWidget::setStyleSheet restyles the widget and all its children even for
+// the same string, too costly for a sheet updated at each keystroke.
+void setStyleSheetIfChanged(QWidget *widget, const QString &sheet);
 
 } // namespace ThemeStyle

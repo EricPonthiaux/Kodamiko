@@ -393,6 +393,12 @@ const Theme &applied()
     return appliedTheme();
 }
 
+void setStyleSheetIfChanged(QWidget *widget, const QString &sheet)
+{
+    if (widget->styleSheet() != sheet)
+        widget->setStyleSheet(sheet);
+}
+
 void applyFont(const QFont &font)
 {
     QApplication::setFont(font);

@@ -5,6 +5,7 @@
 #include "ReviewText.h"
 #include "ui/AppFonts.h"
 #include "ui/Spinner.h"
+#include "ui/ThemeStyle.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -215,7 +216,7 @@ void ReviewBar::setText(const QString &title, const QString &message, const QStr
 {
     title_->setText(title);
     message_->setText(message);
-    message_->setStyleSheet(color.isEmpty() ? QString() : QStringLiteral("color: %1;").arg(color));
+    ThemeStyle::setStyleSheetIfChanged(message_, color.isEmpty() ? QString() : QStringLiteral("color: %1;").arg(color));
     message_->setVisible(!message.isEmpty());
 }
 
