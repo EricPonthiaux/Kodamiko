@@ -6,6 +6,7 @@
 #include "git/FilePatch.h"
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
+#include "git/GitIgnoreFile.h"
 #include "git/GitOperations.h"
 #include "git/GitProcess.h"
 #include "git/LineChanges.h"
@@ -405,6 +406,48 @@ private slots:
         GitOperations::applyToIndex(result.info, eof.partial(eof.selectHunk(0), PatchDirection::Forward),
                                     PatchDirection::Forward);
         QCOMPARE(indexed(project, "eof.txt"), QByteArray("a\nB"));
+    }
+
+    void ignorePatternMatchesOnlyTheEntryAtItsPlace()
+    {
+        using GitIgnoreFile::EntryKind;
+        QCOMPARE(GitIgnoreFile::patternFor("src/build", EntryKind::Folder), QString("/src/build/"));
+        QCOMPARE(GitIgnoreFile::patternFor("notes.txt", EntryKind::File), QString("/notes.txt"));
+        QCOMPARE(GitIgnoreFile::patternFor("a*b?[c]\\d.txt", EntryKind::File), QString("/a\\*b\\?\\[c]\\\\d.txt"));
+        QCOMPARE(GitIgnoreFile::patternFor("trailing  ", EntryKind::File), QString("/trailing\\  "));
+    }
+
+    void ignoringUntrackedEntriesAppendsThemToTheGitignoreOnce()
+    {
+        const QTemporaryDir project;
+        initRepository(project, {{"kept.txt", "k\n"}, {".gitignore", "*.log"}});
+        write(project, "notes.txt", "n\n");
+        write(project, "out/a.o", "o");
+        const QString root = QDir::cleanPath(project.path());
+
+        const QStringList patterns = {GitIgnoreFile::patternFor("notes.txt", GitIgnoreFile::EntryKind::File),
+                                      GitIgnoreFile::patternFor("out", GitIgnoreFile::EntryKind::Folder)};
+        QString error;
+        QVERIFY2(GitIgnoreFile::add(root, patterns, &error), qPrintable(error));
+        QVERIFY2(GitIgnoreFile::add(root, patterns, &error), qPrintable(error));
+
+        QCOMPARE(read(project, ".gitignore"), QByteArray("*.log\n/notes.txt\n/out/\n"));
+        const FileStatusMap statuses = FileStatuses::read(root);
+        QCOMPARE(statuses.value(root + "/notes.txt"), FileStatus::Ignored);
+        QCOMPARE(statuses.value(root + "/out"), FileStatus::Ignored);
+    }
+
+    void ignoringCreatesTheGitignoreOrKeepsItsLineEndings()
+    {
+        const QTemporaryDir created;
+        QString error;
+        QVERIFY2(GitIgnoreFile::add(created.path(), {"/a"}, &error), qPrintable(error));
+        QCOMPARE(read(created, ".gitignore"), QByteArray("/a\n"));
+
+        const QTemporaryDir crlf;
+        write(crlf, ".gitignore", "*.log\r\n");
+        QVERIFY2(GitIgnoreFile::add(crlf.path(), {"/a"}, &error), qPrintable(error));
+        QCOMPARE(read(crlf, ".gitignore"), QByteArray("*.log\r\n/a\r\n"));
     }
 
     void stageAndUnstageFiles()
