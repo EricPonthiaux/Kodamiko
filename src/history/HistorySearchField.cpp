@@ -2,6 +2,7 @@
 
 #include "HistorySearchField.h"
 
+#include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
 
 #include <QCoreApplication>
@@ -159,9 +160,7 @@ void HistorySearchField::showError()
 {
     const bool hasError = !query_.error.isEmpty();
     // Updated at each keystroke: a style sheet is only set when it changes.
-    const QString sheet =
-        hasError ? QStringLiteral("QLineEdit { border: 1px solid %1; }").arg(errorColor_.name()) : QString();
-    if (sheet != styleSheet())
-        setStyleSheet(sheet);
+    ThemeStyle::setStyleSheetIfChanged(
+        this, hasError ? QStringLiteral("QLineEdit { border: 1px solid %1; }").arg(errorColor_.name()) : QString());
     setToolTip(hasError ? query_.error + QStringLiteral("\n\n") + syntaxHelp() : syntaxHelp());
 }

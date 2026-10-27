@@ -429,7 +429,8 @@ QString normalized(const QString &type)
     result.remove(QLatin1Char('&'));
     static const QRegularExpression packages(QStringLiteral("\\b[a-z]\\w*\\.(?=[A-Za-z])"));
     result.remove(packages); // "java.lang.String"
-    result.remove(QRegularExpression(QStringLiteral("\\s+")));
+    static const QRegularExpression spaces(QStringLiteral("\\s+"));
+    result.remove(spaces);
     result.remove(QStringLiteral("std::"));
     if (result.startsWith(QLatin1String("::")))
         result = result.mid(2);

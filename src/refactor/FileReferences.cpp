@@ -8,7 +8,7 @@
 #include "syntax/LanguageRegistry.h"
 
 #include <QDir>
-#include <QDirIterator>
+#include <QDirListing>
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QSet>
@@ -405,10 +405,12 @@ QList<Move> filesOf(const QString &folder, const QString &to)
 {
     const bool hasMoved = QFileInfo(to).isDir();
     const QString root = hasMoved ? to : folder;
+    using enum QDirListing::IteratorFlag;
+    // The links to files move with them, not the broken ones.
+    const QDirListing files(root, Recursive | IncludeHidden | FilesOnly | ResolveSymlinks);
     QList<Move> moves;
-    QDirIterator it(root, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        const QString relative = it.next().mid(root.size());
+    for (const QDirListing::DirEntry &file : files) {
+        const QString relative = file.filePath().mid(root.size());
         moves.append({QDir::cleanPath(folder + relative), QDir::cleanPath(to + relative)});
     }
     return moves;

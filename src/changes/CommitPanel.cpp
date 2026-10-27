@@ -6,6 +6,7 @@
 #include "agent/CommitMessage.h"
 #include "git/GitCommands.h"
 #include "git/GitOperations.h"
+#include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
 #include "workspace/ChoicePopup.h"
 
@@ -136,12 +137,15 @@ void CommitPanel::updateMeter()
     const int length = int(summary_->text().size());
     const bool isOver = length > summaryLimit;
     summaryCount_->setText(QStringLiteral("%1 / %2").arg(length).arg(summaryLimit));
-    summaryCount_->setStyleSheet(isOver ? QStringLiteral("color: %1").arg(overColor_.name()) : QString());
+    // Updated at each keystroke: the style sheets are only set when they change.
+    ThemeStyle::setStyleSheetIfChanged(summaryCount_,
+                                       isOver ? QStringLiteral("color: %1").arg(overColor_.name()) : QString());
     summaryBar_->setValue(std::min(length, summaryLimit));
     const QColor &fill = isOver ? overColor_ : meterColor_;
-    summaryBar_->setStyleSheet(QStringLiteral("QProgressBar { border: none; border-radius: 1px; background: %1; }"
-                                              "QProgressBar::chunk { border-radius: 1px; background: %2; }")
-                                   .arg(trackColor_.name(QColor::HexArgb), fill.name()));
+    ThemeStyle::setStyleSheetIfChanged(
+        summaryBar_, QStringLiteral("QProgressBar { border: none; border-radius: 1px; background: %1; }"
+                                    "QProgressBar::chunk { border-radius: 1px; background: %2; }")
+                         .arg(trackColor_.name(QColor::HexArgb), fill.name()));
 }
 
 QSize CommitPanel::sizeHint() const
