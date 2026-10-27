@@ -159,8 +159,8 @@ const std::array<ThemeColors, 8> themes = {{
         .mutedText = blueGrey300,
         .marginForeground = blueGrey600,
         .currentLineNumber = blueGrey200,
-        .syntax = {blueGrey400, lightGreen300, cyan200, orange300, deepPurpleA100, teal200, lightBlue300, pink200,
-                   orange200, amber200, blueGrey300},
+        .syntax = {blueGrey200, lightGreen300, cyan200, orange300, deepPurple100, teal200, lightBlue200, pink100,
+                   orange200, amber200, blueGrey100},
     },
     {
         .name = "duet-lagoon",
@@ -197,8 +197,8 @@ const std::array<ThemeColors, 8> themes = {{
         .mutedText = brown200,
         .marginForeground = brown400,
         .currentLineNumber = brown100,
-        .syntax = {brown300, lightGreen300, cyan100, deepOrange200, amber400, teal200, yellow200, red200, orange100,
-                   amber100, brown200},
+        .syntax = {brown200, lightGreen300, cyan100, deepOrange200, amber400, teal200, yellow200, red100, orange100,
+                   amber100, brown100},
     },
     // After Dracula (MIT, Copyright (c) 2016 Dracula Theme).
     {
@@ -217,8 +217,8 @@ const std::array<ThemeColors, 8> themes = {{
         .mutedText = indigo300,
         .marginForeground = indigo400,
         .currentLineNumber = grey50,
-        .syntax = {indigo400, limeA100, pinkA100, deepPurpleA100, pinkA100, cyan200, greenA400, deepPurpleA100,
-                   orange300, grey50, grey50},
+        .syntax = {indigoA100, limeA100, pink200, deepPurple100, pink200, cyan200, greenA400, deepPurple100, orange300,
+                   grey50, grey50},
     },
     // After Nord (MIT, Copyright (c) 2016-present Sven Greb).
     {
@@ -237,7 +237,7 @@ const std::array<ThemeColors, 8> themes = {{
         .mutedText = blueGrey100,
         .marginForeground = blueGrey700,
         .currentLineNumber = indigo50,
-        .syntax = {indigo400, green200, orangeA100, purple200, indigoA100, teal200, lightBlue200, indigoA100, indigo50,
+        .syntax = {indigo200, green200, orangeA100, purple100, indigo100, teal200, lightBlue200, indigo100, indigo50,
                    indigo50, blueGrey50},
     },
     // After Night Owl (MIT, Copyright (c) 2018 Sarah Drasner).
@@ -257,7 +257,7 @@ const std::array<ThemeColors, 8> themes = {{
         .mutedText = blueGrey300,
         .marginForeground = blueGrey600,
         .currentLineNumber = blue100,
-        .syntax = {blueGrey600, orange200, deepOrange300, deepOrange300, purple200, lime300, blueA100, teal200, teal200,
+        .syntax = {blueGrey200, orange200, deepOrange200, deepOrange200, purple100, lime300, blue200, teal200, teal200,
                    teal100, indigo50},
     },
     // After Palenight (MIT, Copyright (c) 2017-present Olaolu Olawuyi).
@@ -277,7 +277,7 @@ const std::array<ThemeColors, 8> themes = {{
         .mutedText = indigo200,
         .marginForeground = indigo500,
         .currentLineNumber = teal50,
-        .syntax = {indigo400, lightGreen300, deepOrange300, deepOrange300, purple200, orangeA100, blueA100, pinkA200,
+        .syntax = {indigo200, lightGreen300, deepOrange200, deepOrange200, purple100, orangeA100, blue200, pink100,
                    lightBlueA100, lightBlueA100, blueGrey200},
     },
     // After Tokyo Night (MIT, enkia).
@@ -297,8 +297,8 @@ const std::array<ThemeColors, 8> themes = {{
         .mutedText = indigo300,
         .marginForeground = blueGrey700,
         .currentLineNumber = indigo300,
-        .syntax = {indigo500, lightGreen400, lightBlueA100, deepOrangeA100, deepPurpleA100, indigo100, blueA100,
-                   pink300, orange300, lightBlue200, lightBlueA100},
+        .syntax = {indigoA100, lightGreen400, lightBlueA100, deepOrangeA100, deepPurple100, indigo100, blueA100,
+                   pink200, orange300, lightBlue200, lightBlueA100},
     },
 }};
 

@@ -9,6 +9,7 @@
 // from 50, the palest, to 900, the deepest, and the accents A100 to A700.
 namespace MaterialPalette {
 
+inline constexpr const char *red100 = "#ffcdd2";
 inline constexpr const char *red200 = "#ef9a9a";
 inline constexpr const char *red300 = "#e57373";
 inline constexpr const char *red400 = "#ef5350";
@@ -172,28 +173,28 @@ inline constexpr const char *white = "#ffffff";
 
 // Every color above, for the tests to check that a theme takes only these.
 inline constexpr std::array all = {
-    red200,         red300,         red400,        red700,        red800,         redA100,       pink50,
-    pink100,        pink200,        pink300,       pink600,       pink700,        pink900,       pinkA100,
-    pinkA200,       purple50,       purple100,     purple200,     purple300,      purple600,     purple700,
-    purple800,      purple900,      purpleA100,    deepPurple50,  deepPurple100,  deepPurple200, deepPurple300,
-    deepPurple400,  deepPurple500,  deepPurple600, deepPurple700, deepPurple800,  deepPurple900, deepPurpleA100,
-    indigo50,       indigo100,      indigo200,     indigo300,     indigo400,      indigo500,     indigo600,
-    indigo700,      indigo800,      indigo900,     indigoA100,    blue50,         blue100,       blue200,
-    blue300,        blue600,        blue700,       blue800,       blue900,        blueA100,      lightBlue50,
-    lightBlue100,   lightBlue200,   lightBlue300,  lightBlue600,  lightBlue700,   lightBlue800,  lightBlue900,
-    lightBlueA100,  lightBlueA200,  cyan100,       cyan200,       cyan800,        cyanA100,      cyanA400,
-    teal50,         teal100,        teal200,       teal300,       teal400,        teal600,       teal700,
-    teal800,        teal900,        tealA100,      tealA200,      green200,       green300,      green700,
-    green800,       green900,       greenA100,     greenA400,     lightGreen50,   lightGreen100, lightGreen200,
-    lightGreen300,  lightGreen400,  lightGreen800, lightGreen900, lightGreenA100, lime200,       lime300,
-    lime900,        limeA100,       yellow50,      yellow100,     yellow200,      yellowA100,    amber50,
-    amber100,       amber200,       amber300,      amber400,      amber600,       amber800,      amber900,
-    amberA100,      orange50,       orange100,     orange200,     orange300,      orange800,     orange900,
-    orangeA100,     deepOrange100,  deepOrange200, deepOrange300, deepOrange600,  deepOrange800, deepOrange900,
-    deepOrangeA100, deepOrangeA200, brown50,       brown100,      brown200,       brown300,      brown400,
-    brown500,       brown600,       brown700,      brown800,      brown900,       grey50,        grey100,
-    grey200,        grey300,        grey400,       grey500,       grey600,        grey700,       grey800,
-    grey900,        blueGrey50,     blueGrey100,   blueGrey200,   blueGrey300,    blueGrey400,   blueGrey500,
-    blueGrey600,    blueGrey700,    blueGrey800,   blueGrey900,   black,          white};
+    red100,         red200,         red300,         red400,        red700,        red800,         redA100,
+    pink50,         pink100,        pink200,        pink300,       pink600,       pink700,        pink900,
+    pinkA100,       pinkA200,       purple50,       purple100,     purple200,     purple300,      purple600,
+    purple700,      purple800,      purple900,      purpleA100,    deepPurple50,  deepPurple100,  deepPurple200,
+    deepPurple300,  deepPurple400,  deepPurple500,  deepPurple600, deepPurple700, deepPurple800,  deepPurple900,
+    deepPurpleA100, indigo50,       indigo100,      indigo200,     indigo300,     indigo400,      indigo500,
+    indigo600,      indigo700,      indigo800,      indigo900,     indigoA100,    blue50,         blue100,
+    blue200,        blue300,        blue600,        blue700,       blue800,       blue900,        blueA100,
+    lightBlue50,    lightBlue100,   lightBlue200,   lightBlue300,  lightBlue600,  lightBlue700,   lightBlue800,
+    lightBlue900,   lightBlueA100,  lightBlueA200,  cyan100,       cyan200,       cyan800,        cyanA100,
+    cyanA400,       teal50,         teal100,        teal200,       teal300,       teal400,        teal600,
+    teal700,        teal800,        teal900,        tealA100,      tealA200,      green200,       green300,
+    green700,       green800,       green900,       greenA100,     greenA400,     lightGreen50,   lightGreen100,
+    lightGreen200,  lightGreen300,  lightGreen400,  lightGreen800, lightGreen900, lightGreenA100, lime200,
+    lime300,        lime900,        limeA100,       yellow50,      yellow100,     yellow200,      yellowA100,
+    amber50,        amber100,       amber200,       amber300,      amber400,      amber600,       amber800,
+    amber900,       amberA100,      orange50,       orange100,     orange200,     orange300,      orange800,
+    orange900,      orangeA100,     deepOrange100,  deepOrange200, deepOrange300, deepOrange600,  deepOrange800,
+    deepOrange900,  deepOrangeA100, deepOrangeA200, brown50,       brown100,      brown200,       brown300,
+    brown400,       brown500,       brown600,       brown700,      brown800,      brown900,       grey50,
+    grey100,        grey200,        grey300,        grey400,       grey500,       grey600,        grey700,
+    grey800,        grey900,        blueGrey50,     blueGrey100,   blueGrey200,   blueGrey300,    blueGrey400,
+    blueGrey500,    blueGrey600,    blueGrey700,    blueGrey800,   blueGrey900,   black,          white};
 
 } // namespace MaterialPalette

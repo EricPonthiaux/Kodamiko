@@ -192,10 +192,14 @@ AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
     brand->addWidget(mark_);
     brand->addLayout(identity, 1);
 
-    auto *contact = new QLabel(tr("Contact") + QStringLiteral("<br>") + emailLinks(), this);
-    contact->setTextFormat(Qt::RichText);
-    contact->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    contact->setOpenExternalLinks(true);
+    auto *emails = new QLabel(emailLinks(), this);
+    emails->setTextFormat(Qt::RichText);
+    emails->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    emails->setOpenExternalLinks(true);
+    auto *contact = new QVBoxLayout;
+    contact->setSpacing(6);
+    contact->addWidget(new QLabel(tr("Contact"), this));
+    contact->addWidget(emails);
 
     auto *love = new QHBoxLayout;
     love->setSpacing(6);
@@ -207,7 +211,7 @@ AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
     body->setContentsMargins(PopupMetrics::bodyMargins);
     body->setSpacing(20);
     body->addLayout(brand);
-    body->addWidget(contact);
+    body->addLayout(contact);
     body->addWidget(new RotatingQuote(this));
     body->addStretch();
     body->addLayout(love);

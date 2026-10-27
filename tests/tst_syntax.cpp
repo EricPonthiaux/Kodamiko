@@ -11,7 +11,9 @@
 #include <Qsci/qsciscintilla.h>
 #include <QtTest>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <thread>
 #include <vector>
 
@@ -31,6 +33,20 @@ private:
         const int position = editor.text().toUtf8().indexOf(word);
         Q_ASSERT(position >= 0);
         return editor.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position);
+    }
+
+    // WCAG 2 contrast ratio, from 1:1 to 21:1.
+    static qreal contrastRatio(const QColor &first, const QColor &second)
+    {
+        const auto luminance = [](const QColor &color) {
+            const auto channel = [](qreal value) {
+                return value <= 0.03928 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+            };
+            return 0.2126 * channel(color.redF()) + 0.7152 * channel(color.greenF()) + 0.0722 * channel(color.blueF());
+        };
+        const qreal firstLuminance = luminance(first);
+        const qreal secondLuminance = luminance(second);
+        return (std::max(firstLuminance, secondLuminance) + 0.05) / (std::min(firstLuminance, secondLuminance) + 0.05);
     }
 
     // Loads `code` into an editor highlighted for `languageId`, with the whole text styled.
@@ -55,15 +71,16 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        // Duet's first, then Duet-Night and its Material ones.
-        QCOMPARE(names.size(), 22);
+        // Duet's first, then Duet-Night, Duet-Violet, Duet-Stratos, Duet-Bloom and the Material ones.
+        QCOMPARE(names.size(), 13);
         QCOMPARE(names.first(), QString("duet"));
         QVERIFY(std::ranges::all_of(names.mid(1), [](const QString &name) { return name.startsWith("duet-"); }));
-        const Theme amethyst = Theme::named("duet-amethyst");
-        QVERIFY(amethyst.isDark);
-        QVERIFY(amethyst.accent.isValid() && amethyst.window.isValid() && amethyst.findHighlight.isValid());
-        QVERIFY(amethyst.syntaxStyleIndex(u"function.method") >= 0);
-        QVERIFY(!Theme::named("duet-paper").isDark);
+        const Theme violet = Theme::named("duet-violet");
+        QCOMPARE(violet.name, QString("duet-violet"));
+        QVERIFY(violet.accent.isValid() && violet.window.isValid() && violet.findHighlight.isValid());
+        QVERIFY(violet.syntaxStyleIndex(u"function.method") >= 0);
+        // They are all dark.
+        QVERIFY(std::ranges::all_of(Theme::all(), [](const Theme &theme) { return theme.isDark; }));
         // Every theme has the interface colors the controls' style sheet uses.
         for (const Theme &theme : Theme::all()) {
             for (const QColor &color : {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent,
@@ -77,7 +94,7 @@ private slots:
     void materialThemesTakeOnlyMaterialDesignColors()
     {
         const QList<Theme> themes = MaterialThemes::all();
-        QCOMPARE(themes.size(), 20);
+        QCOMPARE(themes.size(), 8);
         const auto isMaterial = [](const QColor &color) {
             return std::ranges::any_of(MaterialPalette::all,
                                        [&color](const char *swatch) { return QColor(swatch) == color; });
@@ -109,6 +126,21 @@ private slots:
                 QVERIFY2(isMaterial(color), qPrintable(theme.name + ": " + color.name()));
             for (const auto &[capture, style] : theme.syntaxStyles)
                 QVERIFY2(isMaterial(style.foreground), qPrintable(theme.name + ": " + capture));
+        }
+    }
+
+    void everyThemeReadsItsCodeAtAbout7To1AndItsCommentsAt5_5To1()
+    {
+        constexpr qreal codeContrast = 6.9; // 7:1 or about
+        constexpr qreal commentContrast = 5.5;
+        constexpr qreal accentContrast = 4.5;
+        for (const Theme &theme : Theme::all()) {
+            for (const auto &[capture, style] : theme.syntaxStyles) {
+                const qreal minimum = capture == "comment" ? commentContrast : codeContrast;
+                QVERIFY2(contrastRatio(style.foreground, theme.background) >= minimum,
+                         qPrintable(theme.name + ": " + capture));
+            }
+            QVERIFY2(contrastRatio(theme.onAccent, theme.accent) >= accentContrast, qPrintable(theme.name));
         }
     }
 
