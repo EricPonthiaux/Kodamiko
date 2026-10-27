@@ -144,8 +144,11 @@ HistoryView::HistoryView(const Theme &theme, QWidget *parent)
     // The selection, not the current item: the view makes an item current
     // when it takes focus, without the user having chosen anything.
     connect(commits_, &QTreeWidget::itemSelectionChanged, this, &HistoryView::onCommitSelectionChanged);
-    // A click unfolds the commit's message in its row, a second folds it.
-    connect(commits_, &QTreeWidget::itemClicked, this, &HistoryView::toggleUnfolded);
+    // A click unfolds the commit's message in its row, a second folds it. On
+    // the press, not the click: the row unfolded before folds as the press
+    // chooses the new one, the rows under it move, and the release would
+    // land on another row, which is no click.
+    connect(commits_, &QTreeWidget::itemPressed, this, &HistoryView::toggleUnfolded);
     // Narrower or wider, the unfolded message wraps again.
     commits_->viewport()->installEventFilter(this);
     connect(commits_, &QTreeWidget::customContextMenuRequested, this, &HistoryView::showCommitMenu);
@@ -482,9 +485,14 @@ void HistoryView::updateSummary()
 
 void HistoryView::toggleUnfolded(QTreeWidgetItem *item)
 {
+    // The right button opens the menu: the row stays as it is.
+    if (!(QApplication::mouseButtons() & Qt::LeftButton))
+        return;
     unfoldOnly(CommitDelegate::isUnfolded(item) ? nullptr : item);
 }
 
+// Not scrolled to: under the pressed button, the rows would move under the
+// mouse, and the slightest drag would choose another commit.
 void HistoryView::unfoldOnly(QTreeWidgetItem *item)
 {
     unfoldedId_ = item ? item->data(0, idRole).toString() : QString();
@@ -492,8 +500,6 @@ void HistoryView::unfoldOnly(QTreeWidgetItem *item)
         QTreeWidgetItem *row = commits_->topLevelItem(i);
         CommitDelegate::setUnfolded(row, row == item);
     }
-    if (item)
-        commits_->scrollToItem(item); // its message in view
 }
 
 bool HistoryView::eventFilter(QObject *watched, QEvent *event)

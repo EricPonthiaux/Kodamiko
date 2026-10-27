@@ -137,7 +137,8 @@ private:
     void headDays();
     void updateSummary();
     void onCommitSelectionChanged();
-    // Clicked: `item` unfolds, the others fold; unfolded already, it folds.
+    // Pressed with the left button: `item` unfolds, the others fold;
+    // unfolded already, it folds.
     void toggleUnfolded(QTreeWidgetItem *item);
     // Only `item` unfolded; nullptr: none.
     void unfoldOnly(QTreeWidgetItem *item);

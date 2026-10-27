@@ -955,18 +955,42 @@ private slots:
         auto *commits = view.findChild<QTreeWidget *>("commits");
         QTreeWidgetItem *second = commits->topLevelItem(0);
         QTreeWidgetItem *first = commits->topLevelItem(1);
-        const int foldedHeight = commits->visualItemRect(first).height();
+        const int foldedHeight = commits->visualItemRect(second).height();
         const auto click = [commits](QTreeWidgetItem *item) {
             QTest::mouseClick(commits->viewport(), Qt::LeftButton, {}, commits->visualItemRect(item).center());
         };
 
-        click(first);
-        QVERIFY(CommitDelegate::isUnfolded(first));
-        QTRY_VERIFY(commits->visualItemRect(first).height() > foldedHeight); // room for the message
-
         click(second);
         QVERIFY(CommitDelegate::isUnfolded(second));
-        QVERIFY(!CommitDelegate::isUnfolded(first));
+        QTRY_VERIFY(commits->visualItemRect(second).height() > foldedHeight); // room for the message
+
+        // One click on the row under it, which moves up as the first folds.
+        click(first);
+        QVERIFY(CommitDelegate::isUnfolded(first));
+        QVERIFY(!CommitDelegate::isUnfolded(second));
+        QCOMPARE(commits->currentItem(), first);
+    }
+
+    void theRightButtonLeavesTheRowAsItIs()
+    {
+        const QTemporaryDir dir;
+        git(dir, {"init", "-q", "-b", "main"});
+        commit(dir, "only\n\nBody.", {{"a.txt", "a\n"}});
+        HistoryView view(Theme::duet());
+        view.resize(1200, 700);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        view.setFolder(dir.path());
+        const QSignalSpy refreshed(&view, &HistoryView::refreshed);
+        view.refresh();
+        QTRY_COMPARE(refreshed.size(), 1);
+        auto *commits = view.findChild<QTreeWidget *>("commits");
+        QTreeWidgetItem *item = commits->topLevelItem(0);
+
+        QTest::mousePress(commits->viewport(), Qt::RightButton, {}, commits->visualItemRect(item).center());
+        QTest::mouseRelease(commits->viewport(), Qt::RightButton, {}, commits->visualItemRect(item).center());
+
+        QVERIFY(!CommitDelegate::isUnfolded(item));
     }
 
     void aSecondClickFoldsTheCommit()
