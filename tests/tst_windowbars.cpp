@@ -9,10 +9,13 @@
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
+#include "ui/WindowControls.h"
+#include "ui/WindowFrame.h"
 #include "ui/WorkspaceStatusBar.h"
 
 #include <QFile>
 #include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
@@ -213,6 +216,30 @@ private slots:
             QVERIFY2(qAbs(top - bottom) <= 2,
                      qPrintable(QStringLiteral("%1: %2 above, %3 below").arg(box->objectName()).arg(top).arg(bottom)));
         }
+    }
+
+    void closeButtonHoverKeepsTheWindowsRoundedCorner()
+    {
+        QWidget window;
+        WindowFrame frame(&window);
+        frame.setFrameless(true);
+        auto *layout = new QHBoxLayout(&window);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->addStretch();
+        auto *controls = new WindowControls(&window);
+        layout->addWidget(controls, 0, Qt::AlignTop);
+        window.resize(400, 200);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        WindowButton *close = controls->button(WindowButton::Kind::Close);
+
+        close->setDown(true); // fully highlighted, as under the mouse
+        const QImage image = close->grab().toImage();
+
+        const QColor corner = image.pixelColor(image.width() - 1, 0);
+        const QColor middle = image.pixelColor(image.width() / 2, image.height() / 2 + 6);
+        QCOMPARE_LT(corner.red() - corner.green(), 100); // not red: cut by the corner
+        QCOMPARE_GT(middle.red() - middle.green(), 100);
     }
 
     void compactMenuKeepsActionsAndRunStopWorking()

@@ -3,6 +3,7 @@
 #include "WelcomeWindow.h"
 
 #include "NewProjectForm.h"
+#include "ProjectListDelegate.h"
 #include "ProjectSetupForm.h"
 #include "ProjectSetupPanel.h"
 #include "projects/ProjectStore.h"
@@ -10,12 +11,14 @@
 #include "settings/Preferences.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
+#include "ui/AboutPopup.h"
 #include "ui/AppFonts.h"
 #include "ui/BrandMark.h"
 #include "ui/ContextMenus.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
+#include "ui/UiIcons.h"
 #include "ui/WindowFrame.h"
 
 #include <QApplication>
@@ -28,113 +31,60 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QMouseEvent>
-#include <QPainter>
 #include <QPushButton>
 #include <QStackedWidget>
-#include <QStyledItemDelegate>
 #include <QVBoxLayout>
 #include <QWindow>
 
-#include <ranges>
 #include <utility>
 
 namespace {
 
-constexpr int pathRole = Qt::UserRole;
-constexpr int languagesRole = Qt::UserRole + 1;
-constexpr int missingRole = Qt::UserRole + 2;
+constexpr int sideWidth = 248;
+constexpr int brandMarkSize = 44;
+constexpr int emptyMarkSize = 72;
+constexpr int emptyTextWidth = 380;
 
 constexpr const char *welcomeRules = R"(
 QWidget#welcomeSide { background: @panel; border-right: 1px solid @line; }
-QLabel#welcomeVersion { color: @muted; }
-QLineEdit#welcomeSearch { padding: 4px 8px; border-radius: 3px; }
+QLabel#welcomeVersion { color: @muted; border: 1px solid @line; border-radius: 8px; padding: 0 7px; }
+QWidget#welcomeSide QPushButton { text-align: left; padding: 7px 12px; border-radius: 6px; }
+QWidget#welcomeEmpty QPushButton { padding: 7px 18px; border-radius: 6px; }
+QWidget#welcomeSide QPushButton#welcomeLink { background: transparent; border: none; color: @muted; padding: 6px 8px; }
+QWidget#welcomeSide QPushButton#welcomeLink:hover { background: @hover; color: @text; }
+QFrame#welcomeLinks, QFrame#welcomeKeyHints { border: none; border-top: 1px solid @line; }
+QLineEdit#welcomeSearch { padding: 6px 10px; border-radius: 6px; }
 QListWidget#welcomeProjects { background: transparent; border: none; outline: none; }
+QLabel#keyCap { color: @text; background: @panel; border: 1px solid @line; border-bottom: 2px solid @line; border-radius: 4px; padding: 0 5px; }
 )";
 
-// A project of the list: its name, its folder below, the languages it is
-// set up for on the right.
-// The chips of a project in the list: its languages, or why there are none.
-QStringList chipTexts(const QStringList &languages, bool missing)
+using Roles = ProjectListDelegate;
+
+bool isHeading(const QListWidgetItem *item)
 {
-    if (missing)
-        return {QObject::tr("Folder not found")};
-    if (languages.isEmpty())
-        return {QObject::tr("Not set up")};
-    return languages;
+    return item->data(Roles::headingRole).toBool();
 }
 
-class ProjectDelegate : public QStyledItemDelegate {
-public:
-    ProjectDelegate(Theme theme, QObject *parent)
-        : QStyledItemDelegate(parent)
-        , theme_(std::move(theme))
-    {
+QString pathOf(const QListWidgetItem *item)
+{
+    return item->data(Roles::projectRole).value<ProjectConfig>().path;
+}
+
+bool matches(const QListWidgetItem *item, const QString &text)
+{
+    return text.isEmpty() || item->text().contains(text, Qt::CaseInsensitive) ||
+           pathOf(item).contains(text, Qt::CaseInsensitive);
+}
+
+QListWidgetItem *findProject(const QListWidget &list, const QString &path)
+{
+    for (int i = 0; i < list.count(); ++i) {
+        QListWidgetItem *item = list.item(i);
+        if (!isHeading(item) && pathOf(item) == path)
+            return item;
     }
-
-    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &) const override
-    {
-        return {option.rect.width(), option.fontMetrics.height() * 2 + 22};
-    }
-
-    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
-    {
-        painter->save();
-        painter->setRenderHint(QPainter::Antialiasing);
-        const QRectF area = QRectF(option.rect).adjusted(2, 2, -2, -2);
-        if (option.state & QStyle::State_Selected) {
-            painter->setPen(Qt::NoPen);
-            painter->setBrush(theme_.selection);
-            painter->drawRoundedRect(area, 2, 2);
-        } else if (option.state & QStyle::State_MouseOver) {
-            painter->setPen(Qt::NoPen);
-            painter->setBrush(theme_.hover);
-            painter->drawRoundedRect(area, 2, 2);
-        }
-        const bool missing = index.data(missingRole).toBool();
-        const QRect text = option.rect.adjusted(14, 9, -14, -9);
-        const int lineHeight = option.fontMetrics.height();
-
-        // The languages, right-aligned chips.
-        const QStringList languages = index.data(languagesRole).toStringList();
-        QFont small = option.font;
-        small.setPointSizeF(small.pointSizeF() * 0.85);
-        const QFontMetrics smallMetrics(small);
-        painter->setFont(small);
-        int right = text.right();
-        const QStringList chips = chipTexts(languages, missing);
-        for (const auto &it : std::views::reverse(chips)) {
-            const int width = smallMetrics.horizontalAdvance(it) + 14;
-            const QRectF chip(right - width, text.top() + (text.height() - smallMetrics.height() - 6) / 2.0, width,
-                              smallMetrics.height() + 6);
-            painter->setPen(QPen(theme_.line, 1));
-            painter->setBrush(Qt::NoBrush);
-            painter->drawRoundedRect(chip, 2, 2);
-            painter->setPen(languages.isEmpty() || missing ? theme_.mutedText : theme_.foreground);
-            painter->drawText(chip, Qt::AlignCenter, it);
-            right -= width + 6;
-        }
-
-        // The name, the folder.
-        const QRect names(text.left(), text.top(), right - text.left() - 12, text.height());
-        QFont bold = option.font;
-        bold.setWeight(QFont::DemiBold);
-        painter->setFont(bold);
-        painter->setPen(missing ? theme_.mutedText : theme_.foreground);
-        painter->drawText(
-            QRect(names.left(), names.top(), names.width(), lineHeight), Qt::AlignLeft | Qt::AlignVCenter,
-            QFontMetrics(bold).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, names.width()));
-        painter->setFont(option.font);
-        painter->setPen(theme_.mutedText);
-        painter->drawText(QRect(names.left(), names.top() + lineHeight + 4, names.width(), lineHeight),
-                          Qt::AlignLeft | Qt::AlignVCenter,
-                          option.fontMetrics.elidedText(QDir::toNativeSeparators(index.data(pathRole).toString()),
-                                                        Qt::ElideMiddle, names.width()));
-        painter->restore();
-    }
-
-private:
-    Theme theme_;
-};
+    return nullptr;
+}
 
 } // namespace
 
@@ -155,82 +105,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     setWindowTitle(tr("Welcome to Duet"));
     resize(960, 640);
 
-    // The side: Duet's name and version; dragging it moves the window.
-    auto *side = new QWidget(this);
-    side->setObjectName(QStringLiteral("welcomeSide"));
-    side->setAttribute(Qt::WA_StyledBackground);
-    side->setFixedWidth(230);
-    side->installEventFilter(this);
-    auto *logo = new QLabel(side);
-    logo->setPixmap(BrandMark::markPixmap(44, theme_, devicePixelRatioF()));
-    auto *name = new QLabel(QStringLiteral("Duet"), side);
-    AppFonts::setInterfaceFont(name, 1.4);
-    auto *version = new QLabel(QCoreApplication::applicationVersion(), side);
-    version->setObjectName(QStringLiteral("welcomeVersion"));
-    auto *identity = new QVBoxLayout;
-    identity->setSpacing(0);
-    identity->addWidget(name);
-    identity->addWidget(version);
-    auto *brand = new QHBoxLayout;
-    brand->setSpacing(12);
-    brand->addWidget(logo);
-    brand->addLayout(identity, 1);
-    auto *sideLayout = new QVBoxLayout(side);
-    sideLayout->setContentsMargins(20, 24, 20, 20);
-    sideLayout->addLayout(brand);
-    sideLayout->addStretch();
-    auto *hint = new QLabel(tr("Each project keeps its languages, runtimes and servers. Duet downloads what they "
-                               "need into its own folder."),
-                            side);
-    hint->setObjectName(QStringLiteral("footerHint"));
-    hint->setWordWrap(true);
-    sideLayout->addWidget(hint);
-
-    // The projects page: search, new, import, the list.
-    auto *projects = new QWidget(this);
-    projects->installEventFilter(this);
-    search_->setObjectName(QStringLiteral("welcomeSearch"));
-    search_->setPlaceholderText(tr("Search projects"));
-    search_->setClearButtonEnabled(true);
-    search_->installEventFilter(this);
-    connect(search_, &QLineEdit::textChanged, this, &WelcomeWindow::filter);
-    auto *create = new QPushButton(tr("New Project…"), projects);
-    connect(create, &QPushButton::clicked, this, &WelcomeWindow::showNewProject);
-    auto *import = new QPushButton(tr("Import Project…"), projects);
-    import->setDefault(true);
-    connect(import, &QPushButton::clicked, this, &WelcomeWindow::importProject);
-    auto *top = new QHBoxLayout;
-    top->setSpacing(8);
-    top->addWidget(search_, 1);
-    top->addWidget(create);
-    top->addWidget(import);
-    // Duet's frame has no title bar: a close button of its own.
-    auto *close = new WindowButton(WindowButton::Kind::Close, projects);
-    close->applyTheme(theme_);
-    close->setCorners(WindowButton::Corners::Rounded);
-    close->setToolTip(tr("Close"));
-    connect(close, &QAbstractButton::clicked, this, &QWidget::close);
-    top->addWidget(close);
-
-    list_->setObjectName(QStringLiteral("welcomeProjects"));
-    list_->setItemDelegate(new ProjectDelegate(theme_, list_));
-    list_->setMouseTracking(true);
-    list_->setContextMenuPolicy(Qt::CustomContextMenu);
-    list_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    connect(list_, &QListWidget::itemActivated, this,
-            [this](QListWidgetItem *item) { open(item->data(pathRole).toString()); });
-    connect(list_, &QWidget::customContextMenuRequested, this, &WelcomeWindow::showContextMenu);
-    auto *footer =
-        new QLabel(tr("Enter to open · Delete to remove from the list · right-click for the settings"), projects);
-    footer->setObjectName(QStringLiteral("footerHint"));
-    auto *projectsLayout = new QVBoxLayout(projects);
-    projectsLayout->setContentsMargins(24, 20, 16, 14);
-    projectsLayout->setSpacing(12);
-    projectsLayout->addLayout(top);
-    projectsLayout->addWidget(list_, 1);
-    projectsLayout->addWidget(footer);
-
-    pages_->addWidget(projects);
+    pages_->addWidget(createProjectsPage());
     pages_->addWidget(setup_);
     setup_->applyTheme(theme_);
     connect(setup_, &ProjectSetupPanel::done, this, &WelcomeWindow::projectChosen);
@@ -244,19 +119,19 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(side);
+    layout->addWidget(createSide());
     layout->addWidget(pages_, 1);
 
     setStyleSheet(popupStyleSheet(theme_, QString::fromLatin1(welcomeRules)));
-    // A square as high as the buttons beside it, not a title bar's control:
-    // their height comes from the style sheet, so after it.
-    const int buttonHeight = import->sizeHint().height();
-    close->setFixedSize(buttonHeight, buttonHeight);
+    // A square as high as the search beside it, not a title bar's control:
+    // its height comes from the style sheet, so after it.
+    const int searchHeight = search_->sizeHint().height();
+    close_->setFixedSize(searchHeight, searchHeight);
 #ifdef Q_OS_MACOS
-    close->hide();
+    close_->hide();
 #else
     frame_->setFrameless(!preferences.systemTitleBar);
-    close->setVisible(!preferences.systemTitleBar);
+    close_->setVisible(!preferences.systemTitleBar);
 #endif
     frame_->applyTheme(theme_);
 
@@ -266,46 +141,245 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
 
 WelcomeWindow::~WelcomeWindow() = default;
 
+QWidget *WelcomeWindow::createSide()
+{
+    // Dragging the side moves the window.
+    auto *side = new QWidget(this);
+    side->setObjectName(QStringLiteral("welcomeSide"));
+    side->setAttribute(Qt::WA_StyledBackground);
+    side->setFixedWidth(sideWidth);
+    side->installEventFilter(this);
+
+    auto *logo = new QLabel(side);
+    logo->setPixmap(BrandMark::markPixmap(brandMarkSize, theme_, devicePixelRatioF()));
+    auto *name = new QLabel(QStringLiteral("Duet"), side);
+    AppFonts::setInterfaceFont(name, 1.5);
+    auto *version = new QLabel(QCoreApplication::applicationVersion(), side);
+    version->setObjectName(QStringLiteral("welcomeVersion"));
+    AppFonts::setInterfaceFont(version, 0.85, QFont::Normal);
+    auto *identity = new QVBoxLayout;
+    identity->setSpacing(3);
+    identity->addWidget(name);
+    identity->addWidget(version, 0, Qt::AlignLeft);
+    auto *brand = new QHBoxLayout;
+    brand->setSpacing(12);
+    brand->addWidget(logo);
+    brand->addLayout(identity, 1);
+
+    auto *hint = new QLabel(tr("Each project keeps its languages, runtimes and servers. Duet downloads what they "
+                               "need into its own folder."),
+                            side);
+    hint->setObjectName(QStringLiteral("footerHint"));
+    hint->setWordWrap(true);
+    AppFonts::setInterfaceFont(hint, 0.92, QFont::Normal);
+
+    auto *links = new QFrame(side);
+    links->setObjectName(QStringLiteral("welcomeLinks"));
+    auto *about = new QPushButton(tr("About Duet"), links);
+    about->setObjectName(QStringLiteral("welcomeLink"));
+    connect(about, &QPushButton::clicked, this, &WelcomeWindow::showAbout);
+    auto *linksLayout = new QVBoxLayout(links);
+    linksLayout->setContentsMargins(0, 10, 0, 0);
+    linksLayout->addWidget(about);
+
+    auto *layout = new QVBoxLayout(side);
+    layout->setContentsMargins(24, 28, 24, 20);
+    layout->setSpacing(8);
+    layout->addLayout(brand);
+    layout->addSpacing(28);
+    addProjectButtons(layout, side);
+    layout->addStretch();
+    layout->addWidget(hint);
+    layout->addSpacing(8);
+    layout->addWidget(links);
+    return side;
+}
+
+void WelcomeWindow::addProjectButtons(QBoxLayout *layout, QWidget *parent)
+{
+    auto *create =
+        new QPushButton(UiIcons::icon(QStringLiteral("plus"), theme_.accentText), tr("New Project…"), parent);
+    create->setDefault(true);
+    connect(create, &QPushButton::clicked, this, &WelcomeWindow::showNewProject);
+    auto *import =
+        new QPushButton(UiIcons::icon(QStringLiteral("folder"), theme_.foreground), tr("Import Project…"), parent);
+    connect(import, &QPushButton::clicked, this, &WelcomeWindow::importProject);
+    layout->addWidget(create);
+    layout->addWidget(import);
+}
+
+QWidget *WelcomeWindow::createProjectsPage()
+{
+    auto *projects = new QWidget(this);
+    projects->installEventFilter(this);
+    search_->setObjectName(QStringLiteral("welcomeSearch"));
+    search_->setPlaceholderText(tr("Search projects"));
+    search_->setClearButtonEnabled(true);
+    search_->installEventFilter(this);
+    connect(search_, &QLineEdit::textChanged, this, &WelcomeWindow::filter);
+    // Duet's frame has no title bar: a close button of its own.
+    close_ = new WindowButton(WindowButton::Kind::Close, projects);
+    close_->applyTheme(theme_);
+    close_->setCorners(WindowButton::Corners::Rounded);
+    close_->setToolTip(tr("Close"));
+    connect(close_, &QAbstractButton::clicked, this, &QWidget::close);
+    auto *top = new QHBoxLayout;
+    top->setSpacing(8);
+    top->addWidget(search_, 1);
+    top->addStretch(); // keeps the close button on the right without the search
+    top->addWidget(close_);
+
+    list_->setObjectName(QStringLiteral("welcomeProjects"));
+    const ProjectListDelegate::Actions actions{
+        .showMenu = [this](const QModelIndex &index,
+                           QPoint globalPosition) { showMenu(list_->item(index.row()), globalPosition); },
+        .locate = [this](const QModelIndex &index) { locate(pathOf(list_->item(index.row()))); },
+    };
+    list_->setItemDelegate(new ProjectListDelegate(theme_, actions, list_));
+    list_->setMouseTracking(true);
+    list_->setContextMenuPolicy(Qt::CustomContextMenu);
+    list_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    connect(list_, &QListWidget::itemActivated, this, [this](QListWidgetItem *item) { open(pathOf(item)); });
+    connect(list_, &QWidget::customContextMenuRequested, this, &WelcomeWindow::showContextMenu);
+
+    emptyState_ = createEmptyState();
+    keyHints_ = createKeyHints();
+    auto *layout = new QVBoxLayout(projects);
+    layout->setContentsMargins(32, 28, 24, 16);
+    layout->setSpacing(16);
+    layout->addLayout(top);
+    layout->addWidget(list_, 1);
+    layout->addWidget(emptyState_, 1);
+    layout->addWidget(keyHints_);
+    return projects;
+}
+
+QWidget *WelcomeWindow::createEmptyState()
+{
+    auto *empty = new QWidget(this);
+    empty->setObjectName(QStringLiteral("welcomeEmpty"));
+    auto *mark = new QLabel(empty);
+    mark->setPixmap(BrandMark::markPixmap(emptyMarkSize, theme_, devicePixelRatioF()));
+    auto *title = new QLabel(tr("Start your first project"), empty);
+    AppFonts::setInterfaceFont(title, 1.3);
+    auto *text = new QLabel(tr("Create one from a template, or import a folder you already have. Duet sets up its "
+                               "languages and downloads the tools they need."),
+                            empty);
+    text->setObjectName(QStringLiteral("footerHint"));
+    text->setWordWrap(true);
+    text->setAlignment(Qt::AlignCenter);
+    text->setFixedWidth(emptyTextWidth);
+    auto *buttons = new QHBoxLayout;
+    buttons->setSpacing(10);
+    buttons->addStretch();
+    addProjectButtons(buttons, empty);
+    buttons->addStretch();
+
+    auto *layout = new QVBoxLayout(empty);
+    layout->setSpacing(10);
+    layout->addStretch();
+    layout->addWidget(mark, 0, Qt::AlignHCenter);
+    layout->addSpacing(6);
+    layout->addWidget(title, 0, Qt::AlignHCenter);
+    layout->addWidget(text, 0, Qt::AlignHCenter);
+    layout->addSpacing(10);
+    layout->addLayout(buttons);
+    layout->addStretch();
+    return empty;
+}
+
+QWidget *WelcomeWindow::createKeyHints()
+{
+    const QList<std::pair<QStringList, QString>> hints = {
+        {{QStringLiteral("↵")}, tr("Open")},
+        {{QStringLiteral("↑"), QStringLiteral("↓")}, tr("Move")},
+        {{QStringLiteral("Del")}, tr("Remove from list")},
+        {{QStringLiteral("⋯")}, tr("Project settings")},
+    };
+    auto *frame = new QFrame(this);
+    frame->setObjectName(QStringLiteral("welcomeKeyHints"));
+    auto *layout = new QHBoxLayout(frame);
+    layout->setContentsMargins(0, 12, 0, 0);
+    layout->setSpacing(18);
+    for (const auto &[keys, action] : hints) {
+        auto *hint = new QHBoxLayout;
+        hint->setSpacing(4);
+        for (const QString &key : keys) {
+            auto *cap = new QLabel(key, frame);
+            cap->setObjectName(QStringLiteral("keyCap"));
+            AppFonts::setInterfaceFont(cap, 0.85, QFont::Medium);
+            hint->addWidget(cap);
+        }
+        hint->addSpacing(2);
+        auto *label = new QLabel(action, frame);
+        label->setObjectName(QStringLiteral("footerHint"));
+        hint->addWidget(label);
+        layout->addLayout(hint);
+    }
+    layout->addStretch();
+    return frame;
+}
+
 void WelcomeWindow::reload()
 {
-    const QString current = list_->currentItem() ? list_->currentItem()->data(pathRole).toString() : QString();
+    const QString current = list_->currentItem() ? pathOf(list_->currentItem()) : QString();
     list_->clear();
-    for (const ProjectConfig &project : ProjectStore::all()) {
-        auto *item = new QListWidgetItem(project.name.isEmpty() ? project.path : project.name, list_);
-        item->setData(pathRole, project.path);
-        item->setData(languagesRole, shownLanguages(project));
-        item->setData(missingRole, !QFileInfo(project.path).isDir());
-        item->setToolTip(QDir::toNativeSeparators(project.path));
-        if (project.path == current)
-            list_->setCurrentItem(item);
-    }
-    if (!list_->currentItem() && list_->count() > 0)
-        list_->setCurrentRow(0);
+    QList<ProjectConfig> present;
+    QList<ProjectConfig> missing;
+    for (const ProjectConfig &project : ProjectStore::all())
+        (QFileInfo(project.path).isDir() ? present : missing).append(project);
+    // The projects whose folder is gone, apart at the end.
+    if (!present.isEmpty() && !missing.isEmpty())
+        addHeading(tr("Recent"));
+    for (const ProjectConfig &project : std::as_const(present))
+        addProject(project);
+    if (!missing.isEmpty())
+        addHeading(tr("Unavailable"));
+    for (const ProjectConfig &project : std::as_const(missing))
+        addProject(project);
+    if (QListWidgetItem *item = findProject(*list_, current))
+        list_->setCurrentItem(item);
+
+    const bool hasProjects = !present.isEmpty() || !missing.isEmpty();
+    search_->setVisible(hasProjects);
+    list_->setVisible(hasProjects);
+    keyHints_->setVisible(hasProjects);
+    emptyState_->setVisible(!hasProjects);
     filter(search_->text());
 }
 
-QStringList WelcomeWindow::shownLanguages(const ProjectConfig &project)
+void WelcomeWindow::addHeading(const QString &title)
 {
-    if (!project.configured)
-        return {};
-    QStringList languages;
-    for (const LanguageSetup &setup : project.languages) {
-        if (setup.enabled)
-            languages.append(ProjectLanguages::title(setup.language));
-    }
-    if (languages.isEmpty())
-        languages.append(tr("No language server"));
-    return languages;
+    auto *item = new QListWidgetItem(title, list_);
+    item->setData(Roles::headingRole, true);
+    item->setFlags(Qt::NoItemFlags);
+}
+
+QListWidgetItem *WelcomeWindow::addProject(const ProjectConfig &project)
+{
+    auto *item = new QListWidgetItem(project.name.isEmpty() ? project.path : project.name, list_);
+    item->setData(Roles::projectRole, QVariant::fromValue(project));
+    item->setData(Roles::missingRole, !QFileInfo(project.path).isDir());
+    item->setToolTip(QDir::toNativeSeparators(project.path));
+    return item;
 }
 
 void WelcomeWindow::filter(const QString &text)
 {
+    QListWidgetItem *heading = nullptr;
     QListWidgetItem *firstShown = nullptr;
     for (int i = 0; i < list_->count(); ++i) {
         QListWidgetItem *item = list_->item(i);
-        const bool shown = text.isEmpty() || item->text().contains(text, Qt::CaseInsensitive) ||
-                           item->data(pathRole).toString().contains(text, Qt::CaseInsensitive);
+        if (isHeading(item)) {
+            // Hidden until a project of its group is shown.
+            heading = item;
+            heading->setHidden(true);
+            continue;
+        }
+        const bool shown = matches(item, text);
         item->setHidden(!shown);
+        if (shown && heading)
+            heading->setHidden(false);
         if (shown && !firstShown)
             firstShown = item;
     }
@@ -360,6 +434,13 @@ void WelcomeWindow::showNewProject()
     newProject_->reset();
 }
 
+void WelcomeWindow::showAbout()
+{
+    if (!about_)
+        about_ = new AboutPopup(theme_, this);
+    about_->popup();
+}
+
 void WelcomeWindow::importProject()
 {
     const QString folder = QFileDialog::getExistingDirectory(this, tr("Import Project"), QDir::homePath());
@@ -367,27 +448,52 @@ void WelcomeWindow::importProject()
         configure(QDir(folder).absolutePath());
 }
 
+void WelcomeWindow::locate(const QString &path)
+{
+    const QFileInfo gone(path);
+    const QString start = QFileInfo(gone.absolutePath()).isDir() ? gone.absolutePath() : QDir::homePath();
+    const QString folder =
+        QFileDialog::getExistingDirectory(this, tr("Locate the Folder of %1").arg(gone.fileName()), start);
+    if (folder.isEmpty())
+        return;
+    const QString moved = QDir(folder).absolutePath();
+    // The folder may be a project already: it is in the list, and the one
+    // gone leaves it.
+    if (!ProjectStore::relocate(path, moved))
+        ProjectStore::remove(path);
+    reload();
+    if (QListWidgetItem *item = findProject(*list_, moved))
+        list_->setCurrentItem(item);
+}
+
 void WelcomeWindow::remove(QListWidgetItem *item)
 {
-    if (!item)
+    if (!item || isHeading(item))
         return;
-    ProjectStore::remove(item->data(pathRole).toString());
-    delete item;
+    ProjectStore::remove(pathOf(item));
+    // Again, for the headings: a group may be empty now.
+    reload();
 }
 
 void WelcomeWindow::showContextMenu(const QPoint &position)
 {
     QListWidgetItem *item = list_->itemAt(position);
-    if (!item)
-        return;
-    const QString path = item->data(pathRole).toString();
+    if (item && !isHeading(item))
+        showMenu(item, list_->viewport()->mapToGlobal(position));
+}
+
+void WelcomeWindow::showMenu(QListWidgetItem *item, QPoint globalPosition)
+{
+    const QString path = pathOf(item);
     const bool present = QFileInfo(path).isDir();
     QMenu menu(this);
     menu.addAction(tr("Open"), this, [this, path] { open(path); })->setEnabled(present);
+    if (!present)
+        menu.addAction(tr("Locate Folder…"), this, [this, path] { locate(path); });
     menu.addAction(tr("Project Settings…"), this, [this, path] { configure(path); })->setEnabled(present);
     menu.addSeparator();
     menu.addAction(tr("Remove from List"), this, [this, item] { remove(item); });
-    ContextMenus::exec(menu, *list_, list_->viewport()->mapToGlobal(position));
+    ContextMenus::exec(menu, *list_, globalPosition);
 }
 
 bool WelcomeWindow::eventFilter(QObject *watched, QEvent *event)
@@ -410,7 +516,7 @@ bool WelcomeWindow::eventFilter(QObject *watched, QEvent *event)
         }
         if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && list_->currentItem() &&
             !list_->currentItem()->isHidden()) {
-            open(list_->currentItem()->data(pathRole).toString());
+            open(pathOf(list_->currentItem()));
             return true;
         }
     }

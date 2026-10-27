@@ -116,24 +116,26 @@ for the single-process option).
 
 ## 3. Executable identity
 
-Today `packaging/windows/duet.rc` holds the icon only.
-
-- **Version information:** a `VERSIONINFO` block (`FileDescription "Duet"`,
-  `ProductName`, `CompanyName`, `FileVersion` from `PROJECT_VERSION` through
-  a `duet.rc.in` and `configure_file`). Without it, Task Manager, the
-  notifications and the file's properties show `duet.exe`.
-- **Application manifest** (`packaging/windows/duet.manifest`, added to the
-  executable's sources):
+- **Version information** (done): `packaging/windows/duet.rc.in`, configured
+  by CMake, holds the icon and a `VERSIONINFO` block (`FileDescription
+  "Duet"`, the version from `PROJECT_VERSION`): Task Manager, the
+  notifications and the file's properties show Duet, not `duet.exe`.
+- **Application manifest** (done, `packaging/windows/duet.manifest`, merged
+  by the linker):
   - `longPathAware`: paths beyond 260 characters (`node_modules`, deep
     build trees) work with the registry's `LongPathsEnabled`.
-  - `activeCodePage` = `UTF-8` (Windows 10 1903+): the C APIs of Graphviz,
-    libvterm and tree-sitter's loaders read `fopen` paths as UTF-8, so a
-    project under `C:\Users\Émilie\` opens.
   - `supportedOS` Windows 10/11.
   - DPI awareness stays Qt's (per-monitor v2, set at run time).
-- **AppUserModelID:** `SetCurrentProcessExplicitAppUserModelID(L"Duet.Duet")`
-  at start, and the same ID on the Start menu shortcut of the installer
-  (§7). Toast notifications (§4) and the jump list need it.
+  - **Not** `activeCodePage` = `UTF-8`: Duet decodes its child processes'
+    output with `QString::fromLocal8Bit` (cmd's `set` after vcvars,
+    vswhere, tar…), and those processes keep the system's code page. With
+    UTF-8, a `PATH` under `C:\Users\Émilie\` would come out corrupted from
+    the MSVC environment. To reconsider once these places decode with the
+    child's code page; the helpers have no manifest yet either.
+- **AppUserModelID** (done): `DesktopIntegration::identifyApplication()`
+  calls `SetCurrentProcessExplicitAppUserModelID(L"Duet.Duet")` at start.
+  The installer's Start menu shortcut (§7) must carry the same ID. Toast
+  notifications (§4) and the jump list need it.
 - **Opening a folder from Explorer:** the installer registers *Open with
   Duet* on folders and on a folder's background
   (`HKCU\Software\Classes\Directory\shell\Duet` and
@@ -287,7 +289,8 @@ or the VC++ Redistributable in the installer. The helpers (`duet-hook`,
 1. Installing Qt and the MSVC runtime (§7.1): without it, nothing ships.
 2. ~~Bringing a window forward (`AllowSetForegroundWindow`).~~ Done.
 3. ~~AltGr in the terminal, then Ctrl+C/Ctrl+V with a selection.~~ Done.
-4. Version information, manifest (long paths, UTF-8), AppUserModelID.
+4. ~~Version information, manifest (long paths), AppUserModelID.~~ Done;
+   UTF-8 code page left out (§3).
 5. The DWM frame: shadow, rounded corners, Snap Layouts.
 6. The drive letter in the language servers' URIs, path comparisons.
 7. Installer, *Open with Duet*, Authenticode signing.

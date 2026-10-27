@@ -491,7 +491,7 @@ void PreviewPage::revealEditor()
 
 void PreviewPage::scrollPreviewToCaret()
 {
-    if (mode_ != Mode::Preview || !markdown_)
+    if (mode_ == Mode::Editor || !markdown_)
         return;
     int line = 0;
     int index = 0;

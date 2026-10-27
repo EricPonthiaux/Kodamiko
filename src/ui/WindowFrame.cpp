@@ -81,6 +81,19 @@ void WindowFrame::applyTheme(const Theme &theme)
     window_->update();
 }
 
+QPainterPath WindowFrame::roundedContent(const QWidget *window)
+{
+    const bool isFrameless = window->windowFlags() & Qt::FramelessWindowHint;
+    const bool fillsScreen = window->windowState() & (Qt::WindowMaximized | Qt::WindowFullScreen);
+    if (!isFrameless || fillsScreen)
+        return {};
+    // Inside the 1 px outline, which stays visible.
+    const QRectF content = QRectF(window->contentsRect()).adjusted(1, 1, -1, -1);
+    QPainterPath path;
+    path.addRoundedRect(content, cornerRadius - 1, cornerRadius - 1);
+    return path;
+}
+
 bool WindowFrame::drawsShadow() const
 {
     return frameless_ && !(window_->windowState() & (Qt::WindowMaximized | Qt::WindowFullScreen));

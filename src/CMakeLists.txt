@@ -321,6 +321,7 @@ add_library(duet_core STATIC
     welcome/LanguageChoices.cpp
     welcome/NewProjectForm.cpp
     welcome/NewProjectPopup.cpp
+    welcome/ProjectListDelegate.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
     welcome/ProjectSetupPanel.cpp
@@ -500,12 +501,16 @@ else()
     target_sources(duet PRIVATE app/linux/MainWindowTitleBarLinux.cpp app/linux/NativeNotificationsLinux.cpp)
 endif()
 duet_enable_warnings(duet)
+duet_relink_while_running(duet)
 # Installed, it still finds the libraries linked from outside the system's
 # paths (Graphviz's plugins, in a directory of their own).
 set_target_properties(duet PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-# The executable's icon on Windows (Explorer, taskbar).
+# The executable's icon and version information on Windows (Explorer,
+# taskbar, Task Manager), and its manifest.
 if(WIN32)
-    target_sources(duet PRIVATE ${PROJECT_SOURCE_DIR}/packaging/windows/duet.rc)
+    configure_file(${PROJECT_SOURCE_DIR}/packaging/windows/duet.rc.in ${CMAKE_CURRENT_BINARY_DIR}/duet.rc @ONLY)
+    target_sources(duet PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/duet.rc
+                                ${PROJECT_SOURCE_DIR}/packaging/windows/duet.manifest)
 endif()
 target_link_libraries(duet PRIVATE duet_core duet_log)
 target_compile_definitions(duet PRIVATE DUET_VERSION="${PROJECT_VERSION}")

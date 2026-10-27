@@ -1,5 +1,6 @@
 add_executable(duet-mcp main.cpp)
 duet_enable_warnings(duet-mcp)
+duet_relink_while_running(duet-mcp)
 target_link_libraries(duet-mcp PRIVATE Qt6::Core Qt6::Network duet_log)
 
 # Installed next to the editor, where ClaudeLauncher looks for it.

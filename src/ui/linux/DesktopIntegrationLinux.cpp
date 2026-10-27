@@ -4,6 +4,11 @@
 
 #include <QMenuBar>
 
+// The desktop file name (QGuiApplication::setDesktopFileName) identifies it.
+void DesktopIntegration::identifyApplication()
+{
+}
+
 // The desktop has no full-screen Spaces to follow.
 void DesktopIntegration::followActiveSpace(QWidget * /*window*/)
 {

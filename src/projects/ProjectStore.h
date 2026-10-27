@@ -16,6 +16,10 @@ QList<ProjectConfig> all();
 std::optional<ProjectConfig> find(const QString &path);
 void save(const ProjectConfig &config);
 void remove(const QString &path);
+// Moves the project of `from` to the folder `to`, which takes its settings
+// and its name. False, and nothing changed, when `from` is not a project or
+// `to` already is one.
+[[nodiscard]] bool relocate(const QString &from, const QString &to);
 // Marks `path` as opened now, adding it (not configured) if it is new;
 // returns its configuration.
 ProjectConfig touch(const QString &path);

@@ -7,6 +7,7 @@
 #include <QObject>
 
 class QMouseEvent;
+class QPainterPath;
 class QWidget;
 
 // Frame Duet draws itself around its window when the system's is
@@ -35,6 +36,11 @@ public:
     static Qt::Edges edgesAt(const QPoint &position, const QSize &size, int margin);
     // Resize cursor for `edges`; the arrow for none.
     static Qt::CursorShape cursorFor(Qt::Edges edges);
+    // The area inside Duet's outline of `window`, in its coordinates: what
+    // a child against the window's edge fills so as to keep the rounded
+    // corners. Empty when the window's corners are square (the system's
+    // frame, maximized, full screen).
+    static QPainterPath roundedContent(const QWidget *window);
 
     bool eventFilter(QObject *watched, QEvent *event) override;
 

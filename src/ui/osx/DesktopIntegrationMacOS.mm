@@ -28,6 +28,11 @@ NSWindow *nativeWindow(QWidget *window)
 
 } // namespace
 
+// The bundle identifier, from Info.plist, identifies it.
+void DesktopIntegration::identifyApplication()
+{
+}
+
 // An auxiliary window may share a full-screen window's Space; moving to
 // the active Space brings it there instead of switching Spaces. The level
 // stays normal: the window does not float above the others.

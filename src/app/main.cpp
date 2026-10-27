@@ -11,6 +11,7 @@
 #include "toolchains/Toolchains.h"
 #include "ui/BrandMark.h"
 #include "ui/ClickableCursors.h"
+#include "ui/DesktopIntegration.h"
 #include "ui/Motion.h"
 #include "ui/StrayWindowCheck.h"
 #include "ui/ToolTipPlacement.h"
@@ -245,6 +246,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     PreviewSite::registerScheme();
     const QApplication app(argc, argv);
+    DesktopIntegration::identifyApplication();
     ClickableCursors::install();
     StrayWindowCheck::install();
 

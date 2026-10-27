@@ -1,0 +1,36 @@
+// Configured by CMake into the build directory (src/CMakeLists.txt).
+#include <winver.h>
+
+// The executable's icon, shown by Explorer and the taskbar.
+IDI_ICON1 ICON "@PROJECT_SOURCE_DIR@/packaging/windows/duet.ico"
+
+// The name Task Manager, the notifications and the file's properties show
+// instead of "duet.exe".
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Duet"
+            VALUE "FileDescription", "Duet"
+            VALUE "FileVersion", "@PROJECT_VERSION@"
+            VALUE "InternalName", "duet"
+            VALUE "LegalCopyright", "GPL-3.0-only"
+            VALUE "OriginalFilename", "duet.exe"
+            VALUE "ProductName", "Duet"
+            VALUE "ProductVersion", "@PROJECT_VERSION@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

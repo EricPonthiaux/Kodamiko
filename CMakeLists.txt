@@ -69,6 +69,7 @@ endif()
 
 include(cmake/Dependencies.cmake)
 include(cmake/CodeQuality.cmake)
+include(cmake/RelinkWhileRunning.cmake)
 
 # Diagram editor (Mermaid, PlantUML, explainer boards): its layouts come from
 # Graphviz's library. Without it, diagram files open as text. Both branches

@@ -73,6 +73,19 @@ void remove(const QString &path)
     store(projects);
 }
 
+bool relocate(const QString &from, const QString &to)
+{
+    const QString fromKey = QDir(from).absolutePath();
+    const QString toKey = QDir(to).absolutePath();
+    QVariantMap projects = load();
+    if (!projects.contains(fromKey) || projects.contains(toKey))
+        return false;
+    // The name is the folder's, taken from the key.
+    projects.insert(toKey, projects.take(fromKey));
+    store(projects);
+    return true;
+}
+
 ProjectConfig touch(const QString &path)
 {
     const QString key = QDir(path).absolutePath();

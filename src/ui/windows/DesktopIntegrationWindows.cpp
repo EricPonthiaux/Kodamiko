@@ -4,6 +4,15 @@
 
 #include <QMenuBar>
 
+#include <shobjidl_core.h>
+
+void DesktopIntegration::identifyApplication()
+{
+    // A failure only leaves the system's default identity, derived from
+    // the executable's path.
+    SetCurrentProcessExplicitAppUserModelID(L"Duet.Duet");
+}
+
 // The desktop has no full-screen Spaces to follow.
 void DesktopIntegration::followActiveSpace(QWidget * /*window*/)
 {

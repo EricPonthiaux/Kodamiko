@@ -147,8 +147,10 @@ public:
     // The editor hidden by the Preview mode becomes visible (Split): to show
     // a position or a search in it.
     void revealEditor();
-    // In Preview mode, a Markdown preview scrolls to the heading of the
-    // editor's caret, which is hidden: to show a symbol of the outline.
+    // In Split and Preview modes, a Markdown preview scrolls to the heading
+    // of the editor's caret: to show a symbol of the outline. In Split mode
+    // it replaces the share of the text followed by syncScroll, which lands
+    // away from the heading when sections differ in rendered height.
     void scrollPreviewToCaret();
     void applyTheme(const Theme &theme);
 

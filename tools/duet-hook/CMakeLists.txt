@@ -1,5 +1,6 @@
 add_executable(duet-hook main.cpp)
 duet_enable_warnings(duet-hook)
+duet_relink_while_running(duet-hook)
 target_link_libraries(duet-hook PRIVATE Qt6::Core Qt6::Network duet_log duet_system)
 
 # Installed next to the editor, where ClaudeLauncher looks for it.

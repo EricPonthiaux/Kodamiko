@@ -4,6 +4,7 @@
 
 #include "ThemeStyle.h"
 #include "UiMetrics.h"
+#include "WindowFrame.h"
 
 #include <QEvent>
 #include <QHBoxLayout>
@@ -65,9 +66,16 @@ void WindowButton::leaveEvent(QEvent *event)
 void WindowButton::fillBackground(QPainter &painter, const QColor &background) const
 {
     switch (corners_) {
-    case Corners::Square:
-        painter.fillRect(rect(), background);
+    case Corners::Square: {
+        // Against the window's edge, the window's rounded corner cuts it.
+        const QPainterPath windowShape = WindowFrame::roundedContent(this->window());
+        QPainterPath fill;
+        fill.addRect(QRectF(rect()));
+        if (!windowShape.isEmpty())
+            fill = fill.intersected(windowShape.translated(-mapTo(this->window(), QPointF(0, 0))));
+        painter.fillPath(fill, background);
         return;
+    }
     case Corners::Rounded:
         painter.setPen(Qt::NoPen);
         painter.setBrush(background);

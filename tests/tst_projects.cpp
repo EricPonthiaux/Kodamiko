@@ -18,6 +18,7 @@
 #include "ui/ThemeStyle.h"
 #include "welcome/NewProjectForm.h"
 #include "welcome/NewProjectPopup.h"
+#include "welcome/ProjectListDelegate.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "welcome/ProjectSetupForm.h"
 #include "welcome/ProjectSetupPanel.h"
@@ -161,6 +162,14 @@ QStringList titles(const QList<InstallStep> &steps)
     for (const InstallStep &step : steps)
         list.append(step.title);
     return list;
+}
+
+QStringList itemTexts(const QListWidget *list)
+{
+    QStringList texts;
+    for (int i = 0; i < list->count(); ++i)
+        texts.append(list->item(i)->text());
+    return texts;
 }
 
 } // namespace
@@ -981,8 +990,9 @@ private slots:
         ProjectStore::save(touch("gone", 0));
 
         WelcomeWindow window;
-        QCOMPARE(window.projectList()->count(), 3);
-        QCOMPARE(window.projectList()->item(0)->text(), QString("gone")); // opened last
+        // Most recent first, the one whose folder is gone apart at the end.
+        const QStringList shown = itemTexts(window.projectList());
+        QCOMPARE(shown, QStringList({"Recent", "beta", "alpha", "Unavailable", "gone"}));
 
         QSignalSpy chosen(&window, &WelcomeWindow::projectChosen);
         window.open(dir.filePath("gone")); // missing: nothing
@@ -990,6 +1000,60 @@ private slots:
         window.open(dir.filePath("alpha"));
         QCOMPARE(chosen.size(), 1);
         QCOMPARE(chosen.first().first().value<ProjectConfig>().path, dir.filePath("alpha"));
+    }
+
+    void listsTheProjectsWithoutHeadingsWhenNoFolderIsGone()
+    {
+        const QTemporaryDir dir;
+        QDir(dir.path()).mkpath("alpha");
+        ProjectStore::save(ProjectStore::touch(dir.filePath("alpha")));
+
+        WelcomeWindow window;
+
+        QCOMPARE(itemTexts(window.projectList()), QStringList({"alpha"}));
+    }
+
+    void relocatingAProjectKeepsItsSettings()
+    {
+        const QTemporaryDir dir;
+        ProjectConfig gone = ProjectStore::touch(dir.filePath("gone"));
+        gone.configured = true;
+        ProjectStore::save(gone);
+
+        QVERIFY(ProjectStore::relocate(dir.filePath("gone"), dir.filePath("found")));
+
+        QVERIFY(!ProjectStore::find(dir.filePath("gone")).has_value());
+        const std::optional<ProjectConfig> found = ProjectStore::find(dir.filePath("found"));
+        QVERIFY(found.has_value());
+        QVERIFY(found->configured);
+        QCOMPARE(found->name, QString("found"));
+        QCOMPARE(found->lastOpened, gone.lastOpened);
+    }
+
+    void relocatingAProjectOntoAnotherChangesNothing()
+    {
+        const QTemporaryDir dir;
+        ProjectStore::touch(dir.filePath("gone"));
+        ProjectStore::touch(dir.filePath("other"));
+
+        QVERIFY(!ProjectStore::relocate(dir.filePath("gone"), dir.filePath("other")));
+
+        QVERIFY(ProjectStore::find(dir.filePath("gone")).has_value());
+        QVERIFY(ProjectStore::find(dir.filePath("other")).has_value());
+    }
+
+    void lastOpenedSaysHowLongAgoInWords()
+    {
+        const QDate today(2026, 10, 27);
+        const auto opened = [&](int daysAgo) { return QDateTime(today.addDays(-daysAgo), QTime(9, 30)); };
+
+        QCOMPARE(LastOpened::describe(opened(0), today), QString("Today"));
+        QCOMPARE(LastOpened::describe(opened(1), today), QString("Yesterday"));
+        QCOMPARE(LastOpened::describe(opened(3), today), QString("3 days ago"));
+        QCOMPARE(LastOpened::describe(opened(9), today), QString("Last week"));
+        QCOMPARE(LastOpened::describe(opened(21), today), QString("3 weeks ago"));
+        QCOMPARE(LastOpened::describe(opened(60), today), QString("Aug 2026"));
+        QVERIFY(LastOpened::describe(QDateTime(), today).isEmpty());
     }
 
     void newProjectFormCreatesTheProjectWithARepository()

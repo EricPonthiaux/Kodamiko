@@ -62,8 +62,8 @@ public:
     // A Markdown or HTML tab in Preview mode shows its editor too: to display a
     // position or a search in it.
     void revealEditor(EditorWidget *editor) const;
-    // A Markdown tab in Preview mode scrolls its preview to the heading of
-    // the caret of `editor`, which it hides.
+    // A Markdown tab in Split or Preview mode scrolls its preview to the
+    // heading of the caret of `editor`.
     void scrollPreviewToCaret(EditorWidget *editor) const;
     EditorWidget *editorFor(const QString &path) const;
 

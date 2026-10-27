@@ -53,7 +53,8 @@ struct Theme {
 
     static Theme duet();
 
-    // Duet's theme, then its Material ones (MaterialThemes).
+    // Duet's theme, the website's (Duet-Night), then the Material ones
+    // (MaterialThemes).
     static QList<Theme> all();
 
     static Theme named(const QString &name);

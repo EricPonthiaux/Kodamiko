@@ -16,6 +16,12 @@ class QWidget;
 // have it; elsewhere each function does nothing. One source per system.
 namespace DesktopIntegration {
 
+// Gives the process the identity the taskbar groups its windows under and
+// notifications come from (Windows' AppUserModelID, "Duet.Duet"), the same
+// for every Duet process and for the installer's shortcut. Call it at
+// start, before the first window is shown.
+void identifyApplication();
+
 // Makes `window`, a top-level window without parent, open on the current
 // Space, beside a full-screen window, instead of switching to the desktop
 // (macOS). Call it before the window is first shown (it creates the native
