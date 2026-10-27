@@ -123,6 +123,8 @@ Theme themeFrom(const ThemeColors &colors)
     theme.highlight = QColor(colors.highlight);
     theme.accent = QColor(colors.accent);
     theme.accentText = QColor(grey50);
+    // The accents are light shades: white on them is unreadable.
+    theme.onAccent = QColor(black);
     theme.mutedText = QColor(colors.mutedText);
     theme.border = QColor(colors.border);
     theme.line = QColor(colors.line);
@@ -229,7 +231,7 @@ const std::array<ThemeColors, 8> themes = {{
         .line = blueGrey800,
         .border = blueGrey700,
         .selection = blueGrey800,
-        .highlight = lightBlue600,
+        .highlight = lightBlue800,
         .accent = lightBlue200,
         .foreground = indigo50,
         .mutedText = blueGrey100,

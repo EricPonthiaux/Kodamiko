@@ -48,6 +48,8 @@ struct Theme {
     QColor border;     // fields, buttons, menus, scroll bar handles
     QColor line;       // separators
     QColor hover;      // rows under the mouse
+    // Text and check marks drawn over the accent.
+    QColor onAccent{Qt::white};
     // Claude's own orange, the same in every theme: what Claude wrote.
     QColor claude{0xd9, 0x77, 0x57};
 

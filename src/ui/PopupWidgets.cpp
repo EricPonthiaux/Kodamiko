@@ -109,12 +109,12 @@ void drawCodeLines(QPainter &painter, const Theme &theme, const QRectF &preview,
     }
 }
 
-void drawCheckMark(QPainter &painter, const QPointF &center, const QColor &accent)
+void drawCheckMark(QPainter &painter, const QPointF &center, const QColor &accent, const QColor &mark)
 {
     painter.setPen(Qt::NoPen);
     painter.setBrush(accent);
     painter.drawEllipse(center, 8, 8);
-    painter.setPen(QPen(Qt::white, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setPen(QPen(mark, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter.drawPolyline(
         QPolygonF({center + QPointF(-3.5, 0), center + QPointF(-1, 2.6), center + QPointF(3.6, -2.4)}));
 }
@@ -261,7 +261,7 @@ void ThemeCard::paintEvent(QPaintEvent *)
     painter.setPen(colors.color(QPalette::WindowText));
     painter.drawText(label, Qt::AlignVCenter | Qt::AlignLeft, theme_.title);
     if (isChecked())
-        drawCheckMark(painter, QPointF(label.right() - 7, label.center().y()), accent);
+        drawCheckMark(painter, QPointF(label.right() - 7, label.center().y()), accent, ThemeStyle::applied().onAccent);
 
     // The border: the accent when chosen or under the mouse.
     QColor border = colors.color(QPalette::Mid);

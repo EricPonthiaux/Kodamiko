@@ -12,14 +12,14 @@ flowchart TB
   outside(["Terminal ou Claude<br/>modifient le dépôt"])
   watcher["RepositoryWatcher<br/>surveille le dossier .git"]
   env["Environnement<br/>pas de terminal, pas d'éditeur,<br/>messages en anglais"]
-  result{"git a réussi ?"}
-  kill["git tué<br/>erreur Annulé"]
   back["Résultat renvoyé<br/>au thread UI"]
   refresh["Mise à jour du dépôt<br/>branche, ↑↓, statuts"]
   askpass["duet-askpass<br/>demande à l'utilisateur"]
-  cancel{"Annulé ?"}
-  user(["Utilisateur<br/>menu Git, panneau Changes"])
   creds{"Identifiants<br/>en cache ?"}
+  user(["Utilisateur<br/>menu Git, panneau Changes"])
+  result{"git a réussi ?"}
+  cancel{"Annulé ?"}
+  kill["git tué<br/>erreur Annulé"]
   user --> actions
   actions --> kind
   kind -->|non| queue
@@ -61,14 +61,14 @@ flowchart TB
 %% duet {"key":"outside","x":300,"y":1518.9}
 %% duet {"key":"watcher","x":295.5,"y":1674.9}
 %% duet {"key":"env","x":648,"y":1664.9}
-%% duet {"key":"result","x":332,"y":539.1}
-%% duet {"key":"kill","x":167.5,"y":565.1}
 %% duet {"key":"back","x":198,"y":728.1}
 %% duet {"key":"refresh","x":147.5,"y":1811.9}
 %% duet {"key":"askpass","x":315.9,"y":200}
-%% duet {"key":"cancel","x":332,"y":341}
-%% duet {"key":"user","x":614.5,"y":565.1}
 %% duet {"fill":"#4527a0","key":"creds","x":506,"y":0}
+%% duet {"key":"user","x":614.5,"y":565.1}
+%% duet {"key":"result","x":332,"y":539.1}
+%% duet {"key":"cancel","x":332,"y":341}
+%% duet {"key":"kill","x":167.5,"y":565.1}
 %% duet {"c":[713.1,633.3,709.5,654.5,704.7,682.2,700.6,706.5],"e":[698.6,717.8],"link":"user>actions","n":0}
 %% duet {"c":[688,806.4,686.2,834,683.8,870.2,681.7,901.7],"e":[680.9,913.1],"link":"actions>kind","n":0}
 %% duet {"c":[663.5,1027.3,642.8,1112.6,603.2,1275.3,582.5,1360.6],"e":[579.8,1371.6],"link":"kind>queue","lp":[607.5,1220],"n":0}

@@ -153,7 +153,7 @@ QLineEdit:focus, QPlainTextEdit:focus { border: 1px solid @accent; }
 QPushButton { background: @button; border: 1px solid @border; border-radius: 3px; padding: 4px 14px; }
 QPushButton:hover { border-color: @highlight; }
 QPushButton:pressed { background: @highlight; }
-QPushButton:default { color: white; border: 1px solid @accent; background: @accent; }
+QPushButton:default { color: @onAccent; border: 1px solid @accent; background: @accent; }
 QPushButton:disabled { color: @muted; border-color: @line; }
 QToolButton { border-radius: 3px; padding: 2px 5px; }
 QToolButton:hover { background: @button; }
@@ -175,7 +175,7 @@ QTabWidget#terminalTabs QTabBar::tab, QTabBar#goToTabs::tab { background: @tabs;
 QTabWidget#terminalTabs QTabBar::tab { padding: 7px 12px 9px; margin-top: 4px; border: 1px solid transparent; border-top: 2px solid transparent; border-bottom: none; }
 QTabWidget#terminalTabs QTabBar::tab:first, QTabBar#goToTabs::tab:first { border-top-left-radius: 3px; }
 QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
-QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; }
+QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; border-top-left-radius: 3px; border-top-right-radius: 3px; }
 QTabWidget#terminalTabs QTabBar::tab:selected, QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
 EditorTabs QTabBar { background: @window; }
 EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 7px 12px; margin-top: 4px; min-width: 64px; max-width: 240px; border: 1px solid transparent; border-top: 2px solid transparent; border-bottom: none; border-top-left-radius: 6px; border-top-right-radius: 6px; }
@@ -301,6 +301,7 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
     const QList<std::pair<QString, QColor>> colors = {
         {"@accentText", theme.accentText},
         {"@accent", theme.accent},
+        {"@onAccent", theme.onAccent},
         {"@text", theme.foreground},
         {"@muted", theme.mutedText},
         {"@window", theme.window},
@@ -339,7 +340,8 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
                                 "QTabBar::close-button:hover { image: url(%2); background: %3; }\n")
                      .arg(cross, crossHover, theme.hover.name());
 
-    if (const QString check = checkIcon(QStringLiteral("check-%1.svg").arg(theme.name), Qt::white); !check.isEmpty())
+    if (const QString check = checkIcon(QStringLiteral("check-%1.svg").arg(theme.name), theme.onAccent);
+        !check.isEmpty())
         sheet += QStringLiteral("QCheckBox::indicator { width: 14px; height: 14px; }\n"
                                 "QCheckBox::indicator:checked { image: url(%1); }\n")
                      .arg(check);

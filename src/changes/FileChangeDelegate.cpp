@@ -5,6 +5,7 @@
 #include "git/ChangeKindStyle.h"
 #include "git/FilePatch.h"
 #include "ui/FileIcons.h"
+#include "ui/ThemeStyle.h"
 
 #include <QApplication>
 #include <QMouseEvent>
@@ -142,10 +143,10 @@ QRect checkBoxRect(const QStyleOptionViewItem &option)
 }
 
 // The check of a checked box, or the dash of a partly checked one, in
-// white over the accent.
+// the theme's ink over the accent.
 void paintCheckMark(QPainter *painter, const QRectF &box, Qt::CheckState state)
 {
-    painter->setPen(QPen(Qt::white, checkMarkWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter->setPen(QPen(ThemeStyle::applied().onAccent, checkMarkWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     const auto at = [&box](qreal x, qreal y) {
         return QPointF(box.left() + x * box.width(), box.top() + y * box.height());
     };
