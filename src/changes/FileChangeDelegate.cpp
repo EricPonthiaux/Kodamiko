@@ -11,11 +11,18 @@
 #include <QPainter>
 #include <QTreeWidgetItem>
 
+#include <array>
+
 namespace {
 
 constexpr qreal rowRatio = 1.95; // row height / text height
 constexpr int horizontalPadding = 10;
 constexpr int checkSpacing = 8; // between the check box and the file's icon
+// As the theme's QCheckBox (ThemeStyle).
+constexpr int checkBoxSize = 14;
+constexpr qreal checkBoxRadius = 3;
+constexpr qreal checkMarkWidth = 1.6;
+constexpr float emptyBoxOutlineAlpha = 0.45F;
 
 bool isDark(const QPalette &palette)
 {
@@ -130,37 +137,58 @@ const QStyle *styleOf(const QStyleOptionViewItem &option)
 // The check box at the left of the row, less its padding.
 QRect checkBoxRect(const QStyleOptionViewItem &option)
 {
-    const QStyle *style = styleOf(option);
-    const QSize size(style->pixelMetric(QStyle::PM_IndicatorWidth, &option, option.widget),
-                     style->pixelMetric(QStyle::PM_IndicatorHeight, &option, option.widget));
     const QRect row = option.rect.adjusted(horizontalPadding, 0, -horizontalPadding, 0);
-    return {QPoint(row.left(), row.center().y() - size.height() / 2), size};
+    return {QPoint(row.left(), row.center().y() - checkBoxSize / 2), QSize(checkBoxSize, checkBoxSize)};
 }
 
-QStyle::State checkStyleState(Qt::CheckState state)
+// The check of a checked box, or the dash of a partly checked one, in
+// white over the accent.
+void paintCheckMark(QPainter *painter, const QRectF &box, Qt::CheckState state)
 {
+    painter->setPen(QPen(Qt::white, checkMarkWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    const auto at = [&box](qreal x, qreal y) {
+        return QPointF(box.left() + x * box.width(), box.top() + y * box.height());
+    };
     switch (state) {
     case Qt::Unchecked:
-        return QStyle::State_Off;
+        return;
     case Qt::PartiallyChecked:
-        return QStyle::State_NoChange;
-    case Qt::Checked:
-        return QStyle::State_On;
+        painter->drawLine(at(0.28, 0.5), at(0.72, 0.5));
+        return;
+    case Qt::Checked: {
+        const std::array<QPointF, 3> check = {at(0.26, 0.52), at(0.43, 0.69), at(0.75, 0.33)};
+        painter->drawPolyline(check.data(), int(check.size()));
+        return;
     }
-    return QStyle::State_Off;
+    }
 }
 
-// Paints the check box of `index`; returns the room it takes at the left.
+// Paints the check box of `index`, drawn as the theme's QCheckBox rather
+// than by the style, whose item check ignores the theme; returns the room
+// it takes at the left.
 int paintCheckBox(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index)
 {
-    const QVariant state = index.data(Qt::CheckStateRole);
-    if (!state.isValid())
+    const QVariant data = index.data(Qt::CheckStateRole);
+    if (!data.isValid())
         return 0;
-    QStyleOptionViewItem box = option;
-    box.rect = checkBoxRect(option);
-    box.state = (option.state & QStyle::State_Enabled) | checkStyleState(state.value<Qt::CheckState>());
-    styleOf(option)->drawPrimitive(QStyle::PE_IndicatorItemViewItemCheck, &box, painter, option.widget);
-    return box.rect.width() + checkSpacing;
+    const auto state = data.value<Qt::CheckState>();
+    const QPalette &palette = option.palette;
+    const bool isFilled = state != Qt::Unchecked;
+    const QRectF box = QRectF(checkBoxRect(option)).adjusted(0.5, 0.5, -0.5, -0.5);
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    if (!(option.state & QStyle::State_Enabled))
+        painter->setOpacity(0.5);
+    // The text's color, dimmed: the theme's border is too faint on some
+    // light themes for an empty box.
+    QColor outline = palette.color(QPalette::Text);
+    outline.setAlphaF(emptyBoxOutlineAlpha);
+    painter->setPen(isFilled ? palette.color(QPalette::Accent) : outline);
+    painter->setBrush(isFilled ? palette.color(QPalette::Accent) : palette.color(QPalette::Base));
+    painter->drawRoundedRect(box, checkBoxRadius, checkBoxRadius);
+    paintCheckMark(painter, box, state);
+    painter->restore();
+    return checkBoxSize + checkSpacing;
 }
 
 void paintFolder(const Row &row, const QString &label)
