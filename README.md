@@ -83,48 +83,28 @@ rearrange it while Claude keeps editing its source.
 
 ## Getting started
 
-Requirements: **Qt 6.10+** (Widgets, Network, PrintSupport, Test, WebEngine),
-CMake 3.24+, Ninja and a C++23 compiler (GCC 13+, Clang 17+, Apple Clang 16+
-or MSVC 2022).
-The other dependencies (QScintilla, tree-sitter, libvterm, libgit2,
-cmark-gfm) are downloaded and built automatically on the first
-configuration. [Graphviz](https://graphviz.org) (`libgraphviz-dev`,
-optional) enables the diagram editor; on Windows, its official release is
-downloaded too.
+Kodamiko **alpha.1.0** is a pre-release, the first public build: its
+settings and interfaces may still change, and you will meet bugs. Download
+it from the [release page](https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0):
 
-```sh
-cmake --preset default
-cmake --build --preset default
-ctest --preset default
-./build/bin/kodamiko [project-folder]
-```
+| System | Package |
+|---|---|
+| Linux x86-64 | `Kodamiko-alpha.1.0-linux-x86_64.AppImage`: make it executable (`chmod +x`), then run it |
+| Windows x64 | `Kodamiko-alpha.1.0-windows-x64.zip`: unzip it anywhere, then run `bin\kodamiko.exe` |
+| macOS, Apple silicon | `Kodamiko-alpha.1.0-macos-arm64.dmg`: drag Kodamiko to Applications |
 
-On Windows, from an *x64 Native Tools Command Prompt* (Visual Studio 2022
-or later, which also provides CMake and Ninja), with Qt's `msvc2022_64`
-kit in `CMAKE_PREFIX_PATH` and its `bin` directory in `PATH`:
-
-```bat
-set CMAKE_PREFIX_PATH=C:\Qt\6.10.3\msvc2022_64
-set PATH=%CMAKE_PREFIX_PATH%\bin;%PATH%
-cmake --preset windows
-cmake --build --preset windows
-ctest --preset windows
-build-win\bin\kodamiko.exe [project-folder]
-```
-
-On macOS, each rebuild of an ad-hoc signed `Kodamiko.app` asks again for
-access to the Desktop and Documents folders. Signed with a stable identity,
-it asks once: create a code-signing certificate in *Keychain Access ▸
-Certificate Assistant ▸ Create a Certificate…* (type *Code Signing*), or
-use an Apple Development one, then configure with its name:
-
-```sh
-cmake --preset default -DKDK_CODESIGN_IDENTITY="Kodamiko Development"
-```
+Macs with an Intel processor are not supported yet. The packages are not
+signed: Windows SmartScreen and macOS Gatekeeper warn before the first
+launch (on macOS, open Kodamiko with right click ▸ Open). Their checksums
+are in `SHA256SUMS.txt`, on the release page.
 
 At runtime Kodamiko needs [Claude Code](https://claude.com/claude-code) 2.1+
 and git 2.23+. If either is missing, *Help ▸ Check Prerequisites* opens on
 startup and offers to install it.
+
+To report a bug or suggest an idea, open an
+[issue](https://github.com/EricPonthiaux/Kodamiko/issues/new/choose); report
+a vulnerability privately, as [`SECURITY.md`](SECURITY.md) says.
 
 ## Using Kodamiko
 
