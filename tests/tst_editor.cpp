@@ -41,6 +41,9 @@
 
 namespace {
 
+// How long a format on save may take: starting clang-format can be slow.
+constexpr int formatTimeoutMs = 30000;
+
 void write(const QString &path, const QByteArray &content)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());
@@ -768,7 +771,9 @@ private slots:
         tabs.setFormatOnSave(true);
         const QSignalSpy saved(&tabs, &EditorTabs::fileSaved);
         QVERIFY(tabs.saveCurrent());
-        QTRY_COMPARE(saved.size(), 1);
+        // Starting clang-format a third time took more than the default 5 s
+        // on the Windows CI.
+        QTRY_COMPARE_WITH_TIMEOUT(saved.size(), 1, formatTimeoutMs);
         QFile file(dir.filePath("a.cpp"));
         QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll(), QByteArray("int g() { return 2; }\n"));
