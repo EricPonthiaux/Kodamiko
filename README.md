@@ -10,6 +10,8 @@ It is open source (GPL v3), written in C++23 with Qt 6, and runs on Linux,
 Windows and macOS. Kodamiko is in preview: it is used every day to build itself,
 and its interfaces may still change.
 
+![Kodamiko in its violet theme: the project's files on the left, HistoryView.cpp open in the editor](docs/screenshots/kodamiko-violet.png)
+
 ## Why Kodamiko
 
 The editors we use were designed for a human typing code; AI came later, as

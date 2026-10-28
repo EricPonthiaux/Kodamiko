@@ -10,6 +10,9 @@ offscreen on a fresh clone of this repository.
    tools/site-screenshots/capture.sh /tmp/shots 2 &
    ```
 
+   A third argument names another theme: the README's picture is taken
+   with `kodamiko-violet`.
+
    Kodamiko runs with its own HOME and `Kodamiko.conf` (the Kodamiko theme, whose blue the site shares), on
    `/tmp/shots/Kodamiko`; the user's settings are neither read nor written. Its
    Claude sessions use the real Claude Code installation and account: the
@@ -31,6 +34,7 @@ The scenes of the site:
 | `diagram`, `diagram-claude` | “Draw the path of a prompt through Kodamiko as a flowchart, in about ten boxes.”, then “Where does Claude wait before touching the code? Show me in the diagram.” |
 | `review` | `90caac2` reverted then picked again without committing (`git revert --no-edit 90caac2`, `git cherry-pick --no-commit 90caac2`), Claude › Review Staged Changes, then Generate |
 | `history` | History mode, `90caac2` (made with Claude) unfolded |
+| `docs/screenshots/kodamiko-violet` (the README's, theme `kodamiko-violet`) | `src/history/HistoryView.cpp` opened at line 146 (`open_file`), Files side tab, the tree located on the file |
 | `edit` | Outline side tab, completion after `commits_->setSel` on a new line 154, scrolled to show line 134 first |
 
 When a capture changes, check the sentences beside it in `site/index.html`
