@@ -32,8 +32,8 @@ struct SnackbarAction {
 struct SnackbarMessage {
     QIcon icon;
     QString title;
-    // A line under the title, in the code font (a command, a path); elided,
-    // shown in full in its tooltip.
+    // Lines under the title, in the code font (a command, a path, a diff):
+    // wrapped, and cut after a few lines.
     QString detail;
     QList<SnackbarAction> actions;
     // Closes the message by itself after this long; without one, it stays
@@ -47,11 +47,11 @@ struct SnackbarMessage {
 };
 
 // A short message at the bottom of the window, over its contents, in the
-// manner of Material's snackbars: an icon, a title, a detail line, a few
-// buttons and a close button. It never takes the focus: the user keeps
-// typing where they were, and reaches its buttons with the mouse or Tab.
-// The messages posted while one is shown wait their turn, and their count
-// is shown.
+// manner of Material's snackbars: an icon, a title, detail lines, a row of
+// buttons and a close button; the texts take the lines they need. It never
+// takes the focus: the user keeps typing where they were, and reaches its
+// buttons with the mouse or Tab. The messages posted while one is shown
+// wait their turn, and their count is shown.
 //
 // It is a child of the window it shows in, and places itself as the window
 // is resized.
@@ -94,8 +94,6 @@ private:
     // Closes the message shown and shows the next, if any.
     void closeFirst();
     void rebuildActions();
-    // The title and the detail of the message shown, elided to their room.
-    void fitTexts();
     void place();
     // Where it goes, shadow included, at the bottom center of the window.
     QRect placedGeometry() const;
