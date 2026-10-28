@@ -509,6 +509,9 @@ private:
     // needed, and shows it.
     void typeInClaudePrompt(const QString &text, PromptEntry entry);
     void runGitOnTree(const QString &title, const QString &path, bool rollback);
+    // Adds the untracked `paths` to the repository's .gitignore, then rereads
+    // the tree and the git states.
+    void ignoreInGit(const QStringList &paths);
     void updateClaudeMarks();
     // Rereads the current branch and watches the project's git folder.
     void updateRepositoryInfo();

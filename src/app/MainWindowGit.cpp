@@ -18,6 +18,7 @@
 #include "git/Branches.h"
 #include "git/FileStatuses.h"
 #include "git/GitCommands.h"
+#include "git/GitIgnoreFile.h"
 #include "git/GitOperations.h"
 #include "git/Integration.h"
 #include "git/RepositoryWatcher.h"
@@ -28,6 +29,7 @@
 #include "workspace/FileTreeView.h"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
@@ -181,6 +183,33 @@ void MainWindow::runGitOnTree(const QString &title, const QString &path, bool ro
         GitOperations::stage(info, paths);
         return QObject::tr("Added to the index");
     });
+}
+
+void MainWindow::ignoreInGit(const QStringList &paths)
+{
+    std::optional<RepositoryInfo> info;
+    try {
+        info = RepositoryInfo::read(folder_);
+    } catch (const GitError &error) {
+        showNotice({.title = tr("Ignore: failed"), .location = {}, .message = error.message(), .details = {}}, this);
+        return;
+    }
+    if (!info || paths.isEmpty())
+        return;
+    const QDir folder(folder_);
+    QStringList patterns;
+    for (const QString &path : paths) {
+        const auto kind = QFileInfo(path).isDir() ? GitIgnoreFile::EntryKind::Folder : GitIgnoreFile::EntryKind::File;
+        patterns.append(GitIgnoreFile::patternFor(repositoryPathOf(path, *info, folder), kind));
+    }
+    if (QString error; !GitIgnoreFile::add(info->workDir, patterns, &error)) {
+        showNotice({.title = tr("Ignore: failed"), .location = {}, .message = error, .details = {}}, this);
+        return;
+    }
+    showStatus(paths.size() == 1 ? tr("Added to .gitignore") : tr("%1 entries added to .gitignore").arg(paths.size()));
+    // The ignored entries may be hidden, in folders the disk watcher does not report.
+    fileTree_->refreshFromDisk();
+    fileStatuses_->refresh();
 }
 
 void MainWindow::updateRepositoryInfo()

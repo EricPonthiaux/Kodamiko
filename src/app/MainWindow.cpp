@@ -476,6 +476,7 @@ void MainWindow::createFilesPanel()
             [this](const QString &path) { runGitOnTree(tr("Staging"), path, false); });
     connect(fileTree_, &FileTreeView::rollbackRequested, this,
             [this](const QString &path) { runGitOnTree(tr("Rollback"), path, true); });
+    connect(fileTree_, &FileTreeView::ignoreRequested, this, &MainWindow::ignoreInGit);
     fileStatuses_ = new FileStatusReader(this);
     connect(fileStatuses_, &FileStatusReader::statusesChanged, this,
             [this] { fileTree_->setStatuses(fileStatuses_->statuses(), inRepository_); });

@@ -476,9 +476,23 @@ void FileTreeView::addGitMenu(QMenu *menu, const QString &path, const QStringLis
                    })
         ->setEnabled(changed);
     git->addAction(tr("&Rollback…"), this, [this, path] { confirmRollback(path); })->setEnabled(trackedChange);
+    // git only ignores the files it does not track yet.
+    const QStringList untracked = untrackedEntries(selection);
+    git->addAction(tr("&Ignore"), this, [this, untracked] { emit ignoreRequested(untracked); })
+        ->setEnabled(!untracked.isEmpty());
     git->addSeparator();
     git->addAction(tr("Show &History"), this, [this, path] { emit historyRequested(path); })
         ->setEnabled(!status || *status != FileStatus::Untracked);
+}
+
+QStringList FileTreeView::untrackedEntries(const QStringList &paths) const
+{
+    QStringList untracked;
+    for (const QString &path : paths) {
+        if (path != rootPath_ && proxy_->statusOf(path, QFileInfo(path).isDir()) == FileStatus::Untracked)
+            untracked.append(path);
+    }
+    return untracked;
 }
 
 void FileTreeView::confirmRollback(const QString &path)

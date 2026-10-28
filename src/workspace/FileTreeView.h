@@ -178,6 +178,8 @@ signals:
     // Confirmed by the user: restore `path` to its state in the index.
     void rollbackRequested(const QString &path);
     void historyRequested(const QString &path);
+    // Untracked files and folders to add to the repository's .gitignore.
+    void ignoreRequested(const QStringList &paths);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -232,8 +234,10 @@ private:
     // New file, folder and diagram in `folder`.
     void addCreationActions(QMenu *menu, const QString &folder);
     void addEntryActions(QMenu *menu, const QModelIndex &index);
-    // Git commands on `path`; Add on every entry of `selection`.
+    // Git commands on `path`; Add and Ignore on every entry of `selection`.
     void addGitMenu(QMenu *menu, const QString &path, const QStringList &selection);
+    // The entries of `paths` git does not track (nor ignore), the root excepted.
+    QStringList untrackedEntries(const QStringList &paths) const;
     QString targetFolder(const QModelIndex &index) const;
     QString pathOf(const QModelIndex &index) const;
     void createEntry(const QString &folder, bool isFolder);
