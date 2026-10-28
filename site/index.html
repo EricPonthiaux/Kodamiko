@@ -181,16 +181,9 @@
         <ul class="features">
           <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-linux-x86_64.AppImage">Linux x86-64</a></strong><span>An AppImage: make it executable (<code>chmod +x</code>), then run it.</span></li>
           <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-windows-x64.zip">Windows x64</a></strong><span>Unzip it anywhere, then run <code>bin\kodamiko.exe</code>.</span></li>
-          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-macos-arm64.dmg">macOS, Apple silicon</a></strong><span>Drag Kodamiko to Applications. Macs with an Intel processor build it from source.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-macos-arm64.dmg">macOS, Apple silicon</a></strong><span>Drag Kodamiko to Applications. Macs with an Intel processor are not supported yet.</span></li>
         </ul>
         <p class="requirements">The packages are not signed yet: Windows SmartScreen and macOS Gatekeeper warn before the first launch (on macOS, open Kodamiko with right click ▸ Open). Their checksums are in <code>SHA256SUMS.txt</code>, on the <a href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">release page</a>.</p>
-        <pre class="code-block"><code><span class="comment"># Or build it from source</span>
-git clone https://github.com/EricPonthiaux/Kodamiko.git
-cd Kodamiko
-cmake --preset default
-cmake --build --preset default
-./build/bin/kodamiko [project-folder]</code></pre>
-        <p class="requirements">Requires Qt 6.10+, CMake 3.24+, Ninja and a C++23 compiler (GCC 13+, Clang 17+, Apple Clang 16+ or MSVC 2022). The other dependencies are downloaded and built on the first configuration. See the <a href="https://github.com/EricPonthiaux/Kodamiko#getting-started">README</a> for the details.</p>
       </div>
     </section>
 

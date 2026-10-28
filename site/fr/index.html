@@ -181,16 +181,9 @@
         <ul class="features">
           <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-linux-x86_64.AppImage">Linux x86-64</a></strong><span>Une AppImage : rendez-la exécutable (<code>chmod +x</code>), puis lancez-la.</span></li>
           <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-windows-x64.zip">Windows x64</a></strong><span>Décompressez-la où vous voulez, puis lancez <code>bin\kodamiko.exe</code>.</span></li>
-          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-macos-arm64.dmg">macOS, Apple Silicon</a></strong><span>Glissez Kodamiko dans Applications. Les Mac à processeur Intel le compilent depuis les sources.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-macos-arm64.dmg">macOS, Apple Silicon</a></strong><span>Glissez Kodamiko dans Applications. Les Mac à processeur Intel ne sont pas encore pris en charge.</span></li>
         </ul>
         <p class="requirements">Les paquets ne sont pas encore signés : Windows SmartScreen et macOS Gatekeeper préviennent avant le premier lancement (sur macOS, ouvrez Kodamiko par clic droit ▸ Ouvrir). Leurs sommes de contrôle sont dans <code>SHA256SUMS.txt</code>, sur la <a href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">page de la version</a>.</p>
-        <pre class="code-block"><code><span class="comment"># Ou le compiler depuis les sources</span>
-git clone https://github.com/EricPonthiaux/Kodamiko.git
-cd Kodamiko
-cmake --preset default
-cmake --build --preset default
-./build/bin/kodamiko [dossier-du-projet]</code></pre>
-        <p class="requirements">Nécessite Qt 6.10+, CMake 3.24+, Ninja et un compilateur C++23 (GCC 13+, Clang 17+, Apple Clang 16+ ou MSVC 2022). Les autres dépendances sont téléchargées et compilées à la première configuration. Les détails sont dans le <a href="https://github.com/EricPonthiaux/Kodamiko#getting-started">README</a>.</p>
       </div>
     </section>
 

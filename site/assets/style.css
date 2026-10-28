@@ -33,7 +33,6 @@
   --accent-strong: #84a3f7;
   --accent-soft: rgba(79, 124, 240, 0.12);
   --glow: rgba(79, 124, 240, 0.16);
-  --code-bg: #0a0c10;
   --radius: 10px;
   --content-width: 1120px;
   --dot: rgba(255, 255, 255, 0.09);
@@ -56,7 +55,6 @@
     --accent-strong: #2a52c4;
     --accent-soft: rgba(52, 97, 216, 0.08);
     --glow: rgba(52, 97, 216, 0.1);
-    --code-bg: #12151b;
     --dot: rgba(15, 20, 30, 0.12);
     color-scheme: light;
   }
@@ -673,37 +671,6 @@ section.alt {
   background: var(--surface-raised);
   font-size: 0.92rem;
   font-weight: 500;
-}
-
-/* Getting started: the commands in a terminal window */
-
-.code-block {
-  margin: 0 0 24px;
-  padding: 0 24px 22px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--code-bg);
-  color: #e7e9ef;
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: 0.88rem;
-  line-height: 1.8;
-}
-
-.code-block::before {
-  content: "";
-  display: block;
-  height: 38px;
-  margin: 0 -24px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background:
-    radial-gradient(circle, #3a3f4b 5px, transparent 5.5px) 16px 50% / 18px 18px no-repeat,
-    radial-gradient(circle, #3a3f4b 5px, transparent 5.5px) 36px 50% / 18px 18px no-repeat,
-    radial-gradient(circle, #3a3f4b 5px, transparent 5.5px) 56px 50% / 18px 18px no-repeat;
-}
-
-.code-block .comment {
-  color: #7d8496;
 }
 
 .requirements {
