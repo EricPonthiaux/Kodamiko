@@ -24,11 +24,15 @@ ctest --preset debug          # QT_QPA_PLATFORM=offscreen without a display
 
 ## Before you open a pull request
 
-- The code follows the project's conventions, written in
-  [`CLAUDE.md`](CLAUDE.md): it is read by people and by Claude alike. In
-  short: functions of cognitive complexity ≤ 15 and nesting ≤ 3, names that
-  need no comment, ownership readable from the types, comments that say
-  *why*, and everything in English.
+The conventions in [`CLAUDE.md`](CLAUDE.md) are not suggestions: every
+change follows them, whether a person or Claude wrote it. In short:
+functions of cognitive complexity ≤ 15 and nesting ≤ 3, names that need no
+comment, ownership readable from the types, comments that say *why*, and
+everything in English. **If you are thinking of submitting a pull request
+that does not follow these rules, please don't: it will not be merged.**
+
+Also check that:
+
 - A behavior change comes with a Qt Test named after the behavior
   (`highlightsEveryOccurrenceOfTheNameAtTheCursor`).
 - It builds without warnings, and these report nothing:

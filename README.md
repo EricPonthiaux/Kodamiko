@@ -1,45 +1,86 @@
 # Duet
 
-**Duet is a full-featured code editor built around a Claude Code session.** You
-write code on one side, Claude works on the other, and the editor keeps both in
-sync: Claude sees what you see, and you see what Claude changes.
+**A code editor where you and an AI agent work on the same project, side by
+side, and you never lose sight of what it does.**
+
+Duet is a native desktop editor built around a [Claude Code](https://claude.com/claude-code)
+session. You write code on one side; Claude works on the other, in a
+terminal inside the editor. Duet keeps the two in step: Claude knows what you
+are looking at, and you see, as it happens, every change Claude makes, with
+a way to undo it.
 
 It is open source (GPL v3), written in C++23 with Qt 6, and runs on Linux,
-Windows and macOS.
+Windows and macOS. Duet is in preview: it is used every day to build itself,
+and its interfaces may still change.
 
 ## Why Duet
 
-Today's editors were designed for a human typing code, and AI was added
-later: a chat panel on the side, or an agent in a terminal that cannot see
-your editor. The assistant does not know what you are looking at, you lose
-track of what it changes, and undoing its work is up to you.
+The editors we use were designed for a human typing code; AI came later, as
+a chat panel on the side or an agent in a terminal that cannot see the
+editor. The assistant does not know which file is open or what is selected,
+so you keep pointing it at paths and pasting excerpts. It changes files
+behind your back, and you discover the result in a diff, if you look. When
+it goes wrong, undoing its work is up to you.
 
-Duet starts from the other end: an editor built for working *with* an AI
-agent, where you and Claude share the same view of the project.
+Duet starts from the other end, with three ideas:
 
-- **Claude is part of the editor.** A Claude Code session runs in a built-in
-  terminal, started in your project. With each prompt, Duet tells Claude
-  which file is open, where the cursor is, what is selected and which
-  problems are underlined, so "fix this" needs no `@path`.
-- **Claude works in the editor.** Through Duet's own MCP server, Claude can
-  read your open files (unsaved changes included), find symbols and
-  references, rename through the language server, open a file at a line,
-  show a diff or draw a diagram. Anything that changes the repository waits
-  for your *Allow*.
-- **You follow every change.** Open files reload as Claude edits them, and
-  the Diff view updates after each step. A snapshot of the project is taken
-  before each prompt: *Git ▸ Restore a Snapshot* undoes everything Claude
-  did. Claude never overwrites a file you have not saved.
-- **Git without leaving the editor.** Stage by file, hunk or line, commit
-  (with a message Claude writes in the style of your history), browse the
-  history, switch, merge and rebase branches, pull, push and stash.
-- **A real code editor.** Tree-sitter highlighting for C, C++, Java,
-  JavaScript and TypeScript, language servers (completion, diagnostics,
-  go to definition, quick fixes), an outline, find in files, a command
-  palette (Ctrl+Shift+P) and a rendered Markdown viewer.
-- **Diagrams.** Ask for a flowchart, a sequence, a class or an architecture
-  diagram: Claude writes it in Mermaid and it opens laid out in Duet's
-  diagram editor, where you can rearrange it.
+- **One shared view.** You and Claude look at the same project: the open
+  files with their unsaved changes, the selection, the problems, the
+  diagrams, the terminals and git. "Fix this" means what is under your
+  cursor.
+- **Every change visible and reversible.** Files reload as Claude edits
+  them, the diff follows each step, and the project can go back to how it
+  was before any prompt.
+- **You decide.** Claude acts in the editor through tools Duet gives it, and
+  whatever changes the repository waits for your *Allow*, asked in plain
+  words rather than as a command line.
+
+## What you can do
+
+**Work with Claude.** A Claude Code session starts in your project, in a
+built-in terminal. With each prompt, Duet tells Claude which file is open,
+where the cursor is, what is selected and which problems are underlined.
+Through Duet's own MCP server, Claude reads your open files, finds symbols
+and references, opens a file at a line, shows a diff or draws a diagram; the
+errors its edits introduce are reported back to it at once. Its permission
+requests appear in the editor, never taking the focus from what you type.
+
+**Follow and undo.** Open files reload as Claude edits them, and the Diff
+view updates after each step. Claude never overwrites a file you have not
+saved. A snapshot of the project is taken before each prompt: *Claude ▸
+Restore the State Before a Prompt* brings it back.
+
+**Run agents in parallel.** Start more Claude sessions, each in a git
+worktree of its own, so that they never step on each other or on you. Their
+work comes back through a merge queue, after the check of your choice
+(a build, the tests).
+
+**Review before you commit.** *Claude ▸ Review Staged Changes* has the
+changes reviewed, and lays the findings out as cards, file by file, with
+the code they are about: dismiss them, or send them back to be fixed.
+
+**Refactor safely.** Rename a symbol or a file, change a function's
+signature, move a class to its own file: the language server finds every
+usage, a preview shows the result, and *Undo Refactoring* takes it back in
+one step, wherever the change went. Claude uses the same refactorings.
+
+**Git without leaving the editor.** Stage by file, hunk or line, commit with
+a message Claude writes in the style of your history, browse the history,
+switch, merge and rebase branches, resolve conflicts, pull, push and stash.
+Git commands Claude would run in a shell go through Duet's tools instead,
+so each one is explained, snapshotted and shown.
+
+**A real code editor.** Tree-sitter highlighting for C, C++, Java,
+JavaScript, TypeScript and Python; language servers (clangd, jdtls,
+typescript-language-server, pyright) for completion, diagnostics, go to
+definition, hierarchies and quick fixes; an outline, find in files, a
+command palette (Ctrl+Shift+P), run configurations and a rendered Markdown
+viewer.
+
+**Diagrams.** Ask for a flowchart, a sequence, a class, a state, a data
+model, a C4 architecture or a mind map: Claude writes it in Mermaid or
+PlantUML, and it opens laid out in Duet's diagram editor, where you can
+rearrange it while Claude keeps editing its source.
 
 ## Getting started
 
