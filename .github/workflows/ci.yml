@@ -55,9 +55,11 @@ jobs:
             build/_deps/*-subbuild
           key: deps-v2-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/GraphvizWindows.cmake') }}
 
-      # LTO is off in the CI for now.
+      # LTO is off in the CI for now. KDK_NATIVE, on in the default preset,
+      # would build the packages for the runner's processor only: they could
+      # stop with an illegal instruction on an older one.
       - name: Configure
-        run: cmake --preset default -DKDK_LTO=OFF
+        run: cmake --preset default -DKDK_LTO=OFF -DKDK_NATIVE=OFF
 
       - name: Build
         run: cmake --build --preset default
