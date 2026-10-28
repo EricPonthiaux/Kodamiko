@@ -13,13 +13,17 @@ namespace {
 // Long enough for a process busy for a moment; a dead one refuses at once.
 constexpr int connectTimeoutMs = 1000;
 
+// 128 bits of the hash: a socket's path holds 103 bytes on macOS, whose
+// temporary directory (/var/folders/…/T/) already takes 49 of them.
+constexpr qsizetype hashBytes = 16;
+
 // The same for every spelling of the folder (symbolic links, trailing
 // separator) and distinct per user, the sockets being in a shared directory.
 QString serverName(const QString &folder)
 {
     const QString canonical = QDir(folder).canonicalPath();
     const QString key = QDir::homePath() + u'\n' + (canonical.isEmpty() ? QDir(folder).absolutePath() : canonical);
-    const QByteArray hash = QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha1).toHex();
+    const QByteArray hash = QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha1).first(hashBytes).toHex();
     return QStringLiteral("kodamiko-project-") + QString::fromLatin1(hash);
 }
 
