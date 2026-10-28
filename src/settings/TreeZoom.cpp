@@ -35,7 +35,7 @@ bool TreeZoom::eventFilter(QObject *watched, QEvent *event)
     const auto *wheel = static_cast<QWheelEvent *>(event);
     const int delta = wheel->angleDelta().y();
     // Rounded: the size converted to the system's points and back is 13.99….
-    const int size = qRound(AppFonts::duetPoints(baseFont_.pointSizeF()));
+    const int size = qRound(AppFonts::kdkPoints(baseFont_.pointSizeF()));
     const bool isZoom = wheel->modifiers() & Qt::ControlModifier;
     if (!isZoom || delta == 0 || size <= 0)
         return QObject::eventFilter(watched, event);
@@ -52,6 +52,6 @@ void TreeZoom::apply()
 {
     QFont font = baseFont_;
     if (font.pointSizeF() > 0)
-        font.setPointSizeF(AppFonts::systemPoints(AppFonts::duetPoints(font.pointSizeF()) + zoomPoints_));
+        font.setPointSizeF(AppFonts::systemPoints(AppFonts::kdkPoints(font.pointSizeF()) + zoomPoints_));
     applyTreeMetrics(tree_, font);
 }

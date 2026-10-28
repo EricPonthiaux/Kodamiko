@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// MCP tools backed by the language servers Duet runs: problems,
+// MCP tools backed by the language servers Kodamiko runs: problems,
 // definitions, usages, documentation, rename, quick fixes, formatting.
 // Positions are 1-based lines and columns; the files' unsaved text is what
 // the servers see.
 
-#include "DuetTools.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
 #include "diagnostics/ProblemStore.h"
@@ -28,7 +28,7 @@
 #include <optional>
 #include <utility>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -38,7 +38,7 @@ using namespace LspProtocol;
 // How long a server may take to report problems after a change.
 constexpr int diagnosticsWaitMs = 4000;
 
-QString textOf(const DuetToolContext &context, const QString &path)
+QString textOf(const KDKToolContext &context, const QString &path)
 {
     const QHash<QString, QString> buffers = context.tabs->unsavedTexts();
     if (buffers.contains(path))
@@ -65,10 +65,10 @@ QString severityName(int severity)
 // The server of `path`'s language, with the file's current text (and that
 // of the other open files of its languages) sent to it; null, with `error`,
 // when there is none.
-LspClient *serverFor(const DuetToolContext &context, const QString &path, QString *error, bool *sent = nullptr)
+LspClient *serverFor(const KDKToolContext &context, const QString &path, QString *error, bool *sent = nullptr)
 {
     if (!context.languageServers) {
-        *error = QStringLiteral("Language servers are off in Duet");
+        *error = QStringLiteral("Language servers are off in Kodamiko");
         return nullptr;
     }
     const QString languageId = LanguageRegistry::languageForFile(path);
@@ -76,7 +76,7 @@ LspClient *serverFor(const DuetToolContext &context, const QString &path, QStrin
     if (!client) {
         const QString failure = context.languageServers->failure(languageId);
         *error =
-            failure.isEmpty() ? QStringLiteral("No language server for %1 files in Duet").arg(languageId) : failure;
+            failure.isEmpty() ? QStringLiteral("No language server for %1 files in Kodamiko").arg(languageId) : failure;
         return nullptr;
     }
     // The open files first: `path` is then checked with their text (a
@@ -124,7 +124,7 @@ QJsonObject positionSchema(const QJsonObject &extra = {}, const QStringList &opt
 }
 
 // Locations with the text of their line, for Claude to read.
-QJsonArray locationsJson(const DuetToolContext &context, const QList<Location> &locations)
+QJsonArray locationsJson(const KDKToolContext &context, const QList<Location> &locations)
 {
     QHash<QString, QStringList> lines;
     QJsonArray array;
@@ -162,7 +162,7 @@ QJsonArray diagnosticsJson(const QJsonArray &diagnostics)
 }
 
 // The problems the last builds found in `path` that no server reports.
-QJsonArray buildProblemsJson(const DuetToolContext &context, const QString &path)
+QJsonArray buildProblemsJson(const KDKToolContext &context, const QString &path)
 {
     QJsonArray array;
     if (!context.problems)
@@ -203,7 +203,7 @@ QJsonArray editorProblems(const EditorWidget *editor)
 
 // The problems of one file: the servers', else the editor's own, then the
 // builds'.
-QJsonArray fileProblems(const DuetToolContext &context, const QString &path)
+QJsonArray fileProblems(const KDKToolContext &context, const QString &path)
 {
     QJsonArray problems = diagnosticsJson(context.languageServers->diagnostics(path));
     const QJsonArray built = buildProblemsJson(context, path);
@@ -227,7 +227,7 @@ int errorCount(const QJsonArray &problems)
 // report those of the files they were just sent.
 class DiagnosticsCollector : public QObject {
 public:
-    DiagnosticsCollector(const DuetToolContext &context, const QStringList &paths, McpReply reply)
+    DiagnosticsCollector(const KDKToolContext &context, const QStringList &paths, McpReply reply)
         : context_(context)
         , reply_(std::move(reply))
     {
@@ -277,7 +277,7 @@ private:
         return pending;
     }
 
-    DuetToolContext context_;
+    KDKToolContext context_;
     McpReply reply_;
     QStringList paths_;
     QSet<QString> waiting_;
@@ -294,7 +294,7 @@ struct PositionalRequest {
 
 // Sends a positional request to the file's server and replies with
 // `convert`'s result.
-void sendPositionalRequest(const DuetToolContext &context,
+void sendPositionalRequest(const KDKToolContext &context,
                            const QJsonObject &arguments,
                            PositionalRequest request,
                            const McpReply &reply)
@@ -316,7 +316,7 @@ void sendPositionalRequest(const DuetToolContext &context,
 }
 
 // The code actions at a position, for a list or to apply one.
-void requestCodeActions(const DuetToolContext &context,
+void requestCodeActions(const KDKToolContext &context,
                         const QJsonObject &arguments,
                         const std::function<void(LspClient *, QList<QJsonObject>, const QString &)> &done)
 {
@@ -365,7 +365,7 @@ void appendMissing(QStringList &paths, const QStringList &more)
 
 // The files get_diagnostics checks: those asked for, else the open ones and
 // every one a server or a build reported problems for.
-QStringList pathsToCheck(const DuetToolContext &context, const QJsonObject &arguments)
+QStringList pathsToCheck(const KDKToolContext &context, const QJsonObject &arguments)
 {
     QStringList paths;
     for (const QJsonValue &value : arguments.value(QStringLiteral("paths")).toArray())
@@ -380,17 +380,17 @@ QStringList pathsToCheck(const DuetToolContext &context, const QJsonObject &argu
     return paths;
 }
 
-void getDiagnostics(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void getDiagnostics(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QStringList paths = pathsToCheck(context, arguments);
     if (!context.languageServers) {
-        reply(McpResult::error(QStringLiteral("Language servers are off in Duet")));
+        reply(McpResult::error(QStringLiteral("Language servers are off in Kodamiko")));
         return;
     }
     new DiagnosticsCollector(context, paths, reply); // deletes itself once it replied
 }
 
-void findDefinition(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void findDefinition(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     sendPositionalRequest(
         context, arguments,
@@ -404,14 +404,14 @@ void findDefinition(const DuetToolContext &context, const QJsonObject &arguments
         reply);
 }
 
-McpResult referencesResult(const DuetToolContext &context, const QJsonValue &result)
+McpResult referencesResult(const KDKToolContext &context, const QJsonValue &result)
 {
     const QList<Location> locations = parseLocations(result);
     return McpResult::json(QJsonObject{{QStringLiteral("references"), locationsJson(context, locations)},
                                        {QStringLiteral("count"), int(locations.size())}});
 }
 
-void findReferences(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void findReferences(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const bool includeDeclaration = arguments.value(QStringLiteral("includeDeclaration")).toBool(true);
     sendPositionalRequest(
@@ -449,14 +449,14 @@ McpResult hoverResult(const QJsonValue &result)
     return text.isEmpty() ? McpResult::message(QStringLiteral("Nothing known here")) : McpResult::message(text);
 }
 
-void getSymbolInfo(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void getSymbolInfo(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     sendPositionalRequest(context, arguments,
                           {.method = QStringLiteral("textDocument/hover"), .extraParams = {}, .convert = hoverResult},
                           reply);
 }
 
-void renameSymbol(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void renameSymbol(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString newName = arguments.value(QStringLiteral("newName")).toString().trimmed();
     if (newName.isEmpty()) {
@@ -485,7 +485,7 @@ QJsonObject actionSummary(const QJsonObject &action)
     return item;
 }
 
-void getCodeActions(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void getCodeActions(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     requestCodeActions(context, arguments,
                        [reply](LspClient *, const QList<QJsonObject> &actions, const QString &error) {
@@ -526,7 +526,7 @@ struct ServerAction {
     QJsonObject action;
 };
 
-void applyAction(const DuetToolContext &context, const ServerAction &offered, Review review, const McpReply &reply)
+void applyAction(const KDKToolContext &context, const ServerAction &offered, Review review, const McpReply &reply)
 {
     LspClient *server = offered.server;
     const QJsonObject &action = offered.action;
@@ -547,7 +547,7 @@ void applyAction(const DuetToolContext &context, const ServerAction &offered, Re
         });
 }
 
-void applyCodeAction(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void applyCodeAction(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString title = arguments.value(QStringLiteral("title")).toString();
     requestCodeActions(
@@ -578,7 +578,7 @@ bool writeText(const QString &path, const QString &text, QString *error)
 
 // Puts the formatter's text in the file's editor, or on disk when it is
 // not open.
-McpResult formattedResult(const DuetToolContext &context,
+McpResult formattedResult(const KDKToolContext &context,
                           const QString &path,
                           const QString &text,
                           const McpResult &result)
@@ -600,7 +600,7 @@ McpResult formattedResult(const DuetToolContext &context,
     return McpResult::message(QStringLiteral("Formatted %1").arg(context.relative(path)));
 }
 
-void formatFile(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void formatFile(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     const std::optional<CodeFormatter::Command> command =
@@ -622,7 +622,7 @@ void formatFile(const DuetToolContext &context, const QJsonObject &arguments, co
         [context, path, text, reply](const McpResult &result) { reply(formattedResult(context, path, text, result)); });
 }
 
-std::optional<QString> readDiagnosticsResource(const DuetToolContext &context)
+std::optional<QString> readDiagnosticsResource(const KDKToolContext &context)
 {
     QStringList paths;
     if (context.languageServers)
@@ -645,15 +645,16 @@ std::optional<QString> readDiagnosticsResource(const DuetToolContext &context)
 
 } // namespace
 
-void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
+void registerCodeTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("get_diagnostics"),
          .title = QStringLiteral("Problems"),
          .description = QStringLiteral(
-             "Errors and warnings of files, from Duet's language servers (clangd, jdtls, tsserver, pyright…) on the "
+             "Errors and warnings of files, from Kodamiko's language servers (clangd, jdtls, tsserver, pyright…) on "
+             "the "
              "text the user has, unsaved changes included, and from the output of the last builds the user ran in "
-             "Duet (source \"build: <configuration>\"). Without paths: the open files and every file a server or a "
+             "Kodamiko (source \"build: <configuration>\"). Without paths: the open files and every file a server or a "
              "build reported problems for. Use it to check your edits compile."),
          .inputSchema = object({{QStringLiteral("paths"),
                                  array(string(QStringLiteral("File")), QStringLiteral("Files to check (optional)"))}})},
@@ -729,7 +730,7 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("format_file"),
          .title = QStringLiteral("Format a file"),
          .description = QStringLiteral(
-             "Formats a file with its language's formatter as Duet's Format Document does (clang-format, prettier, "
+             "Formats a file with its language's formatter as Kodamiko's Format Document does (clang-format, prettier, "
              "black…, with the project's configuration). An open file changes in its editor, unsaved; a closed one "
              "on disk."),
          .inputSchema =
@@ -739,7 +740,7 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
 
     // The problems as a resource, updated when a server reports.
     registry.addResource({
-        QStringLiteral("duet://diagnostics"),
+        QStringLiteral("kodamiko://diagnostics"),
         false,
         QStringLiteral("diagnostics"),
         QStringLiteral("Problems"),
@@ -748,11 +749,11 @@ void registerCodeTools(McpRegistry &registry, const DuetToolContext &context)
         [context](const QString &) { return readDiagnosticsResource(context); },
     });
     McpRegistry *target = &registry;
-    const auto notify = [target] { target->notifyResourceUpdated(QStringLiteral("duet://diagnostics")); };
+    const auto notify = [target] { target->notifyResourceUpdated(QStringLiteral("kodamiko://diagnostics")); };
     if (context.problems)
         QObject::connect(context.problems, &ProblemStore::changed, target, notify);
     else if (context.languageServers)
         QObject::connect(context.languageServers, &LanguageServers::diagnosticsChanged, target, notify);
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

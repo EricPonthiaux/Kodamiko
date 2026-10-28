@@ -3,7 +3,7 @@
 // MCP tools for terminals: what they show, and commands run in a tab the
 // user sees (unlike Claude's own shell, which runs hidden).
 
-#include "DuetTools.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "system/Shell.h"
 #include "terminal/ProcessSpec.h"
@@ -15,7 +15,7 @@
 
 #include <memory>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -43,12 +43,12 @@ ProcessSpec commandSpec(const QString &folder, const QString &command)
     return spec;
 }
 
-TerminalTabs terminalTabs(const DuetToolContext &context)
+TerminalTabs terminalTabs(const KDKToolContext &context)
 {
     return context.terminals ? context.terminals() : TerminalTabs();
 }
 
-McpResult listTerminals(const DuetToolContext &context, const QJsonObject &)
+McpResult listTerminals(const KDKToolContext &context, const QJsonObject &)
 {
     QJsonArray terminals;
     const TerminalTabs tabs = terminalTabs(context);
@@ -60,7 +60,7 @@ McpResult listTerminals(const DuetToolContext &context, const QJsonObject &)
     return McpResult::json(QJsonObject{{QStringLiteral("terminals"), terminals}});
 }
 
-McpResult readTerminal(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult readTerminal(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const TerminalTabs tabs = terminalTabs(context);
     const int id = arguments.value(QStringLiteral("id")).toInt(-1);
@@ -118,13 +118,13 @@ void watchUntilTimeout(TerminalWidget *terminal, int timeoutSeconds, const McpPr
     ticker->start();
 }
 
-void runInTerminal(const DuetToolContext &context,
+void runInTerminal(const KDKToolContext &context,
                    const QJsonObject &arguments,
                    const McpReply &reply,
                    const McpProgress &progress)
 {
     if (!context.addTerminal) {
-        reply(McpResult::error(QStringLiteral("Duet cannot open terminals here")));
+        reply(McpResult::error(QStringLiteral("Kodamiko cannot open terminals here")));
         return;
     }
     const QString command = arguments.value(QStringLiteral("command")).toString();
@@ -147,12 +147,12 @@ void runInTerminal(const DuetToolContext &context,
 
 } // namespace
 
-void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context)
+void registerTerminalTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("list_terminals"),
          .title = QStringLiteral("Terminals"),
-         .description = QStringLiteral("The terminal tabs of Duet (the first is this Claude session), with whether "
+         .description = QStringLiteral("The terminal tabs of Kodamiko (the first is this Claude session), with whether "
                                        "their program still runs: what read_terminal can read."),
          .inputSchema = object({})},
         handledBy(context, listTerminals)));
@@ -172,7 +172,7 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
         {.name = QStringLiteral("run_in_terminal"),
          .title = QStringLiteral("Run in a terminal"),
          .description = QStringLiteral(
-             "Runs a shell command in a new Duet terminal tab the user watches (a dev server, a long build, an "
+             "Runs a shell command in a new Kodamiko terminal tab the user watches (a dev server, a long build, an "
              "interactive tool), and returns its exit code and last lines once it ends, or what it printed so far "
              "after the timeout (it keeps running). The user is asked first. For quick commands whose output only "
              "you need, use your own shell instead."),
@@ -187,4 +187,4 @@ void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context
         }));
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

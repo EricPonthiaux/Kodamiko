@@ -209,7 +209,7 @@ bool GitActions::offerSignInAgain(const GitError &error,
         {.title = title,
          .location = location(),
          .message = error.message(),
-         .details = tr("git keeps sending the credentials saved for this server, by Duet and by your credential "
+         .details = tr("git keeps sending the credentials saved for this server, by Kodamiko and by your credential "
                        "helper (such as the macOS Keychain). Sign In Again forgets them and tries again: git then "
                        "asks for a user name and a password. On GitHub, the password is a token that can write to "
                        "the repository.")},

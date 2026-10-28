@@ -74,8 +74,8 @@ struct McpTool {
 };
 
 struct McpResource {
-    // A fixed URI ("duet://editor/state") or a template
-    // ("duet://diagram/{path}").
+    // A fixed URI ("kodamiko://editor/state") or a template
+    // ("kodamiko://diagram/{path}").
     QString uri;
     bool isTemplate = false;
     QString name;
@@ -135,7 +135,7 @@ public:
     void confirm(const QString &tool, const QString &what, std::function<void(bool)> answer) const;
 
     // Names of the read-only tools, as Claude Code names them
-    // ("mcp__duet__get_editor_state"): allowed without asking.
+    // ("mcp__kodamiko__get_editor_state"): allowed without asking.
     QStringList readOnlyToolPermissions(const QString &server) const;
 
     // Checks arguments against a tool's input schema (required properties,

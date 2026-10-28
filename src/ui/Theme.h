@@ -20,7 +20,7 @@ struct TextStyle {
 };
 
 struct Theme {
-    QString name;  // "duet", "duet-night", "duet-slate"…
+    QString name;  // "kodamiko", "kodamiko-night", "kodamiko-slate"…
     QString title; // as shown in View ▸ Theme
     bool isDark = true;
     QFont font;
@@ -55,10 +55,10 @@ struct Theme {
 
     QList<std::pair<QString, TextStyle>> syntaxStyles;
 
-    static Theme duet();
+    static Theme kodamiko();
 
-    // Duet's theme, the website's (Duet-Night), Duet-Violet, Duet-Stratos,
-    // Duet-Bloom, Duet-Clay, then the Material ones (MaterialThemes).
+    // Kodamiko's theme, the website's (Kodamiko-Night), Kodamiko-Violet, Kodamiko-Stratos,
+    // Kodamiko-Bloom, Kodamiko-Clay, then the Material ones (MaterialThemes).
     static QList<Theme> all();
 
     static Theme named(const QString &name);

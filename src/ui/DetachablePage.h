@@ -48,7 +48,7 @@ public:
     // Brings the window to the front, activated; nothing while attached.
     void raiseWindow();
     void setWindowTitle(const QString &title);
-    // Frameless: Duet's frame and title bar around the window, as around
+    // Frameless: Kodamiko's frame and title bar around the window, as around
     // the main one; otherwise the system's.
     void setFrameless(bool frameless);
     void applyTheme(const Theme &theme);

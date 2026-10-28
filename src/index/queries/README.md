@@ -1,6 +1,6 @@
 # Occurrence queries (occurrences.scm)
 
-tree-sitter queries of the occurrence index, written for Duet. Every
+tree-sitter queries of the occurrence index, written for Kodamiko. Every
 identifier of a file is an occurrence, a reference unless a query gives
 it another role:
 

@@ -28,7 +28,7 @@ namespace {
 using motion::clamp;
 using motion::easeOut;
 
-const char *const selectionMime = "application/x-duet-diagram";
+const char *const selectionMime = "application/x-kodamiko-diagram";
 
 // Keys that belong to the text being typed, not to the window (Ctrl+S
 // still saves).

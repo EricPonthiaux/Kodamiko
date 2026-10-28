@@ -480,7 +480,7 @@ private slots:
         item.label = QStringLiteral("printValue");
         CompletionPopup popup(&parent);
         popup.setItems({item}, QString());
-        Theme theme = Theme::duet();
+        Theme theme = Theme::kodamiko();
         popup.applyTheme(theme);
         popup.showAt({0, 0}, 0);
         const QSize small = popup.size();
@@ -748,7 +748,7 @@ private slots:
         QVERIFY(moreFile.open(QIODevice::WriteOnly));
         moreFile.write("int getterElsewhere;\n");
         moreFile.close();
-        auto *more = new EditorWidget(Theme::duet(), &g.window);
+        auto *more = new EditorWidget(Theme::kodamiko(), &g.window);
         more->load(g.dir.filePath("b.cpp"), nullptr);
         g.editor->setFocus();
         QTest::keyClicks(g.editor, "get");
@@ -1445,7 +1445,7 @@ private:
                 service.addProvider(extra);
             service.addProvider(std::make_shared<KeywordProvider>());
             service.addProvider(std::make_shared<DocumentWordsProvider>());
-            editor = new EditorWidget(Theme::duet(), &window);
+            editor = new EditorWidget(Theme::kodamiko(), &window);
             editor->load(dir.filePath(name), nullptr);
             controller = new CompletionController(editor, &service);
             window.resize(800, 600);

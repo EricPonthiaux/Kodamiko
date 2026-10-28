@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "agent/ReviewBar.h"
-#include "agent/ReviewFindingsPanel.h"
 #include "agent/ReviewFindingCard.h"
+#include "agent/ReviewFindingsPanel.h"
 #include "agent/ReviewSession.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
 #include "changes/BranchesPopup.h"
@@ -266,7 +266,7 @@ private slots:
         QCOMPARE(lines[1].location.hunk, -1);
         QCOMPARE(lines[0].location.file, -1); // a blank line leads nowhere
 
-        DiffView view(Theme::duet());
+        DiffView view(Theme::kodamiko());
         view.setFiles(
             {{"src/x.cpp", "modified", patch}, {"y.bin", "added", FilePatch::parse("Binary files differ\n")}});
         QCOMPARE(view.displayedLines()[1].text, QString("x.cpp   src  ·  modified   +1 −2"));
@@ -280,7 +280,7 @@ private slots:
     void clickingTheChangeMapScrollsTheDiffThere()
     {
         QWidget window;
-        auto *diff = new DiffView(Theme::duet(), &window);
+        auto *diff = new DiffView(Theme::kodamiko(), &window);
         auto *map = new ChangeMap(diff, &window);
         auto *layout = new QHBoxLayout(&window);
         layout->addWidget(diff, 1);
@@ -301,7 +301,7 @@ private slots:
     void theHeaderSaysWhichBlockIsAtTheTop()
     {
         QWidget window;
-        auto *diff = new DiffView(Theme::duet(), &window);
+        auto *diff = new DiffView(Theme::kodamiko(), &window);
         auto *header = new DiffHeaderBar(diff, &window);
         auto *layout = new QVBoxLayout(&window);
         layout->addWidget(header);
@@ -401,7 +401,7 @@ private slots:
 
     void clickingAnArrowRevealsLinesInPlace()
     {
-        DiffView view(Theme::duet());
+        DiffView view(Theme::kodamiko());
         view.resize(700, 400);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -451,7 +451,7 @@ private slots:
         write(project, "a.txt", "a2\n");
         write(project, "b.txt", "b2\n");
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 400);
         view.show();
         view.setFolder(project.path());
@@ -478,7 +478,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
@@ -504,7 +504,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const ClaudeCodeProvider agent;
@@ -532,7 +532,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const FakeReviewer agent(FakeReviewer::oneFindingReport);
@@ -551,7 +551,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 500);
         view.show();
         view.setFolder(project.path());
@@ -577,7 +577,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const FakeReviewer agent(FakeReviewer::oneFindingReport);
@@ -602,7 +602,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const FakeReviewer agent(FakeReviewer::oneFindingReport);
@@ -628,7 +628,7 @@ private slots:
         Git::run(project.path(), {"commit", "-qm", "init"});
         write(project, "a.txt", "a2\n");
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 400);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -648,7 +648,7 @@ private slots:
     void theListAndTheCommitAreaTakeAResizableShareOfTheColumn()
     {
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 700);
         view.show();
         QSplitter *column = view.fileSplitter();
@@ -667,7 +667,7 @@ private slots:
     void theCommitMessageGrowsWithTheCommitArea()
     {
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 700);
         view.show();
         QSplitter *column = view.fileSplitter();
@@ -685,7 +685,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(1200, 700);
         view.show();
         view.setFolder(project.path());
@@ -706,7 +706,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
@@ -725,7 +725,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
@@ -750,7 +750,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 600);
         view.show();
         view.setFolder(project.path());
@@ -776,7 +776,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 600);
         view.show();
         view.setFolder(project.path());
@@ -807,7 +807,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 600);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -836,7 +836,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
@@ -857,7 +857,7 @@ private slots:
     void theBarsIconBringsTheFileListBack()
     {
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 400);
         view.show();
         view.setFileListVisible(false);
@@ -872,14 +872,14 @@ private slots:
 
     void diffHeaderLinesUpWithTheFileActionsWithOrWithoutFiles()
     {
-        ThemeStyle::apply(Theme::duet()); // the buttons' height, as in the application
+        ThemeStyle::apply(Theme::kodamiko()); // the buttons' height, as in the application
         const QTemporaryDir project;
         write(project, "a.txt", "a\n");
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         Git::run(project.path(), {"add", "-A"});
         Git::run(project.path(), {"commit", "-qm", "init"});
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 300);
         view.show();
         view.setFolder(project.path());
@@ -902,12 +902,12 @@ private slots:
         const QImage image = handle->grab().toImage();
         const int ruleY = header->height() - 1;
         for (int x = 0; x < image.width(); ++x)
-            QCOMPARE(image.pixelColor(x, ruleY), Theme::duet().line);
+            QCOMPARE(image.pixelColor(x, ruleY), Theme::kodamiko().line);
     }
 
     void sideBySideScrollsBothSidesTogether()
     {
-        DiffView view(Theme::duet());
+        DiffView view(Theme::kodamiko());
         view.resize(800, 300);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -932,7 +932,7 @@ private slots:
 
     void diffSaysAFileIsTooLargeToShow()
     {
-        DiffView view(Theme::duet());
+        DiffView view(Theme::kodamiko());
 
         view.setFiles({{"dump.log", "added", {}, true}});
 
@@ -972,7 +972,7 @@ private slots:
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
         const QList<DiffFile> files = {{"src/one.cpp", "modified", FilePatch::parse(patch)},
                                        {"src/two.cpp", "modified", FilePatch::parse(patch)}};
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         DiffHeaderBar header(&diff);
         diff.resize(600, 30); // a line or two: the second file needs scrolling
         diff.show();
@@ -994,7 +994,7 @@ private slots:
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
         const QList<DiffFile> files = {{"src/one.cpp", "modified", FilePatch::parse(patch)},
                                        {"src/two.cpp", "modified", FilePatch::parse(patch)}};
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         DiffHeaderBar header(&diff);
         const auto texts = [&header] {
             QStringList all;
@@ -1014,7 +1014,7 @@ private slots:
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
         const QList<DiffFile> files = {{"src/one.cpp", "modified", FilePatch::parse(patch)},
                                        {"src/two.cpp", "modified", FilePatch::parse(patch)}};
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         DiffHeaderBar header(&diff);
         header.resize(800, header.sizeHint().height());
         header.show();
@@ -1030,7 +1030,7 @@ private slots:
     void draggingTheDividerSharesTheWidthBetweenTheSides()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.resize(800, 300);
         diff.show();
         diff.setMode(DiffView::Mode::SideBySide);
@@ -1052,7 +1052,7 @@ private slots:
     void zoomingEitherSideZoomsTheOther()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.zoomIn(); // before the old side exists
         diff.setMode(DiffView::Mode::SideBySide);
         diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
@@ -1069,7 +1069,7 @@ private slots:
     void diffShowsANoteUnderItsLine()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
 
         diff.setNotes({{.file = 0, .newLine = 2, .text = "c is wrong\nwhen empty"}});
@@ -1083,7 +1083,7 @@ private slots:
     void diffShowsANoteOfALineItHidesUnderItsFileTitle()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
 
         diff.setNotes({{.file = 0, .newLine = 40, .text = "wrong"}});
@@ -1100,7 +1100,7 @@ private slots:
     void diffDropsItsNotesWithItsFiles()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
         diff.setNotes({{.file = 0, .newLine = 2, .text = "wrong"}});
 
@@ -1113,7 +1113,7 @@ private slots:
     void sideBySideTheOldSideLeavesTheRoomOfANote()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.setMode(DiffView::Mode::SideBySide);
         diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
         const auto *oldSide = diff.findChild<DiffView *>();
@@ -1129,7 +1129,7 @@ private slots:
     void f8GoesToTheNextNote()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.resize(600, 300);
         diff.show();
         QVERIFY(QTest::qWaitForWindowExposed(&diff));
@@ -1148,7 +1148,7 @@ private slots:
     void theOldSideDraggedToItsMinimumGrowsWithTheView()
     {
         const QByteArray patch = "@@ -1,2 +1,2 @@\n-a\n+b\n c\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.resize(800, 300);
         diff.show();
         diff.setMode(DiffView::Mode::SideBySide);
@@ -1169,7 +1169,7 @@ private slots:
     void goToChangeScrollsBlockByBlock()
     {
         const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n@@ -40 +40 @@\n-c\n+d\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.resize(600, 40);
         diff.show();
         diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
@@ -1191,7 +1191,7 @@ private slots:
     void keysGoFromBlockToBlockAndFileToFile()
     {
         const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n@@ -40 +40 @@\n-c\n+d\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.resize(600, 40);
         diff.show();
         diff.activateWindow();
@@ -1216,7 +1216,7 @@ private slots:
     void removedLinesOpenAtTheNextLineLeft()
     {
         const QByteArray patch = "@@ -1,3 +1,2 @@\n a\n-b\n c\n@@ -9,2 +8 @@\n z\n-end\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.setFiles({{"x.txt", "modified", FilePatch::parse(patch)}});
         const QList<DiffLine> &lines = diff.displayedLines();
         QList<int> removed;
@@ -1235,7 +1235,7 @@ private slots:
     void blockButtonsActOnTheBlockUnderTheMouse()
     {
         const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         const HunkActions actions(&diff);
         diff.resize(600, 300);
         diff.show();
@@ -1267,7 +1267,7 @@ private slots:
 
     void blockButtonsOfAStagedFileUnstageIt()
     {
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         HunkActions actions(&diff);
         diff.resize(600, 300);
         diff.show();
@@ -1300,7 +1300,7 @@ private slots:
     void blockButtonsFollowTheirBlocksAsTheDiffScrolls()
     {
         const QByteArray patch = "@@ -1 +1 @@\n-a\n+b\n@@ -40 +40 @@\n-c\n+d\n@@ -80 +80 @@\n-e\n+f\n";
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         const HunkActions actions(&diff);
         diff.resize(600, 120); // a few lines: the last block needs scrolling
         diff.show();
@@ -1324,7 +1324,7 @@ private slots:
 
     void theBlockOfAFileClaudeEditedCarriesItsMark()
     {
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         HunkActions actions(&diff);
         diff.resize(600, 300);
         diff.show();
@@ -1354,7 +1354,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project); // a unstaged, b staged, c both
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(1200, 700);
         view.show();
         view.setFolder(project.path());
@@ -1373,7 +1373,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(1200, 700);
         view.show();
         view.setFolder(project.path());
@@ -1402,7 +1402,7 @@ private slots:
         const QTemporaryDir project;
         commitThenChangeThreeFiles(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(1200, 700);
         view.show();
         view.setFolder(project.path());
@@ -1432,7 +1432,7 @@ private slots:
     void diffColorsTheCodeAsTheEditor()
     {
         const FilePatch patch = FilePatch::parse("@@ -1 +1 @@\n-// old comment\n+return value;\n");
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
         diff.setFiles({{"x.cpp", "modified", patch}});
         int removed = -1;
         int added = -1;
@@ -1460,7 +1460,7 @@ private slots:
     {
         // One scratch editor colors every C++ file: the second one too.
         const FilePatch patch = FilePatch::parse("@@ -1 +1 @@\n-// old comment\n+return value;\n");
-        DiffView diff(Theme::duet());
+        DiffView diff(Theme::kodamiko());
 
         diff.setFiles({{"x.cpp", "modified", patch}, {"y.cpp", "modified", patch}});
 
@@ -1475,7 +1475,7 @@ private slots:
     {
         const QTemporaryDir project;
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
@@ -1492,7 +1492,7 @@ private slots:
         Git::run(project.path(), {"add", "-A"});
         Git::run(project.path(), {"commit", "-qm", "init"});
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
@@ -1533,7 +1533,7 @@ private slots:
         write(project, "new.txt", "n\n");
 
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
@@ -1575,7 +1575,7 @@ private slots:
         write(project, "a.txt", "b\n");
         Git::run(project.path(), {"add", "-A"});
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();
@@ -1592,7 +1592,7 @@ private slots:
     void theSummaryMeterTurnsRedPastSeventyTwoCharacters()
     {
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         auto *summary = view.findChild<QLineEdit *>("commitSummary");
         const auto *count = view.findChild<QLabel *>("commitSummaryCount");
 
@@ -1608,7 +1608,7 @@ private slots:
     void enterInTheSummaryGoesOnToTheBody()
     {
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(&view));
@@ -1630,7 +1630,7 @@ private slots:
         write(project, "a.txt", "one\n2\n3\n4\n5\n6\n7\n8\n9\nten\n");
 
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 600);
         view.show();
         view.activateWindow();
@@ -1666,7 +1666,7 @@ private slots:
         Git::run(project.path(), {"commit", "-qm", "init"});
         write(project, "a.txt", "a   b\nd\n");
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 600);
         view.show();
         view.setFolder(project.path());
@@ -1713,7 +1713,7 @@ private slots:
         Git::run(project.path(), {"commit", "-qm", "init"});
         write(project, "a.txt", "1\n2\n3\nfour\n5\n6\n7\n8\n9\nten\n");
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(900, 600);
         view.show();
         view.setFolder(project.path());
@@ -1774,7 +1774,7 @@ private slots:
         write(project, "src/b.txt", "b\n");
         write(project, "c.txt", "c\n");
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show(); // refreshed after a git command only when shown
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
@@ -1823,7 +1823,7 @@ private slots:
 
         QWidget window;
         GitCommands commands;
-        SnapshotsPopup popup(&commands, Theme::duet(), &window);
+        SnapshotsPopup popup(&commands, Theme::kodamiko(), &window);
         popup.load(project.path());
         QCOMPARE(popup.list()->count(), 1);
         QCOMPARE(popup.detailsTitle()->text(), QString("Before discarding a.txt"));
@@ -1844,7 +1844,7 @@ private slots:
         Git::run(project.path(), {"init", "-q", "-b", "main"});
         QWidget window;
         GitCommands commands;
-        SnapshotsPopup popup(&commands, Theme::duet(), &window);
+        SnapshotsPopup popup(&commands, Theme::kodamiko(), &window);
         popup.load(project.path());
         QCOMPARE(popup.list()->count(), 0);
     }
@@ -1862,7 +1862,7 @@ private slots:
     void newBranchPopupChecksTheName()
     {
         QWidget window;
-        NewBranchPopup popup(Theme::duet(), &window);
+        NewBranchPopup popup(Theme::kodamiko(), &window);
         RepositoryInfo info;
         info.branch = "main";
         info.headId = "abc1234";
@@ -1902,7 +1902,7 @@ private slots:
         QWidget window;
         GitCommands commands;
         GitActions actions(&commands, &window, [&] { return project.path(); });
-        BranchesPopup popup(&actions, Theme::duet(), &window);
+        BranchesPopup popup(&actions, Theme::kodamiko(), &window);
         popup.load(project.path());
         QStringList rows;
         for (int i = 0; i < popup.list()->count(); ++i)
@@ -1938,7 +1938,7 @@ private slots:
         QWidget window;
         GitCommands commands;
         GitActions actions(&commands, &window, [&] { return project.path(); });
-        StashesPopup popup(&actions, Theme::duet(), &window);
+        StashesPopup popup(&actions, Theme::kodamiko(), &window);
         popup.load(project.path());
         QCOMPARE(popup.list()->count(), 1);
         QVERIFY(popup.list()->item(0)->text().startsWith("On main: work in progress"));
@@ -1958,7 +1958,7 @@ private slots:
         stopMergeOnConflict(project);
 
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.show();
         view.setFolder(project.path());
         QVERIFY(!view.operationBar()->isVisible());
@@ -1989,7 +1989,7 @@ private slots:
         const QTemporaryDir project;
         stopMergeOnConflict(project);
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.resize(1200, 900);
         view.show();
         view.setFolder(project.path());
@@ -2014,7 +2014,7 @@ private slots:
         write(project, "a.txt", "b\n");
 
         GitCommands commands;
-        ChangesView view(Theme::duet(), &commands);
+        ChangesView view(Theme::kodamiko(), &commands);
         view.setFolder(project.path());
         const QSignalSpy refreshed(&view, &ChangesView::refreshed);
         view.refresh();

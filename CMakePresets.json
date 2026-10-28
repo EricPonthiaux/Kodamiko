@@ -8,8 +8,8 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "DUET_LTO": "ON",
-        "DUET_NATIVE": "ON"
+        "KDK_LTO": "ON",
+        "KDK_NATIVE": "ON"
       }
     },
     {
@@ -19,8 +19,8 @@
       "binaryDir": "${sourceDir}/build-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "DUET_LTO": "OFF",
-        "DUET_NATIVE": "OFF"
+        "KDK_LTO": "OFF",
+        "KDK_NATIVE": "OFF"
       }
     },
     {
@@ -30,10 +30,10 @@
       "binaryDir": "${sourceDir}/build-profile",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "DUET_LTO": "OFF",
+        "KDK_LTO": "OFF",
         "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O2 -g -fno-omit-frame-pointer -DNDEBUG",
         "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -fno-omit-frame-pointer -DNDEBUG",
-        "DUET_NATIVE": "OFF"
+        "KDK_NATIVE": "OFF"
       }
     },
     {
@@ -47,8 +47,8 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
-        "DUET_LTO": "ON",
-        "DUET_NATIVE": "OFF"
+        "KDK_LTO": "ON",
+        "KDK_NATIVE": "OFF"
       },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     },
@@ -59,7 +59,7 @@
       "binaryDir": "${sourceDir}/build-win-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "DUET_LTO": "OFF"
+        "KDK_LTO": "OFF"
       }
     }
   ],

@@ -5,7 +5,7 @@
 #include <array>
 
 // The colors of Material Design's palette (material.io, "The color system",
-// 2014) that Duet's Material themes use (MaterialThemes): a hue and a shade,
+// 2014) that Kodamiko's Material themes use (MaterialThemes): a hue and a shade,
 // from 50, the palest, to 900, the deepest, and the accents A100 to A700.
 namespace MaterialPalette {
 

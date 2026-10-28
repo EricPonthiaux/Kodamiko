@@ -23,7 +23,7 @@ struct Style {
 };
 
 // Whether clang-format formats files of `languageId` (a LanguageRegistry
-// identifier) in Duet.
+// identifier) in Kodamiko.
 bool appliesTo(const QString &languageId);
 
 // The style in the output of `clang-format --dump-config`; nullopt if it

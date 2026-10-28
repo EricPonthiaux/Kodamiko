@@ -1,6 +1,6 @@
-# Static analysis of Duet's code (src/, tests/, tools/). Run it with
+# Static analysis of Kodamiko's code (src/, tests/, tools/). Run it with
 # `cmake --build build --target tidy`, or at each compilation by configuring
-# with -DDUET_CLANG_TIDY=ON.
+# with -DKDK_CLANG_TIDY=ON.
 ---
 Checks: >
   -*,

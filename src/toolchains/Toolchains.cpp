@@ -215,7 +215,7 @@ Toolchains::Toolchains(QString root, bool lookOnMachine)
 
 QString Toolchains::defaultRoot()
 {
-    return QDir::homePath() + QStringLiteral("/.duet/tools");
+    return QDir::homePath() + QStringLiteral("/.kodamiko/tools");
 }
 
 QString Toolchains::qtInstallFolder(const QString &version, const QString &kit) const
@@ -326,7 +326,7 @@ QList<RuntimeInstall> Toolchains::machineRuntimes(const QString &tool) const
         known = probed.insert(tool, found);
     }
     QList<RuntimeInstall> runtimes = known.value();
-    // Duet's own downloads are listed apart.
+    // Kodamiko's own downloads are listed apart.
     const QString own = QFileInfo(root_).canonicalFilePath();
     if (!own.isEmpty()) {
         runtimes.removeIf([&own](const RuntimeInstall &runtime) {

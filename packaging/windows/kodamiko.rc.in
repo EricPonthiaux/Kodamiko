@@ -2,10 +2,10 @@
 #include <winver.h>
 
 // The executable's icon, shown by Explorer and the taskbar.
-IDI_ICON1 ICON "@PROJECT_SOURCE_DIR@/packaging/windows/duet.ico"
+IDI_ICON1 ICON "@PROJECT_SOURCE_DIR@/packaging/windows/kodamiko.ico"
 
 // The name Task Manager, the notifications and the file's properties show
-// instead of "duet.exe".
+// instead of "kodamiko.exe".
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
 PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
@@ -19,13 +19,13 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName", "Duet"
-            VALUE "FileDescription", "Duet"
+            VALUE "CompanyName", "Kodamiko"
+            VALUE "FileDescription", "Kodamiko"
             VALUE "FileVersion", "@PROJECT_VERSION@"
-            VALUE "InternalName", "duet"
+            VALUE "InternalName", "kodamiko"
             VALUE "LegalCopyright", "GPL-3.0-only"
-            VALUE "OriginalFilename", "duet.exe"
-            VALUE "ProductName", "Duet"
+            VALUE "OriginalFilename", "kodamiko.exe"
+            VALUE "ProductName", "Kodamiko"
             VALUE "ProductVersion", "@PROJECT_VERSION@"
         END
     END

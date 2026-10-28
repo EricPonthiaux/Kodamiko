@@ -44,7 +44,7 @@ namespace {
 constexpr int maximumStickyRows = 7;
 constexpr qreal maximumStickyShare = 0.4;
 // Clipboard marker of files cut in the tree: pasting them moves them.
-const QString cutFormat = QStringLiteral("application/x-duet-cut");
+const QString cutFormat = QStringLiteral("application/x-kodamiko-cut");
 
 bool isDarkPalette(const QPalette &palette)
 {

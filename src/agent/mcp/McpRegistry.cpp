@@ -111,7 +111,7 @@ const McpResource *McpRegistry::resourceFor(const QString &uri) const
     for (const McpResource &resource : resources_) {
         if (!resource.isTemplate)
             continue;
-        // "duet://diagram/{path}": the part before the variable must match.
+        // "kodamiko://diagram/{path}": the part before the variable must match.
         const qsizetype variable = resource.uri.indexOf(QLatin1Char('{'));
         if (variable > 0 && uri.startsWith(resource.uri.left(variable)) && uri.size() > variable)
             return &resource;

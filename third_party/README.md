@@ -15,15 +15,15 @@ Copied as published, without changes to their content:
 
 The Markdown preview renders with GitHub's style sheet and icons. The
 interface is set in Ubuntu Sans and the code (editor, terminal, diffs) in
-Droid Sans Mono, embedded so that Duet looks the same everywhere. Ubuntu
+Droid Sans Mono, embedded so that Kodamiko looks the same everywhere. Ubuntu
 Sans Mono and JetBrains Mono are embedded alternatives. When JetBrains Mono
 is selected, its "NL" version is used by default and in the terminal, the
 other one in the editor when ligatures are on. Claude Code's settings files are
 checked against SchemaStore's schema. To update them, replace the files with
 those of a newer version and change the versions above.
 
-The libraries Duet is built with (QScintilla, tree-sitter, libvterm,
+The libraries Kodamiko is built with (QScintilla, tree-sitter, libvterm,
 libgit2, cmark-gfm) are not copied here: CMake downloads them at the
 versions pinned in `cmake/Dependencies.cmake`. Their licenses are listed in
-the main `README.md`, with the additional permission that lets Duet link
+the main `README.md`, with the additional permission that lets Kodamiko link
 Graphviz.

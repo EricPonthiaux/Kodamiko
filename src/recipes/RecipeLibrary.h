@@ -13,11 +13,11 @@
 
 // The folders recipes are found in, each holding one folder per recipe. A
 // recipe of a later folder replaces the one of an earlier folder with the
-// same id: the user's replace Duet's, a project's replace the user's.
+// same id: the user's replace Kodamiko's, a project's replace the user's.
 struct RecipeSources {
-    QString builtIn; // shipped with Duet
+    QString builtIn; // shipped with Kodamiko
     QString user;    // <application data>/recipes
-    QString project; // <project>/.duet/recipes, shared with the project's repository
+    QString project; // <project>/.kodamiko/recipes, shared with the project's repository
 };
 
 namespace RecipeLibrary {
@@ -25,8 +25,8 @@ namespace RecipeLibrary {
 // The "empty" recipe: no files, nothing added.
 constexpr auto emptyId = "empty";
 
-// Duet's own (next to the executable in the build, in share/duet once
-// installed, in the bundle's resources on macOS; $DUET_RECIPES_DIR when it
+// Kodamiko's own (next to the executable in the build, in share/kodamiko once
+// installed, in the bundle's resources on macOS; $KDK_RECIPES_DIR when it
 // is set), the user's, and `projectFolder`'s (none when it is empty).
 RecipeSources defaultSources(const QString &projectFolder = {});
 

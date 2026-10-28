@@ -159,10 +159,11 @@ void AgentMergeQueue::onRebased(const RebaseResult &result, const QString &branc
         return;
     }
     if (!result.conflicts.isEmpty()) {
-        sendBack(tr("Duet could not merge your commits into %1: replayed on it, they conflict in %2. Run `git rebase "
-                    "%1` in your worktree, resolve the conflicts and finish the rebase, then end your turn: Duet "
-                    "merges again.")
-                     .arg(branch, result.conflicts.join(QStringLiteral(", "))));
+        sendBack(
+            tr("Kodamiko could not merge your commits into %1: replayed on it, they conflict in %2. Run `git rebase "
+               "%1` in your worktree, resolve the conflicts and finish the rebase, then end your turn: Kodamiko "
+               "merges again.")
+                .arg(branch, result.conflicts.join(QStringLiteral(", "))));
         return;
     }
     if (checkCommand_.trimmed().isEmpty()) {
@@ -189,8 +190,8 @@ void AgentMergeQueue::onChecked(const ProjectCheck::Result &result, const QStrin
         fastForward(branch);
         return;
     }
-    sendBack(tr("Duet did not merge your commits into %1: the project's check failed (`%2`, exit code %3). Fix it, "
-                "commit, then end your turn: Duet merges again.\n\nLast lines of its output:\n%4")
+    sendBack(tr("Kodamiko did not merge your commits into %1: the project's check failed (`%2`, exit code %3). Fix it, "
+                "commit, then end your turn: Kodamiko merges again.\n\nLast lines of its output:\n%4")
                  .arg(branch, checkCommand_, QString::number(result.exitCode), result.lastLines(reportedOutputLines)));
 }
 

@@ -533,7 +533,7 @@ private slots:
             }
         }
         const QByteArray saved = document::save(board, *loaded.codec);
-        QVERIFY(saved.contains("%% duet {\"key\":\"Child\""));
+        QVERIFY(saved.contains("%% kodamiko {\"key\":\"Child\""));
         Board again;
         document::Loaded reloaded;
         QVERIFY(loadInto(again, QStringLiteral("model.mmd"), saved, &reloaded));

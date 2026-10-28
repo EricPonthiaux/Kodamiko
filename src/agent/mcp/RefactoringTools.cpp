@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // MCP tools of the refactorings: the usages by kind, Rename File and
-// Change Signature. Like Duet's own commands, they show the user their
+// Change Signature. Like Kodamiko's own commands, they show the user their
 // preview when asked to (or when they reach comments and strings, or have
 // conflicts), and answer once the user has chosen. Positions are 1-based.
 
-#include "DuetTools.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "navigation/CodeIntelligence.h"
 #include "refactor/ChangeSignature.h"
@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <optional>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -78,7 +78,7 @@ QJsonObject previewProperty(const QString &byDefault)
                        .arg(byDefault));
 }
 
-void findUsages(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void findUsages(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     const Position position = positionOf(arguments);
@@ -97,7 +97,7 @@ void findUsages(const DuetToolContext &context, const QJsonObject &arguments, co
     });
 }
 
-void renameFile(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void renameFile(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString from = context.absolute(arguments.value(QStringLiteral("path")).toString());
     const QString to = context.absolute(arguments.value(QStringLiteral("newPath")).toString());
@@ -134,7 +134,7 @@ std::optional<QList<ChangeSignature::Parameter>> parametersOf(const QJsonArray &
     return parameters;
 }
 
-void changeSignature(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void changeSignature(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     QString error;
     std::optional<QList<ChangeSignature::Parameter>> parameters =
@@ -169,7 +169,7 @@ QJsonObject parameterSchema()
 
 } // namespace
 
-McpResult refactoringResult(const DuetToolContext &context, const RefactoringOutcome &outcome)
+McpResult refactoringResult(const KDKToolContext &context, const RefactoringOutcome &outcome)
 {
     QJsonArray files;
     for (const QString &path : outcome.edit.filePaths())
@@ -195,13 +195,13 @@ McpResult refactoringResult(const DuetToolContext &context, const RefactoringOut
     return McpResult::json(result);
 }
 
-void registerRefactoringTools(McpRegistry &registry, const DuetToolContext &context)
+void registerRefactoringTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("find_usages"),
          .title = QStringLiteral("Usages by kind"),
          .description = QStringLiteral(
-             "The usages of the symbol at a position, as Duet's Find Usages has them: each one's file, line, text "
+             "The usages of the symbol at a position, as Kodamiko's Find Usages has them: each one's file, line, text "
              "and kind (declaration, read, write, call, import), from the language server. Without a server, every "
              "occurrence of the word (\"semantic\": false). Prefer it to find_references to know where a symbol "
              "is changed or called."),
@@ -213,7 +213,7 @@ void registerRefactoringTools(McpRegistry &registry, const DuetToolContext &cont
         {.name = QStringLiteral("rename_file"),
          .title = QStringLiteral("Rename or move a file"),
          .description = QStringLiteral(
-             "Renames or moves a file or folder and updates what refers to it, as Duet's Move does: C and C++ "
+             "Renames or moves a file or folder and updates what refers to it, as Kodamiko's Move does: C and C++ "
              "includes, JavaScript and TypeScript relative imports, Python imports. One refactoring the user can "
              "undo with Undo Refactoring."),
          .inputSchema = object({{QStringLiteral("path"), string(QStringLiteral("The file or folder"))},
@@ -227,7 +227,7 @@ void registerRefactoringTools(McpRegistry &registry, const DuetToolContext &cont
          .title = QStringLiteral("Change a function's signature"),
          .description = QStringLiteral(
              "Adds, removes or reorders the parameters of the function named at a position (where it is declared), "
-             "in its declarations and at every call the language server finds, as Duet's Change Signature does. "
+             "in its declarations and at every call the language server finds, as Kodamiko's Change Signature does. "
              "\"parameters\" is the new list, in order: {\"keep\": n} for the n-th current parameter, or a new "
              "one's {\"declaration\", \"value\"}. Calls it cannot change (the function passed as a value…) are "
              "listed as conflicts."),
@@ -238,4 +238,4 @@ void registerRefactoringTools(McpRegistry &registry, const DuetToolContext &cont
         handledBy(context, changeSignature)));
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

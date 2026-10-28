@@ -15,7 +15,7 @@ namespace {
 
 QString defaultHelperPath()
 {
-    return Executables::besideTheApplication(QStringLiteral("duet-askpass"));
+    return Executables::besideTheApplication(QStringLiteral("kodamiko-askpass"));
 }
 
 } // namespace
@@ -32,7 +32,7 @@ bool AskpassServer::listen()
 {
     // Only the user may connect: the answers are secrets.
     server_.setSocketOptions(QLocalServer::UserAccessOption);
-    return server_.listen(QStringLiteral("duet-askpass-") + QUuid::createUuid().toString(QUuid::Id128));
+    return server_.listen(QStringLiteral("kodamiko-askpass-") + QUuid::createUuid().toString(QUuid::Id128));
 }
 
 QHash<QString, QString> AskpassServer::environment() const
@@ -45,7 +45,7 @@ QHash<QString, QString> AskpassServer::environment() const
         // ssh uses SSH_ASKPASS even with no display and with a terminal
         // (OpenSSH 8.4 and later).
         {QStringLiteral("SSH_ASKPASS_REQUIRE"), QStringLiteral("force")},
-        {QStringLiteral("DUET_ASKPASS_SOCKET"), server_.fullServerName()},
+        {QStringLiteral("KDK_ASKPASS_SOCKET"), server_.fullServerName()},
     };
 }
 

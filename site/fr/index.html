@@ -4,9 +4,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Duet — l'éditeur construit autour de Claude Code</title>
-  <meta name="description" content="La plupart des éditeurs ont été pensés pour un humain qui tape du code, et l'IA est venue après. Duet part de l'autre bout : un éditeur de code complet, construit autour de Claude Code, où Claude voit ce que vous voyez et où vous voyez tout ce que Claude change. Open source, pour Linux, Windows et macOS.">
-  <link rel="icon" href="../assets/duet-icon.svg" type="image/svg+xml">
+  <title>Kodamiko — l'éditeur construit autour de Claude Code</title>
+  <meta name="description" content="La plupart des éditeurs ont été pensés pour un humain qui tape du code, et l'IA est venue après. Kodamiko part de l'autre bout : un éditeur de code complet, construit autour de Claude Code, où Claude voit ce que vous voyez et où vous voyez tout ce que Claude change. Open source, pour Linux, Windows et macOS.">
+  <link rel="icon" href="../assets/kodamiko-icon.svg" type="image/svg+xml">
   <link rel="alternate" hreflang="en" href="../">
   <link rel="alternate" hreflang="fr" href="./">
   <link rel="preload" href="../assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
@@ -17,11 +17,11 @@
 <body>
   <header class="site-header">
     <div class="container">
-      <a class="brand" href="./"><img src="../assets/duet-icon.svg" alt="">Duet</a>
+      <a class="brand" href="./"><img src="../assets/kodamiko-icon.svg" alt="">Kodamiko</a>
       <nav class="site-nav" aria-label="Navigation principale">
         <a class="optional" href="#fonctionnalites">Fonctionnalités</a>
         <a class="optional" href="#demarrer">Démarrer</a>
-        <a href="https://github.com/EricPonthiaux/Duet">GitHub</a>
+        <a href="https://github.com/EricPonthiaux/Kodamiko">GitHub</a>
         <a class="lang" href="../" hreflang="en" lang="en">English</a>
       </nav>
     </div>
@@ -31,14 +31,14 @@
     <section class="hero">
       <div class="hero-dots" aria-hidden="true"></div>
       <div class="container">
-        <a class="badge" href="https://github.com/EricPonthiaux/Duet"><span class="badge-tag">GPL v3</span>Libre et open source · Linux, Windows et macOS</a>
+        <a class="badge" href="https://github.com/EricPonthiaux/Kodamiko"><span class="badge-tag">GPL v3</span>Libre et open source · Linux, Windows et macOS</a>
         <h1>Construit autour de Claude Code,<br> <span class="accent">pas ajouté après coup</span><span class="cursor" aria-hidden="true"></span></h1>
         <p class="lead">Un éditeur de code complet, pensé pour Claude dès le départ. Claude voit ce que vous voyez — le fichier ouvert, la sélection, les erreurs — et vous voyez tout ce que Claude change, avant que ce soit appliqué.</p>
         <div class="actions">
           <a class="button primary" href="#demarrer">Démarrer</a>
           <div class="clone">
-            <code>git clone https://github.com/EricPonthiaux/Duet.git</code>
-            <button class="copy" type="button" aria-label="Copier la commande" data-command="git clone https://github.com/EricPonthiaux/Duet.git">
+            <code>git clone https://github.com/EricPonthiaux/Kodamiko.git</code>
+            <button class="copy" type="button" aria-label="Copier la commande" data-command="git clone https://github.com/EricPonthiaux/Kodamiko.git">
               <svg class="idle" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
               <svg class="done" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
             </button>
@@ -46,10 +46,10 @@
         </div>
         <figure class="hero-shot">
           <div class="window-pair" style="--pair-ratio: 1120 / 800; --side-width: 48%">
-            <img class="window-main" src="../assets/screenshots/hero-editor.png" srcset="../assets/screenshots/hero-editor.png 1x, ../assets/screenshots/hero-editor-2x.png 2x" width="1600" height="1000" alt="Duet en mode Edit sur son propre code, HistoryView.cpp, à la ligne 151 où Claude vient de corriger un appel.">
-            <img class="window-side" src="../assets/screenshots/hero-claude.png" srcset="../assets/screenshots/hero-claude.png 1x, ../assets/screenshots/hero-claude-2x.png 2x" width="880" height="735" alt="La fenêtre Terminaux de Duet avec Claude Code : la demande « fix this », la correction d'une ligne de HistoryView.cpp et son explication.">
+            <img class="window-main" src="../assets/screenshots/hero-editor.png" srcset="../assets/screenshots/hero-editor.png 1x, ../assets/screenshots/hero-editor-2x.png 2x" width="1600" height="1000" alt="Kodamiko en mode Edit sur son propre code, HistoryView.cpp, à la ligne 151 où Claude vient de corriger un appel.">
+            <img class="window-side" src="../assets/screenshots/hero-claude.png" srcset="../assets/screenshots/hero-claude.png 1x, ../assets/screenshots/hero-claude-2x.png 2x" width="880" height="735" alt="La fenêtre Terminaux de Kodamiko avec Claude Code : la demande « fix this », la correction d'une ligne de HistoryView.cpp et son explication.">
           </div>
-          <figcaption>Capture réelle : Duet sur son propre code, ses terminaux dans une fenêtre à part. Vous tapez <em>« fix this »</em> (ou « corrige ça ») ; Claude connaît déjà le fichier, la ligne et l'erreur sous le curseur, et la corrige.</figcaption>
+          <figcaption>Capture réelle : Kodamiko sur son propre code, ses terminaux dans une fenêtre à part. Vous tapez <em>« fix this »</em> (ou « corrige ça ») ; Claude connaît déjà le fichier, la ligne et l'erreur sous le curseur, et la corrige.</figcaption>
         </figure>
       </div>
     </section>
@@ -58,7 +58,7 @@
       <div class="container">
         <p class="eyebrow">Principes</p>
         <h2 class="section-title">Partir de l'autre bout</h2>
-        <p class="section-lead">Dans Duet, Claude n'est pas un invité de l'éditeur : l'éditeur a été conçu pour lui. Trois choses en découlent.</p>
+        <p class="section-lead">Dans Kodamiko, Claude n'est pas un invité de l'éditeur : l'éditeur a été conçu pour lui. Trois choses en découlent.</p>
         <div class="pillars">
           <article class="pillar">
             <span class="mark" aria-hidden="true"></span>
@@ -83,16 +83,16 @@
       <div class="container">
         <p class="eyebrow">Diagrammes</p>
         <h2 class="section-title">Un schéma vaut mieux que mille lignes de terminal</h2>
-        <p class="section-lead">Quand Claude explique un module, un flux ou un plan de refactorisation, un mur de texte qui défile dans un terminal est la façon la plus pénible de le suivre. Dans Duet, Claude dessine, et le schéma devient un espace que vous partagez : vous le lisez, le désignez et le modifiez tous les deux. La conversation va dans les deux sens.</p>
+        <p class="section-lead">Quand Claude explique un module, un flux ou un plan de refactorisation, un mur de texte qui défile dans un terminal est la façon la plus pénible de le suivre. Dans Kodamiko, Claude dessine, et le schéma devient un espace que vous partagez : vous le lisez, le désignez et le modifiez tous les deux. La conversation va dans les deux sens.</p>
         <figure class="pair-shot">
           <div class="window-pair" style="--pair-ratio: 1120 / 770; --side-width: 40%">
-            <img class="window-main" src="../assets/screenshots/diagram.png" srcset="../assets/screenshots/diagram.png 1x, ../assets/screenshots/diagram-2x.png 2x" width="1600" height="1000" loading="lazy" alt="L'éditeur de diagrammes de Duet avec l'organigramme que Claude a dessiné du parcours d'une demande dans Duet, la boîte « Snapshot of the working tree » sélectionnée.">
-            <img class="window-side" src="../assets/screenshots/diagram-claude.png" srcset="../assets/screenshots/diagram-claude.png 1x, ../assets/screenshots/diagram-claude-2x.png 2x" width="780" height="780" loading="lazy" alt="Claude Code dans la fenêtre Terminaux de Duet, qui répond à « Where does Claude wait before touching the code? Show me in the diagram. » en sélectionnant la boîte de l'instantané.">
+            <img class="window-main" src="../assets/screenshots/diagram.png" srcset="../assets/screenshots/diagram.png 1x, ../assets/screenshots/diagram-2x.png 2x" width="1600" height="1000" loading="lazy" alt="L'éditeur de diagrammes de Kodamiko avec l'organigramme que Claude a dessiné du parcours d'une demande dans Kodamiko, la boîte « Snapshot of the working tree » sélectionnée.">
+            <img class="window-side" src="../assets/screenshots/diagram-claude.png" srcset="../assets/screenshots/diagram-claude.png 1x, ../assets/screenshots/diagram-claude-2x.png 2x" width="780" height="780" loading="lazy" alt="Claude Code dans la fenêtre Terminaux de Kodamiko, qui répond à « Where does Claude wait before touching the code? Show me in the diagram. » en sélectionnant la boîte de l'instantané.">
           </div>
-          <figcaption>Claude a lu le code de Duet et dessiné cet organigramme. À la question « où attends-tu avant de toucher au code ? », il a répondu en sélectionnant la boîte dans le schéma.</figcaption>
+          <figcaption>Claude a lu le code de Kodamiko et dessiné cet organigramme. À la question « où attends-tu avant de toucher au code ? », il a répondu en sélectionnant la boîte dans le schéma.</figcaption>
         </figure>
         <ul class="features exchanges">
-          <li><strong>Vous demandez, Claude dessine</strong><span><em>« Dessine le parcours d'une demande dans Duet. »</em> Claude lit d'abord le code, puis écrit le schéma en Mermaid ou en PlantUML : organigramme, séquence, classes, états, modèle de données, C4, carte mentale ou parcours utilisateur. Il s'ouvre mis en page, prêt à lire.</span></li>
+          <li><strong>Vous demandez, Claude dessine</strong><span><em>« Dessine le parcours d'une demande dans Kodamiko. »</em> Claude lit d'abord le code, puis écrit le schéma en Mermaid ou en PlantUML : organigramme, séquence, classes, états, modèle de données, C4, carte mentale ou parcours utilisateur. Il s'ouvre mis en page, prêt à lire.</span></li>
           <li><strong>Vous désignez, Claude comprend</strong><span>Sélectionnez trois boîtes et tapez <em>« fusionne-les en un seul service »</em>. Claude voit ce qui est sélectionné dans le schéma, comme il voit la sélection dans un fichier.</span></li>
           <li><strong>Claude désigne, vous voyez</strong><span><em>« Où attends-tu avant de toucher au code ? »</em> Plutôt qu'un paragraphe, Claude répond en sélectionnant les bons éléments dans le schéma sous vos yeux.</span></li>
           <li><strong>Vous arrangez, Claude respecte</strong><span>Placez les boîtes là où elles ont du sens pour vous. Quand Claude modifie le schéma, chaque élément garde sa place, les nouveaux se rangent près de leurs voisins, et une seule annulation défait sa modification.</span></li>
@@ -106,7 +106,7 @@
       <div class="container">
         <p class="eyebrow">Outils de l'agent</p>
         <h2 class="section-title">Plus de cinquante outils entre les mains de Claude</h2>
-        <p class="section-lead">Un agent dans un terminal lit et réécrit du texte. Dans Duet, Claude passe par l'éditeur lui-même : les serveurs de langage, les refactorisations, Git, les terminaux et les diagrammes. Les mêmes outils que vous, avec la même précision.</p>
+        <p class="section-lead">Un agent dans un terminal lit et réécrit du texte. Dans Kodamiko, Claude passe par l'éditeur lui-même : les serveurs de langage, les refactorisations, Git, les terminaux et les diagrammes. Les mêmes outils que vous, avec la même précision.</p>
         <ul class="features">
           <li><strong>Comprendre le code</strong><span>Aller à une définition, trouver toutes les références, lire le type et la documentation d'un symbole, lister les erreurs et les avertissements, appliquer un correctif rapide.</span></li>
           <li><strong>Refactoriser tout le projet</strong><span>Renommer un symbole ou un fichier, changer la signature d'une fonction, par le serveur de langage plutôt que par rechercher-remplacer, et annuler le tout en une étape.</span></li>
@@ -128,7 +128,7 @@
             <p>Avant de committer, un relecteur séparé, en lecture seule, passe sur les changements indexés. Son rapport s'ouvre au-dessus du diff, et chaque constat se place sur les lignes qu'il concerne, prêt à être envoyé à Claude ou écarté.</p>
           </div>
           <figure class="screenshot">
-            <img src="../assets/screenshots/review.png" srcset="../assets/screenshots/review.png 1x, ../assets/screenshots/review-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Le mode Diff de Duet : trois fichiers indexés, le rapport du relecteur au-dessus du diff et un message de commit rédigé par Claude.">
+            <img src="../assets/screenshots/review.png" srcset="../assets/screenshots/review.png 1x, ../assets/screenshots/review-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Le mode Diff de Kodamiko : trois fichiers indexés, le rapport du relecteur au-dessus du diff et un message de commit rédigé par Claude.">
           </figure>
         </div>
         <div class="showcase reverse">
@@ -139,7 +139,7 @@
             <p>Cherchez par texte, auteur ou date, ou par le contenu des changements, sur toutes les branches.</p>
           </div>
           <figure class="screenshot">
-            <img src="../assets/screenshots/history.png" srcset="../assets/screenshots/history.png 1x, ../assets/screenshots/history-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Le mode History de Duet : ses propres commits regroupés par jour, l'un écrit avec Claude déplié dans sa ligne, et son diff.">
+            <img src="../assets/screenshots/history.png" srcset="../assets/screenshots/history.png 1x, ../assets/screenshots/history-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Le mode History de Kodamiko : ses propres commits regroupés par jour, l'un écrit avec Claude déplié dans sa ligne, et son diff.">
           </figure>
         </div>
       </div>
@@ -149,9 +149,9 @@
       <div class="container">
         <p class="eyebrow">Éditeur</p>
         <h2 class="section-title">Un éditeur professionnel, sans le fouillis</h2>
-        <p class="section-lead">Au fil des ans, les éditeurs ont empilé panneaux, menus, réglages et extensions, au point que s'en servir est devenu un métier en soi. Duet donne un coup de balai : il garde ce dont un professionnel a vraiment besoin, rangé en quelques endroits clairs. Et ce que vous auriez cherché dans un menu, il suffit de le demander à Claude.</p>
+        <p class="section-lead">Au fil des ans, les éditeurs ont empilé panneaux, menus, réglages et extensions, au point que s'en servir est devenu un métier en soi. Kodamiko donne un coup de balai : il garde ce dont un professionnel a vraiment besoin, rangé en quelques endroits clairs. Et ce que vous auriez cherché dans un menu, il suffit de le demander à Claude.</p>
         <figure class="screenshot wide">
-          <img src="../assets/screenshots/edit.png" srcset="../assets/screenshots/edit.png 1x, ../assets/screenshots/edit-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Le mode Edit de Duet : le plan de HistoryView.cpp à côté du code, et la complétion de clangd avec la signature de la méthode choisie.">
+          <img src="../assets/screenshots/edit.png" srcset="../assets/screenshots/edit.png 1x, ../assets/screenshots/edit-2x.png 2x" width="1600" height="1000" loading="lazy" alt="Le mode Edit de Kodamiko : le plan de HistoryView.cpp à côté du code, et la complétion de clangd avec la signature de la méthode choisie.">
         </figure>
         <ul class="features">
           <li><strong>Comprendre le code</strong><span>Complétion intelligente, diagnostics en direct et correctifs rapides, grâce aux serveurs de langage et à la coloration Tree-sitter.</span></li>
@@ -184,14 +184,14 @@
       <div class="container">
         <p class="eyebrow">Démarrer</p>
         <h2 class="section-title">Ouvert et multiplateforme</h2>
-        <p class="section-lead">Duet est open source (GPL v3) et fonctionne sous Linux, Windows et macOS. Il est écrit en C++ pour être rapide, et il utilise votre propre installation de Claude Code sans toucher à votre configuration.</p>
+        <p class="section-lead">Kodamiko est open source (GPL v3) et fonctionne sous Linux, Windows et macOS. Il est écrit en C++ pour être rapide, et il utilise votre propre installation de Claude Code sans toucher à votre configuration.</p>
         <pre class="code-block"><code><span class="comment"># Compiler et lancer depuis les sources</span>
-git clone https://github.com/EricPonthiaux/Duet.git
-cd Duet
+git clone https://github.com/EricPonthiaux/Kodamiko.git
+cd Kodamiko
 cmake --preset default
 cmake --build --preset default
-./build/bin/duet [dossier-du-projet]</code></pre>
-        <p class="requirements">Nécessite Qt 6.10+, CMake 3.24+, Ninja et un compilateur C++23 (GCC 13+, Clang 17+, Apple Clang 16+ ou MSVC 2022). Les autres dépendances sont téléchargées et compilées à la première configuration. Les détails sont dans le <a href="https://github.com/EricPonthiaux/Duet#getting-started">README</a>.</p>
+./build/bin/kodamiko [dossier-du-projet]</code></pre>
+        <p class="requirements">Nécessite Qt 6.10+, CMake 3.24+, Ninja et un compilateur C++23 (GCC 13+, Clang 17+, Apple Clang 16+ ou MSVC 2022). Les autres dépendances sont téléchargées et compilées à la première configuration. Les détails sont dans le <a href="https://github.com/EricPonthiaux/Kodamiko#getting-started">README</a>.</p>
       </div>
     </section>
 
@@ -199,7 +199,7 @@ cmake --build --preset default
       <div class="container">
         <p>Pour les développeurs qui veulent la puissance d'un assistant IA sans renoncer à un éditeur sérieux, ni au contrôle de leur code.</p>
         <div class="actions">
-          <a class="button primary" href="https://github.com/EricPonthiaux/Duet">Obtenir Duet sur GitHub</a>
+          <a class="button primary" href="https://github.com/EricPonthiaux/Kodamiko">Obtenir Kodamiko sur GitHub</a>
         </div>
       </div>
     </section>
@@ -207,8 +207,8 @@ cmake --build --preset default
 
   <footer class="site-footer">
     <div class="container">
-      <span>Duet est un logiciel libre, publié sous licence GPL v3.</span>
-      <a href="https://github.com/EricPonthiaux/Duet">github.com/EricPonthiaux/Duet</a>
+      <span>Kodamiko est un logiciel libre, publié sous licence GPL v3.</span>
+      <a href="https://github.com/EricPonthiaux/Kodamiko">github.com/EricPonthiaux/Kodamiko</a>
     </div>
   </footer>
 </body>

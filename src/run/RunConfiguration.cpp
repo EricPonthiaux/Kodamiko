@@ -177,7 +177,7 @@ RunConfiguration::Kind kindNamed(const QString &name)
 
 QString filePath(const QString &projectFolder)
 {
-    return QDir(projectFolder).filePath(QStringLiteral(".duet/run.json"));
+    return QDir(projectFolder).filePath(QStringLiteral(".kodamiko/run.json"));
 }
 
 QList<RunConfiguration> parse(const QByteArray &json, QString *error)
@@ -255,7 +255,7 @@ QList<RunConfiguration> all(const QString &projectFolder, QString *error)
         QString parseError;
         configurations = parse(file.readAll(), &parseError);
         if (!parseError.isEmpty() && error)
-            *error = QStringLiteral("%1: %2").arg(QStringLiteral(".duet/run.json"), parseError);
+            *error = QStringLiteral("%1: %2").arg(QStringLiteral(".kodamiko/run.json"), parseError);
     }
     configurations.removeIf([](const RunConfiguration &configuration) { return !isForThisSystem(configuration); });
     QSet<QString> names;

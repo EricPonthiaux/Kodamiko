@@ -36,9 +36,9 @@ QString agentInstructions(const Worktree &worktree, const QString &mainSession, 
         QStringLiteral(
             "You are %1, one of several %2 sessions working on this project at the same time. You work in a git "
             "worktree of your own, on the branch %3; the user's checkout is elsewhere, and its session is named %4. "
-            "When a task is finished and verified, commit it with a clear message: at the end of your turn, Duet "
+            "When a task is finished and verified, commit it with a clear message: at the end of your turn, Kodamiko "
             "merges your new commits into the user's current branch, after replaying them on it and running the "
-            "project's check. Never commit unfinished work. If Duet tells you that your commits conflict or fail "
+            "project's check. Never commit unfinished work. If Kodamiko tells you that your commits conflict or fail "
             "the check, fix that and commit again.")
             .arg(worktree.name, provider.name(), worktree.branch, mainSession);
     if (provider.features().hasAgentMessaging)
@@ -46,7 +46,7 @@ QString agentInstructions(const Worktree &worktree, const QString &mainSession, 
     return instructions;
 }
 
-// The message of the commit Duet makes of an agent's remaining changes.
+// The message of the commit Kodamiko makes of an agent's remaining changes.
 QString commitMessage(const Worktree &worktree, const QString &lastPrompt)
 {
     const QString subject = lastPrompt.trimmed().section(QLatin1Char('\n'), 0, 0);
@@ -106,7 +106,7 @@ void MainWindow::createAgentWorktree(const QString &name)
 
 void MainWindow::startAgentSession(const Worktree &worktree)
 {
-    // Without Duet's MCP tools: they act on the checkout the editor shows,
+    // Without Kodamiko's MCP tools: they act on the checkout the editor shows,
     // not on the session's worktree. No ClaudeTrust call either: Claude Code
     // files a worktree's trust under its main repository, so a trusted
     // project's worktrees start without asking.
@@ -321,11 +321,12 @@ void MainWindow::onAgentMergeWaiting(const Worktree &worktree, const QStringList
     const QString list = files.join(QStringLiteral(", "));
     showStatus(tr("%1's work waits for your changes to %2").arg(worktree.name, list));
     notify(tr("Agent work waiting"), tr("%1's work changes files you are modifying: %2").arg(worktree.name, list));
-    agentMessage_->popup(tr("Merge %1").arg(worktree.name),
-                         tr("%1's work is ready, but it changes files you are modifying:\n\n%2\n\nNothing to do: "
-                            "Duet merges it by itself as soon as you commit, stash or discard your changes to these "
-                            "files.")
-                             .arg(worktree.name, files.join(QLatin1Char('\n'))));
+    agentMessage_->popup(
+        tr("Merge %1").arg(worktree.name),
+        tr("%1's work is ready, but it changes files you are modifying:\n\n%2\n\nNothing to do: "
+           "Kodamiko merges it by itself as soon as you commit, stash or discard your changes to these "
+           "files.")
+            .arg(worktree.name, files.join(QLatin1Char('\n'))));
 }
 
 void MainWindow::onAgentMergeFailed(const Worktree &worktree, const QString &message)

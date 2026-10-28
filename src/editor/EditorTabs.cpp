@@ -15,7 +15,7 @@
 #include "ui/UiIcons.h"
 #include "viewers/ImageView.h"
 #include "workspace/ChoicePopup.h"
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
 #include "viewers/DiagramView.h"
 #endif
 
@@ -181,7 +181,7 @@ QWidget *EditorTabs::openPreview(const QString &path)
     // Edited: kept open.
     if (const EditorWidget *editor = editorIn(page))
         connect(editor, &EditorWidget::modificationChanged, this, [this, page] { preview_.keep(page); });
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (const auto *diagram = qobject_cast<DiagramView *>(page))
         connect(diagram, &DiagramView::modificationChanged, this, [this, page] { preview_.keep(page); });
 #endif
@@ -205,9 +205,9 @@ QWidget *EditorTabs::openFile(const QString &path)
     }
     if (ImageView::isImageFile(absolutePath))
         return openImage(absolutePath);
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (DiagramView::isDiagramFile(absolutePath)) {
-        // A diagram Duet does not read (a Mermaid pie chart, a source with
+        // A diagram Kodamiko does not read (a Mermaid pie chart, a source with
         // errors) is still a text file.
         QString error;
         if (QWidget *view = openDiagram(absolutePath, &error))
@@ -273,7 +273,7 @@ QWidget *EditorTabs::openImage(const QString &absolutePath)
 
 QWidget *EditorTabs::openDiagram(const QString &absolutePath, QString *error)
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     auto *view = new DiagramView(theme_, this);
     if (!view->load(absolutePath, error)) {
         delete view;
@@ -417,7 +417,7 @@ ImageView *EditorTabs::imageViewFor(const QString &path) const
 
 DiagramView *EditorTabs::diagramViewFor(const QString &path) const
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     const QString absolutePath = QFileInfo(path).absoluteFilePath();
     for (DiagramView *view : diagramViews()) {
         if (view->filePath() == absolutePath)
@@ -431,7 +431,7 @@ DiagramView *EditorTabs::diagramViewFor(const QString &path) const
 
 std::optional<EditorTabs::DiagramPlace> EditorTabs::currentDiagramPlace() const
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (const auto *view = qobject_cast<DiagramView *>(currentWidget()))
         return DiagramPlace{.filePath = view->filePath(), .element = view->selectedElement()};
 #endif
@@ -440,7 +440,7 @@ std::optional<EditorTabs::DiagramPlace> EditorTabs::currentDiagramPlace() const
 
 void EditorTabs::revealDiagramElement(QWidget *page, const QString &element) const
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (auto *view = qobject_cast<DiagramView *>(page)) {
         view->revealElement(element);
         view->setFocus();
@@ -454,7 +454,7 @@ void EditorTabs::revealDiagramElement(QWidget *page, const QString &element) con
 QList<DiagramView *> EditorTabs::diagramViews() const
 {
     QList<DiagramView *> result;
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     for (int i = 0; i < count(); ++i) {
         if (auto *view = qobject_cast<DiagramView *>(widget(i)))
             result.append(view);
@@ -469,7 +469,7 @@ QString EditorTabs::filePathOf(QWidget *page) const
         return editor->filePath();
     if (const auto *image = qobject_cast<ImageView *>(page))
         return image->filePath();
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (const auto *diagram = qobject_cast<DiagramView *>(page))
         return diagram->filePath();
 #endif
@@ -493,7 +493,7 @@ bool EditorTabs::hasUnsavedChangesUnder(const QString &path) const
     return std::ranges::any_of(pagesUnder(path), [](QWidget *page) {
         if (const auto *editor = editorIn(page); editor && editor->isModified())
             return true;
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
         if (const auto *diagram = qobject_cast<DiagramView *>(page); diagram && diagram->isModified())
             return true;
 #endif
@@ -565,7 +565,7 @@ QString EditorTabs::currentFilePath() const
         return editor->filePath();
     if (const auto *image = qobject_cast<ImageView *>(currentWidget()))
         return image->filePath();
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (const auto *diagram = qobject_cast<DiagramView *>(currentWidget()))
         return diagram->filePath();
 #endif
@@ -594,7 +594,7 @@ QList<EditorWidget *> EditorTabs::editors() const
 
 bool EditorTabs::saveCurrent()
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (auto *diagram = qobject_cast<DiagramView *>(currentWidget()))
         return saveDiagram(diagram);
 #endif
@@ -619,7 +619,7 @@ bool EditorTabs::saveModified(const std::function<bool(EditorWidget *)> &save)
         if (editor->isModified())
             allSaved = save(editor) && allSaved;
     }
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     for (DiagramView *view : diagramViews()) {
         if (view->isModified())
             allSaved = saveDiagram(view) && allSaved;
@@ -759,7 +759,7 @@ bool EditorTabs::writeEditor(EditorWidget *editor)
 
 bool EditorTabs::saveDiagram(DiagramView *view)
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     QString error;
     if (!view->save(&error)) {
         showFileError(tr("Cannot Save File"), view->filePath(), error);
@@ -803,7 +803,7 @@ bool EditorTabs::askToSaveBeforeClosing(QWidget *page)
     // Closed while the question is open: nothing left to save.
     if (const QPointer<EditorWidget> editor = editorIn(page); editor && editor->isModified())
         return confirmClose(this, editor->filePath(), [this, editor] { return !editor || saveEditor(editor); });
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (const QPointer<DiagramView> diagram = qobject_cast<DiagramView *>(page); diagram && diagram->isModified())
         return confirmClose(this, diagram->filePath(), [this, diagram] { return !diagram || saveDiagram(diagram); });
 #endif
@@ -867,7 +867,7 @@ void EditorTabs::syncWithDisk(const QString &path)
             emit statusMessage(tr("Could not reload %1: %2").arg(QFileInfo(path).fileName(), error));
         return;
     }
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     if (DiagramView *diagram = diagramViewFor(path)) {
         syncDiagramWithDisk(diagram, path);
         return;
@@ -914,7 +914,7 @@ void EditorTabs::syncEditorWithDisk(EditorWidget *editor, const QString &path)
         emit statusMessage(tr("Could not reload %1: %2").arg(name, error));
 }
 
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
 void EditorTabs::syncDiagramWithDisk(DiagramView *diagram, const QString &path)
 {
     if (pathsBeingResolved_.contains(diagram->filePath()))
@@ -997,7 +997,7 @@ void EditorTabs::updateTabTitle(EditorWidget *editor)
 
 void EditorTabs::updateDiagramTabTitle(DiagramView *view)
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     const int index = indexOf(view);
     if (index < 0)
         return;
@@ -1035,7 +1035,7 @@ void EditorTabs::applyTheme(const Theme &theme)
             editor->applyTheme(theme);
         else if (auto *image = qobject_cast<ImageView *>(widget(i)))
             image->applyTheme(theme);
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
         else if (auto *diagram = qobject_cast<DiagramView *>(widget(i)))
             diagram->applyTheme(theme);
 #endif

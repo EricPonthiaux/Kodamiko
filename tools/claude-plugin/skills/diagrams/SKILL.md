@@ -1,12 +1,12 @@
 ---
 name: diagrams
-description: Draw or edit a diagram the user sees in Duet's diagram editor — flowchart, sequence, class, state, data model (ER), C4 architecture, mind map, user journey, product vision or explainer board — as a Mermaid (.mmd), PlantUML (.puml) or explainer board (.board) file. Use whenever the user asks for a diagram, chart, schema, "schéma", map of a process, of classes, of exchanges, of states, of tables or of an architecture, or to change an existing diagram file.
+description: Draw or edit a diagram the user sees in Kodamiko's diagram editor — flowchart, sequence, class, state, data model (ER), C4 architecture, mind map, user journey, product vision or explainer board — as a Mermaid (.mmd), PlantUML (.puml) or explainer board (.board) file. Use whenever the user asks for a diagram, chart, schema, "schéma", map of a process, of classes, of exchanges, of states, of tables or of an architecture, or to change an existing diagram file.
 ---
 
-# Diagrams in Duet
+# Diagrams in Kodamiko
 
-Duet shows diagram files in its diagram editor, in a tab, laid out
-automatically with Graphviz. Write the file with your usual tools; Duet opens
+Kodamiko shows diagram files in its diagram editor, in a tab, laid out
+automatically with Graphviz. Write the file with your usual tools; Kodamiko opens
 it as soon as you have written it, and redraws it every time you change it.
 
 ## Which diagram
@@ -41,13 +41,13 @@ name, in the language the user speaks).
 ## Writing Mermaid
 
 Write standard Mermaid, with short, readable ids (`check`, `paid`,
-`OrderService`): they are how Duet keeps each element's place in the layout.
-What Duet does not keep: flowchart subgraphs are flattened, and styling
+`OrderService`): they are how Kodamiko keeps each element's place in the layout.
+What Kodamiko does not keep: flowchart subgraphs are flattened, and styling
 (`style`, `classDef`, `linkStyle`, `UpdateElementStyle`…) is ignored.
 
 ## Links to the code
 
-In Duet, Ctrl+click on an element opens its code. An element named after a
+In Kodamiko, Ctrl+click on an element opens its code. An element named after a
 symbol (`class HookServer`, a member `listen()`) is found by its name.
 When you draw from the code and an element's text is not the symbol's name,
 or the name is ambiguous, link it explicitly (paths relative to the project):
@@ -63,7 +63,7 @@ where its body is (`src/git/Git.cpp#Git::run`): in C or C++ the source
 file, not the header that only declares it; in TypeScript the
 implementation, not a signature or a `.d.ts`. Qualify a member with its
 class: `Class::member` in C and C++, `Class.member` in Java, JavaScript and
-TypeScript. Duet follows these links in C, C++, Java, JavaScript and
+TypeScript. Kodamiko follows these links in C, C++, Java, JavaScript and
 TypeScript.
 
 ## Explainer boards (.board)
@@ -73,11 +73,11 @@ A JSON scene whose coordinates are part of the meaning. Read
 
 ## Layout
 
-Do not write coordinates in Mermaid or PlantUML: Duet lays the diagram out.
-Once the user has arranged it in Duet, the file ends with lines such as
+Do not write coordinates in Mermaid or PlantUML: Kodamiko lays the diagram out.
+Once the user has arranged it in Kodamiko, the file ends with lines such as
 
-    %% Layout kept by Duet (positions, sizes, colors, curves)
-    %% duet {"key":"check","x":40,"y":120}
+    %% Layout kept by Kodamiko (positions, sizes, colors, curves)
+    %% kodamiko {"key":"check","x":40,"y":120}
 
 (`'` instead of `%%` in PlantUML). They hold the user's arrangement:
 
@@ -85,17 +85,17 @@ Once the user has arranged it in Duet, the file ends with lines such as
 - a new element (an id without such a line) is placed beside the elements it
   is linked to, the others keep their place;
 - an element removed from the source simply loses its line;
-- for a deep restructuring, drop all the `duet` lines: the whole diagram is
+- for a deep restructuring, drop all the `kodamiko` lines: the whole diagram is
   laid out again.
 
-## Duet's tools
+## Kodamiko's tools
 
-In a session started by Duet, its MCP server (tools `mcp__duet__…`) sees the
+In a session started by Kodamiko, its MCP server (tools `mcp__kodamiko__…`) sees the
 diagram editor:
 
 - `get_diagram`: a diagram as the user has it, unsaved changes included,
   with the elements they selected ("this box", "the selected ones");
-- `apply_diagram_source`: changes a diagram open in Duet without writing
+- `apply_diagram_source`: changes a diagram open in Kodamiko without writing
   the file (the user saves; one step they can undo) — prefer it while the
   user is editing that diagram;
 - `layout_diagram`, `select_diagram_elements`, `export_diagram`,
@@ -109,7 +109,7 @@ diagram into several files, one per part, and say which is which.
 
 ## Checking
 
-After each write, Duet reads the file as its editor does. If something could
+After each write, Kodamiko reads the file as its editor does. If something could
 not be read (an unknown kind of diagram, a statement it does not understand,
 invalid JSON), the problems come back to you right away: fix the file before
 going on.

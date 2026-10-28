@@ -3,7 +3,7 @@
 // MainWindow: the menu bar and the shortcuts of its commands.
 
 #include "MainWindow.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/ChangesView.h"
 #include "completion/CompletionController.h"
@@ -183,11 +183,11 @@ void MainWindow::createClaudeMenu()
         claude, {tr("Report E&rrors After Each Edit"), QStringLiteral("reportEditErrors"),
                  tr("Tell %1 the errors the language servers find in the code it has just edited")});
     exposeTools_ = addAgentSettingToggle(
-        claude, {tr("E&xpose Duet's Tools to %1"), QStringLiteral("exposeTools"),
-                 tr("Let %1 read and act in the editor through Duet's MCP server (next session)")});
-    gitThroughDuetTools_ = addAgentSettingToggle(
-        claude, {tr("Send &Git Commands to Duet's Tools"), QStringLiteral("gitThroughDuetTools"),
-                 tr("Refuse the git commands %1 runs in its shell to change the repository when a Duet tool does "
+        claude, {tr("E&xpose Kodamiko's Tools to %1"), QStringLiteral("exposeTools"),
+                 tr("Let %1 read and act in the editor through Kodamiko's MCP server (next session)")});
+    gitThroughKDKTools_ = addAgentSettingToggle(
+        claude, {tr("Send &Git Commands to Kodamiko's Tools"), QStringLiteral("gitThroughKDKTools"),
+                 tr("Refuse the git commands %1 runs in its shell to change the repository when a Kodamiko tool does "
                     "the same: the tools ask you first and take snapshots")});
     claudeNotifications_ =
         addAgentSettingToggle(claude, {tr("&Notifications"), QStringLiteral("claudeNotifications"),
@@ -221,7 +221,7 @@ void MainWindow::createViewMenu()
     QMenu *themes = view->addMenu(tr("T&heme"));
     auto *themeGroup = new QActionGroup(themes);
     themeActions_ = themeGroup;
-    // Duet's and KDE's in one list, by name.
+    // Kodamiko's and KDE's in one list, by name.
     QList<Theme> sortedThemes = Theme::all();
     std::ranges::sort(sortedThemes, [](const Theme &a, const Theme &b) {
         return QString::compare(a.title, b.title, Qt::CaseInsensitive) < 0;
@@ -310,7 +310,7 @@ void MainWindow::createViewMenu()
     view->addSeparator();
     systemTitleBar_ = view->addAction(tr("Use System &Title Bar"));
     systemTitleBar_->setCheckable(true);
-    systemTitleBar_->setToolTip(tr("The system's window frame instead of Duet's (tiling window managers…)"));
+    systemTitleBar_->setToolTip(tr("The system's window frame instead of Kodamiko's (tiling window managers…)"));
     connect(systemTitleBar_, &QAction::toggled, this, [this](bool system) {
         setSystemTitleBar(system);
         QSettings().setValue(QStringLiteral("systemTitleBar"), system);
@@ -501,7 +501,7 @@ QAction *MainWindow::createHelpMenu()
     QMenu *help = titleBar_->menuBar()->addMenu(tr("&Help"));
     help->addAction(tr("Check &Prerequisites…"), this, &MainWindow::showPrerequisites);
     help->addSeparator();
-    QAction *about = help->addAction(tr("&About Duet"), this, &MainWindow::showAbout);
+    QAction *about = help->addAction(tr("&About Kodamiko"), this, &MainWindow::showAbout);
     about->setMenuRole(QAction::AboutRole);
     return about;
 }

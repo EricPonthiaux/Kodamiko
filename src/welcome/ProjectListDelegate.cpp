@@ -96,7 +96,7 @@ QColor avatarColor(const Theme &theme, const QString &name)
     return syntaxColor(theme, captures[qHash(name, 0) % captures.size()]);
 }
 
-// "angular-shop" → "AS", "Duet" → "DU".
+// "angular-shop" → "AS", "Kodamiko" → "DU".
 QString initials(const QString &name)
 {
     static const QRegularExpression separators(QStringLiteral("[-_.\\s]+"));

@@ -1,5 +1,5 @@
 {
-    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
+    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Kodamiko/main/tools/schemas/recipe.schema.json",
     "title": "Empty Folder",
     "description": "No files: the languages are chosen next."
 }

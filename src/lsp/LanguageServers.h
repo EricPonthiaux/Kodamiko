@@ -19,14 +19,14 @@
 class Toolchains;
 struct RuntimeInstall;
 
-// A language server Duet knows how to run.
+// A language server Kodamiko knows how to run.
 struct LanguageServerSpec {
     QString name;    // "clangd"
     QString program; // looked up in the PATH
     QStringList arguments;
     QStringList languages;     // LanguageRegistry identifiers it serves
     QString triggerCharacters; // characters after which it completes members
-    // A recipe's server: `program` is the absolute path of a script Duet
+    // A recipe's server: `program` is the absolute path of a script Kodamiko
     // installed, run with Node.
     bool isNodeScript = false;
 
@@ -37,10 +37,10 @@ struct LanguageServerSpec {
 // C++, jdtls for Java...), started the first time a file of its languages
 // needs it, and stopped when the folder changes. Keeps each server's copy
 // of the open files up to date. With a project's setup, each language uses
-// the server and version it chose (Duet's download, or the PATH's), run
+// the server and version it chose (Kodamiko's download, or the PATH's), run
 // for the project's runtime (its JDK, Python, C++ standard). Its recipes
 // add servers of their own (Angular's, for the templates) and options to
-// Duet's (tsserver's Angular plugin).
+// Kodamiko's (tsserver's Angular plugin).
 class LanguageServers : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(LanguageServers)
@@ -57,7 +57,7 @@ public:
 
     // What the project's recipes add (see RecipeServers).
     struct Additions {
-        // Servers of languages no server Duet knows serves (Angular's
+        // Servers of languages no server Kodamiko knows serves (Angular's
         // templates), chosen before those of the PATH.
         QList<LanguageServerSpec> servers;
         // Merged into the options of the server of that name: objects
@@ -70,7 +70,7 @@ public:
     explicit LanguageServers(QObject *parent = nullptr);
     ~LanguageServers() override;
 
-    // Every server Duet knows, installed or not.
+    // Every server Kodamiko knows, installed or not.
     static const QList<LanguageServerSpec> &known();
     // Protocol identifier of a LanguageRegistry language ("typescriptreact"
     // for "tsx").
@@ -80,7 +80,7 @@ public:
     // project setup: the first server of each language in the PATH.
     void setFolder(const QString &folder);
     // The project's folder and setup, and what its recipes add;
-    // `toolchains` finds Duet's downloads and the runtimes. Stops the
+    // `toolchains` finds Kodamiko's downloads and the runtimes. Stops the
     // servers if any of them changed.
     void setProject(const ProjectConfig &project, Toolchains *toolchains, const Additions &additions = {});
     void setEnabled(bool enabled);
@@ -143,7 +143,7 @@ public:
     QStringList openDocuments() const { return documents_.keys(); }
 
     // Tells its server `path` is closed ("didClose"): the server reads it
-    // from disk again (it was closed in Duet, renamed or deleted).
+    // from disk again (it was closed in Kodamiko, renamed or deleted).
     void closeDocument(const QString &path);
     // Tells its server `path`, open there, was saved ("didSave"), if the
     // server wants to know: clangd then checks again the open files that
@@ -199,11 +199,11 @@ signals:
 
 private:
     QString programPath(const QString &program) const;
-    // The servers Duet knows, then the recipes'.
+    // The servers Kodamiko knows, then the recipes'.
     QList<LanguageServerSpec> allSpecs() const;
     // The project's setup of `languageId`'s family, if it has one.
     const LanguageSetup *setupFor(const QString &languageId) const;
-    // The command of `spec` for the project: Duet's download of the chosen
+    // The command of `spec` for the project: Kodamiko's download of the chosen
     // version, else the PATH's. Empty when there is none.
     QString programFor(const LanguageServerSpec &spec) const;
     std::optional<LanguageServerSpec> findSpec(const QString &languageId) const;
@@ -211,7 +211,7 @@ private:
     struct ServerCommand;
     // Records why the server of `spec` cannot run, and says it.
     void fail(const LanguageServerSpec &spec, const QString &error);
-    // Duet's npm installs are scripts: `command` then runs them with a
+    // Kodamiko's npm installs are scripts: `command` then runs them with a
     // Node recent enough. False, failed, if there is none.
     bool runScriptWithNode(const LanguageServerSpec &spec, ServerCommand &command);
     // The Java jdtls itself runs on, if any.

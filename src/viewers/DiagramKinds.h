@@ -6,9 +6,9 @@
 #include <QList>
 #include <QString>
 
-// The kinds of diagram Duet can show, for the menus that create one (blank
+// The kinds of diagram Kodamiko can show, for the menus that create one (blank
 // or drawn by Claude). Only those the diagram editor supports are listed:
-// none when Duet is built without it.
+// none when Kodamiko is built without it.
 struct DiagramKind {
     QString id;        // "flowchart"
     QString title;     // for menus: "Flowchart"

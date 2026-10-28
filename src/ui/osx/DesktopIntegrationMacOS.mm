@@ -54,12 +54,12 @@ void DesktopIntegration::setDockMenu(QMenu *menu)
 std::unique_ptr<QMenuBar> DesktopIntegration::createNativeMenuBar(const QList<QAction *> &actions)
 {
     auto bar = std::make_unique<QMenuBar>();
-    QMenu *menu = bar->addMenu(QStringLiteral("Duet"));
+    QMenu *menu = bar->addMenu(QStringLiteral("Kodamiko"));
     menu->addActions(actions);
     return bar;
 }
 
-// The system may still sleep when idle: only Duet's own work is kept going.
+// The system may still sleep when idle: only Kodamiko's own work is kept going.
 void DesktopIntegration::beginBackgroundActivity(const QString &reason)
 {
     if (backgroundActivity)

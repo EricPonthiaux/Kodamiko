@@ -130,7 +130,7 @@ private:
     QCheckBox *shareEditorContext_ = nullptr;
     QCheckBox *reportEditErrors_ = nullptr;
     QCheckBox *exposeTools_ = nullptr;
-    QCheckBox *gitThroughDuetTools_ = nullptr;
+    QCheckBox *gitThroughKDKTools_ = nullptr;
     QCheckBox *claudeNotifications_ = nullptr;
     TerminalPreferencesPage *terminalPage_ = nullptr;
 

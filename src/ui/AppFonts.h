@@ -11,7 +11,7 @@
 class QObject;
 class QWidget;
 
-// Fonts embedded in Duet, so that it looks the same on every system:
+// Fonts embedded in Kodamiko, so that it looks the same on every system:
 // Ubuntu Sans for the interface (menus, panels, trees), Droid Sans Mono
 // for code (editor, terminal, diffs); Ubuntu Sans Mono and JetBrains Mono
 // are also offered, the latter with and without programming ligatures.
@@ -45,11 +45,11 @@ void followApplicationFont(QObject *owner, std::function<void()> apply);
 QFont codeFont(qreal pointSize);
 
 // The sizes of Preferences ▸ Fonts are points of 1/96 inch, as Linux and
-// Windows draw them, so that Duet looks the same on every system; macOS
+// Windows draw them, so that Kodamiko looks the same on every system; macOS
 // draws a point at 1/72 inch, a quarter smaller. The size Qt is given for
-// `duetPoints` on this screen, and back.
-qreal systemPoints(qreal duetPoints);
-qreal duetPoints(qreal systemPoints);
+// `kdkPoints` on this screen, and back.
+qreal systemPoints(qreal kdkPoints);
+qreal kdkPoints(qreal systemPoints);
 // Whether `family` is an embedded code font (Droid Sans Mono, Ubuntu Sans
 // Mono, "JetBrains Mono NL" or its version with ligatures).
 bool isBuiltInCode(const QString &family);

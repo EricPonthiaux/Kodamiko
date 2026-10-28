@@ -91,7 +91,7 @@ void setStyleSheetKeepingFonts(const QString &sheet)
 // The theme apply() set last.
 Theme &appliedTheme()
 {
-    static Theme theme = Theme::duet();
+    static Theme theme = Theme::kodamiko();
     return theme;
 }
 

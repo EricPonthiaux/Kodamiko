@@ -31,11 +31,11 @@ TextStyle italic(const char *color)
 // black, the hairlines of white at a few percent drawn here opaque, and a
 // sober syntax where the keywords take the accent's light shade, the types
 // gold and the functions the brightest text.
-Theme duetNight()
+Theme kdkNight()
 {
     Theme theme;
-    theme.name = QStringLiteral("duet-night");
-    theme.title = QStringLiteral("Duet-Night");
+    theme.name = QStringLiteral("kodamiko-night");
+    theme.title = QStringLiteral("Kodamiko-Night");
     theme.font = editorFont();
     theme.background = QColor("#0e1015");
     theme.foreground = QColor("#c9cdd6");
@@ -84,11 +84,11 @@ Theme duetNight()
 // editor, a coral for the accent and the keywords. The code reads at 7:1 or
 // about, the comments at 5.5:1; dark text over the coral, where white would
 // not reach 4.5:1.
-Theme duetViolet()
+Theme kdkViolet()
 {
     Theme theme;
-    theme.name = QStringLiteral("duet-violet");
-    theme.title = QStringLiteral("Duet-Violet");
+    theme.name = QStringLiteral("kodamiko-violet");
+    theme.title = QStringLiteral("Kodamiko-Violet");
     theme.font = editorFont();
     theme.background = QColor("#2b2045");
     theme.foreground = QColor("#e6e0f0");
@@ -137,11 +137,11 @@ Theme duetViolet()
 // the pinks and peaches of the sunset in the syntax. The code reads at 7:1
 // or about, the comments at 5.5:1; dark text over the coral, where white
 // would not reach 4.5:1.
-Theme duetStratos()
+Theme kdkStratos()
 {
     Theme theme;
-    theme.name = QStringLiteral("duet-stratos");
-    theme.title = QStringLiteral("Duet-Stratos");
+    theme.name = QStringLiteral("kodamiko-stratos");
+    theme.title = QStringLiteral("Kodamiko-Stratos");
     theme.font = editorFont();
     theme.background = QColor("#2a2935");
     theme.foreground = QColor("#ece4e6");
@@ -191,11 +191,11 @@ Theme duetStratos()
 // the poppies and the fireflies in the syntax. The code reads at 7:1 or
 // about, the comments at 5.5:1; dark text over the magenta, where white
 // would not reach 4.5:1.
-Theme duetBloom()
+Theme kdkBloom()
 {
     Theme theme;
-    theme.name = QStringLiteral("duet-bloom");
-    theme.title = QStringLiteral("Duet-Bloom");
+    theme.name = QStringLiteral("kodamiko-bloom");
+    theme.title = QStringLiteral("Kodamiko-Bloom");
     theme.font = editorFont();
     theme.background = QColor("#172036");
     theme.foreground = QColor("#dfe4f0");
@@ -248,11 +248,11 @@ Theme duetBloom()
 // white, italics only for the comments and the parameters. The code reads at
 // 7.5:1 or more, the comments at 5.5:1, below the code but readable; the
 // cream over the accent at 4.8:1.
-Theme duetClay()
+Theme kdkClay()
 {
     Theme theme;
-    theme.name = QStringLiteral("duet-clay");
-    theme.title = QStringLiteral("Duet-Clay");
+    theme.name = QStringLiteral("kodamiko-clay");
+    theme.title = QStringLiteral("Kodamiko-Clay");
     theme.font = editorFont();
     theme.background = QColor("#262624");
     theme.foreground = QColor("#e8e5da");
@@ -298,11 +298,11 @@ Theme duetClay()
 
 } // namespace
 
-Theme Theme::duet()
+Theme Theme::kodamiko()
 {
     Theme theme;
-    theme.name = QStringLiteral("duet");
-    theme.title = QStringLiteral("Duet");
+    theme.name = QStringLiteral("kodamiko");
+    theme.title = QStringLiteral("Kodamiko");
     theme.font = editorFont();
     theme.background = QColor("#1f232c");
     theme.foreground = QColor("#c9cfdb");
@@ -353,7 +353,7 @@ Theme Theme::duet()
 
 QList<Theme> Theme::all()
 {
-    QList<Theme> themes{duet(), duetNight(), duetViolet(), duetStratos(), duetBloom(), duetClay()};
+    QList<Theme> themes{kodamiko(), kdkNight(), kdkViolet(), kdkStratos(), kdkBloom(), kdkClay()};
     themes += MaterialThemes::all();
     return themes;
 }
@@ -364,7 +364,7 @@ Theme Theme::named(const QString &name)
         if (theme.name == name)
             return theme;
     }
-    return duet();
+    return kodamiko();
 }
 
 int Theme::syntaxStyleIndex(QStringView captureName) const

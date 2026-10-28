@@ -10,7 +10,7 @@
 // bundle starts its executable.
 NewInstance::Command NewInstance::command(const QString &folder)
 {
-    QDir bundle(QCoreApplication::applicationDirPath()); // Duet.app/Contents/MacOS
+    QDir bundle(QCoreApplication::applicationDirPath()); // Kodamiko.app/Contents/MacOS
     bundle.cdUp();
     bundle.cdUp();
     if (!bundle.dirName().endsWith(QLatin1String(".app")))

@@ -224,7 +224,7 @@ QWidget *ProjectSetupForm::createPage(Page &page)
                         fieldWithState(page.runtime, page.runtimeState));
     auto *serverCard = new SettingsCard;
     serverCard->addRow(tr("Language server"), tr("Completes members, imports, signatures."), page.server);
-    page.versionRow = serverCard->addRow(tr("Version"), tr("Downloaded by Duet, or the system's."),
+    page.versionRow = serverCard->addRow(tr("Version"), tr("Downloaded by Kodamiko, or the system's."),
                                          fieldWithState(page.serverVersion, page.serverState));
 
     page.settings = new QWidget(content);

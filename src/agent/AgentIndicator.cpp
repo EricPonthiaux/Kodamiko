@@ -61,7 +61,7 @@ QString agentStatusText(AgentStatus status)
 
 AgentIndicator::AgentIndicator(QWidget *parent)
     : QAbstractButton(parent)
-    , theme_(Theme::duet())
+    , theme_(Theme::kodamiko())
 {
     setFocusPolicy(Qt::NoFocus);
     updateAccessibleName();

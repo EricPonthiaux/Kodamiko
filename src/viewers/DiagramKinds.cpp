@@ -2,7 +2,7 @@
 
 #include "DiagramKinds.h"
 
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
 #include "viewers/diagram/Document.h"
 #include "viewers/diagram/Family.h"
 #endif
@@ -12,7 +12,7 @@ namespace DiagramKinds {
 QList<DiagramKind> available()
 {
     QList<DiagramKind> kinds;
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     for (const diagram::Family *family : diagram::allFamilies()) {
         const QString extension = diagram::document::extension(family->id);
         if (!extension.isEmpty())

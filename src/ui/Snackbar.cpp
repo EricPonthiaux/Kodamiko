@@ -72,7 +72,7 @@ QString shownDetail(const QString &detail)
 
 Snackbar::Snackbar(QWidget *window)
     : QFrame(window)
-    , theme_(Theme::duet())
+    , theme_(Theme::kodamiko())
     , icon_(new QLabel(this))
     , title_(new QLabel(this))
     , detail_(new QLabel(this))

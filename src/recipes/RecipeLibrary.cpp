@@ -16,11 +16,11 @@ namespace {
 QString builtInFolder()
 {
     // The recipes of a source tree, for their authors and the tests.
-    if (const QString folder = qEnvironmentVariable("DUET_RECIPES_DIR"); !folder.isEmpty())
+    if (const QString folder = qEnvironmentVariable("KDK_RECIPES_DIR"); !folder.isEmpty())
         return folder;
     const QDir appDir(QCoreApplication::applicationDirPath());
-    for (const QString &candidate :
-         {QStringLiteral("recipes"), QStringLiteral("../share/duet/recipes"), QStringLiteral("../Resources/recipes")}) {
+    for (const QString &candidate : {QStringLiteral("recipes"), QStringLiteral("../share/kodamiko/recipes"),
+                                     QStringLiteral("../Resources/recipes")}) {
         const QString path = QDir::cleanPath(appDir.filePath(candidate));
         if (QFileInfo(path).isDir())
             return path;
@@ -58,7 +58,7 @@ RecipeSources defaultSources(const QString &projectFolder)
     sources.builtIn = builtInFolder();
     sources.user = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/recipes");
     if (!projectFolder.isEmpty())
-        sources.project = QDir(projectFolder).filePath(QStringLiteral(".duet/recipes"));
+        sources.project = QDir(projectFolder).filePath(QStringLiteral(".kodamiko/recipes"));
     return sources;
 }
 

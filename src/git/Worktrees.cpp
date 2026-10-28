@@ -16,7 +16,7 @@
 namespace Worktrees {
 namespace {
 
-const QString branchPrefix = QStringLiteral("duet/");
+const QString branchPrefix = QStringLiteral("kodamiko/");
 const QString namePrefix = QStringLiteral("agent-");
 // The exclusion line, relative to the repository root.
 const QByteArray excludeLine = QByteArrayLiteral("/.claude/worktrees/");
@@ -27,7 +27,7 @@ const QByteArray branchAttribute = QByteArrayLiteral("branch refs/heads/");
 // A worktree as `git worktree list` describes it.
 struct ListedWorktree {
     QString folder;
-    QString branch; // "duet/agent-1"; empty when detached
+    QString branch; // "kodamiko/agent-1"; empty when detached
 };
 
 // Adds the worktrees' folder to .git/info/exclude unless it is there already.

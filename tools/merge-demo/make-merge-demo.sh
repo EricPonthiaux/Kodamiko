@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 #
 # Builds a repository whose merge of feature/pricing into main stops on
-# every kind of conflict, to try Duet's conflict resolution by hand:
+# every kind of conflict, to try Kodamiko's conflict resolution by hand:
 # several conflicts in one file, a base section (diff3), CRLF line
 # endings, a file without a final newline, add/add, modify/delete,
 # rename/rename, a binary file, and a file merged without conflict.

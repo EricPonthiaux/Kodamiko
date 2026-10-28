@@ -27,7 +27,7 @@ struct ProcessSpec;
 // declares its domain's in the registry; they act through the editor's
 // objects given in the context, which outlive the registry.
 
-struct DuetToolContext {
+struct KDKToolContext {
     // The project's folder (it changes when another one is opened).
     std::function<QString()> folder;
     EditorTabs *tabs = nullptr;
@@ -60,39 +60,39 @@ struct DuetToolContext {
     QString relative(const QString &path) const;
 };
 
-namespace DuetTools {
+namespace KDKTools {
 
-// Server instructions: what Duet is and when to use its tools.
+// Server instructions: what Kodamiko is and when to use its tools.
 QString instructions();
 
 // A tool's Run from a named function of the context: each tool's work is a
 // function of its own rather than a lambda inside the registration.
-using ToolHandler = void (*)(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply);
-using ImmediateToolHandler = McpResult (*)(const DuetToolContext &context, const QJsonObject &arguments);
-McpTool::Run handledBy(const DuetToolContext &context, ToolHandler handler);
-McpTool::Run handledBy(const DuetToolContext &context, ImmediateToolHandler handler);
+using ToolHandler = void (*)(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply);
+using ImmediateToolHandler = McpResult (*)(const KDKToolContext &context, const QJsonObject &arguments);
+McpTool::Run handledBy(const KDKToolContext &context, ToolHandler handler);
+McpTool::Run handledBy(const KDKToolContext &context, ImmediateToolHandler handler);
 
 // Files and tabs: editor state, open files, file text, opening, saving.
-void registerEditorTools(McpRegistry &registry, const DuetToolContext &context);
+void registerEditorTools(McpRegistry &registry, const KDKToolContext &context);
 // The project: search, files, symbols, editor commands, setup.
-void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &context);
+void registerWorkspaceTools(McpRegistry &registry, const KDKToolContext &context);
 // The language servers: problems, definitions, usages, documentation,
 // rename, quick fixes, formatting.
-void registerCodeTools(McpRegistry &registry, const DuetToolContext &context);
+void registerCodeTools(McpRegistry &registry, const KDKToolContext &context);
 // The refactorings: usages by kind, Rename File, Change Signature.
-void registerRefactoringTools(McpRegistry &registry, const DuetToolContext &context);
+void registerRefactoringTools(McpRegistry &registry, const KDKToolContext &context);
 // A refactoring's outcome as a tool's answer.
-McpResult refactoringResult(const DuetToolContext &context, const RefactoringOutcome &outcome);
+McpResult refactoringResult(const KDKToolContext &context, const RefactoringOutcome &outcome);
 // Terminals: reading them, running a command.
-void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context);
+void registerTerminalTools(McpRegistry &registry, const KDKToolContext &context);
 // Git status, history, index, commits, snapshots; then the branch and
 // integration tools.
-void registerGitTools(McpRegistry &registry, const DuetToolContext &context);
+void registerGitTools(McpRegistry &registry, const KDKToolContext &context);
 // Branches, remotes, stashes.
-void registerBranchTools(McpRegistry &registry, const DuetToolContext &context);
+void registerBranchTools(McpRegistry &registry, const KDKToolContext &context);
 // Merge, rebase, cherry-pick, revert, and the operation in progress.
-void registerIntegrationTools(McpRegistry &registry, const DuetToolContext &context);
+void registerIntegrationTools(McpRegistry &registry, const KDKToolContext &context);
 // Diagrams: their content and selection, changes in the open diagram.
-void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context);
+void registerDiagramTools(McpRegistry &registry, const KDKToolContext &context);
 
-} // namespace DuetTools
+} // namespace KDKTools

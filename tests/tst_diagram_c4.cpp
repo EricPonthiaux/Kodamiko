@@ -431,7 +431,7 @@ private slots:
         byKey(board, QStringLiteral("api"))->customFill = QStringLiteral("#ffccbc");
         const QByteArray saved = document::save(board, *loaded.codec);
         QVERIFY(saved.startsWith("C4Container\n"));
-        QVERIFY(saved.contains("%% duet {"));
+        QVERIFY(saved.contains("%% kodamiko {"));
 
         Board again;
         document::Loaded reloaded;

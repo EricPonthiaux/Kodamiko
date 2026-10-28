@@ -17,7 +17,7 @@
 
 namespace {
 
-constexpr const char *schemeName = "duet-preview";
+constexpr const char *schemeName = "kodamiko-preview";
 
 struct SiteContent {
     QString root;     // canonical: a symbolic link cannot lead out of it

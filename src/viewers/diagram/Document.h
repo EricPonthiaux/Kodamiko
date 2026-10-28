@@ -10,10 +10,10 @@
 
 // A diagram file: its source in a notation (Mermaid, PlantUML, a JSON
 // scene) and, for the notations that know nothing of coordinates, the
-// layout kept by Duet in comments at the end of the file:
+// layout kept by Kodamiko in comments at the end of the file:
 //
-//     %% duet {"key":"A","x":40,"y":40}
-//     %% duet {"link":"A>B","n":0,"c":[…],"lp":[…]}
+//     %% kodamiko {"key":"A","x":40,"y":40}
+//     %% kodamiko {"link":"A>B","n":0,"c":[…],"lp":[…]}
 //
 // As in sidecar, the source is the truth of the meaning and the layout that
 // of the arrangement: an element keeps its place, size and color by its
@@ -39,7 +39,7 @@ struct Loaded {
 };
 
 // Reads a file's content into `board` and tells how to lay it out. Nullopt,
-// with `error` (may be null), if the file is not a diagram Duet reads.
+// with `error` (may be null), if the file is not a diagram Kodamiko reads.
 std::optional<Loaded> load(Board &board, const QString &path, const QByteArray &content, QString *error);
 // The file's content for the board, in the notation of `codec`.
 QByteArray save(const Board &board, const Codec &codec);

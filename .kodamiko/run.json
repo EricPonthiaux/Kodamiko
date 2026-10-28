@@ -71,7 +71,7 @@
     {
       "name": "Run default",
       "kind": "run",
-      "command": "build/bin/Duet.app/Contents/MacOS/Duet",
+      "command": "build/bin/Kodamiko.app/Contents/MacOS/Kodamiko",
       "systems": [
         "macos"
       ]
@@ -79,7 +79,7 @@
     {
       "name": "Run default",
       "kind": "run",
-      "command": "build/bin/duet",
+      "command": "build/bin/kodamiko",
       "systems": [
         "linux"
       ]
@@ -87,7 +87,7 @@
     {
       "name": "Run default",
       "kind": "run",
-      "command": "build-win\\bin\\duet.exe",
+      "command": "build-win\\bin\\kodamiko.exe",
       "systems": [
         "windows"
       ]
@@ -95,7 +95,7 @@
     {
       "name": "Run debug",
       "kind": "run",
-      "command": "build-debug/bin/Duet.app/Contents/MacOS/Duet",
+      "command": "build-debug/bin/Kodamiko.app/Contents/MacOS/Kodamiko",
       "systems": [
         "macos"
       ]
@@ -103,7 +103,7 @@
     {
       "name": "Run debug",
       "kind": "run",
-      "command": "build-debug/bin/duet",
+      "command": "build-debug/bin/kodamiko",
       "systems": [
         "linux"
       ]
@@ -111,7 +111,7 @@
     {
       "name": "Run debug",
       "kind": "run",
-      "command": "build-win-debug\\bin\\duet.exe",
+      "command": "build-win-debug\\bin\\kodamiko.exe",
       "systems": [
         "windows"
       ]

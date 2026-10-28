@@ -655,13 +655,21 @@ private slots:
         QCOMPARE(snapshots.first().reason, QString::number(Snapshots::maximumCount + 1));
     }
 
-    void snapshotsOfEnlumineAreAdopted()
+    void snapshotsOfTheFormerNamesAreAdopted_data()
     {
+        QTest::addColumn<QString>("formerRefs");
+        QTest::newRow("Enlumine") << QString("refs/enlumine/");
+        QTest::newRow("Duet") << QString("refs/duet/");
+    }
+
+    void snapshotsOfTheFormerNamesAreAdopted()
+    {
+        QFETCH(QString, formerRefs);
         const QTemporaryDir project;
         initRepository(project, {{"a.txt", "a\n"}});
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
         const QString ref = Snapshots::create(info, "old", {"a.txt"});
-        const QString legacy = QString(ref).replace("refs/duet/", "refs/enlumine/");
+        const QString legacy = QString(ref).replace("refs/kodamiko/", formerRefs);
         git(project, {"update-ref", legacy, ref});
         git(project, {"update-ref", "-d", ref});
 
@@ -669,7 +677,7 @@ private slots:
         QCOMPARE(snapshots.size(), 1);
         QCOMPARE(snapshots.first().ref, ref);
         QCOMPARE(snapshots.first().reason, QString("old"));
-        QVERIFY(git(project, {"for-each-ref", "refs/enlumine/"}).isEmpty());
+        QVERIFY(git(project, {"for-each-ref", formerRefs}).isEmpty());
     }
 
     void snapshotOfWorkingTreeSkipsUnchangedStates()
@@ -941,11 +949,11 @@ private slots:
 
         const Worktree worktree = Worktrees::add(info, "agent-1");
 
-        QCOMPARE(worktree.branch, QString("duet/agent-1"));
+        QCOMPARE(worktree.branch, QString("kodamiko/agent-1"));
         // The repository's paths have their symbolic links resolved (/private/var on macOS).
         QCOMPARE(worktree.path, QDir(info.workDir).filePath(".claude/worktrees/agent-1"));
         QCOMPARE(read(project, ".claude/worktrees/agent-1/a.txt"), QByteArray("a\n"));
-        QVERIFY(Branches::local(project.path()).contains("duet/agent-1"));
+        QVERIFY(Branches::local(project.path()).contains("kodamiko/agent-1"));
         QVERIFY(git(project, {"status", "--porcelain"}).isEmpty());
     }
 
@@ -970,7 +978,7 @@ private slots:
         QCOMPARE(Worktrees::unusedName(info), QString("agent-1"));
 
         Worktrees::add(info, "agent-1");
-        git(project, {"branch", "duet/agent-2"});
+        git(project, {"branch", "kodamiko/agent-2"});
 
         QCOMPARE(Worktrees::unusedName(info), QString("agent-3"));
     }
@@ -1000,7 +1008,7 @@ private slots:
         Worktrees::remove(info, worktree);
 
         QVERIFY(!QFileInfo::exists(worktree.path));
-        QVERIFY(!Branches::local(project.path()).contains("duet/agent-1"));
+        QVERIFY(!Branches::local(project.path()).contains("kodamiko/agent-1"));
     }
 
     void removesALockedWorktreeAndItsBranch()
@@ -1014,7 +1022,7 @@ private slots:
         Worktrees::remove(info, worktree);
 
         QVERIFY(!QFileInfo::exists(worktree.path));
-        QVERIFY(!Branches::local(project.path()).contains("duet/agent-1"));
+        QVERIFY(!Branches::local(project.path()).contains("kodamiko/agent-1"));
     }
 
     void removesTheBranchOfAWorktreeWhoseFolderIsGone()
@@ -1027,7 +1035,7 @@ private slots:
 
         Worktrees::remove(info, worktree);
 
-        QVERIFY(!Branches::local(project.path()).contains("duet/agent-1"));
+        QVERIFY(!Branches::local(project.path()).contains("kodamiko/agent-1"));
     }
 
     void findsTheWorktreeThatHasABranchCheckedOut()
@@ -1037,7 +1045,7 @@ private slots:
         const RepositoryInfo info = *RepositoryInfo::read(project.path());
         const Worktree worktree = Worktrees::add(info, "agent-1");
 
-        const std::optional<QString> folder = Worktrees::folderHolding(info, "duet/agent-1");
+        const std::optional<QString> folder = Worktrees::folderHolding(info, "kodamiko/agent-1");
 
         QVERIFY(folder);
         QCOMPARE(QFileInfo(*folder).canonicalFilePath(), QFileInfo(worktree.path).canonicalFilePath());
@@ -1052,7 +1060,7 @@ private slots:
         Worktrees::add(info, "agent-1");
 
         try {
-            Branches::remove(info, "duet/agent-1", false);
+            Branches::remove(info, "kodamiko/agent-1", false);
             QFAIL("the branch was deleted");
         } catch (const GitError &error) {
             QCOMPARE(error.kind(), GitError::Kind::InWorktree);

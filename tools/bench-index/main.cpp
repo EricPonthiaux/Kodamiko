@@ -62,7 +62,7 @@ void measureSearches(const OccurrenceStore &store, const QStringList &words)
 int main(int argc, char **argv)
 {
     const QCoreApplication app(argc, argv);
-    QCoreApplication::setApplicationName(QStringLiteral("duet-bench-index"));
+    QCoreApplication::setApplicationName(QStringLiteral("kodamiko-bench-index"));
     const QStringList arguments = QCoreApplication::arguments().mid(1);
     if (arguments.isEmpty()) {
         std::fputs("usage: bench-index <folder> [word…]\n", stderr);

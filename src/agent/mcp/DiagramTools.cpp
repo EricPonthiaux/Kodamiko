@@ -4,7 +4,7 @@
 // changes made in the open diagram (its source applied, its layout, its
 // selection, an export).
 
-#include "DuetTools.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "editor/EditorTabs.h"
 #include "viewers/DiagramCheck.h"
@@ -21,7 +21,7 @@
 
 #include <optional>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -33,8 +33,8 @@ QJsonObject pathArgument()
 }
 
 // The diagram open in a tab for `path`, opening it if needed; null, with
-// `error`, if it is not a diagram Duet reads.
-DiagramView *openDiagram(const DuetToolContext &context, const QString &path, QString *error)
+// `error`, if it is not a diagram Kodamiko reads.
+DiagramView *openDiagram(const KDKToolContext &context, const QString &path, QString *error)
 {
     if (DiagramView *view = context.tabs->diagramViewFor(path))
         return view;
@@ -45,7 +45,7 @@ DiagramView *openDiagram(const DuetToolContext &context, const QString &path, QS
     context.tabs->openFile(path);
     if (DiagramView *view = context.tabs->diagramViewFor(path))
         return view;
-    *error = QStringLiteral("Duet cannot read %1 as a diagram").arg(context.relative(path));
+    *error = QStringLiteral("Kodamiko cannot read %1 as a diagram").arg(context.relative(path));
     return nullptr;
 }
 
@@ -98,12 +98,12 @@ QJsonObject boardJson(const diagram::Board &board, const diagram::Codec &codec)
                        {QStringLiteral("links"), links}};
 }
 
-QString pathOf(const DuetToolContext &context, const QJsonObject &arguments)
+QString pathOf(const KDKToolContext &context, const QJsonObject &arguments)
 {
     return context.absolute(arguments.value(QStringLiteral("path")).toString());
 }
 
-McpResult listDiagramKinds(const DuetToolContext &, const QJsonObject &)
+McpResult listDiagramKinds(const KDKToolContext &, const QJsonObject &)
 {
     QJsonArray kinds;
     for (const DiagramKind &kind : DiagramKinds::available())
@@ -114,7 +114,7 @@ McpResult listDiagramKinds(const DuetToolContext &, const QJsonObject &)
     return McpResult::json(QJsonObject{{QStringLiteral("kinds"), kinds}});
 }
 
-McpResult getDiagram(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult getDiagram(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString path = pathOf(context, arguments);
     if (const DiagramView *view = context.tabs->diagramViewFor(path)) {
@@ -137,7 +137,7 @@ McpResult getDiagram(const DuetToolContext &context, const QJsonObject &argument
     return McpResult::json(json);
 }
 
-McpResult getDiagramProblems(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult getDiagramProblems(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString path = pathOf(context, arguments);
     QByteArray content;
@@ -153,7 +153,7 @@ McpResult getDiagramProblems(const DuetToolContext &context, const QJsonObject &
         QJsonObject{{QStringLiteral("problems"), QJsonArray::fromStringList(DiagramCheck::problems(path, content))}});
 }
 
-McpResult applyDiagramSource(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult applyDiagramSource(const KDKToolContext &context, const QJsonObject &arguments)
 {
     QString error;
     const DiagramView *view = openDiagram(context, pathOf(context, arguments), &error);
@@ -172,7 +172,7 @@ McpResult applyDiagramSource(const DuetToolContext &context, const QJsonObject &
     return McpResult::json(json);
 }
 
-McpResult layoutDiagram(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult layoutDiagram(const KDKToolContext &context, const QJsonObject &arguments)
 {
     QString error;
     const DiagramView *view = openDiagram(context, pathOf(context, arguments), &error);
@@ -185,7 +185,7 @@ McpResult layoutDiagram(const DuetToolContext &context, const QJsonObject &argum
     return McpResult::message(QStringLiteral("Laid out"));
 }
 
-McpResult selectDiagramElements(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult selectDiagramElements(const KDKToolContext &context, const QJsonObject &arguments)
 {
     QString error;
     const DiagramView *view = openDiagram(context, pathOf(context, arguments), &error);
@@ -205,7 +205,7 @@ McpResult selectDiagramElements(const DuetToolContext &context, const QJsonObjec
                : McpResult::error(QStringLiteral("No element %1").arg(missing.join(QStringLiteral(", "))));
 }
 
-McpResult exportDiagram(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult exportDiagram(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString output = context.absolute(arguments.value(QStringLiteral("output")).toString());
     QString error;
@@ -220,16 +220,16 @@ McpResult exportDiagram(const DuetToolContext &context, const QJsonObject &argum
 QString drawDiagramPrompt(const QJsonObject &arguments)
 {
     const QString kind = arguments.value(QStringLiteral("kind")).toString();
-    return QStringLiteral("Following the duet:diagrams skill, draw %1 of %2: read the code it "
-                          "refers to first and draw what it really does. Then open it in Duet "
+    return QStringLiteral("Following the kodamiko:diagrams skill, draw %1 of %2: read the code it "
+                          "refers to first and draw what it really does. Then open it in Kodamiko "
                           "(open_file) and check it reads cleanly (get_diagram_problems).")
         .arg(kind.isEmpty() ? QStringLiteral("the most fitting diagram") : QStringLiteral("a %1 diagram").arg(kind),
              arguments.value(QStringLiteral("subject")).toString());
 }
 
-std::optional<QString> readDiagramResource(const DuetToolContext &context, const QString &uri)
+std::optional<QString> readDiagramResource(const KDKToolContext &context, const QString &uri)
 {
-    const QString path = context.absolute(uri.mid(QStringLiteral("duet://diagram/").size()));
+    const QString path = context.absolute(uri.mid(QStringLiteral("kodamiko://diagram/").size()));
     if (const DiagramView *view = context.tabs->diagramViewFor(path))
         return diagram::document::source(*view->board(), *view->codec());
     QFile file(path);
@@ -240,13 +240,14 @@ std::optional<QString> readDiagramResource(const DuetToolContext &context, const
 
 } // namespace
 
-void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
+void registerDiagramTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("list_diagram_kinds"),
          .title = QStringLiteral("Diagram kinds"),
-         .description = QStringLiteral("The kinds of diagram Duet's editor draws, with the file extension and a blank "
-                                       "source of each (follow the duet:diagrams skill to write one)."),
+         .description =
+             QStringLiteral("The kinds of diagram Kodamiko's editor draws, with the file extension and a blank "
+                            "source of each (follow the kodamiko:diagrams skill to write one)."),
          .inputSchema = object({})},
         handledBy(context, listDiagramKinds)));
 
@@ -254,7 +255,8 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("get_diagram"),
          .title = QStringLiteral("Diagram"),
          .description = QStringLiteral(
-             "A diagram as Duet's editor has it: its kind, its source (with unsaved changes), its elements with their "
+             "A diagram as Kodamiko's editor has it: its kind, its source (with unsaved changes), its elements with "
+             "their "
              "place and size, its links, and what the user has selected in it. Use it when the user talks about "
              "\"this element\" or \"the selected ones\" of a diagram."),
          .inputSchema = object({{QStringLiteral("path"), pathArgument()}}, {QStringLiteral("path")})},
@@ -263,7 +265,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("get_diagram_problems"),
          .title = QStringLiteral("Diagram problems"),
-         .description = QStringLiteral("What Duet's diagram editor cannot read in a diagram file (an unsupported "
+         .description = QStringLiteral("What Kodamiko's diagram editor cannot read in a diagram file (an unsupported "
                                        "kind, statements it does not understand): empty when the diagram reads as "
                                        "written."),
          .inputSchema = object({{QStringLiteral("path"), pathArgument()}}, {QStringLiteral("path")})},
@@ -273,20 +275,21 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("apply_diagram_source"),
          .title = QStringLiteral("Change a diagram"),
          .description = QStringLiteral(
-             "Replaces an open diagram's content with a new source in the same notation, in Duet's editor (one step "
+             "Replaces an open diagram's content with a new source in the same notation, in Kodamiko's editor (one "
+             "step "
              "the user can undo; elements keep their place by id, new ones are placed beside their neighbors). The "
              "file is not written: the user saves. Use it to change a diagram the user is looking at; to create one, "
              "write the file."),
          .inputSchema = object({{QStringLiteral("path"), pathArgument()},
                                 {QStringLiteral("source"), string(QStringLiteral("The whole new source, without the "
-                                                                                 "\"duet\" layout comments"))}},
+                                                                                 "\"kodamiko\" layout comments"))}},
                                {QStringLiteral("path"), QStringLiteral("source")})},
         handledBy(context, applyDiagramSource)));
 
     registry.addTool(McpTool::acting(
         {.name = QStringLiteral("layout_diagram"),
          .title = QStringLiteral("Lay a diagram out"),
-         .description = QStringLiteral("Lays an open diagram out again automatically in Duet's editor (the user's "
+         .description = QStringLiteral("Lays an open diagram out again automatically in Kodamiko's editor (the user's "
                                        "arrangement is replaced; one step they can undo)."),
          .inputSchema = object(
              {{QStringLiteral("path"), pathArgument()},
@@ -321,7 +324,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addPrompt(
         {QStringLiteral("draw-diagram"),
          QStringLiteral("Draw a diagram"),
-         QStringLiteral("Draw a diagram of part of the project, opened in Duet's diagram editor"),
+         QStringLiteral("Draw a diagram of part of the project, opened in Kodamiko's diagram editor"),
          {{QStringLiteral("subject"), QStringLiteral("What it shows (\"the login flow in src/auth\")"), true},
           {QStringLiteral("kind"),
            QStringLiteral("Kind: flowchart, sequence, class, state, data model, "
@@ -330,7 +333,7 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
          drawDiagramPrompt});
 
     registry.addResource({
-        QStringLiteral("duet://diagram/{path}"),
+        QStringLiteral("kodamiko://diagram/{path}"),
         true,
         QStringLiteral("diagram"),
         QStringLiteral("Diagram as in the editor"),
@@ -340,4 +343,4 @@ void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context)
     });
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

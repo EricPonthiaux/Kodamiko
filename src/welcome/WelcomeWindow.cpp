@@ -104,7 +104,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     theme_ = Theme::named(preferences.theme);
     preferences.applyTypography(theme_);
     ThemeStyle::apply(theme_);
-    setWindowTitle(tr("Welcome to Duet"));
+    setWindowTitle(tr("Welcome to Kodamiko"));
     resize(windowWidth, windowHeight);
 
     pages_->addWidget(createProjectsPage());
@@ -154,7 +154,7 @@ QWidget *WelcomeWindow::createSide()
 
     auto *logo = new QLabel(side);
     logo->setPixmap(BrandMark::markPixmap(brandMarkSize, theme_, devicePixelRatioF()));
-    auto *name = new QLabel(QStringLiteral("Duet"), side);
+    auto *name = new QLabel(QStringLiteral("Kodamiko"), side);
     AppFonts::setInterfaceFont(name, 1.5);
     auto *version = new QLabel(QCoreApplication::applicationVersion(), side);
     version->setObjectName(QStringLiteral("welcomeVersion"));
@@ -168,7 +168,7 @@ QWidget *WelcomeWindow::createSide()
     brand->addWidget(logo);
     brand->addLayout(identity, 1);
 
-    auto *hint = new QLabel(tr("Each project keeps its languages, runtimes and servers. Duet downloads what they "
+    auto *hint = new QLabel(tr("Each project keeps its languages, runtimes and servers. Kodamiko downloads what they "
                                "need into its own folder."),
                             side);
     hint->setObjectName(QStringLiteral("footerHint"));
@@ -177,7 +177,7 @@ QWidget *WelcomeWindow::createSide()
 
     auto *links = new QFrame(side);
     links->setObjectName(QStringLiteral("welcomeLinks"));
-    auto *about = new QPushButton(tr("About Duet"), links);
+    auto *about = new QPushButton(tr("About Kodamiko"), links);
     about->setObjectName(QStringLiteral("welcomeLink"));
     connect(about, &QPushButton::clicked, this, &WelcomeWindow::showAbout);
     auto *linksLayout = new QVBoxLayout(links);
@@ -219,7 +219,7 @@ QWidget *WelcomeWindow::createProjectsPage()
     search_->setClearButtonEnabled(true);
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &WelcomeWindow::filter);
-    // Duet's frame has no title bar: a close button of its own.
+    // Kodamiko's frame has no title bar: a close button of its own.
     close_ = new WindowButton(WindowButton::Kind::Close, projects);
     close_->applyTheme(theme_);
     close_->setCorners(WindowButton::Corners::Rounded);
@@ -264,7 +264,7 @@ QWidget *WelcomeWindow::createEmptyState()
     mark->setPixmap(BrandMark::markPixmap(emptyMarkSize, theme_, devicePixelRatioF()));
     auto *title = new QLabel(tr("Start your first project"), empty);
     AppFonts::setInterfaceFont(title, 1.3);
-    auto *text = new QLabel(tr("Create one from a template, or import a folder you already have. Duet sets up its "
+    auto *text = new QLabel(tr("Create one from a template, or import a folder you already have. Kodamiko sets up its "
                                "languages and downloads the tools they need."),
                             empty);
     text->setObjectName(QStringLiteral("footerHint"));

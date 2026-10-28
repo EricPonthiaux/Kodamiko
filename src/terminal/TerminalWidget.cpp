@@ -217,7 +217,7 @@ TerminalWidget::TerminalWidget(QWidget *parent)
         viewport()->update();
     });
 
-    applyTheme(Theme::duet());
+    applyTheme(Theme::kodamiko());
 }
 
 TerminalWidget::~TerminalWidget() = default;
@@ -274,7 +274,7 @@ void TerminalWidget::applyFont()
     font.setStyleHint(QFont::TypeWriter);
     font.setKerning(false);
     if (font.pointSizeF() > 0) {
-        const qreal zoomed = std::clamp(AppFonts::duetPoints(font.pointSizeF()) + zoom_,
+        const qreal zoomed = std::clamp(AppFonts::kdkPoints(font.pointSizeF()) + zoom_,
                                         qreal(Preferences::minimumFontSize), qreal(Preferences::maximumFontSize));
         font.setPointSizeF(AppFonts::systemPoints(zoomed));
     }
@@ -615,7 +615,7 @@ void TerminalWidget::wheelEvent(QWheelEvent *event)
         return;
     }
     if (screen_->isMouseReporting() && !(event->modifiers() & Qt::ShiftModifier)) {
-        // The program scrolls itself; Shift+wheel keeps Duet's history.
+        // The program scrolls itself; Shift+wheel keeps Kodamiko's history.
         wheelRemainder_ += event->angleDelta().y();
         const int notches = wheelRemainder_ / 120;
         wheelRemainder_ -= notches * 120;
@@ -658,7 +658,7 @@ void TerminalWidget::mousePressEvent(QMouseEvent *event)
     if (event->button() != Qt::LeftButton)
         return;
     // The program handles its clicks (Claude Code's panels); Shift+click
-    // keeps Duet's selection, as Shift+wheel keeps its history.
+    // keeps Kodamiko's selection, as Shift+wheel keeps its history.
     if (screen_->isMouseReporting() && !(event->modifiers() & Qt::ShiftModifier)) {
         reportingClick_ = true;
         screen_->sendLeftButtonPress(screenCellAt(event->position().toPoint()), event->modifiers());

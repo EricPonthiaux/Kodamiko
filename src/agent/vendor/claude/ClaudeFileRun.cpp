@@ -74,7 +74,7 @@ QStringList arguments(const QString &prompt,
 QStringList reviewArguments(const AgentReviewRun &run)
 {
     // The prompt first: --allowedTools takes every argument that follows.
-    // No MCP server: the user's own could write, and Duet's would hand over
+    // No MCP server: the user's own could write, and Kodamiko's would hand over
     // the editor's state, and with it the writing session's context.
     QStringList arguments{run.prompt,
                           QStringLiteral("--output-format"),

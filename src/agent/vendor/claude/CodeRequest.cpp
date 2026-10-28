@@ -52,7 +52,7 @@ QString unsavedNote(const Target &target)
     if (!target.unsaved)
         return {};
     return QStringLiteral(" The file has unsaved changes in the editor: the line numbers refer to its text "
-                          "there, which Duet's get_file_text tool returns.");
+                          "there, which Kodamiko's get_file_text tool returns.");
 }
 
 // "error at @src/a.cpp#L42: use of undeclared identifier 'x' (clangd)"
@@ -145,7 +145,7 @@ QString fixPrompt(const Problems &problems, const QString &projectFolder, bool u
     // Claude reads the files from disk: the line numbers would not match.
     if (unsaved)
         lines.append(QStringLiteral("The files have unsaved changes in the editor: the line numbers refer to their "
-                                    "text there, which Duet's get_file_text tool returns."));
+                                    "text there, which Kodamiko's get_file_text tool returns."));
     return lines.join(QLatin1Char('\n'));
 }
 

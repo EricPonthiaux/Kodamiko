@@ -181,7 +181,7 @@ void forgetCredentials(const RepositoryInfo &repository)
         QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("remote"), QStringLiteral("get-url"),
                                                         QStringLiteral("--push"), remote}))
             .trimmed();
-    // "reject" has every helper erase what it saved for that server: Duet's
+    // "reject" has every helper erase what it saved for that server: Kodamiko's
     // cache and the user's own (macOS Keychain, Git Credential Manager…).
     Git::run(repository.workDir, {QStringLiteral("credential"), QStringLiteral("reject")},
              QStringLiteral("url=%1\n\n").arg(url).toUtf8());

@@ -6,7 +6,7 @@
 
 #include <QString>
 
-// A new project made from a recipe: its files, then its .duet/run.json.
+// A new project made from a recipe: its files, then its .kodamiko/run.json.
 namespace ProjectCreation {
 
 // "my_app" from "My App!": what the build files name the project (CMake
@@ -21,7 +21,7 @@ bool isFreeFolder(const QString &folder);
 // Creates `folder` with the files of `given`, {{identifier}} replaced by
 // identifierOf(the folder's name) and the placeholders of its parameters by
 // the values it was given (see Recipe::withValues; the first ones if none),
-// and a .duet/run.json with its run configurations unless its files have
+// and a .kodamiko/run.json with its run configurations unless its files have
 // one; `folder` must be free
 // (isFreeFolder). Returns false with a message in `error` if a file cannot
 // be written; the files written before the failure stay.

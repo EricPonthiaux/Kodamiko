@@ -11,7 +11,7 @@
 #include "agent/EditErrors.h"
 #include "agent/EditorContext.h"
 #include "agent/PermissionPrompts.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "agent/vendor/claude/ClaudeUsage.h"
 #include "agent/vendor/claude/EffectiveSettings.h"
@@ -39,7 +39,7 @@
 #include "workspace/ChoicePopup.h"
 #include "workspace/EntryPopups.h"
 #include "workspace/FileTreeView.h"
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
 #include "viewers/DiagramCheck.h"
 #include "viewers/DiagramGenerationView.h"
 #include "viewers/DiagramView.h"
@@ -186,7 +186,7 @@ bool MainWindow::startClaudeSession(QString *error, SessionStart start)
     options.start = start;
     options.name = QFileInfo(folder_).fileName(); // the agents' sessions address it by the project's name
     if (exposeTools_->isChecked())
-        options.mcpReadOnlyTools = mcpRegistry_.readOnlyToolPermissions(QStringLiteral("duet"));
+        options.mcpReadOnlyTools = mcpRegistry_.readOnlyToolPermissions(QStringLiteral("kodamiko"));
     addRecipesToSession(options);
     const std::optional<ProcessSpec> spec =
         agentProvider_->sessionProcess(folder_, hookServer_.serverName(), options, &launchError);
@@ -295,7 +295,7 @@ void MainWindow::showEffectiveSettings(bool open)
         return;
     QWidget *current = editorTabs_->currentWidget();
     const QList<EffectiveSettings::Layer> layers =
-        EffectiveSettings::read(folder_, {}); // without Duet's hooks: not for the user to see
+        EffectiveSettings::read(folder_, {}); // without Kodamiko's hooks: not for the user to see
     editorTabs_->showText(title, EffectiveSettings::render(layers, folder_), QStringLiteral("json"),
                           QStringLiteral("settings"));
     if (open)
@@ -427,8 +427,8 @@ void MainWindow::notify(const QString &title, const QString &message)
         return;
     QApplication::alert(this);
     // In the window, the dot on the tabs is enough.
-    const bool isDuetActive = isActiveWindow() || (claudeTerminal_ && claudeTerminal_->isActiveWindow());
-    if (isDuetActive)
+    const bool isKDKActive = isActiveWindow() || (claudeTerminal_ && claudeTerminal_->isActiveWindow());
+    if (isKDKActive)
         return;
     qApp->setBadgeNumber(1); // cleared when the window comes back
     const QPointer<MainWindow> window(this);
@@ -450,7 +450,7 @@ void MainWindow::showTrayNotification(const QString &title, const QString &messa
         if (icon.isNull())
             icon = style()->standardIcon(QStyle::SP_MessageBoxInformation);
         trayIcon_ = new QSystemTrayIcon(icon, this);
-        trayIcon_->setToolTip(QStringLiteral("Duet"));
+        trayIcon_->setToolTip(QStringLiteral("Kodamiko"));
         connect(trayIcon_, &QSystemTrayIcon::messageClicked, this, &MainWindow::bringClaudeSessionToFront);
         connect(trayIcon_, &QSystemTrayIcon::activated, this, &MainWindow::bringClaudeSessionToFront);
     }
@@ -485,7 +485,7 @@ void MainWindow::clearNotifications()
 
 void MainWindow::registerMcpTools()
 {
-    DuetToolContext context;
+    KDKToolContext context;
     context.folder = [this] { return folder_; };
     context.tabs = editorTabs_;
     context.navigator = navigator_;
@@ -516,14 +516,14 @@ void MainWindow::registerMcpTools()
         changesView_->showCommitMessage(message);
     };
     context.repositoryChanged = [this] { onRepositoryChanged(); };
-    DuetTools::registerEditorTools(mcpRegistry_, context);
-    DuetTools::registerWorkspaceTools(mcpRegistry_, context);
-    DuetTools::registerCodeTools(mcpRegistry_, context);
-    DuetTools::registerRefactoringTools(mcpRegistry_, context);
-    DuetTools::registerTerminalTools(mcpRegistry_, context);
-    DuetTools::registerGitTools(mcpRegistry_, context);
-#ifdef DUET_WITH_DIAGRAMS
-    DuetTools::registerDiagramTools(mcpRegistry_, context);
+    KDKTools::registerEditorTools(mcpRegistry_, context);
+    KDKTools::registerWorkspaceTools(mcpRegistry_, context);
+    KDKTools::registerCodeTools(mcpRegistry_, context);
+    KDKTools::registerRefactoringTools(mcpRegistry_, context);
+    KDKTools::registerTerminalTools(mcpRegistry_, context);
+    KDKTools::registerGitTools(mcpRegistry_, context);
+#ifdef KDK_WITH_DIAGRAMS
+    KDKTools::registerDiagramTools(mcpRegistry_, context);
 #endif
     mcpRegistry_.setConfirmer(
         [this](const QString &tool, const QString &what, const std::function<void(bool)> &answer) {
@@ -537,7 +537,7 @@ void MainWindow::registerMcpTools()
     editorMoved->setSingleShot(true);
     editorMoved->setInterval(400);
     connect(editorMoved, &QTimer::timeout, this,
-            [this] { mcpRegistry_.notifyResourceUpdated(QStringLiteral("duet://editor/state")); });
+            [this] { mcpRegistry_.notifyResourceUpdated(QStringLiteral("kodamiko://editor/state")); });
     connect(editorTabs_, &QTabWidget::currentChanged, editorMoved, qOverload<>(&QTimer::start));
     connect(editorTabs_, &EditorTabs::editorOpened, this, [editorMoved](EditorWidget *editor) {
         connect(editor, &QsciScintilla::cursorPositionChanged, editorMoved, qOverload<>(&QTimer::start));
@@ -546,7 +546,7 @@ void MainWindow::registerMcpTools()
     });
 }
 
-// A sensitive tool of Duet's (restore a snapshot, commit…) the agent wants
+// A sensitive tool of Kodamiko's (restore a snapshot, commit…) the agent wants
 // to run. Closing the message refuses it, as Deny does.
 void MainWindow::askToolConfirmation(const QString &tool, const QString &what, const std::function<void(bool)> &answer)
 {
@@ -575,16 +575,16 @@ void MainWindow::shareEditorContext()
 
 void MainWindow::guardGitCommands(const HookEvent &event)
 {
-    // Only the sessions with Duet's tools send their commands (see
+    // Only the sessions with Kodamiko's tools send their commands (see
     // ClaudeLauncher::GitInShell).
-    if (!gitThroughDuetTools_->isChecked())
+    if (!gitThroughKDKTools_->isChecked())
         return;
     const std::optional<QString> reason =
         GitCommandGuard::refusal(event.message, {.projectFolder = folder_, .workingDirectory = event.workingDirectory});
     if (!reason)
         return;
     hookServer_.respond(agentProvider_->denyToolReply(*reason));
-    showStatus(tr("%1 was sent to Duet's git tools instead of running git").arg(agentProvider_->name()));
+    showStatus(tr("%1 was sent to Kodamiko's git tools instead of running git").arg(agentProvider_->name()));
 }
 
 void MainWindow::guardUnsavedEdits(const QStringList &paths)
@@ -622,7 +622,7 @@ void MainWindow::reportEditErrors(const QStringList &paths)
 
 void MainWindow::followDiagramEdits(const QStringList &paths)
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     for (const QString &path : paths) {
         if (!DiagramView::isDiagramFile(path))
             continue;
@@ -672,7 +672,7 @@ void MainWindow::generateDiagram(const QString &folder)
 
 void MainWindow::drawDiagram(const QString &path, const DiagramKind &kind, const QString &description)
 {
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     setMode(Mode::Edit);
     auto *view = new DiagramGenerationView({folder_, path, kind.id, kind.title, description, agentProvider_});
     editorTabs_->showPage(view, QFileInfo(path).fileName(), agentProvider_->iconName());
@@ -786,7 +786,7 @@ void MainWindow::explainWithFlowchart()
 {
     const DiagramKind flowchart = DiagramKinds::find(QStringLiteral("flowchart"));
     if (flowchart.id.isEmpty() || !agentProvider_->features().hasFileRuns) {
-        showStatus(tr("%1 cannot draw diagrams in this version of Duet").arg(agentProvider_->name()));
+        showStatus(tr("%1 cannot draw diagrams in this version of Kodamiko").arg(agentProvider_->name()));
         return;
     }
     const std::optional<CodeRequest::Target> target = currentCodeTarget();

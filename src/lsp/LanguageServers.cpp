@@ -204,7 +204,7 @@ void LanguageServers::setFolder(const QString &folder)
 
 void LanguageServers::setProject(const ProjectConfig &project, Toolchains *toolchains, const Additions &additions)
 {
-    // Downloads made meanwhile are seen (Duet's installs are listed from
+    // Downloads made meanwhile are seen (Kodamiko's installs are listed from
     // disk each time). The machine's runtimes are not probed again: that
     // runs programs, and the installer refreshes after a download.
     programPaths_.clear();
@@ -396,7 +396,7 @@ void LanguageServers::fail(const LanguageServerSpec &spec, const QString &error)
 
 bool LanguageServers::runScriptWithNode(const LanguageServerSpec &spec, ServerCommand &command)
 {
-    // Duet's npm installs are scripts, run with a Node recent enough.
+    // Kodamiko's npm installs are scripts, run with a Node recent enough.
     const ToolSpec *tool = ToolCatalog::find(spec.name);
     const bool isCatalogScript =
         tool && tool->script && toolchains_ && command.program.startsWith(toolchains_->root() + QLatin1Char('/'));
@@ -577,7 +577,7 @@ QJsonObject jdtlsSettings()
                                           "io.micrometer.shaded.*", "javax.swing.text.html.HTML.Tag"}},
              // A method comes with its parameters' names to fill in.
              {"guessMethodArguments", "insertParameterNames"},
-             // Templates are Duet's own (see PostfixTemplateProvider), not
+             // Templates are Kodamiko's own (see PostfixTemplateProvider), not
              // twice in the list.
              {"postfix", QJsonObject{{"enabled", false}}},
              // Values reached through a chain of calls, for the expected

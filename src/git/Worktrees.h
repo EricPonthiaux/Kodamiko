@@ -9,13 +9,13 @@
 
 #include <optional>
 
-// A worktree Duet created for a Claude session besides the main one: a
+// A worktree Kodamiko created for a Claude session besides the main one: a
 // second working directory of the same repository, on a branch of its own,
 // so that the session's edits never touch the user's checkout.
 struct Worktree {
     QString name;       // "agent-1": also the session's name
     QString path;       // "<repository>/.claude/worktrees/agent-1"
-    QString branch;     // "duet/agent-1"
+    QString branch;     // "kodamiko/agent-1"
     QString baseCommit; // full identifier of the commit it started from
 };
 
@@ -43,7 +43,7 @@ QString folder(const RepositoryInfo &repository);
 // A name no worktree of the folder uses yet: "agent-1", "agent-2"…
 QString unusedName(const RepositoryInfo &repository);
 
-// Creates the worktree `name` on a new branch "duet/<name>" at HEAD. The
+// Creates the worktree `name` on a new branch "kodamiko/<name>" at HEAD. The
 // folder is excluded locally (.git/info/exclude, never the versioned
 // .gitignore), so the project tree, the search and git status ignore the
 // copies. Uncommitted changes of the checkout do not follow.

@@ -56,7 +56,7 @@ jobs:
 
       # LTO is off in the CI for now.
       - name: Configure
-        run: cmake --preset default -DDUET_LTO=OFF
+        run: cmake --preset default -DKDK_LTO=OFF
 
       - name: Build
         run: cmake --build --preset default
@@ -91,46 +91,46 @@ jobs:
       - name: Linux package (AppImage)
         if: runner.os == 'Linux'
         run: |
-          cmake --install build --component duet --prefix AppDir/usr
+          cmake --install build --component kodamiko --prefix AppDir/usr
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
-            --desktop-file AppDir/usr/share/applications/duet.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/duet.svg \
-            --executable AppDir/usr/bin/duet-hook \
-            --executable AppDir/usr/bin/duet-mcp \
-            --executable AppDir/usr/bin/duet-askpass
+            --desktop-file AppDir/usr/share/applications/kodamiko.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/kodamiko.svg \
+            --executable AppDir/usr/bin/kodamiko-hook \
+            --executable AppDir/usr/bin/kodamiko-mcp \
+            --executable AppDir/usr/bin/kodamiko-askpass
 
       - name: Windows package (zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake --install build --component duet --prefix Duet
-          windeployqt --release --no-translations Duet/bin/duet.exe
-          Compress-Archive -Path Duet/* -DestinationPath Duet-windows.zip
+          cmake --install build --component kodamiko --prefix Kodamiko
+          windeployqt --release --no-translations Kodamiko/bin/kodamiko.exe
+          Compress-Archive -Path Kodamiko/* -DestinationPath Kodamiko-windows.zip
 
       - name: macOS package (dmg)
         if: runner.os == 'macOS'
         run: |
-          cmake --install build --component duet --prefix dist
-          macdeployqt dist/Duet.app -executable=dist/Duet.app/Contents/MacOS/duet-hook \
-            -executable=dist/Duet.app/Contents/MacOS/duet-mcp \
-            -executable=dist/Duet.app/Contents/MacOS/duet-askpass
+          cmake --install build --component kodamiko --prefix dist
+          macdeployqt dist/Kodamiko.app -executable=dist/Kodamiko.app/Contents/MacOS/kodamiko-hook \
+            -executable=dist/Kodamiko.app/Contents/MacOS/kodamiko-mcp \
+            -executable=dist/Kodamiko.app/Contents/MacOS/kodamiko-askpass
           # macdeployqt rewrites the binaries and leaves the bundle unsealed:
           # macOS calls an unsealed download damaged and refuses to open it.
           # An ad hoc signature seals it; without a Developer ID, Gatekeeper
           # still asks to confirm the first launch.
-          codesign --force --deep --sign - dist/Duet.app
-          codesign --verify --deep --strict dist/Duet.app
-          hdiutil create -volname Duet -srcfolder dist/Duet.app -format UDZO dist/Duet.dmg
+          codesign --force --deep --sign - dist/Kodamiko.app
+          codesign --verify --deep --strict dist/Kodamiko.app
+          hdiutil create -volname Kodamiko -srcfolder dist/Kodamiko.app -format UDZO dist/Kodamiko.dmg
 
       - name: Upload the package
         uses: actions/upload-artifact@v4
         with:
-          name: duet-${{ matrix.os }}
+          name: kodamiko-${{ matrix.os }}
           path: |
             *.AppImage
-            Duet-windows.zip
+            Kodamiko-windows.zip
             dist/*.dmg
           if-no-files-found: ignore

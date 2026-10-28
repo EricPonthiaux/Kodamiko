@@ -48,7 +48,7 @@ private slots:
 
     void findsNoMissingProgramBesideTheApplication()
     {
-        QVERIFY(Executables::besideTheApplication("no-such-program-of-duet").isEmpty());
+        QVERIFY(Executables::besideTheApplication("no-such-program-of-kodamiko").isEmpty());
     }
 };
 

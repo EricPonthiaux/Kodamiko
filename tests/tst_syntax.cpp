@@ -71,12 +71,13 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        // Duet's first, then Duet-Night, Duet-Violet, Duet-Stratos, Duet-Bloom, Duet-Clay and the Material ones.
+        // Kodamiko's first, then Kodamiko-Night, Kodamiko-Violet, Kodamiko-Stratos, Kodamiko-Bloom, Kodamiko-Clay and
+        // the Material ones.
         QCOMPARE(names.size(), 14);
-        QCOMPARE(names.first(), QString("duet"));
-        QVERIFY(std::ranges::all_of(names.mid(1), [](const QString &name) { return name.startsWith("duet-"); }));
-        const Theme violet = Theme::named("duet-violet");
-        QCOMPARE(violet.name, QString("duet-violet"));
+        QCOMPARE(names.first(), QString("kodamiko"));
+        QVERIFY(std::ranges::all_of(names.mid(1), [](const QString &name) { return name.startsWith("kodamiko-"); }));
+        const Theme violet = Theme::named("kodamiko-violet");
+        QCOMPARE(violet.name, QString("kodamiko-violet"));
         QVERIFY(violet.accent.isValid() && violet.window.isValid() && violet.findHighlight.isValid());
         QVERIFY(violet.syntaxStyleIndex(u"function.method") >= 0);
         // They are all dark.
@@ -88,7 +89,7 @@ private slots:
                                         theme.currentLineNumber, theme.error, theme.warning})
                 QVERIFY2(color.isValid(), qPrintable(theme.name));
         }
-        QCOMPARE(Theme::named("unknown").name, QString("duet"));
+        QCOMPARE(Theme::named("unknown").name, QString("kodamiko"));
     }
 
     void materialThemesTakeOnlyMaterialDesignColors()
@@ -100,7 +101,7 @@ private slots:
                                        [&color](const char *swatch) { return QColor(swatch) == color; });
         };
         for (const Theme &theme : themes) {
-            QVERIFY2(theme.title.startsWith("Duet-"), qPrintable(theme.title));
+            QVERIFY2(theme.title.startsWith("Kodamiko-"), qPrintable(theme.title));
             for (const QColor &color : {theme.background,
                                         theme.foreground,
                                         theme.caret,
@@ -202,7 +203,7 @@ private slots:
 
     void highlightsC()
     {
-        const Theme theme = Theme::duet();
+        const Theme theme = Theme::kodamiko();
         QsciScintilla editor;
         const auto h = highlight(editor, "c", "int main(void) {\n  // note\n  return puts(\"hi\");\n}\n", theme);
         QCOMPARE(styleOfWord(editor, "int"), styleFor(theme, "type"));
@@ -214,7 +215,7 @@ private slots:
 
     void highlightsCppOverC()
     {
-        const Theme theme = Theme::duet();
+        const Theme theme = Theme::kodamiko();
         QsciScintilla editor;
         const auto h = highlight(editor, "cpp", "namespace app { class Foo {}; }\n", theme);
         QCOMPARE(styleOfWord(editor, "namespace"), styleFor(theme, "keyword"));
@@ -223,7 +224,7 @@ private slots:
 
     void highlightsTemplateTypes()
     {
-        const Theme theme = Theme::duet();
+        const Theme theme = Theme::kodamiko();
         QsciScintilla editor;
         const auto h = highlight(
             editor, "cpp", "// éléments\ntemplate <typename T>\nT sum(T a) { T total{}; return total; }\n", theme);
@@ -235,7 +236,7 @@ private slots:
 
     void highlightsJava()
     {
-        const Theme theme = Theme::duet();
+        const Theme theme = Theme::kodamiko();
         QsciScintilla editor;
         const auto h = highlight(editor, "java", "public class App { static final int MAX = 3; }\n", theme);
         QCOMPARE(styleOfWord(editor, "public"), styleFor(theme, "keyword"));
@@ -245,7 +246,7 @@ private slots:
 
     void highlightsJavaScript()
     {
-        const Theme theme = Theme::duet();
+        const Theme theme = Theme::kodamiko();
         QsciScintilla editor;
         const auto h = highlight(editor, "javascript", "const greet = (name) => console.log(`hi ${name}`);\n", theme);
         QCOMPARE(styleOfWord(editor, "const"), styleFor(theme, "keyword"));
@@ -255,7 +256,7 @@ private slots:
 
     void restylesAfterEdit()
     {
-        const Theme theme = Theme::duet();
+        const Theme theme = Theme::kodamiko();
         QsciScintilla editor;
         const auto h = highlight(editor, "c", "int x;\n", theme);
         QCOMPARE(styleOfWord(editor, "x"), styleFor(theme, "variable"));
@@ -268,7 +269,7 @@ private slots:
 
     void fallsBackToLexerForJson()
     {
-        const Theme theme = Theme::duet();
+        const Theme theme = Theme::kodamiko();
         QsciScintilla editor;
         const auto h = highlight(editor, "json", "{\"key\": \"value\"}\n", theme);
         QVERIFY(editor.lexer() != nullptr);
@@ -292,7 +293,7 @@ private slots:
                                  "#endif\n"            // 11
                                  "int z(int a,\n"      // 12: two lines, nothing to hide
                                  "      int b);\n",
-                                 Theme::duet());
+                                 Theme::kodamiko());
         const auto depth = [&editor](int line) {
             return static_cast<int>((editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) &
                                      QsciScintillaBase::SC_FOLDLEVELNUMBERMASK) -

@@ -21,13 +21,13 @@ namespace {
 
 const QRegularExpression &layoutLine()
 {
-    static const QRegularExpression pattern(QStringLiteral("^\\s*(?:%%|')\\s*duet\\s+(\\{.*\\})\\s*$"));
+    static const QRegularExpression pattern(QStringLiteral("^\\s*(?:%%|')\\s*kodamiko\\s+(\\{.*\\})\\s*$"));
     return pattern;
 }
 
 const QRegularExpression &layoutHeader()
 {
-    static const QRegularExpression pattern(QStringLiteral("^\\s*(?:%%|')\\s*Layout kept by Duet\\b"));
+    static const QRegularExpression pattern(QStringLiteral("^\\s*(?:%%|')\\s*Layout kept by Kodamiko\\b"));
     return pattern;
 }
 
@@ -259,7 +259,7 @@ QJsonObject linkLayoutEntry(const Board &board, const Link &l, const QString &ke
 
 QStringList layoutLines(const Board &board, const Codec &codec)
 {
-    const QString prefix = commentPrefix(codec) + QStringLiteral(" duet ");
+    const QString prefix = commentPrefix(codec) + QStringLiteral(" kodamiko ");
     const auto line = [&prefix](const QJsonObject &entry) {
         return prefix + QString::fromUtf8(QJsonDocument(entry).toJson(QJsonDocument::Compact));
     };
@@ -279,7 +279,8 @@ QStringList layoutLines(const Board &board, const Codec &codec)
             lines.append(line(entry));
     }
     if (!lines.isEmpty())
-        lines.prepend(commentPrefix(codec) + QStringLiteral(" Layout kept by Duet (positions, sizes, colors, curves)"));
+        lines.prepend(commentPrefix(codec) +
+                      QStringLiteral(" Layout kept by Kodamiko (positions, sizes, colors, curves)"));
     return lines;
 }
 
@@ -451,7 +452,7 @@ std::optional<Loaded> applySource(Board &board, const Codec &codec, const QStrin
     const QString cleaned = splitLayout(text, ignored);
     const Codec *target = codecFor(codec.language(), cleaned);
     if (!target) {
-        setError(error, QStringLiteral("This is not a diagram Duet reads"));
+        setError(error, QStringLiteral("This is not a diagram Kodamiko reads"));
         return std::nullopt;
     }
     Board scratch;

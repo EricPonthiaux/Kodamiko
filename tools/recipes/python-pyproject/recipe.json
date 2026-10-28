@@ -1,5 +1,5 @@
 {
-    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
+    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Kodamiko/main/tools/schemas/recipe.schema.json",
     "title": "Python · pyproject",
     "language": "python",
     "description": "pyproject.toml (Python 3.12) and a package in src/. Build checks the syntax of every module.",

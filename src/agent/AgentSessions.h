@@ -18,7 +18,7 @@
 
 class TerminalWidget;
 
-// The agent sessions Duet runs besides the main one, each in a worktree of
+// The agent sessions Kodamiko runs besides the main one, each in a worktree of
 // its own (see Worktrees), and what each is doing, deduced from its hooks.
 // Their hooks never reach the editor: it shows the main checkout, where
 // these sessions edit nothing.

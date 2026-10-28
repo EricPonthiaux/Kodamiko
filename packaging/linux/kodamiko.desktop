@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Duet
+Name=Kodamiko
 Comment=Source code editor with an integrated Claude terminal
-Exec=duet %F
-Icon=duet
+Exec=kodamiko %F
+Icon=kodamiko
 Terminal=false
 Categories=Development;TextEditor;IDE;

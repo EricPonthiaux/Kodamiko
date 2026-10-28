@@ -9,7 +9,7 @@
 #include "agent/EditorContext.h"
 #include "agent/NewAgentPopup.h"
 #include "agent/ReviewPage.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
@@ -177,7 +177,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     shareEditorContext_->setChecked(preferences.shareEditorContext);
     reportEditErrors_->setChecked(preferences.reportEditErrors);
     exposeTools_->setChecked(preferences.exposeTools);
-    gitThroughDuetTools_->setChecked(preferences.gitThroughDuetTools);
+    gitThroughKDKTools_->setChecked(preferences.gitThroughKDKTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     editorTabs_->setEditorOptions(preferences.editor);
     languageServers_->setEnabled(preferences.languageServers);

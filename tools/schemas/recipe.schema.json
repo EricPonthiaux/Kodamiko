@@ -1,7 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
-    "title": "Duet recipe",
+    "$id": "https://raw.githubusercontent.com/EricPonthiaux/Kodamiko/main/tools/schemas/recipe.schema.json",
+    "title": "Kodamiko recipe",
     "description": "A recipe's recipe.json: how to make one kind of project on one system. Its folder also holds files/ (the new project's files), instructions.md (added to the agent's system prompt) and skills/ (the agent's skills there), all optional.",
     "type": "object",
     "required": [
@@ -53,14 +53,14 @@
             "additionalProperties": false
         },
         "requires": {
-            "description": "The tools its projects need: Duet downloads those missing to ~/.duet/tools, and puts them in the project's environment as each one says.",
+            "description": "The tools its projects need: Kodamiko downloads those missing to ~/.kodamiko/tools, and puts them in the project's environment as each one says.",
             "type": "array",
             "items": {
                 "$ref": "#/definitions/requirement"
             }
         },
         "run": {
-            "description": "Written to the new project's .duet/run.json; added to an existing project's own configurations. {{identifier}} in a command or a folder stands for the project's identifier.",
+            "description": "Written to the new project's .kodamiko/run.json; added to an existing project's own configurations. {{identifier}} in a command or a folder stands for the project's identifier.",
             "type": "array",
             "items": {
                 "$ref": "run.schema.json#/definitions/configuration"
@@ -151,7 +151,7 @@
             }
         },
         "languageServers": {
-            "description": "Language servers for languages Duet has none for (Angular's templates): a Node script of a tool the recipe requires.",
+            "description": "Language servers for languages Kodamiko has none for (Angular's templates): a Node script of a tool the recipe requires.",
             "type": "array",
             "items": {
                 "type": "object",
@@ -194,7 +194,7 @@
             }
         },
         "serverOptions": {
-            "description": "What the recipe adds to the options of a server Duet knows, by its name (\"typescript-language-server\"): objects merged key by key, anything else replaced. {{project}} in their texts stands for the project's folder.",
+            "description": "What the recipe adds to the options of a server Kodamiko knows, by its name (\"typescript-language-server\"): objects merged key by key, anything else replaced. {{project}} in their texts stands for the project's folder.",
             "type": "object",
             "additionalProperties": {
                 "type": "object",
@@ -240,7 +240,7 @@
             ],
             "properties": {
                 "tool": {
-                    "description": "The tool's id: one Duet knows how to install (\"jdk\", \"node\", \"qt\"), or any other with a \"download\" or a \"program\" to look for.",
+                    "description": "The tool's id: one Kodamiko knows how to install (\"jdk\", \"node\", \"qt\"), or any other with a \"download\" or a \"program\" to look for.",
                     "type": "string",
                     "minLength": 1
                 },

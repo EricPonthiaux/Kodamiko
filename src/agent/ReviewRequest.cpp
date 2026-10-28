@@ -26,12 +26,14 @@ QString checkNote(const std::optional<Check> &check)
     if (!check)
         return {};
     if (check->result.hasPassed())
-        return QStringLiteral("Before this review, Duet ran the project's check `%1`: it passed. Do not report what "
-                              "it would catch (code that does not build, failing tests, lint warnings).\n\n")
+        return QStringLiteral(
+                   "Before this review, Kodamiko ran the project's check `%1`: it passed. Do not report what "
+                   "it would catch (code that does not build, failing tests, lint warnings).\n\n")
             .arg(check->command);
-    return QStringLiteral("Before this review, Duet ran the project's check `%1`: it failed, with exit code %2. The "
-                          "last lines of its output:\n```\n%3\n```\nReport first the problems of the code that "
-                          "cause this failure.\n\n")
+    return QStringLiteral(
+               "Before this review, Kodamiko ran the project's check `%1`: it failed, with exit code %2. The "
+               "last lines of its output:\n```\n%3\n```\nReport first the problems of the code that "
+               "cause this failure.\n\n")
         .arg(check->command, QString::number(check->result.exitCode), check->result.lastLines(reportedOutputLines));
 }
 

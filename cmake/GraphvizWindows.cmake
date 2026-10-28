@@ -18,7 +18,7 @@ FetchContent_MakeAvailable(graphviz)
 
 find_package(graphviz CONFIG REQUIRED PATHS ${graphviz_SOURCE_DIR} NO_DEFAULT_PATH)
 # The release's gvc target links zlib.lib by a path of Graphviz's build
-# machine: Duet does not call zlib, gvc.dll loads zlib1.dll by itself.
+# machine: Kodamiko does not call zlib, gvc.dll loads zlib1.dll by itself.
 set_property(TARGET graphviz::gvc PROPERTY INTERFACE_LINK_LIBRARIES graphviz::cgraph)
 # GVDLL: the headers declare the functions imported from the DLLs.
 set_property(TARGET graphviz::gvc graphviz::cgraph PROPERTY INTERFACE_COMPILE_DEFINITIONS GVDLL)
@@ -42,5 +42,5 @@ set(GRAPHVIZ_RUNTIME_DLLS "")
 foreach(dll ${graphviz_dlls})
     list(APPEND GRAPHVIZ_RUNTIME_DLLS ${graphviz_SOURCE_DIR}/bin/${dll}.dll)
 endforeach()
-# Next to duet.exe in the build tree too, where the tests find them.
+# Next to kodamiko.exe in the build tree too, where the tests find them.
 file(COPY ${GRAPHVIZ_RUNTIME_DLLS} DESTINATION ${CMAKE_BINARY_DIR}/bin)

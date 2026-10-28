@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "agent/mcp/McpRegistry.h"
 #include "agent/mcp/McpSession.h"
 #include "diagnostics/ProblemStore.h"
@@ -19,7 +19,7 @@
 #include "refactor/RefactoringPreviewPopup.h"
 #include "terminal/ProcessSpec.h"
 #include "terminal/TerminalWidget.h"
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
 #include "viewers/DiagramView.h"
 #include "viewers/diagram/Board.h"
 #endif
@@ -49,7 +49,7 @@ void write(const QTemporaryDir &dir, const QString &path, const QByteArray &cont
 struct Editor {
     Q_DISABLE_COPY_MOVE(Editor)
     QTemporaryDir folder;
-    EditorTabs tabs{Theme::duet()};
+    EditorTabs tabs{Theme::kodamiko()};
     SymbolIndex symbols;
     CodeNavigator navigator{&tabs, &symbols};
     McpRegistry registry;
@@ -63,7 +63,7 @@ struct Editor {
 
     Editor()
     {
-        DuetToolContext context;
+        KDKToolContext context;
         context.folder = [this] { return folder.path(); };
         context.tabs = &tabs;
         context.navigator = &navigator;
@@ -86,12 +86,12 @@ struct Editor {
             changesShown = path.isEmpty() ? QStringLiteral("*") : path;
         };
         context.setCommitMessage = [this](const QString &text) { commitMessage = text; };
-        DuetTools::registerEditorTools(registry, context);
-        DuetTools::registerWorkspaceTools(registry, context);
-        DuetTools::registerGitTools(registry, context);
-        DuetTools::registerTerminalTools(registry, context);
-#ifdef DUET_WITH_DIAGRAMS
-        DuetTools::registerDiagramTools(registry, context);
+        KDKTools::registerEditorTools(registry, context);
+        KDKTools::registerWorkspaceTools(registry, context);
+        KDKTools::registerGitTools(registry, context);
+        KDKTools::registerTerminalTools(registry, context);
+#ifdef KDK_WITH_DIAGRAMS
+        KDKTools::registerDiagramTools(registry, context);
 #endif
         registry.setConfirmer([this](const QString &, const QString &what, const std::function<void(bool)> &answer) {
             asked.append(what);
@@ -132,7 +132,7 @@ struct Editor {
 struct CodeEditor {
     Q_DISABLE_COPY_MOVE(CodeEditor)
     QTemporaryDir folder;
-    EditorTabs tabs{Theme::duet()};
+    EditorTabs tabs{Theme::kodamiko()};
     SymbolIndex symbols;
     CodeNavigator navigator{&tabs, &symbols};
     LanguageServers servers;
@@ -150,7 +150,7 @@ struct CodeEditor {
         QStandardPaths::setTestModeEnabled(true); // the index's cache
         servers.setFolder(folder.path());
         tabs.show();
-        DuetToolContext context;
+        KDKToolContext context;
         context.folder = [this] { return folder.path(); };
         context.tabs = &tabs;
         context.navigator = &navigator;
@@ -158,8 +158,8 @@ struct CodeEditor {
         context.languageServers = &servers;
         context.problems = &problems;
         context.intelligence = &intelligence;
-        DuetTools::registerCodeTools(registry, context);
-        DuetTools::registerRefactoringTools(registry, context);
+        KDKTools::registerCodeTools(registry, context);
+        KDKTools::registerRefactoringTools(registry, context);
         user.setInterval(20);
         QObject::connect(&user, &QTimer::timeout, [this] {
             auto *preview = tabs.window()->findChild<RefactoringPreviewPopup *>();
@@ -565,7 +565,7 @@ private slots:
                     .contains(QStringLiteral("hello")));
     }
 
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     // A diagram the user looks at: its content and selection, changes made
     // in the open diagram.
     void readsAndChangesDiagrams()

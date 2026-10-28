@@ -1,6 +1,6 @@
 # Security policy
 
-Duet runs an AI agent next to your code: it starts processes, runs
+Kodamiko runs an AI agent next to your code: it starts processes, runs
 commands in terminals, reads and writes files, and serves tools to Claude
 Code over a local socket. A flaw there can reach your machine, so please
 report it privately.
@@ -16,19 +16,19 @@ published with credit to you, unless you prefer otherwise.
 
 ## Supported versions
 
-Duet is in preview: only the latest release and the `main` branch receive
+Kodamiko is in preview: only the latest release and the `main` branch receive
 fixes.
 
 ## In scope
 
 For example:
 
-- a sensitive tool of Duet's MCP server (commit, push, discard, restore a
+- a sensitive tool of Kodamiko's MCP server (commit, push, discard, restore a
   snapshot…) that runs without the user's *Allow*;
-- another local user or process reaching Duet's hook or MCP sockets;
+- another local user or process reaching Kodamiko's hook or MCP sockets;
 - a project file (settings, run configurations, diagrams, Markdown) that
   runs code or reads files when it is merely opened;
 - credentials leaking from the git askpass helper or the logs.
 
 Claude Code's own behavior, and the commands the user allows it to run, are
-outside Duet's scope: report those to Anthropic.
+outside Kodamiko's scope: report those to Anthropic.

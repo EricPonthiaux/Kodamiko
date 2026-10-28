@@ -16,7 +16,7 @@
 //   case.json: {"name": "…", "newName": "…"}
 // - rename/: a rename through the language server, the whole way
 //   (popup, server, comments and strings, preview, Undo Refactoring);
-//   skipped when the language's server is not installed in Duet's
+//   skipped when the language's server is not installed in Kodamiko's
 //   toolchains.
 //   case.json: {"newName": "…", "commentsAndStrings": true}
 // - changeSignature/: Change Signature through the language server at the
@@ -86,7 +86,7 @@ struct Copied {
 
 QString corpusFolder()
 {
-    return QStringLiteral(DUET_REFACTORING_CORPUS);
+    return QStringLiteral(KDK_REFACTORING_CORPUS);
 }
 
 Tree readTree(const QString &root)
@@ -196,7 +196,7 @@ void indexFolder(OccurrenceIndex &index, const QString &root)
     QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(), 30000);
 }
 
-// Where the user's Duet downloaded its language servers.
+// Where the user's Kodamiko downloaded its language servers.
 QString userToolchains()
 {
     return Toolchains::defaultRoot();
@@ -235,12 +235,12 @@ std::optional<LanguageSetup> serverSetup(const QString &languageId, const Toolch
     return LanguageSetup{family, true, {}, {}, server, version};
 }
 
-// A project of the corpus open in Duet's code intelligence, with its
+// A project of the corpus open in Kodamiko's code intelligence, with its
 // language server.
 struct ServerProject {
     QTemporaryDir dir;
     Toolchains toolchains{userToolchains(), true};
-    EditorTabs tabs{Theme::duet()};
+    EditorTabs tabs{Theme::kodamiko()};
     SymbolIndex symbols;
     LanguageServers servers;
     CodeNavigator navigator{&tabs, &symbols};
@@ -404,7 +404,7 @@ private slots:
                 moves.append({from, to});
         }
         const Tree moved = readTree(dir.path());
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         LanguageServers servers;
 
         const WorkspaceEdit edit = FileReferences::update({moves, dir.path(), &index.store(), {}});
@@ -431,7 +431,7 @@ private slots:
         const QString language = LanguageRegistry::languageForFile(path);
         const QString source = caseOf(folder).value("source").toString();
         const Tree unmarked = withoutMarker(before);
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         LanguageServers servers;
 
         const MoveClass::Result result =
@@ -469,7 +469,7 @@ private slots:
         for (const QString &path : before.keys())
             everyFile.changes.append(DocumentEdit{dir.filePath(path), std::nullopt, {}});
         const QJsonObject description = caseOf(folder);
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         LanguageServers servers;
 
         const RenameAnalysis::Result analysis = RenameAnalysis::analyze({

@@ -121,7 +121,7 @@ SnapshotsPopup::SnapshotsPopup(GitCommands *commands, const Theme &theme, QWidge
     , list_(new QListWidget(this))
 {
     // The header says what snapshots are.
-    header_->setSubtitle(tr("Duet keeps a copy of your files before discarding changes, and of the whole working "
+    header_->setSubtitle(tr("Kodamiko keeps a copy of your files before discarding changes, and of the whole working "
                             "directory before each prompt to the agent."));
     connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 

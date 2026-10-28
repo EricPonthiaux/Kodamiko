@@ -38,7 +38,7 @@ bool FileOpenRouter::eventFilter(QObject *watched, QEvent *event)
         return QObject::eventFilter(watched, event);
     const QString path = static_cast<QFileOpenEvent *>(event)->file();
     if (!QFileInfo(path).isDir()) {
-        qWarning("Duet opens folders, not files: %s was not opened", qPrintable(QDir::toNativeSeparators(path)));
+        qWarning("Kodamiko opens folders, not files: %s was not opened", qPrintable(QDir::toNativeSeparators(path)));
         return true;
     }
     open(QDir(path).absolutePath());

@@ -15,7 +15,7 @@
 
 namespace {
 
-// What Duet understands of the protocol: completion with snippets (the
+// What Kodamiko understands of the protocol: completion with snippets (the
 // first argument selected) and edits resolved once chosen (imports).
 QJsonObject clientCapabilities()
 {
@@ -222,7 +222,7 @@ void LspClient::start()
 
     QJsonObject params{
         {"processId", QCoreApplication::applicationPid()},
-        {"clientInfo", QJsonObject{{"name", "Duet"}}},
+        {"clientInfo", QJsonObject{{"name", "Kodamiko"}}},
         {"rootUri", QUrl::fromLocalFile(rootFolder_).toString()},
         {"workspaceFolders", QJsonArray{QJsonObject{{"uri", QUrl::fromLocalFile(rootFolder_).toString()},
                                                     {"name", QFileInfo(rootFolder_).fileName()}}}},

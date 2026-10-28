@@ -22,7 +22,7 @@ BrandLogo::BrandLogo(const Theme *theme, QWidget *parent)
         updateGeometry();
     });
     setAttribute(Qt::WA_TransparentForMouseEvents);
-    setToolTip(QStringLiteral("Duet"));
+    setToolTip(QStringLiteral("Kodamiko"));
 }
 
 void BrandLogo::setPlaceWidth(int pixels)

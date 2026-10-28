@@ -7,7 +7,7 @@
 
 class PopupHeader;
 
-// About Duet: its mark, which grows in each time the popup opens, its name,
+// About Kodamiko: its mark, which grows in each time the popup opens, its name,
 // its version, the author's email addresses (they open the user's mail
 // program), a rotating quotation about writing software and "Made with love"
 // beside a beating heart.

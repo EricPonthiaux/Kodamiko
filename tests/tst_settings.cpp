@@ -29,7 +29,7 @@ namespace {
 // A font's size in the points of Preferences ▸ Fonts.
 int preferencePoints(const QFont &font)
 {
-    return qRound(AppFonts::duetPoints(font.pointSizeF()));
+    return qRound(AppFonts::kdkPoints(font.pointSizeF()));
 }
 
 } // namespace
@@ -42,7 +42,7 @@ private slots:
     void initTestCase()
     {
         // Settings of the tests, not the user's.
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_settings"));
         QSettings().clear();
     }
@@ -53,7 +53,7 @@ private slots:
     {
         Preferences preferences;
         QCOMPARE(Preferences::load(), preferences); // the defaults
-        preferences.theme = QStringLiteral("duet-cocoa");
+        preferences.theme = QStringLiteral("kodamiko-cocoa");
         preferences.codeFontSize = 14;
         preferences.interfaceFontSize = 12;
         preferences.treeFontSize = 15;
@@ -68,7 +68,7 @@ private slots:
         QCOMPARE(Preferences::load(), preferences);
         // The menu commands' keys.
         QCOMPARE(QSettings().value("claudeNotifications").toBool(), false);
-        QCOMPARE(QSettings().value("theme").toString(), QString("duet-cocoa"));
+        QCOMPARE(QSettings().value("theme").toString(), QString("kodamiko-cocoa"));
     }
 
     void fontSizesHaveDefaults()
@@ -92,7 +92,7 @@ private slots:
         preferences.codeFontWeight = QFont::Light;
         preferences.codeLineHeight = 1.8;
         preferences.ligatures = true;
-        Theme theme = Theme::duet();
+        Theme theme = Theme::kodamiko();
         preferences.applyTypography(theme);
         QCOMPARE(theme.font.weight(), QFont::Light);
         QCOMPARE(theme.lineHeight, 1.8);
@@ -116,7 +116,7 @@ private slots:
         editor.setMarginWidth(1, 0);
         editor.show();
         const auto draw = [&editor](const Preferences &preferences) {
-            Theme theme = Theme::duet();
+            Theme theme = Theme::kodamiko();
             preferences.applyTypography(theme);
             ScintillaStyles::applyDefaultStyle(editor, theme);
             ScintillaStyles::applyTypography(editor, theme.font, theme.lineHeight);
@@ -149,7 +149,7 @@ private slots:
     void oldDarkThemeSettingIsRead()
     {
         QSettings().setValue("darkTheme", false);
-        QCOMPARE(Preferences::load().theme, QString("duet"));
+        QCOMPARE(Preferences::load().theme, QString("kodamiko"));
     }
 
     void keymapListsMenuCommands()
@@ -210,7 +210,7 @@ private slots:
     void dialogKeepsThemesAndFontsOnSeparatePages()
     {
         QWidget window;
-        const PreferencesPopup popup(Theme::duet(), &window);
+        const PreferencesPopup popup(Theme::kodamiko(), &window);
         const auto *nav = popup.findChild<QListWidget *>(QStringLiteral("popupNav"));
         const auto *pages = popup.findChild<QStackedWidget *>();
         const auto titleOfPage = [nav, pages](const QWidget *widget) {
@@ -242,7 +242,7 @@ private slots:
         QPushButton elsewhere("Elsewhere", &window);
         window.show();
         QVERIFY(QTest::qWaitForWindowExposed(&window));
-        PreferencesPopup popup(Theme::duet(), &window);
+        PreferencesPopup popup(Theme::kodamiko(), &window);
         popup.showCentered();
 
         QTest::mouseClick(&elsewhere, Qt::LeftButton);
@@ -256,7 +256,7 @@ private slots:
         window.resize(1200, 800);
         window.show();
         QVERIFY(QTest::qWaitForWindowExposed(&window));
-        PreferencesPopup popup(Theme::duet(), &window);
+        PreferencesPopup popup(Theme::kodamiko(), &window);
         popup.showCentered();
         const QPoint centered = popup.pos();
         auto *header = popup.findChild<QWidget *>("popupHeader");
@@ -288,7 +288,7 @@ private slots:
         preferences.terminalPathFolders = {"C:/tools/bin", "/opt/cmake/bin"};
         preferences.terminalOptionKey = OptionKey::Meta;
         QWidget window;
-        PreferencesPopup popup(Theme::duet(), &window);
+        PreferencesPopup popup(Theme::kodamiko(), &window);
         popup.load(preferences, {}, {});
         QCOMPARE(popup.preferences(), preferences);
         auto *animations = popup.findChild<QCheckBox *>("interfaceAnimations");
@@ -297,7 +297,7 @@ private slots:
         animations->setChecked(true);
         QVERIFY(popup.preferences().animations);
         preferences.animations = true;
-        preferences.theme = "duet-cocoa";
+        preferences.theme = "kodamiko-cocoa";
         popup.load(preferences, {}, {}); // reopened with other settings
         QCOMPARE(popup.preferences(), preferences);
     }
@@ -327,7 +327,7 @@ private slots:
         QMenuBar bar;
         const Menus menus(bar);
         QWidget window;
-        PreferencesPopup dialog(Theme::duet(), &window);
+        PreferencesPopup dialog(Theme::kodamiko(), &window);
         dialog.load(Preferences(), Keymap::commands(&bar), {});
         QCOMPARE(dialog.commandList()->topLevelItemCount(), 3);
 

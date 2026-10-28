@@ -6,7 +6,7 @@
 #include <QList>
 #include <QString>
 
-// Where a recipe.json departs from Duet's recipe schema
+// Where a recipe.json departs from Kodamiko's recipe schema
 // (tools/schemas/recipe.schema.json, its "run" from run.schema.json): what
 // Recipes::parse silently skips or reads otherwise — an unknown key, a
 // "kind" it does not know, a download without a checksum.

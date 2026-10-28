@@ -42,7 +42,7 @@ QString buildType()
 QByteArray header(const QString &program)
 {
     const QString text = QStringLiteral("%1 %2 (%3 build), Qt %4, %5, %6, arguments: %7\n")
-                             .arg(program, QStringLiteral(DUET_VERSION), buildType(), QString::fromLatin1(qVersion()),
+                             .arg(program, QStringLiteral(KDK_VERSION), buildType(), QString::fromLatin1(qVersion()),
                                   QSysInfo::prettyProductName(), QSysInfo::currentCpuArchitecture(),
                                   QCoreApplication::arguments().join(QLatin1Char(' ')));
     return text.toUtf8();
@@ -65,7 +65,7 @@ QString levelName(QtMsgType type)
     return QStringLiteral("unknown");
 }
 
-// "2026-10-22 14:03:12.345 [warning] duet.lsp: message (lsp/LspClient.cpp:107)":
+// "2026-10-22 14:03:12.345 [warning] kodamiko.lsp: message (lsp/LspClient.cpp:107)":
 // the source location exists in debug builds only.
 QByteArray formatLine(QtMsgType type, const QMessageLogContext &context, const QString &message)
 {
@@ -131,10 +131,10 @@ namespace LogFiles {
 
 QString folder()
 {
-    QString overridden = qEnvironmentVariable("DUET_LOG_DIR");
+    QString overridden = qEnvironmentVariable("KDK_LOG_DIR");
     if (!overridden.isEmpty())
         return overridden;
-    return QDir::homePath() + QStringLiteral("/.duet/logs");
+    return QDir::homePath() + QStringLiteral("/.kodamiko/logs");
 }
 
 void install(const QString &program)

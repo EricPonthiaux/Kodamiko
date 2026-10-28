@@ -33,7 +33,7 @@ struct InstallStep {
 // requires it (see Recipe::requirements).
 struct ToolRequirement {
     // A ToolCatalog runtime ("jdk", "node"), "qt", a tool the requirement
-    // says how to download ("maven"), or a program Duet only looks for in
+    // says how to download ("maven"), or a program Kodamiko only looks for in
     // the PATH ("make").
     QString tool;
     // A major version ("21"); for Qt, a version prefix ("6.10": the newest
@@ -46,7 +46,7 @@ struct ToolRequirement {
     // Its command ("mvn"; empty: `tool`): in the PATH, it stands for the
     // tool, and nothing is downloaded.
     QString program;
-    // Where to download it on this system (Duet installs it in
+    // Where to download it on this system (Kodamiko installs it in
     // <store>/<tool>/<version>), and the file proving the install
     // (InstallStep::check). Nullopt: a ToolCatalog tool, Qt, or a program
     // of the PATH.
@@ -64,7 +64,7 @@ namespace InstallPlan {
 QList<InstallStep> plan(const ProjectConfig &config,
                         const Toolchains &toolchains,
                         const QList<ToolRequirement> &required);
-// What is missing that Duet does not download: a Python, a server set to
+// What is missing that Kodamiko does not download: a Python, a server set to
 // the PATH's that is not there, a required tool or version it does not
 // offer. Sentences to show.
 QStringList unavailable(const ProjectConfig &config,

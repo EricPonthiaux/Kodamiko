@@ -692,7 +692,7 @@ QJsonObject Board::selectionJson() const
         if (linkSelection_.contains(l->id) || (selection_.contains(l->from) && selection_.contains(l->to)))
             links.append(l->toJson());
     }
-    return QJsonObject{{QStringLiteral("format"), QStringLiteral("duet-diagram-selection")},
+    return QJsonObject{{QStringLiteral("format"), QStringLiteral("kodamiko-diagram-selection")},
                        {QStringLiteral("family"), family_ ? family_->id : QString()},
                        {QStringLiteral("shapes"), shapes},
                        {QStringLiteral("links"), links}};

@@ -5,7 +5,7 @@
 #include <QString>
 #include <QStringList>
 
-// Starting another Duet process, one per project window, the way the
+// Starting another Kodamiko process, one per project window, the way the
 // system expects an application to be started. One source per system.
 namespace NewInstance {
 
@@ -14,7 +14,7 @@ struct Command {
     QStringList arguments;
 };
 
-// The command that starts a new Duet on `folder`, an absolute path, for
+// The command that starts a new Kodamiko on `folder`, an absolute path, for
 // QProcess::startDetached.
 [[nodiscard]] Command command(const QString &folder);
 

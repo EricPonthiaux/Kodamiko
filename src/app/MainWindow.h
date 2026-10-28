@@ -223,14 +223,14 @@ private:
         Nothing,
         ShowSettings
     };
-    // Asks whether `folder` opens in a new Duet process or in this window,
+    // Asks whether `folder` opens in a new Kodamiko process or in this window,
     // in place of the current project and its Claude session; nothing if
     // the user cancels. While agents work in worktrees, only a new process.
     void askToOpenProject(const QString &folder, AfterOpening after);
     void openProjectHere(const QString &folder, AfterOpening after);
-    // Starts another Duet process on `folder`; tells the user if it fails.
+    // Starts another Kodamiko process on `folder`; tells the user if it fails.
     void openProjectInNewWindow(const QString &folder);
-    // Another Duet process opened this window's project: it comes forward,
+    // Another Kodamiko process opened this window's project: it comes forward,
     // restored if minimized.
     void bringToFront();
     // What opening another project in this window would stop; may be empty.
@@ -271,9 +271,9 @@ private:
     void runRecipeSetup(const Recipe &recipe);
     void onRecipeSetupFinished(int exitCode);
     void closeProject();
-    // Whether the project lacks tools Duet can download.
+    // Whether the project lacks tools Kodamiko can download.
     bool hasMissingTools() const;
-    // Says when the project lacks tools Duet can download.
+    // Says when the project lacks tools Kodamiko can download.
     void updateToolsNotice();
     // The project's agent: the one its session names, else the default of
     // the preferences.
@@ -362,7 +362,7 @@ private:
     // else the last started.
     void stopRun();
     void onRunFinished(const RunConfiguration &configuration, int exitCode, int errors, int warnings);
-    // Opens .duet/run.json, created from the chosen configuration.
+    // Opens .kodamiko/run.json, created from the chosen configuration.
     void editRunConfigurations();
     // The configurations in `menu`: choosing one selects it, and runs it
     // when `run`.
@@ -373,7 +373,7 @@ private:
     void setRunTabIcon(TerminalWidget *terminal, const QString &iconName, const QColor &color);
     // F2 / Shift+F2: the next or previous problem of the current file.
     void goToProblem(bool forward);
-    // "duet" or one of Duet's Material themes, "duet-slate"… (see Theme::all),
+    // "kodamiko" or one of Kodamiko's Material themes, "kodamiko-slate"… (see Theme::all),
     // applied everywhere.
     void setTheme(const QString &name);
     // The app icon (windows, Dock, taskbar, tray) in the colors of theme_.
@@ -400,8 +400,8 @@ private:
     // Dot on an agent's tab.
     void updateAgentTab(QWidget *terminal, AgentActivity::State state);
     void updateTabIcons();
-    // Duet's frame and title bar, or the system's (View ▸ Use System
-    // Title Bar). On macOS, the system's traffic lights over Duet's bar.
+    // Kodamiko's frame and title bar, or the system's (View ▸ Use System
+    // Title Bar). On macOS, the system's traffic lights over Kodamiko's bar.
     // One implementation per system: MainWindowTitleBar<System>.
     void setSystemTitleBar(bool system);
     // The title bar after the window entered or left full screen, was
@@ -418,7 +418,7 @@ private:
     void showTrayNotification(const QString &title, const QString &message);
     void bringClaudeSessionToFront();
     void clearNotifications();
-    // Keeps App Nap from slowing Duet down while the agent works.
+    // Keeps App Nap from slowing Kodamiko down while the agent works.
     void keepAwakeWhileAgentWorks();
     // Snapshot of the pending changes, so that the state before a prompt
     // can be restored.
@@ -428,7 +428,7 @@ private:
     void registerMcpTools();
     // Asks about the next sensitive tool Claude wants to run.
     void guardUnsavedEdits(const QStringList &paths);
-    // Refuses a git command Duet's tools do, telling the agent which ones.
+    // Refuses a git command Kodamiko's tools do, telling the agent which ones.
     void guardGitCommands(const HookEvent &event);
     // Tells the agent the errors its edit of `paths` brought, once their
     // language servers have reported them.
@@ -532,7 +532,7 @@ private:
     // Git ▸ Branches and Git ▸ Stashes.
     void showBranches();
     // Types `request` in the Claude session's prompt; Claude answers with
-    // Duet's set_commit_message tool, so they must be exposed to it.
+    // Kodamiko's set_commit_message tool, so they must be exposed to it.
     void askClaudeForCommitMessage(const QString &request);
     void showStashes();
     // What git or ssh asks while talking to a remote: a password, a key
@@ -540,7 +540,7 @@ private:
     std::optional<QString> askCredentials(const QString &prompt);
     // Help ▸ Check Prerequisites, also shown at startup if git or claude is missing.
     void showPrerequisites();
-    // Help ▸ About Duet.
+    // Help ▸ About Kodamiko.
     void showAbout();
     // File ▸ Preferences.
     void showPreferences();
@@ -560,7 +560,7 @@ private:
     HookServer hookServer_;
     // Finds this window for the processes opening its project.
     ProjectWindowServer projectWindowServer_;
-    // What the editor's MCP server offers Claude (see DuetTools).
+    // What the editor's MCP server offers Claude (see KDKTools).
     McpRegistry mcpRegistry_;
     AgentActivity agentActivity_;
     // The sessions besides the main one, each in its worktree.
@@ -672,7 +672,7 @@ private:
     // message after the other.
     MessagePopup *agentMessage_ = nullptr;
     // Short messages at the bottom of the window: the agents' permission
-    // requests (permissionPrompts_) and the confirmations of Duet's
+    // requests (permissionPrompts_) and the confirmations of Kodamiko's
     // sensitive tools (askToolConfirmation()).
     Snackbar *snackbar_ = nullptr;
     PermissionPrompts *permissionPrompts_ = nullptr;
@@ -696,7 +696,7 @@ private:
     // agent's submenu, the navigation, then the quick fixes.
     QList<QAction *> editorContextActions_;
     QAction *exposeTools_ = nullptr;
-    QAction *gitThroughDuetTools_ = nullptr;
+    QAction *gitThroughKDKTools_ = nullptr;
     QAction *claudeNotifications_ = nullptr;
 
     // Actions whose text names the agent (nameAfterAgent()).

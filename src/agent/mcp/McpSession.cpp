@@ -71,8 +71,8 @@ QJsonObject initializeAnswer(const McpRegistry &registry, const QJsonObject &par
                       QJsonObject{{QLatin1String("subscribe"), true}, {QLatin1String("listChanged"), false}}},
                      {QLatin1String("prompts"), QJsonObject{{QLatin1String("listChanged"), false}}},
                      {QLatin1String("logging"), QJsonObject{}}}},
-        {QLatin1String("serverInfo"), QJsonObject{{QLatin1String("name"), QLatin1String("duet")},
-                                                  {QLatin1String("title"), QLatin1String("Duet")},
+        {QLatin1String("serverInfo"), QJsonObject{{QLatin1String("name"), QLatin1String("kodamiko")},
+                                                  {QLatin1String("title"), QLatin1String("Kodamiko")},
                                                   {QLatin1String("version"), QCoreApplication::applicationVersion()}}},
     };
     if (!registry.instructions.isEmpty())
@@ -330,7 +330,7 @@ void McpSession::callTool(const QJsonValue &id, const QJsonObject &params)
     registry_->confirm(tool->title.isEmpty() ? name : tool->title, what,
                        [run, arguments, reply, progress](bool allowed) {
                            if (!allowed) {
-                               reply(McpResult::error(QStringLiteral("The user refused this action in Duet.")));
+                               reply(McpResult::error(QStringLiteral("The user refused this action in Kodamiko.")));
                                return;
                            }
                            run(arguments, reply, progress);

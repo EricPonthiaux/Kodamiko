@@ -34,7 +34,7 @@ private slots:
     void initTestCase()
     {
         // Settings of the tests, not the user's.
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_run_windows"));
     }
 

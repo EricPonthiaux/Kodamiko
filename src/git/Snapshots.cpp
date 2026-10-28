@@ -21,9 +21,9 @@ using libgit2::Ptr;
 
 namespace {
 
-const QString refPrefix = QStringLiteral("refs/duet/snapshots/");
-// Where snapshots were kept when the editor was called Enlumine.
-const QString legacyRefPrefix = QStringLiteral("refs/enlumine/snapshots/");
+const QString refPrefix = QStringLiteral("refs/kodamiko/snapshots/");
+// Where snapshots were kept when the editor was called Enlumine, then Duet.
+const std::array legacyRefPrefixes{QStringLiteral("refs/enlumine/snapshots/"), QStringLiteral("refs/duet/snapshots/")};
 // Trailer of the commit message marking a snapshot of the whole working
 // directory.
 const QString wholeTreeTrailer = QStringLiteral("Scope: working tree");
@@ -32,10 +32,10 @@ const QString wholeTreeTrailer = QStringLiteral("Scope: working tree");
 const QHash<QString, QString> &snapshotIdentity()
 {
     static const QHash<QString, QString> identity{
-        {QStringLiteral("GIT_AUTHOR_NAME"), QStringLiteral("Duet")},
-        {QStringLiteral("GIT_AUTHOR_EMAIL"), QStringLiteral("duet@localhost")},
-        {QStringLiteral("GIT_COMMITTER_NAME"), QStringLiteral("Duet")},
-        {QStringLiteral("GIT_COMMITTER_EMAIL"), QStringLiteral("duet@localhost")},
+        {QStringLiteral("GIT_AUTHOR_NAME"), QStringLiteral("Kodamiko")},
+        {QStringLiteral("GIT_AUTHOR_EMAIL"), QStringLiteral("kodamiko@localhost")},
+        {QStringLiteral("GIT_COMMITTER_NAME"), QStringLiteral("Kodamiko")},
+        {QStringLiteral("GIT_COMMITTER_EMAIL"), QStringLiteral("kodamiko@localhost")},
     };
     return identity;
 }
@@ -208,9 +208,9 @@ QString createSnapshot(const RepositoryInfo &repository, const SnapshotRequest &
     return ref;
 }
 
-// Snapshots taken under the editor's former name move to refPrefix, with
-// the same name. A reference that cannot be moved stays where it is.
-void adoptLegacySnapshots(git_repository *repository)
+// Snapshots taken under one of the editor's former names move to refPrefix,
+// with the same name. A reference that cannot be moved stays where it is.
+void adoptLegacySnapshots(git_repository *repository, const QString &legacyRefPrefix)
 {
     QStringList names;
     {
@@ -231,7 +231,7 @@ void adoptLegacySnapshots(git_repository *repository)
         git_reference *renamed = nullptr;
         if (git_reference_rename(&renamed, reference,
                                  (refPrefix + name.mid(legacyRefPrefix.size())).toUtf8().constData(), 0,
-                                 "Snapshot of Enlumine, renamed Duet") == 0)
+                                 "Snapshot of a former name, renamed Kodamiko") == 0)
             git_reference_free(renamed);
     }
 }
@@ -291,7 +291,8 @@ QList<Snapshot> list(const QString &folder)
         return {};
     check(opened, "Opening the git repository");
     const Ptr<git_repository> repositoryGuard(repository);
-    adoptLegacySnapshots(repository);
+    for (const QString &legacyRefPrefix : legacyRefPrefixes)
+        adoptLegacySnapshots(repository, legacyRefPrefix);
 
     git_reference_iterator *iterator = nullptr;
     check(git_reference_iterator_glob_new(&iterator, repository, (refPrefix + QLatin1Char('*')).toUtf8().constData()),

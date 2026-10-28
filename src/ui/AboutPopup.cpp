@@ -57,7 +57,7 @@ QPainterPath heartPath()
 
 } // namespace
 
-// Duet's mark, which grows from the center to its full size.
+// Kodamiko's mark, which grows from the center to its full size.
 class AboutPopup::Mark : public QWidget {
 public:
     explicit Mark(QWidget *parent)
@@ -170,12 +170,12 @@ private:
 
 AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
     : OverlayPopup(QStringLiteral("about"), QSizeF(0.3, 0.3), QSize(440, 400), parent)
-    , header_(new PopupHeader(QStringLiteral("document"), tr("About Duet"), this))
+    , header_(new PopupHeader(QStringLiteral("document"), tr("About Kodamiko"), this))
     , mark_(new Mark(this))
 {
     connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
-    auto *name = new QLabel(QStringLiteral("Duet"), this);
+    auto *name = new QLabel(QStringLiteral("Kodamiko"), this);
     AppFonts::setInterfaceFont(name, 1.4);
     auto *version = new QLabel(tr("Version %1").arg(QCoreApplication::applicationVersion()), this);
     version->setObjectName(QStringLiteral("settingsDescription"));

@@ -33,7 +33,7 @@ private slots:
 
     void theSystemShellGivesTheCommandsOutput()
     {
-        QVERIFY(run(Shell::systemShellRunning("echo duet")).output.contains("duet"));
+        QVERIFY(run(Shell::systemShellRunning("echo kodamiko")).output.contains("kodamiko"));
     }
 
     void theSystemShellGivesTheCommandsExitCode() { QCOMPARE(run(Shell::systemShellRunning("exit 3")).exitCode, 3); }
@@ -52,12 +52,12 @@ private slots:
     void aVerbatimCommandRuns()
     {
         QProcess process;
-        Shell::prepareVerbatim(process, "echo duet");
+        Shell::prepareVerbatim(process, "echo kodamiko");
 
         process.start();
 
         QVERIFY(process.waitForFinished(20000));
-        QVERIFY(process.readAllStandardOutput().contains("duet"));
+        QVERIFY(process.readAllStandardOutput().contains("kodamiko"));
     }
 
     void anExecutableIsLaunchedAsItIs()

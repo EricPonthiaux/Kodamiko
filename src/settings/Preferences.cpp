@@ -16,7 +16,7 @@ Preferences Preferences::load()
     if (settings.contains(QStringLiteral("theme")))
         preferences.theme = settings.value(QStringLiteral("theme")).toString();
     else if (settings.contains(QStringLiteral("darkTheme"))) // before the theme menu: a "Dark Theme" checkbox
-        preferences.theme = QStringLiteral("duet");          // the light themes are gone
+        preferences.theme = QStringLiteral("kodamiko");      // the light themes are gone
     preferences.codeFontFamily = settings.value(QStringLiteral("codeFont/family")).toString();
     preferences.codeFontSize =
         std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(), minimumFontSize, maximumFontSize);
@@ -69,7 +69,7 @@ Preferences Preferences::load()
     preferences.defaultAgentProvider =
         settings.value(QStringLiteral("defaultAgentProvider"), preferences.defaultAgentProvider).toString();
     preferences.exposeTools = settings.value(QStringLiteral("exposeTools"), true).toBool();
-    preferences.gitThroughDuetTools = settings.value(QStringLiteral("gitThroughDuetTools"), true).toBool();
+    preferences.gitThroughKDKTools = settings.value(QStringLiteral("gitThroughKDKTools"), true).toBool();
     preferences.claudeNotifications = settings.value(QStringLiteral("claudeNotifications"), true).toBool();
 
     preferences.terminalPathFolders = settings.value(QStringLiteral("terminal/pathFolders")).toStringList();
@@ -111,7 +111,7 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("reportEditErrors"), reportEditErrors);
     settings.setValue(QStringLiteral("defaultAgentProvider"), defaultAgentProvider);
     settings.setValue(QStringLiteral("exposeTools"), exposeTools);
-    settings.setValue(QStringLiteral("gitThroughDuetTools"), gitThroughDuetTools);
+    settings.setValue(QStringLiteral("gitThroughKDKTools"), gitThroughKDKTools);
     settings.setValue(QStringLiteral("claudeNotifications"), claudeNotifications);
 
     settings.setValue(QStringLiteral("terminal/pathFolders"), terminalPathFolders);

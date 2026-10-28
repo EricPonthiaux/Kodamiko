@@ -31,7 +31,7 @@ namespace {
 // A font's size in the points of Preferences ▸ Fonts.
 int preferencePoints(const QFont &font)
 {
-    return qRound(AppFonts::duetPoints(font.pointSizeF()));
+    return qRound(AppFonts::kdkPoints(font.pointSizeF()));
 }
 
 // The parts of the main window whose fonts Preferences ▸ Fonts sets,
@@ -108,7 +108,7 @@ private slots:
     void initTestCase()
     {
         // Settings of the tests, not the user's.
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_fontsettings"));
     }
 
@@ -116,7 +116,7 @@ private slots:
     {
         QSettings().clear();
         QApplication::setFont(Preferences().interfaceFont());
-        ThemeStyle::apply(Theme::duet());
+        ThemeStyle::apply(Theme::kodamiko());
     }
 
     void cleanup() { QSettings().clear(); }
@@ -129,7 +129,7 @@ private slots:
 
         for (const QWidget *widget : window.interfaceWidgets())
             QVERIFY2(preferencePoints(widget->font()) == 15, qPrintable(widget->metaObject()->className()));
-        QCOMPARE(AppFonts::duetPoints(window.title->font().pointSizeF()), 15 * 1.15);
+        QCOMPARE(AppFonts::kdkPoints(window.title->font().pointSizeF()), 15 * 1.15);
     }
 
     void interfaceFontLeavesTheCodeFont()
@@ -224,7 +224,7 @@ private slots:
         const Window window;
         applyPreferences(withSizes(14, 16), window);
 
-        ThemeStyle::apply(Theme::named("duet-slate"));
+        ThemeStyle::apply(Theme::named("kodamiko-slate"));
 
         QCOMPARE(preferencePoints(window.outline->font()), 16);
         QCOMPARE(preferencePoints(window.files->tree()->font()), 16);
@@ -242,7 +242,7 @@ private slots:
         platformFont.setPointSize(7);
         QApplication::setFont(platformFont, "QMenuBar");
 
-        ThemeStyle::apply(Theme::named("duet-slate"));
+        ThemeStyle::apply(Theme::named("kodamiko-slate"));
 
         QCOMPARE(preferencePoints(window.titleBar->menuBar()->font()), 14);
     }
@@ -250,7 +250,7 @@ private slots:
     void dialogSizesAreSavedAndApplied()
     {
         Window window;
-        PreferencesPopup popup(Theme::duet(), &window.root);
+        PreferencesPopup popup(Theme::kodamiko(), &window.root);
         popup.load(withSizes(15, 17), {}, {});
 
         applyPreferences(popup.preferences(), window);

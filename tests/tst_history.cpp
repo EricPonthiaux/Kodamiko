@@ -372,7 +372,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "a created", {{"src/a.txt", "a\n"}});
         commit(dir, "b created", {{"b.txt", "b\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
 
@@ -390,7 +390,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "both", {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.setPathFilter("a.txt");
@@ -412,7 +412,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "a\n"}, {"b.txt", "b c\n"}});
         commit(dir, "second", {{"a.txt", "z\n"}, {"b.txt", "b   c\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.refresh();
@@ -442,7 +442,7 @@ private slots:
         commit(dir, "create", {{"old.txt", longText("1")}});
         QVERIFY(QFile::remove(dir.filePath("old.txt")));
         commit(dir, "rename", {{"new.txt", longText("1")}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.setPathFilter("new.txt");
@@ -461,7 +461,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         importCommits(dir, 1200);
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -482,7 +482,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         importCommits(dir, 1200);
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -622,7 +622,7 @@ private slots:
         git(dir, {"commit", "-q", "--amend", "--no-edit", "--date", "2026-10-20T09:00:00"});
         commit(dir, "tuesday evening", {{"a.txt", "3\n"}});
         git(dir, {"commit", "-q", "--amend", "--no-edit", "--date", "2026-10-20T18:00:00"});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -669,7 +669,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "create", {{"a.txt", "a\n"}, {"sub/b.txt", "b\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -698,7 +698,7 @@ private slots:
                         .commits = {{.id = "a", .summary = "create", .date = date},
                                     {.id = "b", .summary = "edit", .date = date.addDays(1)}},
                         .lineCommits = {0, 0, 1}};
-        FileLens lens(Theme::duet());
+        FileLens lens(Theme::kodamiko());
         lens.resize(800, 400);
         lens.show();
         QVERIFY(QTest::qWaitForWindowExposed(&lens));
@@ -786,7 +786,7 @@ private slots:
         commit(dir, "add", {{"a.txt", "needle\n"}});
         commit(dir, "other", {{"b.txt", "hay\n"}});
         git(dir, {"commit", "-q", "--allow-empty", "-m", "by bob", "--author", "Bob <bob@example.org>"});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -813,7 +813,7 @@ private slots:
         commit(dir, "on topic", {{"b.txt", "b\n"}});
         git(dir, {"checkout", "-q", "main"});
         commit(dir, "on main", {{"c.txt", "c\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(900, 600);
         view.show();
         view.setFolder(dir.path());
@@ -846,7 +846,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "all", {{"src/a.txt", "a\n"}, {"src/b.txt", "b\n"}, {"c.txt", "c\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.setPathFilter("src");
@@ -869,7 +869,7 @@ private slots:
         commit(dir, "first", {{"a.txt", "a\n"}});
         commit(dir, "second", {{"a.txt", "b\n"}, {"b.txt", "b\n"}});
 
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.setFolder(dir.path());
         const QSignalSpy refreshed(&view, &HistoryView::refreshed);
         view.refresh(); // off the UI thread
@@ -911,7 +911,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first", {{"a.txt", "a\n"}});
         commit(dir, "second", {{"a.txt", "b\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -945,7 +945,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first\n\nWhy the first.", {{"a.txt", "a\n"}});
         commit(dir, "second\n\nWhy the second, at some length.", {{"a.txt", "b\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1200, 700);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -977,7 +977,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "only\n\nBody.", {{"a.txt", "a\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1200, 700);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -999,7 +999,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "only\n\nBody.", {{"a.txt", "a\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1200, 700);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -1023,7 +1023,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "first\n\nBody.", {{"a.txt", "a\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1200, 700);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -1049,7 +1049,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "three", {{"a.txt", "a\n"}, {"src/b.txt", "b\n"}, {"c.txt", "c\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -1074,7 +1074,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         const QByteArray lines = QByteArray("line\n").repeated(100); // taller than the view
         commit(dir, "three", {{"a.txt", lines}, {"b.txt", lines}, {"c.txt", lines}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -1100,7 +1100,7 @@ private slots:
         git(dir, {"init", "-q", "-b", "main"});
         const QByteArray lines = QByteArray("line\n").repeated(100); // taller than the view
         commit(dir, "three", {{"a.txt", lines}, {"b.txt", lines}, {"c.txt", lines}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -1124,7 +1124,7 @@ private slots:
         const QTemporaryDir dir;
         git(dir, {"init", "-q", "-b", "main"});
         commit(dir, "both", {{"a.txt", "a\n"}, {"b.txt", "b\n"}});
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1400, 700);
         view.show();
         view.setFolder(dir.path());
@@ -1145,7 +1145,7 @@ private slots:
 
     void theFoldedCommitsSitAtTheLeftOfTheDiff()
     {
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1200, 700);
         view.show();
         const auto *diff = view.findChild<DiffView *>();
@@ -1160,7 +1160,7 @@ private slots:
 
     void foldingTheCommitsWidensTheDiff()
     {
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1200, 700);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -1174,9 +1174,9 @@ private slots:
 
     void theFoldIsKeptInTheSavedState()
     {
-        HistoryView folded(Theme::duet());
+        HistoryView folded(Theme::kodamiko());
         folded.setCommitListFolded(true);
-        HistoryView restored(Theme::duet());
+        HistoryView restored(Theme::kodamiko());
 
         restored.restoreState(folded.saveState());
 
@@ -1190,7 +1190,7 @@ private slots:
         // The commit's share of the commits and the commit, the diff's of the
         // whole, a splitter's state, the folds.
         stream << 0.5 << 0.5 << QByteArray() << false << true;
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         view.resize(1200, 700);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -1218,7 +1218,7 @@ private slots:
     {
         QFETCH(const int, paneWidth);
         QFETCH(const int, fontSize);
-        HistoryView view(Theme::duet());
+        HistoryView view(Theme::kodamiko());
         QFont font = view.font();
         font.setPointSize(fontSize);
         view.setFont(font);

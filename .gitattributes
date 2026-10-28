@@ -1,3 +1,3 @@
 # LF in every checkout, Windows included: the tests compare files of the
-# tree (tests/refactoring…) byte for byte with what Duet writes.
+# tree (tests/refactoring…) byte for byte with what Kodamiko writes.
 * text=auto eol=lf

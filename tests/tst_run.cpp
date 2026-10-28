@@ -60,7 +60,7 @@ private slots:
 
     void initTestCase()
     {
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_run"));
         QSettings().clear();
     }
@@ -70,7 +70,7 @@ private slots:
     void offersTheRecipeConfigurationsAfterTheProjectsOwn()
     {
         const QTemporaryDir dir;
-        write(dir.path() + "/.duet/run.json",
+        write(dir.path() + "/.kodamiko/run.json",
               R"({"configurations": [{"name": "Build", "kind": "build", "command": "make"}]})");
         ProjectConfig project;
         project.path = dir.path();
@@ -128,12 +128,12 @@ private slots:
     {
         const QTemporaryDir dir;
         const QString other = Host::systemName() == "linux" ? "macos" : "linux";
-        write(dir.path() + "/.duet/run.json", QStringLiteral(R"({"configurations": [
+        write(dir.path() + "/.kodamiko/run.json", QStringLiteral(R"({"configurations": [
             {"name": "Here", "command": "a", "systems": ["%1"]},
             {"name": "Elsewhere", "command": "b", "systems": ["%2"]},
             {"name": "Everywhere", "command": "c"}]})")
-                                                  .arg(Host::systemName(), other)
-                                                  .toUtf8());
+                                                      .arg(Host::systemName(), other)
+                                                      .toUtf8());
 
         const QList<RunConfiguration> all = RunConfigurations::all(dir.path());
 
@@ -187,7 +187,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.path() + "/Makefile", "all: main\n\ntest: all\n");
-        write(dir.path() + "/.duet/run.json",
+        write(dir.path() + "/.kodamiko/run.json",
               R"({"configurations": [{"name": "make test", "kind": "test", "command": "make -j8 test"},
                                      {"name": "Serve", "command": "./serve"}]})");
         const QList<RunConfiguration> all = RunConfigurations::all(dir.path());
@@ -195,10 +195,10 @@ private slots:
         QCOMPARE(all.first().command, QString("make -j8 test"));
         QVERIFY(!all.first().detected);
 
-        write(dir.path() + "/.duet/run.json", "{");
+        write(dir.path() + "/.kodamiko/run.json", "{");
         QString error;
         QCOMPARE(names(RunConfigurations::all(dir.path(), &error)), (QStringList{"make", "make test"}));
-        QVERIFY(error.startsWith(".duet/run.json"));
+        QVERIFY(error.startsWith(".kodamiko/run.json"));
     }
 
     void cleansTerminalOutput()

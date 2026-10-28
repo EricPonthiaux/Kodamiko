@@ -1,4 +1,4 @@
-# Code style of Duet: 4-space indentation, 120 columns, function braces on
+# Code style of Kodamiko: 4-space indentation, 120 columns, function braces on
 # their own line, `Type *pointer`, `const` on the left. Close to Qt's own
 # style. Requires clang-format 20 or newer.
 ---

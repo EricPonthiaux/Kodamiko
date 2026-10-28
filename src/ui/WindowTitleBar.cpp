@@ -16,7 +16,7 @@
 
 WindowTitleBar::WindowTitleBar(QWidget *parent)
     : QWidget(parent)
-    , theme_(Theme::duet())
+    , theme_(Theme::kodamiko())
     , icon_(new QLabel(this))
     , title_(new QLabel(this))
     , controls_(new WindowControls(this))

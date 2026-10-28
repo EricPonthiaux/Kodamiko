@@ -29,4 +29,4 @@ The project is a Qt 6 Widgets application built with CMake
 ## Checking the change
 
 Build with the project's "Build debug" run configuration (or the command in
-`.duet/run.json`) and fix every warning and error before saying you are done.
+`.kodamiko/run.json`) and fix every warning and error before saying you are done.

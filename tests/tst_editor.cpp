@@ -72,14 +72,14 @@ private slots:
         qputenv("GIT_COMMITTER_EMAIL", "t@t");
         // Settings of the tests, not the user's. Without an organization,
         // Windows' registry keeps no settings at all.
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_editor"));
     }
 
     // Ctrl is Command on macOS, as for the trees.
     void zoomsTheTextOnControlWheel()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QWheelEvent wheel(QPointF(10, 10), QPointF(10, 10), QPoint(), QPoint(0, 120), Qt::NoButton, Qt::ControlModifier,
                           Qt::NoScrollPhase, false);
 
@@ -90,7 +90,7 @@ private slots:
 
     void findCountsAndCyclesThroughMatches()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("foo bar Foo\nfoobar foo\n");
         FindBar bar;
         bar.setEditor(&editor);
@@ -119,7 +119,7 @@ private slots:
 
     void findReportsInvalidExpressions()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("a1 b22 c333\n");
         FindBar bar;
         bar.setEditor(&editor);
@@ -135,7 +135,7 @@ private slots:
 
     void replaceOneThenAllWithGroups()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("x=1; y=2; z=3;\n");
         FindBar bar;
         bar.setEditor(&editor);
@@ -157,7 +157,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("crlf.txt"), "été\r\n\tx = 1\r\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QString error;
         QVERIFY(editor.load(dir.filePath("crlf.txt"), &error));
         EditorStatus status;
@@ -199,7 +199,7 @@ private slots:
         Git::run(dir.path(), {"config", "core.autocrlf", "false"});
         Git::run(dir.path(), {"add", "a.txt"});
 
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QString error;
         QVERIFY(editor.load(dir.filePath("a.txt"), &error));
         ChangeGutter *gutter = editor.changeGutter();
@@ -251,7 +251,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QString error;
         QVERIFY(editor.load(dir.filePath("a.txt"), &error));
         QVERIFY(!editor.changeGutter()->hasBase());
@@ -268,7 +268,7 @@ private slots:
         write(dir.filePath("a.txt"), "one\n");
         Git::run(dir.path(), {"init", "-q"});
         Git::run(dir.path(), {"add", "a.txt"});
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         auto *editor = qobject_cast<EditorWidget *>(tabs.openFile(dir.filePath("a.txt")));
         QVERIFY(editor);
         editor->setText("two\n");
@@ -283,7 +283,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\n");
         QAction explain(QStringLiteral("Explain This Code"));
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setFileActions({&explain});
 
         QVERIFY(!editor.createContextMenu()->actions().contains(&explain));
@@ -296,7 +296,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "one\n");
         QAction rename(QStringLiteral("Rename…"));
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setFileActions({&rename});
         QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
 
@@ -313,7 +313,7 @@ private slots:
 
     void contextMenuSuspendsTheToolTipsWhileOpen()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("int value;\n");
         editor.setHoverHelp([](int) { return QStringLiteral("Help"); });
         editor.resize(400, 200);
@@ -341,7 +341,7 @@ private slots:
 
     void highlightsEveryOccurrenceOfTheNameAtTheCursor()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("int count = 0;\ncount += 1; // count\nint counter;\n");
         SymbolOccurrences *occurrences = editor.symbolOccurrences();
 
@@ -358,7 +358,7 @@ private slots:
 
     void clearsTheOccurrencesOffAName()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("int count = 0;\nint x = 42;\n");
         SymbolOccurrences *occurrences = editor.symbolOccurrences();
         editor.setCursorPosition(0, 5);
@@ -383,7 +383,7 @@ private slots:
 
     void serverOccurrencesReplaceTheTextOnes()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("int count;\nint f() { int count; return count; }\n");
         SymbolOccurrences *occurrences = editor.symbolOccurrences();
         QSignalSpy settled(occurrences, &SymbolOccurrences::nameSettled);
@@ -409,7 +409,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("empty.txt"), "");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         tabs.resize(600, 400);
         const auto markIsDrawn = [&tabs] {
             const QImage image = tabs.grab().toImage();
@@ -513,7 +513,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("README.md"), "# Hello\n");
         QSettings().setValue("markdown/mode", 2); // Preview
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("README.md")));
         QVERIFY(page);
         QCOMPARE(page->mode(), PreviewPage::Mode::Preview);
@@ -549,7 +549,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("README.md"), "# Hello\n");
         QSettings().setValue("markdown/mode", 2); // Preview
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("README.md")));
 
         tabs.show();
@@ -566,7 +566,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("README.md"), "# Hello\n");
         QSettings().setValue("markdown/mode", 2); // Preview
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("README.md")));
 
         // Creating the first web view repaints the window: the editor must
@@ -584,7 +584,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("index.html"), "<html><head><title>Page</title></head>"
                                           "<body><h1>Hello</h1><script>document.title = 'ran';</script></body></html>");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(dir.filePath("index.html")));
         QVERIFY(page);
         QCOMPARE(page->kind(), PreviewPage::Kind::Html);
@@ -634,7 +634,7 @@ private slots:
                   "document.title = [answer, ...texts].join(' ');"
                   "</script></body></html>");
         QSettings().setValue("html/mode", 2); // Preview
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         tabs.setProjectFolder(project);
         const auto *page = qobject_cast<PreviewPage *>(tabs.openFile(project + "/site/index.html"));
 
@@ -701,7 +701,7 @@ private slots:
         write(dir.filePath(".clang-format"), "IndentWidth: 3\nColumnLimit: 90\n");
         write(dir.filePath("main.cpp"), "int main()\n{\n}\n");
         write(dir.filePath("notes.txt"), "text\n");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         tabs.openFile(dir.filePath("main.cpp"));
         const EditorWidget *code = tabs.currentEditor();
         QTRY_COMPARE(code->tabWidth(), 3);
@@ -726,7 +726,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("a.cpp"), "int  x;\r\nint y;\r\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(dir.filePath("a.cpp"), nullptr));
         editor.setCursorPosition(1, 4); // on "y"
 
@@ -750,7 +750,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath(".clang-format"), "BasedOnStyle: LLVM\nIndentWidth: 4\n");
         write(dir.filePath("a.cpp"), "int f(){return 1;}\n");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(tabs.openFile(dir.filePath("a.cpp")));
         QSignalSpy messages(&tabs, &EditorTabs::statusMessage);
 
@@ -786,7 +786,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "caf\xE9\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
         QVERIFY(editor.format().isLatin1);
         const QSignalSpy formatChanged(&editor, &EditorWidget::formatChanged);
@@ -807,7 +807,7 @@ private slots:
         // Past the 8 KiB the binary check reads.
         const QByteArray start(10000, 'a');
         write(dir.filePath("a.txt"), start + "\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(dir.filePath("a.txt"), nullptr));
 
         const QByteArray changed = start + QByteArray("\0end\n", 5);
@@ -824,7 +824,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath(".clang-format"), "BasedOnStyle: LLVM\n");
         write(dir.filePath("a.cpp"), "int f();\n");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(tabs.openFile(dir.filePath("a.cpp")));
         tabs.setFormatOnSave(true);
         tabs.currentEditor()->setText("int g(){return 2;}\n");
@@ -841,7 +841,7 @@ private slots:
         const QTemporaryDir dir;
         write(dir.filePath("a.txt"), "a\n");
         write(dir.filePath("b.txt"), "b\n");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(tabs.openFile(dir.filePath("a.txt")));
         QVERIFY(tabs.openFile(dir.filePath("b.txt")));
         tabs.currentEditor()->setText("changed\n");
@@ -864,7 +864,7 @@ private slots:
         const QTemporaryDir dir;
         const QString path = dir.filePath("a.txt");
         write(path, "a\n");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(tabs.openFile(path));
         tabs.currentEditor()->setText("mine\n");
         int questionCount = 0;
@@ -912,7 +912,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("notes.txt"), "text\n");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(tabs.openFile(dir.filePath("notes.txt")));
         QSignalSpy messages(&tabs, &EditorTabs::statusMessage);
         tabs.formatCurrent();
@@ -923,7 +923,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("a.cpp"), "int f() {\n    int a;\n    int b;\n}\nint g() {\n    int c;\n    int d;\n}\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(dir.filePath("a.cpp"), nullptr));
         editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
         const auto visible = [&editor](int line) {
@@ -962,7 +962,7 @@ private slots:
 
     void resolvesAConflictFromItsLinksInOneUndoableEdit()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         const QString text = "a\n<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\nz\n";
         editor.setText(text);
         MergeConflicts *conflicts = editor.mergeConflicts();
@@ -980,7 +980,7 @@ private slots:
 
     void contextMenuResolvesTheConflictAtTheCursor()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\n");
         editor.setCursorPosition(1, 1);
 
@@ -997,7 +997,7 @@ private slots:
 
     void goesFromConflictToConflictWrappingAround()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         const QString conflict = "<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\n";
         editor.setText("a\n" + conflict + "b\n" + conflict + "c\n"); // conflicts at lines 1 and 7
         MergeConflicts *conflicts = editor.mergeConflicts();
@@ -1024,7 +1024,7 @@ private slots:
 
     void readOnlyEditorShowsConflictsWithoutLinks()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         editor.setText("<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\n");
         editor.setReadOnly(true);
 
@@ -1037,7 +1037,7 @@ private slots:
 
     void menuShortcutsWinOverQScintilla()
     {
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         const auto bound = [&editor](const char *shortcut) {
             return editor.standardCommands()->boundTo(QKeySequence(shortcut)[0].toCombined()) != nullptr;
         };

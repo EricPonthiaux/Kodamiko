@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(Duet
+project(Kodamiko
     VERSION 0.1.0
     DESCRIPTION "C/C++/Java/JavaScript source editor with an integrated Claude terminal"
     LANGUAGES C CXX)
@@ -37,27 +37,27 @@ qt_standard_project_setup()
 
 # Link-time optimization across the application and the statically built
 # dependencies (QScintilla, tree-sitter, libvterm, libgit2, cmark-gfm).
-option(DUET_LTO "Build with link-time optimization" OFF)
-if(DUET_LTO)
+option(KDK_LTO "Build with link-time optimization" OFF)
+if(KDK_LTO)
     include(CheckIPOSupported)
-    check_ipo_supported(RESULT duet_ipo_supported OUTPUT duet_ipo_error LANGUAGES C CXX)
-    if(duet_ipo_supported)
+    check_ipo_supported(RESULT kdk_ipo_supported OUTPUT kdk_ipo_error LANGUAGES C CXX)
+    if(kdk_ipo_supported)
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
         # Also for the dependencies that declare an old cmake_minimum_required.
         set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
     else()
-        message(WARNING "Link-time optimization unavailable: ${duet_ipo_error}")
+        message(WARNING "Link-time optimization unavailable: ${kdk_ipo_error}")
     endif()
 endif()
 
 # Code generated for the processor of the building machine (AVX2...): faster,
 # but the binary may not run on an older processor. For local builds only,
 # never for packages meant for other machines.
-option(DUET_NATIVE "Optimize for the building machine's processor (-march=native)" OFF)
-if(DUET_NATIVE)
+option(KDK_NATIVE "Optimize for the building machine's processor (-march=native)" OFF)
+if(KDK_NATIVE)
     include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag(-march=native duet_native_supported)
-    if(duet_native_supported)
+    check_cxx_compiler_flag(-march=native kdk_native_supported)
+    if(kdk_native_supported)
         # Before the dependencies: they are built with it too. At link time
         # as well, where link-time optimization generates the code.
         add_compile_options(-march=native)
@@ -73,7 +73,7 @@ include(cmake/RelinkWhileRunning.cmake)
 
 # Diagram editor (Mermaid, PlantUML, explainer boards): its layouts come from
 # Graphviz's library. Without it, diagram files open as text. Both branches
-# set GRAPHVIZ_FOUND, GRAPHVIZ_LIBRARIES and the plugins Duet links in rather
+# set GRAPHVIZ_FOUND, GRAPHVIZ_LIBRARIES and the plugins Kodamiko links in rather
 # than loads from Graphviz's plugin configuration (GVPLUGIN_core,
 # GVPLUGIN_dot_layout, GVPLUGIN_neato_layout): the same engines everywhere,
 # and no text measured with system fonts (as in sidecar's WebAssembly build).
@@ -101,9 +101,9 @@ find_package(Qt6 OPTIONAL_COMPONENTS Svg)
 enable_testing()
 
 add_subdirectory(src)
-add_subdirectory(tools/duet-hook)
-add_subdirectory(tools/duet-askpass)
-add_subdirectory(tools/duet-mcp)
+add_subdirectory(tools/kodamiko-hook)
+add_subdirectory(tools/kodamiko-askpass)
+add_subdirectory(tools/kodamiko-mcp)
 add_subdirectory(tools/claude-plugin)
 add_subdirectory(tools/recipes)
 add_subdirectory(tools/bench-index)

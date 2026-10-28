@@ -4,8 +4,8 @@
 
 #include <QString>
 
-// The log files of Duet's programs (the editor, duet-hook, duet-mcp,
-// duet-askpass): every Qt message of a process, whatever its level
+// The log files of Kodamiko's programs (the editor, kodamiko-hook, kodamiko-mcp,
+// kodamiko-askpass): every Qt message of a process, whatever its level
 // (qDebug… qFatal) and category, goes to a file of its own in folder(), and
 // still to the standard error.
 //
@@ -13,7 +13,7 @@
 // folder and send it back whole.
 namespace LogFiles {
 
-// ~/.duet/logs, or $DUET_LOG_DIR when it is set.
+// ~/.kodamiko/logs, or $KDK_LOG_DIR when it is set.
 QString folder();
 
 // Routes the process's messages to

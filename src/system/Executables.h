@@ -14,8 +14,8 @@ namespace Executables {
 // "bin/clangd.exe" on Windows.
 QString fileName(const QString &path);
 
-// The program `name` shipped next to the running one (duet-hook beside
-// duet), or an empty string.
+// The program `name` shipped next to the running one (kodamiko-hook beside
+// kodamiko), or an empty string.
 QString besideTheApplication(const QString &name);
 
 // The Python of the virtual environment `folder` (a .venv):

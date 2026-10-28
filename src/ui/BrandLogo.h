@@ -7,7 +7,7 @@
 #include <QRectF>
 #include <QWidget>
 
-// Duet's mark at the start of the title bar, without the app icon's tile,
+// Kodamiko's mark at the start of the title bar, without the app icon's tile,
 // drawn at the screen's resolution. Clicks go through: dragging it moves the
 // window, like the bar. Its height is the bar's controls'; its width runs
 // from its left edge to `trailingGap` pixels after the mark's shapes.

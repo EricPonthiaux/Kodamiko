@@ -66,11 +66,11 @@ void selectRecipe(QListWidget *list, const QString &title)
     list->setCurrentItem(items.first());
 }
 
-// The executables ToolCatalog looks for in Duet's installs of a JDK and a Node.
+// The executables ToolCatalog looks for in Kodamiko's installs of a JDK and a Node.
 const QString javaExecutable = Executables::fileName(QStringLiteral("bin/java"));
 const QString nodeExecutable = QStringLiteral("bin/node");
 
-// A tool installed by Duet, as Installer leaves it.
+// A tool installed by Kodamiko, as Installer leaves it.
 void fakeInstall(const Toolchains &toolchains, const QString &tool, const QString &version, const QString &executable)
 {
     const QString folder = toolchains.installFolder(tool, version);
@@ -182,7 +182,7 @@ private slots:
     void initTestCase()
     {
         // Settings of the tests, not the user's.
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_projects"));
         QSettings().clear();
         // Claude's state of the tests, not the user's ~/.claude.json.
@@ -406,7 +406,7 @@ private slots:
         QVERIFY(InstallPlan::plan(config, toolchains, required).isEmpty()); // any JDK will do
     }
 
-    void saysWhatARecipeRequiresThatDuetCannotDownload()
+    void saysWhatARecipeRequiresThatKDKCannotDownload()
     {
         const QTemporaryDir dir;
         const Toolchains toolchains(dir.path(), false);
@@ -491,7 +491,7 @@ private slots:
         QVERIFY(toolchains.qtFolder("", "gcc_64").isEmpty());
     }
 
-    void aQtInstalledWithoutDuetIsTakenWithItsModules()
+    void aQtInstalledWithoutKDKIsTakenWithItsModules()
     {
         const QTemporaryDir dir;
         const Toolchains toolchains(dir.path(), false);
@@ -534,7 +534,7 @@ private slots:
         const QString program = SystemFixtures::programOfEveryMachine();
         const QList<ToolRequirement> present{{.tool = program, .version = {}, .kit = {}, .modules = {}}};
         const QList<ToolRequirement> absent{
-            {.tool = "no-such-program-of-duet", .version = {}, .kit = {}, .modules = {}}};
+            {.tool = "no-such-program-of-kodamiko", .version = {}, .kit = {}, .modules = {}}};
 
         QVERIFY(InstallPlan::unavailable({}, toolchains, present).isEmpty());
         QVERIFY(InstallPlan::plan({}, toolchains, absent).isEmpty()); // never downloaded
@@ -939,7 +939,7 @@ private slots:
         QWidget window;
         window.resize(1200, 800);
         window.show();
-        ProjectSettingsPopup popup(&toolchains, Theme::duet(), &window);
+        ProjectSettingsPopup popup(&toolchains, Theme::kodamiko(), &window);
         const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
         popup.popup(cppProject(dir.path(), toolchains));
         const auto *panel = popup.findChild<ProjectSetupPanel *>();
@@ -960,7 +960,7 @@ private slots:
         Toolchains toolchains(dir.filePath("toolchains"), false);
         QWidget window;
         window.show();
-        ProjectSettingsPopup popup(&toolchains, Theme::duet(), &window);
+        ProjectSettingsPopup popup(&toolchains, Theme::kodamiko(), &window);
         const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
         popup.popup(cppProject(dir.path(), toolchains));
 
@@ -1181,8 +1181,8 @@ private slots:
         QWidget host;
         host.resize(1200, 900);
         host.show();
-        auto *popup = new NewProjectPopup(Theme::duet(), &host);
-        ThemeStyle::apply(Theme::duet()); // pads the templates once they are laid out
+        auto *popup = new NewProjectPopup(Theme::kodamiko(), &host);
+        ThemeStyle::apply(Theme::kodamiko()); // pads the templates once they are laid out
 
         popup->popup();
 
@@ -1253,11 +1253,11 @@ private slots:
         QVERIFY(ProjectWindows::raise(second.path()));
     }
 
-    // Downloads for real: DUET_NETWORK_TESTS=1.
+    // Downloads for real: KDK_NETWORK_TESTS=1.
     void downloadsTheMavenOfItsRecipe()
     {
-        if (qEnvironmentVariableIsEmpty("DUET_NETWORK_TESTS"))
-            QSKIP("Set DUET_NETWORK_TESTS=1 to download from the Internet");
+        if (qEnvironmentVariableIsEmpty("KDK_NETWORK_TESTS"))
+            QSKIP("Set KDK_NETWORK_TESTS=1 to download from the Internet");
         const std::optional<Recipe> recipe = RecipeLibrary::find(RecipeLibrary::defaultSources(), "java-maven");
         QVERIFY(recipe);
         const QTemporaryDir dir;
@@ -1278,11 +1278,11 @@ private slots:
         QVERIFY(InstallPlan::plan({}, toolchains, maven).isEmpty());
     }
 
-    // Downloads for real: DUET_NETWORK_TESTS=1.
+    // Downloads for real: KDK_NETWORK_TESTS=1.
     void downloadsNodeAndPyright()
     {
-        if (qEnvironmentVariableIsEmpty("DUET_NETWORK_TESTS"))
-            QSKIP("Set DUET_NETWORK_TESTS=1 to download from the Internet");
+        if (qEnvironmentVariableIsEmpty("KDK_NETWORK_TESTS"))
+            QSKIP("Set KDK_NETWORK_TESTS=1 to download from the Internet");
         const QTemporaryDir dir;
         Toolchains toolchains(dir.filePath("toolchains"), false);
         ProjectConfig project;

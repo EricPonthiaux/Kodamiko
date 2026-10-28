@@ -8,7 +8,7 @@
 #include <QStringList>
 #include <QUrl>
 
-// A runtime or language server Duet can download: where its builds are
+// A runtime or language server Kodamiko can download: where its builds are
 // published, and what it runs on.
 struct ToolSpec {
     QString id;    // "jdk", "node", "clangd", "jdtls", "typescript-language-server", "pyright"
@@ -19,7 +19,7 @@ struct ToolSpec {
     QStringList versions;
     // Its command in the PATH ("pyright-langserver"), for "system".
     QString program;
-    // In Duet's install of it, the first one present: the executable, or
+    // In Kodamiko's install of it, the first one present: the executable, or
     // the script run with Node (see `script`).
     QStringList executables;
     bool script = false;
@@ -76,7 +76,7 @@ const ToolSpec *find(const QString &id);
 // The servers of `family`, preferred first.
 QStringList servers(const QString &family);
 // The tool of the runtime of `family`: "jdk", "node"; empty for the
-// languages whose runtime Duet does not download (C++, Python).
+// languages whose runtime Kodamiko does not download (C++, Python).
 QString runtimeOf(const QString &family);
 // The runtime versions offered for `family` (C++: the standards), newest
 // first, and the one chosen when the project does not say.

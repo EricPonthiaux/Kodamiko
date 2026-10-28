@@ -18,7 +18,7 @@
   src: url("fonts/GeistMono-Variable.woff2") format("woff2");
 }
 
-/* The brand colors come from packaging/brand/duet-icon.svg. The site is dark
+/* The brand colors come from packaging/brand/kodamiko-icon.svg. The site is dark
    by default, like the editor its screenshots show. */
 :root {
   --bg: #0d0f13;
@@ -221,7 +221,7 @@ code {
 }
 
 /* Hero: a dot grid fades out around the title, and below it a capture of
-   Duet shows what the title promises. */
+   Kodamiko shows what the title promises. */
 
 .hero {
   position: relative;
@@ -292,7 +292,7 @@ code {
   color: var(--text-subtle);
 }
 
-/* The block cursor of Duet's icon, blinking at the end of the title */
+/* The block cursor of Kodamiko's icon, blinking at the end of the title */
 .cursor {
   display: inline-block;
   width: 0.42em;
@@ -525,7 +525,7 @@ code {
   opacity: 0.88;
 }
 
-/* A screenshot is a capture of Duet's window, which draws its own frame
+/* A screenshot is a capture of Kodamiko's window, which draws its own frame
    and shadow: no bezel around it. */
 .screenshot {
   margin: 56px auto 0;

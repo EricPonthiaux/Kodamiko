@@ -109,7 +109,7 @@ DownloadSource sourceOf(const QJsonObject &entry, const QString &version)
     const std::optional<ArchiveFormat> archiveFormat = formatOf(format.isEmpty() ? source.fileName : format);
     if (archiveFormat)
         source.format = *archiveFormat;
-    // A download Duet cannot check is not installed.
+    // A download Kodamiko cannot check is not installed.
     if (!source.url.isValid() || source.fileName.isEmpty())
         source.error = QObject::tr("its download has no URL");
     else if (source.checksum.isEmpty() && checksumUrl.isEmpty())
@@ -298,7 +298,7 @@ QMap<QString, QString> placeholdersOf(const QList<RecipeParameter> &parameters, 
     return placeholders;
 }
 
-// The "run" array, read as .duet/run.json's "configurations".
+// The "run" array, read as .kodamiko/run.json's "configurations".
 QList<RunConfiguration> runConfigurationsOf(const QJsonValue &value)
 {
     const QJsonObject file{{QStringLiteral("configurations"), value.toArray()}};

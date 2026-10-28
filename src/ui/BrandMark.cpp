@@ -10,7 +10,7 @@ namespace BrandMark {
 namespace {
 
 // The rectangle (`x`, `y`, `w`, `h`) of the 64-unit grid of
-// packaging/brand/duet-mark.svg, fitted in the square `area`.
+// packaging/brand/kodamiko-mark.svg, fitted in the square `area`.
 QRectF gridRect(const QRectF &area, qreal x, qreal y, qreal w, qreal h)
 {
     const qreal unit = std::min(area.width(), area.height()) / 64.0;

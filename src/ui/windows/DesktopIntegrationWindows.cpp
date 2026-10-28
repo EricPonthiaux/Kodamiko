@@ -10,7 +10,7 @@ void DesktopIntegration::identifyApplication()
 {
     // A failure only leaves the system's default identity, derived from
     // the executable's path.
-    SetCurrentProcessExplicitAppUserModelID(L"Duet.Duet");
+    SetCurrentProcessExplicitAppUserModelID(L"Kodamiko.Kodamiko");
 }
 
 // The desktop has no full-screen Spaces to follow.

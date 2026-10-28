@@ -52,7 +52,7 @@ QStringList staleFiles(const WorkspaceEdit &edit, const EditTargets &targets)
         const auto *documentEdit = std::get_if<DocumentEdit>(&change);
         if (!documentEdit || !documentEdit->version)
             continue;
-        // As Duet sends it to the servers.
+        // As Kodamiko sends it to the servers.
         const std::optional<QString> text = WorkspaceFiles::textOf(documentEdit->filePath, targets);
         const bool isCurrent =
             text && targets.servers->isCurrent(documentEdit->filePath, *documentEdit->version, text->toUtf8());

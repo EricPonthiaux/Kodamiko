@@ -1,14 +1,14 @@
-# Contributing to Duet
+# Contributing to Kodamiko
 
 Thank you for your interest. Bug reports, ideas and pull requests are all
-welcome. Duet is young: before a large change, open an issue to talk about
+welcome. Kodamiko is young: before a large change, open an issue to talk about
 it, so that no work is lost.
 
 ## Reporting a bug
 
 Open an issue with the *Bug report* template: what you did, what you
 expected, what happened, and your system, Qt and Claude Code versions
-(*Help ▸ About Duet*). A security problem is not reported in an issue: see
+(*Help ▸ About Kodamiko*). A security problem is not reported in an issue: see
 [`SECURITY.md`](SECURITY.md).
 
 ## Building and testing
@@ -48,7 +48,7 @@ Also check that:
 
 ## License
 
-Duet is distributed under the GNU GPL v3 with an additional permission for
+Kodamiko is distributed under the GNU GPL v3 with an additional permission for
 Graphviz (see [`README.md`](README.md#license)). By contributing, you agree
 that your contribution is distributed under the same terms. Every new source
 file starts with `// SPDX-License-Identifier: GPL-3.0-only`.

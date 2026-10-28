@@ -5,7 +5,7 @@
 #include <QLocalServer>
 #include <QObject>
 
-// Makes the window that has a project open findable by the other Duet
+// Makes the window that has a project open findable by the other Kodamiko
 // processes, which each hold one window: opening a project already open
 // elsewhere brings that window to the front instead of opening it twice.
 //

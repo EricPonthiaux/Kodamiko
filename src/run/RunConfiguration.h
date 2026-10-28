@@ -27,7 +27,7 @@ struct RunConfiguration {
     // Those of Host::systemName() it is offered on; empty: every system.
     QStringList systems;
     // Found in the project's build files rather than written in
-    // .duet/run.json.
+    // .kodamiko/run.json.
     bool detected = false;
 
     bool operator==(const RunConfiguration &) const = default;
@@ -39,7 +39,7 @@ namespace RunConfigurations {
 QString kindName(RunConfiguration::Kind kind);
 RunConfiguration::Kind kindNamed(const QString &name);
 
-// <project>/.duet/run.json.
+// <project>/.kodamiko/run.json.
 QString filePath(const QString &projectFolder);
 
 // The configurations of a run.json:
@@ -51,15 +51,15 @@ QString filePath(const QString &projectFolder);
 QList<RunConfiguration> parse(const QByteArray &json, QString *error = nullptr);
 QByteArray serialize(const QList<RunConfiguration> &configurations);
 
-// Whether `configuration` is offered on the system Duet runs on.
+// Whether `configuration` is offered on the system Kodamiko runs on.
 bool isForThisSystem(const RunConfiguration &configuration);
 
 // The configurations the build files at the project's root offer:
 // package.json scripts, Maven, Cargo, Makefile. Builds first. CMake
-// projects offer none: their builds are those of .duet/run.json.
+// projects offer none: their builds are those of .kodamiko/run.json.
 QList<RunConfiguration> detect(const QString &projectFolder);
 
-// Those of .duet/run.json for this system, then the detected ones whose
+// Those of .kodamiko/run.json for this system, then the detected ones whose
 // name they do not reuse (a configuration of the file replaces the detected
 // one).
 QList<RunConfiguration> all(const QString &projectFolder, QString *error = nullptr);

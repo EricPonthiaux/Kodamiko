@@ -1,0 +1,179 @@
+classDiagram
+  class AgentProvider {
+    <<interface>>
+    name()
+    mark()
+    features()
+    sessionProcess(folder, hookServer, options)
+    fileRunProcess(run)
+    reviewRunProcess(run)
+    parseHook(json) HookEvent
+  }
+  class ClaudeCodeProvider
+  class AgentProviders {
+    <<namespace>>
+    all()
+    find(key)
+    key(provider)
+  }
+  class Agent {
+    worktree
+    sessionId
+    terminal
+    lastPrompt
+    pendingReport
+  }
+  class AgentActivity {
+    state
+    handle(event)
+    interrupt()
+    setWatched(watched)
+  }
+  class Worktree {
+    name
+    path
+    branch
+    baseCommit
+  }
+  class Worktrees {
+    <<namespace>>
+    add(repository, name)
+    hasWork(worktree)
+    rebase(worktree, onto)
+    fastForward(repository, branch)
+    remove(repository, worktree)
+  }
+  class AgentRun {
+    start(spec, timeout)
+    stop()
+    stepsAdded(steps)
+    finished(outcome)
+  }
+  class TerminalWidget
+  class NewAgentPopup {
+    popup(suggestedName, changes)
+    startRequested(name)
+  }
+  class CloseAgentPopup {
+    popup(worktree)
+    fateChosen(worktree, fate)
+  }
+  class HookEvent {
+    kind
+    sessionId
+    workingDirectory
+    filePaths
+    prompt
+  }
+  class State {
+    <<enumeration>>
+    Idle
+    Working
+    NeedsInput
+    Done
+  }
+  class HookServer {
+    listen()
+    deferReply()
+    respond(json)
+    hookReceived(event)
+  }
+  class MainWindow {
+    agentProvider_
+    hookServer_
+    agentSessions_
+    agentMerges_
+    closeAgentTab(worktree, fate)
+    mergeAgentWork(worktree, lastPrompt, afterMerge)
+  }
+  class AgentSessions {
+    add(worktree, sessionId, terminal)
+    find(event)
+    handle(event)
+    sendBack(agent, report, head)
+    activityChanged(terminal, state)
+    attentionRequested(title, message)
+  }
+  class AgentMergeQueue {
+    enqueue(worktree, afterMerge)
+    watch(statuses)
+    merged()
+    sentBack()
+    waiting()
+  }
+  class ProjectCheck
+  class AgentIndicator {
+    setStatus(status)
+    setProvider(provider)
+  }
+  ClaudeCodeProvider ..|> AgentProvider
+  AgentProviders --> AgentProvider : lists
+  MainWindow --> AgentProvider : current agent
+  HookServer --* MainWindow
+  AgentSessions --* MainWindow
+  AgentMergeQueue --* MainWindow
+  NewAgentPopup --* MainWindow
+  CloseAgentPopup --* MainWindow
+  AgentIndicator --* MainWindow
+  HookServer --> AgentProvider : decodes with
+  HookServer ..> HookEvent : emits
+  Agent "*" --* AgentSessions
+  AgentActivity --* Agent
+  Agent --> Worktree
+  Agent --> TerminalWidget : its tab
+  AgentActivity --> State
+  AgentSessions ..> HookEvent : handles
+  AgentMergeQueue ..> Worktrees : replays, fast-forwards
+  ProjectCheck --* AgentMergeQueue : runs the check
+  AgentMergeQueue ..> AgentSessions : sends work back
+  Worktrees ..> Worktree : creates
+  AgentRun --> AgentProvider : decodes output
+  AgentIndicator --> AgentProvider : shows its mark
+  NewAgentPopup ..> Worktree : names
+  CloseAgentPopup ..> Worktree : asks its fate
+
+%% Layout kept by Kodamiko (positions, sizes, colors, curves)
+%% kodamiko {"key":"AgentProvider","x":443,"y":1036}
+%% kodamiko {"key":"ClaudeCodeProvider","x":0,"y":822}
+%% kodamiko {"key":"AgentProviders","x":205,"y":782}
+%% kodamiko {"key":"Agent","x":1888,"y":234}
+%% kodamiko {"key":"AgentActivity","x":1754,"y":0}
+%% kodamiko {"key":"Worktree","x":1620,"y":782}
+%% kodamiko {"key":"Worktrees","x":1690.5,"y":488}
+%% kodamiko {"key":"AgentRun","x":1310,"y":782}
+%% kodamiko {"key":"TerminalWidget","x":2028,"y":548}
+%% kodamiko {"key":"NewAgentPopup","x":1431,"y":528}
+%% kodamiko {"key":"CloseAgentPopup","x":1206.5,"y":528}
+%% kodamiko {"key":"HookEvent","x":568,"y":772}
+%% kodamiko {"key":"State","x":1632.4,"y":206.9}
+%% kodamiko {"key":"HookServer","x":464,"y":508}
+%% kodamiko {"fill":"#ad1457","key":"MainWindow","x":761.5,"y":762}
+%% kodamiko {"fill":"#d84315","key":"AgentSessions","x":744.5,"y":488}
+%% kodamiko {"fill":"#ad1457","key":"AgentMergeQueue","x":754.5,"y":234}
+%% kodamiko {"h":89.3,"key":"ProjectCheck","w":169.9,"x":783,"y":40}
+%% kodamiko {"key":"AgentIndicator","x":1025.5,"y":528}
+%% kodamiko {"c":[135.5,898.4,155.9,912.4,179.4,928.2,201.3,941.7,275.2,987.5,359.4,1035.2,429.4,1073.7],"e":[442.8,1081.1],"link":"ClaudeCodeProvider>AgentProvider","n":0}
+%% kodamiko {"c":[355.5,934.2,384.1,962.4,417.6,995.3,449.9,1027],"e":[458.5,1035.5],"link":"AgentProviders>AgentProvider","lp":[392,997],"n":0}
+%% kodamiko {"c":[809.3,958.3,782.2,981.3,753,1006.1,724.8,1030.1],"e":[715.3,1038.2],"link":"MainWindow>AgentProvider","lp":[815.7,997],"n":0}
+%% kodamiko {"c":[614.3,639.5,658.9,671.1,716.9,712.3,770.8,750.5],"e":[786.6,761.7],"link":"HookServer>MainWindow","n":0}
+%% kodamiko {"c":[882,684.2,886.6,703.1,891.6,723.2,896.3,742.7],"e":[900.9,761.6],"link":"AgentSessions>MainWindow","n":0}
+%% kodamiko {"c":[936.8,410.5,952.6,433.1,966.8,458.4,975.2,484.3,1002.4,568.4,987.2,667.8,966.7,743.1],"e":[961.3,761.8],"link":"AgentMergeQueue>MainWindow","n":0}
+%% kodamiko {"c":[1430.6,634.4,1341.1,674.3,1211.9,732,1106.6,779],"e":[1088.9,786.9],"link":"NewAgentPopup>MainWindow","n":0}
+%% kodamiko {"c":[1217.7,644.5,1175.8,675.3,1123,714.2,1073.9,750.4],"e":[1058.4,761.8],"link":"CloseAgentPopup>MainWindow","n":0}
+%% kodamiko {"c":[1063.1,644.5,1044.2,673.9,1020.7,710.6,998.4,745.4],"e":[987.9,761.8],"link":"AgentIndicator>MainWindow","n":0}
+%% kodamiko {"c":[544.4,664.5,549.4,738.5,557.3,852.7,564.3,951.7,566,974.8,567.7,999.4,569.4,1023.2],"e":[570.3,1035.5],"link":"HookServer>AgentProvider","lp":[505,860],"n":0}
+%% kodamiko {"c":[568.8,664.5,580.1,694.4,593.2,728.8,605.2,760.4],"e":[609.5,771.8],"link":"HookServer>HookEvent","lp":[572,723],"n":0}
+%% kodamiko {"c":[1887.7,352.7,1856.6,364.6,1820,377.4,1786.1,386.6,1452.9,476.7,1354.5,432.5,1021.8,524.3,1011.4,527.2,1000.8,530.4,990.1,533.9],"e":[971.7,540.2],"link":"Agent>AgentSessions","n":0}
+%% kodamiko {"c":[1872.6,156.2,1883.1,175.5,1894.6,196.5,1905.6,216.8],"e":[1914.8,233.7],"link":"AgentActivity>Agent","n":0}
+%% kodamiko {"c":[1964.9,410.5,1962.7,488.3,1950.2,602.3,1901.2,687.7,1872.6,737.6,1823.6,779.4,1780.6,809.4],"e":[1770.4,816.3],"link":"Agent>Worktree","n":0}
+%% kodamiko {"c":[2009.8,410.3,2032.1,452.4,2058,501.1,2076.8,536.6],"e":[2082.6,547.6],"link":"Agent>TerminalWidget","lp":[2056,449],"n":0}
+%% kodamiko {"c":[1785.7,156.3,1778.4,169.2,1770.8,182.8,1763.2,196.1],"e":[1757.2,206.8],"link":"AgentActivity>State","n":0}
+%% kodamiko {"c":[781,684.2,761.1,709.5,739.7,736.7,719.9,762.1],"e":[712.3,771.6],"link":"AgentSessions>HookEvent","lp":[784,723],"n":0}
+%% kodamiko {"c":[961.8,343.1,1114.7,375.3,1408.5,441.9,1650.7,524.3,1659.9,527.5,1669.3,530.9,1678.8,534.6],"e":[1690.3,539.1],"link":"AgentMergeQueue>Worktrees","lp":[1650.9,449],"n":0}
+%% kodamiko {"c":[866.1,129.6,865.1,153.7,863.8,184.6,862.5,214.6],"e":[861.7,234],"link":"ProjectCheck>AgentMergeQueue","n":0}
+%% kodamiko {"c":[858,410.3,858,431.2,858,453.7,858,475.5],"e":[858,487.8],"link":"AgentMergeQueue>AgentSessions","lp":[908.5,449],"n":0}
+%% kodamiko {"c":[1758.5,684.2,1748.4,712.2,1737.4,742.7,1727.4,770.2],"e":[1723.2,781.9],"link":"Worktrees>Worktree","lp":[1773.5,723],"n":0}
+%% kodamiko {"c":[1309.5,887.5,1176.8,935.9,899.3,1037.2,727.1,1100],"e":[715.4,1104.2],"link":"AgentRun>AgentProvider","lp":[1288.6,997],"n":0}
+%% kodamiko {"c":[1037.7,644.4,1018.7,660.1,997,675.9,975.2,687.7,886,736.2,824.8,682,757.8,758.3,700.1,824,755.7,871.1,721.7,951.7,711.1,976.8,697,1001.8,681.8,1025.4],"e":[675,1035.7],"link":"AgentIndicator>AgentProvider","n":0}
+%% kodamiko {"c":[1572.3,644.5,1593.2,681.3,1620.7,729.5,1644.3,771],"e":[1650.4,781.6],"link":"NewAgentPopup>Worktree","lp":[1645.7,723],"n":0}
+%% kodamiko {"c":[1381.9,644.5,1449,690.6,1542.2,754.8,1609.5,801.1],"e":[1619.6,808.1],"link":"CloseAgentPopup>Worktree","lp":[1516,723],"n":0}

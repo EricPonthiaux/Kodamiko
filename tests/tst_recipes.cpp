@@ -40,7 +40,7 @@ QByteArray read(const QString &path)
     return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
 }
 
-// Duet's recipe `id` (from $DUET_RECIPES_DIR, the source tree's).
+// Kodamiko's recipe `id` (from $KDK_RECIPES_DIR, the source tree's).
 Recipe builtIn(const QString &id)
 {
     const std::optional<Recipe> recipe = RecipeLibrary::find(RecipeLibrary::defaultSources(), id);
@@ -85,7 +85,7 @@ private slots:
     void initTestCase()
     {
         // The user's recipes of the tests, not the user's own.
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_recipes"));
     }
 
@@ -254,7 +254,7 @@ private slots:
         QCOMPARE(problems.size(), 1);
     }
 
-    void aProjectRecipeReplacesTheUsersWhichReplacesDuets()
+    void aProjectRecipeReplacesTheUsersWhichReplacesKDKs()
     {
         const QTemporaryDir dir;
         write(dir.filePath("builtIn/qt/recipe.json"), R"({"title": "Built-in"})");
@@ -262,7 +262,7 @@ private slots:
         write(dir.filePath("builtIn/cpp/recipe.json"), R"({"title": "C++"})");
         const RecipeSources sources{.builtIn = dir.filePath("builtIn"), .user = dir.filePath("user"), .project = {}};
         RecipeSources withProject = sources;
-        withProject.project = dir.filePath("project/.duet/recipes");
+        withProject.project = dir.filePath("project/.kodamiko/recipes");
         write(withProject.project + "/qt/recipe.json", R"({"title": "Project"})");
 
         QCOMPARE(RecipeLibrary::find(sources, "qt")->title, QString("User"));
@@ -367,7 +367,7 @@ private slots:
     {
         const QTemporaryDir dir;
         write(dir.filePath("own/recipe.json"), R"({"title": "Own", "run": [{"name": "B", "command": "make"}]})");
-        write(dir.filePath("own/files/.duet/run.json"), R"({"configurations": []})");
+        write(dir.filePath("own/files/.kodamiko/run.json"), R"({"configurations": []})");
         QString error;
         const std::optional<Recipe> recipe = Recipes::load(dir.filePath("own"), &error);
         QVERIFY(recipe);
@@ -645,13 +645,13 @@ private slots:
 
     void terminalsGetTheAdditions()
     {
-        setTerminalAdditions({.variables = {{"DUET_TEST_RECIPE", "on"}}, .pathFolders = {}});
+        setTerminalAdditions({.variables = {{"KDK_TEST_RECIPE", "on"}}, .pathFolders = {}});
 
-        const QString value = terminalEnvironment().value("DUET_TEST_RECIPE");
+        const QString value = terminalEnvironment().value("KDK_TEST_RECIPE");
         setTerminalAdditions({});
 
         QCOMPARE(value, QString("on"));
-        QVERIFY(!terminalEnvironment().contains("DUET_TEST_RECIPE"));
+        QVERIFY(!terminalEnvironment().contains("KDK_TEST_RECIPE"));
     }
 };
 

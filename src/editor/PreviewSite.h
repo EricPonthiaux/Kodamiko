@@ -10,7 +10,7 @@
 class QWebEngineProfile;
 
 // A folder served to a web view as a local web server would, under the
-// duet-preview:// scheme: the page's relative paths (scripts, ES modules,
+// kodamiko-preview:// scheme: the page's relative paths (scripts, ES modules,
 // fetch, style sheets, images) lead to the files next to it, while its
 // scripts can read no file outside the folder (file:// URLs stay out of
 // their reach). One file is served from the editor's text, saved or not.

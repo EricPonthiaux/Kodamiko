@@ -17,7 +17,7 @@ class McpRegistry;
 class QJsonObject;
 
 // Receives notifications from an agent's hooks, relayed by the small
-// `duet-hook` program through a local socket (named pipe on Windows), and
+// `kodamiko-hook` program through a local socket (named pipe on Windows), and
 // decoded by the agent's provider.
 //
 // Protocol: the hook sends one JSON line; the server emits hookReceived()
@@ -28,8 +28,8 @@ class QJsonObject;
 // respond(): the reply is then "ok <json>", which the hook prints for
 // the agent to read (additional context, decision…).
 //
-// The same socket serves the duet-mcp relay, the editor's MCP server for
-// the agent: a connection whose first line is {"duet":"mcp"} stays open and is
+// The same socket serves the kodamiko-mcp relay, the editor's MCP server for
+// the agent: a connection whose first line is {"kodamiko":"mcp"} stays open and is
 // handed to an McpSession serving the registry's tools.
 class HookServer : public QObject {
     Q_OBJECT
@@ -41,7 +41,7 @@ public:
 
     bool listen();
 
-    // Full name to pass to the hook (DUET_SOCKET variable).
+    // Full name to pass to the hook (KDK_SOCKET variable).
     QString serverName() const { return server_.fullServerName(); }
 
     QString errorString() const { return server_.errorString(); }

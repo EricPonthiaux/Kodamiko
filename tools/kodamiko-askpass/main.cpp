@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// duet-askpass: asks the editor's user for what git or ssh needs.
+// kodamiko-askpass: asks the editor's user for what git or ssh needs.
 //
 // git (GIT_ASKPASS) and ssh (SSH_ASKPASS) run this program with a prompt
 // as argument ("Password for 'https://user@example.com':") and read the
 // answer on its standard output. We relay the prompt to the editor over
-// the local socket named in DUET_ASKPASS_SOCKET (see AskpassServer) and
+// the local socket named in KDK_ASKPASS_SOCKET (see AskpassServer) and
 // wait for the user, as long as it takes.
 //
 // Exit code 1 when the user cancels or the editor cannot be reached: git
@@ -30,9 +30,9 @@ constexpr int connectTimeoutMs = 2000;
 int main(int argc, char *argv[])
 {
     const QCoreApplication app(argc, argv);
-    LogFiles::install(QStringLiteral("duet-askpass"));
+    LogFiles::install(QStringLiteral("kodamiko-askpass"));
 
-    const QString serverName = qEnvironmentVariable("DUET_ASKPASS_SOCKET");
+    const QString serverName = qEnvironmentVariable("KDK_ASKPASS_SOCKET");
     if (serverName.isEmpty())
         return 1;
     QLocalSocket socket;

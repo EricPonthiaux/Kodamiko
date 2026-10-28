@@ -2,7 +2,7 @@
 
 // MCP tools for files and tabs.
 
-#include "DuetTools.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "agent/EditorContext.h"
 #include "editor/EditorTabs.h"
@@ -15,7 +15,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 
-QString DuetToolContext::absolute(const QString &path) const
+QString KDKToolContext::absolute(const QString &path) const
 {
     if (path.isEmpty())
         return {};
@@ -23,7 +23,7 @@ QString DuetToolContext::absolute(const QString &path) const
     return QDir::cleanPath(QFileInfo(path).isAbsolute() || base.isEmpty() ? path : QDir(base).filePath(path));
 }
 
-QString DuetToolContext::relative(const QString &path) const
+QString KDKToolContext::relative(const QString &path) const
 {
     const QString base = folder ? folder() : QString();
     if (base.isEmpty())
@@ -32,28 +32,28 @@ QString DuetToolContext::relative(const QString &path) const
     return relativePath.startsWith(QLatin1String("..")) ? path : relativePath;
 }
 
-namespace DuetTools {
+namespace KDKTools {
 
 QString instructions()
 {
     return QStringLiteral(
-        "Duet is the editor the user works in, next to this session: these tools see what the user sees "
+        "Kodamiko is the editor the user works in, next to this session: these tools see what the user sees "
         "(open files with their unsaved changes, the selection, problems, diagrams, terminals, git) and act in "
         "the editor (open a file at a line, lay a diagram out…). Prefer them to reading files from disk when "
         "the user refers to what is in front of them (\"this\", \"the selection\", \"the diagram\"). Paths are "
         "relative to the project unless absolute. To change the code's structure (rename a symbol or a file, "
         "change a function's parameters), prefer the refactoring tools to editing files: they reach every usage "
         "through the language server, and the user undoes them in one step with Undo Refactoring.\n\n"
-        "For git, use Duet's git tools first, rather than git in a shell: stage_files, discard_changes, commit, "
+        "For git, use Kodamiko's git tools first, rather than git in a shell: stage_files, discard_changes, commit, "
         "switch_branch, delete_branch, merge_branch, cherry_pick, revert_commit, stash_changes, push, pull and the "
         "others. Why: each one that changes the repository asks the user with a plain description of what it "
-        "does, so they approve a change they understand rather than a command line; Duet takes a snapshot before "
+        "does, so they approve a change they understand rather than a command line; Kodamiko takes a snapshot before "
         "what is hard to undo (discarding, switching, merging…), which restore_snapshot brings back; the tools "
-        "run one git operation at a time with Duet's own git work, ask for remote credentials in the editor "
-        "instead of leaving the shell waiting, and refresh Duet's Diff, History and branch views at once, so the "
+        "run one git operation at a time with Kodamiko's own git work, ask for remote credentials in the editor "
+        "instead of leaving the shell waiting, and refresh Kodamiko's Diff, History and branch views at once, so the "
         "user sees what you did. To read, get_git_status, get_file_history and get_commit answer in JSON. Git in "
         "a shell stays for what no tool does (push --force, reset --hard, tag, log -S…): say why when you use "
-        "it. When the user enabled it, Duet refuses a shell git command that one of its tools does, and gives "
+        "it. When the user enabled it, Kodamiko refuses a shell git command that one of its tools does, and gives "
         "the tool call to make instead.");
 }
 
@@ -63,7 +63,7 @@ using namespace McpSchema;
 
 // The text of a file as the editor has it: its unsaved buffer if any, else
 // the disk.
-std::optional<QString> fileText(const DuetToolContext &context, const QString &path, bool *unsaved)
+std::optional<QString> fileText(const KDKToolContext &context, const QString &path, bool *unsaved)
 {
     const QHash<QString, QString> buffers = context.tabs->unsavedTexts();
     if (buffers.contains(path)) {
@@ -78,13 +78,13 @@ std::optional<QString> fileText(const DuetToolContext &context, const QString &p
     return decoded->text;
 }
 
-void getEditorState(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void getEditorState(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder ? context.folder() : QString();
     reply(McpResult::json(EditorContext::of(*context.tabs, folder).toJson()));
 }
 
-void getOpenFiles(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void getOpenFiles(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QHash<QString, QString> unsaved = context.tabs->unsavedTexts();
     const QString current = context.tabs->currentFilePath();
@@ -96,7 +96,7 @@ void getOpenFiles(const DuetToolContext &context, const QJsonObject &, const Mcp
     reply(McpResult::json(QJsonObject{{QStringLiteral("files"), files}}));
 }
 
-void getFileText(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void getFileText(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     bool unsaved = false;
@@ -115,7 +115,7 @@ void getFileText(const DuetToolContext &context, const QJsonObject &arguments, c
                                       {QStringLiteral("text"), lines.join(QLatin1Char('\n'))}}));
 }
 
-void openFile(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void openFile(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     if (!QFileInfo(path).isFile()) {
@@ -127,14 +127,14 @@ void openFile(const DuetToolContext &context, const QJsonObject &arguments, cons
         context.navigator->goToLine(path, line - 1, std::max(0, arguments.value(QStringLiteral("column")).toInt(1) - 1),
                                     std::max(0, arguments.value(QStringLiteral("length")).toInt(0)));
     } else if (!context.tabs->openFile(path)) {
-        reply(McpResult::error(QStringLiteral("Duet could not open %1").arg(context.relative(path))));
+        reply(McpResult::error(QStringLiteral("Kodamiko could not open %1").arg(context.relative(path))));
         return;
     }
     reply(McpResult::message(QStringLiteral("Opened %1").arg(context.relative(path))));
 }
 
 // Saves the open file at `path` if it has changes; false if it could not be.
-bool saveOpenFile(const DuetToolContext &context, const QString &path)
+bool saveOpenFile(const KDKToolContext &context, const QString &path)
 {
     EditorWidget *editor = context.tabs->editorFor(path);
     if (!editor)
@@ -143,7 +143,7 @@ bool saveOpenFile(const DuetToolContext &context, const QString &path)
     return !editor->isModified() || editor->save(&error);
 }
 
-void saveFiles(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void saveFiles(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QJsonArray paths = arguments.value(QStringLiteral("paths")).toArray();
     if (paths.isEmpty()) {
@@ -162,7 +162,7 @@ void saveFiles(const DuetToolContext &context, const QJsonObject &arguments, con
                            : McpResult::error(QStringLiteral("Not saved: %1").arg(failed.join(QStringLiteral(", ")))));
 }
 
-void showDiff(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void showDiff(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     context.tabs->showDiff(arguments.value(QStringLiteral("title")).toString(),
                            arguments.value(QStringLiteral("diff")).toString());
@@ -172,7 +172,7 @@ void showDiff(const DuetToolContext &context, const QJsonObject &arguments, cons
 QString reviewSelectionPrompt(const QJsonObject &arguments)
 {
     const QString focus = arguments.value(QStringLiteral("focus")).toString();
-    return QStringLiteral("Get the code I selected in Duet (get_editor_state) and review it%1: "
+    return QStringLiteral("Get the code I selected in Kodamiko (get_editor_state) and review it%1: "
                           "point out problems with their line, then propose fixes, applying "
                           "nothing until I agree.")
         .arg(focus.isEmpty() ? QString() : QStringLiteral(", looking at ") + focus);
@@ -181,7 +181,7 @@ QString reviewSelectionPrompt(const QJsonObject &arguments)
 QString fixDiagnosticsPrompt(const QJsonObject &arguments)
 {
     const QString path = arguments.value(QStringLiteral("path")).toString();
-    return QStringLiteral("Get the problems Duet's language servers report%1 (get_diagnostics), "
+    return QStringLiteral("Get the problems Kodamiko's language servers report%1 (get_diagnostics), "
                           "fix the errors, then check again with get_diagnostics until none "
                           "is left. Tell me what you changed.")
         .arg(path.isEmpty() ? QString() : QStringLiteral(" for ") + path);
@@ -189,7 +189,7 @@ QString fixDiagnosticsPrompt(const QJsonObject &arguments)
 
 QString explainSymbolPrompt(const QJsonObject &)
 {
-    return QStringLiteral("Take the symbol at my cursor in Duet (get_editor_state), find its "
+    return QStringLiteral("Take the symbol at my cursor in Kodamiko (get_editor_state), find its "
                           "definition and usages (get_symbol_info, find_definition, "
                           "find_references) and explain what it does and how the project "
                           "uses it, briefly.");
@@ -197,28 +197,28 @@ QString explainSymbolPrompt(const QJsonObject &)
 
 } // namespace
 
-McpTool::Run handledBy(const DuetToolContext &context, ToolHandler handler)
+McpTool::Run handledBy(const KDKToolContext &context, ToolHandler handler)
 {
     return [context, handler](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
         handler(context, arguments, reply);
     };
 }
 
-McpTool::Run handledBy(const DuetToolContext &context, ImmediateToolHandler handler)
+McpTool::Run handledBy(const KDKToolContext &context, ImmediateToolHandler handler)
 {
     return [context, handler](const QJsonObject &arguments, const McpReply &reply, const McpProgress &) {
         reply(handler(context, arguments));
     };
 }
 
-void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
+void registerEditorTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.instructions = instructions();
 
     registry.addTool({
         QStringLiteral("get_editor_state"),
         QStringLiteral("Editor state"),
-        QStringLiteral("What the user has in front of them in Duet: the current file, the cursor, the selection "
+        QStringLiteral("What the user has in front of them in Kodamiko: the current file, the cursor, the selection "
                        "(with its text), the problems of that file, or the diagram in front and the elements "
                        "selected in it, and the files with unsaved changes. Use it when the user says \"this\", "
                        "\"here\" or \"the selection\"."),
@@ -241,7 +241,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool({
         QStringLiteral("get_open_files"),
         QStringLiteral("Open files"),
-        QStringLiteral("The files open in Duet's tabs, in tab order, the current one first marked, with whether "
+        QStringLiteral("The files open in Kodamiko's tabs, in tab order, the current one first marked, with whether "
                        "each has unsaved changes."),
         object({}),
         {},
@@ -256,7 +256,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool({
         QStringLiteral("get_file_text"),
         QStringLiteral("File text"),
-        QStringLiteral("The text of a file as the user sees it in Duet: its unsaved changes included, which the "
+        QStringLiteral("The text of a file as the user sees it in Kodamiko: its unsaved changes included, which the "
                        "file on disk does not have yet. Lines can be limited to a range."),
         object({{QStringLiteral("path"), string(QStringLiteral("File, relative to the project or absolute"))},
                 {QStringLiteral("startLine"), integer(QStringLiteral("First line, 1-based (optional)"))},
@@ -274,7 +274,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool({
         QStringLiteral("open_file"),
         QStringLiteral("Open file"),
-        QStringLiteral("Opens a file in a Duet tab for the user (a diagram in the diagram editor), optionally at a "
+        QStringLiteral("Opens a file in a Kodamiko tab for the user (a diagram in the diagram editor), optionally at a "
                        "line, with a column and a length to select. Use it to show the user what you are talking "
                        "about."),
         object({{QStringLiteral("path"), string(QStringLiteral("File, relative to the project or absolute"))},
@@ -294,7 +294,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool({
         QStringLiteral("save_files"),
         QStringLiteral("Save files"),
-        QStringLiteral("Saves files that have unsaved changes in Duet (all of them without paths). Ask the user "
+        QStringLiteral("Saves files that have unsaved changes in Kodamiko (all of them without paths). Ask the user "
                        "first unless they asked you to."),
         object({{QStringLiteral("paths"), array(string(QStringLiteral("File")), QStringLiteral("Files to save; all "
                                                                                                "when omitted"))}}),
@@ -310,7 +310,7 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool({
         QStringLiteral("show_diff"),
         QStringLiteral("Show a diff"),
-        QStringLiteral("Shows a unified diff in a Duet tab, for the user to read (a change you propose, or one you "
+        QStringLiteral("Shows a unified diff in a Kodamiko tab, for the user to read (a change you propose, or one you "
                        "explain). It changes no file."),
         object({{QStringLiteral("title"), string(QStringLiteral("Tab title"))},
                 {QStringLiteral("diff"), string(QStringLiteral("Unified diff text"))}},
@@ -324,11 +324,11 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         handledBy(context, showDiff),
     });
 
-    // Prompts: slash commands in the Claude session (/mcp__duet__…).
+    // Prompts: slash commands in the Claude session (/mcp__kodamiko__…).
     registry.addPrompt(
         {QStringLiteral("review-selection"),
          QStringLiteral("Review the selection"),
-         QStringLiteral("Review the code selected in Duet"),
+         QStringLiteral("Review the code selected in Kodamiko"),
          {{QStringLiteral("focus"), QStringLiteral("What to look at (bugs, naming, performance…)"), false}},
          reviewSelectionPrompt});
     registry.addPrompt({QStringLiteral("fix-diagnostics"),
@@ -345,11 +345,11 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
     // The editor's state as a resource: clients that subscribe hear when
     // the user moves.
     registry.addResource({
-        QStringLiteral("duet://editor/state"),
+        QStringLiteral("kodamiko://editor/state"),
         false,
         QStringLiteral("editor-state"),
         QStringLiteral("Editor state"),
-        QStringLiteral("The current file, cursor, selection, problems and unsaved files in Duet"),
+        QStringLiteral("The current file, cursor, selection, problems and unsaved files in Kodamiko"),
         QStringLiteral("application/json"),
         [context](const QString &) -> std::optional<QString> {
             const QString folder = context.folder ? context.folder() : QString();
@@ -358,18 +358,18 @@ void registerEditorTools(McpRegistry &registry, const DuetToolContext &context)
         },
     });
     registry.addResource({
-        QStringLiteral("duet://file/{path}"),
+        QStringLiteral("kodamiko://file/{path}"),
         true,
         QStringLiteral("file"),
         QStringLiteral("File as in the editor"),
         QStringLiteral("A file's text with its unsaved changes"),
         QStringLiteral("text/plain"),
         [context](const QString &uri) -> std::optional<QString> {
-            const QString path = context.absolute(uri.mid(QStringLiteral("duet://file/").size()));
+            const QString path = context.absolute(uri.mid(QStringLiteral("kodamiko://file/").size()));
             bool unsaved = false;
             return fileText(context, path, &unsaved);
         },
     });
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

@@ -9,7 +9,7 @@
 #include <QStringList>
 
 // Claude Code's runs without a session, one-off `claude --print` processes:
-// file runs (AgentFileRun), with Duet's plugin (the diagrams skill), allowed
+// file runs (AgentFileRun), with Kodamiko's plugin (the diagrams skill), allowed
 // to read the project and to write the run's file only; review runs
 // (AgentReviewRun), allowed to read the project only. Their stream-json
 // output tells what Claude is doing, for the loading screen.

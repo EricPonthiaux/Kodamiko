@@ -9,7 +9,7 @@
 class QLabel;
 class WindowControls;
 
-// The title bar of Duet's other frameless windows, matching the main one:
+// The title bar of Kodamiko's other frameless windows, matching the main one:
 // the app icon, the window's title, and the window controls. Dragging it
 // moves the window, a double-click maximizes it.
 class WindowTitleBar : public QWidget {

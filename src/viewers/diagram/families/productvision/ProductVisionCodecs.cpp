@@ -2,7 +2,7 @@
 
 // Product visions (sidecar's fence/sciilo-product-vision.js). A product
 // vision stays ordinary Mermaid mindmap source for Claude: a marker comment
-// and stable node keys let Duet show that tree as the product vision's cards
+// and stable node keys let Kodamiko show that tree as the product vision's cards
 // instead of a generic mind map.
 
 #include "ProductVision.h"
@@ -28,7 +28,7 @@ namespace {
 
 using namespace diagram::source;
 
-// Written by Duet; sidecar writes `%% sciilo:product-vision`, read alike.
+// Written by Kodamiko; sidecar writes `%% sciilo:product-vision`, read alike.
 const QString marker = QStringLiteral("%% product-vision");
 
 bool isProductVisionSource(const QString &source)

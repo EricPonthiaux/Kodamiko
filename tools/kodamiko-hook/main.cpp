@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// duet-hook: relay between Claude Code and the editor.
+// kodamiko-hook: relay between Claude Code and the editor.
 //
 // Claude Code runs this program for every event declared in the hooks
 // (see ClaudeLauncher) and passes it the event as JSON on standard
 // input. We forward it as is to the editor over the local socket named
-// in DUET_SOCKET, then wait for its acknowledgement: "ok", or "ok <json>"
+// in KDK_SOCKET, then wait for its acknowledgement: "ok", or "ok <json>"
 // when the editor answers the hook.
 //
 // As a hook, this program writes to its standard output only the editor's
@@ -16,7 +16,7 @@
 // With the "statusline" argument, it is Claude Code's status line command:
 // it forwards the session state (model, context, usage limits) to the
 // editor, then prints the line to display: the output of the user's own
-// status line command (DUET_STATUSLINE_COMMAND) if there is one, a
+// status line command (KDK_STATUSLINE_COMMAND) if there is one, a
 // short summary otherwise.
 
 #include "log/LogFiles.h"
@@ -46,7 +46,7 @@ constexpr int statusLineTimeoutMs = 5000;
 // Returns the editor's answer: the JSON after "ok", empty if none.
 QByteArray sendToEditor(const QJsonDocument &event, int acknowledgeTimeout)
 {
-    const QString serverName = qEnvironmentVariable("DUET_SOCKET");
+    const QString serverName = qEnvironmentVariable("KDK_SOCKET");
     if (serverName.isEmpty())
         return {};
     QLocalSocket socket;
@@ -100,11 +100,11 @@ QByteArray defaultStatusLine(const QJsonObject &status)
 int statusLine(const QByteArray &input)
 {
     const QJsonObject status = QJsonDocument::fromJson(input).object();
-    sendToEditor(QJsonDocument(QJsonObject{{QLatin1String("hook_event_name"), QLatin1String("DuetStatusLine")},
+    sendToEditor(QJsonDocument(QJsonObject{{QLatin1String("hook_event_name"), QLatin1String("KDKStatusLine")},
                                            {QLatin1String("status"), status}}),
                  connectTimeoutMs);
 
-    const QString userCommand = qEnvironmentVariable("DUET_STATUSLINE_COMMAND");
+    const QString userCommand = qEnvironmentVariable("KDK_STATUSLINE_COMMAND");
     const QByteArray line = userCommand.isEmpty() ? defaultStatusLine(status) : runUserStatusLine(userCommand, input);
     std::fwrite(line.constData(), 1, static_cast<size_t>(line.size()), stdout);
     return 0;
@@ -115,7 +115,7 @@ int statusLine(const QByteArray &input)
 int main(int argc, char *argv[])
 {
     const QCoreApplication app(argc, argv);
-    LogFiles::install(QStringLiteral("duet-hook"));
+    LogFiles::install(QStringLiteral("kodamiko-hook"));
 
     QFile input;
     if (!input.open(stdin, QIODevice::ReadOnly))

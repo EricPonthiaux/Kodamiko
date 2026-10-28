@@ -150,7 +150,7 @@ void DiagramGenerationView::start()
     sketch_->setState(DiagramSketch::State::Drawing);
     steps_->addSteps({tr("Starting %1").arg(agent_->name())});
 
-    // duet-hook reaches this view's own server: the agent gets the diagram's
+    // kodamiko-hook reaches this view's own server: the agent gets the diagram's
     // problems right after writing it.
     if (hookServer_.serverName().isEmpty())
         hookServer_.listen();

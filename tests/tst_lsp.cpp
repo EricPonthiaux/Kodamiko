@@ -379,7 +379,7 @@ private slots:
     {
         const QTemporaryDir dir;
         Toolchains toolchains(dir.filePath("toolchains"), false);
-        // A clangd downloaded by Duet.
+        // A clangd downloaded by Kodamiko.
         const QString folder = toolchains.installFolder("clangd", "23.1.0");
         QDir().mkpath(folder + "/bin");
         QFile clangd(folder + "/" + Executables::fileName("bin/clangd"));
@@ -631,7 +631,7 @@ private slots:
         const CompletionItem toList = itemNamed(items, "toList");
         QVERIFY2(!toList.label.isEmpty(), qPrintable(labelsOf(items).join(", ")));
         QVERIFY2(toList.detail.contains("Collector<"), qPrintable(toList.detail));
-        // Its own postfix templates are off: Duet's are offered instead.
+        // Its own postfix templates are off: Kodamiko's are offered instead.
         const QByteArray member = "public class Main {\n"
                                   "    void f(String name) {\n"
                                   "        name.\n"

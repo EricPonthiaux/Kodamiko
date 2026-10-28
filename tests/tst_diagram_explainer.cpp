@@ -668,7 +668,7 @@ private slots:
         QVERIFY2(build(again, codec().serialize(board, board.meta), &error), qPrintable(error));
     }
 
-    // Shapes created in Duet have no key: their board ids become element ids,
+    // Shapes created in Kodamiko have no key: their board ids become element ids,
     // unique even when one collides with a source id.
     void createdElementsGetUniqueIds()
     {
@@ -714,7 +714,7 @@ private slots:
         node->label = QStringLiteral("q'");
         node->customFill = QStringLiteral("#ffcc00");
         const QByteArray saved = document::save(board, codec());
-        QVERIFY(!saved.contains("duet")); // the scene owns its layout: no comments
+        QVERIFY(!saved.contains("kodamiko")); // the scene owns its layout: no comments
         QVERIFY(saved.endsWith('\n'));
 
         Board reloaded;

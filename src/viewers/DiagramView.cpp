@@ -29,7 +29,7 @@
 
 #include <optional>
 
-#ifdef DUET_WITH_SVG
+#ifdef KDK_WITH_SVG
 #include <QSvgGenerator>
 #endif
 
@@ -225,7 +225,7 @@ QToolButton *DiagramView::createExportButton(QWidget *parent)
     exportButton_->setPopupMode(QToolButton::InstantPopup);
     auto *menu = new QMenu(exportButton_);
     menu->addAction(tr("Source…"), this, &DiagramView::exportSource);
-#ifdef DUET_WITH_SVG
+#ifdef KDK_WITH_SVG
     menu->addAction(tr("SVG Image…"), this, &DiagramView::exportSvg);
 #endif
     menu->addAction(tr("PNG Image…"), this, &DiagramView::exportPng);
@@ -399,7 +399,7 @@ bool DiagramView::exportImage(const QString &path, QString *error) const
 {
     const Printed printed(*board_);
     if (QFileInfo(path).suffix().compare(QStringLiteral("svg"), Qt::CaseInsensitive) == 0) {
-#ifdef DUET_WITH_SVG
+#ifdef KDK_WITH_SVG
         QSvgGenerator generator;
         generator.setFileName(path);
         generator.setSize(printed.box.size().toSize());
@@ -418,7 +418,7 @@ bool DiagramView::exportImage(const QString &path, QString *error) const
         return true;
 #else
         if (error)
-            *error = tr("This build of Duet cannot write SVG");
+            *error = tr("This build of Kodamiko cannot write SVG");
         return false;
 #endif
     }

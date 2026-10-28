@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Linked into the real duet executable by capture.sh, never into a release:
-// once the application exists, it reads commands from $DUET_SHOTS/command
+// Linked into the real kodamiko executable by capture.sh, never into a release:
+// once the application exists, it reads commands from $KDK_SHOTS/command
 // and runs them on the windows, so that a script can set a scene up and
 // grab it. One command per line:
 //   mode <Terminal|Edit|Review|Diff|History>   the tab of the mode bar
@@ -16,7 +16,7 @@
 //   screen <name>                               the whole screen, <name>.png
 //   dump                                        the widget tree, widgets.txt
 //   quit
-// It writes $DUET_SHOTS/done once a file of commands has run.
+// It writes $KDK_SHOTS/done once a file of commands has run.
 
 #include "ui/DetachablePage.h"
 
@@ -48,7 +48,7 @@ QPointer<QWidget> keyTarget;
 
 QString shotsFolder()
 {
-    return qEnvironmentVariable("DUET_SHOTS");
+    return qEnvironmentVariable("KDK_SHOTS");
 }
 
 QMainWindow *mainWindow()

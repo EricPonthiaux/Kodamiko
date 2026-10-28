@@ -22,14 +22,14 @@ private slots:
         ProcessSpec spec;
         spec.environment = terminalEnvironment();
         spec.program = "cmd.exe";
-        spec.arguments = {"/c", "echo duet-ok"};
+        spec.arguments = {"/c", "echo kodamiko-ok"};
 
         QVERIFY2(pty->start(spec, QSize(91, 33)), qPrintable(pty->errorString()));
 
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
-        // Into the pseudo-console, even when Duet's own output is redirected
+        // Into the pseudo-console, even when Kodamiko's own output is redirected
         // (ctest's pipe).
-        QVERIFY(output.contains("duet-ok"));
+        QVERIFY(output.contains("kodamiko-ok"));
     }
 
     // AltGr arrives as Ctrl+Alt: its character is text, not Ctrl+letter

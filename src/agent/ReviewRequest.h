@@ -10,7 +10,7 @@
 
 // What a review run (AgentReviewRun) is asked, and how its findings go
 // back to the session that wrote the code. The reviewer gets the code and
-// what Duet knows for sure about it (the project's check), never the
+// what Kodamiko knows for sure about it (the project's check), never the
 // reasoning that wrote it.
 namespace ReviewRequest {
 

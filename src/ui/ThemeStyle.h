@@ -20,7 +20,7 @@ QString styleSheet(const Theme &theme);
 // Sets both on the application.
 void apply(const Theme &theme);
 // The theme apply() set last, as QApplication::palette() is the palette:
-// for a popup made where no theme is at hand. Theme::duet() before.
+// for a popup made where no theme is at hand. Theme::kodamiko() before.
 const Theme &applied();
 // Sets the application font (Preferences ▸ Fonts) on every widget
 // without a font of its own. Under a style sheet, QApplication::setFont

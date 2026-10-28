@@ -18,10 +18,10 @@ struct LanguageSetup {
     // "17" (JDK), "24" (Node), "3.12" (Python), "c++20" (C++ standard).
     QString runtimeVersion;
     // A runtime of the machine the user picked (JDK home, Python
-    // executable); empty: any of `runtimeVersion`, Duet's own first.
+    // executable); empty: any of `runtimeVersion`, Kodamiko's own first.
     QString runtimePath;
     QString server; // a ToolCatalog server ("clangd"); empty: none
-    // A version Duet downloads, or "system" for the one in the PATH.
+    // A version Kodamiko downloads, or "system" for the one in the PATH.
     QString serverVersion;
     // The id of the recipe attached to the language (see RecipeLibrary),
     // one of this family's; empty: none.
@@ -32,7 +32,7 @@ struct LanguageSetup {
     bool operator==(const LanguageSetup &) const = default;
 };
 
-// A project Duet has opened: a folder and the setup of its languages.
+// A project Kodamiko has opened: a folder and the setup of its languages.
 struct ProjectConfig {
     QString path; // absolute
     QString name; // the folder's name

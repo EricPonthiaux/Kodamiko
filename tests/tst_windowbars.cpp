@@ -117,7 +117,7 @@ private slots:
         QFont font = AppFonts::interfaceFont();
         font.setPointSize(11);
         QApplication::setFont(font);
-        ThemeStyle::apply(Theme::duet());
+        ThemeStyle::apply(Theme::kodamiko());
     }
 
     void barsKeepControlsInsideTheWindow_data()
@@ -125,9 +125,9 @@ private slots:
         QTest::addColumn<int>("width");
         QTest::addColumn<int>("fontSize");
         QTest::addColumn<QString>("themeName");
-        QTest::newRow("duet-11pt-480px") << 480 << 11 << QStringLiteral("duet");
-        QTest::newRow("duet-slate-15pt-480px") << 480 << 15 << QStringLiteral("duet-slate");
-        for (const QString &themeName : {QStringLiteral("duet"), QStringLiteral("duet-slate")}) {
+        QTest::newRow("kodamiko-11pt-480px") << 480 << 11 << QStringLiteral("kodamiko");
+        QTest::newRow("kodamiko-slate-15pt-480px") << 480 << 15 << QStringLiteral("kodamiko-slate");
+        for (const QString &themeName : {QStringLiteral("kodamiko"), QStringLiteral("kodamiko-slate")}) {
             for (int fontSize : {11, 15, 22}) {
                 for (int width : {640, 800, 1024, 1440, 1920}) {
                     const QByteArray name =
@@ -180,7 +180,7 @@ private slots:
         QTest::qWait(20);
         for (int i = 0; i < window.modes->count(); ++i)
             QVERIFY(window.modes->rect().contains(window.modes->tabRect(i)));
-        const QString preview = qEnvironmentVariable("DUET_BAR_PREVIEW_DIR");
+        const QString preview = qEnvironmentVariable("KDK_BAR_PREVIEW_DIR");
         if (!preview.isEmpty())
             window.root.grab().save(preview + "/" + QString::fromLatin1(QTest::currentDataTag()) + ".png");
     }
@@ -198,7 +198,7 @@ private slots:
         QFont font = QApplication::font();
         font.setPointSize(fontSize);
         QApplication::setFont(font);
-        Window window(Theme::duet());
+        Window window(Theme::kodamiko());
 
         window.show(1440);
         QVERIFY(QTest::qWaitForWindowExposed(&window.root));
@@ -244,7 +244,7 @@ private slots:
 
     void compactMenuKeepsActionsAndRunStopWorking()
     {
-        Window window(Theme::duet());
+        Window window(Theme::kodamiko());
         window.show(640);
         auto *menuButton = window.title->findChild<QToolButton *>("mainMenuButton");
         QTRY_VERIFY(menuButton->isVisible());
@@ -264,7 +264,7 @@ private slots:
         const QRect runRect(buttons.first()->mapTo(window.title, QPoint()), buttons.first()->size());
         QTest::mouseClick(buttons.first(), Qt::LeftButton);
         QCOMPARE(started.count(), 1);
-        window.title->setRunConfiguration({.icon = UiIcons::icon("build", Theme::duet().foreground),
+        window.title->setRunConfiguration({.icon = UiIcons::icon("build", Theme::kodamiko().foreground),
                                            .name = "CMake: build a-very-long-configuration-name",
                                            .menu = &window.runMenu,
                                            .running = true});
@@ -276,7 +276,7 @@ private slots:
 
     void statusOverflowRetainsLiveControlsAndRestoresThemOnExpansion()
     {
-        Window window(Theme::duet());
+        Window window(Theme::kodamiko());
         window.show(640);
         auto *more = window.status->findChild<QToolButton *>("statusOverflow");
         auto *popup = window.status->findChild<QFrame *>("statusPopup");
@@ -308,7 +308,7 @@ private slots:
 
     void longLabelsTakeTheRoomLeftInWideBars()
     {
-        Window window(Theme::duet());
+        Window window(Theme::kodamiko());
         window.show(1920);
         QVERIFY(QTest::qWaitForWindowExposed(&window.root));
         auto *project = window.title->findChild<ElidingToolButton *>("projectChip");
@@ -326,7 +326,7 @@ private slots:
 
     void projectAndRunBlockSitInTheMiddleOfAWideBar()
     {
-        Window window(Theme::duet());
+        Window window(Theme::kodamiko());
         window.show(1920);
         QVERIFY(QTest::qWaitForWindowExposed(&window.root));
         const auto *project = window.title->findChild<QToolButton *>("projectChip");
@@ -337,7 +337,7 @@ private slots:
         QTRY_VERIFY(qAbs(groupCenter() - window.title->width() / 2) <= 1);
         // Long labels take the room before the centering does: shorter ones
         // leave enough of it at a laptop's width.
-        window.title->setProject("duet", "/p/duet", &window.projectMenu);
+        window.title->setProject("kodamiko", "/p/kodamiko", &window.projectMenu);
         window.title->setRunConfiguration({.name = "CMake: build default", .menu = &window.runMenu});
         window.root.resize(1440, window.root.height());
         QTRY_VERIFY(qAbs(groupCenter() - window.title->width() / 2) <= 1);
@@ -345,7 +345,7 @@ private slots:
 
     void existingWindowAdaptsToFontChangesAndDetachedTerminals()
     {
-        Window window(Theme::duet());
+        Window window(Theme::kodamiko());
         window.show(1920);
         QVERIFY(QTest::qWaitForWindowExposed(&window.root));
         for (int size : {22, 11, 15}) {
@@ -373,10 +373,10 @@ private slots:
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.write("one\r\ntwo\r\n");
         file.close();
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QString error;
         QVERIFY(editor.load(file.fileName(), &error));
-        Window window(Theme::duet());
+        Window window(Theme::kodamiko());
         auto *status = new EditorStatus(&window.root);
         status->setEditor(&editor);
         window.status->addGroup("File Format", {status});

@@ -188,7 +188,7 @@ PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
     addPage(QStringLiteral("claude"), tr("Claude"), createClaudePage());
     terminalPage_ = new TerminalPreferencesPage;
     addPage(QStringLiteral("terminal"), tr("Terminal"),
-            page(tr("Terminal"), tr("The environment of the programs Duet launches."), terminalPage_));
+            page(tr("Terminal"), tr("The environment of the programs Kodamiko launches."), terminalPage_));
     addPage(QStringLiteral("keyboard"), tr("Keymap"), createKeymapPage());
     pageList_->setCurrentRow(0);
 
@@ -323,7 +323,7 @@ QWidget *PreferencesPopup::createAppearancePage()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    // Theme: one miniature per theme, Duet's and KDE's by name, four in a row.
+    // Theme: one miniature per theme, Kodamiko's and KDE's by name, four in a row.
     themes_ = new QButtonGroup(this);
     themes_->setExclusive(true);
     connect(themes_, &QButtonGroup::buttonToggled, this, [this](QAbstractButton *, bool checked) {
@@ -342,7 +342,8 @@ QWidget *PreferencesPopup::createAppearancePage()
 #else
     auto *windowCard = new SettingsCard;
     windowCard->addRow(tr("System title bar"),
-                       tr("The system's window frame instead of Duet's, for tiling window managers."), systemTitleBar_);
+                       tr("The system's window frame instead of Kodamiko's, for tiling window managers."),
+                       systemTitleBar_);
     addGroup(layout, tr("Window"), windowCard);
 #endif
 
@@ -538,7 +539,7 @@ QWidget *PreferencesPopup::createClaudePage()
     shareEditorContext_ = new QCheckBox;
     reportEditErrors_ = new QCheckBox;
     exposeTools_ = new QCheckBox;
-    gitThroughDuetTools_ = new QCheckBox;
+    gitThroughKDKTools_ = new QCheckBox;
     claudeNotifications_ = new QCheckBox;
     session->addRow(tr("Snapshot before each prompt"),
                     tr("Keeps a copy of the working directory before Claude works on a prompt, to undo its "
@@ -552,15 +553,15 @@ QWidget *PreferencesPopup::createClaudePage()
                     tr("Tells Claude the errors the language servers find in the code it has just edited, so "
                        "that it fixes them before going on."),
                     reportEditErrors_);
-    session->addRow(tr("Expose Duet's tools to Claude"),
+    session->addRow(tr("Expose Kodamiko's tools to Claude"),
                     tr("Lets Claude read and act in the editor (open files with their unsaved changes, problems, "
-                       "diagrams, terminals, git) through Duet's MCP server. Applies to the next session."),
+                       "diagrams, terminals, git) through Kodamiko's MCP server. Applies to the next session."),
                     exposeTools_);
-    session->addRow(tr("Send git commands to Duet's tools"),
-                    tr("When Claude runs a git command that changes the repository in its shell, Duet refuses it "
+    session->addRow(tr("Send git commands to Kodamiko's tools"),
+                    tr("When Claude runs a git command that changes the repository in its shell, Kodamiko refuses it "
                        "and tells Claude which of its git tools does the same: they ask you first and take "
-                       "snapshots. Reading git stays allowed. Needs Duet's tools."),
-                    gitThroughDuetTools_);
+                       "snapshots. Reading git stays allowed. Needs Kodamiko's tools."),
+                    gitThroughKDKTools_);
     session->addRow(tr("Notifications"),
                     tr("Alerts you when Claude needs you or has finished while you are elsewhere."),
                     claudeNotifications_);
@@ -766,7 +767,7 @@ void PreferencesPopup::load(const Preferences &preferences,
     shareEditorContext_->setChecked(preferences.shareEditorContext);
     reportEditErrors_->setChecked(preferences.reportEditErrors);
     exposeTools_->setChecked(preferences.exposeTools);
-    gitThroughDuetTools_->setChecked(preferences.gitThroughDuetTools);
+    gitThroughKDKTools_->setChecked(preferences.gitThroughKDKTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     terminalPage_->setPathFolders(preferences.terminalPathFolders);
     terminalPage_->setOptionKey(preferences.terminalOptionKey);
@@ -826,7 +827,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.shareEditorContext = shareEditorContext_->isChecked();
     preferences.reportEditErrors = reportEditErrors_->isChecked();
     preferences.exposeTools = exposeTools_->isChecked();
-    preferences.gitThroughDuetTools = gitThroughDuetTools_->isChecked();
+    preferences.gitThroughKDKTools = gitThroughKDKTools_->isChecked();
     preferences.claudeNotifications = claudeNotifications_->isChecked();
     preferences.terminalPathFolders = terminalPage_->pathFolders();
     preferences.terminalOptionKey = terminalPage_->optionKey();

@@ -28,7 +28,7 @@ class QTreeWidgetItem;
 // item to the trash (a skill with its folder). Under Settings,
 // Effective Settings shows them merged (see EffectiveSettings).
 //
-// Duet's own hooks (its --settings file) are not listed: Duet needs them.
+// Kodamiko's own hooks (its --settings file) are not listed: Kodamiko needs them.
 //
 // The list is reread when the pane shows, on refresh() and after Claude's
 // edits; only while the pane is visible.

@@ -11,8 +11,8 @@
 #include <optional>
 #include <variant>
 
-// The Language Server Protocol's data, as Duet uses it: positions in lines
-// and UTF-16 code units (the encoding Duet asks for), locations, and the
+// The Language Server Protocol's data, as Kodamiko uses it: positions in lines
+// and UTF-16 code units (the encoding Kodamiko asks for), locations, and the
 // edits of a rename or a quick fix.
 namespace LspProtocol {
 

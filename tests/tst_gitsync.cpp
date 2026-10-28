@@ -551,10 +551,10 @@ private slots:
                 return std::nullopt;
             return QStringLiteral("s3cret");
         });
-        server.setHelperPath(DUET_ASKPASS_PATH);
+        server.setHelperPath(KDK_ASKPASS_PATH);
         QVERIFY(server.listen());
         const QHash<QString, QString> environment = server.environment();
-        QCOMPARE(environment.value("GIT_ASKPASS"), QString(DUET_ASKPASS_PATH));
+        QCOMPARE(environment.value("GIT_ASKPASS"), QString(KDK_ASKPASS_PATH));
         QCOMPARE(environment.value("SSH_ASKPASS_REQUIRE"), QString("force"));
 
         const auto ask = [&](const QString &prompt, int &exitCode) {
@@ -563,7 +563,7 @@ private slots:
             for (auto it = environment.begin(); it != environment.end(); ++it)
                 processEnvironment.insert(it.key(), it.value());
             helper.setProcessEnvironment(processEnvironment);
-            helper.start(DUET_ASKPASS_PATH, {prompt});
+            helper.start(KDK_ASKPASS_PATH, {prompt});
             // The server answers from the event loop.
             QElapsedTimer waited;
             waited.start();
@@ -579,7 +579,7 @@ private slots:
         QCOMPARE(exitCode, 1);
         QCOMPARE(prompts, QStringList({"Password for 'https://u@example.com': ", "Cancel me"}));
 
-        // End to end: git itself asks through duet-askpass.
+        // End to end: git itself asks through kodamiko-askpass.
         prompts.clear();
         QTemporaryDir project;
         git(project, {"init", "-q", "-b", "main"});

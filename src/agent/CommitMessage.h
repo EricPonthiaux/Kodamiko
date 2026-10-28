@@ -4,7 +4,7 @@
 
 #include <QString>
 
-// Commit message written by the agent session in Duet's terminal: Duet
+// Commit message written by the agent session in Kodamiko's terminal: Kodamiko
 // types the request in its prompt, the agent reads the changes with its own
 // tools and hands the message back with the set_commit_message tool. The
 // session knows why the changes were made, which the diff does not say.

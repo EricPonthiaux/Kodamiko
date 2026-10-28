@@ -21,7 +21,7 @@ class Toolchains;
 class WindowButton;
 class WindowFrame;
 
-// The window Duet opens with, before the main one, in the manner of
+// The window Kodamiko opens with, before the main one, in the manner of
 // IntelliJ's welcome screen: the projects opened before, to search and
 // reopen (those whose folder is gone listed apart, to locate), and on the
 // side New Project to create one (NewProjectForm) and Import Project to
@@ -60,7 +60,7 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
-    // Duet's name and version, New Project and Import Project, About.
+    // Kodamiko's name and version, New Project and Import Project, About.
     QWidget *createSide();
     // The search, the list, the shortcuts below, or the empty state.
     QWidget *createProjectsPage();

@@ -408,7 +408,7 @@ void DiffView::applyTheme(const Theme &theme)
 
 void DiffView::wheelEvent(QWheelEvent *event)
 {
-    // QScintilla zooms with the Control key on macOS; Duet, as in its trees,
+    // QScintilla zooms with the Control key on macOS; Kodamiko, as in its trees,
     // with Command there (Qt's ControlModifier) and Ctrl elsewhere.
     if (!(event->modifiers() & Qt::ControlModifier)) {
         QsciScintillaBase::wheelEvent(event);

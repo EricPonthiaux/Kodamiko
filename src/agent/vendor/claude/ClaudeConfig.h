@@ -26,7 +26,7 @@ enum class Category {
     Mcp
 };
 
-// From the lowest precedence to the highest, Duet's session settings last.
+// From the lowest precedence to the highest, Kodamiko's session settings last.
 enum class Scope {
     Managed,   // set by the administrator, read-only
     User,      // ~/.claude, for every project
@@ -35,7 +35,7 @@ enum class Scope {
     Project,   // in the project, shared through git
     Subfolder, // CLAUDE.md of a folder in the project, read when Claude works there
     Local,     // in the project, not shared
-    Session,   // what Duet passes with --settings, read-only
+    Session,   // what Kodamiko passes with --settings, read-only
 };
 
 struct Entry {
@@ -60,7 +60,7 @@ QString autoMemoryDir(const QString &projectDir);
 
 // Everything Claude Code reads for `projectDir`, grouped by category in
 // the order of Category, then by scope. `sessionSettings` is the file
-// Duet passes with --settings (may be empty).
+// Kodamiko passes with --settings (may be empty).
 QList<Entry> entries(const QString &projectDir, const QString &sessionSettings);
 
 struct SettingsFile {
@@ -69,7 +69,7 @@ struct SettingsFile {
 };
 
 // The settings files Claude Code merges, from the lowest precedence to the
-// highest: User, Project, Local, Duet's --settings (`sessionSettings`, if
+// highest: User, Project, Local, Kodamiko's --settings (`sessionSettings`, if
 // not empty), Managed; existing or not.
 QList<SettingsFile> settingsFiles(const QString &projectDir, const QString &sessionSettings);
 

@@ -10,7 +10,7 @@ namespace DiagramRequest {
 QString prompt(const QString &kindTitle, const QString &relativePath, const QString &description)
 {
     return QStringLiteral(
-               "Draw a diagram in the file %2, which does not exist yet, following the duet:diagrams skill. "
+               "Draw a diagram in the file %2, which does not exist yet, following the kodamiko:diagrams skill. "
                "Kind of diagram: %1.\n"
                "What the user wants it to show:\n<request>\n%3\n</request>\n"
                "When the request is about this project, read the code it refers to first and draw what the code "

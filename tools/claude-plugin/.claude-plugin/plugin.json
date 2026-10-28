@@ -1,5 +1,5 @@
 {
-  "name": "duet",
-  "description": "Duet editor integration: the formats Duet displays, such as its .flow diagrams.",
+  "name": "kodamiko",
+  "description": "Kodamiko editor integration: the formats Kodamiko displays, such as its .flow diagrams.",
   "version": "1.0.0"
 }

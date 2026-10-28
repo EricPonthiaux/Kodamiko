@@ -133,7 +133,7 @@ private slots:
     void givesThePermissionHookTimeToWaitForTheUser()
     {
         const QJsonObject settings =
-            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"")).object();
+            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/kodamiko-hook\"")).object();
         const QJsonObject permission = settings["hooks"].toObject()["PermissionRequest"].toArray().first().toObject();
 
         QCOMPARE(permission["hooks"].toArray().first().toObject()["timeout"].toInt(), 600);
@@ -171,11 +171,12 @@ private slots:
         QCOMPARE(command->message, QStringLiteral("git add a"));
     }
 
-    void checksShellCommandsOnlyInSessionsWithDuetTools()
+    void checksShellCommandsOnlyInSessionsWithKDKTools()
     {
         const auto preToolUseMatcher = [](ClaudeLauncher::GitInShell gitInShell) {
             const QJsonObject settings =
-                QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"", {}, gitInShell)).object();
+                QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/kodamiko-hook\"", {}, gitInShell))
+                    .object();
             return settings["hooks"]["PreToolUse"].toArray().first().toObject()["matcher"].toString();
         };
 
@@ -192,7 +193,7 @@ private slots:
         AgentRun run(&claude_, QDir::tempPath(), nullptr);
         QSignalSpy failed(&run, &AgentRun::failed);
         const ProcessSpec spec{.program = QCoreApplication::applicationFilePath(),
-                               .workingDirectory = QDir::temp().filePath(QStringLiteral("duet-no-such-folder"))};
+                               .workingDirectory = QDir::temp().filePath(QStringLiteral("kodamiko-no-such-folder"))};
 
         run.start(spec, std::chrono::milliseconds(50));
         QTest::qWait(200);
@@ -241,17 +242,17 @@ private slots:
         const QString prompt =
             DiagramRequest::prompt("Flowchart", "docs/diagrams/returns.mmd", "  How returns work \n");
         QVERIFY(prompt.startsWith(QStringLiteral("Draw a diagram in the file docs/diagrams/returns.mmd, which does not "
-                                                 "exist yet, following the duet:diagrams skill. Kind of diagram: "
+                                                 "exist yet, following the kodamiko:diagrams skill. Kind of diagram: "
                                                  "Flowchart.\n")));
         QVERIFY(prompt.contains(QStringLiteral("<request>\nHow returns work\n</request>")));
 
         const QStringList arguments = ClaudeFileRun::arguments(prompt, "docs/diagrams/returns.mmd",
-                                                               "/opt/duet/claude-plugin", "\"/opt/duet-hook\"");
+                                                               "/opt/kodamiko/claude-plugin", "\"/opt/kodamiko-hook\"");
         QCOMPARE(arguments.first(), prompt); // before the variadic --allowedTools
         QCOMPARE(arguments.at(arguments.indexOf("--output-format") + 1), QStringLiteral("stream-json"));
         QVERIFY(arguments.contains("--verbose"));
         QCOMPARE(arguments.at(arguments.indexOf("--plugin-dir") + 1),
-                 QDir::toNativeSeparators(QStringLiteral("/opt/duet/claude-plugin")));
+                 QDir::toNativeSeparators(QStringLiteral("/opt/kodamiko/claude-plugin")));
         QCOMPARE(arguments.at(arguments.indexOf("--tools") + 1), QStringLiteral("Read,Grep,Glob,Skill,Write,Edit"));
         QCOMPARE(arguments.mid(arguments.indexOf("--allowedTools") + 1),
                  (QStringList{"Read", "Grep", "Glob", "Skill", "Edit(./docs/diagrams/returns.mmd)"}));
@@ -260,7 +261,7 @@ private slots:
         const QJsonObject check = settings["hooks"].toObject()["PostToolUse"].toArray().first().toObject();
         QCOMPARE(check["matcher"].toString(), QStringLiteral("Write|Edit|MultiEdit"));
         QCOMPARE(check["hooks"].toArray().first().toObject()["command"].toString(),
-                 QStringLiteral("\"/opt/duet-hook\""));
+                 QStringLiteral("\"/opt/kodamiko-hook\""));
 
         const QStringList bare = ClaudeFileRun::arguments(prompt, "a.flow", {}, {});
         QVERIFY(!bare.contains("--plugin-dir"));
@@ -390,7 +391,7 @@ private slots:
     void settingsDeclareHooksAndStatusLine()
     {
         const QJsonObject settings =
-            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"")).object();
+            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/kodamiko-hook\"")).object();
         const QJsonObject hooks = settings["hooks"].toObject();
         QCOMPARE(hooks.keys(), (QStringList{"Notification", "PermissionRequest", "PostToolUse", "PreToolUse", "Stop",
                                             "StopFailure", "UserPromptSubmit"}));
@@ -400,15 +401,15 @@ private slots:
         QCOMPARE(postToolUse["matcher"].toString(), QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash"));
         const QJsonObject command = postToolUse["hooks"].toArray().first().toObject();
         QCOMPARE(command["type"].toString(), QStringLiteral("command"));
-        QCOMPARE(command["command"].toString(), QStringLiteral("\"/opt/duet-hook\""));
+        QCOMPARE(command["command"].toString(), QStringLiteral("\"/opt/kodamiko-hook\""));
         QCOMPARE(settings["statusLine"].toObject()["command"].toString(),
-                 QStringLiteral("\"/opt/duet-hook\" statusline"));
+                 QStringLiteral("\"/opt/kodamiko-hook\" statusline"));
     }
 
     void settingsAcceptMessagesFromOtherSessions()
     {
         const QJsonObject settings =
-            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"")).object();
+            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/kodamiko-hook\"")).object();
         QCOMPARE(settings["crossSessionInbound"].toString(), QStringLiteral("accept"));
     }
 
@@ -459,7 +460,7 @@ private slots:
     void statusLineEventNamesItsSession()
     {
         const std::optional<HookEvent> event = claude_.parseHook(
-            R"({"hook_event_name":"DuetStatusLine","status":{"session_id":"agent-session","model":{}}})");
+            R"({"hook_event_name":"KDKStatusLine","status":{"session_id":"agent-session","model":{}}})");
 
         QVERIFY(event);
         QCOMPARE(event->sessionId, QStringLiteral("agent-session"));
@@ -479,7 +480,7 @@ private slots:
     void newAgentPopupChecksTheName()
     {
         QWidget window;
-        NewAgentPopup popup(Theme::duet(), &window);
+        NewAgentPopup popup(Theme::kodamiko(), &window);
         popup.load("agent-1", NewAgentPopup::UncommittedChanges::None);
         QSignalSpy requested(&popup, &NewAgentPopup::startRequested);
         QVERIFY(popup.startButton()->isEnabled()); // the suggested name
@@ -487,7 +488,7 @@ private slots:
         popup.nameField()->clear();
         QTest::keyClicks(popup.nameField(), "fix login");
         QCOMPARE(popup.nameField()->text(), QString("fix-login")); // as typed
-        QVERIFY(popup.message()->text().contains("duet/fix-login"));
+        QVERIFY(popup.message()->text().contains("kodamiko/fix-login"));
         popup.nameField()->setText("bad..name");
         QVERIFY(!popup.startButton()->isEnabled());
 
@@ -501,8 +502,8 @@ private slots:
     void closeAgentPopupReportsTheChosenFateOfTheWorktreeAskedFor()
     {
         QWidget window;
-        CloseAgentPopup popup(Theme::duet(), &window);
-        popup.load({.name = "agent-1", .path = "/repo/.claude/worktrees/agent-1", .branch = "duet/agent-1"});
+        CloseAgentPopup popup(Theme::kodamiko(), &window);
+        popup.load({.name = "agent-1", .path = "/repo/.claude/worktrees/agent-1", .branch = "kodamiko/agent-1"});
         QString chosenName;
         std::optional<CloseAgentPopup::WorktreeFate> chosenFate;
         connect(&popup, &CloseAgentPopup::fateChosen, this,
@@ -520,7 +521,7 @@ private slots:
     void closeAgentPopupAsksForEachWorktreeOnceInTurn()
     {
         QWidget window;
-        CloseAgentPopup popup(Theme::duet(), &window);
+        CloseAgentPopup popup(Theme::kodamiko(), &window);
         QStringList chosen;
         connect(&popup, &CloseAgentPopup::fateChosen, this,
                 [&](const Worktree &worktree, CloseAgentPopup::WorktreeFate) { chosen.append(worktree.name); });
@@ -542,7 +543,7 @@ private slots:
     void closeAgentPopupReportsTheCancelledWorktreeOnly()
     {
         QWidget window;
-        CloseAgentPopup popup(Theme::duet(), &window);
+        CloseAgentPopup popup(Theme::kodamiko(), &window);
         QStringList cancelled;
         connect(&popup, &CloseAgentPopup::cancelled, this,
                 [&](const Worktree &worktree) { cancelled.append(worktree.name); });
@@ -558,7 +559,7 @@ private slots:
     void messagePopupShowsTheWaitingMessagesInTurn()
     {
         QWidget window;
-        MessagePopup popup(QStringLiteral("claude"), QStringLiteral("testMessage"), Theme::duet(), &window);
+        MessagePopup popup(QStringLiteral("claude"), QStringLiteral("testMessage"), Theme::kodamiko(), &window);
 
         popup.load("Merge agent-1", "Conflicts");
         popup.load("Merge agent-1", "Conflicts"); // repeated
@@ -575,7 +576,7 @@ private slots:
     void agentCheckPopupSavesTheTrimmedCommand()
     {
         QWidget window;
-        AgentCheckPopup popup(Theme::duet(), &window);
+        AgentCheckPopup popup(Theme::kodamiko(), &window);
         QSignalSpy saved(&popup, &AgentCheckPopup::saved);
         popup.commandField()->setText("  ctest --test-dir build ");
 
@@ -666,7 +667,7 @@ private slots:
         QCOMPARE(attention.size(), 0);
     }
 
-    // End to end: the real duet-hook binary, launched as Claude Code
+    // End to end: the real kodamiko-hook binary, launched as Claude Code
     // would, relays the event to the editor's server.
     void hookProgramRelaysEventsToTheServer()
     {
@@ -677,9 +678,9 @@ private slots:
 
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("DUET_SOCKET", server.serverName());
+        environment.insert("KDK_SOCKET", server.serverName());
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        hook.start(QStringLiteral(KDK_HOOK_PATH), {});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"hook_event_name":"Stop","session_id":"hello"})");
         hook.closeWriteChannel();
@@ -703,9 +704,9 @@ private slots:
 
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("DUET_SOCKET", server.serverName());
+        environment.insert("KDK_SOCKET", server.serverName());
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        hook.start(QStringLiteral(KDK_HOOK_PATH), {});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"hook_event_name":"Stop","session_id":"hello"})");
         hook.closeWriteChannel();
@@ -732,9 +733,9 @@ private slots:
 
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("DUET_SOCKET", server.serverName());
+        environment.insert("KDK_SOCKET", server.serverName());
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        hook.start(QStringLiteral(KDK_HOOK_PATH), {});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"hook_event_name":"UserPromptSubmit","prompt":"fix this"})");
         hook.closeWriteChannel();
@@ -761,9 +762,9 @@ private slots:
 
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("DUET_SOCKET", server.serverName());
+        environment.insert("KDK_SOCKET", server.serverName());
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        hook.start(QStringLiteral(KDK_HOOK_PATH), {});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"/a.cpp"}})");
         hook.closeWriteChannel();
@@ -809,7 +810,7 @@ private slots:
         QDir(project.path()).mkpath("src");
         const QString path = project.filePath("src/a.cpp");
         writeFile(path, "int a;\nint b;\nint c;\nint d;\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(path, nullptr));
         editor.setSelection(1, 0, 3, 0); // whole lines 2 and 3
 
@@ -826,7 +827,7 @@ private slots:
         const QTemporaryDir project;
         const QString path = project.filePath("a.cpp");
         writeFile(path, "int parse();\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(path, nullptr));
         editor.setCursorPosition(0, 6);
 
@@ -845,7 +846,7 @@ private slots:
         const QTemporaryDir project;
         const QString path = project.filePath("a.cpp");
         writeFile(path, "int a;\n");
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(path, nullptr));
         editor.insertAt(QStringLiteral("// new\n"), 0, 0);
 
@@ -925,7 +926,7 @@ private slots:
 
     void codeRequestNeedsAFile()
     {
-        EditorWidget view(Theme::duet());
+        EditorWidget view(Theme::kodamiko());
         view.showReadOnlyText(QStringLiteral("diff"), QString());
         QVERIFY(!CodeRequest::targetIn(view, QString()));
     }
@@ -1051,10 +1052,10 @@ private slots:
 
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("DUET_SOCKET", server.serverName());
-        environment.remove("DUET_STATUSLINE_COMMAND");
+        environment.insert("KDK_SOCKET", server.serverName());
+        environment.remove("KDK_STATUSLINE_COMMAND");
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(DUET_HOOK_PATH), {"statusline"});
+        hook.start(QStringLiteral(KDK_HOOK_PATH), {"statusline"});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"model":{"display_name":"Opus"},"context_window":{"used_percentage":42}})");
         hook.closeWriteChannel();
@@ -1071,9 +1072,9 @@ private slots:
     {
         QProcess hook;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert("DUET_SOCKET", "duet-nonexistent-server");
+        environment.insert("KDK_SOCKET", "kodamiko-nonexistent-server");
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        hook.start(QStringLiteral(KDK_HOOK_PATH), {});
         QVERIFY(hook.waitForStarted());
         hook.write(R"({"hook_event_name":"Stop"})");
         hook.closeWriteChannel();

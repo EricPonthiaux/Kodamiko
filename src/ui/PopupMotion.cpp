@@ -16,9 +16,9 @@
 namespace {
 
 constexpr const char *effectName = "motionFade";
-constexpr const char *popupProperty = "duetMotionPopup";
+constexpr const char *popupProperty = "kdkMotionPopup";
 constexpr const char *ghostName = "motionExit";
-constexpr const char *exitProperty = "duetMotionExit";
+constexpr const char *exitProperty = "kdkMotionExit";
 
 // Painting scales inside the final rectangle: native popups keep their
 // placement and their mouse/keyboard grab, including on Wayland.

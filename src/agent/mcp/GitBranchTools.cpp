@@ -2,8 +2,8 @@
 
 // MCP tools for branches, remotes and stashes.
 
-#include "DuetTools.h"
 #include "GitToolSupport.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
 #include "git/Branches.h"
@@ -14,7 +14,7 @@
 
 #include <algorithm>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -45,7 +45,7 @@ McpResult branches(const QString &folder)
     return McpResult::json(QJsonObject{{QStringLiteral("branches"), branches}});
 }
 
-void listBranches(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void listBranches(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     inBackground([folder] { return branches(folder); }, reply);
@@ -66,14 +66,14 @@ McpResult stashes(const QString &folder, bool patches)
     return McpResult::json(QJsonObject{{QStringLiteral("stashes"), stashes}});
 }
 
-void listStashes(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void listStashes(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const bool patches = arguments.value(QStringLiteral("patches")).toBool();
     inBackground([folder, patches] { return stashes(folder, patches); }, reply);
 }
 
-void fetch(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void fetch(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     runRemoteGit(
@@ -86,7 +86,7 @@ QString describePull(const QJsonObject &)
     return QStringLiteral("pull the upstream's commits into the current branch");
 }
 
-void pull(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void pull(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     runRemoteGit(
@@ -107,13 +107,13 @@ QString pushTarget(const QString &folder)
     }
 }
 
-QString describePush(const DuetToolContext &context, const QJsonObject &)
+QString describePush(const KDKToolContext &context, const QJsonObject &)
 {
     const QString target = pushTarget(context.folder());
     return QStringLiteral("push %1").arg(target.isEmpty() ? QStringLiteral("the current branch") : target);
 }
 
-void push(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void push(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     runRemoteGit(
@@ -153,7 +153,7 @@ QString switchToBranch(const QString &folder, const QString &name, bool create)
     return QStringLiteral("Switched to %1").arg(remote ? Branches::nameOnRemote(name) : name);
 }
 
-void switchBranch(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void switchBranch(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString name = arguments.value(QStringLiteral("name")).toString();
@@ -168,7 +168,7 @@ QString describeStash(const QJsonObject &arguments)
                              : QStringLiteral("stash the uncommitted changes as \u201c%1\u201d").arg(message);
 }
 
-void stashChanges(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void stashChanges(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString message = arguments.value(QStringLiteral("message")).toString();
@@ -189,7 +189,7 @@ QString describeApplyStash(const QJsonObject &arguments)
         .arg(arguments.value(QStringLiteral("index")).toInt());
 }
 
-void applyStash(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void applyStash(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const int index = arguments.value(QStringLiteral("index")).toInt();
@@ -215,7 +215,7 @@ QString describeDeleteBranch(const QJsonObject &arguments)
                : QStringLiteral("delete the branch %1").arg(name);
 }
 
-void deleteBranch(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void deleteBranch(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString name = arguments.value(QStringLiteral("name")).toString();
@@ -235,7 +235,7 @@ QString describeRenameBranch(const QJsonObject &arguments)
         .arg(arguments.value(QStringLiteral("name")).toString(), arguments.value(QStringLiteral("newName")).toString());
 }
 
-void renameBranch(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void renameBranch(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString name = arguments.value(QStringLiteral("name")).toString();
@@ -256,7 +256,7 @@ QString describeDropStash(const QJsonObject &arguments)
     return QStringLiteral("drop stash@{%1} without applying it").arg(arguments.value(QStringLiteral("index")).toInt());
 }
 
-void dropStash(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void dropStash(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const int index = arguments.value(QStringLiteral("index")).toInt();
@@ -271,7 +271,7 @@ void dropStash(const DuetToolContext &context, const QJsonObject &arguments, con
 
 } // namespace
 
-void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
+void registerBranchTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("list_branches"),
@@ -326,7 +326,7 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("switch_branch"),
          .title = QStringLiteral("Switch branch"),
          .description = QStringLiteral(
-             "Makes a branch the current one; uncommitted changes come along when they do not conflict (a Duet "
+             "Makes a branch the current one; uncommitted changes come along when they do not conflict (a Kodamiko "
              "snapshot is taken first). A remote branch (\"origin/x\") gets a local branch tracking it. With create, "
              "makes a new branch at the current commit. The user is asked first."),
          .inputSchema =
@@ -389,4 +389,4 @@ void registerBranchTools(McpRegistry &registry, const DuetToolContext &context)
         describeDropStash, handledBy(context, dropStash)));
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

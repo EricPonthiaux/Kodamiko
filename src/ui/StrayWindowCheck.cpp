@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr const char *allowedProperty = "duetTopLevel";
+constexpr const char *allowedProperty = "kdkTopLevel";
 
 bool isStrayWindow(const QWidget *widget)
 {

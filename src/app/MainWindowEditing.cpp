@@ -5,7 +5,7 @@
 
 #include "MainWindow.h"
 #include "agent/EditorContext.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "diagnostics/ProblemStore.h"
 #include "editor/ChangeGutter.h"
 #include "editor/EditorStatus.h"

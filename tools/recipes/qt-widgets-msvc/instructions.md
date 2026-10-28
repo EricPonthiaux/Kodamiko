@@ -1,1 +1,1 @@
-This project is a Qt 6 Widgets application built with CMake. Use the qt-widgets skill for its user interface code. Build it with the command of the "Build debug" configuration in .duet/run.json after a change.
+This project is a Qt 6 Widgets application built with CMake. Use the qt-widgets skill for its user interface code. Build it with the command of the "Build debug" configuration in .kodamiko/run.json after a change.

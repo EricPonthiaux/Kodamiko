@@ -1,5 +1,5 @@
 {
-    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
+    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Kodamiko/main/tools/schemas/recipe.schema.json",
     "title": "C++ · CMake · MSVC",
     "language": "cpp",
     "description": "CMakeLists.txt (C++20) and src/main.cpp, built with Visual Studio's compiler, CMake and Ninja.",

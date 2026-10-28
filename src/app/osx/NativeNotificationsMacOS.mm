@@ -21,7 +21,7 @@ enum class Permission {
 // The user's answer, asked on the first notification. Touched in the main
 // thread only.
 Permission permission = Permission::Unknown;
-// What a click on Duet's notification does: the last window that showed
+// What a click on Kodamiko's notification does: the last window that showed
 // one (one window per process). Main thread only.
 std::function<void()> clickedHandler;
 
@@ -33,12 +33,12 @@ void runInMainThread(std::function<void()> function)
 } // namespace
 
 // UNUserNotificationCenter calls its delegate in a thread of its own.
-@interface DuetNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
+@interface KDKNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
 @end
 
-@implementation DuetNotificationDelegate
+@implementation KDKNotificationDelegate
 
-// Shown even while Duet is the active application: another of its windows
+// Shown even while Kodamiko is the active application: another of its windows
 // may be in front.
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
        willPresentNotification:(UNNotification *)notification
@@ -70,7 +70,7 @@ UNUserNotificationCenter *notificationCenter()
         return nil;
     UNUserNotificationCenter *center = UNUserNotificationCenter.currentNotificationCenter;
     if (!center.delegate)
-        center.delegate = [[DuetNotificationDelegate alloc] init]; // kept for the process's life
+        center.delegate = [[KDKNotificationDelegate alloc] init]; // kept for the process's life
     return center;
 }
 

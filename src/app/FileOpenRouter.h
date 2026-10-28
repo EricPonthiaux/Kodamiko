@@ -7,8 +7,8 @@
 
 #include <functional>
 
-// Opens the folders the system hands Duet as a QFileOpenEvent: on macOS, a
-// folder dropped on the Dock icon, or opened with Duet from the Finder or
+// Opens the folders the system hands Kodamiko as a QFileOpenEvent: on macOS, a
+// folder dropped on the Dock icon, or opened with Kodamiko from the Finder or
 // `open -a`. They do not come through the command line. Elsewhere no such
 // event arrives.
 //

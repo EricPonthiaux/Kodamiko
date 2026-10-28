@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Duet does not work as it should.
+description: Something in Kodamiko does not work as it should.
 labels: [bug]
 body:
   - type: textarea
@@ -26,7 +26,7 @@ body:
     id: versions
     attributes:
       label: Versions
-      description: Duet (Help ▸ About Duet), Qt, Claude Code (`claude --version`).
+      description: Kodamiko (Help ▸ About Kodamiko), Qt, Claude Code (`claude --version`).
     validations:
       required: true
   - type: dropdown

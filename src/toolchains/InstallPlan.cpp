@@ -76,8 +76,8 @@ private:
     QList<InstallStep> steps_;
 };
 
-// What the server runs on: always for jdtls (Duet starts it with Java), for
-// Duet's own npm installs otherwise.
+// What the server runs on: always for jdtls (Kodamiko starts it with Java), for
+// Kodamiko's own npm installs otherwise.
 void planServerRuntime(const ToolSpec &server,
                        const LanguageSetup &setup,
                        const Toolchains &toolchains,
@@ -111,7 +111,7 @@ void planLanguage(const LanguageSetup &setup, const Toolchains &toolchains, Plan
         steps.add(server->id, setup.serverVersion, QObject::tr("%1 language server").arg(family));
 }
 
-// The runtime Duet downloads for `requirement`, nullptr when it offers none.
+// The runtime Kodamiko downloads for `requirement`, nullptr when it offers none.
 const ToolSpec *downloadableRuntime(const ToolRequirement &requirement)
 {
     const ToolSpec *spec = ToolCatalog::find(requirement.tool);
@@ -211,7 +211,7 @@ QString requirementProblem(const ToolRequirement &requirement, const Toolchains 
                               .arg(programOf(requirement));
     }
     const QString tool = QStringLiteral("%1 %2").arg(requirement.tool, requirement.version).trimmed();
-    return QObject::tr("The recipe requires %1, which Duet cannot download: install it.").arg(tool);
+    return QObject::tr("The recipe requires %1, which Kodamiko cannot download: install it.").arg(tool);
 }
 
 } // namespace
@@ -246,13 +246,13 @@ QStringList unavailable(const ProjectConfig &config,
             continue;
         if (setup.language == QLatin1String("python") && !toolchains.runtimeFor(setup))
             problems.append(setup.runtimeVersion.isEmpty()
-                                ? QObject::tr("No Python found: install one, Duet does not download it.")
-                                : QObject::tr("No Python %1 found: install it, Duet does not download it.")
+                                ? QObject::tr("No Python found: install one, Kodamiko does not download it.")
+                                : QObject::tr("No Python %1 found: install it, Kodamiko does not download it.")
                                       .arg(setup.runtimeVersion));
         if (!setup.server.isEmpty() && isSystem(setup.serverVersion) &&
             toolchains.systemProgram(setup.server).isEmpty())
             problems.append(
-                QObject::tr("%1 is not in the PATH: choose a version for Duet to download.").arg(setup.server));
+                QObject::tr("%1 is not in the PATH: choose a version for Kodamiko to download.").arg(setup.server));
     }
     return problems;
 }

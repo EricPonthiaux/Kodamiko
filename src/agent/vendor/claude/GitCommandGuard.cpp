@@ -107,7 +107,7 @@ std::optional<GitCommand> gitCommand(const Words &words, const std::optional<QSt
 QString described(const ToolCall &toolCall)
 {
     QString text =
-        QStringLiteral("mcp__duet__%1 %2")
+        QStringLiteral("mcp__kodamiko__%1 %2")
             .arg(toolCall.tool, QString::fromUtf8(QJsonDocument(toolCall.arguments).toJson(QJsonDocument::Compact)));
     if (!toolCall.note.isEmpty())
         text += QStringLiteral(" (%1)").arg(toolCall.note);
@@ -122,7 +122,7 @@ QString shown(const QString &command)
     return firstLine.left(shownCommandLength) + QStringLiteral("…");
 }
 
-// "- `git add a` → mcp__duet__stage_files {…}", or nothing.
+// "- `git add a` → mcp__kodamiko__stage_files {…}", or nothing.
 std::optional<QString> redirection(const GitCommand &git)
 {
     const QList<ToolCall> calls = GitCommandTranslations::translate(git.subcommand, git.arguments);
@@ -137,11 +137,12 @@ std::optional<QString> redirection(const GitCommand &git)
 QString reasonFor(const QStringList &redirections)
 {
     return QStringLiteral(
-               "In this project, change the git repository through Duet's tools, not git in a shell: each tool asks "
-               "the user with a plain description of what it does, takes a Duet snapshot before what is hard to "
-               "undo (restore_snapshot brings it back), runs one git operation at a time with Duet's own git work, "
+               "In this project, change the git repository through Kodamiko's tools, not git in a shell: each tool "
+               "asks "
+               "the user with a plain description of what it does, takes a Kodamiko snapshot before what is hard to "
+               "undo (restore_snapshot brings it back), runs one git operation at a time with Kodamiko's own git work, "
                "asks for remote credentials in the editor instead of leaving the shell waiting, and refreshes "
-               "Duet's Diff, History and branch views at once. Nothing of this command line ran. Instead:\n%1\n"
+               "Kodamiko's Diff, History and branch views at once. Nothing of this command line ran. Instead:\n%1\n"
                "Run the rest of the command line, if any, on its own. Reading git in a shell (status, log, diff, "
                "show) is fine; get_git_status, get_file_history and get_commit read the same as JSON.")
         .arg(redirections.join(QLatin1Char('\n')));

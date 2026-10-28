@@ -12,7 +12,7 @@ class QListWidget;
 class QPushButton;
 
 // The content of Preferences ▸ Terminal: the folders put first in the PATH
-// of every program Duet launches in a terminal (shells, run
+// of every program Kodamiko launches in a terminal (shells, run
 // configurations, agent sessions), in their order, each editable in place;
 // on macOS, what the Option key does.
 class TerminalPreferencesPage : public QWidget {

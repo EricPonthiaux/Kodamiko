@@ -149,7 +149,7 @@ QString describe(const QList<FileErrors> &files)
     }
     if (lines.isEmpty())
         return {};
-    lines.prepend(QStringLiteral("Duet's language server reports errors in the code you just edited:"));
+    lines.prepend(QStringLiteral("Kodamiko's language server reports errors in the code you just edited:"));
     return lines.join(QLatin1Char('\n'));
 }
 

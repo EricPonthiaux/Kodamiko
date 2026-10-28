@@ -20,7 +20,7 @@ QString serverName(const QString &folder)
     const QString canonical = QDir(folder).canonicalPath();
     const QString key = QDir::homePath() + u'\n' + (canonical.isEmpty() ? QDir(folder).absolutePath() : canonical);
     const QByteArray hash = QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha1).toHex();
-    return QStringLiteral("duet-project-") + QString::fromLatin1(hash);
+    return QStringLiteral("kodamiko-project-") + QString::fromLatin1(hash);
 }
 
 } // namespace

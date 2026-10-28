@@ -124,7 +124,7 @@ void NewAgentPopup::validate()
     const QString error = name.isEmpty() ? QString() : Branches::nameError(name);
     const bool hasError = !error.isEmpty();
     Paragraph::setText(message_,
-                       hasError ? error : tr("Its branch: duet/%1").arg(name.isEmpty() ? tr("<name>") : name));
+                       hasError ? error : tr("Its branch: kodamiko/%1").arg(name.isEmpty() ? tr("<name>") : name));
     message_->setProperty("error", hasError);
     // The property only restyles after a re-polish.
     message_->style()->unpolish(message_);

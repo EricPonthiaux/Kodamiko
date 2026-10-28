@@ -12,13 +12,13 @@ class QMenuBar;
 class QString;
 class QWidget;
 
-// What the desktop offers Duet's windows beyond Qt, on the systems that
+// What the desktop offers Kodamiko's windows beyond Qt, on the systems that
 // have it; elsewhere each function does nothing. One source per system.
 namespace DesktopIntegration {
 
 // Gives the process the identity the taskbar groups its windows under and
-// notifications come from (Windows' AppUserModelID, "Duet.Duet"), the same
-// for every Duet process and for the installer's shortcut. Call it at
+// notifications come from (Windows' AppUserModelID, "Kodamiko.Kodamiko"), the same
+// for every Kodamiko process and for the installer's shortcut. Call it at
 // start, before the first window is shown.
 void identifyApplication();
 

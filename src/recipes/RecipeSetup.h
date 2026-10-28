@@ -19,7 +19,7 @@ namespace RecipeSetup {
 EnvironmentAdditions environmentAdditions(const RecipeEnvironment &environment, QStringList *problems);
 
 // The folders and variables of `requirements`, "{{home}}" replaced by the
-// folder of each tool found in `toolchains` (Duet's or the machine's). A
+// folder of each tool found in `toolchains` (Kodamiko's or the machine's). A
 // tool that is missing, or that has no folder (a program of the PATH), adds
 // nothing: the install plan offers to download it, or says to install it.
 EnvironmentAdditions requirementAdditions(const QList<RecipeRequirement> &requirements, const Toolchains &toolchains);

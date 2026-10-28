@@ -32,7 +32,7 @@ QString socketPath(const QString &workDir)
         QCryptographicHash::hash(repositoryRoot(workDir).toUtf8(), QCryptographicHash::Sha256).toHex();
 
     const QString directory =
-        QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + QLatin1String("/duet/credentials");
+        QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + QLatin1String("/kodamiko/credentials");
     return directory + QLatin1Char('/') + QString::fromLatin1(hash.left(socketNameLength));
 }
 

@@ -315,7 +315,7 @@ DownloadSource source(const QString &id, const QString &version, const Platform 
         source.format = ArchiveFormat::Npm;
         return source;
     }
-    return failure(QObject::tr("Duet cannot download %1").arg(id));
+    return failure(QObject::tr("Kodamiko cannot download %1").arg(id));
 }
 
 QString checksumFor(const QByteArray &checksums, const QString &fileName)

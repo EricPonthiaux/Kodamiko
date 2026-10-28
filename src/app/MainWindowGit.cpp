@@ -5,7 +5,7 @@
 
 #include "MainWindow.h"
 #include "agent/EditorContext.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
@@ -106,7 +106,7 @@ void MainWindow::createGitServices()
         gitProgress_.clear();
         QTimer::singleShot(0, this, &MainWindow::closeWindowOnceAgentsClosed);
     });
-    // git and ssh ask for credentials through duet-askpass.
+    // git and ssh ask for credentials through kodamiko-askpass.
     askpass_ = new AskpassServer([this](const QString &prompt) { return askCredentials(prompt); }, this);
     if (askpass_->listen())
         gitCommands_->setRemoteEnvironment(askpass_->environment());
@@ -266,7 +266,7 @@ void MainWindow::updateRepositoryInfo()
 
 void MainWindow::onRepositoryChanged()
 {
-    mcpRegistry_.notifyResourceUpdated(QStringLiteral("duet://git/status"));
+    mcpRegistry_.notifyResourceUpdated(QStringLiteral("kodamiko://git/status"));
     updateRepositoryInfo();
     refreshIndexes();                 // branch switch, pull…
     editorTabs_->reloadChangeBases(); // staging, commit…
@@ -313,7 +313,7 @@ void MainWindow::createBranch(const QString &name, bool switchTo)
 void MainWindow::askClaudeForCommitMessage(const QString &request)
 {
     if (!exposeTools_->isChecked()) {
-        showStatus(tr("%1 hands the commit message back through Duet's tools: turn on %1 ▸ Expose Duet's "
+        showStatus(tr("%1 hands the commit message back through Kodamiko's tools: turn on %1 ▸ Expose Kodamiko's "
                       "Tools to %1, then restart the session")
                        .arg(agentProvider_->name()));
         return;

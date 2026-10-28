@@ -19,7 +19,7 @@ QNetworkRequest requestFor(const QUrl &url)
 {
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("Duet/%1").arg(QCoreApplication::applicationVersion()));
+                      QStringLiteral("Kodamiko/%1").arg(QCoreApplication::applicationVersion()));
     // download.qt.io sends the archives to https mirrors.
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     return request;

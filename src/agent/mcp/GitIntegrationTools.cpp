@@ -3,14 +3,14 @@
 // MCP tools that bring commits into the current branch (merge, rebase,
 // cherry-pick, revert), and finish or give up the operation in progress.
 
-#include "DuetTools.h"
 #include "GitToolSupport.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "git/Integration.h"
 
 #include <optional>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -25,7 +25,7 @@ QString describeMerge(const QJsonObject &arguments)
     return QStringLiteral("%1 %2").arg(action, arguments.value(QStringLiteral("branch")).toString());
 }
 
-void mergeBranch(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void mergeBranch(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString branch = arguments.value(QStringLiteral("branch")).toString();
@@ -46,7 +46,7 @@ QString describeContinue(const QJsonObject &)
     return QStringLiteral("continue the operation in progress");
 }
 
-void continueOperation(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void continueOperation(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     runGit(
@@ -64,7 +64,7 @@ QString describeAbort(const QJsonObject &)
     return QStringLiteral("abort the operation in progress");
 }
 
-void abortOperation(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void abortOperation(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     runGit(
@@ -82,7 +82,7 @@ QString describeSkip(const QJsonObject &)
     return QStringLiteral("skip the commit that stopped the operation in progress");
 }
 
-void skipCommit(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void skipCommit(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     runGit(
@@ -106,7 +106,7 @@ std::optional<Integration::ConflictSide> conflictSide(const QJsonObject &argumen
     return std::nullopt;
 }
 
-QString describeResolve(const DuetToolContext &context, const QJsonObject &arguments)
+QString describeResolve(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString version = conflictSide(arguments) == Integration::ConflictSide::Current
                                 ? QStringLiteral("the current branch's")
@@ -115,7 +115,7 @@ QString describeResolve(const DuetToolContext &context, const QJsonObject &argum
         .arg(pathsArgument(context, arguments).join(QStringLiteral(", ")), version);
 }
 
-void resolveConflicts(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void resolveConflicts(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const std::optional<Integration::ConflictSide> side = conflictSide(arguments);
     if (!side) {
@@ -139,7 +139,7 @@ QString describeCherryPick(const QJsonObject &arguments)
         .arg(arguments.value(QStringLiteral("id")).toString());
 }
 
-void cherryPick(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void cherryPick(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString id = arguments.value(QStringLiteral("id")).toString();
@@ -157,7 +157,7 @@ QString describeRevert(const QJsonObject &arguments)
     return QStringLiteral("commit the reverse of commit %1").arg(arguments.value(QStringLiteral("id")).toString());
 }
 
-void revertCommit(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void revertCommit(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString id = arguments.value(QStringLiteral("id")).toString();
@@ -172,7 +172,7 @@ void revertCommit(const DuetToolContext &context, const QJsonObject &arguments, 
 
 } // namespace
 
-void registerIntegrationTools(McpRegistry &registry, const DuetToolContext &context)
+void registerIntegrationTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::sensitive(
         {.name = QStringLiteral("merge_branch"),
@@ -233,7 +233,7 @@ void registerIntegrationTools(McpRegistry &registry, const DuetToolContext &cont
         {.name = QStringLiteral("cherry_pick"),
          .title = QStringLiteral("Cherry-pick"),
          .description = QStringLiteral(
-             "Applies a commit's changes to the current branch as a new commit (git cherry-pick), after a Duet "
+             "Applies a commit's changes to the current branch as a new commit (git cherry-pick), after a Kodamiko "
              "snapshot. On conflicts it stops with the operation in progress, as merge_branch does. The user is "
              "asked first."),
          .inputSchema = object({{QStringLiteral("id"), string(QStringLiteral("Commit id (abbreviated or full)"))}},
@@ -245,11 +245,12 @@ void registerIntegrationTools(McpRegistry &registry, const DuetToolContext &cont
          .title = QStringLiteral("Revert a commit"),
          .description = QStringLiteral(
              "Commits the reverse of a commit's changes, with git's default message (git revert --no-edit), after a "
-             "Duet snapshot. On conflicts it stops with the operation in progress, as merge_branch does. The user is "
+             "Kodamiko snapshot. On conflicts it stops with the operation in progress, as merge_branch does. The user "
+             "is "
              "asked first."),
          .inputSchema = object({{QStringLiteral("id"), string(QStringLiteral("Commit id (abbreviated or full)"))}},
                                {QStringLiteral("id")})},
         describeRevert, handledBy(context, revertCommit)));
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

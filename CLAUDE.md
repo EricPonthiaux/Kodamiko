@@ -1,6 +1,6 @@
-# CLAUDE.md — Duet
+# CLAUDE.md — Kodamiko
 
-Duet is a Qt 6 / C++23 code editor built around a Claude Code session. This
+Kodamiko is a Qt 6 / C++23 code editor built around a Claude Code session. This
 file holds the project's conventions. One goal: **code that a human
 understands quickly, changes without fear, and reviews without fatigue.**
 Every rule below reduces *cognitive complexity*: the number of things a reader
@@ -110,7 +110,7 @@ operators. It correlates with the time a reader takes to understand a function.
 | Namespaces of free functions | `PascalCase`, named after the concept | `AppFonts`, `Git` |
 | Namespaces of the diagram engine | `lowercase` | `diagram::explainer` |
 | Files | `PascalCase`, named after the main type or concept | `EditorWidget.h` |
-| Macros (to avoid) | `UPPER_SNAKE_CASE` | `DUET_WITH_DIAGRAMS` |
+| Macros (to avoid) | `UPPER_SNAKE_CASE` | `KDK_WITH_DIAGRAMS` |
 
 ---
 

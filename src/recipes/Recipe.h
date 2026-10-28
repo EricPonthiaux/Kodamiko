@@ -70,7 +70,7 @@ struct RecipeParameter {
     bool operator==(const RecipeParameter &) const = default;
 };
 
-// A language server the recipe brings for languages Duet has none for
+// A language server the recipe brings for languages Kodamiko has none for
 // (Angular's templates): a Node script of a tool the recipe requires.
 struct RecipeLanguageServer {
     QString name; // "angular"
@@ -86,7 +86,7 @@ struct RecipeLanguageServer {
     bool operator==(const RecipeLanguageServer &) const = default;
 };
 
-// What a recipe adds to the options of a server Duet knows (the plugin
+// What a recipe adds to the options of a server Kodamiko knows (the plugin
 // of tsserver); "{{project}}" in their texts stands for the project's
 // folder.
 struct RecipeServerOptions {
@@ -120,10 +120,10 @@ struct Recipe {
     QString language;
     RecipeEnvironment environment;
     // The tools its projects need on this system (a Node for npm, a JDK and
-    // Maven, a Qt kit): Duet downloads those missing to ~/.duet/tools, and
+    // Maven, a Qt kit): Kodamiko downloads those missing to ~/.kodamiko/tools, and
     // puts them in the project's environment as each one says.
     QList<RecipeRequirement> requirements;
-    // Written to the new project's .duet/run.json; added to an existing
+    // Written to the new project's .kodamiko/run.json; added to an existing
     // project's own configurations.
     QList<RunConfiguration> runConfigurations;
     // Run once, one after the other, when the new project is first opened
@@ -136,7 +136,7 @@ struct Recipe {
     // "typescript": "~6.0.0"): the new project's files get them too.
     QMap<QString, QString> values;
     QList<RecipeLanguageServer> languageServers;
-    // By the name of a server Duet knows ("typescript-language-server").
+    // By the name of a server Kodamiko knows ("typescript-language-server").
     QMap<QString, RecipeServerOptions> serverOptions;
 
     // The folder of the recipe's skills for the agent (--plugin-dir), empty

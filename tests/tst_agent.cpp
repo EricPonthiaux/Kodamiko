@@ -70,7 +70,7 @@ struct ReviewedFindings {
     }
 };
 
-// A hook's connection to `server`, as duet-hook makes it.
+// A hook's connection to `server`, as kodamiko-hook makes it.
 struct HookClient {
     QLocalSocket socket;
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- Merged by the linker with the one it generates. DPI awareness stays
-     Qt's, set at run time (per-monitor v2). No UTF-8 activeCodePage: Duet
+     Qt's, set at run time (per-monitor v2). No UTF-8 activeCodePage: Kodamiko
      decodes its child processes' output with the ANSI code page
      (QString::fromLocal8Bit), which they keep. -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">

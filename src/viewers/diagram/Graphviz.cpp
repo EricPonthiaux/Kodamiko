@@ -8,7 +8,7 @@
 #include <QFontMetricsF>
 
 #include <gvc.h>
-#ifdef DUET_GRAPHVIZ_PLUGINS
+#ifdef KDK_GRAPHVIZ_PLUGINS
 #include <gvplugin.h>
 
 extern "C" {
@@ -50,7 +50,7 @@ GVC_t *context()
     static GVC_t *gvc = [] {
         agseterr(AGMAX);
         agseterrf(silent);
-#ifdef DUET_GRAPHVIZ_PLUGINS
+#ifdef KDK_GRAPHVIZ_PLUGINS
         // dot and twopi/neato, and the JSON output: nothing loaded from the
         // system's plugin configuration.
         static const std::array<lt_symlist_t, 4> builtins{{

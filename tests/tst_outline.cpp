@@ -179,7 +179,7 @@ private slots:
 
     void markdown()
     {
-        const char *code = "# Duet\n"
+        const char *code = "# Kodamiko\n"
                            "Intro\n"
                            "## Building\n"
                            "```sh\n"
@@ -192,7 +192,7 @@ private slots:
                            "---\n"
                            "# License\n";
         const auto symbols = outline("markdown", code);
-        QCOMPARE(describe(symbols), QStringLiteral("Duet{Building,Usage{Shortcuts}},License"));
+        QCOMPARE(describe(symbols), QStringLiteral("Kodamiko{Building,Usage{Shortcuts}},License"));
         const OutlineSymbol *compilation = find(symbols, "Building");
         QCOMPARE(compilation->startLine, 2);
         QCOMPARE(compilation->endLine, 5);
@@ -222,7 +222,7 @@ private slots:
         file.write("int first() { return 1; }\n\nint second() {\n  return 2;\n}\n");
         file.close();
 
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QString error;
         QVERIFY(editor.load(path, &error));
         editor.show(); // QScintilla reports the cursor move when shown
@@ -259,7 +259,7 @@ private slots:
         file.write("int " + QByteArray(120, 'n') + "() { return 1; }\nint short_() { return 2; }\n");
         file.close();
 
-        EditorWidget editor(Theme::duet());
+        EditorWidget editor(Theme::kodamiko());
         QString error;
         QVERIFY(editor.load(path, &error));
 

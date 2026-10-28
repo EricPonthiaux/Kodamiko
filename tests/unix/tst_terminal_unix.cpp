@@ -21,12 +21,12 @@ private slots:
         ProcessSpec spec;
         spec.environment = terminalEnvironment();
         spec.program = "/bin/sh";
-        spec.arguments = {"-c", "echo duet-ok; stty size; exit 3"};
+        spec.arguments = {"-c", "echo kodamiko-ok; stty size; exit 3"};
 
         QVERIFY2(pty->start(spec, QSize(91, 33)), qPrintable(pty->errorString()));
 
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
-        QVERIFY(output.contains("duet-ok"));
+        QVERIFY(output.contains("kodamiko-ok"));
         QVERIFY(output.contains("33 91")); // the grid size is passed on to the program
         QCOMPARE(finished.first().first().toInt(), 3);
     }

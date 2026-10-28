@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "DuetTools.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "git/CommitLog.h"
 #include "git/GitCommands.h"
@@ -27,16 +27,16 @@ QJsonObject commitJson(const CommitSummary &commit);
 // Runs a git job with the editor's other git work (one at a time, off the
 // UI thread), then tells the editor the repository changed and replies with
 // the job's message, or its GitError.
-void runGit(const DuetToolContext &context, GitCommands::Job job, McpReply reply);
+void runGit(const KDKToolContext &context, GitCommands::Job job, McpReply reply);
 // Same for a job that talks to a remote: git may ask the user for
 // credentials (see AskpassServer).
-void runRemoteGit(const DuetToolContext &context, GitCommands::LongJob job, McpReply reply);
+void runRemoteGit(const KDKToolContext &context, GitCommands::LongJob job, McpReply reply);
 
 // The project's repository; throws GitError when the project is in none.
 RepositoryInfo repositoryOf(const QString &folder);
 // The "paths" argument, relative to the project.
-QStringList pathsArgument(const DuetToolContext &context, const QJsonObject &arguments);
+QStringList pathsArgument(const KDKToolContext &context, const QJsonObject &arguments);
 // The "path" argument, relative to the project.
-QString relativePathArgument(const DuetToolContext &context, const QJsonObject &arguments);
+QString relativePathArgument(const KDKToolContext &context, const QJsonObject &arguments);
 
 } // namespace GitToolSupport

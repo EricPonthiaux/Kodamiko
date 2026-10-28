@@ -12,10 +12,10 @@ void MainWindow::setSystemTitleBar(bool system)
     frame_->setFrameless(!system);
     terminalWindow_->setFrameless(!system);
     titleBar_->setWindowControlsVisible(!system);
-    statusBar()->setSizeGripEnabled(system); // Duet's frame resizes from its edges
+    statusBar()->setSizeGripEnabled(system); // Kodamiko's frame resizes from its edges
 }
 
 void MainWindow::fitTitleBarToWindowState()
 {
-    // Duet's window controls, or the system's frame: nothing to move.
+    // Kodamiko's window controls, or the system's frame: nothing to move.
 }

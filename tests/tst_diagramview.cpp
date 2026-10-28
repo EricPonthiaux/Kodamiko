@@ -140,7 +140,7 @@ private slots:
 
         const QByteArray saved = document::save(board, *loaded.codec);
         QVERIFY(saved.startsWith("flowchart TB\n  A([\"Début\"])\n  B[\"Étape\"]\n  A --> B\n"));
-        QVERIFY(saved.contains("%% duet {\"key\":\"A\""));
+        QVERIFY(saved.contains("%% kodamiko {\"key\":\"A\""));
 
         // Read back: every element keeps its place; nothing to lay out.
         Board again;
@@ -251,7 +251,7 @@ private slots:
         QVERIFY(graphviz::autoArrange(placed, {}));
         const QString path = writeFile(dir, QStringLiteral("gestures.mmd"), document::save(placed, *loaded.codec));
 
-        DiagramView view(Theme::duet());
+        DiagramView view(Theme::kodamiko());
         view.resize(1000, 700);
         QString error;
         QVERIFY2(view.load(path, &error), qPrintable(error));
@@ -339,7 +339,7 @@ private slots:
         QCOMPARE(garbage, QStringList{QStringLiteral("Not understood: this is not mermaid")});
 
         QCOMPARE(DiagramCheck::feedback(QStringLiteral("docs/a.mmd"), garbage),
-                 QStringLiteral("Duet's diagram editor read docs/a.mmd with problems:\n- %1\n"
+                 QStringLiteral("Kodamiko's diagram editor read docs/a.mmd with problems:\n- %1\n"
                                 "Fix the file so that it reads as you meant it.")
                      .arg(garbage.first()));
     }
@@ -373,7 +373,7 @@ private slots:
         QVERIFY(DiagramView::isDiagramFile(dir.filePath(QStringLiteral("old.flow"))));
         QVERIFY(!DiagramView::isDiagramFile(dir.filePath(QStringLiteral("notes.md"))));
 
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         auto *view = qobject_cast<DiagramView *>(tabs.openFile(path));
         QVERIFY(view);
         QCOMPARE(view->filePath(), QFileInfo(path).absoluteFilePath());
@@ -395,7 +395,7 @@ private slots:
             writeFile(dir, QStringLiteral("Queue.h"), "class Queue {\npublic:\n    void enqueue(int item);\n};\n");
         const QString source = writeFile(dir, QStringLiteral("Queue.cpp"),
                                          "#include \"Queue.h\"\n\nvoid Queue::enqueue(int item)\n{\n}\n");
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         SymbolIndex symbols;
         symbols.setFolder(dir.path());
         symbols.updateFile(header, "class Queue {\npublic:\n    void enqueue(int item);\n};\n");
@@ -420,7 +420,7 @@ private slots:
             {QStringLiteral("queue.d.ts"), "export declare function drain(): void;\n"},
             {QStringLiteral("drain.ts"), "export function drain(): void {\n}\n"},
         };
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         SymbolIndex symbols;
         symbols.setFolder(dir.path());
         for (auto it = files.begin(); it != files.end(); ++it)
@@ -458,7 +458,7 @@ private slots:
             writeFile(dir, QStringLiteral("agents.mmd"), "classDiagram\n  class Hook\n  class Other\n");
         const QString codePath =
             QFileInfo(writeFile(dir, QStringLiteral("Hook.h"), "class Hook {};\n")).absoluteFilePath();
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         SymbolIndex symbols;
         CodeNavigator navigator(&tabs, &symbols);
         auto *view = qobject_cast<DiagramView *>(tabs.openFile(diagramPath));
@@ -482,7 +482,7 @@ private slots:
     void refusesInvalidDiagrams()
     {
         const QTemporaryDir dir;
-        DiagramView view(Theme::duet());
+        DiagramView view(Theme::kodamiko());
         QString error;
         QVERIFY(!view.load(writeFile(dir, QStringLiteral("broken.flow"), "{ not json"), &error));
         QVERIFY(!error.isEmpty());
@@ -490,7 +490,7 @@ private slots:
         QVERIFY(!view.load(pie, &error));
 
         // In a tab, such a file opens as text.
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QSignalSpy messages(&tabs, &EditorTabs::statusMessage);
         QWidget *page = tabs.openFile(pie);
         QVERIFY(page && !qobject_cast<DiagramView *>(page));
@@ -502,7 +502,7 @@ private slots:
     {
         const QTemporaryDir dir;
         const QString path = writeFile(dir, QStringLiteral("process.mmd"), kMermaid);
-        DiagramView view(Theme::duet());
+        DiagramView view(Theme::kodamiko());
         QString error;
         QVERIFY2(view.load(path, &error), qPrintable(error));
         QVERIFY(view.matchesDisk());
@@ -513,7 +513,7 @@ private slots:
         QVERIFY(file.open(QIODevice::ReadOnly));
         const QByteArray saved = file.readAll();
         QVERIFY(saved.contains("Étape"));
-        QVERIFY(saved.contains("%% duet "));
+        QVERIFY(saved.contains("%% kodamiko "));
 
         // A change made by someone else is not ours.
         writeFile(dir, QStringLiteral("process.mmd"), saved + "\n");
@@ -527,7 +527,7 @@ private slots:
     {
         const QTemporaryDir dir;
         const QString path = writeFile(dir, QStringLiteral("new.mmd"), QByteArray());
-        DiagramView view(Theme::duet());
+        DiagramView view(Theme::kodamiko());
         QString error;
         QVERIFY2(view.load(path, &error), qPrintable(error));
         QVERIFY(!view.isModified());
@@ -542,7 +542,7 @@ private slots:
         const QTemporaryDir dir;
         const QString first = writeFile(dir, QStringLiteral("a.mmd"), kMermaid);
         const QString second = writeFile(dir, QStringLiteral("b.flow"), kFlowboard);
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(qobject_cast<DiagramView *>(tabs.openFile(first)));
         QVERIFY(qobject_cast<DiagramView *>(tabs.openFile(second)));
         QCOMPARE(tabs.count(), 2);

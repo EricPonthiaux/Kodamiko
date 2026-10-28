@@ -2,7 +2,7 @@
 
 #include "app/NativeNotifications.h"
 
-// The system tray shows Duet's notifications here.
+// The system tray shows Kodamiko's notifications here.
 bool NativeNotifications::show(const QString & /*title*/,
                                const QString & /*message*/,
                                std::function<void()> /*clicked*/)

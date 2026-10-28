@@ -15,7 +15,7 @@ struct ProcessSpec {
     QProcessEnvironment environment;
 };
 
-// What Duet adds to its own environment for the programs of its terminals:
+// What Kodamiko adds to its own environment for the programs of its terminals:
 // the folders of Preferences ▸ Terminal, and the environment of the open
 // project's recipe (see RecipeEnvironment).
 struct EnvironmentAdditions {
@@ -30,7 +30,7 @@ struct EnvironmentAdditions {
 void addTo(QProcessEnvironment &environment, const EnvironmentAdditions &additions);
 
 // The additions terminalEnvironment() applies from now on. The main window
-// sets them when a project opens and when the preferences change: a Duet
+// sets them when a project opens and when the preferences change: a Kodamiko
 // process shows one project, and every program it launches (terminals, run
 // configurations, agent sessions) gets them without each caller passing
 // them along.

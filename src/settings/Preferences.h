@@ -17,8 +17,8 @@ struct Theme;
 // Title Bar, Claude ▸ Notifications...), so both stay in step.
 struct Preferences {
     // Appearance
-    QString theme = QStringLiteral("duet-violet"); // Theme::name
-    QString codeFontFamily;                        // empty: the embedded Droid Sans Mono
+    QString theme = QStringLiteral("kodamiko-violet"); // Theme::name
+    QString codeFontFamily;                            // empty: the embedded Droid Sans Mono
     int codeFontSize = 11;
     int codeFontWeight = QFont::Normal; // QFont::Light, Normal or Medium
     // Lines of code at this multiple of the font size.
@@ -59,12 +59,12 @@ struct Preferences {
     // The editor's MCP server (tools, resources, prompts) in its sessions.
     bool exposeTools = true;
     // Git commands that change the repository refused in the agent's shell
-    // when a Duet tool does the same (GitCommandGuard).
-    bool gitThroughDuetTools = true;
+    // when a Kodamiko tool does the same (GitCommandGuard).
+    bool gitThroughKDKTools = true;
     bool claudeNotifications = true;
 
     // Terminal
-    // Put first in the PATH of every program Duet launches in a terminal,
+    // Put first in the PATH of every program Kodamiko launches in a terminal,
     // in this order.
     QStringList terminalPathFolders;
     // macOS only: Option composes characters, or acts as Meta.

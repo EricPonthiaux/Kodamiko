@@ -160,14 +160,14 @@ protected:
 private:
     // Makes the window compose with the GPU before a preview needs it.
     void composeWithGpuFromTheStart();
-    // Duet's mark, centered, when no file is open.
+    // Kodamiko's mark, centered, when no file is open.
     void paintEmptyMark();
     // Adds a tab, before the preview's.
     int addPage(QWidget *page, const QString &title);
     // The tab showing the file at `absolutePath`, null if none.
     QWidget *pageFor(const QString &absolutePath) const;
     QWidget *openImage(const QString &absolutePath);
-    // The diagram editor's tab; null, with `error`, if Duet cannot read the
+    // The diagram editor's tab; null, with `error`, if Kodamiko cannot read the
     // diagram (the file then opens as text).
     QWidget *openDiagram(const QString &absolutePath, QString *error);
     bool saveDiagram(DiagramView *view);

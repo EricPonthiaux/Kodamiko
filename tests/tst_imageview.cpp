@@ -22,7 +22,7 @@ private slots:
         QVERIFY(image.save(imagePath));
 
         QVERIFY(ImageView::isImageFile(imagePath));
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         auto *view = qobject_cast<ImageView *>(tabs.openFile(imagePath));
         QVERIFY(view);
         QCOMPARE(view->filePath(), QFileInfo(imagePath).absoluteFilePath());
@@ -41,7 +41,7 @@ private slots:
         file.close();
 
         QVERIFY(!ImageView::isImageFile(textPath));
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(qobject_cast<EditorWidget *>(tabs.openFile(textPath)));
     }
 };

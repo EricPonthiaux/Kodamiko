@@ -1,6 +1,6 @@
 # Outline queries (outline.scm)
 
-tree-sitter queries for the Outline panel, written for Duet (the
+tree-sitter queries for the Outline panel, written for Kodamiko (the
 highlighting queries come from the grammars themselves). Conventions:
 
 - `@definition.<kind>` covers the whole element (body included): its range

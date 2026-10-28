@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// MCP tools for git's state, history, index and commits, and Duet's
+// MCP tools for git's state, history, index and commits, and Kodamiko's
 // snapshots.
 
-#include "DuetTools.h"
 #include "GitToolSupport.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
 #include "agent/CommitMessage.h"
@@ -18,7 +18,7 @@
 
 #include <algorithm>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -49,7 +49,7 @@ McpResult gitStatus(const QString &folder, bool patches)
     return McpResult::json(json);
 }
 
-void getGitStatus(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void getGitStatus(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const bool patches = arguments.value(QStringLiteral("patches")).toBool();
@@ -72,7 +72,7 @@ McpResult fileHistory(const QString &folder, const QString &path, int limit)
         QJsonObject{{QStringLiteral("commits"), commits}, {QStringLiteral("truncated"), log->truncated}});
 }
 
-void getFileHistory(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void getFileHistory(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString path =
@@ -91,7 +91,7 @@ McpResult commitDetails(const QString &folder, const QString &id, bool patches)
     return McpResult::json(json);
 }
 
-void getCommit(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void getCommit(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString id = arguments.value(QStringLiteral("id")).toString();
@@ -111,13 +111,13 @@ McpResult snapshots(const QString &folder)
     return McpResult::json(QJsonObject{{QStringLiteral("snapshots"), snapshots}});
 }
 
-void listSnapshots(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void listSnapshots(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     inBackground([folder] { return snapshots(folder); }, reply);
 }
 
-std::optional<QString> readGitStatusResource(const DuetToolContext &context)
+std::optional<QString> readGitStatusResource(const KDKToolContext &context)
 {
     try {
         const std::optional<RepositoryStatus> status = RepositoryStatus::read(context.folder());
@@ -134,7 +134,7 @@ std::optional<QString> readGitStatusResource(const DuetToolContext &context)
     }
 }
 
-void createSnapshot(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void createSnapshot(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString reason = arguments.value(QStringLiteral("reason")).toString();
@@ -164,14 +164,14 @@ QString restoreSnapshotWithId(const QString &folder, const QString &id)
     throw GitError(QStringLiteral("No snapshot %1 (see list_snapshots)").arg(id));
 }
 
-void restoreSnapshot(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void restoreSnapshot(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString id = arguments.value(QStringLiteral("id")).toString();
     runGit(context, [folder, id] { return restoreSnapshotWithId(folder, id); }, reply);
 }
 
-McpResult showChanges(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult showChanges(const KDKToolContext &context, const QJsonObject &arguments)
 {
     if (!context.showChanges)
         return McpResult::error(QStringLiteral("Not available"));
@@ -180,7 +180,7 @@ McpResult showChanges(const DuetToolContext &context, const QJsonObject &argumen
     return McpResult::message(QStringLiteral("Shown"));
 }
 
-McpResult setCommitMessage(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult setCommitMessage(const KDKToolContext &context, const QJsonObject &arguments)
 {
     if (!context.setCommitMessage)
         return McpResult::error(QStringLiteral("Not available"));
@@ -189,17 +189,17 @@ McpResult setCommitMessage(const DuetToolContext &context, const QJsonObject &ar
         return McpResult::error(QStringLiteral("The message is empty"));
     context.setCommitMessage(message);
     return McpResult::message(
-        QStringLiteral("The message is in Duet's commit field: the user reviews it, then commits."));
+        QStringLiteral("The message is in Kodamiko's commit field: the user reviews it, then commits."));
 }
 
-QString describeStaging(const DuetToolContext &context, const QJsonObject &arguments)
+QString describeStaging(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString action =
         arguments.value(QStringLiteral("unstage")).toBool() ? QStringLiteral("unstage") : QStringLiteral("stage");
     return QStringLiteral("%1 %2").arg(action, pathsArgument(context, arguments).join(QStringLiteral(", ")));
 }
 
-void stageFiles(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void stageFiles(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QStringList paths = pathsArgument(context, arguments);
@@ -228,7 +228,7 @@ QString describeCommit(const QJsonObject &arguments)
         .arg(action, arguments.value(QStringLiteral("message")).toString().section(QLatin1Char('\n'), 0, 0));
 }
 
-void commit(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void commit(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString message = arguments.value(QStringLiteral("message")).toString();
@@ -238,7 +238,7 @@ void commit(const DuetToolContext &context, const QJsonObject &arguments, const 
         reply);
 }
 
-QString describeDiscard(const DuetToolContext &context, const QJsonObject &arguments)
+QString describeDiscard(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString files = pathsArgument(context, arguments).join(QStringLiteral(", "));
     return arguments.value(QStringLiteral("staged")).toBool()
@@ -246,7 +246,7 @@ QString describeDiscard(const DuetToolContext &context, const QJsonObject &argum
                : QStringLiteral("discard the unstaged changes to %1").arg(files);
 }
 
-void discardChanges(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void discardChanges(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QStringList paths = pathsArgument(context, arguments);
@@ -267,13 +267,14 @@ void discardChanges(const DuetToolContext &context, const QJsonObject &arguments
 
 } // namespace
 
-void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
+void registerGitTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("get_git_status"),
          .title = QStringLiteral("Git status"),
          .description = QStringLiteral(
-             "The project's git state as Duet's Diff mode shows it: branch, the remote branch it tracks and how many "
+             "The project's git state as Kodamiko's Diff mode shows it: branch, the remote branch it tracks and how "
+             "many "
              "commits each side has that the other lacks (as of the last fetch), last commit, operation in progress, "
              "staged and unstaged changes (untracked files included), optionally with their patches."),
          .inputSchema =
@@ -284,7 +285,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("get_file_history"),
          .title = QStringLiteral("History"),
          .description = QStringLiteral("The commits of the project, or of one file or folder, newest first, as "
-                                       "Duet's History mode shows them. A file is followed across its renames: "
+                                       "Kodamiko's History mode shows them. A file is followed across its renames: "
                                        "a commit made before one gives the file's \"path\" at that time."),
          .inputSchema =
              object({{QStringLiteral("path"), string(QStringLiteral("File or folder (optional): its commits only"))},
@@ -305,14 +306,14 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("list_snapshots"),
          .title = QStringLiteral("Snapshots"),
-         .description = QStringLiteral("Duet's snapshots of the working directory, newest first: taken before each "
+         .description = QStringLiteral("Kodamiko's snapshots of the working directory, newest first: taken before each "
                                        "prompt and on request, they can bring files back to an earlier state "
                                        "(restore_snapshot)."),
          .inputSchema = object({})},
         handledBy(context, listSnapshots)));
 
     registry.addResource({
-        QStringLiteral("duet://git/status"),
+        QStringLiteral("kodamiko://git/status"),
         false,
         QStringLiteral("git-status"),
         QStringLiteral("Git status"),
@@ -324,7 +325,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool(McpTool::acting(
         {.name = QStringLiteral("create_snapshot"),
          .title = QStringLiteral("Take a snapshot"),
-         .description = QStringLiteral("Records the working directory's files in a Duet snapshot (outside any "
+         .description = QStringLiteral("Records the working directory's files in a Kodamiko snapshot (outside any "
                                        "branch), to come back to them later with restore_snapshot: before a risky "
                                        "change."),
          .inputSchema = object(
@@ -335,7 +336,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool(McpTool::sensitive(
         {.name = QStringLiteral("restore_snapshot"),
          .title = QStringLiteral("Restore a snapshot"),
-         .description = QStringLiteral("Brings the files of a Duet snapshot back on disk (see list_snapshots), the "
+         .description = QStringLiteral("Brings the files of a Kodamiko snapshot back on disk (see list_snapshots), the "
                                        "current ones being saved first so that the restore can itself be undone. "
                                        "The user is asked first."),
          .inputSchema = object({{QStringLiteral("id"), string(QStringLiteral("Snapshot id (see list_snapshots)"))}},
@@ -345,8 +346,9 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool(McpTool::acting(
         {.name = QStringLiteral("show_changes"),
          .title = QStringLiteral("Show changes"),
-         .description = QStringLiteral("Shows Duet's Diff mode to the user, on a file's changes if given: for them to "
-                                       "review what changed."),
+         .description =
+             QStringLiteral("Shows Kodamiko's Diff mode to the user, on a file's changes if given: for them to "
+                            "review what changed."),
          .inputSchema = object({{QStringLiteral("path"), string(QStringLiteral("File to show (optional)"))}})},
         handledBy(context, showChanges)));
 
@@ -354,7 +356,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
         {.name = QStringLiteral("stage_files"),
          .title = QStringLiteral("Stage files"),
          .description = QStringLiteral("Adds files' changes to git's index (or removes them from it with unstage), "
-                                       "as Duet's Diff mode does. The user is asked first."),
+                                       "as Kodamiko's Diff mode does. The user is asked first."),
          .inputSchema =
              object({{QStringLiteral("paths"), array(string(QStringLiteral("File")), QStringLiteral("Files"))},
                      {QStringLiteral("unstage"), boolean(QStringLiteral("Remove from the index instead"))}},
@@ -367,7 +369,7 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
          .title = QStringLiteral("Discard changes"),
          .description = QStringLiteral(
              "Brings files back to their staged state (git restore), or with staged, to the last commit (git restore "
-             "--staged --worktree): new files are deleted. A Duet snapshot keeps what is discarded "
+             "--staged --worktree): new files are deleted. A Kodamiko snapshot keeps what is discarded "
              "(restore_snapshot). The user is asked first."),
          .inputSchema =
              object({{QStringLiteral("paths"), array(string(QStringLiteral("File")), QStringLiteral("Files"))},
@@ -389,9 +391,10 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
     registry.addTool(McpTool::acting(
         {.name = QStringLiteral("set_commit_message"),
          .title = QStringLiteral("Set the commit message"),
-         .description = QStringLiteral("Puts a commit message in Duet's commit field, in the Diff mode, for the user "
-                                       "to review and commit; nothing is committed. Use it when the user asks for "
-                                       "the message of the next commit."),
+         .description =
+             QStringLiteral("Puts a commit message in Kodamiko's commit field, in the Diff mode, for the user "
+                            "to review and commit; nothing is committed. Use it when the user asks for "
+                            "the message of the next commit."),
          .inputSchema = object({{QStringLiteral("message"), string(QStringLiteral("Commit message"))}},
                                {QStringLiteral("message")})},
         handledBy(context, setCommitMessage)));
@@ -400,4 +403,4 @@ void registerGitTools(McpRegistry &registry, const DuetToolContext &context)
     registerIntegrationTools(registry, context);
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

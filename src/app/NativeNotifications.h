@@ -6,7 +6,7 @@
 
 #include <functional>
 
-// The system's own notification center, where Duet can use it: macOS's
+// The system's own notification center, where Kodamiko can use it: macOS's
 // (UNUserNotificationCenter), which needs a bundle identifier and asks the
 // user's permission once. Elsewhere, and when it is refused, the caller
 // shows its notification through the system tray. One source per system.

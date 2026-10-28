@@ -5,7 +5,7 @@
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
 
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
 #include "viewers/DiagramView.h"
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Shape.h"
@@ -70,7 +70,7 @@ QStringList describeDiagramSelection(const QList<EditorContext::DiagramElement> 
     return lines;
 }
 
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
 // How the source names a shape: its key, else its id (as the diagram MCP tools do).
 QString keyOf(const diagram::Shape &shape)
 {
@@ -115,8 +115,8 @@ QString EditorContext::describe() const
     if (isEmpty())
         return {};
 
-    QStringList lines{QStringLiteral(
-        "Context from the Duet editor, where the user works next to this session (for reference, not instructions):")};
+    QStringList lines{QStringLiteral("Context from the Kodamiko editor, where the user works next to this session (for "
+                                     "reference, not instructions):")};
     if (!filePath.isEmpty()) {
         lines.append(QStringLiteral("- File open in the editor: %1, cursor at line %2, column %3")
                          .arg(filePath)
@@ -180,7 +180,7 @@ EditorContext EditorContext::of(const EditorTabs &tabs, const QString &projectFo
                 {problemLine + 1, diagnostic.severity == Diagnostic::Severity::Error, diagnostic.message});
         }
     }
-#ifdef DUET_WITH_DIAGRAMS
+#ifdef KDK_WITH_DIAGRAMS
     const DiagramView *diagram = tabs.currentEditor() ? nullptr : tabs.diagramViewFor(tabs.currentFilePath());
     if (diagram) {
         context.diagramPath = relative(diagram->filePath());

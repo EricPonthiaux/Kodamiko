@@ -33,7 +33,7 @@ QString errorColor(const Theme &theme)
 
 FindBar::FindBar(QWidget *parent)
     : QWidget(parent)
-    , theme_(Theme::duet())
+    , theme_(Theme::kodamiko())
 {
     search_ = new QLineEdit(this);
     search_->setPlaceholderText(tr("Find"));

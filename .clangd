@@ -1,5 +1,5 @@
 # clangd runs clang-tidy on every file opened in the editor, regardless of
-# .clang-tidy's HeaderFilterRegex: Duet's rules must not flag the dependencies
+# .clang-tidy's HeaderFilterRegex: Kodamiko's rules must not flag the dependencies
 # a go-to-definition opens (libgit2, Scintilla, libvterm...).
 If:
   PathMatch: (build[^/]*|third_party)/.*

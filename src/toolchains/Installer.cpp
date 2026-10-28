@@ -26,7 +26,7 @@ QNetworkRequest requestFor(const QUrl &url)
     QNetworkRequest request(url);
     // GitHub's API refuses requests without one.
     request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("Duet/%1").arg(QCoreApplication::applicationVersion()));
+                      QStringLiteral("Kodamiko/%1").arg(QCoreApplication::applicationVersion()));
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     return request;
 }
@@ -344,7 +344,7 @@ void Installer::installNpm(const DownloadSource &source)
     }
     const QStringList packages = npmPackagesOf(source, spec, step.version);
     if (packages.isEmpty()) {
-        fail(tr("Duet does not know which npm packages make %1").arg(step.tool));
+        fail(tr("Kodamiko does not know which npm packages make %1").arg(step.tool));
         return;
     }
     const QString content = stagingFolder() + QStringLiteral("/content");

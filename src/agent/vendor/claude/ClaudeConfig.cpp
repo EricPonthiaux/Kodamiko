@@ -66,7 +66,7 @@ public:
             entries.append(describe({.category = category, .scope = scope, .name = name, .path = path}));
     }
 
-    // Like add(), for a file Duet must show but never edit.
+    // Like add(), for a file Kodamiko must show but never edit.
     void addReadOnly(Category category, Scope scope, const QString &name, const QString &path)
     {
         if (QFileInfo(path).isFile())
@@ -202,7 +202,7 @@ void collectSettings(Collector &c, const QString &projectDir, const QString &ses
             c.add(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
             break;
         case Scope::Session:
-            c.add(Category::Settings, file.scope, tr("Duet session hooks"), file.path);
+            c.add(Category::Settings, file.scope, tr("Kodamiko session hooks"), file.path);
             break;
         case Scope::User:
             c.addUsual(Category::Settings, file.scope, QFileInfo(file.path).fileName(), file.path);
@@ -331,7 +331,7 @@ QString scopeTitle(Scope scope)
     case Scope::Local:
         return tr("Local");
     case Scope::Session:
-        return tr("Duet");
+        return tr("Kodamiko");
     }
     return {};
 }
@@ -354,7 +354,7 @@ QString scopeDescription(Scope scope)
     case Scope::Local:
         return tr("Yours, for this project only, not shared");
     case Scope::Session:
-        return tr("Passed by Duet to its Claude session, read-only");
+        return tr("Passed by Kodamiko to its Claude session, read-only");
     }
     return {};
 }

@@ -45,7 +45,7 @@ enum class SessionStart {
 // What a session is started with, besides its folder and the editor's hooks.
 struct AgentSessionOptions {
     SessionStart start = SessionStart::New;
-    // With them, the session gets the editor's MCP server (duet-mcp), these
+    // With them, the session gets the editor's MCP server (kodamiko-mcp), these
     // of its tools allowed without asking.
     std::optional<QStringList> mcpReadOnlyTools;
     // The name other sessions address it by; without one, the agent picks
@@ -60,7 +60,7 @@ struct AgentSessionOptions {
     // Added to the agent's system prompt (the instructions of a worktree
     // session, of the project's recipe); empty for none.
     QString instructions;
-    // Plugin folders of skills the session loads besides Duet's own (the
+    // Plugin folders of skills the session loads besides Kodamiko's own (the
     // project's recipe's); an agent without plugins ignores them.
     QStringList pluginFolders;
 };
@@ -113,7 +113,7 @@ enum class PermissionAnswer {
     Deny,
 };
 
-// An agent CLI that Duet runs in a terminal (Claude Code…): its name and
+// An agent CLI that Kodamiko runs in a terminal (Claude Code…): its name and
 // look in the editor, how to start it, and the language of its hooks. The
 // rest of the editor deals with any agent through this interface and the
 // HookEvents it decodes.
@@ -139,7 +139,7 @@ public:
     virtual QString findExecutable() const = 0;
     // The interactive session to run in `workingDirectory`, its hooks
     // reporting to the HookServer named `hookServerName`; nullopt (with
-    // `error` set) when the agent or duet-hook cannot be found.
+    // `error` set) when the agent or kodamiko-hook cannot be found.
     virtual std::optional<ProcessSpec> sessionProcess(const QString &workingDirectory,
                                                       const QString &hookServerName,
                                                       const AgentSessionOptions &options,
@@ -158,7 +158,7 @@ public:
     // paths in steps are shown relative to `workingDirectory`.
     virtual AgentRunEvent parseRunOutput(const QByteArray &line, const QString &workingDirectory) const = 0;
 
-    // Decodes the JSON a hook passes (relayed by duet-hook); nullopt for
+    // Decodes the JSON a hook passes (relayed by kodamiko-hook); nullopt for
     // invalid JSON or an event the editor does not follow.
     virtual std::optional<HookEvent> parseHook(const QByteArray &json) const = 0;
     // The reply to a PromptSubmitted hook that adds `context` to the prompt.

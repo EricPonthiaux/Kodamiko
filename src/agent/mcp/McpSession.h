@@ -11,7 +11,7 @@
 
 class QLocalSocket;
 
-// One MCP connection: the duet-mcp relay Claude Code started, connected to
+// One MCP connection: the kodamiko-mcp relay Claude Code started, connected to
 // the editor's local socket. Speaks JSON-RPC 2.0, one message per line (MCP's
 // stdio transport, relayed as is): the lifecycle (initialize, ping), tools,
 // resources with subscriptions, prompts. The session lives as long as the

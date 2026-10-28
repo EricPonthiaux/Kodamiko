@@ -11,7 +11,7 @@
 
 class QPainter;
 
-// Duet's mark: a thin text caret (the editor) next to a block cursor (the
+// Kodamiko's mark: a thin text caret (the editor) next to a block cursor (the
 // terminal where Claude runs). Drawn rather than loaded, so it is sharp at
 // every size; packaging/brand holds the same shapes as SVG.
 namespace BrandMark {
@@ -34,7 +34,7 @@ Colors colorsFor(const Theme &theme);
 QPixmap markPixmap(int size, const Theme &theme, qreal devicePixelRatio = 1);
 // The app icon in the square `area`, in the colors of `theme`: the mark on a
 // rounded tile of the theme's window color. The bundle's icon file
-// (packaging/brand) keeps the default colors: systems show it while Duet is
+// (packaging/brand) keeps the default colors: systems show it while Kodamiko is
 // not running.
 void paintAppIcon(QPainter *painter, const QRectF &area, const Theme &theme);
 // The app icon, `size` pixels square.

@@ -144,8 +144,8 @@ Theme themeFrom(const ThemeColors &colors)
 // of its hue.
 const std::array<ThemeColors, 8> themes = {{
     {
-        .name = "duet-slate",
-        .title = "Duet-Slate",
+        .name = "kodamiko-slate",
+        .title = "Kodamiko-Slate",
         .window = grey900,
         .background = blueGrey900,
         .raised = blueGrey800,
@@ -163,8 +163,8 @@ const std::array<ThemeColors, 8> themes = {{
                    orange200, amber200, blueGrey100},
     },
     {
-        .name = "duet-lagoon",
-        .title = "Duet-Lagoon",
+        .name = "kodamiko-lagoon",
+        .title = "Kodamiko-Lagoon",
         .window = teal900,
         .background = grey900,
         .raised = teal800,
@@ -182,8 +182,8 @@ const std::array<ThemeColors, 8> themes = {{
                    orange100, amber100, teal100},
     },
     {
-        .name = "duet-cocoa",
-        .title = "Duet-Cocoa",
+        .name = "kodamiko-cocoa",
+        .title = "Kodamiko-Cocoa",
         .window = grey900,
         .background = brown900,
         .raised = brown800,
@@ -202,8 +202,8 @@ const std::array<ThemeColors, 8> themes = {{
     },
     // After Dracula (MIT, Copyright (c) 2016 Dracula Theme).
     {
-        .name = "duet-nocturne",
-        .title = "Duet-Nocturne",
+        .name = "kodamiko-nocturne",
+        .title = "Kodamiko-Nocturne",
         .window = grey900,
         .background = grey900,
         .raised = grey800,
@@ -222,8 +222,8 @@ const std::array<ThemeColors, 8> themes = {{
     },
     // After Nord (MIT, Copyright (c) 2016-present Sven Greb).
     {
-        .name = "duet-fjord",
-        .title = "Duet-Fjord",
+        .name = "kodamiko-fjord",
+        .title = "Kodamiko-Fjord",
         .window = blueGrey900,
         .background = blueGrey900,
         .raised = blueGrey800,
@@ -242,8 +242,8 @@ const std::array<ThemeColors, 8> themes = {{
     },
     // After Night Owl (MIT, Copyright (c) 2018 Sarah Drasner).
     {
-        .name = "duet-tawny",
-        .title = "Duet-Tawny",
+        .name = "kodamiko-tawny",
+        .title = "Kodamiko-Tawny",
         .window = blueGrey900,
         .background = blueGrey900,
         .raised = grey900,
@@ -262,8 +262,8 @@ const std::array<ThemeColors, 8> themes = {{
     },
     // After Palenight (MIT, Copyright (c) 2017-present Olaolu Olawuyi).
     {
-        .name = "duet-dusk",
-        .title = "Duet-Dusk",
+        .name = "kodamiko-dusk",
+        .title = "Kodamiko-Dusk",
         .window = blueGrey900,
         .background = blueGrey900,
         .raised = grey900,
@@ -282,8 +282,8 @@ const std::array<ThemeColors, 8> themes = {{
     },
     // After Tokyo Night (MIT, enkia).
     {
-        .name = "duet-lantern",
-        .title = "Duet-Lantern",
+        .name = "kodamiko-lantern",
+        .title = "Kodamiko-Lantern",
         .window = grey900,
         .background = grey900,
         .raised = blueGrey900,

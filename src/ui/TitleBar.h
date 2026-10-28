@@ -22,7 +22,7 @@ class QSpacerItem;
 class QTabBar;
 class QToolButton;
 
-// Duet's own title bar, in the manner of IntelliJ's main toolbar: the menu
+// Kodamiko's own title bar, in the manner of IntelliJ's main toolbar: the menu
 // at the left; in the middle, the project (with the recent folders) and the
 // run block (the configuration and its Run or Stop button, on a tinted
 // background); at the right, the search actions, then a divider and the

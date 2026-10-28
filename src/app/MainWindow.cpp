@@ -10,7 +10,7 @@
 #include "agent/NewAgentPopup.h"
 #include "agent/PermissionPrompts.h"
 #include "agent/ReviewPage.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "agent/vendor/claude/ClaudeLinter.h"
 #include "changes/BranchesPopup.h"
@@ -327,9 +327,9 @@ void MainWindow::createCentralWidget(const Preferences &preferences)
     modes_->addWidget(changesView_);
     modes_->addWidget(historyView_);
 
-    terminalWindow_ = new DetachablePage(
-        modes_, terminalPage_, QStringLiteral("terminalWindow"),
-        {tr("Terminals — Duet"), tr("The terminals are in a window of their own."), tr("Bring the Terminals Back")});
+    terminalWindow_ = new DetachablePage(modes_, terminalPage_, QStringLiteral("terminalWindow"),
+                                         {tr("Terminals — Kodamiko"), tr("The terminals are in a window of their own."),
+                                          tr("Bring the Terminals Back")});
 
     connect(terminalWindow_, &DetachablePage::detachedChanged, this, [this](bool detached) {
         updateTerminalWindowControls();

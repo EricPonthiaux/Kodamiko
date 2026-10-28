@@ -42,8 +42,8 @@ target_link_libraries(tree_sitter_grammars INTERFACE
     tree_sitter_javascript tree_sitter_typescript tree_sitter_tsx tree_sitter_python)
 
 # The grammars' highlights.scm queries and the Outline panel's outline.scm
-# queries (written for Duet, in src/syntax/queries), exposed to the application as
-# Qt resources (`:/queries/<grammar>/<file>`) via duet_add_queries().
+# queries (written for Kodamiko, in src/syntax/queries), exposed to the application as
+# Qt resources (`:/queries/<grammar>/<file>`) via kdk_add_queries().
 set(TREE_SITTER_QUERY_FILES
     "c/highlights.scm|${tree_sitter_c_SOURCE_DIR}/queries/highlights.scm"
     "cpp/highlights.scm|${tree_sitter_cpp_SOURCE_DIR}/queries/highlights.scm"
@@ -64,7 +64,7 @@ endforeach()
 list(APPEND TREE_SITTER_QUERY_FILES
     "javascript/occurrences-params.scm|${PROJECT_SOURCE_DIR}/src/index/queries/javascript/occurrences-params.scm")
 
-function(duet_add_queries target)
+function(kdk_add_queries target)
     set(query_dir ${CMAKE_BINARY_DIR}/queries)
     set(resource_files "")
     foreach(entry IN LISTS TREE_SITTER_QUERY_FILES)

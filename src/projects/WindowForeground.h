@@ -2,7 +2,7 @@
 
 #pragma once
 
-// Handing the foreground to another Duet process, so that the window it is
+// Handing the foreground to another Kodamiko process, so that the window it is
 // asked to show comes forward instead of flashing in the taskbar. One
 // source per system.
 namespace WindowForeground {

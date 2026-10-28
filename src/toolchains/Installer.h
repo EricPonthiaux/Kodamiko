@@ -22,7 +22,7 @@ class Toolchains;
 // the other: each archive is fetched (its address first, from the release's
 // information), checked against its published SHA-256, unpacked with the
 // system's tar (or unzip), and moved in place; npm packages are installed
-// with the Node Duet has, a Qt kit by QtDownload. A step that fails does
+// with the Node Kodamiko has, a Qt kit by QtDownload. A step that fails does
 // not stop the others.
 class Installer : public QObject {
     Q_OBJECT

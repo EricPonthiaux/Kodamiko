@@ -15,7 +15,7 @@ QStringList problems(const QString &path, const QByteArray &content)
 
 QString feedback(const QString &file, const QStringList &problems)
 {
-    QString reason = QStringLiteral("Duet's diagram editor read %1 with problems:").arg(file);
+    QString reason = QStringLiteral("Kodamiko's diagram editor read %1 with problems:").arg(file);
     for (const QString &problem : problems)
         reason += QStringLiteral("\n- ") + problem;
     reason += QStringLiteral("\nFix the file so that it reads as you meant it.");

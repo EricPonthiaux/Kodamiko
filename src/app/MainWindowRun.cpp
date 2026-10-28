@@ -4,7 +4,7 @@
 // they report.
 
 #include "MainWindow.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "diagnostics/ProblemsView.h" // IWYU pragma: keep (ProblemsView * -> QWidget * needs the full type)
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
@@ -139,7 +139,7 @@ void MainWindow::fillRunMenu(QMenu *menu, bool run)
     QString error;
     const QList<RunConfiguration> configurations = runner_->configurations(&error);
     const std::optional<RunConfiguration> selected = runner_->selected();
-    // .duet/run.json's first, then the detected ones by kind.
+    // .kodamiko/run.json's first, then the detected ones by kind.
     const auto heading = [](const RunConfiguration &configuration) {
         if (!configuration.detected)
             return tr("Project");
@@ -196,7 +196,7 @@ void MainWindow::updateRunWidgets()
         titleBar_->setRunConfiguration({
             .icon = UiIcons::icon(QStringLiteral("run"), theme_.mutedText),
             .name = tr("Add Configuration"),
-            .toolTip = tr("No build file found: write the project's commands in .duet/run.json"),
+            .toolTip = tr("No build file found: write the project's commands in .kodamiko/run.json"),
             .menu = runChooser_,
             .running = false,
         });
@@ -233,7 +233,7 @@ void MainWindow::buildProject()
     if (const std::optional<RunConfiguration> configuration = runner_->buildConfiguration())
         runConfiguration(*configuration);
     else
-        showStatus(tr("No build configuration: add one in .duet/run.json"));
+        showStatus(tr("No build configuration: add one in .kodamiko/run.json"));
 }
 
 void MainWindow::runConfiguration(const RunConfiguration &configuration)
@@ -346,7 +346,7 @@ void MainWindow::editRunConfigurations()
         file.write(RunConfigurations::serialize({example}));
         file.close();
         fileStatuses_->refresh();
-        showStatus(tr("A configuration of .duet/run.json replaces the detected one of the same name"));
+        showStatus(tr("A configuration of .kodamiko/run.json replaces the detected one of the same name"));
     }
     setMode(Mode::Edit);
     editorTabs_->openFile(path);

@@ -5,13 +5,13 @@
 #include <QString>
 #include <QUrl>
 
-// What the file system adds to Duet's rules on names, and file paths in
+// What the file system adds to Kodamiko's rules on names, and file paths in
 // URLs. One implementation per system: FilePathsWindows.cpp,
 // FilePathsUnix.cpp.
 namespace FilePaths {
 
 // Whether the system accepts `name`, one component of a path, beyond
-// Duet's own rules (not empty, no "/", no control character): Windows
+// Kodamiko's own rules (not empty, no "/", no control character): Windows
 // refuses <>:"|?*\ and a final dot or space.
 bool systemAcceptsName(const QString &name);
 
@@ -24,7 +24,7 @@ QString fromUrlPath(const QString &urlPath);
 
 // The file path of the file URL `url`, its drive as Qt writes it: language
 // servers send Windows' "C:/a.ts" as "file:///c%3A/a.ts", and a path
-// compared with Duet's must say "C:".
+// compared with Kodamiko's must say "C:".
 QString fromFileUrl(const QUrl &url);
 
 } // namespace FilePaths

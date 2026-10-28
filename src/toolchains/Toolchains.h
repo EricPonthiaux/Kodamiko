@@ -10,39 +10,39 @@
 
 #include <optional>
 
-// A runtime a project can use: one Duet downloaded, or one of the machine.
+// A runtime a project can use: one Kodamiko downloaded, or one of the machine.
 struct RuntimeInstall {
     QString tool;    // "jdk", "node", "python"
     QString version; // "17", "24" (major versions), "3.12"
     QString home;    // the JDK or Node folder; for Python, its executable's
     QString executable;
-    bool managed = false; // downloaded by Duet
+    bool managed = false; // downloaded by Kodamiko
 };
 
-// The runtimes and language servers available: those Duet downloaded, in
+// The runtimes and language servers available: those Kodamiko downloaded, in
 // its store (<root>/<tool>/<version>, complete once a ".complete" file is
 // there), and those of the machine (the PATH, JavaRuntimes, nvm,
 // pyenv...). What is found on the machine is kept until refresh().
 class Toolchains {
 public:
-    // `lookOnMachine` false: only Duet's own installs (tests).
+    // `lookOnMachine` false: only Kodamiko's own installs (tests).
     explicit Toolchains(QString root = defaultRoot(), bool lookOnMachine = true);
-    // ~/.duet/tools: the store shared by every project and every version of
-    // Duet, so that nothing is downloaded twice.
+    // ~/.kodamiko/tools: the store shared by every project and every version of
+    // Kodamiko, so that nothing is downloaded twice.
     static QString defaultRoot();
 
     QString root() const { return root_; }
 
-    // Duet's own installs.
+    // Kodamiko's own installs.
     QString installFolder(const QString &tool, const QString &version) const;
     bool isInstalled(const QString &tool, const QString &version) const;
     // Newest first.
     QStringList installedVersions(const QString &tool) const;
-    // The executable of Duet's install (ToolSpec::executables), empty if
+    // The executable of Kodamiko's install (ToolSpec::executables), empty if
     // it is not installed.
     QString installedExecutable(const QString &tool, const QString &version) const;
 
-    // The runtimes of `tool`, Duet's first, then newest first.
+    // The runtimes of `tool`, Kodamiko's first, then newest first.
     QList<RuntimeInstall> runtimes(const QString &tool) const;
     // The runtime at `path` if given and present, else one of `version`
     // (empty: the newest).
@@ -57,16 +57,16 @@ public:
     // The command of `tool` (a ToolCatalog id, or a program's name: "mvn")
     // in the PATH, empty if there is none.
     QString systemProgram(const QString &tool) const;
-    // The server's executable for `version`: Duet's install, or the PATH's
+    // The server's executable for `version`: Kodamiko's install, or the PATH's
     // for "system". Empty when it is not there.
     QString serverExecutable(const QString &server, const QString &version) const;
 
-    // Duet's install of Qt `version` ("6.10.3") for `kit`:
+    // Kodamiko's install of Qt `version` ("6.10.3") for `kit`:
     // <root>/qt/<version>/<kit>, as Qt's installer lays it out.
     QString qtInstallFolder(const QString &version, const QString &kit) const;
     // The newest Qt for `kit` whose version starts with `version` ("6.10";
-    // empty: any): Duet's, or one in the machine's usual folders (see
-    // machineQtRoots). Duet's must have `modules`; one installed otherwise
+    // empty: any): Kodamiko's, or one in the machine's usual folders (see
+    // machineQtRoots). Kodamiko's must have `modules`; one installed otherwise
     // is taken as it is. Empty when there is none.
     QString qtFolder(const QString &version, const QString &kit, const QStringList &modules = {}) const;
     // C:/Qt and ~/Qt, and /opt/Qt outside Windows.
@@ -94,7 +94,7 @@ private:
     mutable QHash<QString, QString> programs_;              // by server
 };
 
-// Where Duet downloaded its tools before ~/.duet/tools.
+// Where Kodamiko downloaded its tools before ~/.kodamiko/tools.
 namespace LegacyToolchains {
 
 // <application data>/toolchains.

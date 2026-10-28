@@ -1,16 +1,16 @@
-# Duet
+# Kodamiko
 
-Duet is a native desktop editor built around a [Claude Code](https://claude.com/claude-code)
+Kodamiko is a native desktop editor built around a [Claude Code](https://claude.com/claude-code)
 session. You write code on one side; Claude works on the other, in a
-terminal inside the editor. Duet keeps the two in step: Claude knows what you
+terminal inside the editor. Kodamiko keeps the two in step: Claude knows what you
 are looking at, and you see, as it happens, every change Claude makes, with
 a way to undo it.
 
 It is open source (GPL v3), written in C++23 with Qt 6, and runs on Linux,
-Windows and macOS. Duet is in preview: it is used every day to build itself,
+Windows and macOS. Kodamiko is in preview: it is used every day to build itself,
 and its interfaces may still change.
 
-## Why Duet
+## Why Kodamiko
 
 The editors we use were designed for a human typing code; AI came later, as
 a chat panel on the side or an agent in a terminal that cannot see the
@@ -19,7 +19,7 @@ so you keep pointing it at paths and pasting excerpts. It changes files
 behind your back, and you discover the result in a diff, if you look. When
 it goes wrong, undoing its work is up to you.
 
-Duet starts from the other end, with three ideas:
+Kodamiko starts from the other end, with three ideas:
 
 - **One shared view.** You and Claude look at the same project: the open
   files with their unsaved changes, the selection, the problems, the
@@ -28,16 +28,16 @@ Duet starts from the other end, with three ideas:
 - **Every change visible and reversible.** Files reload as Claude edits
   them, the diff follows each step, and the project can go back to how it
   was before any prompt.
-- **You decide.** Claude acts in the editor through tools Duet gives it, and
+- **You decide.** Claude acts in the editor through tools Kodamiko gives it, and
   whatever changes the repository waits for your *Allow*, asked in plain
   words rather than as a command line.
 
 ## What you can do
 
 **Work with Claude.** A Claude Code session starts in your project, in a
-built-in terminal. With each prompt, Duet tells Claude which file is open,
+built-in terminal. With each prompt, Kodamiko tells Claude which file is open,
 where the cursor is, what is selected and which problems are underlined.
-Through Duet's own MCP server, Claude reads your open files, finds symbols
+Through Kodamiko's own MCP server, Claude reads your open files, finds symbols
 and references, opens a file at a line, shows a diff or draws a diagram; the
 errors its edits introduce are reported back to it at once. Its permission
 requests appear in the editor, never taking the focus from what you type.
@@ -64,7 +64,7 @@ one step, wherever the change went. Claude uses the same refactorings.
 **Git without leaving the editor.** Stage by file, hunk or line, commit with
 a message Claude writes in the style of your history, browse the history,
 switch, merge and rebase branches, resolve conflicts, pull, push and stash.
-Git commands Claude would run in a shell go through Duet's tools instead,
+Git commands Claude would run in a shell go through Kodamiko's tools instead,
 so each one is explained, snapshotted and shown.
 
 **A real code editor.** Tree-sitter highlighting for C, C++, Java,
@@ -76,7 +76,7 @@ viewer.
 
 **Diagrams.** Ask for a flowchart, a sequence, a class, a state, a data
 model, a C4 architecture or a mind map: Claude writes it in Mermaid or
-PlantUML, and it opens laid out in Duet's diagram editor, where you can
+PlantUML, and it opens laid out in Kodamiko's diagram editor, where you can
 rearrange it while Claude keeps editing its source.
 
 ## Getting started
@@ -94,7 +94,7 @@ downloaded too.
 cmake --preset default
 cmake --build --preset default
 ctest --preset default
-./build/bin/duet [project-folder]
+./build/bin/kodamiko [project-folder]
 ```
 
 On Windows, from an *x64 Native Tools Command Prompt* (Visual Studio 2022
@@ -107,24 +107,24 @@ set PATH=%CMAKE_PREFIX_PATH%\bin;%PATH%
 cmake --preset windows
 cmake --build --preset windows
 ctest --preset windows
-build-win\bin\duet.exe [project-folder]
+build-win\bin\kodamiko.exe [project-folder]
 ```
 
-On macOS, each rebuild of an ad-hoc signed `Duet.app` asks again for
+On macOS, each rebuild of an ad-hoc signed `Kodamiko.app` asks again for
 access to the Desktop and Documents folders. Signed with a stable identity,
 it asks once: create a code-signing certificate in *Keychain Access ▸
 Certificate Assistant ▸ Create a Certificate…* (type *Code Signing*), or
 use an Apple Development one, then configure with its name:
 
 ```sh
-cmake --preset default -DDUET_CODESIGN_IDENTITY="Duet Development"
+cmake --preset default -DKDK_CODESIGN_IDENTITY="Kodamiko Development"
 ```
 
-At runtime Duet needs [Claude Code](https://claude.com/claude-code) 2.1+
+At runtime Kodamiko needs [Claude Code](https://claude.com/claude-code) 2.1+
 and git 2.23+. If either is missing, *Help ▸ Check Prerequisites* opens on
 startup and offers to install it.
 
-## Using Duet
+## Using Kodamiko
 
 The window has four modes, switched with the tabs at the bottom right:
 
@@ -161,20 +161,20 @@ project using C++ and Java can combine a Qt recipe and a Maven one; their
 environments, tools, configurations, skills and prompts add up. A recipe
 is a folder with a `recipe.json`, its `files/`, an
 optional `instructions.md` and an optional `skills/` folder (a Claude Code
-plugin): see `src/recipes/Recipe.h` and Duet's own in `tools/recipes/`. Yours
-go in Duet's application data folder (`recipes/`), or in a project's
-`.duet/recipes/` to share them with its repository; one with the same name
-replaces Duet's.
+plugin): see `src/recipes/Recipe.h` and Kodamiko's own in `tools/recipes/`. Yours
+go in Kodamiko's application data folder (`recipes/`), or in a project's
+`.kodamiko/recipes/` to share them with its repository; one with the same name
+replaces Kodamiko's.
 
 *Preferences ▸ Terminal* adds folders of your own in front of the `PATH` of
-every program Duet starts.
+every program Kodamiko starts.
 
 ## How it works
 
-Duet launches `claude` with hooks and an MCP server of its own, without
+Kodamiko launches `claude` with hooks and an MCP server of its own, without
 touching your Claude configuration. Two small programs shipped with the
-editor relay them over a local socket: `duet-hook` (prompts, edits,
-permissions, status line) and `duet-mcp` (the tools Claude uses to act in
+editor relay them over a local socket: `kodamiko-hook` (prompts, edits,
+permissions, status line) and `kodamiko-mcp` (the tools Claude uses to act in
 the editor).
 
 The sources are organized by feature under `src/` (`editor`, `git`,
@@ -188,7 +188,7 @@ planned next is in `docs/roadmap/`.
 
 ## License
 
-Duet is distributed under the **GNU GPL v3** (see `LICENSE`), the license
+Kodamiko is distributed under the **GNU GPL v3** (see `LICENSE`), the license
 required by QScintilla, with the additional permission below for Graphviz.
 
 **Additional permission under GNU GPL version 3 section 7.** If you modify
@@ -200,7 +200,7 @@ for a non-source form of such a combination shall include the source code
 for the parts of Graphviz used as well as that of the covered work.
 
 The permission is needed because the EPL 1.0 is not compatible with the GPL,
-and the diagram editor links Graphviz's library. It covers Duet's own code
+and the diagram editor links Graphviz's library. It covers Kodamiko's own code
 only; the other components keep their licenses.
 
 Third-party components:
@@ -213,7 +213,7 @@ Third-party components:
 | libvterm | built and linked statically | MIT |
 | libgit2 | built and linked statically | GPL v2 with linking exception |
 | cmark-gfm | built and linked statically | BSD 2-Clause |
-| Graphviz (optional, diagram editor) | linked from the system; on Windows, its release's DLLs ship with Duet | Eclipse Public License 1.0 |
+| Graphviz (optional, diagram editor) | linked from the system; on Windows, its release's DLLs ship with Kodamiko | Eclipse Public License 1.0 |
 | github-markdown-css, Octicons (in `third_party/`) | embedded | MIT |
 | SchemaStore's Claude Code settings schema (in `third_party/schemastore/`) | embedded | Apache 2.0 |
 | Ubuntu Sans, Ubuntu Sans Mono (in `third_party/fonts/`) | embedded | Ubuntu Font Licence 1.0 |

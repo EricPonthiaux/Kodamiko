@@ -63,7 +63,7 @@ QString wrapBody(const QString &message)
 QString request(Scope scope, const QString &pathspec)
 {
     return QStringLiteral(
-               "Write the commit message for %1, and put it in Duet's commit field with the set_commit_message "
+               "Write the commit message for %1, and put it in Kodamiko's commit field with the set_commit_message "
                "tool; do not commit. Use what you know of why these changes were made. First line: a summary in "
                "the imperative mood, at most 72 characters, without a final period, in the style and the language "
                "of the recent commits (git log -n 15 --format=%s; ignore placeholder subjects such as '++' or "

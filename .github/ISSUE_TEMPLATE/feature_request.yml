@@ -1,5 +1,5 @@
 name: Idea
-description: Something Duet could do, or do better.
+description: Something Kodamiko could do, or do better.
 labels: [enhancement]
 body:
   - type: textarea
@@ -13,4 +13,4 @@ body:
     id: idea
     attributes:
       label: Your idea
-      description: How Duet could help. Mockups are welcome.
+      description: How Kodamiko could help. Mockups are welcome.

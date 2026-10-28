@@ -1,5 +1,5 @@
 {
-    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Duet/main/tools/schemas/recipe.schema.json",
+    "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Kodamiko/main/tools/schemas/recipe.schema.json",
     "title": "Qt Widgets · CMake",
     "language": "cpp",
     "description": "A Qt 6 Widgets window, built with the system's compiler and Qt 6.10, downloaded if the machine has none.",

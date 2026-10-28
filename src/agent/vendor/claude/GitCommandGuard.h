@@ -7,10 +7,10 @@
 #include <optional>
 
 // Keeps Claude from changing the project's repository with git in a shell
-// when one of Duet's git tools (MCP) does the same: the tool asks the user
+// when one of Kodamiko's git tools (MCP) does the same: the tool asks the user
 // with a plain description, takes a snapshot before what is hard to undo,
 // runs one git operation at a time with the editor's, asks for credentials
-// in the editor, and keeps Duet's views in step. Such a command is refused
+// in the editor, and keeps Kodamiko's views in step. Such a command is refused
 // (PreToolUse hook on Bash) with the tool calls that do its work, their
 // arguments included, so that Claude goes on in one step.
 //
@@ -22,7 +22,7 @@ namespace GitCommandGuard {
 
 // Where a command runs.
 struct Location {
-    QString projectFolder;    // the project Duet's tools act on
+    QString projectFolder;    // the project Kodamiko's tools act on
     QString workingDirectory; // the shell's current directory; empty: the project
 };
 

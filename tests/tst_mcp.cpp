@@ -59,11 +59,11 @@ void fill(McpRegistry &registry)
                       [](const QJsonObject &, const McpReply &reply, const McpProgress &) {
                           reply(McpResult::message(QStringLiteral("erased")));
                       }});
-    registry.addResource({QStringLiteral("duet://test/state"), false, QStringLiteral("state"), QStringLiteral("State"),
-                          QStringLiteral("A state"), QStringLiteral("application/json"),
+    registry.addResource({QStringLiteral("kodamiko://test/state"), false, QStringLiteral("state"),
+                          QStringLiteral("State"), QStringLiteral("A state"), QStringLiteral("application/json"),
                           [](const QString &) -> std::optional<QString> { return QStringLiteral("{\"a\":1}"); }});
     registry.addResource(
-        {QStringLiteral("duet://test/file/{path}"), true, QStringLiteral("file"), QStringLiteral("File"),
+        {QStringLiteral("kodamiko://test/file/{path}"), true, QStringLiteral("file"), QStringLiteral("File"),
          QStringLiteral("A file"), QStringLiteral("text/plain"),
          [](const QString &uri) -> std::optional<QString> { return uri.section(QLatin1Char('/'), -1); }});
     registry.addPrompt({QStringLiteral("review"),
@@ -117,7 +117,7 @@ private slots:
         QJsonObject result = last().value(QStringLiteral("result")).toObject();
         QCOMPARE(result.value(QStringLiteral("protocolVersion")).toString(), QStringLiteral("2025-03-26"));
         QCOMPARE(result.value(QStringLiteral("serverInfo")).toObject().value(QStringLiteral("name")).toString(),
-                 QStringLiteral("duet"));
+                 QStringLiteral("kodamiko"));
         QCOMPARE(result.value(QStringLiteral("instructions")).toString(), QStringLiteral("Test server"));
         QVERIFY(result.value(QStringLiteral("capabilities")).toObject().contains(QStringLiteral("tools")));
         // An unknown version gets the newest.
@@ -204,9 +204,9 @@ private slots:
                      .toObject()
                      .value(QStringLiteral("uriTemplate"))
                      .toString(),
-                 QStringLiteral("duet://test/file/{path}"));
+                 QStringLiteral("kodamiko://test/file/{path}"));
         session.handleMessage(request(12, QStringLiteral("resources/read"),
-                                      {{QStringLiteral("uri"), QStringLiteral("duet://test/file/a.txt")}}));
+                                      {{QStringLiteral("uri"), QStringLiteral("kodamiko://test/file/a.txt")}}));
         QCOMPARE(last()
                      .value(QStringLiteral("result"))
                      .toObject()
@@ -218,13 +218,13 @@ private slots:
                      .toString(),
                  QStringLiteral("a.txt"));
         session.handleMessage(
-            request(13, QStringLiteral("resources/read"), {{QStringLiteral("uri"), QStringLiteral("duet://x")}}));
+            request(13, QStringLiteral("resources/read"), {{QStringLiteral("uri"), QStringLiteral("kodamiko://x")}}));
         QCOMPARE(last().value(QStringLiteral("error")).toObject().value(QStringLiteral("code")).toInt(), -32002);
         session.handleMessage(request(14, QStringLiteral("resources/subscribe"),
-                                      {{QStringLiteral("uri"), QStringLiteral("duet://test/state")}}));
-        registry.notifyResourceUpdated(QStringLiteral("duet://test/other"));
+                                      {{QStringLiteral("uri"), QStringLiteral("kodamiko://test/state")}}));
+        registry.notifyResourceUpdated(QStringLiteral("kodamiko://test/other"));
         QVERIFY(last().contains(QStringLiteral("result"))); // not subscribed: nothing sent
-        registry.notifyResourceUpdated(QStringLiteral("duet://test/state"));
+        registry.notifyResourceUpdated(QStringLiteral("kodamiko://test/state"));
         QCOMPARE(last().value(QStringLiteral("method")).toString(), QStringLiteral("notifications/resources/updated"));
 
         // Prompts.
@@ -302,12 +302,12 @@ private slots:
 
         // Read-only tools are allowed without asking in Claude Code; the
         // others are not.
-        QCOMPARE(registry.readOnlyToolPermissions(QStringLiteral("duet")),
-                 QStringList{QStringLiteral("mcp__duet__echo")});
+        QCOMPARE(registry.readOnlyToolPermissions(QStringLiteral("kodamiko")),
+                 QStringList{QStringLiteral("mcp__kodamiko__echo")});
     }
 
     // The relay Claude Code starts, against the editor's socket.
-    void relaysThroughDuetMcp()
+    void relaysThroughKDKMcp()
     {
         McpRegistry registry;
         fill(registry);
@@ -319,9 +319,9 @@ private slots:
 
         QProcess relay;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert(QStringLiteral("DUET_SOCKET"), server.serverName());
+        environment.insert(QStringLiteral("KDK_SOCKET"), server.serverName());
         relay.setProcessEnvironment(environment);
-        relay.start(QStringLiteral(DUET_MCP_PATH), {});
+        relay.start(QStringLiteral(KDK_MCP_PATH), {});
         QVERIFY(relay.waitForStarted());
         QJsonObject reply = exchange(relay, request(1, QStringLiteral("initialize")));
         QCOMPARE(reply.value(QStringLiteral("id")).toInt(), 1);
@@ -343,7 +343,7 @@ private slots:
         const QSignalSpy hooks(&server, &HookServer::hookReceived);
         QProcess hook;
         hook.setProcessEnvironment(environment);
-        hook.start(QStringLiteral(DUET_HOOK_PATH), {});
+        hook.start(QStringLiteral(KDK_HOOK_PATH), {});
         hook.write(R"({"hook_event_name":"Stop","session_id":"s"})");
         hook.closeWriteChannel();
         QTRY_COMPARE_WITH_TIMEOUT(hook.state(), QProcess::NotRunning, 5000);
@@ -360,16 +360,16 @@ private slots:
     {
         QProcess relay;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert(QStringLiteral("DUET_SOCKET"), QStringLiteral("duet-nobody-listens"));
+        environment.insert(QStringLiteral("KDK_SOCKET"), QStringLiteral("kodamiko-nobody-listens"));
         relay.setProcessEnvironment(environment);
-        relay.start(QStringLiteral(DUET_MCP_PATH), {});
+        relay.start(QStringLiteral(KDK_MCP_PATH), {});
         QVERIFY(relay.waitForStarted());
         QJsonObject reply = exchange(relay, request(1, QStringLiteral("initialize")));
         QVERIFY(reply.value(QStringLiteral("result"))
                     .toObject()
                     .value(QStringLiteral("instructions"))
                     .toString()
-                    .startsWith(QStringLiteral("Duet's editor is not reachable")));
+                    .startsWith(QStringLiteral("Kodamiko's editor is not reachable")));
         reply = exchange(relay, request(2, QStringLiteral("tools/list")));
         QVERIFY(reply.value(QStringLiteral("result")).toObject().value(QStringLiteral("tools")).toArray().isEmpty());
         reply = exchange(relay,
@@ -401,9 +401,9 @@ private slots:
         server->setMcpRegistry(&registry);
         QProcess relay;
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert(QStringLiteral("DUET_SOCKET"), server->serverName());
+        environment.insert(QStringLiteral("KDK_SOCKET"), server->serverName());
         relay.setProcessEnvironment(environment);
-        relay.start(QStringLiteral(DUET_MCP_PATH), {});
+        relay.start(QStringLiteral(KDK_MCP_PATH), {});
         QVERIFY(relay.waitForStarted());
         relay.write(
             QJsonDocument(request(7, QStringLiteral("tools/call"), {{QStringLiteral("name"), QStringLiteral("slow")}}))
@@ -422,18 +422,18 @@ private slots:
     void declaresTheServerToClaude()
     {
         const QJsonObject config =
-            QJsonDocument::fromJson(ClaudeLauncher::mcpConfig(QStringLiteral("/opt/duet/duet-mcp"))).object();
-        const QJsonObject duet =
-            config.value(QStringLiteral("mcpServers")).toObject().value(QStringLiteral("duet")).toObject();
-        QCOMPARE(duet.value(QStringLiteral("type")).toString(), QStringLiteral("stdio"));
-        QCOMPARE(duet.value(QStringLiteral("command")).toString(),
-                 QDir::toNativeSeparators(QStringLiteral("/opt/duet/duet-mcp")));
+            QJsonDocument::fromJson(ClaudeLauncher::mcpConfig(QStringLiteral("/opt/kodamiko/kodamiko-mcp"))).object();
+        const QJsonObject kodamiko =
+            config.value(QStringLiteral("mcpServers")).toObject().value(QStringLiteral("kodamiko")).toObject();
+        QCOMPARE(kodamiko.value(QStringLiteral("type")).toString(), QStringLiteral("stdio"));
+        QCOMPARE(kodamiko.value(QStringLiteral("command")).toString(),
+                 QDir::toNativeSeparators(QStringLiteral("/opt/kodamiko/kodamiko-mcp")));
         const QJsonObject settings =
             QJsonDocument::fromJson(
-                ClaudeLauncher::sessionSettings(QStringLiteral("hook"), {QStringLiteral("mcp__duet__a")}))
+                ClaudeLauncher::sessionSettings(QStringLiteral("hook"), {QStringLiteral("mcp__kodamiko__a")}))
                 .object();
         QCOMPARE(settings.value(QStringLiteral("permissions")).toObject().value(QStringLiteral("allow")).toArray(),
-                 QJsonArray{QStringLiteral("mcp__duet__a")});
+                 QJsonArray{QStringLiteral("mcp__kodamiko__a")});
         QVERIFY(!QJsonDocument::fromJson(ClaudeLauncher::sessionSettings(QStringLiteral("hook")))
                      .object()
                      .contains(QStringLiteral("permissions")));

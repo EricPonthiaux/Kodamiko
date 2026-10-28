@@ -139,15 +139,15 @@ std::optional<ProcessSpec> ClaudeCodeProvider::fileRunProcess(const AgentFileRun
     // The hook is what checks the file: a run without it would take an
     // unreadable file for a success.
     if (!run.hookServerName.isEmpty() && hook.isEmpty()) {
-        *error =
-            QCoreApplication::translate("ClaudeLauncher", "The duet-hook program is missing from the editor's folder.");
+        *error = QCoreApplication::translate("ClaudeLauncher",
+                                             "The kodamiko-hook program is missing from the editor's folder.");
         return std::nullopt;
     }
     std::optional<ProcessSpec> spec = ClaudeLauncher::printProcess(
         run.workingDirectory,
         ClaudeFileRun::arguments(run.prompt, run.relativePath, ClaudeLauncher::pluginPath(), hook), error);
     if (spec && !hook.isEmpty())
-        spec->environment.insert(QStringLiteral("DUET_SOCKET"), run.hookServerName);
+        spec->environment.insert(QStringLiteral("KDK_SOCKET"), run.hookServerName);
     return spec;
 }
 
@@ -204,7 +204,7 @@ std::optional<HookEvent> ClaudeCodeProvider::parseHook(const QByteArray &json) c
         event.message = object.value(QLatin1String("message")).toString();
         return event;
     }
-    if (eventName == QLatin1String("DuetStatusLine")) { // sent by `duet-hook statusline`
+    if (eventName == QLatin1String("KDKStatusLine")) { // sent by `kodamiko-hook statusline`
         event.kind = HookEvent::Kind::StatusUpdated;
         event.status = object.value(QLatin1String("status")).toObject();
         // The session is named in the status Claude Code passed, not beside it.
@@ -268,7 +268,7 @@ QJsonObject ClaudeCodeProvider::permissionReply(const HookEvent &request, Permis
         break;
     case PermissionAnswer::Deny:
         decision.insert(QLatin1String("behavior"), QLatin1String("deny"));
-        decision.insert(QLatin1String("message"), QLatin1String("The user denied this in Duet."));
+        decision.insert(QLatin1String("message"), QLatin1String("The user denied this in Kodamiko."));
         break;
     }
     return QJsonObject{

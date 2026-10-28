@@ -5,7 +5,7 @@
 
 #include "MainWindow.h"
 #include "agent/EditorContext.h"
-#include "agent/mcp/DuetTools.h"
+#include "agent/mcp/KDKTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "changes/ChangesView.h"
 #include "completion/CompletionController.h"
@@ -111,7 +111,7 @@ void MainWindow::openFolder(const QString &folder)
         changesView_->refresh();
     if (mode_ == Mode::History)
         historyView_->refresh();
-    setWindowTitle(QStringLiteral("%1 — Duet").arg(QFileInfo(folder_).fileName()));
+    setWindowTitle(QStringLiteral("%1 — Kodamiko").arg(QFileInfo(folder_).fileName()));
     terminalWindow_->setWindowTitle(tr("Terminals — %1").arg(QFileInfo(folder_).fileName()));
     updateProjectMenu();
     if (project_.needsRecipeSetup)
@@ -182,8 +182,8 @@ void MainWindow::askToOpenProject(const QString &folder, AfterOpening after)
         choices.append({tr("This Window"), [this, folder, after] { openProjectHere(folder, after); }});
     const QString message =
         hasAgentWork
-            ? tr("Open %1 in a new Duet window?").arg(name)
-            : tr("Open %1 in a new Duet window, or here in place of %2?").arg(name, QFileInfo(folder_).fileName());
+            ? tr("Open %1 in a new Kodamiko window?").arg(name)
+            : tr("Open %1 in a new Kodamiko window, or here in place of %2?").arg(name, QFileInfo(folder_).fileName());
     auto *popup = new ChoicePopup({.title = tr("Open Project"),
                                    .location = QDir::toNativeSeparators(folder),
                                    .message = message,
@@ -223,7 +223,7 @@ void MainWindow::openProjectInNewWindow(const QString &folder)
     }
     showNotice({.title = tr("Open Project"),
                 .location = QDir::toNativeSeparators(folder),
-                .message = tr("Duet could not start a new window: %1 did not run.").arg(command.program),
+                .message = tr("Kodamiko could not start a new window: %1 did not run.").arg(command.program),
                 .details = {}},
                this);
 }
@@ -372,7 +372,7 @@ void MainWindow::updateToolsNotice()
         return;
     }
     toolsNotice_->showNotice(
-        tr("This project's setup needs tools Duet has not downloaded yet: %1").arg(InstallPlan::summary(steps)),
+        tr("This project's setup needs tools Kodamiko has not downloaded yet: %1").arg(InstallPlan::summary(steps)),
         tr("Download"));
 }
 

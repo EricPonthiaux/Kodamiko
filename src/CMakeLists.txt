@@ -1,40 +1,40 @@
 # The log files, shared by the editor and its helper programs (tools/).
-add_library(duet_log STATIC log/LogFiles.cpp)
-target_include_directories(duet_log PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(duet_log PUBLIC Qt6::Core)
-target_compile_definitions(duet_log PRIVATE DUET_VERSION="${PROJECT_VERSION}")
-duet_enable_warnings(duet_log)
+add_library(kdk_log STATIC log/LogFiles.cpp)
+target_include_directories(kdk_log PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(kdk_log PUBLIC Qt6::Core)
+target_compile_definitions(kdk_log PRIVATE KDK_VERSION="${PROJECT_VERSION}")
+kdk_enable_warnings(kdk_log)
 
 # The system's ways (shells, executables, file names...), shared by the
 # editor and its helper programs: an interface per concept, and one source
 # per system implementing it.
-add_library(duet_system STATIC system/Executables.cpp system/Host.cpp)
+add_library(kdk_system STATIC system/Executables.cpp system/Host.cpp)
 if(WIN32)
-    target_sources(duet_system PRIVATE
+    target_sources(kdk_system PRIVATE
         system/windows/ExecutablesWindows.cpp
         system/windows/FilePathsWindows.cpp
         system/windows/HostWindows.cpp
         system/windows/ShellWindows.cpp
         system/windows/StandardStreamsWindows.cpp)
 else()
-    target_sources(duet_system PRIVATE
+    target_sources(kdk_system PRIVATE
         system/unix/ExecutablesUnix.cpp
         system/unix/FilePathsUnix.cpp
         system/unix/ShellUnix.cpp
         system/unix/StandardStreamsUnix.cpp)
     if(APPLE)
-        target_sources(duet_system PRIVATE system/osx/HostMacOS.cpp)
+        target_sources(kdk_system PRIVATE system/osx/HostMacOS.cpp)
     else()
-        target_sources(duet_system PRIVATE system/linux/HostLinux.cpp)
+        target_sources(kdk_system PRIVATE system/linux/HostLinux.cpp)
     endif()
 endif()
-target_include_directories(duet_system PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(duet_system PUBLIC Qt6::Core)
-duet_enable_warnings(duet_system)
+target_include_directories(kdk_system PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(kdk_system PUBLIC Qt6::Core)
+kdk_enable_warnings(kdk_system)
 
 # Library containing the whole editor except main(): the executable and the
 # tests link against it.
-add_library(duet_core STATIC
+add_library(kdk_core STATIC
     agent/AgentActivity.cpp
     agent/AgentCheckPopup.cpp
     agent/AgentIndicator.cpp
@@ -366,7 +366,7 @@ add_library(duet_core STATIC
 # The features that work differently on each system: one source per
 # system. The PTY is ConPTY on Windows, forkpty elsewhere.
 if(WIN32)
-    target_sources(duet_core PRIVATE
+    target_sources(kdk_core PRIVATE
         editor/windows/WebZoomWindows.cpp
         git/windows/CredentialCacheWindows.cpp
         projects/windows/NewInstanceWindows.cpp
@@ -380,14 +380,14 @@ if(WIN32)
     # Public: ConPty.h includes <windows.h>, and so does every source that
     # includes it. WIN32_LEAN_AND_MEAN leaves out rpcndr.h, whose `small`
     # macro breaks a field of vterm.h.
-    target_compile_definitions(duet_core PUBLIC _WIN32_WINNT=0x0A00 NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(kdk_core PUBLIC _WIN32_WINNT=0x0A00 NOMINMAX WIN32_LEAN_AND_MEAN)
 else()
-    target_sources(duet_core PRIVATE
+    target_sources(kdk_core PRIVATE
         git/unix/CredentialCacheUnix.cpp
         projects/unix/WindowForegroundUnix.cpp
         terminal/unix/UnixPty.cpp)
     if(APPLE)
-        target_sources(duet_core PRIVATE
+        target_sources(kdk_core PRIVATE
             editor/osx/WebZoomMacOS.cpp
             projects/osx/NewInstanceMacOS.cpp
             setup/osx/SystemSetupMacOS.cpp
@@ -395,9 +395,9 @@ else()
             terminal/osx/PtyForegroundMacOS.cpp
             toolchains/osx/SystemJdksMacOS.cpp
             ui/osx/DesktopIntegrationMacOS.mm)
-        target_link_libraries(duet_core PRIVATE "-framework AppKit")
+        target_link_libraries(kdk_core PRIVATE "-framework AppKit")
     else()
-        target_sources(duet_core PRIVATE
+        target_sources(kdk_core PRIVATE
             editor/linux/WebZoomLinux.cpp
             projects/linux/NewInstanceLinux.cpp
             setup/linux/SystemSetupLinux.cpp
@@ -407,18 +407,18 @@ else()
             ui/linux/DesktopIntegrationLinux.cpp)
     endif()
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_link_libraries(duet_core PRIVATE util) # forkpty() before glibc 2.34
+        target_link_libraries(kdk_core PRIVATE util) # forkpty() before glibc 2.34
     endif()
 endif()
 
-target_include_directories(duet_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(duet_core PUBLIC
-    duet_system Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets
+target_include_directories(kdk_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(kdk_core PUBLIC
+    kdk_system Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets
     qscintilla tree_sitter_grammars vterm git2 cmark_gfm)
-duet_add_queries(duet_core)
+kdk_add_queries(kdk_core)
 
 # GitHub's Markdown style sheets and icons, for the Markdown preview.
-qt_add_resources(duet_core markdown_assets
+qt_add_resources(kdk_core markdown_assets
     PREFIX /markdown
     BASE ${PROJECT_SOURCE_DIR}/third_party
     FILES
@@ -431,14 +431,14 @@ qt_add_resources(duet_core markdown_assets
         ${PROJECT_SOURCE_DIR}/third_party/octicons/link-16.svg)
 
 # Schema of Claude Code's settings files, to check them in the editor.
-qt_add_resources(duet_core schemas
+qt_add_resources(kdk_core schemas
     PREFIX /schemas
     BASE ${PROJECT_SOURCE_DIR}/third_party/schemastore
     FILES
         ${PROJECT_SOURCE_DIR}/third_party/schemastore/claude-code-settings.json)
 
-# Schemas of Duet's own files, to check the recipes as they are read.
-qt_add_resources(duet_core duet_schemas
+# Schemas of Kodamiko's own files, to check the recipes as they are read.
+qt_add_resources(kdk_core kdk_schemas
     PREFIX /schemas
     BASE ${PROJECT_SOURCE_DIR}/tools/schemas
     FILES
@@ -448,7 +448,7 @@ qt_add_resources(duet_core duet_schemas
 # Interface and code fonts, the same on every system: Ubuntu Sans and
 # Droid Sans Mono by default; Ubuntu Sans Mono is also offered. JetBrains
 # Mono comes without ligatures (NL) and with them (the editor's option).
-qt_add_resources(duet_core fonts
+qt_add_resources(kdk_core fonts
     PREFIX /fonts
     BASE ${PROJECT_SOURCE_DIR}/third_party/fonts
     FILES
@@ -479,7 +479,7 @@ qt_add_resources(duet_core fonts
 if(GRAPHVIZ_FOUND)
     file(GLOB_RECURSE diagram_sources CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewers/diagram/*.cpp)
-    target_sources(duet_core PRIVATE
+    target_sources(kdk_core PRIVATE
         agent/mcp/DiagramTools.cpp
         viewers/DiagramCheck.cpp
         viewers/DiagramGenerationView.cpp
@@ -488,21 +488,21 @@ if(GRAPHVIZ_FOUND)
         viewers/sketch/SketchScenes.cpp
         viewers/DiagramView.cpp
         ${diagram_sources})
-    target_link_libraries(duet_core PUBLIC ${GRAPHVIZ_LIBRARIES})
-    target_compile_definitions(duet_core PUBLIC DUET_WITH_DIAGRAMS)
+    target_link_libraries(kdk_core PUBLIC ${GRAPHVIZ_LIBRARIES})
+    target_compile_definitions(kdk_core PUBLIC KDK_WITH_DIAGRAMS)
     if(GVPLUGIN_core AND GVPLUGIN_dot_layout AND GVPLUGIN_neato_layout)
-        target_link_libraries(duet_core PUBLIC ${GVPLUGIN_core} ${GVPLUGIN_dot_layout} ${GVPLUGIN_neato_layout})
-        target_compile_definitions(duet_core PRIVATE DUET_GRAPHVIZ_PLUGINS)
+        target_link_libraries(kdk_core PUBLIC ${GVPLUGIN_core} ${GVPLUGIN_dot_layout} ${GVPLUGIN_neato_layout})
+        target_compile_definitions(kdk_core PRIVATE KDK_GRAPHVIZ_PLUGINS)
     endif()
     if(TARGET Qt6::Svg)
-        target_link_libraries(duet_core PUBLIC Qt6::Svg)
-        target_compile_definitions(duet_core PRIVATE DUET_WITH_SVG)
+        target_link_libraries(kdk_core PUBLIC Qt6::Svg)
+        target_compile_definitions(kdk_core PRIVATE KDK_WITH_SVG)
     endif()
 endif()
 
-duet_enable_warnings(duet_core)
+kdk_enable_warnings(kdk_core)
 
-qt_add_executable(duet WIN32 MACOSX_BUNDLE
+qt_add_executable(kodamiko WIN32 MACOSX_BUNDLE
     app/main.cpp
     app/FileOpenRouter.cpp
     app/MainWindow.cpp
@@ -518,120 +518,120 @@ qt_add_executable(duet WIN32 MACOSX_BUNDLE
     app/MainWindowRun.cpp
     app/MainWindowSettings.cpp)
 if(WIN32)
-    target_sources(duet PRIVATE app/windows/MainWindowTitleBarWindows.cpp app/windows/NativeNotificationsWindows.cpp)
+    target_sources(kodamiko PRIVATE app/windows/MainWindowTitleBarWindows.cpp app/windows/NativeNotificationsWindows.cpp)
 elseif(APPLE)
-    target_sources(duet PRIVATE app/osx/MainWindowTitleBarMacOS.mm app/osx/NativeNotificationsMacOS.mm)
-    target_link_libraries(duet PRIVATE "-framework AppKit" "-framework UserNotifications")
+    target_sources(kodamiko PRIVATE app/osx/MainWindowTitleBarMacOS.mm app/osx/NativeNotificationsMacOS.mm)
+    target_link_libraries(kodamiko PRIVATE "-framework AppKit" "-framework UserNotifications")
 else()
-    target_sources(duet PRIVATE app/linux/MainWindowTitleBarLinux.cpp app/linux/NativeNotificationsLinux.cpp)
+    target_sources(kodamiko PRIVATE app/linux/MainWindowTitleBarLinux.cpp app/linux/NativeNotificationsLinux.cpp)
 endif()
-duet_enable_warnings(duet)
-duet_relink_while_running(duet)
+kdk_enable_warnings(kodamiko)
+kdk_relink_while_running(kodamiko)
 # Installed, it still finds the libraries linked from outside the system's
 # paths (Graphviz's plugins, in a directory of their own).
-set_target_properties(duet PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+set_target_properties(kodamiko PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 # The executable's icon and version information on Windows (Explorer,
 # taskbar, Task Manager), and its manifest.
 if(WIN32)
-    configure_file(${PROJECT_SOURCE_DIR}/packaging/windows/duet.rc.in ${CMAKE_CURRENT_BINARY_DIR}/duet.rc @ONLY)
-    target_sources(duet PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/duet.rc
-                                ${PROJECT_SOURCE_DIR}/packaging/windows/duet.manifest)
+    configure_file(${PROJECT_SOURCE_DIR}/packaging/windows/kodamiko.rc.in ${CMAKE_CURRENT_BINARY_DIR}/kodamiko.rc @ONLY)
+    target_sources(kodamiko PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/kodamiko.rc
+                                ${PROJECT_SOURCE_DIR}/packaging/windows/kodamiko.manifest)
 endif()
-target_link_libraries(duet PRIVATE duet_core duet_log)
-target_compile_definitions(duet PRIVATE DUET_VERSION="${PROJECT_VERSION}")
-set_target_properties(duet PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-add_dependencies(duet duet-hook duet-mcp duet-askpass)
+target_link_libraries(kodamiko PRIVATE kdk_core kdk_log)
+target_compile_definitions(kodamiko PRIVATE KDK_VERSION="${PROJECT_VERSION}")
+set_target_properties(kodamiko PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_dependencies(kodamiko kodamiko-hook kodamiko-mcp kodamiko-askpass)
 
-# ClaudeLauncher looks for duet-hook and duet-mcp next to the executable, and
-# AskpassServer for duet-askpass: on macOS,
-# that is inside the bundle (Duet.app/Contents/MacOS), with Duet's Claude
+# ClaudeLauncher looks for kodamiko-hook and kodamiko-mcp next to the executable, and
+# AskpassServer for kodamiko-askpass: on macOS,
+# that is inside the bundle (Kodamiko.app/Contents/MacOS), with Kodamiko's Claude
 # plugin and recipes in Contents/Resources.
 if(APPLE)
-    set_target_properties(duet PROPERTIES OUTPUT_NAME Duet)
+    set_target_properties(kodamiko PROPERTIES OUTPUT_NAME Kodamiko)
     # The bundle's identity: notifications, privacy permissions and Spaces
     # assignment are tied to its identifier.
-    set(duet_icon ${PROJECT_SOURCE_DIR}/packaging/macos/duet.icns)
-    set_source_files_properties(${duet_icon} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    target_sources(duet PRIVATE ${duet_icon})
+    set(kdk_icon ${PROJECT_SOURCE_DIR}/packaging/macos/kodamiko.icns)
+    set_source_files_properties(${kdk_icon} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(kodamiko PRIVATE ${kdk_icon})
     if(CMAKE_OSX_DEPLOYMENT_TARGET)
-        set(DUET_MACOS_MINIMUM_VERSION ${CMAKE_OSX_DEPLOYMENT_TARGET})
+        set(KDK_MACOS_MINIMUM_VERSION ${CMAKE_OSX_DEPLOYMENT_TARGET})
     else()
-        set(DUET_MACOS_MINIMUM_VERSION ${QT_SUPPORTED_MIN_MACOS_VERSION})
+        set(KDK_MACOS_MINIMUM_VERSION ${QT_SUPPORTED_MIN_MACOS_VERSION})
     endif()
-    set_target_properties(duet PROPERTIES
+    set_target_properties(kodamiko PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/packaging/macos/Info.plist.in
-        MACOSX_BUNDLE_GUI_IDENTIFIER io.github.ericponthiaux.duet
-        MACOSX_BUNDLE_BUNDLE_NAME Duet
-        MACOSX_BUNDLE_ICON_FILE duet.icns
+        MACOSX_BUNDLE_GUI_IDENTIFIER io.github.ericponthiaux.kodamiko
+        MACOSX_BUNDLE_BUNDLE_NAME Kodamiko
+        MACOSX_BUNDLE_ICON_FILE kodamiko.icns
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_COPYRIGHT "Licensed under the GNU GPL version 3.")
 
     # macOS identifies an ad-hoc signed application by its code's hash: each
     # rebuild asks again for the protected folders (Desktop, Documents…),
-    # for Duet and the processes it starts. Signed with a stable identity
+    # for Kodamiko and the processes it starts. Signed with a stable identity
     # (a development certificate, or a self-signed one in the keychain), it
     # asks once. The helpers first, then the bundle that holds them.
-    set(DUET_CODESIGN_IDENTITY "" CACHE STRING
-        "Identity that signs Duet.app on macOS, as codesign names it (empty: ad-hoc)")
-    set(duet_signing)
-    if(DUET_CODESIGN_IDENTITY)
-        set(duet_codesign codesign --force --timestamp=none --sign ${DUET_CODESIGN_IDENTITY})
-        set(duet_signing
-            COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-hook
-            COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-mcp
-            COMMAND ${duet_codesign} $<TARGET_FILE_DIR:duet>/duet-askpass
-            COMMAND ${duet_codesign} $<TARGET_BUNDLE_DIR:duet>)
+    set(KDK_CODESIGN_IDENTITY "" CACHE STRING
+        "Identity that signs Kodamiko.app on macOS, as codesign names it (empty: ad-hoc)")
+    set(kdk_signing)
+    if(KDK_CODESIGN_IDENTITY)
+        set(kdk_codesign codesign --force --timestamp=none --sign ${KDK_CODESIGN_IDENTITY})
+        set(kdk_signing
+            COMMAND ${kdk_codesign} $<TARGET_FILE_DIR:kodamiko>/kodamiko-hook
+            COMMAND ${kdk_codesign} $<TARGET_FILE_DIR:kodamiko>/kodamiko-mcp
+            COMMAND ${kdk_codesign} $<TARGET_FILE_DIR:kodamiko>/kodamiko-askpass
+            COMMAND ${kdk_codesign} $<TARGET_BUNDLE_DIR:kodamiko>)
     endif()
 
     # The helpers, the plugin and the recipes go into the bundle whenever
-    # one of them changes, not only when duet links: a step of its own, after
-    # duet. Signing comes last, as a change to a signed bundle breaks its
+    # one of them changes, not only when kodamiko links: a step of its own, after
+    # kodamiko. Signing comes last, as a change to a signed bundle breaks its
     # seal.
-    file(GLOB_RECURSE duet_bundle_resources CONFIGURE_DEPENDS
+    file(GLOB_RECURSE kdk_bundle_resources CONFIGURE_DEPENDS
         ${PROJECT_SOURCE_DIR}/tools/claude-plugin/*
         ${PROJECT_SOURCE_DIR}/tools/recipes/*/*)
-    set(duet_bundle_stamp ${CMAKE_CURRENT_BINARY_DIR}/duet-bundle.stamp)
-    add_custom_command(OUTPUT ${duet_bundle_stamp}
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-hook> $<TARGET_FILE_DIR:duet>
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-mcp> $<TARGET_FILE_DIR:duet>
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:duet-askpass> $<TARGET_FILE_DIR:duet>
+    set(kdk_bundle_stamp ${CMAKE_CURRENT_BINARY_DIR}/kodamiko-bundle.stamp)
+    add_custom_command(OUTPUT ${kdk_bundle_stamp}
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kodamiko-hook> $<TARGET_FILE_DIR:kodamiko>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kodamiko-mcp> $<TARGET_FILE_DIR:kodamiko>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kodamiko-askpass> $<TARGET_FILE_DIR:kodamiko>
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/claude-plugin
-                $<TARGET_FILE_DIR:duet>/../Resources/claude-plugin
+                $<TARGET_FILE_DIR:kodamiko>/../Resources/claude-plugin
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/bin/recipes
-                $<TARGET_FILE_DIR:duet>/../Resources/recipes
-        ${duet_signing}
-        COMMAND ${CMAKE_COMMAND} -E touch ${duet_bundle_stamp}
-        DEPENDS duet duet-hook duet-mcp duet-askpass ${duet_bundle_resources}
-        COMMENT "Copying the helpers, the plugin and the recipes into Duet.app"
+                $<TARGET_FILE_DIR:kodamiko>/../Resources/recipes
+        ${kdk_signing}
+        COMMAND ${CMAKE_COMMAND} -E touch ${kdk_bundle_stamp}
+        DEPENDS kodamiko kodamiko-hook kodamiko-mcp kodamiko-askpass ${kdk_bundle_resources}
+        COMMENT "Copying the helpers, the plugin and the recipes into Kodamiko.app"
         VERBATIM)
-    add_custom_target(duet-bundle ALL DEPENDS ${duet_bundle_stamp})
+    add_custom_target(kodamiko-bundle ALL DEPENDS ${kdk_bundle_stamp})
 endif()
 
 # Windows has no rpath: without Qt's DLLs next to it, the built executable
 # does not start. windeployqt only copies what changed since the last build.
 if(WIN32)
-    add_custom_command(TARGET duet POST_BUILD
+    add_custom_command(TARGET kodamiko POST_BUILD
         COMMAND $<TARGET_FILE:Qt6::windeployqt> --no-translations --no-compiler-runtime
-                $<TARGET_FILE:duet>
-        COMMENT "Deploying Qt next to duet.exe")
+                $<TARGET_FILE:kodamiko>
+        COMMENT "Deploying Qt next to kodamiko.exe")
 endif()
 
-# "duet" component: the dependencies (libgit2) declare their own
+# "kodamiko" component: the dependencies (libgit2) declare their own
 # install rules, which we do not want in the packages.
-#   cmake --install build --component duet --prefix <folder>
+#   cmake --install build --component kodamiko --prefix <folder>
 include(GNUInstallDirs)
-install(TARGETS duet
-    BUNDLE DESTINATION . COMPONENT duet
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT duet)
+install(TARGETS kodamiko
+    BUNDLE DESTINATION . COMPONENT kodamiko
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT kodamiko)
 # Windows has no rpath: Graphviz's DLLs go next to the executable.
 if(GRAPHVIZ_RUNTIME_DLLS)
     install(FILES ${GRAPHVIZ_RUNTIME_DLLS}
-        DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT duet)
+        DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT kodamiko)
 endif()
 if(UNIX AND NOT APPLE)
-    install(FILES ${PROJECT_SOURCE_DIR}/packaging/linux/duet.desktop
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications COMPONENT duet)
-    install(FILES ${PROJECT_SOURCE_DIR}/packaging/linux/duet.svg
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps COMPONENT duet)
+    install(FILES ${PROJECT_SOURCE_DIR}/packaging/linux/kodamiko.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications COMPONENT kodamiko)
+    install(FILES ${PROJECT_SOURCE_DIR}/packaging/linux/kodamiko.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps COMPONENT kodamiko)
 endif()

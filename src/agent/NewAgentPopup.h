@@ -13,7 +13,7 @@ class QPushButton;
 
 // Agent ▸ New Session in Worktree, a small popup over the window:
 // the name of the session, which also names its worktree and its branch
-// (duet/<name>), checked as it is typed.
+// (kodamiko/<name>), checked as it is typed.
 class NewAgentPopup : public OverlayPopup {
     Q_OBJECT
 

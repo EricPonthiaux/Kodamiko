@@ -202,7 +202,7 @@ QWidget *HistoryView::createDiffPane()
 {
     auto *pane = new QFrame(this);
     pane->setObjectName(QStringLiteral("historyPane"));
-    diff_ = new DiffView(Theme::duet(), pane);
+    diff_ = new DiffView(Theme::kodamiko(), pane);
     diff_->setToolTip({});
     diffHeader_ = new DiffHeaderBar(diff_, pane);
     connect(diffHeader_, &DiffHeaderBar::whitespaceChanged, this, &HistoryView::rereadCommit);
@@ -210,7 +210,7 @@ QWidget *HistoryView::createDiffPane()
     fileStrip_ = new DiffFileStrip(diff_, pane);
     connect(fileStrip_, &DiffFileStrip::fileActivated, this, &HistoryView::openFile);
     changeMap_ = new ChangeMap(diff_, pane);
-    lens_ = new FileLens(Theme::duet(), pane);
+    lens_ = new FileLens(Theme::kodamiko(), pane);
     lens_->hide();
     connect(lens_, &FileLens::commitClicked, this, &HistoryView::chooseCommitOfLens);
 

@@ -18,7 +18,7 @@
 namespace {
 
 // The hook's output, kept on the socket until the reply.
-constexpr const char *outputProperty = "duetHookOutput";
+constexpr const char *outputProperty = "kdkHookOutput";
 
 } // namespace
 
@@ -39,7 +39,7 @@ HookServer::~HookServer()
 
 bool HookServer::listen()
 {
-    const QString name = QStringLiteral("duet-%1-%2")
+    const QString name = QStringLiteral("kodamiko-%1-%2")
                              .arg(QCoreApplication::applicationPid())
                              .arg(QRandomGenerator::global()->generate(), 8, 16, QLatin1Char('0'));
     return server_.listen(name);
@@ -63,7 +63,7 @@ void HookServer::onReadyRead(QLocalSocket *socket)
     if (!socket->canReadLine())
         return;
     const QByteArray line = socket->readLine();
-    if (QJsonDocument::fromJson(line).object().value(QLatin1String("duet")).toString() == QLatin1String("mcp")) {
+    if (QJsonDocument::fromJson(line).object().value(QLatin1String("kodamiko")).toString() == QLatin1String("mcp")) {
         // The MCP relay: the connection stays open for its session.
         disconnect(socket, &QLocalSocket::readyRead, this, nullptr);
         if (mcpRegistry_)

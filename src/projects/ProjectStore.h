@@ -6,7 +6,7 @@
 
 #include <optional>
 
-// The projects Duet has opened, kept with QSettings under "projects": a map
+// The projects Kodamiko has opened, kept with QSettings under "projects": a map
 // from each folder's absolute path to its ProjectConfig. The folders of the
 // former "recentFolders" list become projects to set up.
 namespace ProjectStore {

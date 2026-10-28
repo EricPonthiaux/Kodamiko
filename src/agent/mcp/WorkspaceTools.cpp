@@ -3,7 +3,7 @@
 // MCP tools for the project as a whole: search, files, symbols, the
 // editor's commands, the project's setup.
 
-#include "DuetTools.h"
+#include "KDKTools.h"
 #include "McpRegistry.h"
 #include "McpWork.h"
 #include "editor/EditorTabs.h"
@@ -28,7 +28,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace DuetTools {
+namespace KDKTools {
 
 namespace {
 
@@ -102,7 +102,7 @@ FindQuery findQueryFrom(const QJsonObject &arguments)
     return query;
 }
 
-void searchInFiles(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void searchInFiles(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const FindQuery query = findQueryFrom(arguments);
     QString error;
@@ -154,7 +154,7 @@ McpResult filesMatching(const QString &folder, const QString &query, int limit)
         QJsonObject{{QStringLiteral("files"), files}, {QStringLiteral("total"), int(scored.size())}});
 }
 
-void findFiles(const DuetToolContext &context, const QJsonObject &arguments, const McpReply &reply)
+void findFiles(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QString query = arguments.value(QStringLiteral("query")).toString();
@@ -162,13 +162,13 @@ void findFiles(const DuetToolContext &context, const QJsonObject &arguments, con
     inBackground([folder, query, limit] { return filesMatching(folder, query, limit); }, reply);
 }
 
-McpResult getDocumentSymbols(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult getDocumentSymbols(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString path = context.absolute(arguments.value(QStringLiteral("path")).toString());
     const std::unique_ptr<IOutlineProvider> provider =
         OutlineProviders::create(LanguageRegistry::languageForFile(path));
     if (!provider)
-        return McpResult::error(QStringLiteral("Duet has no outline for this kind of file"));
+        return McpResult::error(QStringLiteral("Kodamiko has no outline for this kind of file"));
     QByteArray text;
     const QHash<QString, QString> buffers = context.tabs->unsavedTexts();
     if (buffers.contains(path)) {
@@ -183,7 +183,7 @@ McpResult getDocumentSymbols(const DuetToolContext &context, const QJsonObject &
                                        {QStringLiteral("symbols"), outlineJson(provider->symbols(text))}});
 }
 
-McpResult findSymbol(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult findSymbol(const KDKToolContext &context, const QJsonObject &arguments)
 {
     if (!context.symbols)
         return McpResult::error(QStringLiteral("No symbol index"));
@@ -211,7 +211,7 @@ QJsonObject commandJson(const Keymap::Command &command)
     return item;
 }
 
-McpResult listCommands(const DuetToolContext &context, const QJsonObject &)
+McpResult listCommands(const KDKToolContext &context, const QJsonObject &)
 {
     QJsonArray commands;
     if (context.menus) {
@@ -223,7 +223,7 @@ McpResult listCommands(const DuetToolContext &context, const QJsonObject &)
     return McpResult::json(QJsonObject{{QStringLiteral("commands"), commands}});
 }
 
-McpResult runCommand(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult runCommand(const KDKToolContext &context, const QJsonObject &arguments)
 {
     const QString id = arguments.value(QStringLiteral("id")).toString();
     if (isForbiddenCommand(id))
@@ -253,14 +253,14 @@ McpResult projectInfo(const QString &folder, const QStringList &servers)
                                        {QStringLiteral("languageServers"), QJsonArray::fromStringList(servers)}});
 }
 
-void getProjectInfo(const DuetToolContext &context, const QJsonObject &, const McpReply &reply)
+void getProjectInfo(const KDKToolContext &context, const QJsonObject &, const McpReply &reply)
 {
     const QString folder = context.folder();
     const QStringList servers = context.languageServers ? context.languageServers->describe() : QStringList();
     inBackground([folder, servers] { return projectInfo(folder, servers); }, reply);
 }
 
-McpResult notifyUser(const DuetToolContext &context, const QJsonObject &arguments)
+McpResult notifyUser(const KDKToolContext &context, const QJsonObject &arguments)
 {
     if (context.showMessage)
         context.showMessage(arguments.value(QStringLiteral("message")).toString());
@@ -269,12 +269,12 @@ McpResult notifyUser(const DuetToolContext &context, const QJsonObject &argument
 
 } // namespace
 
-void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &context)
+void registerWorkspaceTools(McpRegistry &registry, const KDKToolContext &context)
 {
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("search_in_files"),
          .title = QStringLiteral("Search in files"),
-         .description = QStringLiteral("Searches the project's files as Duet's Find in Files does: unsaved changes "
+         .description = QStringLiteral("Searches the project's files as Kodamiko's Find in Files does: unsaved changes "
                                        "included, files ignored by git left out. Returns the matching lines (1-based) "
                                        "with their file."),
          .inputSchema =
@@ -291,9 +291,10 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("find_files"),
          .title = QStringLiteral("Find files"),
-         .description = QStringLiteral("Finds project files by name, as Duet's Go to File does (fuzzy: \"diagview\" "
-                                       "finds DiagramView.cpp; a slash matches folders). Files ignored by git are "
-                                       "left out."),
+         .description =
+             QStringLiteral("Finds project files by name, as Kodamiko's Go to File does (fuzzy: \"diagview\" "
+                            "finds DiagramView.cpp; a slash matches folders). Files ignored by git are "
+                            "left out."),
          .inputSchema = object({{QStringLiteral("query"), string(QStringLiteral("Part of a file name or path"))},
                                 {QStringLiteral("limit"), integer(QStringLiteral("Most files returned (default 50)"))}},
                                {QStringLiteral("query")})},
@@ -302,7 +303,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("get_document_symbols"),
          .title = QStringLiteral("Document symbols"),
-         .description = QStringLiteral("The outline of a file as Duet's Outline pane shows it (classes, functions, "
+         .description = QStringLiteral("The outline of a file as Kodamiko's Outline pane shows it (classes, functions, "
                                        "methods, headings…), with their lines, nested. Works on unsaved text."),
          .inputSchema =
              object({{QStringLiteral("path"), string(QStringLiteral("File, relative to the project or absolute"))}},
@@ -313,7 +314,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
         {.name = QStringLiteral("find_symbol"),
          .title = QStringLiteral("Find symbol"),
          .description = QStringLiteral(
-             "Where a class, function, method, field or macro is declared and defined in the project, from Duet's "
+             "Where a class, function, method, field or macro is declared and defined in the project, from Kodamiko's "
              "symbol index (names only, no type information: use find_definition for the symbol under a position)."),
          .inputSchema = object({{QStringLiteral("name"), string(QStringLiteral("Simple name: \"bar\" for Foo::bar"))}},
                                {QStringLiteral("name")})},
@@ -322,7 +323,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("list_commands"),
          .title = QStringLiteral("Editor commands"),
-         .description = QStringLiteral("The commands of Duet's menus (ids such as \"Edit/Format Document\"), with "
+         .description = QStringLiteral("The commands of Kodamiko's menus (ids such as \"Edit/Format Document\"), with "
                                        "their shortcuts and whether they are available now: what run_command can "
                                        "trigger."),
          .inputSchema = object({})},
@@ -331,7 +332,7 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
     registry.addTool(McpTool::acting(
         {.name = QStringLiteral("run_command"),
          .title = QStringLiteral("Run an editor command"),
-         .description = QStringLiteral("Triggers one of Duet's menu commands by id (see list_commands), as if the "
+         .description = QStringLiteral("Triggers one of Kodamiko's menu commands by id (see list_commands), as if the "
                                        "user chose it: most act on the current file or open a panel for the user."),
          .inputSchema = object({{QStringLiteral("id"), string(QStringLiteral("Command id, \"Edit/Format Document\""))}},
                                {QStringLiteral("id")})},
@@ -340,19 +341,20 @@ void registerWorkspaceTools(McpRegistry &registry, const DuetToolContext &contex
     registry.addTool(McpTool::reading(
         {.name = QStringLiteral("get_project_info"),
          .title = QStringLiteral("Project information"),
-         .description = QStringLiteral("The project Duet has open: its folder, the languages detected (with runtime "
-                                       "versions and the files that tell), and the state of the language servers."),
+         .description =
+             QStringLiteral("The project Kodamiko has open: its folder, the languages detected (with runtime "
+                            "versions and the files that tell), and the state of the language servers."),
          .inputSchema = object({})},
         handledBy(context, getProjectInfo)));
 
     registry.addTool(McpTool::acting(
         {.name = QStringLiteral("notify_user"),
          .title = QStringLiteral("Tell the user"),
-         .description = QStringLiteral("Shows a short message in Duet's status bar, for something the user should "
+         .description = QStringLiteral("Shows a short message in Kodamiko's status bar, for something the user should "
                                        "notice in the editor while you work."),
          .inputSchema = object({{QStringLiteral("message"), string(QStringLiteral("One short sentence"))}},
                                {QStringLiteral("message")})},
         handledBy(context, notifyUser)));
 }
 
-} // namespace DuetTools
+} // namespace KDKTools

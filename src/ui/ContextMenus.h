@@ -10,7 +10,7 @@ class QAction;
 class QMenu;
 class QWidget;
 
-// Context menus placed by Duet rather than by Qt: Qt moves a menu that does
+// Context menus placed by Kodamiko rather than by Qt: Qt moves a menu that does
 // not fit below the click by the pointer position it last knew and, under
 // Wayland, the compositor moves it again, which can open it far above the
 // click. Placed inside the application's window, a menu needs neither.

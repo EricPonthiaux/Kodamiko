@@ -76,7 +76,7 @@ int fillPythons(QComboBox *combo, const LanguageSetup &setup, const Toolchains &
     }
     if (pythons.isEmpty())
         addItem(combo, QObject::tr("None found"), runtimeData(setup.runtimeVersion),
-                QObject::tr("No Python on this machine; Duet does not download it."));
+                QObject::tr("No Python on this machine; Kodamiko does not download it."));
     const int selected = combo->findData(runtimeData(setup.runtimeVersion, setup.runtimePath));
     return selected >= 0 ? selected : indexOfVersion(combo, setup.runtimeVersion);
 }

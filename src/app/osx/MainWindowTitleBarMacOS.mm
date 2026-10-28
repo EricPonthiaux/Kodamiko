@@ -17,7 +17,7 @@ namespace {
 // a compact and a regular toolbar (measured on macOS 26).
 constexpr int compactToolbarButtonsCenterPx = 20;
 constexpr int toolbarButtonsCenterPx = 26;
-// The Duet mark beside the traffic lights, a little smaller than the bar's
+// The Kodamiko mark beside the traffic lights, a little smaller than the bar's
 // buttons.
 constexpr qreal logoScale = 0.8;
 
@@ -36,11 +36,11 @@ void fitTitleBarHeight(QWidget *window, int barHeight)
     // An empty toolbar is the only way AppKit offers to make the title bar
     // taller and lower the traffic lights.
     if (!nsWindow.toolbar) {
-        NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"Duet"];
+        NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"Kodamiko"];
         nsWindow.toolbar = toolbar;
         [toolbar release]; // the window retains it
     }
-    // In full screen, macOS draws the toolbar opaque, over Duet's bar.
+    // In full screen, macOS draws the toolbar opaque, over Kodamiko's bar.
     nsWindow.toolbar.visible = !window->isFullScreen();
     const int barCenter = barHeight / 2;
     const bool isCompactCloser =
@@ -69,7 +69,7 @@ int trafficLightsMargin(QWidget *window)
 
 } // namespace
 
-// macOS keeps its frame: `system` changes nothing. Duet's bar lies under the
+// macOS keeps its frame: `system` changes nothing. Kodamiko's bar lies under the
 // transparent system title bar, the traffic lights at its left.
 void MainWindow::setSystemTitleBar(bool system)
 {
@@ -79,10 +79,10 @@ void MainWindow::setSystemTitleBar(bool system)
     setWindowFlag(Qt::ExpandedClientAreaHint, true);
     setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
     // Qt would push the whole window below the system title bar, leaving
-    // Duet's bar under an empty strip instead of beside the traffic lights.
+    // Kodamiko's bar under an empty strip instead of beside the traffic lights.
     setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
     // After the flags, which may recreate the native window: its title
-    // would cover Duet's logo and menu.
+    // would cover Kodamiko's logo and menu.
     nativeWindow(this).titleVisibility = NSWindowTitleHidden;
     // The bar's height follows the font: the traffic lights, its middle.
     AppFonts::followApplicationFont(this, [this] { fitTitleBarToWindowState(); });

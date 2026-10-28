@@ -25,7 +25,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>${DUET_MACOS_MINIMUM_VERSION}</string>
+	<string>${KDK_MACOS_MINIMUM_VERSION}</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
 	<key>NSPrincipalClass</key>
@@ -34,7 +34,7 @@
 	<true/>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
-	<!-- Folders dropped on the Dock icon or opened with Duet arrive as a
+	<!-- Folders dropped on the Dock icon or opened with Kodamiko arrive as a
 	     QFileOpenEvent (FileOpenRouter). -->
 	<key>CFBundleDocumentTypes</key>
 	<array>

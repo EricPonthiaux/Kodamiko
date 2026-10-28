@@ -19,7 +19,7 @@ if(QSCI_FACE_AT EQUAL -1)
 endif()
 string(REPLACE "${QSCI_FACE_LINE}" [[
     {
-        // Duet: "family#liga" turns the ligatures on.
+        // Kodamiko: "family#liga" turns the ligatures on.
         QString face = QString::fromUtf8(fp.faceName);
         const bool ligatures = face.endsWith(QLatin1String("#liga"));
         if (ligatures)

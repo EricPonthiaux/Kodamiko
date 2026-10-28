@@ -12,7 +12,7 @@ namespace {
 
 // Marks the widgets whose cursor this filter manages, so that a cursor set
 // by the code itself is never replaced.
-constexpr const char *managedProperty = "duetClickableCursor";
+constexpr const char *managedProperty = "kdkClickableCursor";
 
 bool isClickable(const QWidget *widget)
 {

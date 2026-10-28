@@ -7,7 +7,7 @@
 
 class AgentProvider;
 
-// Every agent Duet can run, and how settings name them. The providers live
+// Every agent Kodamiko can run, and how settings name them. The providers live
 // as long as the application; the pointers and references returned are not
 // owned.
 namespace AgentProviders {

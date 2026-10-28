@@ -33,7 +33,7 @@ using GitDone = std::function<void(const QString &message, const QString &error)
 
 // Tells the editor the repository changed, then replies with the job's
 // message or error.
-GitDone replyAfterGit(const DuetToolContext &context, McpReply reply)
+GitDone replyAfterGit(const KDKToolContext &context, McpReply reply)
 {
     return [context, reply = std::move(reply)](const QString &message, const QString &error) {
         if (context.repositoryChanged)
@@ -84,7 +84,7 @@ QJsonObject commitJson(const CommitSummary &commit)
 
 // Runs a git job with the editor's other git work (one at a time, off the
 // UI thread), then tells the editor the repository changed.
-void runGit(const DuetToolContext &context, GitCommands::Job job, McpReply reply)
+void runGit(const KDKToolContext &context, GitCommands::Job job, McpReply reply)
 {
     const GitDone done = replyAfterGit(context, std::move(reply));
     if (context.git) {
@@ -100,7 +100,7 @@ void runGit(const DuetToolContext &context, GitCommands::Job job, McpReply reply
 
 // Same for a job that talks to a remote: git may ask the user for
 // credentials (see AskpassServer).
-void runRemoteGit(const DuetToolContext &context, GitCommands::LongJob job, McpReply reply)
+void runRemoteGit(const KDKToolContext &context, GitCommands::LongJob job, McpReply reply)
 {
     if (!context.git) {
         runGit(context, [job] { return job({}); }, std::move(reply));
@@ -119,7 +119,7 @@ RepositoryInfo repositoryOf(const QString &folder)
     return *repository;
 }
 
-QStringList pathsArgument(const DuetToolContext &context, const QJsonObject &arguments)
+QStringList pathsArgument(const KDKToolContext &context, const QJsonObject &arguments)
 {
     QStringList paths;
     for (const QJsonValue &value : arguments.value(QStringLiteral("paths")).toArray())
@@ -128,7 +128,7 @@ QStringList pathsArgument(const DuetToolContext &context, const QJsonObject &arg
 }
 
 // The "path" argument, relative to the project.
-QString relativePathArgument(const DuetToolContext &context, const QJsonObject &arguments)
+QString relativePathArgument(const KDKToolContext &context, const QJsonObject &arguments)
 {
     return context.relative(context.absolute(arguments.value(QStringLiteral("path")).toString()));
 }

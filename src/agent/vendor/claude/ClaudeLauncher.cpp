@@ -21,7 +21,7 @@ namespace {
 
 QString hookExecutablePath()
 {
-    return Executables::besideTheApplication(QStringLiteral("duet-hook"));
+    return Executables::besideTheApplication(QStringLiteral("kodamiko-hook"));
 }
 
 constexpr int permissionHookTimeoutSeconds = 600;
@@ -63,7 +63,7 @@ void removeInheritedSessionVariables(QProcessEnvironment &environment)
         environment.remove(variable);
 }
 
-// The sessions without Duet's tools get a file of their own: starting one
+// The sessions without Kodamiko's tools get a file of their own: starting one
 // must not rewrite the settings of a running session that has them.
 QString settingsPathWithoutTools()
 {
@@ -110,7 +110,7 @@ QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowe
     hooks.insert(QLatin1String("PreToolUse"), commandHook(hookCommand, checkedTools, 30));
     hooks.insert(QLatin1String("PostToolUse"),
                  commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash")));
-    // The user answers it in the editor (duet-hook waits up to 590 s).
+    // The user answers it in the editor (kodamiko-hook waits up to 590 s).
     hooks.insert(QLatin1String("PermissionRequest"), commandHook(hookCommand, {}, permissionHookTimeoutSeconds));
     hooks.insert(QLatin1String("Notification"), commandHook(hookCommand));
     hooks.insert(QLatin1String("Stop"), commandHook(hookCommand));
@@ -132,15 +132,15 @@ QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowe
 
 QString mcpServerPath()
 {
-    return Executables::besideTheApplication(QStringLiteral("duet-mcp"));
+    return Executables::besideTheApplication(QStringLiteral("kodamiko-mcp"));
 }
 
 QByteArray mcpConfig(const QString &mcpServer)
 {
-    const QJsonObject duet{{QLatin1String("type"), QLatin1String("stdio")},
-                           {QLatin1String("command"), QDir::toNativeSeparators(mcpServer)},
-                           {QLatin1String("args"), QJsonArray{}}};
-    return QJsonDocument(QJsonObject{{QLatin1String("mcpServers"), QJsonObject{{QLatin1String("duet"), duet}}}})
+    const QJsonObject kodamiko{{QLatin1String("type"), QLatin1String("stdio")},
+                               {QLatin1String("command"), QDir::toNativeSeparators(mcpServer)},
+                               {QLatin1String("args"), QJsonArray{}}};
+    return QJsonDocument(QJsonObject{{QLatin1String("mcpServers"), QJsonObject{{QLatin1String("kodamiko"), kodamiko}}}})
         .toJson();
 }
 
@@ -172,12 +172,12 @@ QString userStatusLineCommand(const QString &projectDir)
     return command;
 }
 
-// Next to the executable in the build, in share/duet once installed, in the
+// Next to the executable in the build, in share/kodamiko once installed, in the
 // bundle's resources on macOS.
 QString pluginPath()
 {
     const QDir appDir(QCoreApplication::applicationDirPath());
-    for (const QString &candidate : {QStringLiteral("claude-plugin"), QStringLiteral("../share/duet/claude-plugin"),
+    for (const QString &candidate : {QStringLiteral("claude-plugin"), QStringLiteral("../share/kodamiko/claude-plugin"),
                                      QStringLiteral("../Resources/claude-plugin")}) {
         const QString path = QDir::cleanPath(appDir.filePath(candidate));
         if (QFileInfo::exists(path + QStringLiteral("/.claude-plugin/plugin.json")))
@@ -223,8 +223,8 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
     }
     const QString hook = hookCommand();
     if (hook.isEmpty()) {
-        *error =
-            QCoreApplication::translate("ClaudeLauncher", "The duet-hook program is missing from the editor's folder.");
+        *error = QCoreApplication::translate("ClaudeLauncher",
+                                             "The kodamiko-hook program is missing from the editor's folder.");
         return std::nullopt;
     }
 
@@ -260,12 +260,12 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
     spec.arguments += options.extraArguments;
     spec.workingDirectory = workingDirectory;
     spec.environment = terminalEnvironment();
-    spec.environment.insert(QStringLiteral("DUET_SOCKET"), hookServerName);
-    // Our status line replaces the user's: duet-hook runs it and
+    spec.environment.insert(QStringLiteral("KDK_SOCKET"), hookServerName);
+    // Our status line replaces the user's: kodamiko-hook runs it and
     // displays its output.
     const QString userStatusLine = userStatusLineCommand(workingDirectory);
     if (!userStatusLine.isEmpty())
-        spec.environment.insert(QStringLiteral("DUET_STATUSLINE_COMMAND"), userStatusLine);
+        spec.environment.insert(QStringLiteral("KDK_STATUSLINE_COMMAND"), userStatusLine);
     removeInheritedSessionVariables(spec.environment);
 
     makeLaunchable(spec);

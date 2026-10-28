@@ -95,7 +95,7 @@ private slots:
     {
         // Settings of the tests, not the user's. Without an organization,
         // Windows' registry keeps no settings at all.
-        QCoreApplication::setOrganizationName(QStringLiteral("DuetTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("KDKTests"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_workspace"));
         ClickableCursors::install();
     }
@@ -329,8 +329,8 @@ private slots:
         auto *frame = new WindowFrame(&window);
         frame->setFrameless(true);
         window.show();
-        ThemeStyle::apply(Theme::named("duet-lagoon"));
-        ThemeStyle::apply(Theme::named("duet-slate"));
+        ThemeStyle::apply(Theme::named("kodamiko-lagoon"));
+        ThemeStyle::apply(Theme::named("kodamiko-slate"));
         QCoreApplication::processEvents();
         const int shadow = OverlayPopup::shadowWidth;
         QCOMPARE(popup.contentsMargins(), QMargins(shadow, shadow, shadow, shadow));
@@ -397,7 +397,7 @@ private slots:
         TitleBar bar;
         const auto *chip = bar.findChild<QToolButton *>("projectChip");
 
-        bar.applyTheme(Theme::duet());
+        bar.applyTheme(Theme::kodamiko());
         QCOMPARE(chip->icon().cacheKey(), FileIcons::folder(true).cacheKey());
     }
 
@@ -405,10 +405,10 @@ private slots:
     {
         QTest::addColumn<QString>("themeName");
         QTest::addColumn<int>("fontSize");
-        QTest::newRow("duet") << QStringLiteral("duet") << 11;
-        QTest::newRow("duet-slate") << QStringLiteral("duet-slate") << 11;
-        QTest::newRow("duet-large-font") << QStringLiteral("duet") << 15;
-        QTest::newRow("duet-slate-large-font") << QStringLiteral("duet-slate") << 15;
+        QTest::newRow("kodamiko") << QStringLiteral("kodamiko") << 11;
+        QTest::newRow("kodamiko-slate") << QStringLiteral("kodamiko-slate") << 11;
+        QTest::newRow("kodamiko-large-font") << QStringLiteral("kodamiko") << 15;
+        QTest::newRow("kodamiko-slate-large-font") << QStringLiteral("kodamiko-slate") << 15;
     }
 
     void titleBarOverflowRemainsVisibleAndOpensHiddenMenus()
@@ -432,7 +432,7 @@ private slots:
         bar.applyTheme(theme);
         for (const auto *name : {"&File", "&Edit", "&View", "&Navigate", "&Claude", "&Git", "&Run", "&Help"})
             bar.menuBar()->addMenu(name)->addAction("Action");
-        bar.setProject("duet", "/p/duet", nullptr);
+        bar.setProject("kodamiko", "/p/kodamiko", nullptr);
         bar.resize(400, bar.height());
         bar.show();
 
@@ -475,7 +475,8 @@ private slots:
 
     void agentIndicatorTakesItsColorsFromTheTheme()
     {
-        for (const Theme &theme : {Theme::duet(), Theme::named("duet-lagoon"), Theme::named("duet-cocoa")}) {
+        for (const Theme &theme :
+             {Theme::kodamiko(), Theme::named("kodamiko-lagoon"), Theme::named("kodamiko-cocoa")}) {
             QCOMPARE(agentStatusColor(AgentStatus::Working, theme), theme.warning);
             QCOMPARE(agentStatusColor(AgentStatus::NeedsYou, theme), theme.accent);
             QCOMPARE(agentStatusColor(AgentStatus::Ready, theme), theme.mutedText);
@@ -500,12 +501,12 @@ private slots:
 
         auto *project = new QMenu(&window);
         project->addAction("other");
-        titleBar->setProject("duet", "/p/duet", project);
+        titleBar->setProject("kodamiko", "/p/kodamiko", project);
         QStringList texts;
         for (const QToolButton *button : titleBar->findChildren<QToolButton *>())
             if (button->isVisibleTo(titleBar))
                 texts.append(button->text());
-        QVERIFY(texts.contains("duet"));
+        QVERIFY(texts.contains("kodamiko"));
         QVERIFY(!titleBar->findChild<AgentIndicator *>());
 
         QAction action("Go to File");
@@ -736,7 +737,7 @@ private slots:
         QTRY_COMPARE(tree.currentPath(), root + "/lib/a (2).cpp");
         // A cut is pasted once.
         const QMimeData *clipboard = QApplication::clipboard()->mimeData();
-        QVERIFY(!clipboard || !clipboard->hasFormat("application/x-duet-cut"));
+        QVERIFY(!clipboard || !clipboard->hasFormat("application/x-kodamiko-cut"));
     }
 
     void treeDuplicatesUnderANewName()
@@ -1097,7 +1098,7 @@ private slots:
             QVERIFY(file.open(QIODevice::WriteOnly));
             file.write("one\ntwo\nthree\n");
         }
-        EditorTabs tabs(Theme::duet());
+        EditorTabs tabs(Theme::kodamiko());
         QVERIFY(tabs.openFile(dir.filePath("src/a.txt")));
         QVERIFY(tabs.openFile(dir.filePath("b.txt")));
         tabs.editorFor(dir.filePath("src/a.txt"))->setCursorPosition(2, 1);
@@ -1223,8 +1224,8 @@ private slots:
 
     void terminalTabsAreAsTallAsEditorTabs()
     {
-        ThemeStyle::apply(Theme::duet());
-        EditorTabs editors(Theme::duet());
+        ThemeStyle::apply(Theme::kodamiko());
+        EditorTabs editors(Theme::kodamiko());
         editors.addTab(new QLabel("code"), "main.cpp");
         QTabWidget terminals;
         terminals.setObjectName("terminalTabs");

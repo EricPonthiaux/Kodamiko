@@ -171,7 +171,7 @@ private:
     }
 };
 
-// Duet's downloads, from its application data to ~/.duet/tools, once.
+// Kodamiko's downloads, from its application data to ~/.kodamiko/tools, once.
 void adoptLegacyToolchains()
 {
     const QString legacy = LegacyToolchains::defaultRoot();
@@ -235,10 +235,10 @@ int main(int argc, char *argv[])
     StrayWindowCheck::install();
 
     const libgit2::Session git;
-    QApplication::setApplicationName(QStringLiteral("Duet"));
-    QApplication::setOrganizationName(QStringLiteral("Duet"));
-    QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
-    LogFiles::install(QStringLiteral("duet"));
+    QApplication::setApplicationName(QStringLiteral("Kodamiko"));
+    QApplication::setOrganizationName(QStringLiteral("Kodamiko"));
+    QApplication::setApplicationVersion(QStringLiteral(KDK_VERSION));
+    LogFiles::install(QStringLiteral("kodamiko"));
     adoptLegacyToolchains();
     Motion::policy().setEnabled(Preferences::load().animations);
     Motion::install();
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
     QApplication::setFont(Preferences::load().interfaceFont());
 
     QApplication::setWindowIcon(BrandMark::windowIcon(Theme::named(Preferences::load().theme)));
-    QGuiApplication::setDesktopFileName(QStringLiteral("duet"));
+    QGuiApplication::setDesktopFileName(QStringLiteral("kodamiko"));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Source code editor with an integrated Claude terminal"));

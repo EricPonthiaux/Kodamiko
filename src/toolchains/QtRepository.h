@@ -38,7 +38,7 @@ struct QtPackageSet {
 // from Qt 6.12, after the release and the kit ("qt6_6120_msvc2022_64").
 namespace QtRepository {
 
-// The tool id of Qt in install plans and in Duet's store, where a kit is
+// The tool id of Qt in install plans and in Kodamiko's store, where a kit is
 // <store>/qt/<version>/<kit>, as Qt's installer lays it out.
 constexpr auto toolId = "qt";
 

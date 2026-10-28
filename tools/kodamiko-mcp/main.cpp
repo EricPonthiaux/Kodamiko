@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// duet-mcp: the editor's MCP server, as Claude Code starts it.
+// kodamiko-mcp: the editor's MCP server, as Claude Code starts it.
 //
-// Claude Code runs this program for the "duet" MCP server declared with
+// Claude Code runs this program for the "kodamiko" MCP server declared with
 // --mcp-config (see ClaudeLauncher) and speaks MCP with it over standard
 // input and output: JSON-RPC, one message per line. We relay those lines as
-// they are to the editor, over the local socket named in DUET_SOCKET, after
-// a first line {"duet":"mcp"} that tells it apart from hooks; the editor
+// they are to the editor, over the local socket named in KDK_SOCKET, after
+// a first line {"kodamiko":"mcp"} that tells it apart from hooks; the editor
 // serves the tools and answers on the same socket.
 //
 // When the editor cannot be reached (closed, or another one), we answer on
@@ -56,8 +56,8 @@ void fail(const QJsonValue &id, const QString &message)
                   .toJson(QJsonDocument::Compact));
 }
 
-const QString unreachable = QStringLiteral("Duet's editor is not reachable: its tools are not available in this "
-                                           "session (restart Claude from Duet).");
+const QString unreachable = QStringLiteral("Kodamiko's editor is not reachable: its tools are not available in this "
+                                           "session (restart Claude from Kodamiko).");
 
 // Answers in the editor's absence: an initialized server with nothing to
 // offer.
@@ -75,7 +75,7 @@ void answerAlone(const QJsonObject &message)
         answer(id,
                QJsonObject{{QLatin1String("protocolVersion"), version},
                            {QLatin1String("capabilities"), QJsonObject{{QLatin1String("tools"), QJsonObject{}}}},
-                           {QLatin1String("serverInfo"), QJsonObject{{QLatin1String("name"), QLatin1String("duet")},
+                           {QLatin1String("serverInfo"), QJsonObject{{QLatin1String("name"), QLatin1String("kodamiko")},
                                                                      {QLatin1String("version"), QLatin1String("0")}}},
                            {QLatin1String("instructions"), unreachable}});
     } else if (method == QLatin1String("ping")) {
@@ -96,11 +96,11 @@ class Relay : public QObject {
 public:
     Relay()
     {
-        const QString name = qEnvironmentVariable("DUET_SOCKET");
+        const QString name = qEnvironmentVariable("KDK_SOCKET");
         if (!name.isEmpty()) {
             socket_.connectToServer(name);
             if (socket_.waitForConnected(connectTimeoutMs)) {
-                socket_.write("{\"duet\":\"mcp\"}\n");
+                socket_.write("{\"kodamiko\":\"mcp\"}\n");
                 socket_.flush();
                 connected_ = true;
             }
@@ -158,7 +158,7 @@ private:
 int main(int argc, char *argv[])
 {
     const QCoreApplication app(argc, argv);
-    LogFiles::install(QStringLiteral("duet-mcp"));
+    LogFiles::install(QStringLiteral("kodamiko-mcp"));
     Relay relay;
     // Standard input is read on a thread of its own (no portable way to wait
     // on it in the event loop); each line is handed to the relay.

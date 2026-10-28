@@ -24,7 +24,7 @@ namespace ClaudeLauncher {
 // editor's read-only MCP tools). Messages from the other local Claude
 // sessions are accepted, so that the sessions of a project coordinate.
 // With GitInShell::Checked, the editor also sees each shell command before
-// it runs, to send git commands to Duet's tools (GitCommandGuard).
+// it runs, to send git commands to Kodamiko's tools (GitCommandGuard).
 enum class GitInShell {
     Allowed,
     Checked,
@@ -32,7 +32,7 @@ enum class GitInShell {
 QByteArray sessionSettings(const QString &hookCommand,
                            const QStringList &allowedTools = {},
                            GitInShell gitInShell = GitInShell::Allowed);
-// Where the --settings file of the sessions with Duet's tools is written.
+// Where the --settings file of the sessions with Kodamiko's tools is written.
 QString sessionSettingsPath();
 
 // Status line command configured by the user for `projectDir` (user,
@@ -42,15 +42,15 @@ QString userStatusLineCommand(const QString &projectDir);
 // The `claude` program found, or an empty string.
 QString findClaudeExecutable();
 
-// The command that runs duet-hook, quoted for sh and cmd.exe, or an empty
+// The command that runs kodamiko-hook, quoted for sh and cmd.exe, or an empty
 // string if the program is missing.
 QString hookCommand();
-// Duet's plugin for its Claude sessions (--plugin-dir), or an empty string.
+// Kodamiko's plugin for its Claude sessions (--plugin-dir), or an empty string.
 QString pluginPath();
 
-// The duet-mcp program (the editor's MCP server), or an empty string.
+// The kodamiko-mcp program (the editor's MCP server), or an empty string.
 QString mcpServerPath();
-// JSON content of the --mcp-config file: the "duet" server run by
+// JSON content of the --mcp-config file: the "kodamiko" server run by
 // `mcpServer`.
 QByteArray mcpConfig(const QString &mcpServer);
 // Where the --mcp-config file is written.
@@ -60,7 +60,7 @@ QString mcpConfigPath();
 struct SessionOptions {
     // After --settings ("--resume" and an identifier to resume a conversation).
     QStringList extraArguments;
-    // With them, the session gets the editor's MCP server (duet-mcp), these
+    // With them, the session gets the editor's MCP server (kodamiko-mcp), these
     // of its tools allowed without asking.
     std::optional<QStringList> mcpReadOnlyTools;
     // The name other Claude sessions address it by (--name); without one,
@@ -69,12 +69,12 @@ struct SessionOptions {
     // Its identifier (--session-id, a UUID), which its hooks carry: tells
     // its events from the other sessions'. Without one, Claude Code picks it.
     QString sessionId;
-    // Claude Code plugin folders loaded besides Duet's (--plugin-dir).
+    // Claude Code plugin folders loaded besides Kodamiko's (--plugin-dir).
     QStringList pluginFolders;
 };
 
 // Process to launch, or nullopt (with `error` set) if `claude` or
-// `duet-hook` cannot be found.
+// `kodamiko-hook` cannot be found.
 std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
                                          const QString &hookServerName,
                                          QString *error,

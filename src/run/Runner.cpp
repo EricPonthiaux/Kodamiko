@@ -137,7 +137,7 @@ ProcessSpec Runner::processSpec(const RunConfiguration &configuration) const
     }
     for (auto it = configuration.environment.cbegin(); it != configuration.environment.cend(); ++it)
         spec.environment.insert(it.key(), it.value());
-    // As in Duet's terminals: the PATH of the user's profile.
+    // As in Kodamiko's terminals: the PATH of the user's profile.
     const ShellCommand shell = Shell::loginShellRunning(configuration.command);
     spec.program = shell.program;
     spec.arguments = shell.arguments;
