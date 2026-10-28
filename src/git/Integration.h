@@ -23,6 +23,14 @@ QString merge(const RepositoryInfo &repository, const QString &branch);
 // snapshot and conflicts as merge().
 QString rebase(const RepositoryInfo &repository, const QString &onto);
 
+// Applies the changes of the commit `id` to the current branch as a new
+// commit; same snapshot and conflicts as merge().
+QString cherryPick(const RepositoryInfo &repository, const QString &id);
+
+// Commits the reverse of the commit `id`, with git's default message; same
+// snapshot and conflicts as merge().
+QString revert(const RepositoryInfo &repository, const QString &id);
+
 // For the operation in progress (`repository.operation`): commit the
 // resolution and go on, give up and restore the state from before, or (a
 // rebase only) leave out the commit that stopped it.

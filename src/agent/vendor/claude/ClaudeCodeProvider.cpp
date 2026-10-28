@@ -50,9 +50,15 @@ std::optional<HookEvent> afterToolUse(HookEvent event, const QJsonObject &object
     return event;
 }
 
-// PreToolUse: Claude is about to edit files; other tools do not concern us.
+// PreToolUse: Claude is about to edit files or run a command; other tools
+// do not concern us.
 std::optional<HookEvent> beforeToolUse(HookEvent event, const QJsonObject &object)
 {
+    if (object.value(QLatin1String("tool_name")).toString() == QLatin1String("Bash")) {
+        event.kind = HookEvent::Kind::CommandRequested;
+        event.message = object.value(QLatin1String("tool_input")).toObject().value(QLatin1String("command")).toString();
+        return event;
+    }
     event.filePaths = findEditedFiles(object);
     if (event.filePaths.isEmpty())
         return std::nullopt;
@@ -204,7 +210,7 @@ QJsonObject ClaudeCodeProvider::promptContextReply(const QString &context) const
                                               }}};
 }
 
-QJsonObject ClaudeCodeProvider::denyEditReply(const QString &reason) const
+QJsonObject ClaudeCodeProvider::denyToolReply(const QString &reason) const
 {
     return QJsonObject{
         {QLatin1String("hookSpecificOutput"), QJsonObject{

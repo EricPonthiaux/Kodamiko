@@ -426,6 +426,8 @@ private:
     // Asks about the next sensitive tool Claude wants to run.
     void showToolRequest();
     void guardUnsavedEdits(const QStringList &paths);
+    // Refuses a git command Duet's tools do, telling the agent which ones.
+    void guardGitCommands(const HookEvent &event);
     // Tells the agent the errors its edit of `paths` brought, once their
     // language servers have reported them.
     void reportEditErrors(const QStringList &paths);
@@ -694,6 +696,7 @@ private:
     // agent's submenu, the navigation, then the quick fixes.
     QList<QAction *> editorContextActions_;
     QAction *exposeTools_ = nullptr;
+    QAction *gitThroughDuetTools_ = nullptr;
     QAction *claudeNotifications_ = nullptr;
 
     // Actions whose text names the agent (nameAfterAgent()).

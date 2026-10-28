@@ -51,6 +51,9 @@ add_library(duet_core STATIC
     agent/HookServer.cpp
     agent/mcp/CodeTools.cpp
     agent/mcp/EditorTools.cpp
+    agent/mcp/GitBranchTools.cpp
+    agent/mcp/GitIntegrationTools.cpp
+    agent/mcp/GitToolSupport.cpp
     agent/mcp/GitTools.cpp
     agent/mcp/McpRegistry.cpp
     agent/mcp/McpSession.cpp
@@ -81,6 +84,9 @@ add_library(duet_core STATIC
     agent/vendor/claude/ClaudeUsage.cpp
     agent/vendor/claude/CodeRequest.cpp
     agent/vendor/claude/EffectiveSettings.cpp
+    agent/vendor/claude/GitCommandGuard.cpp
+    agent/vendor/claude/GitCommandTranslations.cpp
+    agent/vendor/claude/ShellCommandLine.cpp
     agent/vendor/claude/UnsavedEditGuard.cpp
     changes/BranchesPopup.cpp
     changes/ChangeMap.cpp

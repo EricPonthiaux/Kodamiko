@@ -58,6 +58,9 @@ struct Preferences {
     bool reportEditErrors = true;
     // The editor's MCP server (tools, resources, prompts) in its sessions.
     bool exposeTools = true;
+    // Git commands that change the repository refused in the agent's shell
+    // when a Duet tool does the same (GitCommandGuard).
+    bool gitThroughDuetTools = true;
     bool claudeNotifications = true;
 
     // Terminal

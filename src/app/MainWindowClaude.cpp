@@ -13,6 +13,7 @@
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "agent/vendor/claude/ClaudeUsage.h"
 #include "agent/vendor/claude/EffectiveSettings.h"
+#include "agent/vendor/claude/GitCommandGuard.h"
 #include "agent/vendor/claude/UnsavedEditGuard.h"
 #include "changes/BranchesPopup.h"
 #include "changes/ChangesView.h"
@@ -308,6 +309,9 @@ void MainWindow::onHookReceived(const HookEvent &event)
         guardUnsavedEdits(event.filePaths);
         editErrorCheck_->rememberErrorsBefore(event.filePaths);
         break;
+    case HookEvent::Kind::CommandRequested:
+        guardGitCommands(event);
+        break;
     case HookEvent::Kind::FilesEdited:
     case HookEvent::Kind::CommandFinished: {
         if (event.kind == HookEvent::Kind::FilesEdited) {
@@ -539,6 +543,20 @@ void MainWindow::shareEditorContext()
         hookServer_.respond(agentProvider_->promptContextReply(description));
 }
 
+void MainWindow::guardGitCommands(const HookEvent &event)
+{
+    // Only the sessions with Duet's tools send their commands (see
+    // ClaudeLauncher::GitInShell).
+    if (!gitThroughDuetTools_->isChecked())
+        return;
+    const std::optional<QString> reason =
+        GitCommandGuard::refusal(event.message, {.projectFolder = folder_, .workingDirectory = event.workingDirectory});
+    if (!reason)
+        return;
+    hookServer_.respond(agentProvider_->denyToolReply(*reason));
+    showStatus(tr("%1 was sent to Duet's git tools instead of running git").arg(agentProvider_->name()));
+}
+
 void MainWindow::guardUnsavedEdits(const QStringList &paths)
 {
     QStringList unsaved;
@@ -550,7 +568,7 @@ void MainWindow::guardUnsavedEdits(const QStringList &paths)
     }
     if (unsaved.isEmpty())
         return;
-    hookServer_.respond(agentProvider_->denyEditReply(UnsavedEditGuard::reason(unsaved)));
+    hookServer_.respond(agentProvider_->denyToolReply(UnsavedEditGuard::reason(unsaved)));
     const QString files = unsaved.join(QStringLiteral(", "));
     const QString agent = agentProvider_->name();
     unsavedEditNotice_->showNotice(

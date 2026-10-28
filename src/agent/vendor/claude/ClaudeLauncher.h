@@ -23,7 +23,15 @@ namespace ClaudeLauncher {
 // `hookCommand statusline`. `allowedTools` are allowed without asking (the
 // editor's read-only MCP tools). Messages from the other local Claude
 // sessions are accepted, so that the sessions of a project coordinate.
-QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowedTools = {});
+// With GitInShell::Checked, the editor also sees each shell command before
+// it runs, to send git commands to Duet's tools (GitCommandGuard).
+enum class GitInShell {
+    Allowed,
+    Checked,
+};
+QByteArray sessionSettings(const QString &hookCommand,
+                           const QStringList &allowedTools = {},
+                           GitInShell gitInShell = GitInShell::Allowed);
 // Where the --settings file of the sessions with Duet's tools is written.
 QString sessionSettingsPath();
 

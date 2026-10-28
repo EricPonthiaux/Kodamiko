@@ -72,7 +72,7 @@ public:
         return claude_.promptContextReply(context);
     }
 
-    QJsonObject denyEditReply(const QString &reason) const override { return claude_.denyEditReply(reason); }
+    QJsonObject denyToolReply(const QString &reason) const override { return claude_.denyToolReply(reason); }
 
     QJsonObject blockReply(const QString &reason) const override { return claude_.blockReply(reason); }
 

@@ -85,10 +85,13 @@ void registerRefactoringTools(McpRegistry &registry, const DuetToolContext &cont
 McpResult refactoringResult(const DuetToolContext &context, const RefactoringOutcome &outcome);
 // Terminals: reading them, running a command.
 void registerTerminalTools(McpRegistry &registry, const DuetToolContext &context);
-// Git status, history, commits, snapshots; then the branch tools.
+// Git status, history, index, commits, snapshots; then the branch and
+// integration tools.
 void registerGitTools(McpRegistry &registry, const DuetToolContext &context);
-// Branches, remotes, stashes, merge and rebase.
+// Branches, remotes, stashes.
 void registerBranchTools(McpRegistry &registry, const DuetToolContext &context);
+// Merge, rebase, cherry-pick, revert, and the operation in progress.
+void registerIntegrationTools(McpRegistry &registry, const DuetToolContext &context);
 // Diagrams: their content and selection, changes in the open diagram.
 void registerDiagramTools(McpRegistry &registry, const DuetToolContext &context);
 

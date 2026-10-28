@@ -94,15 +94,18 @@ QString sessionSettingsPath()
         .filePath(QStringLiteral("claude-hooks.json"));
 }
 
-QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowedTools)
+QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowedTools, GitInShell gitInShell)
 {
     QJsonObject hooks;
     // The editor takes a snapshot before replying: Claude only starts once
     // the files are saved.
     hooks.insert(QLatin1String("UserPromptSubmit"), commandHook(hookCommand, {}, 30));
-    // The editor refuses an edit that would overwrite unsaved changes.
-    hooks.insert(QLatin1String("PreToolUse"),
-                 commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit"), 30));
+    // The editor refuses an edit that would overwrite unsaved changes, and a
+    // git command one of its tools does.
+    const QString checkedTools = gitInShell == GitInShell::Checked
+                                     ? QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash")
+                                     : QStringLiteral("Edit|Write|MultiEdit|NotebookEdit");
+    hooks.insert(QLatin1String("PreToolUse"), commandHook(hookCommand, checkedTools, 30));
     hooks.insert(QLatin1String("PostToolUse"),
                  commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash")));
     hooks.insert(QLatin1String("PermissionRequest"), commandHook(hookCommand));
@@ -230,7 +233,8 @@ std::optional<ProcessSpec> claudeProcess(const QString &workingDirectory,
 
     const std::optional<QString> settingsFile =
         mcpFile
-            ? writeSettingsFile(sessionSettings(hook, mcpReadOnlyTools.value_or(QStringList())), sessionSettingsPath())
+            ? writeSettingsFile(sessionSettings(hook, mcpReadOnlyTools.value_or(QStringList()), GitInShell::Checked),
+                                sessionSettingsPath())
             : writeSettingsFile(sessionSettings(hook), settingsPathWithoutTools());
     if (!settingsFile) {
         *error = QCoreApplication::translate("ClaudeLauncher", "Could not write the hooks configuration.");

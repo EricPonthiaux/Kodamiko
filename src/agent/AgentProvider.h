@@ -154,8 +154,9 @@ public:
     virtual std::optional<HookEvent> parseHook(const QByteArray &json) const = 0;
     // The reply to a PromptSubmitted hook that adds `context` to the prompt.
     virtual QJsonObject promptContextReply(const QString &context) const = 0;
-    // The reply to an EditRequested hook that refuses the edit for `reason`.
-    virtual QJsonObject denyEditReply(const QString &reason) const = 0;
+    // The reply to an EditRequested or CommandRequested hook that refuses the
+    // edit or the command for `reason`.
+    virtual QJsonObject denyToolReply(const QString &reason) const = 0;
     // The reply to a FilesEdited hook that sends `reason` back to the agent
     // to fix what it wrote.
     virtual QJsonObject blockReply(const QString &reason) const = 0;

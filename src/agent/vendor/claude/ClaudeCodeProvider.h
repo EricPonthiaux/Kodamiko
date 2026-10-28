@@ -32,7 +32,7 @@ public:
 
     std::optional<HookEvent> parseHook(const QByteArray &json) const override;
     QJsonObject promptContextReply(const QString &context) const override;
-    QJsonObject denyEditReply(const QString &reason) const override;
+    QJsonObject denyToolReply(const QString &reason) const override;
     QJsonObject blockReply(const QString &reason) const override;
     QJsonObject editContextReply(const QString &context) const override;
 

@@ -176,6 +176,7 @@ void MainWindow::applyPreferences(const Preferences &preferences)
     shareEditorContext_->setChecked(preferences.shareEditorContext);
     reportEditErrors_->setChecked(preferences.reportEditErrors);
     exposeTools_->setChecked(preferences.exposeTools);
+    gitThroughDuetTools_->setChecked(preferences.gitThroughDuetTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     editorTabs_->setEditorOptions(preferences.editor);
     languageServers_->setEnabled(preferences.languageServers);

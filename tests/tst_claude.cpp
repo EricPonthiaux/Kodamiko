@@ -117,12 +117,36 @@ private slots:
         QVERIFY(!claude_.parseHook(R"({"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}})"));
     }
 
+    void decodesTheCommandClaudeIsAboutToRun()
+    {
+        const std::optional<HookEvent> command = claude_.parseHook(
+            R"({"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"/p","tool_input":{"command":"git add a"}})");
+
+        QVERIFY(command);
+        QCOMPARE(command->kind, HookEvent::Kind::CommandRequested);
+        QCOMPARE(command->message, QStringLiteral("git add a"));
+    }
+
+    void checksShellCommandsOnlyInSessionsWithDuetTools()
+    {
+        const auto preToolUseMatcher = [](ClaudeLauncher::GitInShell gitInShell) {
+            const QJsonObject settings =
+                QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"", {}, gitInShell)).object();
+            return settings["hooks"]["PreToolUse"].toArray().first().toObject()["matcher"].toString();
+        };
+
+        QCOMPARE(preToolUseMatcher(ClaudeLauncher::GitInShell::Checked),
+                 QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash"));
+        QCOMPARE(preToolUseMatcher(ClaudeLauncher::GitInShell::Allowed),
+                 QStringLiteral("Edit|Write|MultiEdit|NotebookEdit"));
+    }
+
     void refusesEditsOverUnsavedChanges()
     {
         const QString reason = UnsavedEditGuard::reason({"src/a.cpp", "src/b.h"});
         QVERIFY(reason.startsWith(QStringLiteral("src/a.cpp, src/b.h have unsaved changes")));
         QVERIFY(UnsavedEditGuard::reason({"a.cpp"}).startsWith(QStringLiteral("a.cpp has unsaved changes")));
-        const QJsonObject output = claude_.denyEditReply(reason)["hookSpecificOutput"].toObject();
+        const QJsonObject output = claude_.denyToolReply(reason)["hookSpecificOutput"].toObject();
         QCOMPARE(output["hookEventName"].toString(), QStringLiteral("PreToolUse"));
         QCOMPARE(output["permissionDecision"].toString(), QStringLiteral("deny"));
         QCOMPARE(output["permissionDecisionReason"].toString(), reason);

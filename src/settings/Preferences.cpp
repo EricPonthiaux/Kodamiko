@@ -69,6 +69,7 @@ Preferences Preferences::load()
     preferences.defaultAgentProvider =
         settings.value(QStringLiteral("defaultAgentProvider"), preferences.defaultAgentProvider).toString();
     preferences.exposeTools = settings.value(QStringLiteral("exposeTools"), true).toBool();
+    preferences.gitThroughDuetTools = settings.value(QStringLiteral("gitThroughDuetTools"), true).toBool();
     preferences.claudeNotifications = settings.value(QStringLiteral("claudeNotifications"), true).toBool();
 
     preferences.terminalPathFolders = settings.value(QStringLiteral("terminal/pathFolders")).toStringList();
@@ -110,6 +111,7 @@ void Preferences::save() const
     settings.setValue(QStringLiteral("reportEditErrors"), reportEditErrors);
     settings.setValue(QStringLiteral("defaultAgentProvider"), defaultAgentProvider);
     settings.setValue(QStringLiteral("exposeTools"), exposeTools);
+    settings.setValue(QStringLiteral("gitThroughDuetTools"), gitThroughDuetTools);
     settings.setValue(QStringLiteral("claudeNotifications"), claudeNotifications);
 
     settings.setValue(QStringLiteral("terminal/pathFolders"), terminalPathFolders);

@@ -538,6 +538,7 @@ QWidget *PreferencesPopup::createClaudePage()
     shareEditorContext_ = new QCheckBox;
     reportEditErrors_ = new QCheckBox;
     exposeTools_ = new QCheckBox;
+    gitThroughDuetTools_ = new QCheckBox;
     claudeNotifications_ = new QCheckBox;
     session->addRow(tr("Snapshot before each prompt"),
                     tr("Keeps a copy of the working directory before Claude works on a prompt, to undo its "
@@ -555,6 +556,11 @@ QWidget *PreferencesPopup::createClaudePage()
                     tr("Lets Claude read and act in the editor (open files with their unsaved changes, problems, "
                        "diagrams, terminals, git) through Duet's MCP server. Applies to the next session."),
                     exposeTools_);
+    session->addRow(tr("Send git commands to Duet's tools"),
+                    tr("When Claude runs a git command that changes the repository in its shell, Duet refuses it "
+                       "and tells Claude which of its git tools does the same: they ask you first and take "
+                       "snapshots. Reading git stays allowed. Needs Duet's tools."),
+                    gitThroughDuetTools_);
     session->addRow(tr("Notifications"),
                     tr("Alerts you when Claude needs you or has finished while you are elsewhere."),
                     claudeNotifications_);
@@ -760,6 +766,7 @@ void PreferencesPopup::load(const Preferences &preferences,
     shareEditorContext_->setChecked(preferences.shareEditorContext);
     reportEditErrors_->setChecked(preferences.reportEditErrors);
     exposeTools_->setChecked(preferences.exposeTools);
+    gitThroughDuetTools_->setChecked(preferences.gitThroughDuetTools);
     claudeNotifications_->setChecked(preferences.claudeNotifications);
     terminalPage_->setPathFolders(preferences.terminalPathFolders);
     terminalPage_->setOptionKey(preferences.terminalOptionKey);
@@ -819,6 +826,7 @@ Preferences PreferencesPopup::preferences() const
     preferences.shareEditorContext = shareEditorContext_->isChecked();
     preferences.reportEditErrors = reportEditErrors_->isChecked();
     preferences.exposeTools = exposeTools_->isChecked();
+    preferences.gitThroughDuetTools = gitThroughDuetTools_->isChecked();
     preferences.claudeNotifications = claudeNotifications_->isChecked();
     preferences.terminalPathFolders = terminalPage_->pathFolders();
     preferences.terminalOptionKey = terminalPage_->optionKey();

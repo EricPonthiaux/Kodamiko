@@ -6,8 +6,10 @@
 #include "diagnostics/ProblemStore.h"
 #include "editor/EditorTabs.h"
 #include "editor/EditorWidget.h"
+#include "git/Branches.h"
 #include "git/GitProcess.h"
 #include "git/RepositoryStatus.h"
+#include "git/Stashes.h"
 #include "index/OccurrenceIndex.h"
 #include "lsp/LanguageServers.h"
 #include "lsp/LspClient.h"
@@ -478,6 +480,68 @@ private slots:
         QCOMPARE(status.value(QStringLiteral("ahead")).toInt(), 1);
         editor.call(QStringLiteral("abort_operation"));
         QVERIFY(RepositoryInfo::read(editor.folder.path())->operation.isEmpty());
+    }
+
+    // What Claude used to do with git in a shell: discard, delete and rename
+    // branches, drop stashes, cherry-pick, revert, resolve conflicts.
+    void doesWhatGitInAShellDid()
+    {
+        Editor editor;
+        const QString folder = editor.folder.path();
+        const auto readFile = [&editor] {
+            QFile file(editor.folder.filePath(QStringLiteral("a.txt")));
+            return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+        };
+        write(editor.folder, QStringLiteral("a.txt"), "one\n");
+        Git::run(folder, {"init", "-q", "-b", "main"});
+        Git::run(folder, {"add", "-A"});
+        Git::run(folder, {"commit", "-qm", "init"});
+
+        // Discarded, asked first.
+        write(editor.folder, QStringLiteral("a.txt"), "changed\n");
+        editor.call(QStringLiteral("discard_changes"), {{QStringLiteral("paths"), QJsonArray{"a.txt"}}});
+        QCOMPARE(editor.asked.last(), QStringLiteral("discard the unstaged changes to a.txt"));
+        QCOMPARE(readFile(), QByteArray("one\n"));
+
+        // A commit on a branch, cherry-picked onto main, then reverted.
+        Git::run(folder, {"switch", "-qc", "topic"});
+        write(editor.folder, QStringLiteral("a.txt"), "two\n");
+        Git::run(folder, {"commit", "-qam", "two"});
+        const QString picked = QString::fromUtf8(Git::run(folder, {"rev-parse", "HEAD"})).trimmed();
+        Git::run(folder, {"switch", "-q", "main"});
+        editor.call(QStringLiteral("cherry_pick"), {{QStringLiteral("id"), picked}});
+        QCOMPARE(readFile(), QByteArray("two\n"));
+        editor.call(QStringLiteral("revert_commit"), {{QStringLiteral("id"), QStringLiteral("HEAD")}});
+        QCOMPARE(editor.asked.last(), QStringLiteral("commit the reverse of commit HEAD"));
+        QCOMPARE(readFile(), QByteArray("one\n"));
+
+        // Renamed, then deleted: its commit is on main, no force needed.
+        editor.call(QStringLiteral("rename_branch"), {{QStringLiteral("name"), QStringLiteral("topic")},
+                                                      {QStringLiteral("newName"), QStringLiteral("done")}});
+        QVERIFY(Branches::local(folder).contains(QStringLiteral("done")));
+        editor.call(QStringLiteral("delete_branch"), {{QStringLiteral("name"), QStringLiteral("done")}});
+        QCOMPARE(Branches::local(folder), QStringList{QStringLiteral("main")});
+
+        // A stash dropped without being applied.
+        write(editor.folder, QStringLiteral("a.txt"), "wip\n");
+        Git::run(folder, {"stash", "-q"});
+        editor.call(QStringLiteral("drop_stash"), {{QStringLiteral("index"), 0}});
+        QCOMPARE(editor.asked.last(), QStringLiteral("drop stash@{0} without applying it"));
+        QVERIFY(Stashes::list(folder).isEmpty());
+
+        // A conflict resolved with the incoming side, then continued.
+        Git::run(folder, {"switch", "-qc", "other"});
+        write(editor.folder, QStringLiteral("a.txt"), "theirs\n");
+        Git::run(folder, {"commit", "-qam", "theirs"});
+        Git::run(folder, {"switch", "-q", "main"});
+        write(editor.folder, QStringLiteral("a.txt"), "ours\n");
+        Git::run(folder, {"commit", "-qam", "ours"});
+        editor.call(QStringLiteral("merge_branch"), {{QStringLiteral("branch"), QStringLiteral("other")}});
+        editor.call(QStringLiteral("resolve_conflicts"), {{QStringLiteral("paths"), QJsonArray{"a.txt"}},
+                                                          {QStringLiteral("side"), QStringLiteral("incoming")}});
+        QCOMPARE(readFile(), QByteArray("theirs\n"));
+        editor.call(QStringLiteral("continue_operation"));
+        QVERIFY(RepositoryInfo::read(folder)->operation.isEmpty());
     }
 
     // A command in a terminal the user sees, once allowed.

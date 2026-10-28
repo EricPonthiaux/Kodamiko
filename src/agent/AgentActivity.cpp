@@ -42,6 +42,7 @@ void AgentActivity::handle(const HookEvent &event)
         setState(State::Working);
         break;
     case HookEvent::Kind::EditRequested:
+    case HookEvent::Kind::CommandRequested:
     case HookEvent::Kind::FilesEdited:
     case HookEvent::Kind::CommandFinished:
         // A tool ran: the permission, if one was pending, was granted.

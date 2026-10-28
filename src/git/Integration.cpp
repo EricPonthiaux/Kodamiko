@@ -95,6 +95,17 @@ QString rebase(const RepositoryInfo &repository, const QString &onto)
     return integrate(repository, {QStringLiteral("rebase"), onto}, QObject::tr("Before rebasing onto %1").arg(onto));
 }
 
+QString cherryPick(const RepositoryInfo &repository, const QString &id)
+{
+    return integrate(repository, {QStringLiteral("cherry-pick"), id}, QObject::tr("Before cherry-picking %1").arg(id));
+}
+
+QString revert(const RepositoryInfo &repository, const QString &id)
+{
+    return integrate(repository, {QStringLiteral("revert"), QStringLiteral("--no-edit"), id},
+                     QObject::tr("Before reverting %1").arg(id));
+}
+
 void continueOperation(const RepositoryInfo &repository)
 {
     // The message stays the one git prepared (GIT_EDITOR does nothing).

@@ -43,7 +43,18 @@ QString instructions()
         "the user refers to what is in front of them (\"this\", \"the selection\", \"the diagram\"). Paths are "
         "relative to the project unless absolute. To change the code's structure (rename a symbol or a file, "
         "change a function's parameters), prefer the refactoring tools to editing files: they reach every usage "
-        "through the language server, and the user undoes them in one step with Undo Refactoring.");
+        "through the language server, and the user undoes them in one step with Undo Refactoring.\n\n"
+        "For git, use Duet's git tools first, rather than git in a shell: stage_files, discard_changes, commit, "
+        "switch_branch, delete_branch, merge_branch, cherry_pick, revert_commit, stash_changes, push, pull and the "
+        "others. Why: each one that changes the repository asks the user with a plain description of what it "
+        "does, so they approve a change they understand rather than a command line; Duet takes a snapshot before "
+        "what is hard to undo (discarding, switching, merging…), which restore_snapshot brings back; the tools "
+        "run one git operation at a time with Duet's own git work, ask for remote credentials in the editor "
+        "instead of leaving the shell waiting, and refresh Duet's Diff, History and branch views at once, so the "
+        "user sees what you did. To read, get_git_status, get_file_history and get_commit answer in JSON. Git in "
+        "a shell stays for what no tool does (push --force, reset --hard, tag, log -S…): say why when you use "
+        "it. When the user enabled it, Duet refuses a shell git command that one of its tools does, and gives "
+        "the tool call to make instead.");
 }
 
 namespace {

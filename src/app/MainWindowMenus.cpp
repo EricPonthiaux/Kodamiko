@@ -185,6 +185,10 @@ void MainWindow::createClaudeMenu()
     exposeTools_ = addAgentSettingToggle(
         claude, {tr("E&xpose Duet's Tools to %1"), QStringLiteral("exposeTools"),
                  tr("Let %1 read and act in the editor through Duet's MCP server (next session)")});
+    gitThroughDuetTools_ = addAgentSettingToggle(
+        claude, {tr("Send &Git Commands to Duet's Tools"), QStringLiteral("gitThroughDuetTools"),
+                 tr("Refuse the git commands %1 runs in its shell to change the repository when a Duet tool does "
+                    "the same: the tools ask you first and take snapshots")});
     claudeNotifications_ =
         addAgentSettingToggle(claude, {tr("&Notifications"), QStringLiteral("claudeNotifications"),
                                        tr("Alert when %1 needs you or has finished while you are elsewhere")});
