@@ -18,7 +18,7 @@ struct Theme;
 struct Preferences {
     // Appearance
     QString theme = QStringLiteral("duet-violet"); // Theme::name
-    QString codeFontFamily;                      // empty: the embedded Droid Sans Mono
+    QString codeFontFamily;                        // empty: the embedded Droid Sans Mono
     int codeFontSize = 11;
     int codeFontWeight = QFont::Normal; // QFont::Light, Normal or Medium
     // Lines of code at this multiple of the font size.

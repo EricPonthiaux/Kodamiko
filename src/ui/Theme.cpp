@@ -80,11 +80,10 @@ Theme duetNight()
     return theme;
 }
 
-// After a website: its soft violets, from the near black of its
-// header for the panels to the violet of its pages under the editor, its
-// coral for the accent and the keywords. The code reads at 7:1 or about,
-// the comments at 5.5:1; dark text over the coral, where white would not
-// reach 4.5:1.
+// Soft violets, from a near black for the panels to a violet under the
+// editor, a coral for the accent and the keywords. The code reads at 7:1 or
+// about, the comments at 5.5:1; dark text over the coral, where white would
+// not reach 4.5:1.
 Theme duetViolet()
 {
     Theme theme;
@@ -133,11 +132,11 @@ Theme duetViolet()
     return theme;
 }
 
-// After a page over the clouds at dusk: the night blue of its sky
-// for the panels, the slate of the clouds' shadows under the editor, the
-// coral of its button for the accent, the pinks and peaches of the lasers
-// and the sunset in the syntax. The code reads at 7:1 or about, the comments
-// at 5.5:1; dark text over the coral, where white would not reach 4.5:1.
+// Over the clouds at dusk: the night blue of the sky for the panels, the
+// slate of the clouds' shadows under the editor, a coral for the accent,
+// the pinks and peaches of the sunset in the syntax. The code reads at 7:1
+// or about, the comments at 5.5:1; dark text over the coral, where white
+// would not reach 4.5:1.
 Theme duetStratos()
 {
     Theme theme;

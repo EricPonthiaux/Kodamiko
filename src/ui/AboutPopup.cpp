@@ -20,7 +20,6 @@
 #include <QVBoxLayout>
 #include <QVariantAnimation>
 
-#include <array>
 #include <chrono>
 
 using namespace std::chrono_literals;
@@ -35,14 +34,11 @@ constexpr std::chrono::milliseconds heartbeatDuration = 1200ms;
 constexpr qreal heartbeatPeak = 1.25;
 const QColor heartColor{0xe5, 0x48, 0x5c};
 
-constexpr std::array authorEmails{"ponthiaux.eric@protonmail.com", "ponthiaux.eric@protonmail.com"};
+constexpr auto authorEmail = "ponthiaux.eric@protonmail.com";
 
-QString emailLinks()
+QString emailLink()
 {
-    QStringList links;
-    for (const char *email : authorEmails)
-        links.append(QStringLiteral("<a href=\"mailto:%1\">%1</a>").arg(QLatin1String(email)));
-    return links.join(QStringLiteral("<br>"));
+    return QStringLiteral("<a href=\"mailto:%1\">%1</a>").arg(QLatin1String(authorEmail));
 }
 
 // A heart filling the unit square, drawn with two cubic curves per side.
@@ -192,14 +188,14 @@ AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
     brand->addWidget(mark_);
     brand->addLayout(identity, 1);
 
-    auto *emails = new QLabel(emailLinks(), this);
-    emails->setTextFormat(Qt::RichText);
-    emails->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    emails->setOpenExternalLinks(true);
+    auto *email = new QLabel(emailLink(), this);
+    email->setTextFormat(Qt::RichText);
+    email->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    email->setOpenExternalLinks(true);
     auto *contact = new QVBoxLayout;
     contact->setSpacing(6);
     contact->addWidget(new QLabel(tr("Contact"), this));
-    contact->addWidget(emails);
+    contact->addWidget(email);
 
     auto *love = new QHBoxLayout;
     love->setSpacing(6);
