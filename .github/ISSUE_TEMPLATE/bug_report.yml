@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in Duet does not work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The steps that lead to the problem, from a fresh start if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: A screenshot helps for anything visual.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Duet (Help ▸ About Duet), Qt, Claude Code (`claude --version`).
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options: [Linux, Windows, macOS]
+    validations:
+      required: true
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop and screen
+      description: For example "KDE Plasma on Wayland, 1280×800 at 150 %".

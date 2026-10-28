@@ -142,6 +142,12 @@ the editor).
 The sources are organized by feature under `src/` (`editor`, `git`,
 `agent`, `terminal`, `viewers`…); `CLAUDE.md` holds the coding conventions.
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome: see `CONTRIBUTING.md`.
+Report a security problem privately, as `SECURITY.md` explains. The work
+planned next is in `docs/roadmap/`.
+
 ## License
 
 Duet is distributed under the **GNU GPL v3** (see `LICENSE`), the license

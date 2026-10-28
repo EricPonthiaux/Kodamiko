@@ -4,3 +4,5 @@ CMakeUserPresets.json
 .cache/
 /reports/
 /research_notes/
+.DS_Store
+*.log
