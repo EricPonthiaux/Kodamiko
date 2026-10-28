@@ -19,6 +19,7 @@
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QtTest>
 
 #include <functional>
@@ -602,6 +603,29 @@ private slots:
         snapshots = Snapshots::list(project.path());
         QCOMPARE(snapshots.size(), 2);
         QVERIFY(snapshots.first().reason.startsWith("Before restoring"));
+    }
+
+    // A file changed in the second it was committed, to the same size, has
+    // the stat data of the index entry: git reads its content only because
+    // the index is not older than it ("racy git"). The snapshot, taken a
+    // second later, must read it too.
+    void snapshotRecordsAFileChangedInTheSecondOfItsCommit()
+    {
+        const QTemporaryDir project;
+        // At the start of a second, so that the commit and the change share it.
+        while (QDateTime::currentMSecsSinceEpoch() % 1000 > 100)
+            QThread::msleep(5);
+        const qint64 second = QDateTime::currentSecsSinceEpoch();
+        initRepository(project, {{"a.txt", "one\n"}});
+        write(project, "a.txt", "two\n");
+        if (QDateTime::currentSecsSinceEpoch() != second)
+            QSKIP("The commit and the change did not fit in the same second");
+        QThread::msleep(1100);
+
+        Snapshots::createOfWorkingTree(*RepositoryInfo::read(project.path()), QStringLiteral("test"));
+
+        const QString commit = Snapshots::list(project.path()).first().commitId;
+        QCOMPARE(git(project, {"show", commit + ":a.txt"}), QByteArray("two\n"));
     }
 
     void discardSelectedLines()

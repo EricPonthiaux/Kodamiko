@@ -155,6 +155,22 @@ struct SnapshotRequest {
     bool skipIfUnchanged = false;
 };
 
+// Copies the real index to `copy`, keeping its modification time. Git reads
+// the content of a file whose stat data matches its index entry only when
+// the index is not older than the file ("racy git": a change of the same size
+// in the second the index was written). A copy dated now would make git trust
+// such an entry, and record the file as it was.
+void copyIndex(const QString &realIndex, const QString &copy)
+{
+    if (!QFile::copy(realIndex, copy))
+        throw GitError(QObject::tr("Cannot copy the index for the snapshot"));
+    QFile file(copy);
+    const bool isDated = file.open(QIODevice::ReadWrite) &&
+                         file.setFileTime(QFileInfo(realIndex).lastModified(), QFileDevice::FileModificationTime);
+    if (!isDated)
+        throw GitError(QObject::tr("Cannot date the copy of the index for the snapshot: %1").arg(file.errorString()));
+}
+
 // Snapshot described by `request`; its reference name, or an empty string
 // when skipped as unchanged.
 QString createSnapshot(const RepositoryInfo &repository, const SnapshotRequest &request)
@@ -167,8 +183,8 @@ QString createSnapshot(const RepositoryInfo &repository, const SnapshotRequest &
         throw GitError(QObject::tr("Cannot create a temporary folder for the snapshot"));
     const QString index = temporary.filePath(QStringLiteral("index"));
     const QString realIndex = QDir(repository.gitDir).filePath(QStringLiteral("index"));
-    if (QFileInfo::exists(realIndex) && !QFile::copy(realIndex, index))
-        throw GitError(QObject::tr("Cannot copy the index for the snapshot"));
+    if (QFileInfo::exists(realIndex))
+        copyIndex(realIndex, index);
     QHash<QString, QString> environment = snapshotIdentity();
     environment.insert(QStringLiteral("GIT_INDEX_FILE"), index);
 
