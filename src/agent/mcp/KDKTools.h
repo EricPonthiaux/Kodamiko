@@ -45,6 +45,8 @@ struct KDKToolContext {
     std::function<QList<std::pair<QString, TerminalWidget *>>()> terminals;
     // Opens a terminal tab running `spec`, shown to the user.
     std::function<TerminalWidget *(const QString &title, const ProcessSpec &spec)> addTerminal;
+    // Shows the Edit mode, where the editor's tabs are.
+    std::function<void()> showEditor;
     // Shows the Diff mode on a file (relative path; empty: the list).
     std::function<void(const QString &)> showChanges;
     // Puts a commit message in the Diff mode's commit field, for the user to
@@ -74,6 +76,8 @@ McpTool::Run handledBy(const KDKToolContext &context, ImmediateToolHandler handl
 
 // Files and tabs: editor state, open files, file text, opening, saving.
 void registerEditorTools(McpRegistry &registry, const KDKToolContext &context);
+// The editor's tabs, files and pages: listing, showing, reading a page.
+void registerTabTools(McpRegistry &registry, const KDKToolContext &context);
 // The project: search, files, symbols, editor commands, setup.
 void registerWorkspaceTools(McpRegistry &registry, const KDKToolContext &context);
 // The language servers: problems, definitions, usages, documentation,

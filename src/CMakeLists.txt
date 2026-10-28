@@ -52,6 +52,7 @@ add_library(kdk_core STATIC
     agent/PermissionPrompts.cpp
     agent/mcp/CodeTools.cpp
     agent/mcp/EditorTools.cpp
+    agent/mcp/TabTools.cpp
     agent/mcp/GitBranchTools.cpp
     agent/mcp/GitIntegrationTools.cpp
     agent/mcp/GitToolSupport.cpp

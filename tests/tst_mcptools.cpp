@@ -29,10 +29,14 @@
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QLabel>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
+#include <QTextBrowser>
+#include <QVBoxLayout>
 #include <QtTest>
 
 namespace {
@@ -58,6 +62,7 @@ struct Editor {
     QString message;
     QString changesShown;
     QString commitMessage;
+    bool editorShown = false;
     bool allow = true;
     QStringList asked;
 
@@ -86,7 +91,9 @@ struct Editor {
             changesShown = path.isEmpty() ? QStringLiteral("*") : path;
         };
         context.setCommitMessage = [this](const QString &text) { commitMessage = text; };
+        context.showEditor = [this] { editorShown = true; };
         KDKTools::registerEditorTools(registry, context);
+        KDKTools::registerTabTools(registry, context);
         KDKTools::registerWorkspaceTools(registry, context);
         KDKTools::registerGitTools(registry, context);
         KDKTools::registerTerminalTools(registry, context);
@@ -315,6 +322,48 @@ private slots:
 
         editor.call(QStringLiteral("notify_user"), {{QStringLiteral("message"), QStringLiteral("Done")}});
         QCOMPARE(editor.message, QStringLiteral("Done"));
+    }
+
+    void listsShowsAndReadsThePageTabs()
+    {
+        Editor editor;
+        write(editor.folder, QStringLiteral("a.cpp"), "int one();\n");
+        editor.tabs.openFile(editor.folder.filePath(QStringLiteral("a.cpp")));
+        auto *review = new QWidget;
+        auto *layout = new QVBoxLayout(review);
+        layout->addWidget(new QLabel(QStringLiteral("Review of a.cpp"), review));
+        auto *answer = new QTextBrowser(review);
+        answer->setMarkdown(QStringLiteral("**One** finding"));
+        layout->addWidget(answer);
+        layout->addWidget(new QPushButton(QStringLiteral("Close"), review));
+        auto *hidden = new QLabel(QStringLiteral("Not shown"), review);
+        layout->addWidget(hidden);
+        hidden->hide();
+        editor.tabs.showPage(review, QStringLiteral("Review: a.cpp"), QStringLiteral("claude"));
+        editor.tabs.setCurrentIndex(0);
+
+        const QJsonArray tabs =
+            structured(editor.call(QStringLiteral("list_tabs"))).value(QStringLiteral("tabs")).toArray();
+
+        QCOMPARE(tabs.size(), 2);
+        QCOMPARE(tabs.at(0).toObject().value(QStringLiteral("path")).toString(), QStringLiteral("a.cpp"));
+        QCOMPARE(tabs.at(1).toObject().value(QStringLiteral("title")).toString(), QStringLiteral("Review: a.cpp"));
+        QVERIFY(!tabs.at(1).toObject().contains(QStringLiteral("path")));
+        editor.call(QStringLiteral("show_tab"), {{QStringLiteral("index"), 2}});
+        QCOMPARE(editor.tabs.currentWidget(), review);
+        QVERIFY(editor.editorShown);
+        const QStringList texts =
+            structured(editor.call(QStringLiteral("get_tab_text"), {{QStringLiteral("index"), 2}}))
+                .value(QStringLiteral("texts"))
+                .toVariant()
+                .toStringList();
+        QCOMPARE(texts, (QStringList{"Review of a.cpp", "**One** finding", "[Close]"}));
+        QVERIFY(editor.call(QStringLiteral("get_tab_text"), {{QStringLiteral("index"), 1}})
+                    .value(QStringLiteral("isError"))
+                    .toBool());
+        QVERIFY(editor.call(QStringLiteral("show_tab"), {{QStringLiteral("index"), 3}})
+                    .value(QStringLiteral("isError"))
+                    .toBool());
     }
 
     void readsAClosedFileInItsOwnEncoding()

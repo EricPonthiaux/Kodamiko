@@ -505,6 +505,7 @@ void MainWindow::registerMcpTools()
         return terminals;
     };
     context.addTerminal = [this](const QString &title, const ProcessSpec &spec) { return addTerminal(title, spec); };
+    context.showEditor = [this] { setMode(Mode::Edit); };
     context.showChanges = [this](const QString &relativePath) {
         setMode(Mode::Diff);
         changesView_->refresh();
@@ -517,6 +518,7 @@ void MainWindow::registerMcpTools()
     };
     context.repositoryChanged = [this] { onRepositoryChanged(); };
     KDKTools::registerEditorTools(mcpRegistry_, context);
+    KDKTools::registerTabTools(mcpRegistry_, context);
     KDKTools::registerWorkspaceTools(mcpRegistry_, context);
     KDKTools::registerCodeTools(mcpRegistry_, context);
     KDKTools::registerRefactoringTools(mcpRegistry_, context);

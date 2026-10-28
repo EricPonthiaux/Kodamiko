@@ -88,6 +88,9 @@ public:
 
     // Paths of open files, in tab order (excluding diffs).
     QStringList openFilePaths() const;
+    // Path of the file shown in `page`, empty for a page that shows no file
+    // (a diff, a review…).
+    QString filePathOf(QWidget *page) const;
     QString currentFilePath() const;
     // Text of the files with unsaved changes, by path.
     QHash<QString, QString> unsavedTexts() const;
@@ -182,8 +185,6 @@ private:
     // Tells that `filePath` could not be opened or saved, and why.
     void showFileError(const QString &title, const QString &filePath, const QString &error);
     bool closeTab(int index, bool askToSave = true);
-    // Path of the file shown in `page`, empty for a diff.
-    QString filePathOf(QWidget *page) const;
     // Pages of the files under `path`.
     QList<QWidget *> pagesUnder(const QString &path) const;
     // `pages` in the order to close them: the current one last. Closed
