@@ -178,6 +178,8 @@ private slots:
         QVERIFY(request.startsWith(QStringLiteral(
             "Explain how this code works, as a flowchart: `AgentRun` in src/agent/AgentRun.cpp, line 21.\n")));
         QVERIFY(request.contains(QStringLiteral("`click` line")));
+        QVERIFY(request.contains(QStringLiteral("not the header that only declares it")));
+        QVERIFY(request.contains(QStringLiteral("Class.member in Java, JavaScript and TypeScript")));
         QVERIFY(request.endsWith(QStringLiteral("in French.")));
     }
 

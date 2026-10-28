@@ -45,6 +45,9 @@ private:
     // The menu of `targets`, opened at `globalPoint` over `clicked`.
     void chooseTargetAt(QWidget &clicked, QPoint globalPoint, const QList<SymbolLocation> &targets);
     QString notFoundMessage(const QString &name) const;
+    // A link "main.ts" reads as the symbol `ts` in `main`: the project's root
+    // file `container`.`name` when there is one (absolute path), else empty.
+    QString rootFileNamed(const QString &container, const QString &name) const;
     // No symbol found: opens the linked `file` when there is one (absolute
     // path), else says that `qualifiedName` was not found.
     void showLinkedFile(const QString &file, const QString &qualifiedName);

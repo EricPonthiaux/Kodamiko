@@ -30,7 +30,11 @@ QString explanation(const QString &code, const QString &language)
                "code runs them, the error paths included. Name each step in plain words rather than with code, and "
                "keep to about 25 elements. Link each element that stands for a function, a method or a class of "
                "this project to it with a `click` line, as the skill's \"Links to the code\" says: the user "
-               "Ctrl+clicks it to read that code. Write the diagram's texts and your answer in %2.")
+               "Ctrl+clicks it to read that code. Name the file that defines it, where its body is: in C or C++ the "
+               "source file, not the header that only declares it; in TypeScript the implementation, not a "
+               "signature or a .d.ts. Qualify a member with its class: Class::member in C and C++, Class.member in "
+               "Java, JavaScript and TypeScript. The element where the flow starts links to the code this request "
+               "is about. Write the diagram's texts and your answer in %2.")
         .arg(code, language);
 }
 

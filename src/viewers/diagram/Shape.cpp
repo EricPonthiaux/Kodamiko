@@ -262,9 +262,12 @@ std::optional<CodeReference> codeReferenceOf(const QString &link)
 
 std::optional<CodeReference> codeReferenceIn(const QString &text)
 {
-    static const QRegularExpression generics(QStringLiteral("~[^~]*~|<.*>"));
-    static const QRegularExpression qualifiedName(QStringLiteral("^(?:([A-Za-z_]\\w*)::)*([A-Za-z_]\\w*)$"));
-    const QString bare = QString(text).remove(generics).trimmed();
+    // Generics, and the parameters of a function written as called.
+    static const QRegularExpression decorations(QStringLiteral("~[^~]*~|<.*>|\\(.*\\)$"));
+    // C and C++ qualify with "::", Java, JavaScript and TypeScript with ".".
+    static const QRegularExpression qualifiedName(
+        QStringLiteral("^(?:([A-Za-z_$][\\w$]*)(?:::|\\.))*([A-Za-z_$][\\w$]*)$"));
+    const QString bare = QString(text).remove(decorations).trimmed();
     const QRegularExpressionMatch match = qualifiedName.match(bare);
     if (!match.hasMatch())
         return std::nullopt;

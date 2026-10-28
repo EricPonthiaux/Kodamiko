@@ -86,13 +86,16 @@ struct CodeReference {
     QString filePath;  // relative to the project, or empty: anywhere
 };
 
-// The reference written in `text` when it reads as a (qualified) name:
-// "Foo", "Foo::bar", "Foo~T~" (Mermaid's generics) or "Foo<T>"; nullopt for
-// prose ("Hook server").
+// The reference written in `text` when it reads as a (qualified) name, in
+// C, C++, Java, JavaScript or TypeScript: "Foo", "Foo::bar", "Foo.bar",
+// "bar()", "Foo~T~" (Mermaid's generics) or "Foo<T>"; nullopt for prose
+// ("Hook server").
 std::optional<CodeReference> codeReferenceIn(const QString &text);
 // The reference of an element's explicit link to the code: a name
-// ("HookServer", "Git::run"), a file ("src/git/Git.h") or a name in a file
-// ("src/git/Git.h#Git::run"); nullopt when empty.
+// ("HookServer", "Git::run", "Queue.enqueue"), a file ("src/git/Git.h") or
+// a name in a file ("src/git/Git.cpp#Git::run"); nullopt when empty. A
+// file at the project's root reads as a name ("main.ts" as `ts` in `main`):
+// the navigator opens it when no such symbol exists.
 std::optional<CodeReference> codeReferenceOf(const QString &link);
 
 // ---------------------------------------------------------------------------

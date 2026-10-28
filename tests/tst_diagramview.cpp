@@ -386,6 +386,71 @@ private slots:
 
     // Ctrl+click from a diagram to the code, then Back (Alt+←) to the element
     // it started from, and Forward (Alt+→) to the code again.
+    // A link that names the header goes to the code: the definition in the
+    // .cpp, as Ctrl+click in the editor does.
+    void followsALinkToAHeaderToTheDefinition()
+    {
+        const QTemporaryDir dir;
+        const QString header =
+            writeFile(dir, QStringLiteral("Queue.h"), "class Queue {\npublic:\n    void enqueue(int item);\n};\n");
+        const QString source = writeFile(dir, QStringLiteral("Queue.cpp"),
+                                         "#include \"Queue.h\"\n\nvoid Queue::enqueue(int item)\n{\n}\n");
+        EditorTabs tabs(Theme::duet());
+        SymbolIndex symbols;
+        symbols.setFolder(dir.path());
+        symbols.updateFile(header, "class Queue {\npublic:\n    void enqueue(int item);\n};\n");
+        symbols.updateFile(source, "#include \"Queue.h\"\n\nvoid Queue::enqueue(int item)\n{\n}\n");
+        CodeNavigator navigator(&tabs, &symbols);
+
+        navigator.goToSymbol(QStringLiteral("enqueue"), QStringLiteral("Queue"), QStringLiteral("Queue.h"));
+
+        QVERIFY(tabs.currentEditor());
+        QCOMPARE(tabs.currentEditor()->filePath(), QFileInfo(source).absoluteFilePath());
+    }
+
+    // The links of a diagram in the other languages the symbol index reads:
+    // members qualified with ".", a TypeScript declaration to its
+    // implementation, a root file named like a symbol.
+    void followsLinksInJavaJavaScriptAndTypeScript()
+    {
+        const QTemporaryDir dir;
+        const QHash<QString, QByteArray> files{
+            {QStringLiteral("Queue.java"), "class Queue {\n    void enqueue(int item) {\n    }\n}\n"},
+            {QStringLiteral("queue.js"), "class Queue {\n  enqueue(item) {\n  }\n}\n"},
+            {QStringLiteral("queue.d.ts"), "export declare function drain(): void;\n"},
+            {QStringLiteral("drain.ts"), "export function drain(): void {\n}\n"},
+        };
+        EditorTabs tabs(Theme::duet());
+        SymbolIndex symbols;
+        symbols.setFolder(dir.path());
+        for (auto it = files.begin(); it != files.end(); ++it)
+            symbols.updateFile(writeFile(dir, it.key(), it.value()), it.value());
+        CodeNavigator navigator(&tabs, &symbols);
+        const auto openedAt = [&tabs] {
+            const EditorWidget *editor = tabs.currentEditor();
+            if (!editor)
+                return QString();
+            int line = 0;
+            int column = 0;
+            editor->getCursorPosition(&line, &column);
+            return QStringLiteral("%1:%2").arg(QFileInfo(editor->filePath()).fileName()).arg(line + 1);
+        };
+
+        navigator.goToSymbol(QStringLiteral("enqueue"), QStringLiteral("Queue"), QStringLiteral("Queue.java"));
+        const QString java = openedAt();
+        navigator.goToSymbol(QStringLiteral("enqueue"), QStringLiteral("Queue"), QStringLiteral("queue.js"));
+        const QString javaScript = openedAt();
+        navigator.goToSymbol(QStringLiteral("drain"), {}, QStringLiteral("queue.d.ts"));
+        const QString typeScript = openedAt();
+        navigator.goToSymbol(QStringLiteral("ts"), QStringLiteral("drain"), {});
+        const QString rootFile = openedAt();
+
+        QCOMPARE(java, QStringLiteral("Queue.java:2"));
+        QCOMPARE(javaScript, QStringLiteral("queue.js:2"));
+        QCOMPARE(typeScript, QStringLiteral("drain.ts:1"));
+        QCOMPARE(rootFile, QStringLiteral("drain.ts:1"));
+    }
+
     void comesBackToTheDiagramElementWithBack()
     {
         const QTemporaryDir dir;

@@ -622,6 +622,22 @@ private slots:
         QVERIFY(!codeReferenceIn(QStringLiteral("Hook server")));
     }
 
+    void readsMembersQualifiedWithADotAndNamesWrittenAsCalls()
+    {
+        const auto member = codeReferenceIn(QStringLiteral("Queue.enqueue"));
+        const auto call = codeReferenceIn(QStringLiteral("enqueue(item)"));
+        const auto linked = codeReferenceOf(QStringLiteral("src/queue.ts#Queue.enqueue"));
+
+        QVERIFY(member && call && linked);
+        QCOMPARE(member->name, QStringLiteral("enqueue"));
+        QCOMPARE(member->container, QStringLiteral("Queue"));
+        QCOMPARE(call->name, QStringLiteral("enqueue"));
+        QVERIFY(call->container.isEmpty());
+        QCOMPARE(linked->name, QStringLiteral("enqueue"));
+        QCOMPARE(linked->container, QStringLiteral("Queue"));
+        QCOMPARE(linked->filePath, QStringLiteral("src/queue.ts"));
+    }
+
     void readsALinkToTheCodeAsASymbolAFileOrBoth()
     {
         const auto symbol = codeReferenceOf(QStringLiteral("Git::run"));

@@ -58,7 +58,13 @@ or the name is ambiguous, link it explicitly (paths relative to the project):
 in a flowchart or a Mermaid class diagram, and `class Hooks [[src/agent/HookServer.h#HookServer]]`
 in a PlantUML class diagram. The target is a symbol (`HookServer`,
 `Git::run`), a file, or a symbol in a file (`file#Symbol`): never a line
-number, which moves with every edit.
+number, which moves with every edit. Name the file that defines the symbol,
+where its body is (`src/git/Git.cpp#Git::run`): in C or C++ the source
+file, not the header that only declares it; in TypeScript the
+implementation, not a signature or a `.d.ts`. Qualify a member with its
+class: `Class::member` in C and C++, `Class.member` in Java, JavaScript and
+TypeScript. Duet follows these links in C, C++, Java, JavaScript and
+TypeScript.
 
 ## Explainer boards (.board)
 

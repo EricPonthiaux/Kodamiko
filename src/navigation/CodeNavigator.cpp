@@ -13,7 +13,31 @@
 #include <QMenu>
 #include <QRegularExpression>
 
+#include <algorithm>
+
 namespace {
+
+// The symbols of `matches` in `file`. When the file only declares them (a
+// header), their definitions elsewhere too: a link to a symbol means its code,
+// as Ctrl+click in the editor does, and Definitions::resolve puts them first.
+QList<SymbolLocation> inLinkedFile(const QList<SymbolLocation> &matches, const QString &file)
+{
+    QList<SymbolLocation> linked;
+    for (const SymbolLocation &symbol : matches) {
+        if (QDir::cleanPath(symbol.filePath) == file)
+            linked.append(symbol);
+    }
+    const bool onlyDeclares = !linked.isEmpty() && std::ranges::all_of(linked, [](const SymbolLocation &symbol) {
+        return symbol.declarationOnly;
+    });
+    if (!onlyDeclares)
+        return linked;
+    for (const SymbolLocation &symbol : matches) {
+        if (!symbol.declarationOnly)
+            linked.append(symbol);
+    }
+    return linked;
+}
 
 QString describe(const SymbolLocation &target, const QString &folder)
 {
@@ -87,12 +111,17 @@ void CodeNavigator::goToSymbol(const QString &name, const QString &container, co
         filePath.isEmpty() ? QString() : QDir::cleanPath(QDir(index_->folder()).absoluteFilePath(filePath));
     QList<SymbolLocation> matches = name.isEmpty() ? QList<SymbolLocation>() : index_->lookup(name);
     if (!file.isEmpty())
-        matches.removeIf([&file](const SymbolLocation &symbol) { return QDir::cleanPath(symbol.filePath) != file; });
+        matches = inLinkedFile(matches, file);
     Definitions::Request request;
     request.word = name;
     request.qualifier = container;
     const Definitions::Result result = Definitions::resolve(request, std::move(matches), {});
 
+    if (const QString rootFile = file.isEmpty() ? rootFileNamed(container, name) : QString();
+        result.targets.isEmpty() && !rootFile.isEmpty()) {
+        goToLine(rootFile, 0);
+        return;
+    }
     if (result.targets.isEmpty()) {
         showLinkedFile(file, container.isEmpty() ? name : container + QLatin1String("::") + name);
         return;
@@ -118,6 +147,14 @@ void CodeNavigator::showLinkedFile(const QString &file, const QString &qualified
     goToLine(file, 0);
     if (!qualifiedName.isEmpty())
         emit statusMessage(tr("No definition found for \"%1\" in %2").arg(qualifiedName, shownPath));
+}
+
+QString CodeNavigator::rootFileNamed(const QString &container, const QString &name) const
+{
+    if (container.isEmpty())
+        return {};
+    const QString path = QDir(index_->folder()).filePath(container + QLatin1Char('.') + name);
+    return QFileInfo(path).isFile() ? QDir::cleanPath(path) : QString();
 }
 
 QString CodeNavigator::notFoundMessage(const QString &name) const
