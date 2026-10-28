@@ -454,6 +454,26 @@ private slots:
         QVERIFY(view.findChild<ReviewFindingCard *>()->isVisible());
     }
 
+    void aReviewWithoutFindingsKeepsItsTextUnderItsTitle()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(QStringLiteral(R"({"summary": "Sound.", "findings": []})"));
+        ReviewView view({.workDir = folder.path(), .subject = "the code", .agent = &agent});
+        view.resize(800, 900);
+        view.show();
+
+        view.session()->start();
+        QTRY_COMPARE(view.session()->state(), ReviewSession::State::Finished);
+
+        const QLabel *summary = nullptr;
+        for (const QLabel *label : view.findChildren<QLabel *>()) {
+            if (label->isVisible() && label->text().contains("Sound."))
+                summary = label;
+        }
+        QVERIFY(summary);
+        QVERIFY2(summary->mapTo(&view, QPoint()).y() < 200, "the summary is spread down the tab");
+    }
+
     void findingsAreGroupedByFile()
     {
         ReviewedFindings review;

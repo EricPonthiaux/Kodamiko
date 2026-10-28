@@ -82,6 +82,9 @@ QWidget *ReviewView::createResults()
     layout->addWidget(summary_);
     layout->addWidget(findings_, 1);
     layout->addWidget(rawAnswerView_, 1);
+    // Takes the height left when neither the findings nor the answer show (a
+    // review without findings): the texts stay at the top, not spread out.
+    layout->addStretch();
     return results_;
 }
 
