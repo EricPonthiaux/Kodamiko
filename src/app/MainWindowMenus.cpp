@@ -25,6 +25,7 @@
 #include "terminal/TerminalWidget.h"
 #include "ui/AboutPopup.h"
 #include "ui/DesktopIntegration.h"
+#include "ui/FileIcons.h"
 #include "ui/TitleBar.h"
 #include "viewers/DiagramKinds.h"
 #include "workspace/CommandPalette.h"
@@ -525,6 +526,7 @@ int MainWindow::addRecentProjects(QMenu *menu)
         QAction *action = menu->addAction(QFileInfo(folder).fileName(), this,
                                           [this, folder] { askToOpenProject(folder, AfterOpening::Nothing); });
         action->setToolTip(QDir::toNativeSeparators(folder));
+        action->setIcon(FileIcons::folder(theme_.isDark)); // the project chip's
         ++listed;
     }
     menu->setToolTipsVisible(true);

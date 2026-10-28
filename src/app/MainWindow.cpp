@@ -214,6 +214,7 @@ void MainWindow::createWidgets(const Preferences &preferences)
     setMenuWidget(titleBar_);
     frame_ = new WindowFrame(this);
     projectMenu_ = new QMenu(this);
+    projectMenu_->setObjectName(QStringLiteral("projectMenu"));
 
     editorTabs_ = new EditorTabs(theme_, this);
     editorTabs_->setEditorOptions(preferences.editor);

@@ -25,7 +25,6 @@
 #include <QFileInfo>
 #include <QMenu>
 #include <QProxyStyle>
-#include <QSettings>
 #include <QStyleFactory>
 #include <QStyleOption>
 
@@ -172,21 +171,6 @@ private:
     }
 };
 
-void adoptLegacySettings()
-{
-    const QString adopted = QStringLiteral("adoptedDuetSettings");
-    QSettings settings;
-    if (settings.value(adopted).toBool())
-        return;
-    const QSettings legacy(QStringLiteral("Duet"), QStringLiteral("Duet"));
-    const QStringList keys = legacy.allKeys();
-    for (const QString &key : keys) {
-        if (!settings.contains(key))
-            settings.setValue(key, legacy.value(key));
-    }
-    settings.setValue(adopted, true);
-}
-
 // Duet's downloads, from its application data to ~/.duet/tools, once.
 void adoptLegacyToolchains()
 {
@@ -255,7 +239,6 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("Duet"));
     QApplication::setApplicationVersion(QStringLiteral(DUET_VERSION));
     LogFiles::install(QStringLiteral("duet"));
-    adoptLegacySettings();
     adoptLegacyToolchains();
     Motion::policy().setEnabled(Preferences::load().animations);
     Motion::install();

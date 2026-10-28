@@ -144,6 +144,7 @@ QMenuBar::item:selected, QMenuBar::item:pressed { background: @hover; color: @te
 QMenu { background: @panel; color: @text; border: 1px solid @border; border-radius: @frameRadiuspx; padding: 6px; }
 QMenu::item { padding: 6px 28px 6px 22px; border: 1px solid transparent; border-radius: @rowRadiuspx; }
 QMenu::icon { padding-left: 32px; }
+QMenu#projectMenu::icon { padding-left: 44px; }
 QMenu::item:selected { color: @text; background: @slate; }
 QMenu::item:disabled { color: @muted; }
 QMenu::separator { height: 1px; background: @separator; margin: 6px 10px; }

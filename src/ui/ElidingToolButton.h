@@ -31,6 +31,10 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    // The pixels added between the icon and the text, when both show.
+    int iconGap() const;
+    // QToolButton's size hint, with that gap.
+    QSize labelSizeHint() const;
     int fullWidth() const;
 
     int preferredWidth_;
