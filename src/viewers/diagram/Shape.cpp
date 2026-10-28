@@ -6,6 +6,7 @@
 
 #include <QJsonArray>
 #include <QPainter>
+#include <QRegularExpression>
 
 #include <algorithm>
 #include <cmath>
@@ -113,6 +114,7 @@ void Shape::load(const QJsonObject &props)
     const QString fill = jsonString(props, QStringLiteral("customFill"));
     customFill = isHexColor(fill) ? fill.toLower() : QString();
     parentBoundary = jsonString(props, QStringLiteral("parentBoundary"));
+    codeLink = jsonString(props, QStringLiteral("code"));
     const int order = int(jsonNumber(props, QStringLiteral("appearAt"), 0));
     appearAt = order >= 1 && order <= 1000 ? order : 0;
 }
@@ -129,6 +131,8 @@ QJsonObject Shape::toJson() const
         json.insert(QStringLiteral("customFill"), customFill);
     if (!parentBoundary.isEmpty())
         json.insert(QStringLiteral("parentBoundary"), parentBoundary);
+    if (!codeLink.isEmpty())
+        json.insert(QStringLiteral("code"), codeLink);
     if (appearAt)
         json.insert(QStringLiteral("appearAt"), appearAt);
     return json;
@@ -232,6 +236,39 @@ QStringList Shape::graphvizNodeAttributes(const Board &, const QString &, qreal,
 QString Shape::displayText() const
 {
     return key;
+}
+
+std::optional<CodeReference> Shape::codeReferenceAt(QPointF) const
+{
+    if (!codeLink.isEmpty())
+        return codeReferenceOf(codeLink);
+    return codeReferenceIn(displayText().section(QLatin1Char('\n'), 0, 0));
+}
+
+std::optional<CodeReference> codeReferenceOf(const QString &link)
+{
+    const QString written = link.trimmed();
+    if (written.isEmpty())
+        return std::nullopt;
+    const qsizetype hash = written.indexOf(QLatin1Char('#'));
+    const QString filePath = hash < 0 ? QString() : written.left(hash);
+    const QString symbolText = hash < 0 ? written : written.mid(hash + 1);
+    std::optional<CodeReference> symbol = codeReferenceIn(symbolText);
+    if (!symbol)
+        return CodeReference{.filePath = hash < 0 ? written : filePath};
+    symbol->filePath = filePath;
+    return symbol;
+}
+
+std::optional<CodeReference> codeReferenceIn(const QString &text)
+{
+    static const QRegularExpression generics(QStringLiteral("~[^~]*~|<.*>"));
+    static const QRegularExpression qualifiedName(QStringLiteral("^(?:([A-Za-z_]\\w*)::)*([A-Za-z_]\\w*)$"));
+    const QString bare = QString(text).remove(generics).trimmed();
+    const QRegularExpressionMatch match = qualifiedName.match(bare);
+    if (!match.hasMatch())
+        return std::nullopt;
+    return CodeReference{.name = match.captured(2), .container = match.captured(1)};
 }
 
 QVariant Shape::propertyValue(const QString &) const

@@ -281,6 +281,7 @@ void MainWindow::createCodeServices(const Preferences &preferences)
         }
     });
     navigator_ = new CodeNavigator(editorTabs_, symbolIndex_, this);
+    connect(editorTabs_, &EditorTabs::symbolRequested, navigator_, &CodeNavigator::goToSymbol);
 
     intelligence_ = new CodeIntelligence(
         {editorTabs_, languageServers_, navigator_, problemStore_, &occurrenceIndex_->store()}, this);

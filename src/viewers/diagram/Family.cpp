@@ -136,6 +136,14 @@ const Codec *defaultCodec(const Family &family)
     return nullptr;
 }
 
+void linkToCode(Model &model, const QHash<QString, QString> &codeLinks)
+{
+    for (Model::Node &node : model.nodes) {
+        if (codeLinks.contains(node.key))
+            node.props.insert(QStringLiteral("code"), codeLinks.value(node.key));
+    }
+}
+
 QJsonObject buildBoard(Board &board, const Codec &codec, const Model &model)
 {
     if (board.family() != &codec.family())

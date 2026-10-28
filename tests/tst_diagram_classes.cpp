@@ -588,6 +588,92 @@ private slots:
         QCOMPARE(byKey(board, "Child")->stereotype, QStringLiteral("abstract"));
     }
 
+    void pointsAtTheClassFromItsTitleAndAtAMemberFromItsRow()
+    {
+        ClassShape classifier;
+        classifier.load(QJsonObject{{"name", "AgentActivity"},
+                                    {"attributes", QJsonArray{"-state: State"}},
+                                    {"methods", QJsonArray{"+handle(event) void"}}});
+        classifier.x = 0;
+        classifier.y = 0;
+
+        const auto title = classifier.codeReferenceAt(QPointF(40, 20));
+        const auto attribute = classifier.codeReferenceAt(QPointF(40, 65));
+        const auto method = classifier.codeReferenceAt(QPointF(40, 99));
+
+        QVERIFY(title && attribute && method);
+        QCOMPARE(title->name, QStringLiteral("AgentActivity"));
+        QVERIFY(title->container.isEmpty());
+        QCOMPARE(attribute->name, QStringLiteral("state"));
+        QCOMPARE(attribute->container, QStringLiteral("AgentActivity"));
+        QCOMPARE(method->name, QStringLiteral("handle"));
+        QCOMPARE(method->container, QStringLiteral("AgentActivity"));
+    }
+
+    void readsOnlyANameAsACodeReference()
+    {
+        const auto qualified = codeReferenceIn(QStringLiteral("Git::run"));
+        const auto generic = codeReferenceIn(QStringLiteral("List~T~"));
+
+        QVERIFY(qualified && generic);
+        QCOMPARE(qualified->name, QStringLiteral("run"));
+        QCOMPARE(qualified->container, QStringLiteral("Git"));
+        QCOMPARE(generic->name, QStringLiteral("List"));
+        QVERIFY(!codeReferenceIn(QStringLiteral("Hook server")));
+    }
+
+    void readsALinkToTheCodeAsASymbolAFileOrBoth()
+    {
+        const auto symbol = codeReferenceOf(QStringLiteral("Git::run"));
+        const auto file = codeReferenceOf(QStringLiteral("src/git/Git.h"));
+        const auto both = codeReferenceOf(QStringLiteral("src/git/Git.h#Git::run"));
+
+        QVERIFY(symbol && file && both);
+        QCOMPARE(symbol->name, QStringLiteral("run"));
+        QCOMPARE(symbol->container, QStringLiteral("Git"));
+        QVERIFY(symbol->filePath.isEmpty());
+        QVERIFY(file->name.isEmpty());
+        QCOMPARE(file->filePath, QStringLiteral("src/git/Git.h"));
+        QCOMPARE(both->name, QStringLiteral("run"));
+        QCOMPARE(both->filePath, QStringLiteral("src/git/Git.h"));
+        QVERIFY(!codeReferenceOf(QStringLiteral("  ")));
+    }
+
+    void keepsTheMermaidLinksToTheCode()
+    {
+        Board board;
+        QVERIFY(loadInto(board, QStringLiteral("a.mmd"),
+                         "classDiagram\n  class Hook {\n    +listen()\n  }\n  class Other\n"
+                         "  click Hook href \"src/agent/HookServer.h#HookServer\"\n  click Other call back()\n"));
+
+        const ClassShape *hook = byKey(board, QStringLiteral("Hook"));
+        const auto title = hook->codeReferenceAt(QPointF(hook->x + 20, hook->y + 20));
+        const QByteArray saved = document::save(board, mermaid());
+
+        QCOMPARE(hook->codeLink, QStringLiteral("src/agent/HookServer.h#HookServer"));
+        QVERIFY(byKey(board, QStringLiteral("Other"))->codeLink.isEmpty());
+        QVERIFY(title);
+        QCOMPARE(title->name, QStringLiteral("HookServer"));
+        QCOMPARE(title->filePath, QStringLiteral("src/agent/HookServer.h"));
+        QVERIFY(saved.contains("\n  click Hook href \"src/agent/HookServer.h#HookServer\"\n"));
+        QVERIFY(!saved.contains("click Other"));
+    }
+
+    void keepsThePlantumlLinksToTheCode()
+    {
+        Board board;
+        QVERIFY(loadInto(board, QStringLiteral("a.puml"),
+                         "@startuml\nclass Hook [[src/agent/HookServer.h#HookServer{the server}]] {\n  +listen()\n}\n"
+                         "@enduml\n"));
+
+        const ClassShape *hook = byKey(board, QStringLiteral("Hook"));
+        const QByteArray saved = document::save(board, plantuml());
+
+        QCOMPARE(hook->codeLink, QStringLiteral("src/agent/HookServer.h#HookServer"));
+        QCOMPARE(hook->methods, QStringList{QStringLiteral("+listen()")});
+        QVERIFY(saved.contains("class Hook [[src/agent/HookServer.h#HookServer]] {\n"));
+    }
+
     void drawsWithoutCrashing()
     {
         Board board;

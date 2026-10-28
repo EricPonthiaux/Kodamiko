@@ -132,6 +132,8 @@ signals:
     void fileSaved(const QString &path);
     // Ctrl+click in the current editor.
     void definitionRequested();
+    // Ctrl+click on a diagram's element (see DiagramView::codeRequested).
+    void symbolRequested(const QString &name, const QString &container, const QString &filePath);
     // A file was opened in a new text editor (not emitted for diffs).
     void editorOpened(EditorWidget *editor);
     // A tab was opened or closed: openFilePaths() may have changed.

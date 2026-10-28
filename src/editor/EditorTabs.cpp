@@ -285,6 +285,7 @@ QWidget *EditorTabs::openDiagram(const QString &absolutePath, QString *error)
     setTabToolTip(index, absolutePath);
     setCurrentIndex(index);
     connect(view, &DiagramView::modificationChanged, this, [this, view] { updateDiagramTabTitle(view); });
+    connect(view, &DiagramView::codeRequested, this, &EditorTabs::symbolRequested);
     watcher_.watch(absolutePath);
     view->setFocus();
     return view;

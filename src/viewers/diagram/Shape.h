@@ -78,6 +78,23 @@ struct Property {
     qreal maximum = 100;
 };
 
+// The code an element stands for: a symbol found by name in the project,
+// in one file when `filePath` is set, or that file alone.
+struct CodeReference {
+    QString name;      // "handle" for "AgentActivity::handle"; empty: the file
+    QString container; // the class or namespace "name" belongs to, or empty
+    QString filePath;  // relative to the project, or empty: anywhere
+};
+
+// The reference written in `text` when it reads as a (qualified) name:
+// "Foo", "Foo::bar", "Foo~T~" (Mermaid's generics) or "Foo<T>"; nullopt for
+// prose ("Hook server").
+std::optional<CodeReference> codeReferenceIn(const QString &text);
+// The reference of an element's explicit link to the code: a name
+// ("HookServer", "Git::run"), a file ("src/git/Git.h") or a name in a file
+// ("src/git/Git.h#Git::run"); nullopt when empty.
+std::optional<CodeReference> codeReferenceOf(const QString &link);
+
 // ---------------------------------------------------------------------------
 // Shape
 
@@ -184,6 +201,10 @@ public:
     // What the shape is called, for menus and descriptions (its text, name,
     // label or key).
     virtual QString displayText() const;
+    // The symbol under `point` (in world coordinates), for Ctrl+click and
+    // Go to Code. Default: the shape's link to the code, else the first line
+    // of its text when it reads as a name.
+    virtual std::optional<CodeReference> codeReferenceAt(QPointF point) const;
 
     virtual QList<Property> properties() const { return {}; }
 
@@ -203,6 +224,9 @@ public:
     qreal h = 60;
     QString customFill;     // "#rrggbb" chosen by the user, or empty
     QString parentBoundary; // id or key of the frame holding it, or empty
+    // The explicit link to the code (see codeReferenceOf), written in the
+    // source by the codecs that can (Codec::writesCodeLinks), or empty.
+    QString codeLink;
     // Order in which an explainer reveals it (0: none).
     int appearAt = 0;
 

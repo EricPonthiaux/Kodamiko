@@ -6,6 +6,7 @@
 #include <QString>
 #include <QStringList>
 
+#include <optional>
 #include <utility>
 
 // Shared helpers of the codecs, ported from sidecar's fence/util.js: source
@@ -28,6 +29,18 @@ QString mermaidUnquote(const QString &text);
 // An edge's pipe label: no structural pipe inside.
 QString pipeLabel(const QString &text);
 
+// A link from a node to the code, as written in a source.
+struct CodeLinkStatement {
+    QString key;
+    QString target; // see diagram::codeReferenceOf
+};
+
+// `click Key href "target"` or `click Key "target"`; nullopt for any other
+// statement (a `click` with a callback included).
+std::optional<CodeLinkStatement> readMermaidCodeLink(const QString &statement);
+// The `click` line linking `key` to `target`, indented by `indent`.
+QString mermaidCodeLinkLine(const QString &key, const QString &target, const QString &indent);
+
 // --- PlantUML
 
 // PlantUML text: the \n escape is a line break.
@@ -37,6 +50,17 @@ QString plantumlText(const QString &text);
 QStringList plantumlLines(const QString &source);
 // A name, quoted when it needs it.
 QString plantumlName(const QString &text);
+
+// A declaration without its `[[target]]` (a tooltip or a label after the
+// target is dropped), and that target, empty when it has none.
+struct PlantumlLinked {
+    QString statement;
+    QString target;
+};
+
+PlantumlLinked splitPlantumlCodeLink(const QString &statement);
+// The ` [[target]]` written after a declaration, empty without a target.
+QString plantumlCodeLink(const QString &target);
 
 // --- UML relations, shared by the Mermaid and PlantUML class codecs.
 

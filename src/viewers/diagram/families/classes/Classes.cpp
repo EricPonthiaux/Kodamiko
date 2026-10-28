@@ -29,6 +29,41 @@ QString tr(const char *text)
     return QCoreApplication::translate("ClassDiagram", text);
 }
 
+// The name and «stereotype» lines of a class box.
+qreal headerHeight(const QString &stereotype)
+{
+    return (stereotype.isEmpty() ? 1 : 2) * lineHeight + pad * 2;
+}
+
+// The attributes' or the methods' section, an empty one included.
+qreal sectionHeight(qsizetype memberCount)
+{
+    return memberCount ? qreal(memberCount) * lineHeight + pad : pad;
+}
+
+// The member on the row at `y` of a section whose first row starts at `top`,
+// or empty.
+QString memberAt(const QStringList &members, qreal top, qreal y)
+{
+    const qreal row = std::floor((y - top) / lineHeight);
+    const bool isOnARow = row >= 0 && row < qreal(members.size());
+    return isOnARow ? members.at(qsizetype(row)) : QString();
+}
+
+// The name a member line declares: "+handle(event) void" → "handle",
+// "-String name" → "name", "count : int" → "count".
+QString memberName(const QString &member)
+{
+    static const QRegularExpression method(QStringLiteral("([A-Za-z_]\\w*)\\s*\\("));
+    if (const QRegularExpressionMatch match = method.match(member); match.hasMatch())
+        return match.captured(1);
+    static const QRegularExpression identifier(QStringLiteral("[A-Za-z_]\\w*"));
+    QString name;
+    for (const QRegularExpressionMatch &match : identifier.globalMatch(member.section(QLatin1Char(':'), 0, 0)))
+        name = match.captured();
+    return name;
+}
+
 // UML_CLASSIFIER_PRESETS: what the creation menu offers, and the stereotypes
 // the inspector proposes.
 struct Classifier {
@@ -225,9 +260,25 @@ void ClassShape::measure(const Board &)
     for (const QString &member : attributes + methods)
         widest = std::max(widest, text::width(font, member));
     w = std::ceil(std::max<qreal>(150, widest + pad * 2));
-    const qreal header = (stereotype.isEmpty() ? 1 : 2) * lineHeight + pad * 2;
-    const auto section = [](qsizetype count) { return count ? count * lineHeight + pad : pad; };
-    h = header + section(attributes.size()) + section(methods.size());
+    h = headerHeight(stereotype) + sectionHeight(attributes.size()) + sectionHeight(methods.size());
+}
+
+std::optional<CodeReference> ClassShape::codeReferenceAt(QPointF point) const
+{
+    std::optional<CodeReference> classReference =
+        codeLink.isEmpty() ? codeReferenceIn(name) : codeReferenceOf(codeLink);
+    if (!classReference)
+        return std::nullopt;
+    // The rows as draw() lays them out, half a padding below each separator.
+    const qreal attributesTop = y + headerHeight(stereotype) + pad / 2;
+    const qreal methodsTop = attributesTop + sectionHeight(attributes.size());
+    QString member = memberAt(attributes, attributesTop, point.y());
+    if (member.isEmpty())
+        member = memberAt(methods, methodsTop, point.y());
+    const QString memberSymbol = memberName(member);
+    if (memberSymbol.isEmpty())
+        return classReference;
+    return CodeReference{.name = memberSymbol, .container = classReference->name, .filePath = classReference->filePath};
 }
 
 QString ClassShape::editText() const

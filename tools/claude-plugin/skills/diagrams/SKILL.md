@@ -45,6 +45,21 @@ Write standard Mermaid, with short, readable ids (`check`, `paid`,
 What Duet does not keep: flowchart subgraphs are flattened, and styling
 (`style`, `classDef`, `linkStyle`, `UpdateElementStyle`…) is ignored.
 
+## Links to the code
+
+In Duet, Ctrl+click on an element opens its code. An element named after a
+symbol (`class HookServer`, a member `listen()`) is found by its name.
+When you draw from the code and an element's text is not the symbol's name,
+or the name is ambiguous, link it explicitly (paths relative to the project):
+
+    click hooks href "src/agent/HookServer.h#HookServer"
+    click git href "src/git/Git.h"
+
+in a flowchart or a Mermaid class diagram, and `class Hooks [[src/agent/HookServer.h#HookServer]]`
+in a PlantUML class diagram. The target is a symbol (`HookServer`,
+`Git::run`), a file, or a symbol in a file (`file#Symbol`): never a line
+number, which moves with every edit.
+
 ## Explainer boards (.board)
 
 A JSON scene whose coordinates are part of the meaning. Read

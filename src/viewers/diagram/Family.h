@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <QHash>
 #include <QJsonObject>
 #include <QList>
 #include <QString>
@@ -136,6 +137,10 @@ public:
     // beside it.
     virtual bool sourceOwnsLayout() const { return false; }
 
+    // The notation writes the shapes' links to the code (Shape::codeLink):
+    // the inspector offers to edit them.
+    virtual bool writesCodeLinks() const { return false; }
+
     // Whether this codec reads `source` (its header).
     virtual bool matches(const QString &source) const = 0;
     // False, with `error`, if the source cannot be read.
@@ -158,6 +163,10 @@ const Codec *codecFor(const QString &language, const QString &source);
 QString languageOfFile(const QString &path);
 // The codec a family's new files are written with.
 const Codec *defaultCodec(const Family &family);
+
+// Gives the nodes of `model` keyed in `codeLinks` their link to the code
+// (the `code` prop); a key no node has is ignored.
+void linkToCode(Model &model, const QHash<QString, QString> &codeLinks);
 
 // Builds the board from a model: registers its family, creates the nodes
 // (keyed by their source ids) on a provisional grid, then the links.

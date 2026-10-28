@@ -61,6 +61,10 @@ public:
 
 signals:
     void modificationChanged(bool modified);
+    // An element was Ctrl+clicked to show the definition of `name`, a
+    // member of `container` when it is not empty, in `filePath` (relative to
+    // the project) when it is not empty; the file alone without a name.
+    void codeRequested(const QString &name, const QString &container, const QString &filePath);
 
 private:
     QWidget *createCanvasColumn();

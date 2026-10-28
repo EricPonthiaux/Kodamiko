@@ -244,12 +244,14 @@ void Canvas::showContextMenu(QPointF screen)
         board_->selectShape(s->id);
     if (l && !board_->linkSelection().contains(l->id))
         board_->selectLink(l->id);
-    if (s)
+    if (s) {
+        addCodeAction(menu, *s, p);
         addShapeActions(menu, *s);
-    else if (l)
+    } else if (l) {
         addLinkActions(menu, *l);
-    else
+    } else {
         addCanvasActions(menu, p);
+    }
     ContextMenus::exec(menu, *this, mapToGlobal(screen.toPoint()));
 }
 
@@ -267,6 +269,16 @@ void Canvas::addShapeActions(QMenu &menu, const Shape &shape)
     QAction *remove = menu.addAction(tr("Delete"));
     remove->setEnabled(board_->allowDeletion());
     connect(remove, &QAction::triggered, this, &Canvas::deleteSelection);
+}
+
+void Canvas::addCodeAction(QMenu &menu, const Shape &shape, QPointF point)
+{
+    const std::optional<CodeReference> reference = shape.codeReferenceAt(point);
+    if (!reference)
+        return;
+    connect(menu.addAction(tr("Go to Code")), &QAction::triggered, this,
+            [this, target = *reference] { emit codeRequested(target.name, target.container, target.filePath); });
+    menu.addSeparator();
 }
 
 void Canvas::addLinkActions(QMenu &menu, const Link &link)

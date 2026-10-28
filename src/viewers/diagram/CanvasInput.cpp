@@ -6,6 +6,7 @@
 #include "Canvas.h"
 #include "Family.h"
 
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -268,12 +269,14 @@ void Canvas::updateHover(QPointF screen)
         hoverConnectionShape_ = hover;
         update();
     }
+    const bool isCodeLink = s && QGuiApplication::keyboardModifiers() == Qt::ControlModifier && s->codeReferenceAt(p);
+    const bool isDiagramLink = !s && linkAt(p);
     if (portAt(p))
         setCursor(Qt::CrossCursor);
+    else if (isCodeLink || isDiagramLink)
+        setCursor(Qt::PointingHandCursor);
     else if (s)
         setCursor(Qt::SizeAllCursor);
-    else if (linkAt(p))
-        setCursor(Qt::PointingHandCursor);
     else
         setCursor(Qt::ArrowCursor);
 }
@@ -329,6 +332,8 @@ void Canvas::pressLeft(QPointF point, Qt::KeyboardModifiers modifiers)
         dragPort_ = port->second;
         return;
     }
+    if (modifiers == Qt::ControlModifier && requestCodeAt(point))
+        return;
     const bool shift = modifiers & Qt::ShiftModifier;
     if (const Shape *s = shapeAt(point)) {
         const bool keepsSelection = shift || board_->selection().contains(s->id);
@@ -348,6 +353,16 @@ void Canvas::pressLeft(QPointF point, Qt::KeyboardModifiers modifiers)
     board_->clearSelection();
     drag_ = Drag::Pan;
     panStart_ = camera_;
+}
+
+bool Canvas::requestCodeAt(QPointF point)
+{
+    const Shape *shape = shapeAt(point);
+    const std::optional<CodeReference> reference = shape ? shape->codeReferenceAt(point) : std::nullopt;
+    if (!reference)
+        return false;
+    emit codeRequested(reference->name, reference->container, reference->filePath);
+    return true;
 }
 
 void Canvas::startResize(Shape &shape)

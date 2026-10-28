@@ -26,6 +26,10 @@ public:
 
     QString displayText() const override { return name; }
 
+    // The class (its link to the code, else its name), or the member on the
+    // row under `point`.
+    std::optional<CodeReference> codeReferenceAt(QPointF point) const override;
+
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &propertyId) const override;
     void setPropertyValue(const QString &propertyId, const QVariant &value) override;

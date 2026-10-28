@@ -146,6 +146,17 @@ QStringList relationLines(const Board &board, const QHash<QString, QString> &key
 
 // A class name. Mermaid is not ASCII-only here, and an agent writing in the
 // user's language names its classes `Société` without a second thought.
+// The `click` lines of the classes linked to the code.
+QStringList codeLinkLines(const QList<ClassOut> &classes)
+{
+    QStringList out;
+    for (const ClassOut &c : classes) {
+        if (!c.shape->codeLink.isEmpty())
+            out.append(mermaidCodeLinkLine(c.key, c.shape->codeLink, QStringLiteral("  ")));
+    }
+    return out;
+}
+
 const QString mermaidName = QStringLiteral("[\\p{L}\\p{N}_.`~]+");
 
 const QRegularExpression &mermaidHeader()
@@ -176,13 +187,17 @@ public:
         if (mermaidHeader().match(stmt).hasMatch())
             return;
         const bool understood = readDirection(stmt) || readBodyLine(stmt) || readDeclaration(stmt) ||
-                                readAnnotation(stmt) || readRelation(stmt) || isSkipped(stmt) ||
+                                readAnnotation(stmt) || readRelation(stmt) || readCodeLink(stmt) || isSkipped(stmt) ||
                                 readExternalMember(stmt);
         if (!understood)
             model_.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
     }
 
-    void finish() { finishModel(model_, nodes_, QJsonObject{{QStringLiteral("rankdir"), rankdir_}}); }
+    void finish()
+    {
+        finishModel(model_, nodes_, QJsonObject{{QStringLiteral("rankdir"), rankdir_}});
+        linkToCode(model_, codeLinks_);
+    }
 
 private:
     ClassNode &classNamed(const QString &rawName)
@@ -281,6 +296,16 @@ private:
         return true;
     }
 
+    // click Name href "target"
+    bool readCodeLink(const QString &stmt)
+    {
+        const std::optional<CodeLinkStatement> link = readMermaidCodeLink(stmt);
+        if (!link)
+            return false;
+        codeLinks_.insert(link->key, link->target);
+        return true;
+    }
+
     static bool isSkipped(const QString &stmt)
     {
         static const QRegularExpression skip(
@@ -304,6 +329,7 @@ private:
 
     Model &model_;
     ClassNodes nodes_;
+    QHash<QString, QString> codeLinks_; // by class key
     QString rankdir_ = QStringLiteral("TB");
     int body_ = -1; // the class whose { } body we are inside
 };
@@ -317,6 +343,8 @@ public:
     QString title() const override { return QStringLiteral("Class diagram"); }
 
     const Family &family() const override { return families::classes(); }
+
+    bool writesCodeLinks() const override { return true; }
 
     bool matches(const QString &source) const override
     {
@@ -341,7 +369,8 @@ public:
         if (!rankdir.isEmpty() && rankdir != QLatin1String("TB"))
             out.append(QStringLiteral("  direction ") + rankdir);
         QHash<QString, QString> keys;
-        for (const ClassOut &c : classesOf(board, keys)) {
+        const QList<ClassOut> classes = classesOf(board, keys);
+        for (const ClassOut &c : classes) {
             QStringList members;
             if (!c.shape->stereotype.isEmpty())
                 members.append(QStringLiteral("<<%1>>").arg(c.shape->stereotype));
@@ -366,6 +395,7 @@ public:
             out.append(QStringLiteral("  }"));
         }
         out += relationLines(board, keys, QStringLiteral("  "));
+        out += codeLinkLines(classes);
         return out.join(QLatin1Char('\n'));
     }
 
@@ -426,7 +456,11 @@ public:
             model_.warnings.append(QStringLiteral("Not understood: %1").arg(stmt));
     }
 
-    void finish() { finishModel(model_, nodes_, QJsonObject{}); }
+    void finish()
+    {
+        finishModel(model_, nodes_, QJsonObject{});
+        linkToCode(model_, codeLinks_);
+    }
 
 private:
     ClassNode &classNamed(const QString &rawName, const QString &alias = QString())
@@ -495,10 +529,13 @@ private:
         static const QRegularExpression declarationKind(QStringLiteral("^(") + plantumlKinds + QStringLiteral(")"),
                                                         QRegularExpression::CaseInsensitiveOption);
         static const QRegularExpression stereotypePattern(QStringLiteral("<<\\s*([^>]*?)\\s*>>"));
-        const QRegularExpressionMatch m = declaration.match(stmt);
+        const PlantumlLinked linked = splitPlantumlCodeLink(stmt);
+        const QRegularExpressionMatch m = declaration.match(linked.statement);
         if (!m.hasMatch())
             return false;
         ClassNode &node = declaredClass(m);
+        if (!linked.target.isEmpty())
+            codeLinks_.insert(node.key, linked.target);
         const QString kindStereotype = keywordStereotype(declarationKind.match(stmt).captured(1).toLower());
         if (!kindStereotype.isEmpty())
             node.stereotype = kindStereotype;
@@ -556,7 +593,8 @@ private:
 
     Model &model_;
     ClassNodes nodes_;
-    int body_ = -1; // the class whose { } body we are inside
+    QHash<QString, QString> codeLinks_; // by class key
+    int body_ = -1;                     // the class whose { } body we are inside
 };
 
 class PlantumlClass : public Codec {
@@ -568,6 +606,8 @@ public:
     QString title() const override { return QStringLiteral("Class diagram"); }
 
     const Family &family() const override { return families::classes(); }
+
+    bool writesCodeLinks() const override { return true; }
 
     bool matches(const QString &source) const override
     {
@@ -609,7 +649,7 @@ public:
                                    ? QStringLiteral(" <<%1>>").arg(c.shape->stereotype)
                                    : QString();
             const QStringList members = c.shape->attributes + c.shape->methods;
-            const QString head = keyword + QLatin1Char(' ') + label + c.key + st;
+            const QString head = keyword + QLatin1Char(' ') + label + c.key + st + plantumlCodeLink(c.shape->codeLink);
             if (members.isEmpty()) {
                 out.append(head);
                 continue;

@@ -7,6 +7,7 @@
 #include "editor/EditorWidget.h"
 #include "ui/ContextMenus.h"
 
+#include <QCursor>
 #include <QDir>
 #include <QFileInfo>
 #include <QMenu>
@@ -71,9 +72,7 @@ void CodeNavigator::goToDefinition()
         Definitions::resolve(request, index_->lookup(request.word), index_->symbolsIn(request.filePath));
 
     if (result.targets.isEmpty()) {
-        emit statusMessage(index_->isIndexing()
-                               ? tr("No definition found for \"%1\" (indexing in progress)").arg(request.word)
-                               : tr("No definition found for \"%1\"").arg(request.word));
+        emit statusMessage(notFoundMessage(request.word));
         return;
     }
     if (result.ambiguous)
@@ -82,19 +81,68 @@ void CodeNavigator::goToDefinition()
         jumpTo(result.targets.first());
 }
 
+void CodeNavigator::goToSymbol(const QString &name, const QString &container, const QString &filePath)
+{
+    const QString file =
+        filePath.isEmpty() ? QString() : QDir::cleanPath(QDir(index_->folder()).absoluteFilePath(filePath));
+    QList<SymbolLocation> matches = name.isEmpty() ? QList<SymbolLocation>() : index_->lookup(name);
+    if (!file.isEmpty())
+        matches.removeIf([&file](const SymbolLocation &symbol) { return QDir::cleanPath(symbol.filePath) != file; });
+    Definitions::Request request;
+    request.word = name;
+    request.qualifier = container;
+    const Definitions::Result result = Definitions::resolve(request, std::move(matches), {});
+
+    if (result.targets.isEmpty()) {
+        showLinkedFile(file, container.isEmpty() ? name : container + QLatin1String("::") + name);
+        return;
+    }
+    // The diagram was just clicked: the menu opens under the pointer.
+    if (result.ambiguous)
+        chooseTargetAt(*tabs_, QCursor::pos(), result.targets);
+    else
+        jumpTo(result.targets.first());
+}
+
+void CodeNavigator::showLinkedFile(const QString &file, const QString &qualifiedName)
+{
+    if (file.isEmpty()) {
+        emit statusMessage(notFoundMessage(qualifiedName));
+        return;
+    }
+    const QString shownPath = QDir(index_->folder()).relativeFilePath(file);
+    if (!QFileInfo::exists(file)) {
+        emit statusMessage(tr("The linked file \"%1\" does not exist").arg(shownPath));
+        return;
+    }
+    goToLine(file, 0);
+    if (!qualifiedName.isEmpty())
+        emit statusMessage(tr("No definition found for \"%1\" in %2").arg(qualifiedName, shownPath));
+}
+
+QString CodeNavigator::notFoundMessage(const QString &name) const
+{
+    return index_->isIndexing() ? tr("No definition found for \"%1\" (indexing in progress)").arg(name)
+                                : tr("No definition found for \"%1\"").arg(name);
+}
+
 // Several plausible targets: menu under the word.
 void CodeNavigator::chooseTarget(EditorWidget *editor, const QList<SymbolLocation> &targets)
 {
-    QMenu menu(editor);
-    for (const SymbolLocation &target : targets)
-        menu.addAction(describe(target, index_->folder()), this, [this, target] { jumpTo(target); });
-
     const int caret = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
     const int line = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret));
     const QPoint point(static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
                        static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret)) +
                            static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
-    ContextMenus::exec(menu, *editor, editor->viewport()->mapToGlobal(point));
+    chooseTargetAt(*editor, editor->viewport()->mapToGlobal(point), targets);
+}
+
+void CodeNavigator::chooseTargetAt(QWidget &clicked, QPoint globalPoint, const QList<SymbolLocation> &targets)
+{
+    QMenu menu(&clicked);
+    for (const SymbolLocation &target : targets)
+        menu.addAction(describe(target, index_->folder()), this, [this, target] { jumpTo(target); });
+    ContextMenus::exec(menu, clicked, globalPoint);
 }
 
 void CodeNavigator::jumpTo(const SymbolLocation &target)

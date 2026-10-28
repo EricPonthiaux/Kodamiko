@@ -526,6 +526,8 @@ public:
 
     const Family &family() const override { return families::flowchart(); }
 
+    bool writesCodeLinks() const override { return true; }
+
     bool matches(const QString &source) const override
     {
         QString start = source;
@@ -539,6 +541,7 @@ public:
     bool parse(const QString &source, Model &model, QString *) const override
     {
         Nodes nodes;
+        QHash<QString, QString> codeLinks; // by node key
         QString rankdir = QStringLiteral("TB");
         QStringList statements;
         for (const QString &line : mermaidLines(source))
@@ -549,10 +552,15 @@ public:
                 rankdir = rankdirOf(h);
                 continue;
             }
+            if (const std::optional<CodeLinkStatement> link = readMermaidCodeLink(stmt)) {
+                codeLinks.insert(link->key, link->target);
+                continue;
+            }
             if (!skip().match(stmt).hasMatch())
                 parseStatement(stmt, nodes, model);
         }
         appendNodes(nodes, model);
+        linkToCode(model, codeLinks);
         model.meta = QJsonObject{{QStringLiteral("rankdir"), rankdir}};
         return true;
     }
@@ -574,6 +582,10 @@ public:
             if (from.isEmpty() || to.isEmpty())
                 continue;
             out.append(mermaidLinkLine(*l, from, to));
+        }
+        for (const auto &s : board.shapes()) {
+            if (!s->codeLink.isEmpty())
+                out.append(mermaidCodeLinkLine(keys.value(s->id), s->codeLink, QStringLiteral("  ")));
         }
         return out.join(QLatin1Char('\n'));
     }

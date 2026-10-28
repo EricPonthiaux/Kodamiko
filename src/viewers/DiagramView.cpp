@@ -101,6 +101,7 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
 
     connect(canvas_, &diagram::Canvas::zoomChanged, this, &DiagramView::updateZoom);
     connect(canvas_, &diagram::Canvas::message, this, &DiagramView::showMessage);
+    connect(canvas_, &diagram::Canvas::codeRequested, this, &DiagramView::codeRequested);
     connect(inspector_, &diagram::Inspector::sourceApplied, this,
             [this](const diagram::document::Loaded &loaded) { canvas_->settle(loaded, true); });
     messageTimer_->setSingleShot(true);

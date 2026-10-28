@@ -159,6 +159,22 @@ QString pipeLabel(const QString &text)
     return result;
 }
 
+std::optional<CodeLinkStatement> readMermaidCodeLink(const QString &statement)
+{
+    static const QRegularExpression click(QStringLiteral("^click\\s+(\\S+)\\s+(?:href\\s+)?\"([^\"]*)\""));
+    const QRegularExpressionMatch match = click.match(statement);
+    if (!match.hasMatch())
+        return std::nullopt;
+    return CodeLinkStatement{.key = match.captured(1), .target = match.captured(2).trimmed()};
+}
+
+QString mermaidCodeLinkLine(const QString &key, const QString &target, const QString &indent)
+{
+    QString written = target;
+    written.replace(QLatin1Char('"'), QLatin1Char('\''));
+    return QStringLiteral("%1click %2 href \"%3\"").arg(indent, key, written);
+}
+
 QString plantumlText(const QString &text)
 {
     QString result = text;
@@ -201,6 +217,22 @@ QString plantumlName(const QString &text)
     quoted.replace(QLatin1Char('"'), QLatin1Char('\''));
     quoted.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
     return QLatin1Char('"') + quoted + QLatin1Char('"');
+}
+
+PlantumlLinked splitPlantumlCodeLink(const QString &statement)
+{
+    // [[target]], [[target{tooltip}]] or [[target label]].
+    static const QRegularExpression link(QStringLiteral("\\s*\\[\\[([^\\]\\s{]*)[^\\]]*\\]\\]"));
+    const QRegularExpressionMatch match = link.match(statement);
+    if (!match.hasMatch())
+        return {.statement = statement, .target = {}};
+    return {.statement = QString(statement).remove(match.capturedStart(), match.capturedLength()),
+            .target = match.captured(1)};
+}
+
+QString plantumlCodeLink(const QString &target)
+{
+    return target.isEmpty() ? QString() : QStringLiteral(" [[%1]]").arg(target);
 }
 
 const QList<UmlRelation> &umlRelations()

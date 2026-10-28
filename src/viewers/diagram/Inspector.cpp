@@ -454,6 +454,8 @@ QWidget *Inspector::buildShapeSection()
                                }
                            }},
                       shape->properties());
+    if (codec_ && codec_->writesCodeLinks())
+        addCodeLinkField(section, layout, id);
     layout->addWidget(fieldLabel(tr("Color"), section));
     layout->addWidget(swatchGrid(swatches(), section, [this](const QString &color) { board_->paintSelection(color); }));
     auto *buttons = new QHBoxLayout;
@@ -473,6 +475,30 @@ QWidget *Inspector::buildShapeSection()
     layout->addSpacing(swatchButtonsGapPx);
     layout->addLayout(buttons);
     return section;
+}
+
+void Inspector::addCodeLinkField(QWidget *section, QVBoxLayout *layout, const QString &shapeId)
+{
+    const Shape *shape = board_->shape(shapeId);
+    layout->addWidget(fieldLabel(tr("Code"), section));
+    auto *field = new QLineEdit(shape ? shape->codeLink : QString(), section);
+    field->setPlaceholderText(tr("Found by its name"));
+    field->setToolTip(tr("What Ctrl+click opens: a symbol (Git::run), a file (src/git/Git.h) "
+                         "or a symbol in a file (src/git/Git.h#Git::run)"));
+    field->setClearButtonEnabled(true);
+    connect(field, &QLineEdit::editingFinished, this, [this, shapeId, field] {
+        Shape *s = board_->shape(shapeId);
+        const QString link = field->text().trimmed();
+        if (!s || s->codeLink == link)
+            return;
+        beginTyping();
+        updating_ = true;
+        s->codeLink = link;
+        board_->touch();
+        updating_ = false;
+        endTyping();
+    });
+    layout->addWidget(field);
 }
 
 QWidget *Inspector::buildLinkSection()

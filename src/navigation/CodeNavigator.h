@@ -19,6 +19,12 @@ public:
     CodeNavigator(EditorTabs *tabs, SymbolIndex *index, QObject *parent = nullptr);
 
     void goToDefinition();
+    // Opens the definition of the project's symbol `name`, a member of
+    // `container` when it is not empty, in `filePath` (relative to the
+    // project) when it is not empty: an element of a diagram. A menu at the
+    // pointer when several are as likely; the file itself when the symbol is
+    // not in it or `name` is empty; a status message when nothing is found.
+    void goToSymbol(const QString &name, const QString &container, const QString &filePath);
     void goBack();
     void goForward();
 
@@ -36,6 +42,12 @@ private:
     void jumpTo(const SymbolLocation &target);
     void showLocation(const NavigationHistory::Location &location);
     void chooseTarget(EditorWidget *editor, const QList<SymbolLocation> &targets);
+    // The menu of `targets`, opened at `globalPoint` over `clicked`.
+    void chooseTargetAt(QWidget &clicked, QPoint globalPoint, const QList<SymbolLocation> &targets);
+    QString notFoundMessage(const QString &name) const;
+    // No symbol found: opens the linked `file` when there is one (absolute
+    // path), else says that `qualifiedName` was not found.
+    void showLinkedFile(const QString &file, const QString &qualifiedName);
 
     EditorTabs *tabs_;
     SymbolIndex *index_;

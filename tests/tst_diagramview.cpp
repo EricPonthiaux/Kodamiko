@@ -183,6 +183,19 @@ private slots:
                                      "solid/circle/", "invisible/none/"}));
     }
 
+    void keepsTheFlowchartLinksToTheCode()
+    {
+        Board board;
+        QVERIFY(loadInto(board, QStringLiteral("a.mmd"),
+                         "flowchart TB\n  A[Hook] --> B[Done]\n  click A href \"src/agent/HookServer.h\"\n"));
+
+        const QByteArray saved = document::save(board, *codecFor(QStringLiteral("mermaid"), "flowchart TB"));
+
+        QCOMPARE(byKey(board, QStringLiteral("A"))->codeLink, QStringLiteral("src/agent/HookServer.h"));
+        QVERIFY(byKey(board, QStringLiteral("B"))->codeLink.isEmpty());
+        QVERIFY(saved.contains("\n  click A href \"src/agent/HookServer.h\"\n"));
+    }
+
     void appliesAnEditedSource()
     {
         Board board;

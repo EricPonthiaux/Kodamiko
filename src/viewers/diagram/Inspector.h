@@ -47,6 +47,8 @@ private:
     void beginTyping();
     void endTyping();
     QWidget *buildShapeSection();
+    // The shape's link to the code, for the notations that write it.
+    void addCodeLinkField(QWidget *section, QVBoxLayout *layout, const QString &shapeId);
     QWidget *buildLinkSection();
     // Several elements selected: their count and a color for the shapes.
     QWidget *buildSelectionSection();

@@ -30,7 +30,8 @@ class QTimer;
 //   menu of the family's relations; in empty space: a new linked element);
 // - drag in empty space or with the middle button to pan, Shift+drag to
 //   select a rectangle; wheel to zoom;
-// - right-click for the context menus.
+// - right-click for the context menus;
+// - Ctrl+click an element named after a symbol to go to its code.
 namespace diagram {
 
 class Board;
@@ -115,6 +116,9 @@ public:
 signals:
     void zoomChanged(qreal zoom);
     void message(const QString &text);
+    // Ctrl+click or Go to Code on an element: show its code (see
+    // CodeReference).
+    void codeRequested(const QString &name, const QString &container, const QString &filePath);
 
 protected:
     bool event(QEvent *event) override;
@@ -207,6 +211,8 @@ private:
 
     // Pointer gestures (CanvasInput.cpp).
     void pressLeft(QPointF point, Qt::KeyboardModifiers modifiers);
+    // Emits codeRequested() for the symbol at `point`; false if there is none.
+    bool requestCodeAt(QPointF point);
     void startResize(Shape &shape);
     void startMove(QPointF point);
     // The contents of the selected frames, which follow them.
@@ -253,6 +259,8 @@ private:
     // Menus (CanvasMenus.cpp).
     void showContextMenu(QPointF screen);
     void addShapeActions(QMenu &menu, const Shape &shape);
+    // Go to Code, when the element at `point` is named after a symbol.
+    void addCodeAction(QMenu &menu, const Shape &shape, QPointF point);
     void addLinkActions(QMenu &menu, const Link &link);
     void addCanvasActions(QMenu &menu, QPointF point);
     void addFillMenu(QMenu *menu);
