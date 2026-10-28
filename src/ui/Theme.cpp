@@ -239,20 +239,20 @@ Theme duetBloom()
     return theme;
 }
 
-// After Claude's own interface: its warm charcoal for the editor, a shade
-// deeper for the panels, its cream for the text, its clay orange for the
-// caret and a darker one for the accent, so that what Claude wrote, marked
-// in the clay orange, stands out from the current tab and the focus. The
-// syntax follows the rules of the most used VS Code themes: one hue per role
-// (keywords clay, types sand, functions sky, strings sage, constants fig),
-// the same in every language, no pure black or white, italics only for the
-// comments and the parameters. The code reads at 7.5:1 or more, the comments
-// at 5.5:1, below the code but readable; the cream over the accent at 4.8:1.
-Theme duetClaude()
+// A warm charcoal for the editor, a shade deeper for the panels, a cream for
+// the text, a clay orange for the caret and a darker one for the accent, so
+// that what Claude wrote, marked in the clay orange, stands out from the
+// current tab and the focus. The syntax follows the rules of the most used
+// VS Code themes: one hue per role (keywords clay, types sand, functions sky,
+// strings sage, constants fig), the same in every language, no pure black or
+// white, italics only for the comments and the parameters. The code reads at
+// 7.5:1 or more, the comments at 5.5:1, below the code but readable; the
+// cream over the accent at 4.8:1.
+Theme duetClay()
 {
     Theme theme;
-    theme.name = QStringLiteral("duet-claude");
-    theme.title = QStringLiteral("Duet-Claude");
+    theme.name = QStringLiteral("duet-clay");
+    theme.title = QStringLiteral("Duet-Clay");
     theme.font = editorFont();
     theme.background = QColor("#262624");
     theme.foreground = QColor("#e8e5da");
@@ -353,7 +353,7 @@ Theme Theme::duet()
 
 QList<Theme> Theme::all()
 {
-    QList<Theme> themes{duet(), duetNight(), duetViolet(), duetStratos(), duetBloom(), duetClaude()};
+    QList<Theme> themes{duet(), duetNight(), duetViolet(), duetStratos(), duetBloom(), duetClay()};
     themes += MaterialThemes::all();
     return themes;
 }

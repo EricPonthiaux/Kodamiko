@@ -71,7 +71,7 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        // Duet's first, then Duet-Night, Duet-Violet, Duet-Stratos, Duet-Bloom, Duet-Claude and the Material ones.
+        // Duet's first, then Duet-Night, Duet-Violet, Duet-Stratos, Duet-Bloom, Duet-Clay and the Material ones.
         QCOMPARE(names.size(), 14);
         QCOMPARE(names.first(), QString("duet"));
         QVERIFY(std::ranges::all_of(names.mid(1), [](const QString &name) { return name.startsWith("duet-"); }));
