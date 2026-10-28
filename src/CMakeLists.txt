@@ -265,6 +265,7 @@ add_library(kdk_core STATIC
     settings/Keymap.cpp
     settings/Preferences.cpp
     settings/PreferencesPopup.cpp
+    settings/PreferencesPopupUi.cpp
     settings/TerminalPreferencesPage.cpp
     settings/TreeZoom.cpp
     setup/Prerequisites.cpp
@@ -319,6 +320,7 @@ add_library(kdk_core STATIC
     ui/PopupRows.cpp
     ui/PopupSearchField.cpp
     ui/PopupWidgets.cpp
+    ui/SettingsSwitch.cpp
     ui/PopupMotion.cpp
     ui/RotatingQuote.cpp
     ui/Spinner.cpp
@@ -347,6 +349,7 @@ add_library(kdk_core STATIC
     welcome/ProjectListDelegate.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
+    welcome/ProjectSetupFormUi.cpp
     welcome/ProjectSetupPanel.cpp
     welcome/ProvisioningView.cpp
     welcome/WelcomeWindow.cpp

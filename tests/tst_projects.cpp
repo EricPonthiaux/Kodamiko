@@ -1010,12 +1010,18 @@ private slots:
         const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
         popup.popup(cppProject(dir.path(), toolchains));
         const auto *panel = popup.findChild<ProjectSetupPanel *>();
+        QVERIFY(!panel->applyButton()->isEnabled());
+        auto *standard = panel->form()->findChild<QComboBox *>("cppRuntime");
+        standard->setCurrentIndex(standard->currentIndex() == 0 ? 1 : 0);
 
         panel->applyButton()->click();
 
         QCOMPARE(applied.size(), 1);
         QVERIFY(popup.isVisible());
         QVERIFY(ProjectStore::find(dir.path()).has_value());
+        QVERIFY(!panel->applyButton()->isEnabled());
+        QCOMPARE(ProjectStore::find(dir.path())->language("cpp")->runtimeVersion,
+                 panel->form()->project().language("cpp")->runtimeVersion);
         panel->okButton()->click();
         QCOMPARE(applied.size(), 2);
         QVERIFY(!popup.isVisible());
@@ -1030,12 +1036,102 @@ private slots:
         ProjectSettingsPopup popup(&toolchains, Theme::kodamiko(), &window);
         const QSignalSpy applied(&popup, &ProjectSettingsPopup::applied);
         popup.popup(cppProject(dir.path(), toolchains));
+        popup.findChild<QCheckBox *>("cppEnabled")->setChecked(false);
 
         popup.findChild<ProjectSetupPanel *>()->cancelButton()->click();
 
         QCOMPARE(applied.size(), 0);
         QVERIFY(!popup.isVisible());
         QVERIFY(!ProjectStore::find(dir.path()).has_value());
+    }
+
+    void projectSettingsRevertingAChangeDisablesApply()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupPanel panel(&toolchains, ProjectSetupPanel::Purpose::Settings);
+        panel.load(cppProject(dir.path(), toolchains));
+        auto *standard = panel.form()->findChild<QComboBox *>("cppRuntime");
+        const int saved = standard->currentIndex();
+
+        standard->setCurrentIndex(saved == 0 ? 1 : 0);
+        QVERIFY(panel.applyButton()->isEnabled());
+        QVERIFY(panel.findChild<QLabel *>("footerHint")->text().contains("1 pending change"));
+        standard->setCurrentIndex(saved);
+
+        QVERIFY(!panel.applyButton()->isEnabled());
+        QVERIFY(panel.findChild<QLabel *>("footerHint")->text().contains("No pending changes"));
+    }
+
+    void projectSettingsOffersDownloadsWithoutEdits()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupPanel panel(&toolchains, ProjectSetupPanel::Purpose::Settings);
+
+        panel.load(javaProject(dir.path()));
+        panel.form()->selectLanguage("cpp"); // the footer covers every language
+
+        QVERIFY(panel.applyButton()->isEnabled());
+        QCOMPARE(panel.applyButton()->text(), QString("Download && apply"));
+        QCOMPARE(panel.okButton()->text(), QString("Download && close"));
+        QVERIFY(panel.form()->languageList()->item(0)->toolTip().contains("Download needed"));
+        QVERIFY(panel.findChild<QLabel *>("footerHint")->text().contains("No pending changes"));
+    }
+
+    void languageAvailabilityFollowsTheSelectedServer()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+        form.setProject(cppProject(dir.path(), toolchains), {});
+        auto *version = form.findChild<QComboBox *>("cppServerVersion");
+
+        version->setCurrentIndex(version->findData("system"));
+        QCOMPARE(form.languageList()->currentItem()->toolTip(), QString("Tools missing"));
+
+        auto *server = form.findChild<QComboBox *>("cppServer");
+        server->setCurrentIndex(server->findData(QString()));
+        QCOMPARE(form.languageList()->currentItem()->toolTip(), QString("Enabled · Ready"));
+        QVERIFY(version->parentWidget()->parentWidget()->isHidden());
+        QVERIFY(form.project().language("cpp")->serverVersion.isEmpty());
+    }
+
+    void enablingALanguagePreservesTheOtherSettings()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupForm form(&toolchains);
+        const ProjectConfig project = cppProject(dir.path(), toolchains);
+        form.setProject(project, {});
+        form.selectLanguage("python");
+
+        form.findChild<QPushButton *>("pythonEnableButton")->click();
+
+        QVERIFY(form.project().language("python")->enabled);
+        QCOMPARE(*form.project().language("cpp"), *project.language("cpp"));
+        QCOMPARE(form.findChild<QLabel *>("activeCount")->text(), QString("2 active"));
+    }
+
+    void detectingAgainKeepsProjectOptionsAndPendingChanges()
+    {
+        const QTemporaryDir dir;
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        ProjectSetupPanel panel(&toolchains, ProjectSetupPanel::Purpose::Settings);
+        ProjectConfig project = javaProject(dir.path());
+        project.agentCheckCommand = "make check";
+        project.recipeValues = {{"angular", "21"}};
+        panel.load(project);
+        write(dir.filePath("CMakeLists.txt"), "project(demo)\n");
+
+        panel.form()->detectAgain();
+
+        const ProjectConfig detected = panel.form()->project();
+        QCOMPARE(detected.agentCheckCommand, project.agentCheckCommand);
+        QCOMPARE(detected.recipeValues, project.recipeValues);
+        QVERIFY(detected.language("cpp")->enabled);
+        QVERIFY(panel.applyButton()->isEnabled());
+        QVERIFY(!panel.findChild<QLabel *>("footerHint")->text().contains("No pending changes"));
     }
 
     void listsTheProjects()

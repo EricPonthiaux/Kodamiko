@@ -4,13 +4,10 @@
 
 #include "LanguageChoices.h"
 #include "recipes/RecipeLibrary.h"
+#include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
-#include "ui/AppFonts.h"
 #include "ui/Paragraph.h"
 #include "ui/PopupMetrics.h"
-#include "ui/PopupWidgets.h"
-#include "ui/TreeMetrics.h"
-#include "ui/UiIcons.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -22,6 +19,7 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QStackedWidget>
+#include <QStyle>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -29,63 +27,6 @@
 namespace {
 
 constexpr int familyRole = Qt::UserRole;
-
-// The group of the runtime: what builds the code, or what runs it.
-QString runtimeGroup(const QString &family)
-{
-    const bool builds = family == QLatin1String("cpp") || family == QLatin1String("java");
-    return builds ? QObject::tr("Build") : QObject::tr("Runtime");
-}
-
-QString runtimeLabel(const QString &family)
-{
-    if (family == QLatin1String("java"))
-        return QObject::tr("JDK");
-    if (family == QLatin1String("javascript"))
-        return QObject::tr("Node.js");
-    if (family == QLatin1String("python"))
-        return QObject::tr("Python interpreter");
-    return QObject::tr("C++ standard");
-}
-
-QString runtimeDescription(const QString &family)
-{
-    if (family == QLatin1String("java"))
-        return QObject::tr("JAVA_HOME of Maven.");
-    if (family == QLatin1String("javascript"))
-        return QObject::tr("What the project runs on.");
-    if (family == QLatin1String("python"))
-        return QObject::tr("Its packages are the ones completed.");
-    return QObject::tr("For the files compile_commands.json does not cover.");
-}
-
-QComboBox *settingCombo()
-{
-    auto *combo = new QComboBox;
-    combo->setMinimumWidth(240);
-    return combo;
-}
-
-QLabel *stateLabel()
-{
-    auto *label = new QLabel;
-    label->setObjectName(QStringLiteral("settingState"));
-    label->setWordWrap(true);
-    label->setMaximumWidth(320);
-    return label;
-}
-
-// A list with, under it, what its value means on this machine.
-QWidget *fieldWithState(QComboBox *combo, QLabel *state)
-{
-    auto *field = new QWidget;
-    auto *layout = new QVBoxLayout(field);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(4);
-    layout->addWidget(combo);
-    layout->addWidget(state);
-    return field;
-}
 
 // The recipes of `saved`'s enabled languages, attached to the same
 // languages of `project`: a language its files do not show yet (a project
@@ -147,36 +88,6 @@ ProjectSetupForm::ProjectSetupForm(Toolchains *toolchains, QWidget *parent)
     layout->addWidget(stack_, 1);
 }
 
-QWidget *ProjectSetupForm::createSidebar()
-{
-    auto *sidebar = new QFrame(this);
-    sidebar->setObjectName(QStringLiteral("popupSidebar"));
-    // "JavaScript/TypeScript · Off" whole.
-    sidebar->setFixedWidth(PopupMetrics::sidebarWidth);
-    auto *heading = new QLabel(tr("LANGUAGES"), sidebar);
-    heading->setObjectName(QStringLiteral("navHeading"));
-    AppFonts::setInterfaceFont(heading, 0.85, QFont::DemiBold, 0.6);
-    list_ = new QListWidget(sidebar);
-    list_->setObjectName(QStringLiteral("popupNav"));
-    list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    applyTreeRowHeight(list_);
-    connect(list_, &QListWidget::currentItemChanged, this, [this](const QListWidgetItem *current) {
-        if (current)
-            selectLanguage(current->data(familyRole).toString());
-    });
-    detect_ = new QPushButton(tr("Detect Again"), sidebar);
-    detect_->setToolTip(tr("Looks at the project's files again; nothing is saved before Apply"));
-    connect(detect_, &QPushButton::clicked, this, &ProjectSetupForm::detectAgain);
-
-    auto *layout = new QVBoxLayout(sidebar);
-    layout->setContentsMargins(PopupMetrics::sidebarMargins);
-    layout->setSpacing(6);
-    layout->addWidget(heading);
-    layout->addWidget(list_, 1);
-    layout->addWidget(detect_, 0, Qt::AlignLeft);
-    return sidebar;
-}
-
 void ProjectSetupForm::fillRecipes(const Page &page, const QString &selected)
 {
     const QSignalBlocker blocker(page.recipe);
@@ -194,73 +105,11 @@ void ProjectSetupForm::fillRecipes(const Page &page, const QString &selected)
     page.recipe->setCurrentIndex(std::max(page.recipe->findData(selected), 0));
 }
 
-QWidget *ProjectSetupForm::createPage(Page &page)
-{
-    auto *content = new QWidget;
-    auto *title = new QLabel(ProjectLanguages::title(page.family), content);
-    AppFonts::setInterfaceFont(title, 1.05, QFont::DemiBold);
-    page.enabled = new QCheckBox(tr("Enabled"), content);
-    page.enabled->setLayoutDirection(Qt::RightToLeft); // the box after its text
-    auto *titleRow = new QHBoxLayout;
-    titleRow->addWidget(title);
-    titleRow->addStretch();
-    titleRow->addWidget(page.enabled);
-    page.evidence = new QLabel(content);
-    page.evidence->setObjectName(QStringLiteral("pageDescription"));
-
-    page.recipe = settingCombo();
-    page.recipeState = stateLabel();
-    page.runtime = settingCombo();
-    page.runtimeState = stateLabel();
-    page.server = settingCombo();
-    page.serverVersion = settingCombo();
-    page.serverState = stateLabel();
-    auto *recipeCard = new SettingsCard;
-    recipeCard->addRow(tr("Recipe"),
-                       tr("Its environment, run configurations, skills and prompts; its files are not copied."),
-                       fieldWithState(page.recipe, page.recipeState));
-    auto *runtimeCard = new SettingsCard;
-    runtimeCard->addRow(runtimeLabel(page.family), runtimeDescription(page.family),
-                        fieldWithState(page.runtime, page.runtimeState));
-    auto *serverCard = new SettingsCard;
-    serverCard->addRow(tr("Language server"), tr("Completes members, imports, signatures."), page.server);
-    page.versionRow = serverCard->addRow(tr("Version"), tr("Downloaded by Kodamiko, or the system's."),
-                                         fieldWithState(page.serverVersion, page.serverState));
-
-    page.settings = new QWidget(content);
-    auto *settingsLayout = new QVBoxLayout(page.settings);
-    settingsLayout->setContentsMargins(0, 0, 0, 0);
-    settingsLayout->setSpacing(0);
-    settingsLayout->addWidget(sectionHeading(tr("Recipe")));
-    settingsLayout->addWidget(recipeCard);
-    settingsLayout->addSpacing(16);
-    settingsLayout->addWidget(sectionHeading(runtimeGroup(page.family)));
-    settingsLayout->addWidget(runtimeCard);
-    settingsLayout->addSpacing(16);
-    settingsLayout->addWidget(sectionHeading(tr("Code intelligence")));
-    settingsLayout->addWidget(serverCard);
-
-    page.offHint = new QLabel(content);
-    page.offHint->setObjectName(QStringLiteral("pageDescription"));
-    Paragraph::setText(page.offHint, tr("Turn it on to choose how the project is built and completed."));
-
-    auto *layout = new QVBoxLayout(content);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(4);
-    layout->addLayout(titleRow);
-    layout->addWidget(page.evidence);
-    layout->addSpacing(14);
-    layout->addWidget(page.settings);
-    layout->addWidget(page.offHint);
-    return content;
-}
-
 void ProjectSetupForm::connectPage(const Page &page)
 {
     const QString family = page.family;
     connect(page.enabled, &QAbstractButton::toggled, this, [this, family] {
         updatePage(pageOf(family));
-        updateListItem(pageOf(family));
         emit changed();
     });
     const auto update = [this, family] {
@@ -271,7 +120,7 @@ void ProjectSetupForm::connectPage(const Page &page)
     connect(page.runtime, &QComboBox::currentIndexChanged, this, update);
     connect(page.serverVersion, &QComboBox::currentIndexChanged, this, update);
     connect(page.server, &QComboBox::currentIndexChanged, this, [this, family] {
-        const Page &current = pageOf(family);
+        Page &current = pageOf(family);
         LanguageSetup setup = setupOf(current);
         setup.serverVersion.clear();
         toolchains_->complete(setup);
@@ -288,16 +137,12 @@ ProjectSetupForm::Page &ProjectSetupForm::pageOf(const QString &family)
     return *found;
 }
 
-void ProjectSetupForm::applyTheme(const Theme &theme)
-{
-    detect_->setIcon(UiIcons::icon(QStringLiteral("refresh"), theme.foreground));
-}
-
 ProjectConfig ProjectSetupForm::detectedProject(const ProjectConfig &saved,
                                                 const Toolchains &toolchains,
                                                 QList<DetectedLanguage> *detected)
 {
-    ProjectConfig project;
+    ProjectConfig project = saved;
+    project.languages.clear();
     project.path = QDir(saved.path).absolutePath();
     project.name = QFileInfo(project.path).fileName();
     project.lastOpened = saved.lastOpened;
@@ -319,6 +164,7 @@ ProjectConfig ProjectSetupForm::detectedProject(const ProjectConfig &saved,
 
 void ProjectSetupForm::setProject(const ProjectConfig &project, const QList<DetectedLanguage> &detected)
 {
+    QSignalBlocker blocker(this);
     project_ = project;
     recipes_ = RecipeLibrary::available(RecipeLibrary::defaultSources(project_.path));
     for (Page &page : pages_) {
@@ -328,16 +174,17 @@ void ProjectSetupForm::setProject(const ProjectConfig &project, const QList<Dete
         if (const LanguageSetup *saved = project.language(page.family))
             setup = *saved;
         toolchains_->complete(setup);
-        QString evidence = tr("Not found in the project.");
+        QString evidence = tr("Not detected in this project. You can enable it manually.");
+        if (project.language(page.family))
+            evidence = tr("Configured for this project.");
         for (const DetectedLanguage &language : detected) {
             if (language.language == page.family)
-                evidence = tr("Found: %1").arg(language.evidence);
+                evidence = tr("Detected from %1").arg(language.evidence);
         }
-        if (!project.language(page.family) && detected.isEmpty() && project.configured)
-            evidence = tr("Not used by the project.");
         fill(page, setup, evidence);
     }
     fillList(currentLanguage());
+    blocker.unblock();
     emit changed();
 }
 
@@ -350,7 +197,7 @@ void ProjectSetupForm::detectAgain()
 
 void ProjectSetupForm::fill(Page &page, const LanguageSetup &setup, const QString &evidence)
 {
-    // The switch is not blocked: it draws its knob from its own signal.
+    const QSignalBlocker enabledBlocker(page.enabled);
     const QSignalBlocker serverBlocker(page.server);
     Paragraph::setText(page.evidence, evidence);
     page.enabled->setChecked(setup.enabled);
@@ -372,16 +219,84 @@ void ProjectSetupForm::fillServerVersions(const Page &page, const QString &serve
     LanguageChoices::fillServerVersions(page.serverVersion, server, selected, *toolchains_);
 }
 
-void ProjectSetupForm::updatePage(const Page &page)
+void ProjectSetupForm::updatePage(Page &page)
 {
+    page.enabled->setText(page.enabled->isChecked() ? tr("Enabled") : tr("Disabled"));
     page.settings->setVisible(page.enabled->isChecked());
     page.offHint->setVisible(!page.enabled->isChecked());
     page.versionRow->setVisible(!page.server->currentData().toString().isEmpty());
-    page.recipeState->setText(page.recipe->currentData(Qt::ToolTipRole).toString());
+    updateRecipe(page);
     const QString runtimeState = page.runtime->currentData(LanguageChoices::stateRole).toString();
     page.runtimeState->setText(runtimeState);
     page.runtimeState->setVisible(!runtimeState.isEmpty());
     page.serverState->setText(page.serverVersion->currentData(LanguageChoices::stateRole).toString());
+    updateAvailability(page);
+    updateListItem(page);
+}
+
+void ProjectSetupForm::updateRecipe(const Page &page)
+{
+    Paragraph::setText(page.recipeState, page.recipe->currentData(Qt::ToolTipRole).toString());
+    const QString selected = page.recipe->currentData().toString();
+    const auto found = std::ranges::find(recipes_, selected, &Recipe::id);
+    if (found == recipes_.end()) {
+        Paragraph::setText(page.recipeTags, tr("Runtime & language server"));
+        page.recipeTags->show();
+        return;
+    }
+    const Recipe recipe = found->withValues(project_.recipeValues);
+    QStringList tags;
+    for (const RecipeRequirement &requirement : recipe.requirements) {
+        const ToolSpec *tool = ToolCatalog::find(requirement.tool.tool);
+        const QString title = tool ? tool->title : requirement.tool.tool;
+        tags.append((title + QLatin1Char(' ') + requirement.tool.version).trimmed());
+    }
+    if (!recipe.runConfigurations.isEmpty())
+        tags.append(tr("Run configurations"));
+    if (!recipe.instructions.isEmpty() || !recipe.pluginFolder().isEmpty())
+        tags.append(tr("Agent instructions"));
+    tags.removeDuplicates();
+    Paragraph::setText(page.recipeTags, tags.join(QStringLiteral(" · ")));
+    page.recipeTags->setVisible(!tags.isEmpty());
+}
+
+void ProjectSetupForm::updateAvailability(Page &page)
+{
+    ProjectConfig language = project_;
+    language.languages = {setupOf(page)};
+    const QList<ToolRequirement> required = RecipeLibrary::requirementsOf(language);
+    const QList<InstallStep> steps = InstallPlan::plan(language, *toolchains_, required);
+    const QStringList unavailable = InstallPlan::unavailable(language, *toolchains_, required);
+    QString state = QStringLiteral("ready");
+    QString title = tr("All required tools are available");
+    QString detail = tr("Ready to apply. No downloads needed.");
+    QString badge = tr("Ready");
+    page.status = tr("Enabled · Ready");
+    if (!steps.isEmpty()) {
+        state = QStringLiteral("download");
+        title = steps.size() == 1 ? tr("1 tool to download") : tr("%1 tools to download").arg(steps.size());
+        detail = tr("%1 · Downloads start when you apply.").arg(InstallPlan::summary(steps));
+        badge = tr("On apply");
+        page.status = tr("Download needed");
+    }
+    if (!unavailable.isEmpty()) {
+        state = QStringLiteral("missing");
+        title = tr("Some tools need your attention");
+        detail = unavailable.join(QLatin1Char('\n')) + (steps.isEmpty() ? QString() : QLatin1Char('\n') + detail);
+        badge = tr("Missing");
+        page.status = tr("Tools missing");
+    }
+    if (!page.enabled->isChecked())
+        page.status = tr("Not enabled");
+    page.toolTitle->setText(title);
+    Paragraph::setText(page.toolDetail, detail);
+    page.toolBadge->setText(badge);
+    if (page.availability->property("state").toString() != state) {
+        page.availability->setProperty("state", state);
+        page.availability->style()->unpolish(page.availability);
+        page.availability->style()->polish(page.availability);
+        page.toolBadge->style()->polish(page.toolBadge);
+    }
 }
 
 void ProjectSetupForm::fillList(const QString &keep)
@@ -399,16 +314,6 @@ void ProjectSetupForm::fillList(const QString &keep)
     }
     const QString shown = keep.isEmpty() ? list_->item(0)->data(familyRole).toString() : keep;
     selectLanguage(shown);
-}
-
-void ProjectSetupForm::updateListItem(const Page &page)
-{
-    const QString title = ProjectLanguages::title(page.family);
-    for (int row = 0; row < list_->count(); ++row) {
-        QListWidgetItem *entry = list_->item(row);
-        if (entry->data(familyRole) == page.family)
-            entry->setText(page.enabled->isChecked() ? title : tr("%1 · Off").arg(title));
-    }
 }
 
 QComboBox *ProjectSetupForm::recipeChoice(const QString &family)

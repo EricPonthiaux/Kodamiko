@@ -28,7 +28,7 @@ public:
     enum class Purpose {
         // A new project, from the welcome window: Back, Open Project.
         FirstSetup,
-        // Project Settings: Cancel, Apply (saves, stays open), OK.
+        // Project Settings: Cancel, Apply (saves, stays open), Save & close.
         Settings,
     };
 
@@ -54,7 +54,7 @@ public:
 signals:
     // Saved by Apply, its tools downloaded (or skipped); the form stays.
     void applied(const ProjectConfig &project);
-    // Saved by OK or Open Project, its tools downloaded (or skipped).
+    // Saved by Save & close or Open Project, its tools downloaded (or skipped).
     void done(const ProjectConfig &project);
     // Back to the list, or the popup closed.
     void cancelled();
@@ -80,6 +80,7 @@ private:
     Purpose purpose_;
     Then then_ = Then::Close;
     ProjectConfig project_;
+    ProjectConfig baseline_;
     PopupHeader *header_;
     QStackedWidget *pages_;
     ProjectSetupForm *form_;

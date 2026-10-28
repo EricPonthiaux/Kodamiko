@@ -9,7 +9,7 @@
 #include <QVBoxLayout>
 
 ProjectSettingsPopup::ProjectSettingsPopup(Toolchains *toolchains, const Theme &theme, QWidget *parent)
-    : OverlayPopup(QStringLiteral("projectSettings"), QSizeF(0.6, 0.76), QSize(860, 560), parent)
+    : OverlayPopup(QStringLiteral("projectSettings"), QSizeF(0.7, 0.86), QSize(960, 680), parent)
     , panel_(new ProjectSetupPanel(toolchains, ProjectSetupPanel::Purpose::Settings, this))
 {
     auto *layout = new QVBoxLayout(this);

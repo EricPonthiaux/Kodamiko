@@ -58,12 +58,17 @@ private:
 // A section of settings: rows separated by thin lines, flush with the
 // section's heading (sectionHeading(), underlined). Each row has a title, an optional
 // description and its control: a check box before the title, any other
-// control on the right.
+// control on the right. TogglePlacement::AfterTitle aligns switches on the right too.
 class SettingsCard : public QFrame {
     Q_OBJECT
 
 public:
-    explicit SettingsCard(QWidget *parent = nullptr);
+    enum class TogglePlacement {
+        BeforeTitle,
+        AfterTitle
+    };
+
+    explicit SettingsCard(QWidget *parent = nullptr, TogglePlacement toggles = TogglePlacement::BeforeTitle);
     // Returns the row, to hide it with its control.
     QWidget *addRow(const QString &title, const QString &description, QWidget *control);
     // A row taking the card's whole width.
@@ -72,6 +77,7 @@ public:
 private:
     void addSeparator();
     QVBoxLayout *layout_;
+    TogglePlacement toggles_;
 };
 
 // The header of a popup: a 16-pixel icon, the title in demibold, an

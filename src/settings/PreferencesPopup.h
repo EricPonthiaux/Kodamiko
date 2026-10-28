@@ -26,8 +26,8 @@ class TerminalPreferencesPage;
 // File ▸ Preferences, a popup over the window like Find in Files: a side
 // bar of pages (Appearance, Fonts, Editor, Files, Claude, Terminal,
 // Keymap), each made of
-// cards of settings. Changes apply on OK or Apply; Cancel, Escape or a
-// click elsewhere leave everything as it was.
+// cards of settings. Changes apply on Save & close or Apply; Cancel and
+// Escape discard edits made since the last Apply.
 class PreferencesPopup : public OverlayPopup {
     Q_OBJECT
 
@@ -60,7 +60,7 @@ public:
     QLabel *keymapNote() const { return keymapNote_; }
 
 signals:
-    // OK or Apply: preferences() and shortcutOverrides() hold the changes.
+    // Save & close or Apply: preferences() and shortcutOverrides() hold the changes.
     void applied();
 
 protected:
@@ -70,7 +70,11 @@ private:
     // The Full Line rows shown while it is on, the model for Ollama only.
     void updateFullLineRows();
     QWidget *createSidebar();
-    // Miniatures of `themes`, four in a row, added to themes_.
+    QWidget *createFooter();
+    void watchChanges();
+    void updateSummary();
+    void applyChanges();
+    // Miniatures of `themes`, three in a row, added to themes_.
     QWidget *themeGrid(const QList<Theme> &themes);
     QWidget *createAppearancePage();
     QWidget *createFontsPage();
@@ -80,7 +84,7 @@ private:
     QWidget *createKeymapPage();
     // A page: its title and description above `content`, which scrolls.
     QWidget *page(const QString &title, const QString &description, QWidget *content, bool scrolls = true);
-    void addPage(const QString &icon, const QString &title, QWidget *page);
+    void addPage(const QString &icon, const QString &title, QWidget *content);
     void updateFontPreview();
 
     // Keymap page.
@@ -96,7 +100,11 @@ private:
     QListWidget *pageList_ = nullptr;
     PopupHeader *header_ = nullptr;
     QStackedWidget *pages_ = nullptr;
-    QStringList pageIcons_;
+    QLabel *summary_ = nullptr;
+    QPushButton *apply_ = nullptr;
+    Preferences baseline_;
+    Keymap::Overrides baselineOverrides_;
+    bool loading_ = false;
 
     QButtonGroup *themes_ = nullptr;
     QComboBox *fontFamily_ = nullptr;

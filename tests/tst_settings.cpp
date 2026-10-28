@@ -312,6 +312,72 @@ private slots:
         QCOMPARE(page.pathFolders(), QStringList{"/b"});
     }
 
+    void applyTracksEditsAndKeepsThePopupOpen()
+    {
+        QWidget window;
+        window.resize(1200, 800);
+        window.show();
+        PreferencesPopup popup(Theme::kodamiko(), &window);
+        Preferences saved;
+        saved.defaultAgentProvider = QStringLiteral("codex");
+        popup.popup(saved, {}, {});
+        auto *apply = popup.findChild<QPushButton *>("applyPreferences");
+        const auto *summary = popup.findChild<QLabel *>("footerHint");
+        auto *animations = popup.findChild<QCheckBox *>("interfaceAnimations");
+        const QSignalSpy applied(&popup, &PreferencesPopup::applied);
+        QVERIFY(!apply->isEnabled());
+
+        animations->setChecked(!saved.animations);
+        QVERIFY(apply->isEnabled());
+        QCOMPARE(summary->text(), QString("Unsaved changes"));
+        animations->setChecked(saved.animations);
+        QVERIFY(!apply->isEnabled());
+        animations->setChecked(!saved.animations);
+        apply->click();
+
+        QCOMPARE(applied.count(), 1);
+        QVERIFY(popup.isVisible());
+        QVERIFY(!apply->isEnabled());
+        QCOMPARE(summary->text(), QString("No pending changes"));
+        QCOMPARE(popup.preferences().defaultAgentProvider, saved.defaultAgentProvider);
+        saved = popup.preferences();
+        animations->setChecked(!saved.animations);
+        QTest::keyClick(&popup, Qt::Key_Escape);
+        QCOMPARE(applied.count(), 1);
+        popup.popup(saved, {}, {});
+        QCOMPARE(popup.preferences(), saved);
+        QVERIFY(!apply->isEnabled());
+    }
+
+    void shortcutAndTerminalEditsEnableApply()
+    {
+        QMenuBar bar;
+        const Menus menus(bar);
+        QWidget window;
+        PreferencesPopup popup(Theme::kodamiko(), &window);
+        Preferences saved;
+        saved.terminalPathFolders = {"/tools/bin", "/other/bin"};
+        popup.load(saved, Keymap::commands(&bar), {});
+        auto *apply = popup.findChild<QPushButton *>("applyPreferences");
+        QVERIFY(!apply->isEnabled());
+
+        popup.selectCommand("Edit/Find");
+        popup.assignShortcut(QKeySequence("Ctrl+K"));
+        QVERIFY(apply->isEnabled());
+        popup.assignShortcut(QKeySequence("Ctrl+F"));
+        QVERIFY(!apply->isEnabled());
+
+        auto *folders = popup.findChild<TerminalPreferencesPage *>()->folderList();
+        folders->item(0)->setText("/new/bin");
+        QVERIFY(apply->isEnabled());
+        folders->item(0)->setText("/tools/bin");
+        QVERIFY(!apply->isEnabled());
+        folders->insertItem(1, folders->takeItem(0));
+        QVERIFY(apply->isEnabled());
+        apply->click();
+        QVERIFY(!apply->isEnabled());
+    }
+
     void keepsWhatTheOptionKeyDoes()
     {
         Preferences preferences;

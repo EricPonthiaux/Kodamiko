@@ -17,15 +17,16 @@ class QPushButton;
 class QStackedWidget;
 class Toolchains;
 
-// The setup of a project's languages, in two columns as Preferences: at the
-// left, the languages (those the project uses first, the others marked
-// Off) and Detect Again; at the right, the selected one's settings: whether
+// The setup of a project's languages: at the left, each language's tool
+// availability (those the project uses first) and Detect Again; at the
+// right, the selected one's settings: whether
 // it is used, its recipe (one of the language's, see RecipeLibrary: its
 // environment, skills, prompts and run configurations, without its files),
 // its runtime (JDK, Node, Python, C++ standard), its language server and the
 // server's version. Each list shows the values alone; the line under it
 // says whether the one chosen is downloaded already, on the machine (and
-// where), or still to download.
+// where), or still to download. The recipe card describes its tools and
+// commands; the summary also accounts for missing tools Kodamiko cannot install.
 class ProjectSetupForm : public QWidget {
     Q_OBJECT
 
@@ -52,8 +53,8 @@ public:
     void selectLanguage(const QString &family);
 
     // A setup for `saved.path` from what its files say, keeping `saved`'s
-    // last opening, pending recipe setup and the recipes of its enabled
-    // languages (their language kept even when no file shows it yet).
+    // project options and the recipes of its enabled languages (their
+    // language kept even when no file shows it yet).
     static ProjectConfig detectedProject(const ProjectConfig &saved,
                                          const Toolchains &toolchains,
                                          QList<DetectedLanguage> *detected = nullptr);
@@ -69,14 +70,20 @@ private:
         QCheckBox *enabled{};
         QComboBox *recipe{};
         QLabel *recipeState{};
+        QLabel *recipeTags{};
         QComboBox *runtime{};
         QLabel *runtimeState{};
         QComboBox *server{};
         QComboBox *serverVersion{};
         QLabel *serverState{};
         QWidget *settings{};   // hidden when turned off
-        QLabel *offHint{};     // shown instead
+        QWidget *offHint{};    // shown instead
         QWidget *versionRow{}; // hidden without a server
+        QWidget *availability{};
+        QLabel *toolTitle{};
+        QLabel *toolDetail{};
+        QLabel *toolBadge{};
+        QString status;
     };
 
     QWidget *createSidebar();
@@ -84,11 +91,18 @@ private:
     // marked missing, when it is not installed).
     void fillRecipes(const Page &page, const QString &selected);
     QWidget *createPage(Page &page);
+    QWidget *createLanguageHeading(Page &page);
+    QWidget *createRecipeCard(Page &page);
+    QWidget *createSettings(Page &page);
+    QWidget *createOffHint(const Page &page);
+    QWidget *createAvailability(Page &page);
     void connectPage(const Page &page);
     Page &pageOf(const QString &family);
     void fill(Page &page, const LanguageSetup &setup, const QString &evidence);
     void fillServerVersions(const Page &page, const QString &server, const QString &selected);
-    void updatePage(const Page &page);
+    void updatePage(Page &page);
+    void updateRecipe(const Page &page);
+    void updateAvailability(Page &page);
     // The languages used first; `keep` stays selected.
     void fillList(const QString &keep);
     void updateListItem(const Page &page);
@@ -100,5 +114,6 @@ private:
     QListWidget *list_ = nullptr;
     QStackedWidget *stack_ = nullptr;
     QPushButton *detect_ = nullptr;
+    QLabel *activeCount_ = nullptr;
     QList<Recipe> recipes_; // those of this system, for the project
 };

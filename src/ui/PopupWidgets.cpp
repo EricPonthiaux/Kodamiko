@@ -283,9 +283,10 @@ void ThemeCard::paintEvent(QPaintEvent *)
 
 // SettingsCard
 
-SettingsCard::SettingsCard(QWidget *parent)
+SettingsCard::SettingsCard(QWidget *parent, TogglePlacement toggles)
     : QFrame(parent)
     , layout_(new QVBoxLayout(this))
+    , toggles_(toggles)
 {
     setObjectName(QStringLiteral("settingsCard"));
     layout_->setContentsMargins(0, 0, 0, 0);
@@ -319,7 +320,7 @@ QWidget *SettingsCard::addRow(const QString &title, const QString &description, 
     auto *layout = new QHBoxLayout(row);
     layout->setContentsMargins(0, 8, 0, 8);
     // A check box is a classic one: before its title, aligned on its first line.
-    if (qobject_cast<QCheckBox *>(control)) {
+    if (toggles_ == TogglePlacement::BeforeTitle && qobject_cast<QCheckBox *>(control)) {
         // Centered on the title's line.
         auto *box = new QVBoxLayout;
         box->addSpacing(std::max(0, (titleLabel->sizeHint().height() - control->sizeHint().height()) / 2));
@@ -335,6 +336,7 @@ QWidget *SettingsCard::addRow(const QString &title, const QString &description, 
     }
     // A click on the text toggles a switch, like a check box's label.
     if (auto *button = qobject_cast<QAbstractButton *>(control)) {
+        button->setAccessibleName(title);
         titleLabel->setBuddy(button);
         row->setCursor(Qt::PointingHandCursor);
         row->installEventFilter(new RowClick(button, row));

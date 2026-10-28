@@ -5,12 +5,9 @@
 #include "TerminalPreferencesPage.h"
 #include "ui/AppFonts.h"
 #include "ui/Paragraph.h"
-#include "ui/PopupFooter.h"
-#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
+#include "ui/SettingsSwitch.h"
 #include "ui/TreeMetrics.h"
-#include "ui/UiIcons.h"
-#include "ui/UiMetrics.h"
 
 #include <QAction>
 #include <QButtonGroup>
@@ -53,23 +50,10 @@ QLabel *mutedLabel(const QString &text, const char *objectName = "pageDescriptio
 void addGroup(QVBoxLayout *layout, const QString &heading, QWidget *card)
 {
     if (layout->count() > 0)
-        layout->addSpacing(16);
+        layout->addSpacing(22);
     layout->addWidget(sectionHeading(heading));
+    layout->addSpacing(8);
     layout->addWidget(card);
-}
-
-// The icon in the side bar's colors: muted, and the text's color on the
-// selected page.
-QIcon sidebarIcon(const QString &name, const Theme &theme)
-{
-    QIcon icon;
-    for (const auto &[mode, color] :
-         {std::pair{QIcon::Normal, theme.mutedText}, std::pair{QIcon::Selected, theme.foreground}}) {
-        const QIcon drawn = UiIcons::icon(name, color);
-        for (const QSize size : {QSize(16, 16), QSize(32, 32)})
-            icon.addPixmap(drawn.pixmap(size), mode);
-    }
-    return icon;
 }
 
 QString shortcutsText(const QList<QKeySequence> &shortcuts)
@@ -165,142 +149,11 @@ QStringList fillFontFamilies(QComboBox *combo)
     return downloadLinks(missing);
 }
 
-// The keymap, besides the shared rules (popupStyleSheet).
-constexpr const char *preferencesRules = R"(
-QLabel#keymapNote { color: @accent; }
-QTreeWidget#keymapList { border-top: 1px solid @line; }
-QTreeWidget#keymapList::item { padding: 0 6px; }
-QKeySequenceEdit QLineEdit { padding: 4px 8px; }
-)";
-
 } // namespace
-
-PreferencesPopup::PreferencesPopup(const Theme &theme, QWidget *parent)
-    : OverlayPopup(QStringLiteral("preferences"), QSizeF(0.6, 0.76), QSize(860, 560), parent)
-    , theme_(theme)
-{
-    pages_ = new QStackedWidget(this);
-    QWidget *sidebar = createSidebar();
-    addPage(QStringLiteral("appearance"), tr("Appearance"), createAppearancePage());
-    addPage(QStringLiteral("fonts"), tr("Fonts"), createFontsPage());
-    addPage(QStringLiteral("code"), tr("Editor"), createEditorPage());
-    addPage(QStringLiteral("files"), tr("Files"), createFilesPage());
-    addPage(QStringLiteral("claude"), tr("Claude"), createClaudePage());
-    terminalPage_ = new TerminalPreferencesPage;
-    addPage(QStringLiteral("terminal"), tr("Terminal"),
-            page(tr("Terminal"), tr("The environment of the programs Kodamiko launches."), terminalPage_));
-    addPage(QStringLiteral("keyboard"), tr("Keymap"), createKeymapPage());
-    pageList_->setCurrentRow(0);
-
-    auto *footer = new PopupFooter(this);
-    footer->setHint(tr("Changes apply with OK or Apply · Esc to close"));
-    auto *cancel = new QPushButton(tr("Cancel"), footer);
-    auto *apply = new QPushButton(tr("Apply"), footer);
-    auto *ok = new QPushButton(tr("OK"), footer);
-    ok->setDefault(true);
-    for (QPushButton *button : {cancel, apply, ok})
-        footer->addButton(button);
-    connect(cancel, &QPushButton::clicked, this, &OverlayPopup::dismiss);
-    connect(apply, &QPushButton::clicked, this, &PreferencesPopup::applied);
-    connect(ok, &QPushButton::clicked, this, [this] {
-        emit applied();
-        dismiss();
-    });
-
-    // The header across, then the categories at the left of their page,
-    // then the footer across.
-    header_ = new PopupHeader(QStringLiteral("settings"), tr("Preferences"), this);
-    connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
-    auto *columns = new QHBoxLayout;
-    columns->setContentsMargins(0, 0, 0, 0);
-    columns->setSpacing(0);
-    columns->addWidget(sidebar);
-    columns->addWidget(pages_, 1);
-
-    auto *layout = new QVBoxLayout(this);
-    // 1 pixel: the panel's border stays visible around the side bar.
-    layout->setContentsMargins(1, 1, 1, 1);
-    layout->setSpacing(0);
-    layout->addWidget(header_);
-    layout->addLayout(columns, 1);
-    layout->addWidget(footer);
-
-    applyTheme(theme);
-}
-
-QWidget *PreferencesPopup::createSidebar()
-{
-    auto *sidebar = new QFrame(this);
-    sidebar->setObjectName(QStringLiteral("popupSidebar"));
-    sidebar->setFixedWidth(PopupMetrics::sidebarWidth);
-
-    pageList_ = new QListWidget(sidebar);
-    pageList_->setObjectName(QStringLiteral("popupNav"));
-    UiMetrics::setScaledIconSize(pageList_);
-    pageList_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    pageList_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    applyTreeRowHeight(pageList_);
-    connect(pageList_, &QListWidget::currentRowChanged, pages_, &QStackedWidget::setCurrentIndex);
-
-    auto *layout = new QVBoxLayout(sidebar);
-    layout->setContentsMargins(PopupMetrics::sidebarMargins);
-    layout->addWidget(pageList_, 1);
-    return sidebar;
-}
-
-void PreferencesPopup::addPage(const QString &icon, const QString &title, QWidget *page)
-{
-    new QListWidgetItem(title, pageList_);
-    pageIcons_.append(icon);
-    pages_->addWidget(page);
-}
-
-QWidget *PreferencesPopup::page(const QString &title, const QString &description, QWidget *content, bool scrolls)
-{
-    auto *page = new QWidget;
-    auto *titleLabel = new QLabel(title, page);
-    AppFonts::setInterfaceFont(titleLabel, 1.05, QFont::DemiBold);
-
-    auto *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 14, 0, 0);
-    layout->setSpacing(0);
-    auto *heading = new QVBoxLayout;
-    heading->setContentsMargins(16, 0, 16, 0);
-    heading->setSpacing(2);
-    heading->addWidget(titleLabel);
-    heading->addWidget(mutedLabel(description));
-    layout->addLayout(heading);
-    layout->addSpacing(14);
-
-    content->setObjectName(QStringLiteral("pageContent"));
-    if (!scrolls) {
-        content->setContentsMargins(16, 0, 16, 16);
-        layout->addWidget(content, 1);
-        return page;
-    }
-    // The cards scroll; the title stays.
-    auto *holder = new QWidget;
-    holder->setObjectName(QStringLiteral("pageContent"));
-    auto *holderLayout = new QVBoxLayout(holder);
-    holderLayout->setContentsMargins(16, 0, 16, 16);
-    holderLayout->addWidget(content);
-    // A stretch factor, not 0: with word-wrapped labels the layout would
-    // otherwise share the spare height with the cards and pull their rows apart.
-    holderLayout->addStretch(1);
-    auto *scroll = new QScrollArea(page);
-    scroll->setObjectName(QStringLiteral("pageScroll"));
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scroll->setWidget(holder);
-    scroll->viewport()->setAutoFillBackground(false);
-    layout->addWidget(scroll, 1);
-    return page;
-}
 
 QWidget *PreferencesPopup::themeGrid(const QList<Theme> &themes)
 {
-    constexpr int columns = 4;
+    constexpr int columns = 3;
     auto *grid = new QWidget;
     auto *layout = new QGridLayout(grid);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -323,7 +176,7 @@ QWidget *PreferencesPopup::createAppearancePage()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    // Theme: one miniature per theme, Kodamiko's and KDE's by name, four in a row.
+    // The wider previews keep each theme name readable beside the navigation.
     themes_ = new QButtonGroup(this);
     themes_->setExclusive(true);
     connect(themes_, &QButtonGroup::buttonToggled, this, [this](QAbstractButton *, bool checked) {
@@ -336,19 +189,19 @@ QWidget *PreferencesPopup::createAppearancePage()
     });
     addGroup(layout, tr("Theme"), themeGrid(sortedThemes));
 
-    systemTitleBar_ = new QCheckBox(content);
+    systemTitleBar_ = new SettingsSwitch(content);
 #ifdef Q_OS_MACOS
     systemTitleBar_->hide(); // macOS keeps its own frame and traffic lights
 #else
-    auto *windowCard = new SettingsCard;
+    auto *windowCard = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
     windowCard->addRow(tr("System title bar"),
                        tr("The system's window frame instead of Kodamiko's, for tiling window managers."),
                        systemTitleBar_);
     addGroup(layout, tr("Window"), windowCard);
 #endif
 
-    auto *motionCard = new SettingsCard;
-    animations_ = new QCheckBox;
+    auto *motionCard = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
+    animations_ = new SettingsSwitch;
     animations_->setObjectName(QStringLiteral("interfaceAnimations"));
     motionCard->addRow(tr("Interface animations"),
                        tr("Animate menus, popups, hover feedback and diagram transitions. "
@@ -366,7 +219,7 @@ QWidget *PreferencesPopup::createFontsPage()
     layout->setSpacing(0);
 
     // Code font, with a sample in the chosen theme.
-    auto *fontCard = new SettingsCard;
+    auto *fontCard = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
     fontFamily_ = new QComboBox;
     fontFamily_->setMinimumWidth(240);
     const QStringList sources = fillFontFamilies(fontFamily_);
@@ -387,7 +240,7 @@ QWidget *PreferencesPopup::createFontsPage()
     lineHeight_->setSingleStep(0.1);
     lineHeight_->setDecimals(2);
     lineHeight_->setMinimumWidth(90);
-    ligatures_ = new QCheckBox;
+    ligatures_ = new SettingsSwitch;
     fontPreview_ = new QLabel;
     fontPreview_->setTextFormat(Qt::RichText);
     connect(fontFamily_, &QComboBox::currentIndexChanged, this, &PreferencesPopup::updateFontPreview);
@@ -412,7 +265,7 @@ QWidget *PreferencesPopup::createFontsPage()
     addGroup(layout, tr("Code font"), fontCard);
 
     // Interface font: Ubuntu Sans, 11 pt unless another size is chosen.
-    auto *interfaceCard = new SettingsCard;
+    auto *interfaceCard = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
     interfaceFontSize_ = new QSpinBox;
     interfaceFontSize_->setRange(Preferences::minimumFontSize, Preferences::maximumFontSize);
     interfaceFontSize_->setSuffix(tr(" pt"));
@@ -422,7 +275,7 @@ QWidget *PreferencesPopup::createFontsPage()
     interfaceCard->addRow(tr("Navigation trees"), tr("The files, the outline and the changes."), treeFontSize_);
     addGroup(layout, tr("Interface font"), interfaceCard);
 
-    return page(tr("Fonts"), tr("The code's, the interface's and the trees'."), content);
+    return page(tr("Fonts"), tr("Make code and interface text comfortable to read."), content);
 }
 
 QWidget *PreferencesPopup::createEditorPage()
@@ -432,17 +285,17 @@ QWidget *PreferencesPopup::createEditorPage()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    auto *display = new SettingsCard;
-    codeFolding_ = new QCheckBox;
-    wrapLines_ = new QCheckBox;
-    showWhitespace_ = new QCheckBox;
+    auto *display = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
+    codeFolding_ = new SettingsSwitch;
+    wrapLines_ = new SettingsSwitch;
+    showWhitespace_ = new SettingsSwitch;
     display->addRow(tr("Code folding"), tr("Marks in the margin fold blocks, comments and #if sections."),
                     codeFolding_);
     display->addRow(tr("Wrap long lines"), tr("Long lines continue below instead of scrolling sideways."), wrapLines_);
     display->addRow(tr("Show whitespace"), tr("Spaces appear as dots and tabs as arrows."), showWhitespace_);
     addGroup(layout, tr("Display"), display);
 
-    auto *completion = new SettingsCard;
+    auto *completion = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
     autoCompletion_ = new QComboBox;
     autoCompletion_->addItem(tr("Off"), int(AutoCompletion::Off));
     autoCompletion_->addItem(tr("Calm"), int(AutoCompletion::Calm));
@@ -452,11 +305,11 @@ QWidget *PreferencesPopup::createEditorPage()
                        tr("Off: only on Ctrl+Space. Calm: after a pause, from the third letter of a name. "
                           "Eager: as soon as you type a name or a member access."),
                        autoCompletion_);
-    completionAcceptsEnter_ = new QCheckBox;
+    completionAcceptsEnter_ = new SettingsSwitch;
     completion->addRow(tr("Enter inserts the suggestion"),
                        tr("Otherwise only Tab inserts it, and Enter always starts a new line."),
                        completionAcceptsEnter_);
-    languageServers_ = new QCheckBox;
+    languageServers_ = new SettingsSwitch;
     completion->addRow(tr("Language servers"),
                        tr("Members, signatures and types from clangd (C, C++), jdtls (Java), "
                           "typescript-language-server, pyright or pylsp, when installed."),
@@ -465,8 +318,8 @@ QWidget *PreferencesPopup::createEditorPage()
     completion->addWidget(serversFound_);
     addGroup(layout, tr("Completion"), completion);
 
-    auto *fullLine = new SettingsCard;
-    fullLine_ = new QCheckBox;
+    auto *fullLine = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
+    fullLine_ = new SettingsSwitch;
     fullLine->addRow(tr("Full Line completion"),
                      tr("A code model on this machine suggests the rest of the line in gray; Tab inserts it. "
                         "The code around the cursor is sent to the server below."),
@@ -500,8 +353,8 @@ QWidget *PreferencesPopup::createEditorPage()
     });
     addGroup(layout, tr("Full Line"), fullLine);
 
-    auto *saving = new SettingsCard;
-    formatOnSave_ = new QCheckBox;
+    auto *saving = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
+    formatOnSave_ = new SettingsSwitch;
     saving->addRow(tr("Format on save"),
                    tr("Formats each file before writing it, with clang-format, prettier, ruff, black, shfmt or "
                       "cmake-format, whichever is installed for its language."),
@@ -518,13 +371,13 @@ QWidget *PreferencesPopup::createFilesPage()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    auto *tree = new SettingsCard;
-    alwaysSelectOpenedFile_ = new QCheckBox;
+    auto *tree = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
+    alwaysSelectOpenedFile_ = new SettingsSwitch;
     tree->addRow(tr("Always select the opened file"), tr("The Files tree reveals each file you open."),
                  alwaysSelectOpenedFile_);
     addGroup(layout, tr("Files panel"), tree);
 
-    return page(tr("Files"), tr("The project tree."), content);
+    return page(tr("Files"), tr("Choose how the project tree follows your work."), content);
 }
 
 QWidget *PreferencesPopup::createClaudePage()
@@ -534,13 +387,13 @@ QWidget *PreferencesPopup::createClaudePage()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    auto *session = new SettingsCard;
-    snapshotBeforePrompt_ = new QCheckBox;
-    shareEditorContext_ = new QCheckBox;
-    reportEditErrors_ = new QCheckBox;
-    exposeTools_ = new QCheckBox;
-    gitThroughKDKTools_ = new QCheckBox;
-    claudeNotifications_ = new QCheckBox;
+    auto *session = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
+    snapshotBeforePrompt_ = new SettingsSwitch;
+    shareEditorContext_ = new SettingsSwitch;
+    reportEditErrors_ = new SettingsSwitch;
+    exposeTools_ = new SettingsSwitch;
+    gitThroughKDKTools_ = new SettingsSwitch;
+    claudeNotifications_ = new SettingsSwitch;
     session->addRow(tr("Snapshot before each prompt"),
                     tr("Keeps a copy of the working directory before Claude works on a prompt, to undo its "
                        "changes."),
@@ -631,6 +484,7 @@ QWidget *PreferencesPopup::createKeymapPage()
         overrides_.clear();
         setNote({});
         updateCommandRows();
+        updateSummary();
     });
     keymapNote_ = mutedLabel(QString(), "keymapNote");
     keymapNote_->hide();
@@ -658,18 +512,6 @@ QWidget *PreferencesPopup::createKeymapPage()
 
     return page(tr("Keymap"), tr("Shortcuts of the menu commands. Select one, then press its new keys."), content,
                 false);
-}
-
-void PreferencesPopup::applyTheme(const Theme &theme)
-{
-    theme_ = theme;
-    setStyleSheet(popupStyleSheet(theme, QString::fromLatin1(preferencesRules)));
-    header_->applyTheme(theme);
-    for (int i = 0; i < pageList_->count(); ++i)
-        pageList_->item(i)->setIcon(sidebarIcon(pageIcons_.value(i), theme));
-    if (!commandFilter_->actions().isEmpty())
-        commandFilter_->actions().first()->setIcon(UiIcons::icon(QStringLiteral("search"), theme.mutedText));
-    updateFontPreview();
 }
 
 void PreferencesPopup::setInstalledServers(const QStringList &names)
@@ -725,6 +567,8 @@ void PreferencesPopup::load(const Preferences &preferences,
                             const QList<Keymap::Command> &commands,
                             const Keymap::Overrides &overrides)
 {
+    loading_ = true;
+    baseline_ = preferences;
     for (QAbstractButton *button : themes_->buttons()) {
         if (static_cast<ThemeCard *>(button)->themeName() == preferences.theme)
             button->setChecked(true);
@@ -778,6 +622,10 @@ void PreferencesPopup::load(const Preferences &preferences,
     commandFilter_->clear();
     fillCommandList();
     updateFontPreview();
+    baseline_ = this->preferences();
+    baselineOverrides_ = overrides_;
+    loading_ = false;
+    updateSummary();
 }
 
 void PreferencesPopup::updateFullLineRows()
@@ -799,7 +647,7 @@ void PreferencesPopup::keyPressEvent(QKeyEvent *event)
 
 Preferences PreferencesPopup::preferences() const
 {
-    Preferences preferences;
+    Preferences preferences = baseline_;
     if (const auto *card = qobject_cast<ThemeCard *>(themes_->checkedButton()))
         preferences.theme = card->themeName();
     preferences.codeFontFamily = fontFamily_->currentData().toString();
@@ -900,6 +748,7 @@ void PreferencesPopup::setShortcuts(const Keymap::Command &command, const QList<
     else
         overrides_.insert(command.id, shortcuts);
     updateCommandRows();
+    updateSummary();
 }
 
 void PreferencesPopup::setNote(const QString &text)

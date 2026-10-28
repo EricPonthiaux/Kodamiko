@@ -18,6 +18,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -34,6 +35,42 @@ QString headerIcon(ProjectSetupPanel::Purpose purpose)
     return {};
 }
 
+int changeCount(const ProjectConfig &baseline, const ProjectConfig &draft)
+{
+    int count = 0;
+    for (const QString &family : ProjectLanguages::families()) {
+        const LanguageSetup *before = baseline.language(family);
+        const LanguageSetup *after = draft.language(family);
+        if (!before || !after) {
+            if (before != after)
+                ++count;
+            continue;
+        }
+        const QVariantMap saved = before->toVariant();
+        const QVariantMap edited = after->toVariant();
+        for (auto it = edited.cbegin(); it != edited.cend(); ++it) {
+            if (saved.value(it.key()) != it.value())
+                ++count;
+        }
+    }
+    return count;
+}
+
+QStringList changesSummary(int changes, qsizetype downloads)
+{
+    QString pending = QObject::tr("No pending changes");
+    if (changes == 1)
+        pending = QObject::tr("1 pending change");
+    else if (changes > 1)
+        pending = QObject::tr("%1 pending changes").arg(changes);
+    QStringList lines{pending};
+    if (downloads == 1)
+        lines.append(QObject::tr("1 download"));
+    else if (downloads > 1)
+        lines.append(QObject::tr("%1 downloads").arg(downloads));
+    return lines;
+}
+
 } // namespace
 
 ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, Purpose purpose, QWidget *parent)
@@ -45,6 +82,11 @@ ProjectSetupPanel::ProjectSetupPanel(Toolchains *toolchains, Purpose purpose, QW
     , form_(new ProjectSetupForm(toolchains, this))
     , provisioning_(new ProvisioningView(toolchains, this))
 {
+    if (purpose_ == Purpose::Settings) {
+        auto *scope = new QLabel(tr("This project"), header_);
+        scope->setObjectName(QStringLiteral("pageDescription"));
+        header_->addButton(scope);
+    }
     connect(header_, &PopupHeader::closeRequested, this, [this] {
         if (provisioning_->isRunning())
             provisioning_->cancel();
@@ -84,7 +126,7 @@ QWidget *ProjectSetupPanel::createFooter()
     retry_ = new QPushButton(tr("Retry"), footer);
     skip_ = new QPushButton(tr("Continue Without Them"), footer);
     apply_ = new QPushButton(tr("Apply"), footer);
-    ok_ = new QPushButton(isFirstSetup ? tr("Open Project") : tr("OK"), footer);
+    ok_ = new QPushButton(isFirstSetup ? tr("Open Project") : tr("Save && close"), footer);
     ok_->setDefault(true);
     connect(cancel_, &QPushButton::clicked, this, [this] {
         if (provisioning_->isRunning())
@@ -114,7 +156,9 @@ void ProjectSetupPanel::applyTheme(const Theme &theme)
 void ProjectSetupPanel::load(const ProjectConfig &project, const QList<DetectedLanguage> &detected)
 {
     project_ = project;
+    const QSignalBlocker blocker(form_);
     form_->setProject(project, detected);
+    baseline_ = form_->project();
     showForm();
 }
 
@@ -153,10 +197,21 @@ void ProjectSetupPanel::updateSummary()
     const QList<ToolRequirement> required = RecipeLibrary::requirementsOf(project);
     const QList<InstallStep> steps = InstallPlan::plan(project, *toolchains_, required);
     QStringList lines;
-    if (!steps.isEmpty())
+    const int changes = changeCount(baseline_, project);
+    if (purpose_ == Purpose::Settings) {
+        lines = changesSummary(changes, steps.size());
+    } else if (!steps.isEmpty()) {
         lines.append(tr("Will download: %1").arg(InstallPlan::summary(steps)));
-    lines.append(InstallPlan::unavailable(project, *toolchains_, required));
-    Paragraph::setText(summary_, lines.isEmpty() ? tr("All tools available") : lines.join(QLatin1Char('\n')));
+    }
+    const QStringList unavailable = InstallPlan::unavailable(project, *toolchains_, required);
+    if (!unavailable.isEmpty())
+        lines.append(tr("Some tools are missing"));
+    Paragraph::setText(summary_, lines.isEmpty() ? tr("All tools available") : lines.join(QStringLiteral(" · ")));
+    summary_->setToolTip((QStringList{InstallPlan::summary(steps)} + unavailable).join(QLatin1Char('\n')).trimmed());
+    apply_->setEnabled(changes > 0 || !steps.isEmpty());
+    apply_->setText(steps.isEmpty() ? tr("Apply") : tr("Download && apply"));
+    if (purpose_ == Purpose::Settings)
+        ok_->setText(steps.isEmpty() ? tr("Save && close") : tr("Download && close"));
 }
 
 void ProjectSetupPanel::save(Then then)
@@ -196,7 +251,7 @@ void ProjectSetupPanel::finish()
     }
     // Applied: the form again, the tools now downloaded.
     emit applied(project_);
-    load(project_);
+    load(project_, ProjectDetector::detect(project_.path));
 }
 
 void ProjectSetupPanel::startDownloads(const QList<InstallStep> &steps)
