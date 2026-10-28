@@ -10,7 +10,7 @@ offscreen on a fresh clone of this repository.
    tools/site-screenshots/capture.sh /tmp/shots 2 &
    ```
 
-   Kodamiko runs with its own HOME and `Kodamiko.conf` (the default theme), on
+   Kodamiko runs with its own HOME and `Kodamiko.conf` (the Kodamiko theme, whose blue the site shares), on
    `/tmp/shots/Kodamiko`; the user's settings are neither read nor written. Its
    Claude sessions use the real Claude Code installation and account: the
    prompts of a scene cost real usage, and Claude asks once to trust the
@@ -28,10 +28,10 @@ The scenes of the site:
 | Image | Scene |
 |---|---|
 | `hero-editor`, `hero-claude` | Terminals detached; an error planted in `src/history/HistoryView.cpp:151`, cursor on it; the prompt “fix this” |
-| `diagram`, `diagram-claude` | “Draw the path of a prompt through Kodamiko…”, then “Where does Claude wait before touching the code? Show me in the diagram.” |
-| `review` | `a0208aa` staged again (`git reset --soft`), Claude › Review Staged Changes, then Generate |
-| `history` | History mode, `bc75e28` (made with Claude) unfolded |
-| `edit` | Outline side tab, completion after `commits_->setSel` |
+| `diagram`, `diagram-claude` | “Draw the path of a prompt through Kodamiko as a flowchart, in about ten boxes.”, then “Where does Claude wait before touching the code? Show me in the diagram.” |
+| `review` | `90caac2` reverted then picked again without committing (`git revert --no-edit 90caac2`, `git cherry-pick --no-commit 90caac2`), Claude › Review Staged Changes, then Generate |
+| `history` | History mode, `90caac2` (made with Claude) unfolded |
+| `edit` | Outline side tab, completion after `commits_->setSel` on a new line 154, scrolled to show line 134 first |
 
 When a capture changes, check the sentences beside it in `site/index.html`
 and `site/fr/index.html`: each picture shows what its text says.
