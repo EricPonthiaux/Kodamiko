@@ -664,6 +664,46 @@ private slots:
         QVERIFY(!toolchains.isInstalled("maven", "3.9.16"));
     }
 
+    void aFailedReinstallKeepsThePreviousInstall()
+    {
+        if (QStandardPaths::findExecutable("tar").isEmpty())
+            QSKIP("No tar");
+        QTemporaryDir dir;
+        write(dir.filePath("source/maven/README"), "no bin/mvn\n");
+        QProcess tar;
+        tar.start("tar", {"-czf", dir.filePath("maven.tar.gz"), "-C", dir.filePath("source"), "maven"});
+        QVERIFY(tar.waitForFinished());
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        const QString mvn = toolchains.installFolder("maven", "3.9.16") + "/bin/mvn";
+        write(mvn, "#!/bin/sh\necho maven\n");
+        write(toolchains.installFolder("maven", "3.9.16") + "/.complete", "maven 3.9.16");
+        Installer installer(&toolchains);
+        const DownloadSource source{.url = QUrl::fromLocalFile(dir.filePath("maven.tar.gz")),
+                                    .fileName = "maven.tar.gz",
+                                    .checksumUrl = {},
+                                    .checksum = {},
+                                    .algorithm = ChecksumAlgorithm::Sha256,
+                                    .format = ArchiveFormat::TarGz,
+                                    .error = {}};
+        QSignalSpy finished(&installer, &Installer::finished);
+        QSignalSpy steps(&installer, &Installer::stepFinished);
+
+        installer.run({{.tool = "maven",
+                        .version = "3.9.16",
+                        .title = "maven 3.9.16",
+                        .reason = {},
+                        .kit = {},
+                        .modules = {},
+                        .source = source,
+                        .check = "bin/mvn"}});
+
+        QVERIFY(finished.wait(10000));
+        QVERIFY(steps.first().at(1).toString().contains("expected files"));
+        QVERIFY(toolchains.isInstalled("maven", "3.9.16"));
+        QVERIFY(QFileInfo::exists(mvn));
+        QVERIFY(!QFileInfo::exists(toolchains.installFolder("maven", "3.9.16") + "/README"));
+    }
+
     void plansWhatIsMissing()
     {
         const QTemporaryDir dir;

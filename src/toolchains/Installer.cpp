@@ -50,9 +50,51 @@ QString hashOf(const QString &path, ChecksumAlgorithm algorithm)
     return QString::fromLatin1(hash.result().toHex());
 }
 
+QString writeError(const QFile &file)
+{
+    return QObject::tr("Cannot write %1: %2").arg(QDir::toNativeSeparators(file.fileName()), file.errorString());
+}
+
+// When no program found can unpack `format`: what to install.
+QString missingUnpackerError(ArchiveFormat format)
+{
+    switch (format) {
+    case ArchiveFormat::TarGz:
+        return QObject::tr("Cannot unpack the archive: tar is not installed");
+    case ArchiveFormat::Zip:
+        return QObject::tr("Cannot unpack a zip file: install unzip or bsdtar");
+    case ArchiveFormat::SevenZip:
+        // GNU tar, Linux's, does not read 7z files.
+        return QObject::tr("Cannot unpack a 7z file: install bsdtar (libarchive)");
+    case ArchiveFormat::Npm:
+        return QObject::tr("An npm package is installed by npm, not unpacked");
+    }
+    return {};
+}
+
+// Puts the install that `complete` set aside back in place.
+[[nodiscard]] bool restorePrevious(const QString &previous, const QString &target)
+{
+    return !QFileInfo::exists(previous) || QDir().rename(previous, target);
+}
+
 void makeExecutable(const QString &path)
 {
     QFile::setPermissions(path, QFile::permissions(path) | QFile::ExeOwner | QFile::ExeGroup | QFile::ExeOther);
+}
+
+// zipfile (Python) does not keep the permissions: the step's executables
+// and its check file, in `target`, get them back.
+void makeExecutables(const InstallStep &step, const QString &target)
+{
+    QStringList executables{step.check};
+    if (const ToolSpec *spec = ToolCatalog::find(step.tool); spec && !spec->script)
+        executables.append(spec->executables);
+    for (const QString &executable : executables) {
+        const QString path = target + QLatin1Char('/') + executable;
+        if (!executable.isEmpty() && QFileInfo::exists(path))
+            makeExecutable(path);
+    }
 }
 
 // What npm installs: a recipe's packages, else the catalog's `spec` at
@@ -246,8 +288,9 @@ void Installer::fetchArchive(const DownloadSource &source, const QString &expect
     const QString name = source.fileName.isEmpty() ? QFileInfo(source.url.path()).fileName() : source.fileName;
     const QString archive = stagingFolder() + QStringLiteral("/") + name;
     file_ = std::make_unique<QFile>(archive);
+    archiveWriteError_.clear();
     if (!file_->open(QIODevice::WriteOnly)) {
-        fail(tr("Cannot write %1").arg(QDir::toNativeSeparators(archive)));
+        fail(writeError(*file_));
         return;
     }
     QNetworkReply *reply = network_->get(requestFor(source.url));
@@ -255,8 +298,8 @@ void Installer::fetchArchive(const DownloadSource &source, const QString &expect
     const int generation = generation_;
     const int index = index_;
     connect(reply, &QNetworkReply::readyRead, this, [this, reply, generation] {
-        if (generation == generation_ && file_)
-            file_->write(reply->readAll());
+        if (generation == generation_)
+            writeToArchive(reply);
     });
     connect(reply, &QNetworkReply::downloadProgress, this, [this, index, generation](qint64 received, qint64 total) {
         if (generation == generation_)
@@ -274,10 +317,14 @@ void Installer::finishArchive(QNetworkReply *reply,
                               const QString &archive,
                               const QString &expectedChecksum)
 {
-    if (file_) {
-        file_->write(reply->readAll());
-        file_->close();
-        file_ = nullptr;
+    writeToArchive(reply);
+    if (file_ && !file_->flush())
+        archiveWriteError_ = writeError(*file_);
+    file_ = nullptr;
+    // Before the reply's error: a failed write aborts the download.
+    if (!archiveWriteError_.isEmpty()) {
+        fail(archiveWriteError_);
+        return;
     }
     if (const QString error = replyError(reply); !error.isEmpty()) {
         fail(error);
@@ -290,14 +337,26 @@ void Installer::finishArchive(QNetworkReply *reply,
     extract(source, archive);
 }
 
+void Installer::writeToArchive(QNetworkReply *reply)
+{
+    if (!file_)
+        return;
+    const QByteArray data = reply->readAll();
+    if (file_->write(data) == data.size())
+        return;
+    // The disk is full, say: the rest of the download would be lost too.
+    archiveWriteError_ = writeError(*file_);
+    file_ = nullptr;
+    reply->abort();
+}
+
 void Installer::extract(const DownloadSource &source, const QString &archive)
 {
     const QString content = stagingFolder() + QStringLiteral("/content");
     QDir().mkpath(content);
     const QStringList command = extractCommand(source.format, archive, content);
     if (command.isEmpty()) {
-        fail(source.format == ArchiveFormat::Zip ? tr("Cannot unpack a zip file: install unzip or bsdtar")
-                                                 : tr("Cannot unpack the archive: tar is not installed"));
+        fail(missingUnpackerError(source.format));
         return;
     }
     auto *process = new QProcess(this);
@@ -420,44 +479,51 @@ void Installer::installQt()
 
 void Installer::complete(const QString &content, const QString &target)
 {
-    const InstallStep step = steps_.at(index_);
-    QDir(target).removeRecursively();
+    // The previous install stays until the new one proves usable: a failed
+    // reinstall leaves the tool as it was.
+    const QString previous = stagingFolder() + QStringLiteral("/previous");
+    if (QFileInfo::exists(target) && !QDir().rename(target, previous)) {
+        fail(tr("Cannot replace %1: a program may be using it").arg(QDir::toNativeSeparators(target)));
+        return;
+    }
     QDir().mkpath(QFileInfo(target).absolutePath());
-    if (!QDir().rename(content, target)) {
-        fail(tr("Cannot move the files to %1").arg(QDir::toNativeSeparators(target)));
+    const bool isMoved = QDir().rename(content, target);
+    QString error =
+        isMoved ? finishInstall(target) : tr("Cannot move the files to %1").arg(QDir::toNativeSeparators(target));
+    if (!error.isEmpty()) {
+        if (isMoved)
+            QDir(target).removeRecursively();
+        if (!restorePrevious(previous, target))
+            error += tr(", and the previous install could not be put back");
+        fail(error);
         return;
     }
-    // zipfile (Python) does not keep the permissions.
-    if (const ToolSpec *spec = ToolCatalog::find(step.tool); spec && !spec->script) {
-        for (const QString &executable : spec->executables) {
-            if (QFileInfo::exists(target + QLatin1Char('/') + executable))
-                makeExecutable(target + QLatin1Char('/') + executable);
-        }
-    }
-    QFile marker(target + QStringLiteral("/.complete"));
-    if (!marker.open(QIODevice::WriteOnly)) {
-        fail(tr("Cannot write %1").arg(QDir::toNativeSeparators(marker.fileName())));
-        return;
-    }
-    // A Qt's modules follow its title, one per line (see Toolchains::qtFolder).
-    marker.write((QStringList{step.title} + step.modules).join(QLatin1Char('\n')).toUtf8());
-    marker.close();
     QDir(stagingFolder()).removeRecursively();
-    const QString check = target + QLatin1Char('/') + step.check;
-    if (!step.check.isEmpty() && QFileInfo::exists(check))
-        makeExecutable(check);
-    const bool lacksCheck = !step.check.isEmpty() && !QFileInfo::exists(check);
-    const bool lacksExecutable =
-        toolchains_->installedExecutable(step.tool, step.version).isEmpty() && ToolCatalog::find(step.tool);
-    if (lacksCheck || lacksExecutable) {
-        // Unpacked, but not as expected: not usable.
-        QFile::remove(marker.fileName());
-        fail(tr("%1 does not contain the expected files").arg(step.title));
-        return;
-    }
     toolchains_->refresh();
     emit stepFinished(index_, QString());
     nextStep();
+}
+
+QString Installer::finishInstall(const QString &target) const
+{
+    const InstallStep &step = steps_.at(index_);
+    makeExecutables(step, target);
+    const QString check = target + QLatin1Char('/') + step.check;
+    QFile marker(target + QStringLiteral("/.complete"));
+    if (!marker.open(QIODevice::WriteOnly))
+        return writeError(marker);
+    // A Qt's modules follow its title, one per line (see Toolchains::qtFolder).
+    const QByteArray markerText = (QStringList{step.title} + step.modules).join(QLatin1Char('\n')).toUtf8();
+    if (marker.write(markerText) != markerText.size() || !marker.flush())
+        return writeError(marker);
+    marker.close();
+    const bool lacksCheck = !step.check.isEmpty() && !QFileInfo::exists(check);
+    const bool lacksExecutable =
+        toolchains_->installedExecutable(step.tool, step.version).isEmpty() && ToolCatalog::find(step.tool);
+    // Unpacked, but not as expected: not usable.
+    if (lacksCheck || lacksExecutable)
+        return tr("%1 does not contain the expected files").arg(step.title);
+    return {};
 }
 
 void Installer::fail(const QString &error)

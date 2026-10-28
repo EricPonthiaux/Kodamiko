@@ -65,11 +65,18 @@ private:
                        const DownloadSource &source,
                        const QString &archive,
                        const QString &expectedChecksum);
+    // Appends what the reply received to the archive; stops the download at
+    // the first failed write.
+    void writeToArchive(QNetworkReply *reply);
     void extract(const DownloadSource &source, const QString &archive);
     void installNpm(const DownloadSource &source);
     void installQt();
-    // Moves `content` to `target` and marks it complete.
+    // Moves `content` to `target` and marks it complete; a failure leaves the
+    // previous install of `target` in place.
     void complete(const QString &content, const QString &target);
+    // Makes the files moved to `target` usable and marks them complete; an
+    // error when they are not what the step expects.
+    QString finishInstall(const QString &target) const;
     void fail(const QString &error);
     void nextStep();
     // GET `url` into memory; `done` gets the body, or an error.
@@ -88,6 +95,8 @@ private:
     QPointer<QProcess> process_;
     QPointer<QtDownload> qt_;
     std::unique_ptr<QFile> file_;
+    // Why writing the archive failed, which aborted its download.
+    QString archiveWriteError_;
     // Incremented by cancel(): callbacks of an older generation are ignored.
     int generation_ = 0;
 };
