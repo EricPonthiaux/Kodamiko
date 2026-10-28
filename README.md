@@ -1,8 +1,5 @@
 # Duet
 
-**A code editor where you and an AI agent work on the same project, side by
-side, and you never lose sight of what it does.**
-
 Duet is a native desktop editor built around a [Claude Code](https://claude.com/claude-code)
 session. You write code on one side; Claude works on the other, in a
 terminal inside the editor. Duet keeps the two in step: Claude knows what you
