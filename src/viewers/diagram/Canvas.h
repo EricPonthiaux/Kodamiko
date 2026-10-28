@@ -97,6 +97,10 @@ public:
     // Ends animations: the model is already at its final state.
     void finishMotion();
 
+    // Selects the shape `reference` (an id, or else a key) and moves the
+    // view just enough to show it; nothing when the diagram has none.
+    void revealShape(const QString &reference);
+
     void copy();
     void cut();
     void paste();

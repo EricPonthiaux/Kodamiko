@@ -53,6 +53,12 @@ public:
 
     void applyTheme(const Theme &theme);
 
+    // The selected element as a place to come back to: its key, else its id;
+    // empty unless one element is selected.
+    QString selectedElement() const;
+    // Selects the element `reference` (a key or an id) and shows it.
+    void revealElement(const QString &reference);
+
     diagram::Board *board() const { return board_; }
 
     diagram::Canvas *canvas() const { return canvas_; }

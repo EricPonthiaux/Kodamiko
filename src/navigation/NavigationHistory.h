@@ -8,12 +8,14 @@
 #include <optional>
 
 // Positions visited while jumping from one symbol to another, for Back (Alt+←)
-// and Forward (Alt+→), as in a web browser.
+// and Forward (Alt+→), as in a web browser. A position is in a text file, or
+// in a diagram, on the element a jump to the code started from.
 class NavigationHistory {
 public:
     struct Location {
         QString filePath;
-        int position = 0; // in bytes
+        int position = 0; // in a text file, in bytes
+        QString element;  // in a diagram, the selected element (a key or an id), or empty
         bool operator==(const Location &) const = default;
     };
 

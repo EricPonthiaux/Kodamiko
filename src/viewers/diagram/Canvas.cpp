@@ -596,6 +596,16 @@ void Canvas::syncEditor()
         QRectF(topLeft.x() - 2, topLeft.y(), r.width() * camera_.scale + 4, height + 4).toAlignedRect());
 }
 
+void Canvas::revealShape(const QString &reference)
+{
+    const Shape *shape = board_->shapeByReference(reference);
+    if (!shape)
+        return;
+    board_->selectShape(shape->id);
+    keepVisible(*shape);
+    update();
+}
+
 void Canvas::keepVisible(const Shape &shape)
 {
     // Zooms out only when the box no longer fits, then moves the view just

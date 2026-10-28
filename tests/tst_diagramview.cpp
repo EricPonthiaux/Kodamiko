@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "editor/EditorTabs.h"
+#include "editor/EditorWidget.h"
+#include "navigation/CodeNavigator.h"
+#include "navigation/SymbolIndex.h"
 #include "viewers/DiagramCheck.h"
 #include "viewers/DiagramKinds.h"
 #include "viewers/DiagramView.h"
@@ -379,6 +382,36 @@ private slots:
         QCOMPARE(tabs.count(), 1);
         QCOMPARE(tabs.currentFilePath(), view->filePath());
         QCOMPARE(tabs.openFilePaths(), QStringList{view->filePath()});
+    }
+
+    // Ctrl+click from a diagram to the code, then Back (Alt+←) to the element
+    // it started from, and Forward (Alt+→) to the code again.
+    void comesBackToTheDiagramElementWithBack()
+    {
+        const QTemporaryDir dir;
+        const QString diagramPath =
+            writeFile(dir, QStringLiteral("agents.mmd"), "classDiagram\n  class Hook\n  class Other\n");
+        const QString codePath =
+            QFileInfo(writeFile(dir, QStringLiteral("Hook.h"), "class Hook {};\n")).absoluteFilePath();
+        EditorTabs tabs(Theme::duet());
+        SymbolIndex symbols;
+        CodeNavigator navigator(&tabs, &symbols);
+        auto *view = qobject_cast<DiagramView *>(tabs.openFile(diagramPath));
+        QVERIFY(view);
+        view->revealElement(QStringLiteral("Hook"));
+
+        navigator.goTo(codePath, 6);
+        QVERIFY(tabs.currentEditor());
+        view->board()->clearSelection();
+        navigator.goBack();
+        const bool showsTheDiagram = tabs.currentWidget() == view;
+        const QString element = view->selectedElement();
+        navigator.goForward();
+
+        QVERIFY(showsTheDiagram);
+        QCOMPARE(element, QStringLiteral("Hook"));
+        QVERIFY(tabs.currentEditor());
+        QCOMPARE(tabs.currentEditor()->filePath(), codePath);
     }
 
     void refusesInvalidDiagrams()

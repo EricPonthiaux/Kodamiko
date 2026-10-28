@@ -361,6 +361,8 @@ bool Canvas::requestCodeAt(QPointF point)
     const std::optional<CodeReference> reference = shape ? shape->codeReferenceAt(point) : std::nullopt;
     if (!reference)
         return false;
+    // The element stays selected: Back (Alt+←) comes back to it.
+    board_->selectShape(shape->id);
     emit codeRequested(reference->name, reference->container, reference->filePath);
     return true;
 }

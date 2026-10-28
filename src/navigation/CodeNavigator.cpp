@@ -196,20 +196,25 @@ void CodeNavigator::goForward()
 
 std::optional<NavigationHistory::Location> CodeNavigator::currentLocation() const
 {
-    const EditorWidget *editor = tabs_->currentEditor();
-    if (!editor || editor->filePath().isEmpty())
-        return std::nullopt;
-    return NavigationHistory::Location{editor->filePath(),
-                                       static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))};
+    if (const EditorWidget *editor = tabs_->currentEditor(); editor && !editor->filePath().isEmpty())
+        return NavigationHistory::Location{
+            .filePath = editor->filePath(),
+            .position = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))};
+    if (const std::optional<EditorTabs::DiagramPlace> diagram = tabs_->currentDiagramPlace())
+        return NavigationHistory::Location{.filePath = diagram->filePath, .element = diagram->element};
+    return std::nullopt;
 }
 
 void CodeNavigator::showLocation(const NavigationHistory::Location &location)
 {
     if (location.filePath.isEmpty() || !QFileInfo::exists(location.filePath))
         return;
-    auto *editor = EditorTabs::editorIn(tabs_->openFile(location.filePath));
-    if (!editor)
+    QWidget *page = tabs_->openFile(location.filePath);
+    auto *editor = EditorTabs::editorIn(page);
+    if (!editor) {
+        tabs_->revealDiagramElement(page, location.element);
         return;
+    }
     tabs_->revealEditor(editor);
     editor->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, location.position);
     editor->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);

@@ -119,6 +119,20 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
 
 DiagramView::~DiagramView() = default;
 
+QString DiagramView::selectedElement() const
+{
+    const diagram::Shape *shape = board_->selectedShape();
+    if (!shape)
+        return {};
+    return shape->key.isEmpty() ? shape->id : shape->key;
+}
+
+void DiagramView::revealElement(const QString &reference)
+{
+    if (!reference.isEmpty())
+        canvas_->revealShape(reference);
+}
+
 // The toolbar over the canvas alone, so that the properties panel has its
 // own header beside it, at the same height.
 QWidget *DiagramView::createCanvasColumn()

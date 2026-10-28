@@ -429,6 +429,28 @@ DiagramView *EditorTabs::diagramViewFor(const QString &path) const
     return nullptr;
 }
 
+std::optional<EditorTabs::DiagramPlace> EditorTabs::currentDiagramPlace() const
+{
+#ifdef DUET_WITH_DIAGRAMS
+    if (const auto *view = qobject_cast<DiagramView *>(currentWidget()))
+        return DiagramPlace{.filePath = view->filePath(), .element = view->selectedElement()};
+#endif
+    return std::nullopt;
+}
+
+void EditorTabs::revealDiagramElement(QWidget *page, const QString &element) const
+{
+#ifdef DUET_WITH_DIAGRAMS
+    if (auto *view = qobject_cast<DiagramView *>(page)) {
+        view->revealElement(element);
+        view->setFocus();
+    }
+#else
+    Q_UNUSED(page);
+    Q_UNUSED(element);
+#endif
+}
+
 QList<DiagramView *> EditorTabs::diagramViews() const
 {
     QList<DiagramView *> result;

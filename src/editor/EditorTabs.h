@@ -73,6 +73,19 @@ public:
     ImageView *imageViewFor(const QString &path) const;
     DiagramView *diagramViewFor(const QString &path) const;
 
+    // A place in a diagram, for the navigation history.
+    struct DiagramPlace {
+        QString filePath;
+        QString element; // see DiagramView::selectedElement
+    };
+
+    // The current tab's diagram and its selected element; nullopt when the
+    // current tab is not a diagram.
+    std::optional<DiagramPlace> currentDiagramPlace() const;
+    // In `page`, a diagram's tab, selects and shows `element` (nothing when
+    // empty) and gives the diagram the focus; nothing for another page.
+    void revealDiagramElement(QWidget *page, const QString &element) const;
+
     // Paths of open files, in tab order (excluding diffs).
     QStringList openFilePaths() const;
     QString currentFilePath() const;
