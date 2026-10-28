@@ -664,6 +664,33 @@ private slots:
         QVERIFY(!toolchains.isInstalled("maven", "3.9.16"));
     }
 
+    void anInstallerDestroyedWhileRunningEmitsNothing()
+    {
+        QTemporaryDir dir;
+        write(dir.filePath("maven.tar.gz"), "not downloaded before the installer dies");
+        auto toolchains = std::make_unique<Toolchains>(dir.filePath("toolchains"), false);
+        auto installer = std::make_unique<Installer>(toolchains.get());
+        installer->setSourceResolver([&](const InstallStep &) {
+            DownloadSource source;
+            source.url = QUrl::fromLocalFile(dir.filePath("maven.tar.gz"));
+            source.fileName = "maven.tar.gz";
+            source.format = ArchiveFormat::TarGz;
+            return source;
+        });
+        installer->run({{"maven", "3.9.16", "maven 3.9.16", {}}});
+        QVERIFY(installer->isRunning());
+        const QSignalSpy finished(installer.get(), &Installer::finished);
+        const QSignalSpy steps(installer.get(), &Installer::stepFinished);
+
+        // Its owner's members first, then the toolchains, then the installer.
+        toolchains.reset();
+        installer.reset();
+
+        QCOMPARE(finished.size(), 0);
+        QCOMPARE(steps.size(), 0);
+        QVERIFY(!QDir(dir.filePath("toolchains/.staging/maven-3.9.16")).exists());
+    }
+
     void aFailedReinstallKeepsThePreviousInstall()
     {
         if (QStandardPaths::findExecutable("tar").isEmpty())

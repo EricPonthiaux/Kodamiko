@@ -114,13 +114,15 @@ QStringList npmPackagesOf(const DownloadSource &source, const ToolSpec *spec, co
 Installer::Installer(Toolchains *toolchains, QObject *parent)
     : QObject(parent)
     , toolchains_(toolchains)
+    , root_(toolchains->root())
     , network_(new QNetworkAccessManager(this))
 {
 }
 
+// No signal: the owner is being destroyed, its slots with it.
 Installer::~Installer()
 {
-    cancel();
+    stop();
 }
 
 QStringList Installer::extractCommand(ArchiveFormat format, const QString &archive, const QString &destination)
@@ -165,6 +167,16 @@ void Installer::cancel()
 {
     if (!running_)
         return;
+    stop();
+    if (index_ >= 0 && index_ < steps_.size())
+        emit stepFinished(index_, tr("Cancelled"));
+    emit finished(false);
+}
+
+void Installer::stop()
+{
+    if (!running_)
+        return;
     ++generation_;
     running_ = false;
     if (reply_)
@@ -179,9 +191,6 @@ void Installer::cancel()
     }
     file_ = nullptr;
     QDir(stagingFolder()).removeRecursively();
-    if (index_ >= 0 && index_ < steps_.size())
-        emit stepFinished(index_, tr("Cancelled"));
-    emit finished(false);
 }
 
 QString Installer::stagingFolder() const
@@ -190,7 +199,7 @@ QString Installer::stagingFolder() const
         return {};
     // Inside the toolchains' folder: moving it in place is a rename.
     const InstallStep &step = steps_.at(index_);
-    return toolchains_->root() + QStringLiteral("/.staging/") + step.tool + QLatin1Char('-') + step.version;
+    return root_ + QStringLiteral("/.staging/") + step.tool + QLatin1Char('-') + step.version;
 }
 
 void Installer::nextStep()
@@ -198,7 +207,7 @@ void Installer::nextStep()
     ++index_;
     if (index_ >= steps_.size()) {
         running_ = false;
-        QDir(toolchains_->root() + QStringLiteral("/.staging")).removeRecursively();
+        QDir(root_ + QStringLiteral("/.staging")).removeRecursively();
         toolchains_->refresh();
         emit finished(ok_);
         return;

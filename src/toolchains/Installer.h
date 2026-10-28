@@ -77,13 +77,17 @@ private:
     // Makes the files moved to `target` usable and marks them complete; an
     // error when they are not what the step expects.
     QString finishInstall(const QString &target) const;
+    // Stops the current step's work and removes its files, without a signal.
+    void stop();
     void fail(const QString &error);
     void nextStep();
     // GET `url` into memory; `done` gets the body, or an error.
     void fetch(const QUrl &url, std::function<void(const QByteArray &body, const QString &error)> done);
     QString stagingFolder() const;
 
-    Toolchains *toolchains_;
+    Toolchains *toolchains_; // Not owned; may die before the installer.
+    // toolchains_'s, for the staging folder: the destructor may run after it.
+    QString root_;
     QNetworkAccessManager *network_;
     SourceResolver resolver_;
     QList<InstallStep> steps_;
