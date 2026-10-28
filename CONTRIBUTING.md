@@ -171,6 +171,24 @@ Kodamiko needs [Claude Code](https://claude.com/claude-code) 2.1+ and git
 
 ## Before you open a pull request
 
+Using AI is no excuse for sloppy code, and sloppy code will not get into
+Kodamiko. Most of Kodamiko is written with Claude, so the bar is set where
+an assistant cannot lower it:
+
+- **The rules are written down.** `CLAUDE.md` says what good code is here,
+  and Claude reads it before every change, as a contributor should.
+- **The tools check them, not goodwill.** clang-tidy rejects a function
+  above 15 of cognitive complexity, the compiler's warnings stay at zero,
+  clang-format leaves no choice in the layout, and the CI builds and tests
+  every change on Linux, Windows and macOS.
+- **Every behavior is proven by a test.** A fix comes with the test that
+  failed before it; a feature, with the tests of what it does.
+- **A person reads every line.** Code is merged once someone understands
+  it, whoever or whatever wrote it, and its author can explain each choice.
+- **A second review sees what the author missed.** Kodamiko's own review,
+  a separate Claude session that sees only the code, looks for the bugs
+  and the broken rules before the change is committed.
+
 The conventions in [`CLAUDE.md`](CLAUDE.md) are not suggestions: every
 change follows them, whether a person or Claude wrote it. In short:
 functions of cognitive complexity ≤ 15 and nesting ≤ 3, names that need no
