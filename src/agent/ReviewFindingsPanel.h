@@ -9,11 +9,11 @@
 
 class QLabel;
 class QToolButton;
-class ReviewFindingsTable;
+class ReviewFindingsView;
 struct Theme;
 
-// A review's findings (ReviewSession) over the diff they are about, in a
-// grid (ReviewFindingsTable) under the reviewer's summary; its close button
+// A review's findings (ReviewSession) over the diff they are about
+// (ReviewFindingsView), under the reviewer's summary; its close button
 // gives the diff back. Its owner lays it over the diff, at its size.
 class ReviewFindingsPanel : public QFrame {
     Q_OBJECT
@@ -28,7 +28,7 @@ public:
     void applyTheme(const Theme &theme);
 
 signals:
-    // A row activated: its place in the diff.
+    // A finding activated: its place in the diff.
     void findingRequested(const ReviewReport::Finding &finding);
     void closeRequested();
 
@@ -39,5 +39,5 @@ private:
     QLabel *title_;
     QLabel *summary_;
     QToolButton *close_;
-    ReviewFindingsTable *table_;
+    ReviewFindingsView *findings_;
 };

@@ -3,11 +3,11 @@
 #include "DiagramGenerationView.h"
 
 #include "DiagramCheck.h"
-#include "StepTimeline.h"
 #include "agent/AgentProvider.h"
 #include "agent/AgentRun.h"
 #include "agent/DiagramRequest.h"
 #include "ui/AppFonts.h"
+#include "ui/StepTimeline.h"
 #include "viewers/sketch/DiagramSketch.h"
 
 #include <QDir>
@@ -186,6 +186,7 @@ void DiagramGenerationView::onRunFinished(const AgentRun::Outcome &outcome)
     clock_->stop();
     if (!outcome.failed && QFileInfo::exists(path_)) {
         sketch_->setState(DiagramSketch::State::Done);
+        steps_->setState(StepTimeline::State::Done);
         emit finished(path_, outcome.answer);
         return;
     }

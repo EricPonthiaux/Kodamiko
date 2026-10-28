@@ -2,7 +2,7 @@
 
 #include "agent/ReviewBar.h"
 #include "agent/ReviewFindingsPanel.h"
-#include "agent/ReviewFindingsTable.h"
+#include "agent/ReviewFindingCard.h"
 #include "agent/ReviewSession.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
 #include "changes/BranchesPopup.h"
@@ -585,18 +585,16 @@ private slots:
         view.setReview(session, ChangesView::ReviewDisplay::OverTheDiff);
         session->start();
         QTRY_COMPARE(session->state(), ReviewSession::State::Finished);
-        const auto *table = view.findChild<ReviewFindingsTable *>();
-        const auto resolveButton = [table] {
-            return table->cellWidget(0, table->columnCount() - 1)->findChild<QPushButton *>();
-        };
+        const auto card = [&view] { return view.findChild<ReviewFindingCard *>(); };
         const QSignalSpy resolved(session, &ReviewSession::resolveRequested);
 
-        resolveButton()->click();
+        buttonWithText(card(), "Resolve")->click();
 
-        QCOMPARE(resolved.size(), 1);
+        QTRY_COMPARE(resolved.size(), 1);
         QVERIFY(resolved.first().first().toString().contains("Off by one."));
-        QCOMPARE(resolveButton()->text(), QString("Sent"));
-        QVERIFY(!resolveButton()->isEnabled());
+        QTRY_VERIFY(!buttonWithText(card(), "Resolve"));
+        const QList<QLabel *> labels = card()->findChildren<QLabel *>();
+        QVERIFY(std::ranges::any_of(labels, [](const QLabel *label) { return label->text() == "✓ Sent to Claude"; }));
     }
 
     void reviewAgainAsksForANewReviewOfTheStagedChanges()
@@ -1587,7 +1585,8 @@ private slots:
         view.findChild<QPlainTextEdit *>("commitBody")->setPlainText("Because b reads better.");
         commitButton(view)->click();
 
-        QTRY_COMPARE(RepositoryInfo::read(project.path())->headMessage, QString("Change a\n\nBecause b reads better.\n"));
+        QTRY_COMPARE(RepositoryInfo::read(project.path())->headMessage,
+                     QString("Change a\n\nBecause b reads better.\n"));
     }
 
     void theSummaryMeterTurnsRedPastSeventyTwoCharacters()

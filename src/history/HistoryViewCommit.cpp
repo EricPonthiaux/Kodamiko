@@ -66,7 +66,8 @@ QString HistoryView::filterOf(const QString &commitId) const
 void HistoryView::chooseFile(const QString &path)
 {
     const QList<DiffView::FileSummary> &files = diff_->fileSummaries();
-    const auto file = std::ranges::find_if(files, [&path](const DiffView::FileSummary &each) { return each.path == path; });
+    const auto file =
+        std::ranges::find_if(files, [&path](const DiffView::FileSummary &each) { return each.path == path; });
     if (file != files.end())
         diff_->scrollToTop(diff_->fileStart(int(file - files.begin())));
 }

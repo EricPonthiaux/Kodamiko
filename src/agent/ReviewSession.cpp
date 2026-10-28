@@ -206,13 +206,11 @@ void ReviewSession::dismiss(const QList<ReviewReport::Finding> &findings)
 
 void ReviewSession::resolve(const QList<ReviewReport::Finding> &findings)
 {
-    if (findings.isEmpty())
+    const QList<ReviewReport::Finding> handedOver = notHandedOver(findings);
+    if (handedOver.isEmpty())
         return;
-    for (const ReviewReport::Finding &finding : findings) {
-        if (!resolving_.contains(finding))
-            resolving_.append(finding);
-    }
-    emit resolveRequested(ReviewReport::toMarkdown(findings, workDir_));
+    resolving_ += handedOver;
+    emit resolveRequested(ReviewReport::toMarkdown(handedOver, workDir_));
     emit findingsChanged();
 }
 
@@ -221,14 +219,30 @@ bool ReviewSession::isResolving(const ReviewReport::Finding &finding) const
     return resolving_.contains(finding);
 }
 
+QList<ReviewReport::Finding> ReviewSession::notHandedOver(const QList<ReviewReport::Finding> &findings) const
+{
+    QList<ReviewReport::Finding> left;
+    for (const ReviewReport::Finding &finding : findings) {
+        if (!resolving_.contains(finding) && !left.contains(finding))
+            left.append(finding);
+    }
+    return left;
+}
+
 void ReviewSession::send(const QList<ReviewReport::Finding> &findings)
 {
-    emit sendRequested(ReviewReport::toMarkdown(findings, workDir_));
+    const QList<ReviewReport::Finding> sent = notHandedOver(findings);
+    if (!sent.isEmpty())
+        emit sendRequested(ReviewReport::toMarkdown(sent, workDir_));
 }
 
 void ReviewSession::sendAll()
 {
-    emit sendRequested(rawAnswer_.isEmpty() ? ReviewReport::toMarkdown(findings_, workDir_) : rawAnswer_);
+    if (!rawAnswer_.isEmpty()) {
+        emit sendRequested(rawAnswer_);
+        return;
+    }
+    send(findings_);
 }
 
 void ReviewSession::publishFindings()

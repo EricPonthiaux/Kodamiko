@@ -216,8 +216,6 @@ QTreeView { padding-top: 6px; }
 QTreeView::item:selected, QTreeWidget::item:selected { background: @selection; color: @text; }
 QTreeView::item:selected:active, QTreeWidget::item:selected:active { color: @text; background: @slate; }
 QTreeView::item:hover { background: @hover; }
-QTableView#reviewFindingsTable { background: @base; alternate-background-color: @panel; border: none; outline: 0; }
-QTableView#reviewFindingsTable::item:selected { background: @slate; color: @text; }
 QListWidget#projectRecipes::item { padding: 10px 14px; margin: 3px 0; border-radius: 2px; }
 QListWidget#projectRecipes::item:hover { background: @hover; }
 QListWidget#projectRecipes::item:selected { background: @slate; color: @text; }

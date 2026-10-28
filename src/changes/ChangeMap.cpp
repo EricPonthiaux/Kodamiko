@@ -106,8 +106,8 @@ void ChangeMap::paintChanges(QPainter &painter) const
             painter.fillRect(QRectF(0, top, width(), 1), rule_);
         } else if (kind == DiffLineKind::Added || kind == DiffLineKind::Removed) {
             const QColor &color = kind == DiffLineKind::Added ? added_ : removed_;
-            painter.fillRect(QRectF(column.left(), top, column.width(), std::max(minimumRunPx, (end - start) * perLine)),
-                             color);
+            painter.fillRect(
+                QRectF(column.left(), top, column.width(), std::max(minimumRunPx, (end - start) * perLine)), color);
         }
         start = end;
     }

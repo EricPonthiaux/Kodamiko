@@ -171,6 +171,7 @@ void ChangesView::addFindingActions(QMenu *menu, QAction *before, int line)
     const bool isSingle = findings.size() == 1;
     auto *send = new QAction(
         isSingle ? tr("Send This Finding to %1").arg(agent) : tr("Send These Findings to %1").arg(agent), menu);
+    send->setEnabled(!review_->notHandedOver(findings).isEmpty());
     connect(send, &QAction::triggered, review_, [session = review_, findings] { session->send(findings); });
     auto *dismiss = new QAction(isSingle ? tr("Dismiss This Finding") : tr("Dismiss These Findings"), menu);
     connect(dismiss, &QAction::triggered, review_, [session = review_, findings] { session->dismiss(findings); });

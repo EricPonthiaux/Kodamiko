@@ -96,8 +96,8 @@ void ChangesView::updateReviewFooter()
     const int byClaude = staged.byClaude + unstaged.byClaude;
     reviewProgress_->setRange(0, std::max(1, all));
     reviewProgress_->setValue(staged.all);
-    QString text = all == 1 ? tr("%1 of 1 block staged").arg(staged.all)
-                            : tr("%1 of %2 blocks staged").arg(staged.all).arg(all);
+    QString text =
+        all == 1 ? tr("%1 of 1 block staged").arg(staged.all) : tr("%1 of %2 blocks staged").arg(staged.all).arg(all);
     if (byClaude > 0)
         text += tr(" · %1 by Claude").arg(byClaude);
     reviewCount_->setText(all > 0 ? text : QString());

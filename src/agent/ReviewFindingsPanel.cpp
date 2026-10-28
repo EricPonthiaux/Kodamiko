@@ -2,7 +2,7 @@
 
 #include "ReviewFindingsPanel.h"
 
-#include "ReviewFindingsTable.h"
+#include "ReviewFindingsView.h"
 #include "ui/AppFonts.h"
 #include "ui/Theme.h"
 #include "ui/UiIcons.h"
@@ -17,7 +17,7 @@ ReviewFindingsPanel::ReviewFindingsPanel(QWidget *parent)
     , title_(new QLabel(this))
     , summary_(new QLabel(this))
     , close_(new QToolButton(this))
-    , table_(new ReviewFindingsTable(this))
+    , findings_(new ReviewFindingsView(this))
 {
     setObjectName(QStringLiteral("reviewFindings"));
     // Opaque: the diff under it does not show through.
@@ -34,7 +34,8 @@ ReviewFindingsPanel::ReviewFindingsPanel(QWidget *parent)
     close_->setToolTip(tr("Close the findings and show the diff (Esc)"));
     close_->setShortcut(QKeySequence(Qt::Key_Escape));
     connect(close_, &QToolButton::clicked, this, &ReviewFindingsPanel::closeRequested);
-    connect(table_, &ReviewFindingsTable::findingRequested, this, &ReviewFindingsPanel::findingRequested);
+    setFocusProxy(findings_);
+    connect(findings_, &ReviewFindingsView::findingRequested, this, &ReviewFindingsPanel::findingRequested);
 
     auto *header = new QHBoxLayout;
     header->setSpacing(8);
@@ -46,7 +47,7 @@ ReviewFindingsPanel::ReviewFindingsPanel(QWidget *parent)
     layout->setSpacing(6);
     layout->addLayout(header);
     layout->addWidget(summary_);
-    layout->addWidget(table_, 1);
+    layout->addWidget(findings_, 1);
 }
 
 void ReviewFindingsPanel::setSession(ReviewSession *session)
@@ -54,7 +55,7 @@ void ReviewFindingsPanel::setSession(ReviewSession *session)
     if (session_)
         session_->disconnect(this);
     session_ = session;
-    table_->setSession(session);
+    findings_->setSession(session);
     if (!session)
         return;
     connect(session, &ReviewSession::stateChanged, this, &ReviewFindingsPanel::showSummary);
@@ -70,9 +71,8 @@ void ReviewFindingsPanel::setClosable(bool closable)
 
 void ReviewFindingsPanel::showSummary()
 {
-    const qsizetype count = session_->findings().size();
-    const QString findings = count == 1 ? tr("1 finding") : tr("%1 findings").arg(count);
-    title_->setText(tr("Review of %1 · %2").arg(session_->subject(), findings));
+    // The findings' bar counts them.
+    title_->setText(tr("Review of %1").arg(session_->subject()));
     summary_->setText(session_->summary());
     summary_->setVisible(!session_->summary().isEmpty());
 }

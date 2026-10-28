@@ -4,24 +4,58 @@
 
 #include "ReviewReport.h"
 
-#include <QFrame>
+#include <QWidget>
 
-// A finding in a review's tab (ReviewView): its place, its severity, what
-// is wrong and when it fails, with Send to <agent> and Dismiss.
-class ReviewFindingCard : public QFrame {
+class QPushButton;
+
+// A finding in a list of findings (ReviewFindingsList): a stripe in the
+// color of its severity, its severity and line, what is wrong, the code
+// around it (ReviewExcerpt) and when it fails. Resolve, Send to <agent> and
+// Dismiss show on the card hovered, selected or current; a finding handed
+// over to be fixed says so, muted, with Dismiss only.
+class ReviewFindingCard : public QWidget {
     Q_OBJECT
 
 public:
-    // `location` is the finding's place as shown ("src/a.cpp:12");
+    enum class Status {
+        Open,
+        Sent // handed over to be fixed (ReviewSession::isResolving())
+    };
+
     // `agentName` names the Send button.
-    ReviewFindingCard(const ReviewReport::Finding &finding,
-                      const QString &location,
-                      const QString &agentName,
-                      QWidget *parent);
+    ReviewFindingCard(const ReviewReport::Finding &finding, Status status, const QString &agentName, QWidget *parent);
+
+    const ReviewReport::Finding &finding() const { return finding_; }
+
+    void setSelected(bool selected);
+    // The current card has the keyboard: a frame in the accent color.
+    void setCurrent(bool current);
 
 signals:
-    // A click on the place.
-    void openRequested();
+    // A click on the card, with the keys held.
+    void pressed(Qt::KeyboardModifiers modifiers);
+    // A double click, or a click on the line: the finding's place.
+    void activated();
+    void resolveRequested();
     void sendRequested();
     void dismissRequested();
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void enterEvent(QEnterEvent *event) override;
+    void leaveEvent(QEvent *event) override;
+
+private:
+    QLayout *createHeader(Status status, const QString &agentName);
+    QPushButton *createAction(const QString &text, const QString &toolTip);
+    void updateActions();
+    QColor severityColor() const;
+
+    ReviewReport::Finding finding_;
+    QWidget *actions_ = nullptr;
+    bool isSelected_ = false;
+    bool isCurrent_ = false;
+    bool isHovered_ = false;
 };

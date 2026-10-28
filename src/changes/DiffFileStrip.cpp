@@ -232,9 +232,10 @@ bool DiffFileStrip::event(QEvent *event)
         event->ignore();
         return true;
     }
-    const QString text = chip->file >= 0 ? tr("%1\nDouble-click: open the file in the editor")
-                                               .arg(diff_->fileSummaries().at(chip->file).path)
-                                         : tr("The other files of the diff");
+    const QString text =
+        chip->file >= 0
+            ? tr("%1\nDouble-click: open the file in the editor").arg(diff_->fileSummaries().at(chip->file).path)
+            : tr("The other files of the diff");
     QToolTip::showText(help->globalPos(), text, this, chip->rect);
     return true;
 }

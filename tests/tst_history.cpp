@@ -562,7 +562,8 @@ private slots:
 
     void aCommitMadeWithClaudeIsMarkedForTheGraph()
     {
-        const CommitSummary withClaude{.summary = "Fix", .message = "Fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>"};
+        const CommitSummary withClaude{.summary = "Fix",
+                                       .message = "Fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>"};
         const CommitSummary alone{.summary = "Fix", .message = "Fix"};
         QTreeWidgetItem withClaudeItem;
         QTreeWidgetItem aloneItem;

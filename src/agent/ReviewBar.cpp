@@ -210,6 +210,7 @@ void ReviewBar::updateFindings()
     findings_->setText(count == 1 ? tr("1 Finding") : tr("%1 Findings").arg(count));
     findings_->setVisible(count > 0);
     sendAll_->setVisible(count > 0);
+    sendAll_->setEnabled(!session_->notHandedOver(session_->findings()).isEmpty());
 }
 
 void ReviewBar::setText(const QString &title, const QString &message, const QString &color)

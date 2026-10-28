@@ -15,8 +15,11 @@ class StepTimeline : public QWidget {
     Q_OBJECT
 
 public:
+    // Only Running moves: Done checks the last step as the others, Failed
+    // crosses it.
     enum class State {
         Running,
+        Done,
         Failed
     };
 

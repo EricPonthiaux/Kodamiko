@@ -89,7 +89,10 @@ private:
     // An unfolded row's message, wrapped at `width`: its height.
     static int messageHeight(const QStyleOptionViewItem &option, const QModelIndex &index, int width);
     // The body, then the email and the full date, in `area`.
-    static void paintMessage(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index, QRect area);
+    static void paintMessage(QPainter *painter,
+                             const QStyleOptionViewItem &option,
+                             const QModelIndex &index,
+                             QRect area);
     // The second line: author · time at the left, Claude's mark and the ID
     // at the right.
     static void paintDetails(QPainter *painter,

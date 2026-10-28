@@ -98,12 +98,19 @@ public:
 
     // Leaves `findings` out of the findings and the ProblemStore.
     void dismiss(const QList<ReviewReport::Finding> &findings);
-    // resolveRequested() with `findings`, which are then resolving.
+    // A finding handed over to be fixed is not resolved nor sent again: the
+    // session that fixes it has it already.
+    //
+    // resolveRequested() with `findings` not handed over yet, which are then
+    // resolving; nothing when there are none.
     void resolve(const QList<ReviewReport::Finding> &findings);
     // `finding` was handed to be fixed (resolve()).
     bool isResolving(const ReviewReport::Finding &finding) const;
-    // sendRequested() with `findings`, or with every finding left (or the
-    // raw answer).
+    // `findings` but those handed over to be fixed: what resolve() and
+    // send() act on.
+    QList<ReviewReport::Finding> notHandedOver(const QList<ReviewReport::Finding> &findings) const;
+    // sendRequested() with `findings` not handed over, or with every finding
+    // left not handed over (or the raw answer); nothing when there are none.
     void send(const QList<ReviewReport::Finding> &findings);
     void sendAll();
 

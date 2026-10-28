@@ -7,12 +7,20 @@
 #include "agent/PermissionPrompts.h"
 #include "agent/ProjectCheck.h"
 #include "agent/ReviewBar.h"
+#include "agent/ReviewFileHeader.h"
+#include "agent/ReviewFindingCard.h"
+#include "agent/ReviewFindingsList.h"
 #include "agent/ReviewFindingsPanel.h"
+#include "agent/ReviewFindingsView.h"
 #include "agent/ReviewPage.h"
+#include "agent/ReviewProgressView.h"
 #include "agent/ReviewSession.h"
+#include "agent/ReviewSketch.h"
+#include "agent/ReviewView.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
 #include "support/FakeReviewer.h"
 #include "ui/Snackbar.h"
+#include "ui/StepTimeline.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -38,6 +46,29 @@ QStringList shownTexts(const QWidget &widget)
     }
     return texts;
 }
+
+// A finished review of three findings, an error and a warning in a.cpp and
+// a warning in b.cpp, shown in a list of findings.
+struct ReviewedFindings {
+    static inline const QString report = QStringLiteral(
+        R"({"summary": "", "findings": [)"
+        R"({"file": "a.cpp", "line": 3, "severity": "error", "problem": "Off by one.", "scenario": ""},)"
+        R"({"file": "a.cpp", "line": 5, "severity": "warning", "problem": "Unused value.", "scenario": ""},)"
+        R"({"file": "b.cpp", "line": 2, "severity": "warning", "problem": "Leaks the file.", "scenario": ""}]})");
+
+    QTemporaryDir folder;
+    FakeReviewer agent{report};
+    ReviewSession session{{.workDir = folder.path(), .subject = "the code", .agent = &agent}};
+    ReviewFindingsList list;
+
+    ReviewedFindings()
+    {
+        list.setSession(&session);
+        list.show();
+        session.start();
+        QTRY_COMPARE(session.state(), ReviewSession::State::Finished);
+    }
+};
 
 // A hook's connection to `server`, as duet-hook makes it.
 struct HookClient {
@@ -381,6 +412,114 @@ private slots:
         page.setSession(nullptr);
         QVERIFY(start->isVisible());
         QVERIFY(!findings->isVisible());
+    }
+
+    void reviewTabShowsItsProgressWhileTheReviewRunsThenItsFindings()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ReviewView view({.workDir = folder.path(), .subject = "the code", .agent = &agent});
+        view.show();
+        const auto *progress = view.findChild<ReviewProgressView *>();
+        const auto *sketch = view.findChild<ReviewSketch *>();
+        const auto *steps = view.findChild<StepTimeline *>();
+
+        view.session()->start();
+
+        QVERIFY(progress->isVisible() && sketch->isVisible() && steps->isVisible());
+        QVERIFY(shownTexts(*progress).join('\n').contains("is reviewing the code"));
+        QVERIFY(steps->findChild<QTimer *>()->isActive());
+        QTRY_COMPARE(view.session()->state(), ReviewSession::State::Finished);
+        QVERIFY(!progress->isVisible());
+        QVERIFY(!steps->findChild<QTimer *>()->isActive());
+        QVERIFY(view.findChild<ReviewFindingCard *>()->isVisible());
+    }
+
+    void findingsAreGroupedByFile()
+    {
+        ReviewedFindings review;
+
+        QCOMPARE(review.list.findChildren<ReviewFileHeader *>().size(), 2);
+        QCOMPARE(review.list.findChildren<ReviewFindingCard *>().size(), 3);
+    }
+
+    void theErrorsFilterShowsOnlyTheErrors()
+    {
+        ReviewedFindings review;
+
+        review.list.setFilter(ReviewFindingsList::Filter::Errors);
+
+        const QList<ReviewFindingCard *> cards = review.list.findChildren<ReviewFindingCard *>();
+        QCOMPARE(cards.size(), 1);
+        QCOMPARE(cards.first()->finding().problem, QString("Off by one."));
+    }
+
+    void deleteDismissesTheCurrentFindingAndMakesTheNextCurrent()
+    {
+        ReviewedFindings review;
+        review.list.setFocus();
+
+        QTest::keyClick(&review.list, Qt::Key_Down);
+        QTest::keyClick(&review.list, Qt::Key_Delete);
+
+        QCOMPARE(review.session.findings().size(), 2);
+        QVERIFY(std::ranges::none_of(review.session.findings(), [](const ReviewReport::Finding &finding) {
+            return finding.problem == "Unused value.";
+        }));
+        QCOMPARE(review.list.selectedFindings().size(), 1);
+        QCOMPARE(review.list.selectedFindings().first().problem, QString("Leaks the file."));
+    }
+
+    void resolveAndSendLeaveOutTheFindingsHandedOverToBeFixed()
+    {
+        ReviewedFindings review;
+        const QSignalSpy resolved(&review.session, &ReviewSession::resolveRequested);
+        const QSignalSpy sent(&review.session, &ReviewSession::sendRequested);
+        const ReviewReport::Finding first = review.session.findings().first();
+        review.session.resolve({first});
+
+        review.session.resolve(review.session.findings());
+        review.session.send({first});
+        review.session.sendAll();
+
+        QCOMPARE(resolved.size(), 2);
+        const QString second = resolved.last().first().toString();
+        QVERIFY(!second.contains("Off by one."));
+        QVERIFY(second.contains("Unused value.") && second.contains("Leaks the file."));
+        QCOMPARE(sent.size(), 0);
+    }
+
+    void afterResolveAllOnlyDismissIsLeft()
+    {
+        ReviewedFindings review;
+        ReviewFindingsView view;
+        view.setSession(&review.session);
+        view.show();
+        // The buttons of the cards, not those of the bar.
+        const auto buttonsNamed = [&view](const QString &text) {
+            qsizetype count = 0;
+            for (const ReviewFindingCard *card : view.findChildren<ReviewFindingCard *>()) {
+                const QList<QPushButton *> buttons = card->findChildren<QPushButton *>();
+                count += std::ranges::count_if(buttons,
+                                               [&text](const QPushButton *button) { return button->text() == text; });
+            }
+            return count;
+        };
+        const auto barButton = [&view](const QString &text) {
+            for (QPushButton *button : view.findChildren<QPushButton *>(Qt::FindDirectChildrenOnly)) {
+                if (button->text() == text)
+                    return button;
+            }
+            return static_cast<QPushButton *>(nullptr);
+        };
+
+        barButton("Resolve All")->click();
+
+        QTRY_COMPARE(buttonsNamed("Dismiss"), qsizetype(3));
+        QVERIFY(!barButton("Resolve All")->isEnabled());
+        QVERIFY(!barButton("Send All to Claude")->isEnabled());
+        QCOMPARE(buttonsNamed("Send to Claude"), qsizetype(0));
+        QCOMPARE(buttonsNamed("Resolve"), qsizetype(0));
     }
 
     void projectCheckKeepsTheLastLinesOfItsOutput()

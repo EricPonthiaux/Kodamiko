@@ -287,7 +287,9 @@ int CommitDelegate::messageHeight(const QStyleOptionViewItem &option, const QMod
     const QFontMetrics metrics(option.font);
     const QString body = index.data(bodyRole).toString();
     const int bodyHeight =
-        body.isEmpty() ? 0 : metrics.boundingRect(QRect(0, 0, std::max(1, width), 1 << 20), Qt::TextWordWrap, body).height();
+        body.isEmpty()
+            ? 0
+            : metrics.boundingRect(QRect(0, 0, std::max(1, width), 1 << 20), Qt::TextWordWrap, body).height();
     return (body.isEmpty() ? 0 : bodyHeight + messageGap) + metrics.height() + messageBottomMargin;
 }
 
@@ -360,7 +362,8 @@ void CommitDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
                       QFontMetrics(summaryFont).elidedText(summary, Qt::ElideRight, available));
     paintDetails(painter, option, index, secondLine);
     if (index.data(unfoldedRole).toBool())
-        paintMessage(painter, option, index, QRect(left, rect.bottom() + 1, rect.right() - left, item.rect.bottom() - rect.bottom()));
+        paintMessage(painter, option, index,
+                     QRect(left, rect.bottom() + 1, rect.right() - left, item.rect.bottom() - rect.bottom()));
     painter->restore();
 }
 

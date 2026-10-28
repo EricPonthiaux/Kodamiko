@@ -60,7 +60,7 @@ class QTreeWidgetItem;
 // their lines in the diff: F8 and Shift+F8 go from one to the next, the
 // diff's menu sends one to the agent or dismisses it. Without a review step
 // of its own (ReviewDisplay::OverTheDiff), the review also tells its
-// progress in a bar over the diff, then shows its findings in a grid that
+// progress in a bar over the diff, then shows its findings in a panel that
 // covers the diff until it is closed (ReviewFindingsPanel).
 class ChangesView : public QWidget {
     Q_OBJECT
@@ -69,7 +69,7 @@ class ChangesView : public QWidget {
 public:
     // Where a review shows besides its notes in the diff.
     enum class ReviewDisplay {
-        OverTheDiff, // its bar and its grid, over the diff
+        OverTheDiff, // its bar and its findings, over the diff
         NotesOnly    // elsewhere: the Review mode
     };
 
@@ -110,7 +110,7 @@ public:
 
     QSplitter *splitter() const { return splitter_; }
 
-    // Keeps the findings' grid at the diff's place and size.
+    // Keeps the findings' panel at the diff's place and size.
     bool eventFilter(QObject *watched, QEvent *event) override;
 
     // The file column's splitter: the list, the commit area.
@@ -299,11 +299,11 @@ private:
     void markResolved(const QList<FileRef> &refs);
     // The review's bar, under the diff's header, hidden without a review.
     QWidget *createReviewArea();
-    // The findings' grid, in `diffPane` over the diff, hidden.
+    // The findings' panel, in `diffPane` over the diff, hidden.
     void createFindingsPanel(QWidget *diffPane);
     void showFindingsPanel();
     void hideFindingsPanel();
-    // Finished with findings: the grid shown; running again: hidden.
+    // Finished with findings: the panel shown; running again: hidden.
     void onReviewStateChanged(ReviewSession::State state);
     // The findings of the review in the shown files, as the diff's notes.
     void showFindings();
@@ -343,7 +343,7 @@ private:
     QTreeWidget *fileList_;
     DiffView *diff_;
     DiffHeaderBar *diffHeader_;
-    ChangeMap *changeMap_ = nullptr;      // beside the diff
+    ChangeMap *changeMap_ = nullptr;     // beside the diff
     DiffFileStrip *fileStrip_ = nullptr; // above it
     QSet<QString> claudeEdited_;         // absolute, clean paths
     QLabel *reviewCount_ = nullptr;

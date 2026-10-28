@@ -2,7 +2,7 @@
 
 #include "StepTimeline.h"
 
-#include "ui/Motion.h"
+#include "Motion.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -131,7 +131,7 @@ void StepTimeline::drawMarker(QPainter &painter, QPointF center, bool isCurrent)
     const QColor background = palette().color(QPalette::Base);
     const QColor muted = palette().color(QPalette::PlaceholderText);
     painter.setPen(Qt::NoPen);
-    if (!isCurrent) {
+    if (!isCurrent || state_ == State::Done) {
         painter.setBrush(background);
         painter.drawEllipse(center, markerRadiusPx + 2, markerRadiusPx + 2);
         painter.setBrush(withAlpha(muted, 0.2));

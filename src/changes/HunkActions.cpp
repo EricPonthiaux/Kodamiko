@@ -140,8 +140,9 @@ QList<std::pair<int, int>> HunkActions::blocksInView() const
     const QList<DiffLine> &lines = diff_->displayedLines();
     const long firstShown = diff_->firstVisibleLine();
     const int top = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE, firstShown));
-    const int bottom = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE,
-                                                firstShown + diff_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN)));
+    const int bottom =
+        int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE,
+                                 firstShown + diff_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN)));
     QList<std::pair<int, int>> blocks;
     // The block at the top, its separator scrolled away: its bar at the top.
     if (const int scrolledAway = diff_->hunkStart(top); scrolledAway >= 0 && scrolledAway < top)

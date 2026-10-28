@@ -8,16 +8,15 @@
 
 class QLabel;
 class QPushButton;
-class QScrollArea;
+class QStackedLayout;
 class QTextBrowser;
-class QTimer;
-class QVBoxLayout;
-class Spinner;
+class ReviewFindingsView;
+class ReviewProgressView;
 
-// The tab of a review (ReviewSession): the project's check first, when it
-// has one, then what the reviewer reads as it goes, then its findings, each
-// a card with Send to <agent> and Dismiss. A failing check shows its output,
-// with Review Anyway.
+// The tab of a review (ReviewSession): while the check and the reviewer run,
+// or when they fail, the progress page (ReviewProgressView); then the
+// findings to go through (ReviewFindingsView). A failing check shows its
+// output, with Review Anyway.
 class ReviewView : public QWidget {
     Q_OBJECT
 
@@ -29,42 +28,36 @@ public:
     ReviewSession *session() const { return session_; }
 
 signals:
-    // A click on a finding's place; `line` from 1.
+    // A finding activated in the list: its place; `line` from 1.
     void openRequested(const QString &path, int line);
     // Cancel or Close.
     void closeRequested();
 
 private:
+    // The page of the outcomes, under the header.
+    QWidget *createResults();
     QLayout *createHeader();
-    QWidget *createProgress();
-    QWidget *createFindingsArea();
     void onStateChanged(ReviewSession::State state);
-    // Back to the progress, nothing else shown.
-    void showProgress();
+    // The results page, nothing shown on it yet but the header.
+    void showResults();
     void showCheckFailure();
     void showFinished();
-    void showFailure();
-    void showSteps();
-    // The cards of the session's findings.
+    // The findings, while there are some.
     void showFindings();
-    void updateElapsed();
 
     ReviewSession *session_;
-    QTimer *clock_;
 
+    QStackedLayout *pages_;
+    ReviewProgressView *progress_;
+    QWidget *results_ = nullptr;
     QLabel *title_;
     QLabel *elapsedLabel_;
-    QWidget *progress_ = nullptr; // the spinner and the steps, while the run goes on
-    Spinner *spinner_ = nullptr;
-    QLabel *stepsLabel_ = nullptr;
     QLabel *summary_;
-    QScrollArea *findingsArea_ = nullptr;
-    QVBoxLayout *findingsLayout_ = nullptr;
+    ReviewFindingsView *findings_;
     QTextBrowser *rawAnswerView_; // also the output of a failing check
     QLabel *error_;
-    QPushButton *cancel_;
     QPushButton *reviewAnyway_;
     QPushButton *retry_;
-    QPushButton *sendAll_;
+    QPushButton *sendAll_; // of an answer that is not a report
     QPushButton *close_;
 };

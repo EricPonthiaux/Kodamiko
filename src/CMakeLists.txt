@@ -64,13 +64,18 @@ add_library(duet_core STATIC
     agent/NewAgentPopup.cpp
     agent/ProjectCheck.cpp
     agent/ReviewBar.cpp
+    agent/ReviewExcerpt.cpp
+    agent/ReviewFileHeader.cpp
     agent/ReviewFindingCard.cpp
+    agent/ReviewFindingsList.cpp
     agent/ReviewFindingsPanel.cpp
-    agent/ReviewFindingsTable.cpp
+    agent/ReviewFindingsView.cpp
     agent/ReviewPage.cpp
+    agent/ReviewProgressView.cpp
     agent/ReviewReport.cpp
     agent/ReviewRequest.cpp
     agent/ReviewSession.cpp
+    agent/ReviewSketch.cpp
     agent/ReviewText.cpp
     agent/ReviewView.cpp
     agent/vendor/claude/ClaudeCodeProvider.cpp
@@ -316,6 +321,7 @@ add_library(duet_core STATIC
     ui/PopupMotion.cpp
     ui/RotatingQuote.cpp
     ui/Spinner.cpp
+    ui/StepTimeline.cpp
     ui/StrayWindowCheck.cpp
     ui/Theme.cpp
     ui/ThemeStyle.cpp
@@ -481,7 +487,6 @@ if(GRAPHVIZ_FOUND)
         viewers/sketch/SketchPainting.cpp
         viewers/sketch/SketchScenes.cpp
         viewers/DiagramView.cpp
-        viewers/StepTimeline.cpp
         ${diagram_sources})
     target_link_libraries(duet_core PUBLIC ${GRAPHVIZ_LIBRARIES})
     target_compile_definitions(duet_core PUBLIC DUET_WITH_DIAGRAMS)
