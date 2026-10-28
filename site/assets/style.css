@@ -357,61 +357,6 @@ code {
   content: "\2192";
 }
 
-/* The clone command, with a button that copies it (assets/site.js) */
-.clone {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 100%;
-  height: 46px;
-  padding: 0 6px 0 16px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-raised) 60%, transparent);
-  font-size: 0.84rem;
-}
-
-.clone code {
-  min-width: 0;
-  overflow: hidden;
-  font-size: inherit;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.clone code::before {
-  content: "$ ";
-  color: var(--accent-strong);
-}
-
-.copy {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent-soft);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.copy:hover {
-  color: var(--text);
-}
-
-.copy .done,
-.copy.copied .idle {
-  display: none;
-}
-
-.copy.copied .done {
-  display: block;
-  color: #3fb37a;
-}
-
 /* A real capture of a main window, with a second window over its lower
    right corner, as on a desk. The captures carry their own frame and
    shadow; --pair-ratio sets the height of the pair, --side-width the size of

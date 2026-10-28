@@ -12,7 +12,6 @@
   <link rel="preload" href="../assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="../assets/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../assets/style.css">
-  <script src="../assets/site.js" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -31,18 +30,12 @@
     <section class="hero">
       <div class="hero-dots" aria-hidden="true"></div>
       <div class="container">
-        <a class="badge" href="https://github.com/EricPonthiaux/Kodamiko"><span class="badge-tag">GPL v3</span>Libre et open source · Linux, Windows et macOS</a>
+        <a class="badge" href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0"><span class="badge-tag">alpha.1.0</span>Préversion · Linux, Windows et macOS</a>
         <h1>Construit autour de Claude Code,<br> <span class="accent">pas ajouté après coup</span><span class="cursor" aria-hidden="true"></span></h1>
         <p class="lead">Un éditeur de code complet, pensé pour Claude dès le départ. Claude voit ce que vous voyez — le fichier ouvert, la sélection, les erreurs — et vous voyez tout ce que Claude change, avant que ce soit appliqué.</p>
         <div class="actions">
-          <a class="button primary" href="#demarrer">Démarrer</a>
-          <div class="clone">
-            <code>git clone https://github.com/EricPonthiaux/Kodamiko.git</code>
-            <button class="copy" type="button" aria-label="Copier la commande" data-command="git clone https://github.com/EricPonthiaux/Kodamiko.git">
-              <svg class="idle" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-              <svg class="done" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
-            </button>
-          </div>
+          <a class="button primary" href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">Télécharger alpha.1.0</a>
+          <a class="button" href="#demarrer">Démarrer</a>
         </div>
         <figure class="hero-shot">
           <div class="window-pair" style="--pair-ratio: 1120 / 800; --side-width: 48%">
@@ -183,9 +176,15 @@
     <section class="alt" id="demarrer">
       <div class="container">
         <p class="eyebrow">Démarrer</p>
-        <h2 class="section-title">Ouvert et multiplateforme</h2>
-        <p class="section-lead">Kodamiko est open source (GPL v3) et fonctionne sous Linux, Windows et macOS. Il est écrit en C++ pour être rapide, et il utilise votre propre installation de Claude Code sans toucher à votre configuration.</p>
-        <pre class="code-block"><code><span class="comment"># Compiler et lancer depuis les sources</span>
+        <h2 class="section-title">Essayer la préversion</h2>
+        <p class="section-lead">Kodamiko alpha.1.0 est une préversion : la première version publique. Elle sert chaque jour à développer Kodamiko lui-même, mais ses réglages et ses interfaces peuvent encore changer, et vous rencontrerez des bugs. Elle est libre et open source (GPL v3), et elle utilise votre propre installation de Claude Code, installée et connectée, sans toucher à sa configuration.</p>
+        <ul class="features">
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-linux-x86_64.AppImage">Linux x86-64</a></strong><span>Une AppImage : rendez-la exécutable (<code>chmod +x</code>), puis lancez-la.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-windows-x64.zip">Windows x64</a></strong><span>Décompressez-la où vous voulez, puis lancez <code>bin\kodamiko.exe</code>.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-macos-arm64.dmg">macOS, Apple Silicon</a></strong><span>Glissez Kodamiko dans Applications. Les Mac à processeur Intel le compilent depuis les sources.</span></li>
+        </ul>
+        <p class="requirements">Les paquets ne sont pas encore signés : Windows SmartScreen et macOS Gatekeeper préviennent avant le premier lancement (sur macOS, ouvrez Kodamiko par clic droit ▸ Ouvrir). Leurs sommes de contrôle sont dans <code>SHA256SUMS.txt</code>, sur la <a href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">page de la version</a>.</p>
+        <pre class="code-block"><code><span class="comment"># Ou le compiler depuis les sources</span>
 git clone https://github.com/EricPonthiaux/Kodamiko.git
 cd Kodamiko
 cmake --preset default
@@ -195,11 +194,25 @@ cmake --build --preset default
       </div>
     </section>
 
+    <section id="retours">
+      <div class="container">
+        <p class="eyebrow">Retours</p>
+        <h2 class="section-title">Un bug ? Dites-le-nous</h2>
+        <p class="section-lead">Une préversion s’améliore grâce aux problèmes que signalent ses utilisateurs. Tout passe par le projet sur GitHub, en public, sauf les failles de sécurité, qui se signalent en privé.</p>
+        <ul class="features">
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/issues/new?template=bug_report.yml">Signaler un bug</a></strong><span>Le formulaire demande ce que vous avez fait, ce que vous attendiez et ce qui s’est passé, avec vos versions (Help ▸ About Kodamiko, <code>claude --version</code>) et votre système. Une capture d’écran aide pour tout ce qui se voit. Le formulaire est en anglais.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/issues/new?template=feature_request.yml">Proposer une idée</a></strong><span>Dites ce que vous cherchez à faire et ce qui vous en empêche aujourd’hui ; les maquettes sont bienvenues.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/issues">Voir les problèmes connus</a></strong><span>Votre problème est peut-être déjà signalé : complétez-le plutôt que d’en ouvrir un autre.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/security/advisories/new">Signaler une faille</a></strong><span>En privé, par les avis de sécurité de GitHub, jamais dans un ticket public.</span></li>
+        </ul>
+      </div>
+    </section>
+
     <section class="audience">
       <div class="container">
         <p>Pour les développeurs qui veulent la puissance d'un assistant IA sans renoncer à un éditeur sérieux, ni au contrôle de leur code.</p>
         <div class="actions">
-          <a class="button primary" href="https://github.com/EricPonthiaux/Kodamiko">Obtenir Kodamiko sur GitHub</a>
+          <a class="button primary" href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">Télécharger la préversion</a>
         </div>
       </div>
     </section>

@@ -12,7 +12,6 @@
   <link rel="preload" href="assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/style.css">
-  <script src="assets/site.js" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -31,18 +30,12 @@
     <section class="hero">
       <div class="hero-dots" aria-hidden="true"></div>
       <div class="container">
-        <a class="badge" href="https://github.com/EricPonthiaux/Kodamiko"><span class="badge-tag">GPL v3</span>Free and open source · Linux, Windows and macOS</a>
+        <a class="badge" href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0"><span class="badge-tag">alpha.1.0</span>Pre-release · Linux, Windows and macOS</a>
         <h1>Built around Claude Code,<br> <span class="accent">not added later</span><span class="cursor" aria-hidden="true"></span></h1>
         <p class="lead">A full code editor designed for Claude from the start. Claude sees what you see — the open file, the selection, the errors — and you see everything Claude changes, before it lands.</p>
         <div class="actions">
-          <a class="button primary" href="#get-started">Get started</a>
-          <div class="clone">
-            <code>git clone https://github.com/EricPonthiaux/Kodamiko.git</code>
-            <button class="copy" type="button" aria-label="Copy the command" data-command="git clone https://github.com/EricPonthiaux/Kodamiko.git">
-              <svg class="idle" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-              <svg class="done" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
-            </button>
-          </div>
+          <a class="button primary" href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">Download alpha.1.0</a>
+          <a class="button" href="#get-started">Get started</a>
         </div>
         <figure class="hero-shot">
           <div class="window-pair" style="--pair-ratio: 1120 / 800; --side-width: 48%">
@@ -183,9 +176,15 @@
     <section class="alt" id="get-started">
       <div class="container">
         <p class="eyebrow">Get started</p>
-        <h2 class="section-title">Open and cross-platform</h2>
-        <p class="section-lead">Kodamiko is open source (GPL v3) and runs on Linux, Windows and macOS. It is written in C++ to be fast, and it uses your own Claude Code installation without touching your configuration.</p>
-        <pre class="code-block"><code><span class="comment"># Build and run from source</span>
+        <h2 class="section-title">Try the pre-release</h2>
+        <p class="section-lead">Kodamiko alpha.1.0 is a pre-release: the first public build. It is used every day to build Kodamiko itself, but its settings and interfaces may still change, and you will meet bugs. It is free and open source (GPL v3), and it uses your own Claude Code installation, installed and signed in, without touching its configuration.</p>
+        <ul class="features">
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-linux-x86_64.AppImage">Linux x86-64</a></strong><span>An AppImage: make it executable (<code>chmod +x</code>), then run it.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-windows-x64.zip">Windows x64</a></strong><span>Unzip it anywhere, then run <code>bin\kodamiko.exe</code>.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/releases/download/alpha.1.0/Kodamiko-alpha.1.0-macos-arm64.dmg">macOS, Apple silicon</a></strong><span>Drag Kodamiko to Applications. Macs with an Intel processor build it from source.</span></li>
+        </ul>
+        <p class="requirements">The packages are not signed yet: Windows SmartScreen and macOS Gatekeeper warn before the first launch (on macOS, open Kodamiko with right click ▸ Open). Their checksums are in <code>SHA256SUMS.txt</code>, on the <a href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">release page</a>.</p>
+        <pre class="code-block"><code><span class="comment"># Or build it from source</span>
 git clone https://github.com/EricPonthiaux/Kodamiko.git
 cd Kodamiko
 cmake --preset default
@@ -195,11 +194,25 @@ cmake --build --preset default
       </div>
     </section>
 
+    <section id="feedback">
+      <div class="container">
+        <p class="eyebrow">Feedback</p>
+        <h2 class="section-title">Found a bug? Tell us</h2>
+        <p class="section-lead">A pre-release gets better through the problems its users report. Everything goes through the project on GitHub, in the open, except security vulnerabilities, which are reported privately.</p>
+        <ul class="features">
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/issues/new?template=bug_report.yml">Report a bug</a></strong><span>The form asks what you did, what you expected and what happened, with your versions (Help ▸ About Kodamiko, <code>claude --version</code>) and your system. A screenshot helps for anything visual.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/issues/new?template=feature_request.yml">Suggest an idea</a></strong><span>Say what you are trying to do and what gets in the way today; mockups are welcome.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/issues">Look at the known issues</a></strong><span>Your problem may be reported already: add what you know to it rather than opening another one.</span></li>
+          <li><strong><a href="https://github.com/EricPonthiaux/Kodamiko/security/advisories/new">Report a vulnerability</a></strong><span>Privately, through GitHub’s security advisories, never in a public issue.</span></li>
+        </ul>
+      </div>
+    </section>
+
     <section class="audience">
       <div class="container">
         <p>For developers who want the power of an AI assistant without giving up a serious editor, or control of their code.</p>
         <div class="actions">
-          <a class="button primary" href="https://github.com/EricPonthiaux/Kodamiko">Get Kodamiko on GitHub</a>
+          <a class="button primary" href="https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0">Download the pre-release</a>
         </div>
       </div>
     </section>
