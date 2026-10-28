@@ -12,6 +12,7 @@
 #include "viewers/diagram/Document.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/Graphviz.h"
+#include "viewers/diagram/Style.h"
 #include "viewers/diagram/families/Families.h"
 #include "viewers/diagram/families/flow/Flow.h"
 
@@ -185,6 +186,40 @@ private slots:
         }
         QCOMPARE(kinds, (QStringList{"solid/arrow/yes", "solid/arrow/yes", "dotted/arrow/", "thick/arrow/done",
                                      "solid/circle/", "invisible/none/"}));
+    }
+
+    void wrappingKeepsABlankLineOfSpacesOrOfACarriageReturn()
+    {
+        const Font font(14);
+
+        QCOMPARE(text::wrap(font, "a\n \nb", 200), (QStringList{"a", "", "b"}));
+        QCOMPARE(text::wrap(font, "a\r\n\r\nb", 200), (QStringList{"a", "", "b"}));
+    }
+
+    void wrappingNeverCutsAnEmojiInHalf()
+    {
+        const Font font(14);
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80");
+        const QString label = emoji.repeated(12);
+
+        // Widths around one and a few emoji, so that the best fit falls
+        // between the two halves of a pair for some of them.
+        for (qreal maxWidth = 6; maxWidth < 80; maxWidth += 3) {
+            for (const QString &line : text::wrap(font, label, maxWidth)) {
+                QVERIFY2(!line.isEmpty() && !line.back().isHighSurrogate() && !line.front().isLowSurrogate(),
+                         qPrintable(QStringLiteral("width %1").arg(maxWidth)));
+            }
+        }
+    }
+
+    void anArrowheadIsSeventyPercentAsWideAsItIsLong()
+    {
+        const qreal size = 9;
+        const qreal length = size * std::cos(graphvizNormalArrowSpread);
+        const qreal base = 2 * size * std::sin(graphvizNormalArrowSpread);
+
+        QVERIFY(qFuzzyCompare(base / length, 0.7));
+        QVERIFY(qFuzzyCompare(arrowBaseInset(size), length));
     }
 
     void drawsATerminatorWithoutVariantAsAStadium()

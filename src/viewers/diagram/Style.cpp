@@ -6,16 +6,18 @@
 #include "ui/Theme.h"
 
 #include <QFontMetricsF>
-#include <QHash>
 #include <QPainter>
 #include <QRegularExpression>
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace diagram {
 
-const qreal graphvizNormalArrowSpread = std::asin(0.35);
+// Graphviz draws its half-width as 0.35 times the head's length (arrows.c,
+// arrow_type_normal): the sides' angle to the axis is atan(0.35).
+const qreal graphvizNormalArrowSpread = std::atan(0.35);
 
 qreal arrowBaseInset(qreal size, qreal spread)
 {
@@ -146,12 +148,13 @@ constexpr qreal referencePx = 100;
 
 const QFontMetricsF &metrics(const Font &font)
 {
-    static QHash<int, QFontMetricsF *> cache;
+    // By value: an unordered_map keeps its elements in place as it grows.
+    static std::unordered_map<int, QFontMetricsF> cache;
     const int key = font.weight * 4 + (font.italic ? 2 : 0) + (font.mono ? 1 : 0);
     auto it = cache.find(key);
     if (it == cache.end())
-        it = cache.insert(key, new QFontMetricsF(referenceFont(font)));
-    return **it;
+        it = cache.try_emplace(key, referenceFont(font)).first;
+    return it->second;
 }
 
 } // namespace
@@ -192,7 +195,8 @@ QString joined(const QString &line, const QString &token)
 }
 
 // The length of the longest prefix of `token` that fits `maxWidth`; at least
-// one character, so that cutting always progresses.
+// one character, so that cutting always progresses, and never half of a
+// surrogate pair (an emoji), which would draw as two boxes.
 int fittingPrefixLength(const Font &font, const QString &token, qreal maxWidth)
 {
     int lo = 1;
@@ -207,6 +211,9 @@ int fittingPrefixLength(const Font &font, const QString &token, qreal maxWidth)
             hi = mid - 1;
         }
     }
+    const bool splitsAPair = fit < token.size() && token.at(fit - 1).isHighSurrogate();
+    if (splitsAPair)
+        fit = fit > 1 ? fit - 1 : fit + 1;
     return fit;
 }
 
@@ -222,7 +229,8 @@ public:
     void addParagraph(const QString &paragraph)
     {
         static const QRegularExpression spaces(QStringLiteral("\\s+"));
-        if (paragraph.isEmpty()) {
+        // A blank line, spaces or a CRLF's "\r" included, is kept.
+        if (paragraph.trimmed().isEmpty()) {
             lines_.append(QString());
             return;
         }
