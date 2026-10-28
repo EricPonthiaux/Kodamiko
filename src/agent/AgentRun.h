@@ -35,7 +35,8 @@ public:
     AgentRun(const AgentProvider *agent, QString workDir, QObject *parent);
     ~AgentRun() override;
 
-    // Runs `spec`, killed after `timeout`.
+    // Runs `spec`, killed after `timeout`. When the process cannot start,
+    // failed() may be emitted before start() returns.
     void start(const ProcessSpec &spec, std::chrono::milliseconds timeout);
     // Kills the process; no signal follows.
     void stop();

@@ -55,6 +55,10 @@ void AgentRun::start(const ProcessSpec &spec, std::chrono::milliseconds timeout)
         emit failed(error);
     });
     process_->start();
+    // Qt reports some failures (no program, a missing working directory, any
+    // on Windows) from inside start(): the run is already stopped and failed.
+    if (!process_)
+        return;
     process_->closeWriteChannel();
     timeout_->start(timeout);
 }

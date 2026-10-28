@@ -2,6 +2,7 @@
 
 #include "agent/AgentActivity.h"
 #include "agent/AgentCheckPopup.h"
+#include "agent/AgentRun.h"
 #include "agent/AgentSessions.h"
 #include "agent/CloseAgentPopup.h"
 #include "agent/CommitMessage.h"
@@ -24,6 +25,7 @@
 #include "agent/vendor/claude/EffectiveSettings.h"
 #include "agent/vendor/claude/UnsavedEditGuard.h"
 #include "editor/EditorWidget.h"
+#include "terminal/ProcessSpec.h"
 #include "terminal/TerminalWidget.h"
 #include "ui/MessagePopup.h"
 #include "ui/Theme.h"
@@ -139,6 +141,22 @@ private slots:
                  QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash"));
         QCOMPARE(preToolUseMatcher(ClaudeLauncher::GitInShell::Allowed),
                  QStringLiteral("Edit|Write|MultiEdit|NotebookEdit"));
+    }
+
+    // Qt fails inside start() when the working directory is missing: the
+    // run reports it once, and its timeout does not report it again.
+    void failsOnceWhenTheRunCannotStart()
+    {
+        AgentRun run(&claude_, QDir::tempPath(), nullptr);
+        QSignalSpy failed(&run, &AgentRun::failed);
+        const ProcessSpec spec{.program = QCoreApplication::applicationFilePath(),
+                               .workingDirectory = QDir::temp().filePath(QStringLiteral("duet-no-such-folder"))};
+
+        run.start(spec, std::chrono::milliseconds(50));
+        QTest::qWait(200);
+
+        QCOMPARE(failed.size(), 1);
+        QVERIFY(failed.first().first().toString().startsWith(QStringLiteral("Could not start")));
     }
 
     void refusesEditsOverUnsavedChanges()

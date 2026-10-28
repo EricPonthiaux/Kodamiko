@@ -168,10 +168,12 @@ void DiagramGenerationView::start()
         return;
     }
 
-    run_->start(*spec, timeout);
+    // The clock first: a run that cannot start fails inside start(), and
+    // fail() stops it.
     elapsed_.start();
     updateElapsed();
     clock_->start();
+    run_->start(*spec, timeout);
 }
 
 void DiagramGenerationView::stop()
