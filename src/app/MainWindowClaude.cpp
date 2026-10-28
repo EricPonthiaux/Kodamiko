@@ -6,6 +6,7 @@
 #include "MainWindow.h"
 #include "NativeNotifications.h"
 #include "agent/AgentIndicator.h"
+#include "agent/DiagramRequest.h"
 #include "agent/DiagramRequestPopup.h"
 #include "agent/EditErrors.h"
 #include "agent/EditorContext.h"
@@ -48,6 +49,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLabel>
+#include <QLocale>
 #include <QMenu>
 #include <QPainter>
 #include <QSettings>
@@ -117,6 +119,17 @@ AgentStatus indicatorStatus(AgentActivity::State state)
         return AgentStatus::Done;
     }
     return AgentStatus::Ready;
+}
+
+// `path`, or with -2, -3… before its extension when a file already has it.
+QString unusedPath(const QString &path)
+{
+    const QFileInfo info(path);
+    QString candidate = path;
+    for (int n = 2; QFileInfo::exists(candidate); ++n)
+        candidate =
+            info.dir().filePath(QStringLiteral("%1-%2.%3").arg(info.completeBaseName()).arg(n).arg(info.suffix()));
+    return candidate;
 }
 
 // Dot drawn in front of the agents' tabs while the agent works, waits or has
@@ -731,6 +744,7 @@ void MainWindow::createCodeRequestActions(QMenu *claude)
         codeRequestActions_.append(action);
     };
     add(tr("&Explain This Code"), {}, [this] { askClaude(CodeRequest::Kind::Explain); });
+    add(tr("Explain With a F&lowchart"), {}, [this] { explainWithFlowchart(); });
     add(tr("Re&view This Code"), {}, [this] { reviewCode(); });
     add(tr("Write T&ests for This Code"), {}, [this] { askClaude(CodeRequest::Kind::WriteTests); });
     add(tr("Ask %1 to &Fix the Problems Here"), {}, [this] { askClaudeToFixProblemsHere(); });
@@ -749,6 +763,25 @@ void MainWindow::askClaude(CodeRequest::Kind kind)
 {
     if (const std::optional<CodeRequest::Target> target = currentCodeTarget())
         typeInClaudePrompt(CodeRequest::prompt(kind, *target), PromptEntry::Submitted);
+}
+
+void MainWindow::explainWithFlowchart()
+{
+    const DiagramKind flowchart = DiagramKinds::find(QStringLiteral("flowchart"));
+    if (flowchart.id.isEmpty() || !agentProvider_->features().hasFileRuns) {
+        showStatus(tr("%1 cannot draw diagrams in this version of Duet").arg(agentProvider_->name()));
+        return;
+    }
+    const std::optional<CodeRequest::Target> target = currentCodeTarget();
+    if (!target)
+        return;
+    const QString name = DiagramRequest::explanationFileName(target->symbol, target->path, flowchart.extension);
+    const QString path = unusedPath(QDir(folder_).filePath(QStringLiteral("docs/diagrams/") + name));
+    const QString language = QLocale::languageToString(QLocale::system().language());
+    drawDiagram(path, flowchart.title, DiagramRequest::explanation(CodeRequest::describe(*target), language));
+    if (target->unsaved)
+        showStatus(
+            tr("%1 reads %2 as saved: its unsaved changes are left out").arg(agentProvider_->name(), target->path));
 }
 
 void MainWindow::askClaudeToFixProblemsHere()

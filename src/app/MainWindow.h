@@ -464,6 +464,9 @@ private:
     // the editor's context menu and the Claude menu.
     void createCodeRequestActions(QMenu *claude);
     void askClaude(CodeRequest::Kind kind);
+    // Has the agent draw a flowchart that explains the code at the cursor
+    // or the selection, in docs/diagrams, then shows it.
+    void explainWithFlowchart();
     // Asks the agent to fix the problems on the editor's selected lines,
     // or the cursor's.
     void askClaudeToFixProblemsHere();

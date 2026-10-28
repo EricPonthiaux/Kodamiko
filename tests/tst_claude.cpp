@@ -170,6 +170,28 @@ private slots:
         QCOMPARE(output["permissionDecisionReason"].toString(), reason);
     }
 
+    void asksForAFlowchartThatExplainsTheCodeAndLinksToIt()
+    {
+        const QString request =
+            DiagramRequest::explanation(QStringLiteral("`AgentRun` in src/agent/AgentRun.cpp, line 21"), "French");
+
+        QVERIFY(request.startsWith(QStringLiteral(
+            "Explain how this code works, as a flowchart: `AgentRun` in src/agent/AgentRun.cpp, line 21.\n")));
+        QVERIFY(request.contains(QStringLiteral("`click` line")));
+        QVERIFY(request.endsWith(QStringLiteral("in French.")));
+    }
+
+    void namesTheExplanationAfterItsSymbolOrItsFile()
+    {
+        QCOMPARE(DiagramRequest::explanationFileName("AgentRun", "src/agent/AgentRun.cpp", "mmd"),
+                 QStringLiteral("agent-run-flow.mmd"));
+        QCOMPARE(DiagramRequest::explanationFileName("setWorkingDirectory", "a.cpp", "mmd"),
+                 QStringLiteral("set-working-directory-flow.mmd"));
+        QCOMPARE(DiagramRequest::explanationFileName("", "src/git/Snapshots.cpp", "mmd"),
+                 QStringLiteral("snapshots-flow.mmd"));
+        QCOMPARE(DiagramRequest::explanationFileName("process_", "a.cpp", "mmd"), QStringLiteral("process-flow.mmd"));
+    }
+
     void asksClaudeForADiagram()
     {
         const QString prompt =

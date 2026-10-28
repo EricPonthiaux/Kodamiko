@@ -12,4 +12,15 @@ namespace DiagramRequest {
 // `description`.
 QString prompt(const QString &kindTitle, const QString &relativePath, const QString &description);
 
+// The description, for prompt(), of a flowchart that explains how `code`
+// works: `code` says where it is ("`AgentRun` in src/agent/AgentRun.cpp,
+// line 21", see CodeRequest::describe). Its steps link to the code they stand
+// for; its texts are in `language` ("French").
+QString explanation(const QString &code, const QString &language);
+
+// The name of the file of the flowchart that explains `symbol`, or without
+// one the file `filePath`: "agent-run-flow.mmd" for AgentRun, with the
+// diagram's `extension` ("mmd").
+QString explanationFileName(const QString &symbol, const QString &filePath, const QString &extension);
+
 } // namespace DiagramRequest
