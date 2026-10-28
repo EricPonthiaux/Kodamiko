@@ -97,6 +97,48 @@ private slots:
         QCOMPARE(command->kind, HookEvent::Kind::CommandFinished);
     }
 
+    void readsWhatAPermissionRequestWorksOnAndTheRulesItSuggests()
+    {
+        const auto permission = claude_.parseHook(
+            R"({"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf build"},)"
+            R"("permission_suggestions":[{"type":"addRules","behavior":"allow","destination":"localSettings",)"
+            R"("rules":[{"toolName":"Bash","ruleContent":"rm -rf build"}]}]})");
+
+        QVERIFY(permission);
+        QCOMPARE(permission->toolDetail, QStringLiteral("rm -rf build"));
+        QCOMPARE(permission->permissionSuggestions.size(), 1);
+    }
+
+    void answersAPermissionRequestWithTheUsersDecision()
+    {
+        HookEvent request{};
+        request.permissionSuggestions = QJsonArray{QJsonObject{{"type", "addRules"}}};
+
+        const QJsonObject allowed = claude_.permissionReply(request, PermissionAnswer::Allow);
+        const QJsonObject always = claude_.permissionReply(request, PermissionAnswer::AlwaysAllow);
+        const QJsonObject denied = claude_.permissionReply(request, PermissionAnswer::Deny);
+
+        const auto decision = [](const QJsonObject &reply) {
+            return reply["hookSpecificOutput"].toObject()["decision"].toObject();
+        };
+        QCOMPARE(allowed["hookSpecificOutput"].toObject()["hookEventName"].toString(),
+                 QStringLiteral("PermissionRequest"));
+        QCOMPARE(decision(allowed)["behavior"].toString(), QStringLiteral("allow"));
+        QVERIFY(!decision(allowed).contains("updatedPermissions"));
+        QCOMPARE(decision(always)["updatedPermissions"].toArray(), request.permissionSuggestions);
+        QCOMPARE(decision(denied)["behavior"].toString(), QStringLiteral("deny"));
+        QVERIFY(!decision(denied)["message"].toString().isEmpty());
+    }
+
+    void givesThePermissionHookTimeToWaitForTheUser()
+    {
+        const QJsonObject settings =
+            QJsonDocument::fromJson(ClaudeLauncher::sessionSettings("\"/opt/duet-hook\"")).object();
+        const QJsonObject permission = settings["hooks"].toObject()["PermissionRequest"].toArray().first().toObject();
+
+        QCOMPARE(permission["hooks"].toArray().first().toObject()["timeout"].toInt(), 600);
+    }
+
     void keepsOnlyNotificationsThatWaitForTheUser()
     {
         const auto permission = claude_.parseHook(

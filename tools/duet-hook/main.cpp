@@ -36,6 +36,9 @@ namespace {
 constexpr int connectTimeoutMs = 2000;
 // The editor may take a snapshot or recompute the git diff before replying.
 constexpr int acknowledgeTimeoutMs = 10000;
+// A permission request waits for the user's answer in the editor; Claude
+// Code's own timeout for the hook (ClaudeLauncher) is a little longer.
+constexpr int permissionAnswerTimeoutMs = 590'000;
 // Claude Code cancels a status line that is still running when the next
 // update arrives: no need to wait long.
 constexpr int statusLineTimeoutMs = 5000;
@@ -125,7 +128,10 @@ int main(int argc, char *argv[])
     const QJsonDocument event = QJsonDocument::fromJson(json);
     if (event.isNull())
         return 0;
-    const QByteArray output = sendToEditor(event, acknowledgeTimeoutMs);
+    const bool isPermissionRequest =
+        event.object().value(QLatin1String("hook_event_name")).toString() == QLatin1String("PermissionRequest");
+    const QByteArray output =
+        sendToEditor(event, isPermissionRequest ? permissionAnswerTimeoutMs : acknowledgeTimeoutMs);
     if (!output.isEmpty()) {
         std::fwrite(output.constData(), 1, static_cast<size_t>(output.size()), stdout);
         std::fputc('\n', stdout);

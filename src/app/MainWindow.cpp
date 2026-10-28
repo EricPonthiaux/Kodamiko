@@ -8,6 +8,7 @@
 #include "agent/DiagramRequestPopup.h"
 #include "agent/EditErrors.h"
 #include "agent/NewAgentPopup.h"
+#include "agent/PermissionPrompts.h"
 #include "agent/ReviewPage.h"
 #include "agent/mcp/DuetTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
@@ -62,6 +63,7 @@
 #include "ui/MessagePopup.h"
 #include "ui/ModeTabBar.h"
 #include "ui/NoticeBar.h"
+#include "ui/Snackbar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
 #include "ui/TrailingTabButton.h"
@@ -344,10 +346,6 @@ void MainWindow::createCentralWidget(const Preferences &preferences)
     auto *centralLayout = new QVBoxLayout(central);
     centralLayout->setContentsMargins(0, 0, 0, 0);
     centralLayout->setSpacing(0);
-    toolRequestBar_ = new NoticeBar(central);
-    connect(toolRequestBar_, &NoticeBar::actionClicked, this, [this] { answerToolRequest(true); });
-    connect(toolRequestBar_, &NoticeBar::dismissed, this, [this] { answerToolRequest(false); });
-    centralLayout->addWidget(toolRequestBar_);
     centralLayout->addWidget(modes_, 1);
     setCentralWidget(central);
     createModeTabs();
@@ -357,17 +355,6 @@ void MainWindow::createCentralWidget(const Preferences &preferences)
     FontSettings::applyTreeFont(preferences.treeFont(), this);
 
     resize(1400, 900);
-}
-
-void MainWindow::answerToolRequest(bool accepted)
-{
-    if (toolRequests_.isEmpty())
-        return;
-    const ToolRequest request = toolRequests_.takeFirst();
-    if (accepted)
-        toolRequestBar_->hide();
-    request.answer(accepted);
-    showToolRequest();
 }
 
 void MainWindow::createPopups()
@@ -400,6 +387,9 @@ void MainWindow::createPopups()
     connect(agentCheckPopup_, &AgentCheckPopup::saved, this, &MainWindow::setAgentCheckCommand);
     diagramRequestPopup_ = new DiagramRequestPopup(theme_, this);
     agentMessage_ = new MessagePopup(QStringLiteral("claude"), QStringLiteral("agentMessage"), theme_, this);
+    snackbar_ = new Snackbar(this);
+    snackbar_->applyTheme(theme_);
+    permissionPrompts_ = new PermissionPrompts(snackbar_, &hookServer_, this);
     findInFiles_ = new FindInFilesPopup(theme_, this);
     findInFiles_->setBufferProvider([this] { return editorTabs_->unsavedTexts(); });
     connect(findInFiles_, &FindInFilesPopup::matchChosen, this,

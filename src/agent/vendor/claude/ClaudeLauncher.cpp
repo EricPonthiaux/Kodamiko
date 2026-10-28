@@ -24,6 +24,8 @@ QString hookExecutablePath()
     return Executables::besideTheApplication(QStringLiteral("duet-hook"));
 }
 
+constexpr int permissionHookTimeoutSeconds = 600;
+
 QJsonArray commandHook(const QString &command, const QString &matcher = {}, int timeout = 60)
 {
     QJsonObject entry;
@@ -108,7 +110,8 @@ QByteArray sessionSettings(const QString &hookCommand, const QStringList &allowe
     hooks.insert(QLatin1String("PreToolUse"), commandHook(hookCommand, checkedTools, 30));
     hooks.insert(QLatin1String("PostToolUse"),
                  commandHook(hookCommand, QStringLiteral("Edit|Write|MultiEdit|NotebookEdit|Bash")));
-    hooks.insert(QLatin1String("PermissionRequest"), commandHook(hookCommand));
+    // The user answers it in the editor (duet-hook waits up to 590 s).
+    hooks.insert(QLatin1String("PermissionRequest"), commandHook(hookCommand, {}, permissionHookTimeoutSeconds));
     hooks.insert(QLatin1String("Notification"), commandHook(hookCommand));
     hooks.insert(QLatin1String("Stop"), commandHook(hookCommand));
     hooks.insert(QLatin1String("StopFailure"), commandHook(hookCommand));

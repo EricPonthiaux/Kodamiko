@@ -6,6 +6,7 @@
 #include "ClaudeLauncher.h"
 
 #include <QCoreApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
@@ -65,6 +66,21 @@ std::optional<HookEvent> beforeToolUse(HookEvent event, const QJsonObject &objec
     event.kind = HookEvent::Kind::EditRequested;
     event.message = object.value(QLatin1String("tool_name")).toString();
     return event;
+}
+
+// What a tool asking for permission works on, from its input: the command,
+// the file, the address, the pattern; its whole input otherwise.
+QString toolDetail(const QJsonObject &input)
+{
+    static const QStringList telling{QStringLiteral("command"),       QStringLiteral("file_path"),
+                                     QStringLiteral("notebook_path"), QStringLiteral("url"),
+                                     QStringLiteral("pattern"),       QStringLiteral("query")};
+    for (const QString &key : telling) {
+        const QString value = input.value(key).toString();
+        if (!value.isEmpty())
+            return value;
+    }
+    return input.isEmpty() ? QString() : QString::fromUtf8(QJsonDocument(input).toJson(QJsonDocument::Compact));
 }
 
 } // namespace
@@ -177,6 +193,8 @@ std::optional<HookEvent> ClaudeCodeProvider::parseHook(const QByteArray &json) c
     if (eventName == QLatin1String("PermissionRequest")) {
         event.kind = HookEvent::Kind::PermissionRequested;
         event.message = object.value(QLatin1String("tool_name")).toString();
+        event.toolDetail = toolDetail(object.value(QLatin1String("tool_input")).toObject());
+        event.permissionSuggestions = object.value(QLatin1String("permission_suggestions")).toArray();
         return event;
     }
     if (eventName == QLatin1String("Notification")) {
@@ -231,5 +249,31 @@ QJsonObject ClaudeCodeProvider::editContextReply(const QString &context) const
         {QLatin1String("hookSpecificOutput"), QJsonObject{
                                                   {QLatin1String("hookEventName"), QLatin1String("PostToolUse")},
                                                   {QLatin1String("additionalContext"), context},
+                                              }}};
+}
+
+// Deny and ask rules still apply to an allowed tool: Claude Code checks them
+// after the hook.
+QJsonObject ClaudeCodeProvider::permissionReply(const HookEvent &request, PermissionAnswer answer) const
+{
+    QJsonObject decision;
+    switch (answer) {
+    case PermissionAnswer::Allow:
+        decision.insert(QLatin1String("behavior"), QLatin1String("allow"));
+        break;
+    case PermissionAnswer::AlwaysAllow:
+        decision.insert(QLatin1String("behavior"), QLatin1String("allow"));
+        // The suggestions, given back, are the rules to add.
+        decision.insert(QLatin1String("updatedPermissions"), request.permissionSuggestions);
+        break;
+    case PermissionAnswer::Deny:
+        decision.insert(QLatin1String("behavior"), QLatin1String("deny"));
+        decision.insert(QLatin1String("message"), QLatin1String("The user denied this in Duet."));
+        break;
+    }
+    return QJsonObject{
+        {QLatin1String("hookSpecificOutput"), QJsonObject{
+                                                  {QLatin1String("hookEventName"), QLatin1String("PermissionRequest")},
+                                                  {QLatin1String("decision"), decision},
                                               }}};
 }

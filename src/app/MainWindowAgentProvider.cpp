@@ -9,6 +9,7 @@
 #include "agent/CloseAgentPopup.h"
 #include "agent/DiagramRequestPopup.h"
 #include "agent/NewAgentPopup.h"
+#include "agent/PermissionPrompts.h"
 #include "agent/ReviewPage.h"
 #include "changes/ChangesView.h"
 #include "settings/Keymap.h"
@@ -131,5 +132,6 @@ void MainWindow::setAgentProvider(const AgentProvider &provider)
     closeAgentPopup_->applyTheme(theme_);
     agentMessage_->setIconName(provider.iconName());
     agentMessage_->applyTheme(theme_);
+    permissionPrompts_->setProvider(&provider);
     updateAgentIndicator();
 }

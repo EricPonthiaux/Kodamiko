@@ -76,6 +76,11 @@ public:
 
     QJsonObject blockReply(const QString &reason) const override { return claude_.blockReply(reason); }
 
+    QJsonObject permissionReply(const HookEvent &request, PermissionAnswer answer) const override
+    {
+        return claude_.permissionReply(request, answer);
+    }
+
     QJsonObject editContextReply(const QString &context) const override { return claude_.editContextReply(context); }
 
 private:

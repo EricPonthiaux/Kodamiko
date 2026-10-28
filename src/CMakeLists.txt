@@ -49,6 +49,7 @@ add_library(duet_core STATIC
     agent/EditErrors.cpp
     agent/EditorContext.cpp
     agent/HookServer.cpp
+    agent/PermissionPrompts.cpp
     agent/mcp/CodeTools.cpp
     agent/mcp/EditorTools.cpp
     agent/mcp/GitBranchTools.cpp
@@ -304,6 +305,7 @@ add_library(duet_core STATIC
     ui/ModeTabBar.cpp
     ui/Motion.cpp
     ui/NoticeBar.cpp
+    ui/Snackbar.cpp
     ui/OverlayPopup.cpp
     ui/TabBarBaseLine.cpp
     ui/Paragraph.cpp

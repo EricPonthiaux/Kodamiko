@@ -12,6 +12,7 @@
 #include <QPointer>
 #include <QRandomGenerator>
 
+#include <memory>
 #include <utility>
 
 namespace {
@@ -26,6 +27,14 @@ HookServer::HookServer(QObject *parent)
 {
     server_.setSocketOptions(QLocalServer::UserAccessOption);
     connect(&server_, &QLocalServer::newConnection, this, &HookServer::onNewConnection);
+}
+
+// The server's sockets die with it, after the members their handlers read:
+// a hook still waiting (a permission request) must not reach them.
+HookServer::~HookServer()
+{
+    for (const QLocalSocket *socket : server_.findChildren<QLocalSocket *>())
+        socket->disconnect(this);
 }
 
 bool HookServer::listen()
@@ -103,6 +112,26 @@ std::function<void(const QJsonObject &output)> HookServer::deferResponse()
         if (!output.isEmpty())
             socket->setProperty(outputProperty, QJsonDocument(output).toJson(QJsonDocument::Compact));
         reply(socket);
+    };
+}
+
+std::function<void(const QJsonObject &output)> HookServer::deferResponse(QObject *context,
+                                                                         std::function<void()> abandoned)
+{
+    const QLocalSocket *socket = receiving_;
+    std::function<void(const QJsonObject &)> respond = deferResponse();
+    if (!socket)
+        return respond;
+    // The hook leaves once it has the reply too: only a departure before it
+    // is a give-up.
+    const auto replied = std::make_shared<bool>(false);
+    connect(socket, &QLocalSocket::disconnected, context, [replied, abandoned = std::move(abandoned)] {
+        if (!*replied)
+            abandoned();
+    });
+    return [replied, respond = std::move(respond)](const QJsonObject &output) {
+        *replied = true;
+        respond(output);
     };
 }
 

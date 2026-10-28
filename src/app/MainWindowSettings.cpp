@@ -40,6 +40,7 @@
 #include "ui/MessagePopup.h"
 #include "ui/Motion.h"
 #include "ui/NoticeBar.h"
+#include "ui/Snackbar.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
@@ -99,13 +100,13 @@ void MainWindow::setTheme(const QString &name)
             terminal->applyTheme(theme_);
     }
     changesView_->applyTheme(theme_);
+    snackbar_->applyTheme(theme_);
     reviewPage_->applyTheme(theme_);
     historyView_->applyTheme(theme_);
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
     serverNotice_->applyTheme(theme_);
     unsavedEditNotice_->applyTheme(theme_);
-    toolRequestBar_->applyTheme(theme_);
     toolsNotice_->applyTheme(theme_);
     if (projectSettings_)
         projectSettings_->applyTheme(theme_);

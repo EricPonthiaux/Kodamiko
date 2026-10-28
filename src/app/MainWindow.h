@@ -30,6 +30,8 @@
 #include <optional>
 
 class AgentCheckPopup;
+class PermissionPrompts;
+class Snackbar;
 class AskpassServer;
 class BranchesPopup;
 class ChangesView;
@@ -147,8 +149,6 @@ private:
     void createCodeServices(const Preferences &preferences);
     void createGitViews();
     void createCentralWidget(const Preferences &preferences);
-    // The answer to the sensitive tool request shown, then the next one.
-    void answerToolRequest(bool accepted);
     void createGitServices();
     void createPopups();
     QWidget *createEditPage();
@@ -393,6 +393,8 @@ private:
     void updateTerminalWindowControls();
 
     void onHookReceived(const HookEvent &event);
+    QString askerOf(const HookEvent &event) const;
+    void askToolConfirmation(const QString &tool, const QString &what, const std::function<void(bool)> &answer);
     // Dot on the Claude tab and on the Terminal mode tab.
     void updateAgentIndicator();
     // Dot on an agent's tab.
@@ -425,7 +427,6 @@ private:
     // The tools, resources and prompts of the editor's MCP server.
     void registerMcpTools();
     // Asks about the next sensitive tool Claude wants to run.
-    void showToolRequest();
     void guardUnsavedEdits(const QStringList &paths);
     // Refuses a git command Duet's tools do, telling the agent which ones.
     void guardGitCommands(const HookEvent &event);
@@ -601,16 +602,6 @@ private:
     NoticeBar *serverNotice_ = nullptr;
     QSet<QString> dismissedServerNotices_;   // closed by the user, by message
     NoticeBar *unsavedEditNotice_ = nullptr; // an edit by Claude refused
-    // Claude asks to run a sensitive tool (restore a snapshot, commit…):
-    // above every mode, one request at a time.
-    NoticeBar *toolRequestBar_ = nullptr;
-
-    struct ToolRequest {
-        QString text;
-        std::function<void(bool)> answer;
-    };
-
-    QList<ToolRequest> toolRequests_;
     CodeNavigator *navigator_ = nullptr;
     CodeIntelligence *intelligence_ = nullptr;
     OutlineView *outlineView_ = nullptr;
@@ -680,6 +671,11 @@ private:
     // What the agents' sessions and merges have to tell the user, one
     // message after the other.
     MessagePopup *agentMessage_ = nullptr;
+    // Short messages at the bottom of the window: the agents' permission
+    // requests (permissionPrompts_) and the confirmations of Duet's
+    // sensitive tools (askToolConfirmation()).
+    Snackbar *snackbar_ = nullptr;
+    PermissionPrompts *permissionPrompts_ = nullptr;
     RecentFiles recentFiles_;
     PrerequisitesPopup *prerequisitesPopup_ = nullptr;
     AboutPopup *aboutPopup_ = nullptr;

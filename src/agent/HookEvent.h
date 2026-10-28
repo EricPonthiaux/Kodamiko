@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QString>
 #include <QStringList>
@@ -33,6 +34,13 @@ struct HookEvent {
     // the command line; NeedsAttention: the agent's message;
     // ResponseFinished: the error, if any.
     QString message;
+    // PermissionRequested: what the tool works on (the command, the file,
+    // the address…), for the user to read.
+    QString toolDetail;
+    // PermissionRequested: the rules the agent offers to remember the
+    // approval with, in its own terms, for AgentProvider::permissionReply();
+    // empty when it offers none.
+    QJsonArray permissionSuggestions;
     bool failed = false; // ResponseFinished after an API error
     QJsonObject status;  // StatusUpdated: the JSON the agent passes to status lines
 };

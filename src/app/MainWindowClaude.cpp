@@ -10,6 +10,7 @@
 #include "agent/DiagramRequestPopup.h"
 #include "agent/EditErrors.h"
 #include "agent/EditorContext.h"
+#include "agent/PermissionPrompts.h"
 #include "agent/mcp/DuetTools.h"
 #include "agent/vendor/claude/ClaudeConfigView.h"
 #include "agent/vendor/claude/ClaudeUsage.h"
@@ -31,6 +32,7 @@
 #include "ui/DesktopIntegration.h"
 #include "ui/DetachablePage.h"
 #include "ui/NoticeBar.h"
+#include "ui/Snackbar.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
 #include "viewers/DiagramKinds.h"
@@ -304,6 +306,7 @@ void MainWindow::showEffectiveSettings(bool open)
 
 void MainWindow::onHookReceived(const HookEvent &event)
 {
+    permissionPrompts_->handle(event, askerOf(event));
     // An agent edits its worktree, not the checkout the editor shows.
     if (handleAgentHook(event))
         return;
@@ -361,6 +364,13 @@ void MainWindow::onHookReceived(const HookEvent &event)
     case HookEvent::Kind::NeedsAttention:
         break;
     }
+}
+
+// How a permission request names the session it comes from.
+QString MainWindow::askerOf(const HookEvent &event) const
+{
+    const AgentSessions::Agent *agent = agentSessions_.find(event);
+    return agent ? tr("%1 in %2").arg(agentProvider_->name(), agent->worktree.name) : agentProvider_->name();
 }
 
 void MainWindow::updateAgentIndicator()
@@ -515,11 +525,10 @@ void MainWindow::registerMcpTools()
 #ifdef DUET_WITH_DIAGRAMS
     DuetTools::registerDiagramTools(mcpRegistry_, context);
 #endif
-    mcpRegistry_.setConfirmer([this](const QString &tool, const QString &what, std::function<void(bool)> answer) {
-        toolRequests_.append({tr("%1 asks to %2 (%3).").arg(agentProvider_->name(), what, tool), std::move(answer)});
-        if (toolRequests_.size() == 1)
-            showToolRequest();
-    });
+    mcpRegistry_.setConfirmer(
+        [this](const QString &tool, const QString &what, const std::function<void(bool)> &answer) {
+            askToolConfirmation(tool, what, answer);
+        });
     hookServer_.setMcpRegistry(&mcpRegistry_);
 
     // Subscribed clients hear when the user moves in the editor (once
@@ -537,12 +546,20 @@ void MainWindow::registerMcpTools()
     });
 }
 
-void MainWindow::showToolRequest()
+// A sensitive tool of Duet's (restore a snapshot, commit…) the agent wants
+// to run. Closing the message refuses it, as Deny does.
+void MainWindow::askToolConfirmation(const QString &tool, const QString &what, const std::function<void(bool)> &answer)
 {
-    if (toolRequests_.isEmpty())
-        return;
-    toolRequestBar_->showNotice(toolRequests_.first().text, tr("Allow"));
-    // Close refuses; the request waits for an answer.
+    // The snackbar runs one of the three: the answer is given once.
+    snackbar_->post({
+        .icon = UiIcons::icon(agentProvider_->iconName(), agentProvider_->brandColor()),
+        .title = tr("%1 asks to %2").arg(agentProvider_->name(), what),
+        .detail = tool,
+        .actions = {{tr("Deny"), [answer] { answer(false); }},
+                    {tr("Allow"), [answer] { answer(true); }, SnackbarAction::Emphasis::Primary}},
+        .closeToolTip = tr("Deny"),
+        .dismissed = [answer] { answer(false); },
+    });
     QApplication::alert(this);
 }
 

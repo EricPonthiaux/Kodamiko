@@ -34,6 +34,7 @@ public:
     QJsonObject promptContextReply(const QString &context) const override;
     QJsonObject denyToolReply(const QString &reason) const override;
     QJsonObject blockReply(const QString &reason) const override;
+    QJsonObject permissionReply(const HookEvent &request, PermissionAnswer answer) const override;
     QJsonObject editContextReply(const QString &context) const override;
 
 private:

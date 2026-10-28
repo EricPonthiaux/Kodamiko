@@ -104,6 +104,15 @@ struct AgentRunEvent {
     QString text;        // Finished: the agent's answer, or the error
 };
 
+// What the user answers to a PermissionRequested hook.
+enum class PermissionAnswer {
+    Allow,
+    // Allow, and remember it with the rules the agent suggested
+    // (HookEvent::permissionSuggestions).
+    AlwaysAllow,
+    Deny,
+};
+
 // An agent CLI that Duet runs in a terminal (Claude Code…): its name and
 // look in the editor, how to start it, and the language of its hooks. The
 // rest of the editor deals with any agent through this interface and the
@@ -163,4 +172,7 @@ public:
     // The reply to a FilesEdited hook that tells the agent `context` along
     // with the edit's result, without refusing anything.
     virtual QJsonObject editContextReply(const QString &context) const = 0;
+    // The reply to the PermissionRequested hook `request` that gives the
+    // user's `answer`.
+    virtual QJsonObject permissionReply(const HookEvent &request, PermissionAnswer answer) const = 0;
 };

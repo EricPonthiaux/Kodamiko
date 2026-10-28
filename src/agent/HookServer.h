@@ -36,6 +36,8 @@ class HookServer : public QObject {
 
 public:
     explicit HookServer(QObject *parent = nullptr);
+    ~HookServer() override;
+    Q_DISABLE_COPY_MOVE(HookServer)
 
     bool listen();
 
@@ -51,6 +53,9 @@ public:
     // The same, the reply carrying the JSON passed to the returned function
     // (as respond() would), or none for an empty object.
     std::function<void(const QJsonObject &output)> deferResponse();
+    // The same, and `abandoned` runs if the hook gives up waiting before the
+    // reply (the agent went on without it), as long as `context` lives.
+    std::function<void(const QJsonObject &output)> deferResponse(QObject *context, std::function<void()> abandoned);
 
     // Only from a hookReceived() slot: the JSON the hook prints on its
     // standard output, sent with the reply (deferred or not).
