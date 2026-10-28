@@ -327,6 +327,25 @@ private slots:
         QVERIFY(fixture.button(QStringLiteral("Always Allow")));
     }
 
+    void aSnackbarMessageIsAsTallAsItsTextsNeed()
+    {
+        QWidget window;
+        window.resize(800, 600);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        auto *snackbar = new Snackbar(&window);
+        const Snackbar::Id shortMessage = snackbar->post({.title = QStringLiteral("Saved")});
+        snackbar->withdraw(shortMessage);
+
+        snackbar->post({
+            .title = QStringLiteral("Claude asks to stage %1").arg(QStringLiteral("src/ui/Theme.cpp ").repeated(12)),
+            .detail = QStringLiteral("first line\nsecond line\nthird line"),
+            .actions = {{QStringLiteral("Deny"), {}}, {QStringLiteral("Allow"), {}}},
+        });
+
+        QCOMPARE(snackbar->height(), snackbar->heightForWidth(snackbar->width()));
+    }
+
     void projectCheckReportsItsExitCodeAndOutput()
     {
         const QTemporaryDir folder;

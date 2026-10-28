@@ -27,7 +27,7 @@ namespace {
 constexpr int shadowRoomPx = 12;
 constexpr int shadowSpreadPx = 8;
 constexpr int shadowDropPx = 3;
-constexpr qreal cornerRadiusPx = 6;
+constexpr qreal cornerRadiusPx = 4;
 // The strip on its left edge, in the accent color.
 constexpr qreal accentStripPx = 3;
 constexpr int iconSizePx = 20;
@@ -253,6 +253,10 @@ void Snackbar::showFirst()
     // The style sheet sets the labels' fonts as they are polished: the size
     // depends on them.
     ensurePolished();
+    // The rows keep the sizes of the texts before until the next pass of the
+    // event loop: they measure the new ones now, for the height placed.
+    layout()->invalidate();
+    layout()->activate();
     place();
     show();
     raise();
