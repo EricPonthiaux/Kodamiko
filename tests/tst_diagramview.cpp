@@ -12,6 +12,7 @@
 #include "viewers/diagram/Document.h"
 #include "viewers/diagram/Family.h"
 #include "viewers/diagram/Graphviz.h"
+#include "viewers/diagram/families/Families.h"
 #include "viewers/diagram/families/flow/Flow.h"
 
 #include <QFile>
@@ -184,6 +185,39 @@ private slots:
         }
         QCOMPARE(kinds, (QStringList{"solid/arrow/yes", "solid/arrow/yes", "dotted/arrow/", "thick/arrow/done",
                                      "solid/circle/", "invisible/none/"}));
+    }
+
+    void drawsATerminatorWithoutVariantAsAStadium()
+    {
+        Board board;
+        board.setFamily(&families::flowchart());
+        auto *unset =
+            dynamic_cast<flow::FlowShape *>(board.addShape(QStringLiteral("terminator"), {{"text", "Start"}}));
+        auto *stadium = dynamic_cast<flow::FlowShape *>(
+            board.addShape(QStringLiteral("terminator"), {{"text", "Start"}, {"variant", "stadium"}}));
+        QVERIFY(unset && stadium);
+        stadium->x = unset->x;
+        stadium->y = unset->y;
+
+        // Links meet it where they meet a stadium, not an ellipse.
+        for (const QPointF toward : {QPointF(unset->x - 40, unset->y - 40), QPointF(unset->x + 20, unset->y - 80)})
+            QCOMPARE(unset->borderPoint(toward), stadium->borderPoint(toward));
+    }
+
+    void freeTextShrinksWithItsText()
+    {
+        Board board;
+        board.setFamily(&families::flowchart());
+        auto *text = dynamic_cast<flow::FlowTextShape *>(board.addShape(QStringLiteral("flowText"), {}));
+        QVERIFY(text);
+        text->text = QStringLiteral("A long line of free text that wraps past its width");
+        board.measureShape(*text);
+        const qreal wide = text->w;
+
+        text->text = QStringLiteral("Hi");
+        board.measureShape(*text);
+
+        QVERIFY2(text->w < wide / 2, qPrintable(QStringLiteral("%1 then %2").arg(wide).arg(text->w)));
     }
 
     void keepsTheFlowchartLinksToTheCode()

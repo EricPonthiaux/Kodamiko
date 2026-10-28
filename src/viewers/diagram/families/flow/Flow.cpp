@@ -56,6 +56,12 @@ QString defaultVariantOf(const QString &type)
     return QStringLiteral("square");
 }
 
+// The variant a shape is drawn as: its own, else its type's default.
+QString drawnVariant(const QString &variant, const QString &type)
+{
+    return variant.isEmpty() ? defaultVariantOf(type) : variant;
+}
+
 const QList<std::pair<QString, QString>> &variantChoices()
 {
     static const QList<std::pair<QString, QString>> list{
@@ -256,7 +262,7 @@ QList<QPointF> FlowShape::points() const
 QPainterPath FlowShape::outline() const
 {
     if (type == QLatin1String("terminator")) {
-        if (variant == QLatin1String("stadium"))
+        if (drawnVariant(variant, type) == QLatin1String("stadium"))
             return roundRect(x, y, w, h, h / 2);
         return ellipse(QPointF(cx(), cy()), w / 2, h / 2);
     }
@@ -316,7 +322,7 @@ QPointF FlowShape::borderPoint(QPointF toward) const
         const qreal dy = toward.y() - cy();
         if (!dx && !dy)
             return center;
-        if (variant == QLatin1String("stadium") && w > h)
+        if (drawnVariant(variant, type) == QLatin1String("stadium") && w > h)
             return stadiumBorderPoint(dx, dy);
         return ellipseBorderPoint(center, toward, w / 2, h / 2);
     }
@@ -405,7 +411,7 @@ QList<Property> FlowShape::properties() const
 QVariant FlowShape::propertyValue(const QString &propertyId) const
 {
     if (propertyId == QLatin1String("variant"))
-        return variant.isEmpty() ? defaultVariantOf(type) : variant;
+        return drawnVariant(variant, type);
     return {};
 }
 
@@ -454,8 +460,10 @@ void FlowTextShape::measure(const Board &)
     const qreal safeHeight = std::max(lineHeight + pad * 2, lines.size() * lineHeight + pad * 2);
     minWidth_ = std::ceil(std::max<qreal>(60, safeWidth));
     minHeight_ = std::ceil(std::max<qreal>(34, safeHeight));
-    w = std::max(w, minWidth_);
-    h = std::max(h, minHeight_);
+    // The text's size, smaller as well as larger: measureShape keeps a size
+    // the user chose (manualWidth, manualHeight) over it.
+    w = minWidth_;
+    h = minHeight_;
     lines_ = text::wrap(font, text, std::max<qreal>(20, textRect().width()));
 }
 
