@@ -50,6 +50,7 @@ class FileTreeView;
 class FilesPanel;
 class FindBar;
 class DiagramRequestPopup;
+struct DiagramKind;
 class FindInFilesPopup;
 class GitActions;
 class GitCommands;
@@ -434,7 +435,7 @@ private:
     void followDiagramEdits(const QStringList &paths);
     // Asks what Claude should draw in `folder`, then shows the drawing.
     void generateDiagram(const QString &folder);
-    void drawDiagram(const QString &path, const QString &kindTitle, const QString &description);
+    void drawDiagram(const QString &path, const DiagramKind &kind, const QString &description);
     // Context and plan usage, from the status line data.
     void updateUsage();
     void showCommandPalette();

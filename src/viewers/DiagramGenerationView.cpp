@@ -3,11 +3,12 @@
 #include "DiagramGenerationView.h"
 
 #include "DiagramCheck.h"
+#include "StepTimeline.h"
 #include "agent/AgentProvider.h"
 #include "agent/AgentRun.h"
 #include "agent/DiagramRequest.h"
 #include "ui/AppFonts.h"
-#include "ui/Spinner.h"
+#include "viewers/sketch/DiagramSketch.h"
 
 #include <QDir>
 #include <QFile>
@@ -24,8 +25,9 @@ namespace {
 
 // The agent may read a good part of the project first.
 constexpr std::chrono::minutes timeout{10};
-constexpr int shownSteps = 6;
-constexpr int contentWidth = 520;
+constexpr int contentWidth = 560;
+constexpr qreal kindScale = 0.85;
+constexpr qreal kindLetterSpacingPx = 1.2;
 
 QString errorColor(const QPalette &palette)
 {
@@ -56,9 +58,9 @@ DiagramGenerationView::DiagramGenerationView(Request drawing, QWidget *parent)
     , agent_(drawing.agent)
     , run_(new AgentRun(agent_, workDir_, this))
     , clock_(new QTimer(this))
-    , spinner_(new Spinner(this))
+    , sketch_(new DiagramSketch(drawing.kindId, this))
     , title_(new QLabel(this))
-    , stepsLabel_(new QLabel(this))
+    , steps_(new StepTimeline(this))
     , elapsedLabel_(new QLabel(this))
     , error_(new QLabel(this))
     , cancel_(new QPushButton(tr("Cancel"), this))
@@ -68,23 +70,16 @@ DiagramGenerationView::DiagramGenerationView(Request drawing, QWidget *parent)
     setAutoFillBackground(true);
     setBackgroundRole(QPalette::Base);
 
+    auto *kind = new QLabel(kindTitle_.toUpper(), this);
+    kind->setForegroundRole(QPalette::Highlight);
+    AppFonts::setInterfaceFont(kind, kindScale, QFont::Bold, kindLetterSpacingPx);
+    elapsedLabel_->setForegroundRole(QPalette::PlaceholderText);
+    elapsedLabel_->setFont(AppFonts::codeFont(font().pointSizeF()));
+
     title_->setWordWrap(true);
-    title_->setAlignment(Qt::AlignCenter);
     AppFonts::setInterfaceFont(title_, 1.3);
 
-    auto *request = new QLabel(description_.trimmed(), this);
-    request->setWordWrap(true);
-    request->setAlignment(Qt::AlignCenter);
-    request->setTextFormat(Qt::PlainText);
-    request->setForegroundRole(QPalette::PlaceholderText);
-
-    stepsLabel_->setAlignment(Qt::AlignCenter);
-    stepsLabel_->setTextFormat(Qt::RichText);
-    stepsLabel_->setWordWrap(true);
-    elapsedLabel_->setAlignment(Qt::AlignCenter);
-    elapsedLabel_->setForegroundRole(QPalette::PlaceholderText);
     error_->setWordWrap(true);
-    error_->setAlignment(Qt::AlignCenter);
     error_->setTextFormat(Qt::PlainText);
     error_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     error_->setStyleSheet(QStringLiteral("color: %1;").arg(errorColor(palette())));
@@ -99,30 +94,34 @@ DiagramGenerationView::DiagramGenerationView(Request drawing, QWidget *parent)
     clock_->setInterval(1000);
     Q_ASSERT(agent_);
     hookServer_.setProvider(agent_);
-    connect(run_, &AgentRun::stepsAdded, this, &DiagramGenerationView::addSteps);
+    connect(run_, &AgentRun::stepsAdded, steps_, &StepTimeline::addSteps);
     connect(run_, &AgentRun::finished, this, &DiagramGenerationView::onRunFinished);
     connect(run_, &AgentRun::failed, this, &DiagramGenerationView::fail);
     connect(&hookServer_, &HookServer::hookReceived, this, &DiagramGenerationView::onHookReceived,
             Qt::DirectConnection);
+
+    auto *header = new QHBoxLayout;
+    header->addWidget(kind);
+    header->addStretch();
+    header->addWidget(elapsedLabel_);
 
     auto *buttons = new QHBoxLayout;
     buttons->addStretch();
     buttons->addWidget(cancel_);
     buttons->addWidget(retry_);
     buttons->addWidget(close_);
-    buttons->addStretch();
 
     auto *column = new QWidget(this);
     // Wrapped labels need a width to compute their height.
     column->setFixedWidth(contentWidth);
     auto *layout = new QVBoxLayout(column);
-    layout->setSpacing(12);
-    layout->addWidget(spinner_, 0, Qt::AlignHCenter);
+    layout->setSpacing(8);
+    layout->addWidget(sketch_);
+    layout->addSpacing(16);
+    layout->addLayout(header);
     layout->addWidget(title_);
-    layout->addWidget(request);
-    layout->addSpacing(8);
-    layout->addWidget(stepsLabel_);
-    layout->addWidget(elapsedLabel_);
+    layout->addSpacing(16);
+    layout->addWidget(steps_);
     layout->addWidget(error_);
     layout->addSpacing(8);
     layout->addLayout(buttons);
@@ -141,15 +140,15 @@ DiagramGenerationView::~DiagramGenerationView()
 void DiagramGenerationView::start()
 {
     stop();
-    steps_.clear();
+    steps_->clear();
     title_->setText(
         tr("%1 is drawing %2").arg(agent_->name(), QDir::toNativeSeparators(QDir(workDir_).relativeFilePath(path_))));
     error_->hide();
     retry_->hide();
     close_->hide();
     cancel_->show();
-    spinner_->setSpinning(true);
-    addSteps({tr("Starting %1").arg(agent_->name())});
+    sketch_->setState(DiagramSketch::State::Drawing);
+    steps_->addSteps({tr("Starting %1").arg(agent_->name())});
 
     // duet-hook reaches this view's own server: the agent gets the diagram's
     // problems right after writing it.
@@ -186,6 +185,7 @@ void DiagramGenerationView::onRunFinished(const AgentRun::Outcome &outcome)
 {
     clock_->stop();
     if (!outcome.failed && QFileInfo::exists(path_)) {
+        sketch_->setState(DiagramSketch::State::Done);
         emit finished(path_, outcome.answer);
         return;
     }
@@ -206,30 +206,16 @@ void DiagramGenerationView::onHookReceived(const HookEvent &event)
         if (!problems.isEmpty()) {
             hookServer_.respond(
                 agent_->blockReply(DiagramCheck::feedback(QDir(workDir_).relativeFilePath(path), problems)));
-            addSteps({tr("Fixing what the diagram editor could not read")});
+            steps_->addSteps({tr("Fixing what the diagram editor could not read")});
         }
     }
-}
-
-void DiagramGenerationView::addSteps(const QStringList &steps)
-{
-    steps_ += steps;
-    // The last steps, the current one in full color with an ellipsis.
-    const QStringList shown = steps_.mid(std::max<qsizetype>(0, steps_.size() - shownSteps));
-    const QString muted = palette().color(QPalette::PlaceholderText).name();
-    QStringList lines;
-    for (qsizetype i = 0; i < shown.size(); ++i) {
-        const QString text = shown.at(i).toHtmlEscaped();
-        lines.append(i + 1 == shown.size() ? text + QStringLiteral("…")
-                                           : QStringLiteral("<span style=\"color:%1\">%2</span>").arg(muted, text));
-    }
-    stepsLabel_->setText(lines.join(QStringLiteral("<br>")));
 }
 
 void DiagramGenerationView::fail(const QString &error)
 {
     stop();
-    spinner_->setSpinning(false);
+    sketch_->setState(DiagramSketch::State::Failed);
+    steps_->setState(StepTimeline::State::Failed);
     title_->setText(tr("%1 could not draw the diagram").arg(agent_->name()));
     error_->setText(error);
     error_->show();

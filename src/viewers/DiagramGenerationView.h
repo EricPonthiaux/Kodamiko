@@ -11,23 +11,26 @@
 class AgentProvider;
 class QLabel;
 class QPushButton;
+class DiagramSketch;
 class QTimer;
-class Spinner;
+class StepTimeline;
 
-// The tab shown while the agent draws a diagram (see DiagramRequest): what
-// was asked, what the agent is doing, the time spent, and Cancel. Once the file is
-// written, finished() hands over to the diagram editor; on failure, the
-// error stays with Try Again and Close.
+// The tab shown while the agent draws a diagram (see DiagramRequest): a
+// sketch that draws itself, the agent's steps, the time spent, and Cancel.
+// Once the file is written, finished() hands over to the diagram editor; on
+// failure, the error stays with Try Again and Close.
 class DiagramGenerationView : public QWidget {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(DiagramGenerationView)
 
 public:
-    // `agent` draws a `kindTitle` in `path`, inside `workDir`, showing
-    // `description`, in a file run (AgentFileRun).
+    // `agent` draws a diagram of the family `kindId` (DiagramKind::id), named
+    // `kindTitle`, in `path`, inside `workDir`, that shows `description`, in
+    // a file run (AgentFileRun).
     struct Request {
         QString workDir;
         QString path;
+        QString kindId;
         QString kindTitle;
         QString description;
         const AgentProvider *agent = nullptr; // not owned, never null
@@ -50,7 +53,6 @@ private:
     void stop();
     void onRunFinished(const AgentRun::Outcome &outcome);
     void onHookReceived(const HookEvent &event);
-    void addSteps(const QStringList &steps);
     void fail(const QString &error);
     void updateElapsed();
 
@@ -62,13 +64,12 @@ private:
     const AgentProvider *agent_;
     HookServer hookServer_;
     AgentRun *run_;
-    QStringList steps_;
     QElapsedTimer elapsed_;
     QTimer *clock_;
 
-    Spinner *spinner_;
+    DiagramSketch *sketch_;
     QLabel *title_;
-    QLabel *stepsLabel_;
+    StepTimeline *steps_;
     QLabel *elapsedLabel_;
     QLabel *error_;
     QPushButton *cancel_;

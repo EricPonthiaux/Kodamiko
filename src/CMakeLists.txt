@@ -475,7 +475,11 @@ if(GRAPHVIZ_FOUND)
         agent/mcp/DiagramTools.cpp
         viewers/DiagramCheck.cpp
         viewers/DiagramGenerationView.cpp
+        viewers/sketch/DiagramSketch.cpp
+        viewers/sketch/SketchPainting.cpp
+        viewers/sketch/SketchScenes.cpp
         viewers/DiagramView.cpp
+        viewers/StepTimeline.cpp
         ${diagram_sources})
     target_link_libraries(duet_core PUBLIC ${GRAPHVIZ_LIBRARIES})
     target_compile_definitions(duet_core PUBLIC DUET_WITH_DIAGRAMS)

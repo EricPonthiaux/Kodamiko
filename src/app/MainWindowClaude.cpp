@@ -648,16 +648,16 @@ void MainWindow::generateDiagram(const QString &folder)
             const EntryTarget target = resolveNewEntry(folder_, folder, DiagramKinds::withExtension(name, kind), false);
             if (!target.error.isEmpty())
                 return target.error;
-            drawDiagram(target.path, kind.title, description);
+            drawDiagram(target.path, kind, description);
             return QString();
         });
 }
 
-void MainWindow::drawDiagram(const QString &path, const QString &kindTitle, const QString &description)
+void MainWindow::drawDiagram(const QString &path, const DiagramKind &kind, const QString &description)
 {
 #ifdef DUET_WITH_DIAGRAMS
     setMode(Mode::Edit);
-    auto *view = new DiagramGenerationView({folder_, path, kindTitle, description, agentProvider_});
+    auto *view = new DiagramGenerationView({folder_, path, kind.id, kind.title, description, agentProvider_});
     editorTabs_->showPage(view, QFileInfo(path).fileName(), agentProvider_->iconName());
     connect(view, &DiagramGenerationView::closeRequested, this, [this, view] { editorTabs_->closePage(view); });
     connect(view, &DiagramGenerationView::finished, this, [this, view](const QString &drawn, const QString &summary) {
@@ -668,7 +668,7 @@ void MainWindow::drawDiagram(const QString &path, const QString &kindTitle, cons
     view->start();
 #else
     Q_UNUSED(path);
-    Q_UNUSED(kindTitle);
+    Q_UNUSED(kind);
     Q_UNUSED(description);
 #endif
 }
@@ -778,7 +778,7 @@ void MainWindow::explainWithFlowchart()
     const QString name = DiagramRequest::explanationFileName(target->symbol, target->path, flowchart.extension);
     const QString path = unusedPath(QDir(folder_).filePath(QStringLiteral("docs/diagrams/") + name));
     const QString language = QLocale::languageToString(QLocale::system().language());
-    drawDiagram(path, flowchart.title, DiagramRequest::explanation(CodeRequest::describe(*target), language));
+    drawDiagram(path, flowchart, DiagramRequest::explanation(CodeRequest::describe(*target), language));
     if (target->unsaved)
         showStatus(
             tr("%1 reads %2 as saved: its unsaved changes are left out").arg(agentProvider_->name(), target->path));
