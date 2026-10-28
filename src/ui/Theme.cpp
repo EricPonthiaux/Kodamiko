@@ -240,6 +240,63 @@ Theme duetBloom()
     return theme;
 }
 
+// After Claude's own interface: its warm charcoal for the editor, a shade
+// deeper for the panels, its cream for the text, its clay orange for the
+// caret and a darker one for the accent, so that what Claude wrote, marked
+// in the clay orange, stands out from the current tab and the focus. The
+// syntax follows the rules of the most used VS Code themes: one hue per role
+// (keywords clay, types sand, functions sky, strings sage, constants fig),
+// the same in every language, no pure black or white, italics only for the
+// comments and the parameters. The code reads at 7.5:1 or more, the comments
+// at 5.5:1, below the code but readable; the cream over the accent at 4.8:1.
+Theme duetClaude()
+{
+    Theme theme;
+    theme.name = QStringLiteral("duet-claude");
+    theme.title = QStringLiteral("Duet-Claude");
+    theme.font = editorFont();
+    theme.background = QColor("#262624");
+    theme.foreground = QColor("#e8e5da");
+    theme.caret = QColor("#d97757");
+    theme.caretLine = QColor("#2d2c2a");
+    theme.selection = QColor("#4a3a33");
+    theme.marginBackground = QColor("#262624");
+    theme.marginForeground = QColor("#6b6a63");
+    theme.currentLineNumber = QColor("#c2c0b6");
+    theme.braceMatch = QColor("#45433e");
+    theme.findHighlight = QColor("#e0b45c");
+    theme.error = QColor("#ef8170");
+    theme.warning = QColor("#e3a54c");
+    theme.window = QColor("#1f1e1d");
+    theme.button = QColor("#30302e");
+    theme.alternateBase = QColor("#2b2b29");
+    theme.highlight = QColor("#5a3d31");
+    theme.accent = QColor("#ae5630");
+    theme.accentText = QColor("#faf9f5");
+    theme.mutedText = QColor("#a3a097");
+    theme.border = QColor("#3e3d38");
+    theme.line = QColor("#30302e");
+    theme.hover = QColor("#2f2e2b");
+    theme.onAccent = QColor("#faf9f5");
+    theme.syntaxStyles = {
+        {"comment", italic("#a29e91")},         {"string", plain("#b9cc9c")},
+        {"string.special", plain("#a9d3c6")},   {"escape", plain("#a9d3c6")},
+        {"number", plain("#eaabc2")},           {"constant", plain("#eaabc2")},
+        {"constant.builtin", plain("#eaabc2")}, {"keyword", plain("#f2a585")},
+        {"operator", plain("#a9d3c6")},         {"type", plain("#e8c992")},
+        {"type.builtin", plain("#e8c992")},     {"constructor", plain("#e8c992")},
+        {"module", plain("#e8c992")},           {"function", plain("#a3c6ea")},
+        {"function.builtin", plain("#a9d3c6")}, {"variable", plain("#e8e5da")},
+        {"variable.builtin", plain("#f4a596")}, {"variable.parameter", italic("#e8e5da")},
+        {"property", plain("#d0cee0")},         {"label", plain("#f4a596")},
+        {"attribute", plain("#d0cee0")},        {"tag", plain("#f4a596")},
+        {"punctuation", plain("#bdbab0")},      {"punctuation.special", plain("#f2a585")},
+        {"embedded", plain("#e8e5da")},         {"heading", bold("#a3c6ea")},
+        {"diff.plus", plain("#b9cc9c")},        {"diff.minus", plain("#f4a596")},
+    };
+    return theme;
+}
+
 } // namespace
 
 Theme Theme::duet()
@@ -297,7 +354,7 @@ Theme Theme::duet()
 
 QList<Theme> Theme::all()
 {
-    QList<Theme> themes{duet(), duetNight(), duetViolet(), duetStratos(), duetBloom()};
+    QList<Theme> themes{duet(), duetNight(), duetViolet(), duetStratos(), duetBloom(), duetClaude()};
     themes += MaterialThemes::all();
     return themes;
 }
