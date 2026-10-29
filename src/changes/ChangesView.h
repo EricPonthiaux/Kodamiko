@@ -18,6 +18,7 @@
 #include <optional>
 
 class CommitPanel;
+class CleanDiffState;
 class QMenu;
 class ReviewBar;
 class ReviewFindingsPanel;
@@ -110,7 +111,7 @@ public:
 
     QSplitter *splitter() const { return splitter_; }
 
-    // Keeps the findings' panel at the diff's place and size.
+    // Keeps the findings' panel and clean illustration fitted to the diff.
     bool eventFilter(QObject *watched, QEvent *event) override;
 
     // The file column's splitter: the list, the commit area.
@@ -342,6 +343,7 @@ private:
     QPushButton *abortButton_;
     QTreeWidget *fileList_;
     DiffView *diff_;
+    CleanDiffState *cleanState_;
     DiffHeaderBar *diffHeader_;
     ChangeMap *changeMap_ = nullptr;     // beside the diff
     DiffFileStrip *fileStrip_ = nullptr; // above it

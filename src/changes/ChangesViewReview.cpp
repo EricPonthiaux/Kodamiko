@@ -4,6 +4,7 @@
 // its findings under the diff's lines.
 
 #include "ChangesView.h"
+#include "CleanDiffState.h"
 #include "DiffView.h"
 #include "agent/ReviewBar.h"
 #include "agent/ReviewFindingsPanel.h"
@@ -62,8 +63,10 @@ void ChangesView::createFindingsPanel(QWidget *diffPane)
 bool ChangesView::eventFilter(QObject *watched, QEvent *event)
 {
     const bool isDiffMoved = watched == diff_ && (event->type() == QEvent::Resize || event->type() == QEvent::Move);
-    if (isDiffMoved)
+    if (isDiffMoved) {
         findingsPanel_->setGeometry(diff_->geometry());
+        cleanState_->setGeometry(diff_->rect());
+    }
     return QWidget::eventFilter(watched, event);
 }
 

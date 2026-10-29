@@ -104,6 +104,7 @@ add_library(kdk_core STATIC
     changes/ChangesViewDiff.cpp
     changes/ChangesViewList.cpp
     changes/ChangesViewReview.cpp
+    changes/CleanDiffState.cpp
     changes/CommitPanel.cpp
     changes/DiffFileStrip.cpp
     changes/DiffHeaderBar.cpp

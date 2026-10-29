@@ -4,6 +4,7 @@
 
 #include "ChangeMap.h"
 #include "ChangeTree.h"
+#include "CleanDiffState.h"
 #include "CommitPanel.h"
 #include "DiffFileStrip.h"
 #include "DiffHeaderBar.h"
@@ -68,6 +69,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     , summary_(new QLabel(this))
     , fileList_(new QTreeWidget(this))
     , diff_(new DiffView(theme, this))
+    , cleanState_(new CleanDiffState(theme, diff_))
     , diffHeader_(new DiffHeaderBar(diff_, this))
     , hunkActions_(new HunkActions(diff_))
     , splitter_(new GripSplitter(Qt::Horizontal, this))
@@ -80,6 +82,7 @@ ChangesView::ChangesView(const Theme &theme, GitCommands *commands, QWidget *par
     , discardButton_(new QToolButton(this))
     , commitPanel_(new CommitPanel(commands, this))
 {
+    cleanState_->hide();
     const auto toolButton = [](QToolButton *button, const QString &text, const QString &toolTip) {
         button->setText(text);
         button->setToolTip(toolTip);
@@ -436,6 +439,13 @@ void ChangesView::showDiff()
         diff_->setFiles(shown);
     else
         diff_->showMessage(emptyDiffMessage());
+    const bool isClean = status_ && status_->staged.isEmpty() && status_->unstaged.isEmpty();
+    const bool showIllustration = isClean && status_->info.operation.isEmpty();
+    cleanState_->setGeometry(diff_->rect());
+    cleanState_->setVisible(showIllustration);
+    if (showIllustration)
+        cleanState_->raise();
+    changeMap_->setVisible(!showIllustration);
     showFindings();
 }
 
@@ -649,6 +659,7 @@ void ChangesView::setAgent(const QString &name, const QString &iconName)
 void ChangesView::applyTheme(const Theme &theme)
 {
     diff_->applyTheme(theme);
+    cleanState_->applyTheme(theme);
     changeMap_->applyTheme(theme);
     fileStrip_->applyTheme(theme);
     hunkActions_->applyTheme(theme);
