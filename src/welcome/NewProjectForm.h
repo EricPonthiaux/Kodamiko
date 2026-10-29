@@ -14,6 +14,7 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QPushButton;
+class QScrollArea;
 
 // Creating a project, for the welcome window and File ▸ New Project: its
 // name, the folder it goes in, the recipe it is made with (those of this
@@ -47,17 +48,23 @@ public:
 
     QPushButton *createButton() const { return create_; }
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     // `folder`: the absolute path of the project created.
     void created(const QString &folder);
     void cancelled();
 
-protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
-
 private:
     QWidget *createBody();
+    QWidget *createTemplatePanel();
+    QWidget *createDetails();
+    QWidget *createLocationFields();
+    QWidget *createRecipeDetails();
+    QWidget *createGitOption();
     QWidget *createFooter();
+    void configureFields();
+    void updateDestination();
     void browse();
     // The project's folder: the name in the location.
     QString targetFolder() const;
@@ -80,11 +87,14 @@ private:
     QLineEdit *location_;
     QListWidget *recipeList_;
     QList<Recipe> recipes_; // the items' recipes, in the same order
+    QLabel *recipeTitle_;
     QLabel *description_;
-    QLabel *parametersLabel_;
     QWidget *parameters_;
     QList<QComboBox *> parameterBoxes_;
     QCheckBox *git_;
+    QLabel *destination_;
+    QPushButton *browse_ = nullptr;
+    QScrollArea *details_ = nullptr;
     QLabel *summary_ = nullptr;
     QPushButton *create_ = nullptr;
 };

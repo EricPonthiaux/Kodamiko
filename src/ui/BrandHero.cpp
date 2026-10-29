@@ -19,9 +19,7 @@ namespace {
 constexpr qreal topPadding = 24;
 constexpr qreal sidePadding = 28;
 constexpr qreal bottomPadding = 20;
-constexpr qreal copyGap = 10;      // between the headline and the line below it
-constexpr qreal signatureGap = 16; // above the signature
-constexpr qreal artGap = 6;        // around the artwork
+constexpr qreal artGap = 6; // around the artwork
 constexpr qreal minimumArtHeight = 120;
 constexpr QSize preferredSize{420, 434};
 
@@ -57,51 +55,30 @@ constexpr int orbitAlpha = 96;
 constexpr int sparkleAlpha = 150;
 constexpr int captionAlpha = 200;
 
-struct HeroFonts {
-    QFont label; // the small capitals in a monospace font
-    QFont headline;
-    QFont subtitle;
-};
-
-HeroFonts fontsFor(const QFont &base)
+QFont labelFontFor(const QFont &base)
 {
     QFont label = AppFonts::codeFont(base.pointSizeF() * 0.72);
     label.setLetterSpacing(QFont::AbsoluteSpacing, 1.6);
-    QFont headline = base;
-    headline.setPointSizeF(base.pointSizeF() * 2.35);
-    headline.setWeight(QFont::Normal);
-    headline.setLetterSpacing(QFont::PercentageSpacing, 96);
-    QFont subtitle = base;
-    subtitle.setPointSizeF(base.pointSizeF() * 0.95);
-    subtitle.setWeight(QFont::Normal);
-    return {.label = label, .headline = headline, .subtitle = subtitle};
+    return label;
 }
 
-// Where the hero's parts go, from the bottom up: the artwork takes what
-// the text leaves.
+// The artwork is centred in the space below the overline.
 struct HeroLayout {
     QRectF overline;
     QRectF art;
-    QRectF headline;
-    QRectF subtitle;
-    QRectF signature;
 };
 
-HeroLayout layoutOf(const QRectF &area, const HeroFonts &fonts)
+HeroLayout layoutOf(const QRectF &area, const QFont &labelFont)
 {
     const QRectF content = area.adjusted(sidePadding, topPadding, -sidePadding, -bottomPadding);
-    const qreal labelHeight = QFontMetricsF(fonts.label).height();
-    const qreal headlineHeight = 2 * QFontMetricsF(fonts.headline).lineSpacing();
-    const qreal subtitleHeight = 2 * QFontMetricsF(fonts.subtitle).lineSpacing();
-    const QRectF signature(content.left(), content.bottom() - labelHeight, content.width(), labelHeight);
-    const QRectF subtitle(content.left(), signature.top() - signatureGap - subtitleHeight, content.width(),
-                          subtitleHeight);
-    const QRectF headline(content.left(), subtitle.top() - copyGap - headlineHeight, content.width(), headlineHeight);
+    const qreal labelHeight = QFontMetricsF(labelFont).height();
     const QRectF overline(content.left(), content.top(), content.width(), labelHeight);
     // The artwork spans the whole width: its orbits go beyond the margins.
-    const QRectF art(area.left(), overline.bottom() + artGap, area.width(),
-                     headline.top() - artGap - overline.bottom() - artGap);
-    return {.overline = overline, .art = art, .headline = headline, .subtitle = subtitle, .signature = signature};
+    const qreal artTop = overline.bottom() + artGap;
+    const qreal availableHeight = content.bottom() - artTop;
+    const qreal artHeight = std::min(availableHeight, artUnits * largestScale);
+    const QRectF art(area.left(), artTop + (availableHeight - artHeight) / 2, area.width(), artHeight);
+    return {.overline = overline, .art = art};
 }
 
 QColor withAlpha(QColor color, int alpha)
@@ -277,39 +254,6 @@ void paintCaption(QPainter &painter, const QRectF &art, const Theme &theme)
                      QObject::tr("TWO CURSORS. ONE FLOW."));
 }
 
-void paintCopy(QPainter &painter, const HeroLayout &layout, const HeroFonts &fonts, const Theme &theme)
-{
-    painter.setFont(fonts.label);
-    painter.setPen(theme.mutedText);
-    painter.drawText(layout.overline, Qt::AlignCenter, QObject::tr("A SPACE FOR WHAT COMES NEXT"));
-
-    const qreal headlineLine = QFontMetricsF(fonts.headline).lineSpacing();
-    const QRectF first = layout.headline.adjusted(0, 0, 0, -headlineLine);
-    painter.setFont(fonts.headline);
-    painter.setPen(theme.foreground);
-    painter.drawText(first, Qt::AlignCenter, QObject::tr("Small spark."));
-    painter.setPen(theme.accent);
-    painter.drawText(first.translated(0, headlineLine), Qt::AlignCenter, QObject::tr("Limitless ideas."));
-
-    painter.setFont(fonts.subtitle);
-    painter.setPen(theme.mutedText);
-    painter.drawText(layout.subtitle, Qt::AlignCenter,
-                     QObject::tr("One shared view. A world of ideas.\nLet’s see where yours takes you."));
-
-    // A short line of the accent, then the signature.
-    painter.setFont(fonts.label);
-    const QString signature = QObject::tr("YOU BRING THE SPARK.");
-    constexpr qreal lineWidth = 24;
-    constexpr qreal lineGap = 10;
-    const qreal textWidth = QFontMetricsF(fonts.label).horizontalAdvance(signature);
-    const qreal left = layout.signature.center().x() - (lineWidth + lineGap + textWidth) / 2;
-    const qreal middle = layout.signature.center().y();
-    painter.fillRect(QRectF(left, middle, lineWidth, 1), theme.accent);
-    painter.drawText(
-        QRectF(left + lineWidth + lineGap, layout.signature.top(), textWidth + 2, layout.signature.height()),
-        Qt::AlignLeft | Qt::AlignVCenter, signature);
-}
-
 } // namespace
 
 BrandHero::BrandHero(Theme theme, QWidget *parent)
@@ -337,10 +281,9 @@ QSize BrandHero::sizeHint() const
 
 QSize BrandHero::minimumSizeHint() const
 {
-    const HeroFonts fonts = fontsFor(font());
-    const HeroLayout layout = layoutOf(QRectF(0, 0, preferredSize.width(), preferredSize.height()), fonts);
-    const qreal text = preferredSize.height() - layout.art.height();
-    return {preferredSize.width() * 3 / 4, int(std::ceil(text + minimumArtHeight))};
+    const qreal labelHeight = QFontMetricsF(labelFontFor(font())).height();
+    return {preferredSize.width() * 3 / 4,
+            int(std::ceil(topPadding + labelHeight + artGap + minimumArtHeight + bottomPadding))};
 }
 
 void BrandHero::paintEvent(QPaintEvent *)
@@ -349,17 +292,18 @@ void BrandHero::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::TextAntialiasing);
     const QRectF area = rect();
-    const HeroFonts fonts = fontsFor(font());
-    const HeroLayout layout = layoutOf(area, fonts);
+    const QFont labelFont = labelFontFor(font());
+    const HeroLayout layout = layoutOf(area, labelFont);
     const qreal scale = std::min(layout.art.height() / artUnits, largestScale);
 
     paintField(painter, area, theme_);
     paintGlow(painter, layout.art, theme_);
     paintOrbits(painter, layout.art, theme_);
     paintSculpture(painter, sculptureIn(layout.art, scale), theme_);
-    painter.setFont(fonts.label);
+    painter.setFont(labelFont);
     paintMarkers(painter, layout.art, scale, theme_);
     paintSparkles(painter, layout.art, scale, theme_);
     paintCaption(painter, layout.art, theme_);
-    paintCopy(painter, layout, fonts, theme_);
+    painter.setPen(theme_.mutedText);
+    painter.drawText(layout.overline, Qt::AlignCenter, tr("A SPACE FOR WHAT COMES NEXT"));
 }

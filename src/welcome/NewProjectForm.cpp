@@ -8,8 +8,6 @@
 #include "recipes/ProjectCreation.h"
 #include "recipes/RecipeLibrary.h"
 #include "ui/Paragraph.h"
-#include "ui/PopupFooter.h"
-#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "workspace/ChoicePopup.h"
 
@@ -18,32 +16,23 @@
 #include <QDir>
 #include <QEvent>
 #include <QFileDialog>
-#include <QGridLayout>
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
+#include <QStyle>
 #include <QVBoxLayout>
 
 #include <algorithm>
 
 namespace {
 
-constexpr int descriptionRole = Qt::UserRole + 1;
-
 // The choices of the last project created, proposed for the next one.
 constexpr auto locationKey = "newProject/location";
 constexpr auto recipeKey = "newProject/recipe";
 constexpr auto gitKey = "newProject/git";
-
-QLabel *fieldLabel(const QString &text, QWidget *parent)
-{
-    auto *label = new QLabel(text, parent);
-    label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    return label;
-}
 
 } // namespace
 
@@ -53,10 +42,11 @@ NewProjectForm::NewProjectForm(QWidget *parent)
     , name_(new QLineEdit(this))
     , location_(new QLineEdit(this))
     , recipeList_(new QListWidget(this))
+    , recipeTitle_(new QLabel(this))
     , description_(new QLabel(this))
-    , parametersLabel_(fieldLabel(tr("With"), this))
     , parameters_(new QWidget(this))
-    , git_(new QCheckBox(tr("Create a Git repository"), this))
+    , git_(new QCheckBox(tr("Initialize a Git repository"), this))
+    , destination_(new QLabel(this))
 {
     connect(header_, &PopupHeader::closeRequested, this, &NewProjectForm::cancelled);
     auto *layout = new QVBoxLayout(this);
@@ -65,76 +55,29 @@ NewProjectForm::NewProjectForm(QWidget *parent)
     layout->addWidget(header_);
     layout->addWidget(createBody(), 1);
     layout->addWidget(createFooter());
+    configureFields();
     reset();
 }
 
-QWidget *NewProjectForm::createBody()
+void NewProjectForm::configureFields()
 {
-    auto *body = new QWidget(this);
-    body->setObjectName(QStringLiteral("pageContent"));
-
     name_->setPlaceholderText(tr("my-project"));
     location_->setText(QSettings().value(QLatin1String(locationKey), QDir::homePath()).toString());
-    auto *browse = new QPushButton(tr("Browse…"), body);
-    connect(browse, &QPushButton::clicked, this, &NewProjectForm::browse);
-
-    recipeList_->setObjectName(QStringLiteral("projectRecipes"));
-    recipeList_->installEventFilter(this);
     const QString lastRecipe = QSettings().value(QLatin1String(recipeKey)).toString();
     recipes_ = RecipeLibrary::available(RecipeLibrary::defaultSources());
     for (const Recipe &recipe : std::as_const(recipes_)) {
         auto *item = new QListWidgetItem(recipe.title, recipeList_);
-        item->setData(descriptionRole, recipe.description);
+        item->setToolTip(recipe.description);
         if (recipe.id == lastRecipe || !recipeList_->currentItem())
             recipeList_->setCurrentItem(item);
     }
-    description_->setObjectName(QStringLiteral("settingState"));
     git_->setChecked(QSettings().value(QLatin1String(gitKey), true).toBool());
-
     for (const QLineEdit *field : {name_, location_})
         connect(field, &QLineEdit::textChanged, this, &NewProjectForm::updateState);
     connect(recipeList_, &QListWidget::currentItemChanged, this, &NewProjectForm::updateState);
     connect(recipeList_, &QListWidget::currentItemChanged, this, &NewProjectForm::showParameters);
-    auto *parameterRow = new QHBoxLayout(parameters_);
-    parameterRow->setContentsMargins(0, 0, 0, 0);
-    parameterRow->setSpacing(8);
-    // No stretch to keep them left: deleting the boxes empties the row.
-    parameterRow->setAlignment(Qt::AlignLeft);
-    showParameters();
     connect(name_, &QLineEdit::returnPressed, this, &NewProjectForm::create);
-
-    auto *grid = new QGridLayout(body);
-    grid->setContentsMargins(PopupMetrics::bodyMargins);
-    grid->setHorizontalSpacing(12);
-    grid->setVerticalSpacing(10);
-    grid->addWidget(fieldLabel(tr("Name"), body), 0, 0);
-    grid->addWidget(name_, 0, 1, 1, 2);
-    grid->addWidget(fieldLabel(tr("Location"), body), 1, 0);
-    grid->addWidget(location_, 1, 1);
-    grid->addWidget(browse, 1, 2);
-    grid->addWidget(fieldLabel(tr("Start with"), body), 2, 0, Qt::AlignTop);
-    grid->addWidget(recipeList_, 2, 1, 1, 2);
-    grid->addWidget(description_, 3, 1, 1, 2);
-    grid->addWidget(parametersLabel_, 4, 0);
-    grid->addWidget(parameters_, 4, 1, 1, 2);
-    grid->addWidget(git_, 5, 1, 1, 2);
-    grid->setRowStretch(2, 1);
-    grid->setColumnStretch(1, 1);
-    return body;
-}
-
-QWidget *NewProjectForm::createFooter()
-{
-    auto *footer = new PopupFooter(this);
-    summary_ = footer->hint();
-    auto *cancel = new QPushButton(tr("Cancel"), footer);
-    create_ = new QPushButton(tr("Create"), footer);
-    create_->setDefault(true);
-    connect(cancel, &QPushButton::clicked, this, &NewProjectForm::cancelled);
-    connect(create_, &QPushButton::clicked, this, &NewProjectForm::create);
-    footer->addButton(cancel);
-    footer->addButton(create_);
-    return footer;
+    showParameters();
 }
 
 void NewProjectForm::reset()
@@ -142,11 +85,6 @@ void NewProjectForm::reset()
     name_->clear();
     updateState();
     name_->setFocus();
-}
-
-void NewProjectForm::applyTheme(const Theme &theme)
-{
-    header_->applyTheme(theme);
 }
 
 bool NewProjectForm::eventFilter(QObject *watched, QEvent *event)
@@ -157,6 +95,12 @@ bool NewProjectForm::eventFilter(QObject *watched, QEvent *event)
     // change before the new rules reach its items' size.
     if (watched == recipeList_ && event->type() == QEvent::StyleChange)
         QMetaObject::invokeMethod(recipeList_, &QListWidget::doItemsLayout, Qt::QueuedConnection);
+    if (watched == destination_ && event->type() == QEvent::Resize)
+        updateDestination();
+    // Tabbing into a field also reveals it in short windows or with large fonts.
+    auto *field = qobject_cast<QWidget *>(watched);
+    if (event->type() == QEvent::FocusIn && details_ && details_->widget()->isAncestorOf(field))
+        details_->ensureWidgetVisible(field);
     return QWidget::eventFilter(watched, event);
 }
 
@@ -191,11 +135,25 @@ QString NewProjectForm::problem() const
 
 void NewProjectForm::updateState()
 {
-    const QListWidgetItem *item = recipeList_->currentItem();
-    Paragraph::setText(description_, item ? item->data(descriptionRole).toString() : QString());
+    const Recipe *recipe = selectedRecipe();
+    recipeTitle_->setText(recipe ? recipe->title : tr("No templates available"));
+    Paragraph::setText(description_, recipe ? recipe->description : tr("Add a project template to get started."));
     const QString why = problem();
-    Paragraph::setText(summary_, why.isEmpty() ? tr("Creates %1").arg(QDir::toNativeSeparators(targetFolder())) : why);
-    create_->setEnabled(why.isEmpty() && selectedRecipe());
+    const QString hint = recipe ? tr("Your workspace is ready to create.") : tr("A template is required.");
+    Paragraph::setText(summary_, why.isEmpty() ? hint : why);
+    summary_->setProperty("error", !why.isEmpty() && !name_->text().trimmed().isEmpty());
+    summary_->style()->unpolish(summary_);
+    summary_->style()->polish(summary_);
+    create_->setEnabled(why.isEmpty() && recipe);
+    updateDestination();
+}
+
+void NewProjectForm::updateDestination()
+{
+    const QString path = QDir::toNativeSeparators(targetFolder());
+    const QString text = name_->text().trimmed().isEmpty() ? tr("Your project folder will appear here") : path;
+    destination_->setText(destination_->fontMetrics().elidedText(text, Qt::ElideMiddle, destination_->width()));
+    destination_->setToolTip(name_->text().trimmed().isEmpty() ? QString() : path);
 }
 
 const Recipe *NewProjectForm::selectedRecipe() const
@@ -211,15 +169,22 @@ void NewProjectForm::showParameters()
     parameterBoxes_.clear();
     const Recipe *recipe = selectedRecipe();
     const QList<RecipeParameter> parameters = recipe ? recipe->parameters : QList<RecipeParameter>();
+    QWidget *previous = recipeList_;
     for (const RecipeParameter &parameter : parameters) {
         auto *box = new QComboBox(parameters_);
         for (const RecipeParameterValue &value : parameter.values)
             box->addItem(value.value);
-        parameters_->layout()->addWidget(new QLabel(parameter.title, parameters_));
+        auto *label = new QLabel(parameter.title, parameters_);
+        label->setBuddy(box);
+        box->setAccessibleName(parameter.title);
+        parameters_->layout()->addWidget(label);
         parameters_->layout()->addWidget(box);
+        box->installEventFilter(this);
         parameterBoxes_.append(box);
+        setTabOrder(previous, box);
+        previous = box;
     }
-    parametersLabel_->setVisible(!parameters.isEmpty());
+    setTabOrder(previous, git_);
     parameters_->setVisible(!parameters.isEmpty());
 }
 

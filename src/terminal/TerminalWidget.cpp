@@ -200,6 +200,9 @@ TerminalWidget::TerminalWidget(QWidget *parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
+    // The current tab opens onto the terminal, as onto an editor: the
+    // style's sunken frame drew a line between them.
+    setFrameShape(QFrame::NoFrame);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     viewport()->setCursor(Qt::IBeamCursor);

@@ -9,7 +9,7 @@
 #include <QVBoxLayout>
 
 NewProjectPopup::NewProjectPopup(const Theme &theme, QWidget *parent)
-    : OverlayPopup(QStringLiteral("newProject"), QSizeF(0.45, 0.6), QSize(620, 440), parent)
+    : OverlayPopup(QStringLiteral("newProject"), QSizeF(0.62, 0.78), QSize(840, 640), parent)
     , form_(new NewProjectForm(this))
 {
     auto *layout = new QVBoxLayout(this);

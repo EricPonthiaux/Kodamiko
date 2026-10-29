@@ -231,7 +231,8 @@ void WelcomeWindow::showProjectsState(qsizetype projectCount)
 {
     const bool hasProjects = projectCount > 0;
     eyebrow_->setText(hasProjects ? tr("YOUR WORKSPACE") : tr("YOUR NEXT CHAPTER"));
-    title_->setText(hasProjects ? tr("Pick up your flow.") : tr("What will you make?"));
+    title_->setText(tr("What will you make?"));
+    title_->setVisible(!hasProjects);
     description_->setVisible(!hasProjects);
     card_->setVisible(!featuredPath_.isEmpty());
     // A single project is on the card: nothing else to list or search.

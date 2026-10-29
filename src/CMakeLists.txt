@@ -347,6 +347,7 @@ add_library(kdk_core STATIC
     viewers/ImageView.cpp
     welcome/LanguageChoices.cpp
     welcome/NewProjectForm.cpp
+    welcome/NewProjectFormUi.cpp
     welcome/NewProjectPopup.cpp
     welcome/ProjectAvatar.cpp
     welcome/ProjectListDelegate.cpp
