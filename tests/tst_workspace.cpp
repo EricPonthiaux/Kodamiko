@@ -152,6 +152,42 @@ private slots:
         QCOMPARE(tabBar.cursor().shape(), Qt::ArrowCursor);
     }
 
+    void paletteSearchesCategoriesAndRunsTheSelectedCommand()
+    {
+        QWidget window;
+        window.resize(1000, 800);
+        window.show();
+        QMenuBar menus;
+        auto *file = menus.addMenu("&File");
+        auto *save = file->addAction("&Save");
+        save->setShortcut(QKeySequence("Ctrl+S"));
+        const auto *saveAll = file->addAction("Save &All");
+        auto *unavailable = file->addAction("Unavailable");
+        unavailable->setEnabled(false);
+        const QSignalSpy triggered(saveAll, &QAction::triggered);
+        CommandPalette popup(&window);
+        popup.popup(&menus);
+        auto *search = popup.findChild<QLineEdit *>("popupSearch");
+        const auto *list = popup.findChild<QTreeWidget *>("popupList");
+        QVERIFY(search);
+        QVERIFY(list);
+        QCOMPARE(list->topLevelItemCount(), 2);
+        search->setText("no-such-command");
+        QCOMPARE(list->topLevelItemCount(), 0);
+        QTest::keyClick(search, Qt::Key_Down);
+        QTest::keyClick(search, Qt::Key_Up);
+        QTest::keyClick(search, Qt::Key_PageUp);
+        QTest::keyClick(search, Qt::Key_Return);
+        QVERIFY(popup.isVisible());
+        search->setText("File save"); // the category remains searchable, beside the title
+        QCOMPARE(list->topLevelItemCount(), 2);
+        QCOMPARE(list->currentItem()->text(0), QString("Save"));
+        QTest::keyClick(search, Qt::Key_Down);
+        QTest::keyClick(search, Qt::Key_Return);
+        QTRY_COMPARE(triggered.size(), 1);
+        QVERIFY(!popup.isVisible());
+    }
+
     void paletteMatchesLettersInOrder()
     {
         QVERIFY(CommandPalette::matchScore("Git: Stage All", "stall") > 0);
@@ -436,7 +472,8 @@ private slots:
         bar.resize(400, bar.height());
         bar.show();
 
-        auto *extension = bar.findChild<QToolButton *>("mainMenuButton");
+        QVERIFY(bar.menuBar()->isVisible());
+        auto *extension = bar.menuBar()->findChild<QToolButton *>("qt_menubar_ext_button");
         QVERIFY(extension);
         QTRY_VERIFY(extension->isVisible());
         QCOMPARE(bar.childAt(extension->mapTo(&bar, extension->rect().center())), extension);

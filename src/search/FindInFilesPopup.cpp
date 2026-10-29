@@ -3,11 +3,11 @@
 #include "FindInFilesPopup.h"
 
 #include "editor/EditorWidget.h"
-#include "ui/AppFonts.h"
 #include "ui/GripSplitter.h"
-#include "ui/PopupMetrics.h"
 #include "ui/PopupSearchField.h"
+#include "ui/SearchPopupWidgets.h"
 #include "ui/TreeMetrics.h"
+#include "ui/UiMetrics.h"
 
 #include <QCheckBox>
 #include <QDir>
@@ -163,30 +163,57 @@ std::optional<int> navigationTarget(int key, int row, int count, int page)
 } // namespace
 
 FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
-    : OverlayPopup(QStringLiteral("findInFiles"), QSizeF(0.72, 0.8), QSize(760, 520), parent)
+    : OverlayPopup(QStringLiteral("findInFiles"), QSizeF(0.68, 0.72), QSize(720, 480), parent)
     , theme_(std::move(theme))
 {
     setBehavior(Behavior::Transient);
-    auto *title = new QLabel(tr("Find in Files"), this);
-    AppFonts::setInterfaceFont(title, 1);
-    summary_ = new QLabel(this);
-    summary_->setObjectName(QStringLiteral("findSummary"));
+    setAccessibleName(tr("Find in Files"));
 
     search_ = new PopupSearchField(this);
-    search_->setPlaceholderText(tr("Text to find"));
+    search_->setPlaceholderText(tr("Find in files"));
+    search_->setAccessibleName(tr("Text to find"));
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &FindInFilesPopup::scheduleSearch);
 
-    matchCase_ = addOption(QStringLiteral("Cc"), tr("Match Case (Alt+C)"));
-    wholeWords_ = addOption(QStringLiteral("W"), tr("Words (Alt+O)"));
-    regularExpression_ = addOption(QStringLiteral(".*"), tr("Regex (Alt+X)"));
+    matchCase_ = addOption(QStringLiteral("Aa"), tr("Match Case (Alt+C)"));
+    wholeWords_ = addOption(QStringLiteral("W"), tr("Whole Words (Alt+O)"));
+    regularExpression_ = addOption(QStringLiteral(".*"), tr("Regular Expression (Alt+X)"));
+    QWidget *searchBar = SearchPopup::searchArea(search_, this);
+    for (QToolButton *option : {matchCase_, wholeWords_, regularExpression_})
+        searchBar->layout()->addWidget(option);
 
+    auto *splitter = new GripSplitter(Qt::Vertical, this);
+    splitter->setChildrenCollapsible(false);
+    splitter->addWidget(createResultsPane());
+    previewPane_ = createPreviewPane();
+    splitter->addWidget(previewPane_);
+    splitter->setSizes({300, 240});
+
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setSpacing(0);
+    layout->addWidget(searchBar);
+    layout->addWidget(createFilters());
+    layout->addWidget(splitter, 1);
+    layout->addWidget(SearchPopup::footer(
+        {{tr("↑ ↓"), tr("Preview")}, {tr("Enter"), tr("Open")}, {tr("Esc"), tr("Close")}}, summary_, this));
+
+    searchTimer_.setSingleShot(true);
+    searchTimer_.setInterval(searchDelayMs);
+    connect(&searchTimer_, &QTimer::timeout, this, &FindInFilesPopup::searchNow);
+    connect(&engine_, &FindInFilesSearch::finished, this, &FindInFilesPopup::showResults);
+    applyTheme(theme_);
+}
+
+QWidget *FindInFilesPopup::createFilters()
+{
     useMask_ = new QCheckBox(tr("File mask:"), this);
     useMask_->setFocusPolicy(Qt::NoFocus);
     mask_ = new QLineEdit(this);
     mask_->setPlaceholderText(QStringLiteral("*.cpp, *.h, !*.min.js"));
     mask_->setEnabled(false);
-    mask_->setMinimumWidth(mask_->fontMetrics().horizontalAdvance(mask_->placeholderText()) + 24);
+    mask_->setObjectName(QStringLiteral("fileMask"));
+    mask_->setAccessibleName(tr("File mask"));
     mask_->installEventFilter(this);
     connect(useMask_, &QCheckBox::toggled, this, [this](bool checked) {
         mask_->setEnabled(checked);
@@ -196,7 +223,20 @@ FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
     });
     connect(mask_, &QLineEdit::textChanged, this, &FindInFilesPopup::scheduleSearch);
 
+    auto *filters = new QFrame(this);
+    filters->setObjectName(QStringLiteral("searchFilters"));
+    auto *layout = new QHBoxLayout(filters);
+    layout->setContentsMargins(10, 4, 10, 4);
+    layout->setSpacing(8);
+    layout->addWidget(useMask_);
+    layout->addWidget(mask_, 1);
+    return filters;
+}
+
+QWidget *FindInFilesPopup::createResultsPane()
+{
     results_ = new QTreeWidget(this);
+    results_->setAccessibleName(tr("Search results"));
     results_->setObjectName(QStringLiteral("popupList"));
     results_->setColumnCount(2);
     results_->setHeaderHidden(true);
@@ -212,56 +252,56 @@ FindInFilesPopup::FindInFilesPopup(Theme theme, QWidget *parent)
     connect(results_, &QTreeWidget::currentItemChanged, this, &FindInFilesPopup::updatePreview);
     connect(results_, &QTreeWidget::itemDoubleClicked, this, &FindInFilesPopup::openCurrent);
 
-    preview_ = new EditorWidget(theme_, this);
+    auto *pane = new QWidget(this);
+    summary_ = SearchPopup::resultSummary(this);
+    empty_ = SearchPopup::emptyState(pane);
+    auto *layout = new QVBoxLayout(pane);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(results_, 1);
+    layout->addWidget(empty_, 1);
+    return pane;
+}
+
+QWidget *FindInFilesPopup::createPreviewPane()
+{
+    auto *pane = new QWidget(this);
+    auto *header = new QFrame(pane);
+    header->setObjectName(QStringLiteral("searchPreviewHeader"));
+    previewLocation_ = new QLabel(header);
+    previewLocation_->setObjectName(QStringLiteral("searchPreviewPath"));
+    previewLocation_->setTextFormat(Qt::PlainText);
+    previewLocation_->installEventFilter(this);
+    previewLocation_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    auto *heading = new QHBoxLayout(header);
+    heading->setContentsMargins(10, 4, 10, 4);
+    heading->addWidget(previewLocation_, 1);
+    preview_ = new EditorWidget(theme_, pane);
     preview_->setReadOnly(true);
     preview_->setFocusPolicy(Qt::NoFocus);
-
-    auto *splitter = new GripSplitter(Qt::Vertical, this);
-    splitter->setChildrenCollapsible(false);
-    splitter->addWidget(results_);
-    splitter->addWidget(preview_);
-    splitter->setSizes({300, 260});
-
-    auto *header = new QHBoxLayout;
-    const QMargins room = PopupMetrics::searchMargins;
-    header->setContentsMargins(room.left(), room.top(), room.right(), room.bottom());
-    header->addWidget(title);
-    header->addWidget(summary_, 1);
-    header->addWidget(useMask_);
-    header->addWidget(mask_);
-
-    // The field and its options on one line, underlined together.
-    auto *searchBar = new QFrame(this);
-    searchBar->setObjectName(QStringLiteral("popupSearchBar"));
-    search_->setParent(searchBar);
-    auto *searchRow = new QHBoxLayout(searchBar);
-    searchRow->setContentsMargins(0, 0, room.right(), 0);
-    searchRow->setSpacing(4);
-    searchRow->addWidget(search_, 1);
-    for (QToolButton *option : {matchCase_, wholeWords_, regularExpression_}) {
-        option->setParent(searchBar);
-        searchRow->addWidget(option);
-    }
-
-    // Inside the panel's border: the field reaches its edges.
-    auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(1, 1, 1, 1);
+    auto *layout = new QVBoxLayout(pane);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addLayout(header);
-    layout->addWidget(searchBar);
-    layout->addWidget(splitter, 1);
+    layout->addWidget(header);
+    layout->addWidget(preview_, 1);
+    return pane;
+}
 
-    searchTimer_.setSingleShot(true);
-    searchTimer_.setInterval(searchDelayMs);
-    connect(&searchTimer_, &QTimer::timeout, this, &FindInFilesPopup::searchNow);
-    connect(&engine_, &FindInFilesSearch::finished, this, &FindInFilesPopup::showResults);
-    applyTheme(theme_);
+void FindInFilesPopup::setEmptyMessage(const QString &text)
+{
+    empty_->setText(text);
+    empty_->show();
+    results_->hide();
+    previewPane_->hide();
 }
 
 QToolButton *FindInFilesPopup::addOption(const QString &text, const QString &toolTip)
 {
     auto *button = new QToolButton(this);
+    button->setObjectName(QStringLiteral("searchOption"));
     button->setText(text);
+    button->setAccessibleName(toolTip);
+    UiMetrics::setScaledSize(button, QSize(28, 28));
     button->setToolTip(toolTip);
     button->setCheckable(true);
     button->setAutoRaise(true);
@@ -327,16 +367,19 @@ void FindInFilesPopup::searchNow()
         matches_.clear();
         results_->clear();
         updatePreview();
-        summary_->setText(error.isEmpty() ? QString() : tr("Invalid expression: %1").arg(error));
+        summary_->setText(error.isEmpty() ? tr("Project search") : tr("Invalid regular expression"));
+        setEmptyMessage(error.isEmpty() ? tr("Type to search in files") : error);
         return;
     }
+    matches_.clear();
+    results_->clear();
     summary_->setText(tr("Searching…"));
+    setEmptyMessage(tr("Searching your project…"));
     engine_.start(folder_, current, buffers_ ? buffers_() : QHash<QString, QString>());
 }
 
 void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncated, int filesSearched)
 {
-    Q_UNUSED(filesSearched);
     matches_ = matches;
     QSet<QString> files;
     results_->clear();
@@ -345,7 +388,7 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
         const FindMatch &match = matches_[i];
         files.insert(match.filePath);
         const Excerpt excerpt = excerptOf(match);
-        const QString location = QStringLiteral("%1 %2")
+        const QString location = QStringLiteral("%1:%2")
                                      .arg(QDir::toNativeSeparators(root.relativeFilePath(match.filePath)))
                                      .arg(match.line + 1);
         auto *item = new QTreeWidgetItem(results_, {excerpt.text, location});
@@ -360,6 +403,11 @@ void FindInFilesPopup::showResults(const QList<FindMatch> &matches, bool truncat
         summary_->clear();
     else
         summary_->setText(summaryText(truncated, files.size()));
+    summary_->setToolTip(filesSearched == 1 ? tr("1 file searched") : tr("%1 files searched").arg(filesSearched));
+    results_->setVisible(!matches_.isEmpty());
+    empty_->setVisible(matches_.isEmpty());
+    if (matches_.isEmpty())
+        setEmptyMessage(tr("No matches found"));
     fitLocationColumn();
     if (results_->topLevelItemCount() > 0)
         results_->setCurrentItem(results_->topLevelItem(0));
@@ -403,12 +451,19 @@ void FindInFilesPopup::resizeEvent(QResizeEvent *event)
 void FindInFilesPopup::updatePreview()
 {
     const QTreeWidgetItem *item = results_->currentItem();
+    previewPane_->setVisible(item != nullptr);
     if (!item) {
+        previewLocation_->clear();
         previewPath_.clear();
         preview_->showReadOnlyText(QString(), QStringLiteral("text"));
         return;
     }
     const FindMatch match = matches_.value(item->data(0, matchRole).toLongLong());
+    const QString location =
+        QStringLiteral("%1:%2").arg(QDir(folder_).relativeFilePath(match.filePath)).arg(match.line + 1);
+    previewLocation_->setToolTip(location);
+    previewLocation_->setText(
+        previewLocation_->fontMetrics().elidedText(location, Qt::ElideMiddle, previewLocation_->width()));
     if (match.filePath != previewPath_) {
         previewPath_ = match.filePath;
         QString error;
@@ -437,7 +492,7 @@ void FindInFilesPopup::updatePreview()
 
 void FindInFilesPopup::openCurrent()
 {
-    if (searchTimer_.isActive())
+    if (searchTimer_.isActive() || engine_.isRunning())
         return; // the results do not match the query yet
     const QTreeWidgetItem *item = results_->currentItem();
     if (!item)
@@ -452,17 +507,25 @@ void FindInFilesPopup::openCurrent()
 void FindInFilesPopup::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    setStyleSheet(SearchPopup::styleSheet(theme));
     preview_->applyTheme(theme);
     if (auto *delegate = dynamic_cast<MatchDelegate *>(results_->itemDelegate())) {
         QColor highlight = theme.findHighlight;
         highlight.setAlpha(theme.isDark ? 70 : 60);
         delegate->highlight = highlight;
     }
+    for (int row = 0; row < results_->topLevelItemCount(); ++row) {
+        results_->topLevelItem(row)->setFont(0, theme.font);
+        results_->topLevelItem(row)->setForeground(1, theme.mutedText);
+    }
     results_->viewport()->update();
 }
 
 bool FindInFilesPopup::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == previewLocation_ && event->type() == QEvent::Resize)
+        previewLocation_->setText(previewLocation_->fontMetrics().elidedText(
+            previewLocation_->toolTip(), Qt::ElideMiddle, previewLocation_->width()));
     const bool isSearchField = watched == search_ || watched == mask_;
     if (!isSearchField || event->type() != QEvent::KeyPress)
         return QFrame::eventFilter(watched, event);

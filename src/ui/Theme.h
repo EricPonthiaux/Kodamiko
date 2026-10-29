@@ -58,7 +58,7 @@ struct Theme {
     static Theme kodamiko();
 
     // Kodamiko's theme, the website's (Kodamiko-Night), Kodamiko-Violet, Kodamiko-Stratos,
-    // Kodamiko-Bloom, Kodamiko-Clay, then the Material ones (MaterialThemes).
+    // Kodamiko-Bloom, Kodamiko-Clay, Kodamiko-Pearl (light), then the Material ones (MaterialThemes).
     static QList<Theme> all();
 
     static Theme named(const QString &name);

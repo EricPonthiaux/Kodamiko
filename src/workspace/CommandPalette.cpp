@@ -3,11 +3,13 @@
 #include "CommandPalette.h"
 
 #include "ui/PopupSearchField.h"
+#include "ui/SearchPopupWidgets.h"
 #include "ui/ThemeStyle.h"
 
 #include <QAction>
 #include <QHeaderView>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
@@ -47,11 +49,16 @@ void collect(const QMenu *menu, const QString &prefix, QList<QPair<QString, QAct
 } // namespace
 
 CommandPalette::CommandPalette(QWidget *parent)
-    : OverlayPopup(QStringLiteral("commandPalette"), QSizeF(0.45, 0.55), QSize(560, 360), parent)
+    : OverlayPopup(QStringLiteral("commandPalette"), QSizeF(0.45, 0.48), QSize(600, 360), parent)
 {
     setBehavior(Behavior::Transient);
+    setAccessibleName(tr("Command Palette"));
+    summary_ = SearchPopup::resultSummary(this);
+    empty_ = SearchPopup::emptyState(this);
+    empty_->setText(tr("No commands found"));
     search_ = new PopupSearchField(this);
     search_->setPlaceholderText(tr("Type a command"));
+    search_->setAccessibleName(tr("Search"));
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &CommandPalette::filter);
     connect(search_, &QLineEdit::returnPressed, this, &CommandPalette::runCurrent);
@@ -64,6 +71,8 @@ CommandPalette::CommandPalette(QWidget *parent)
     list_->setUniformRowHeights(true);
     list_->setFocusPolicy(Qt::NoFocus);
     list_->setFrameShape(QFrame::NoFrame);
+    list_->setAccessibleName(tr("Commands"));
+    list_->setItemDelegateForColumn(0, new SearchPopup::ResultDelegate(list_));
     list_->header()->setStretchLastSection(false);
     list_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     list_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
@@ -73,8 +82,12 @@ CommandPalette::CommandPalette(QWidget *parent)
     // Inside the panel's border: the field reaches its edges.
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
-    layout->addWidget(search_);
-    layout->addWidget(list_);
+    layout->addWidget(SearchPopup::searchArea(search_, this));
+    layout->addWidget(list_, 1);
+    layout->addWidget(empty_, 1);
+    layout->addWidget(SearchPopup::footer(
+        {{tr("↑ ↓"), tr("Navigate")}, {tr("Enter"), tr("Run")}, {tr("Esc"), tr("Close")}}, summary_, this));
+    applyTheme(ThemeStyle::applied());
 }
 
 void CommandPalette::popup(const QMenuBar *menuBar)
@@ -133,16 +146,27 @@ void CommandPalette::filter()
         const Command &command = commands_[index];
         auto *item =
             new QTreeWidgetItem(list_, {command.name, command.action->shortcut().toString(QKeySequence::NativeText)});
+        const QString title = withoutMnemonic(command.action->text());
+        item->setText(0, title);
+        item->setData(0, Qt::AccessibleTextRole, command.name);
+        item->setData(0, SearchPopup::ResultDelegate::detailRole, command.name.chopped(title.size() + 2));
+        item->setToolTip(0, command.name);
         item->setData(0, Qt::UserRole, QVariant::fromValue(index));
         item->setForeground(1, ThemeStyle::applied().mutedText);
         item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     }
-    if (matches.isEmpty()) {
-        auto *item = new QTreeWidgetItem(list_, {tr("No matching command")});
-        item->setFlags(Qt::NoItemFlags);
-    } else {
+    summary_->setText(matches.size() == 1 ? tr("1 command") : tr("%1 commands").arg(matches.size()));
+    list_->setVisible(!matches.isEmpty());
+    empty_->setVisible(matches.isEmpty());
+    if (!matches.isEmpty())
         list_->setCurrentItem(list_->topLevelItem(0));
-    }
+}
+
+void CommandPalette::applyTheme(const Theme &theme)
+{
+    setStyleSheet(SearchPopup::styleSheet(theme));
+    for (int row = 0; row < list_->topLevelItemCount(); ++row)
+        list_->topLevelItem(row)->setForeground(1, theme.mutedText);
 }
 
 void CommandPalette::runCurrent()
@@ -185,7 +209,7 @@ bool CommandPalette::eventFilter(QObject *watched, QEvent *event)
         default:
             return QFrame::eventFilter(watched, event);
         }
-        if (target >= 0 && (list_->topLevelItem(target)->flags() & Qt::ItemIsEnabled))
+        if (target >= 0 && target < count && (list_->topLevelItem(target)->flags() & Qt::ItemIsEnabled))
             list_->setCurrentItem(list_->topLevelItem(target));
         return true;
     }

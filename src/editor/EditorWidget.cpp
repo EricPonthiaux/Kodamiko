@@ -232,6 +232,9 @@ EditorWidget::~EditorWidget()
 
 void EditorWidget::configureEditing()
 {
+    // The style's sunken frame drew a dark line along the top and the left:
+    // under the current tab, which opens onto the text.
+    setFrameShape(QFrame::NoFrame);
     setUtf8(true);
     // Keeps the layout of every visible line (not only the caret's):
     // repainting while typing or scrolling, wrapped lines especially, does

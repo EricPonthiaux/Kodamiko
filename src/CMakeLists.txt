@@ -319,6 +319,7 @@ add_library(kdk_core STATIC
     ui/PopupFooter.cpp
     ui/PopupRows.cpp
     ui/PopupSearchField.cpp
+    ui/SearchPopupWidgets.cpp
     ui/PopupWidgets.cpp
     ui/SettingsSwitch.cpp
     ui/PopupMotion.cpp

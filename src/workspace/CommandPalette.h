@@ -8,6 +8,8 @@
 
 class QAction;
 class QLineEdit;
+class QLabel;
+struct Theme;
 class QMenuBar;
 class QTreeWidget;
 
@@ -22,6 +24,7 @@ public:
     // Shows the commands of `menuBar` (enabled actions of its menus and
     // submenus), at the top of the parent window.
     void popup(const QMenuBar *menuBar);
+    void applyTheme(const Theme &theme);
 
     // Fuzzy match: -1 if the letters of `query` do not all appear, in
     // order, in `text`; otherwise a score that favors consecutive letters
@@ -44,6 +47,8 @@ private:
     void filter();
     void runCurrent();
 
+    QLabel *summary_;
+    QLabel *empty_;
     QLineEdit *search_;
     QTreeWidget *list_;
     QList<Command> commands_;

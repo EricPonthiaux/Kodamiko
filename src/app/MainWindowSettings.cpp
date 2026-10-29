@@ -24,6 +24,7 @@
 #include "editor/FindBar.h"
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
+#include "navigation/GoToPopup.h"
 #include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
 #include "outline/OutlineView.h"
@@ -47,6 +48,7 @@
 #include "ui/WindowFrame.h"
 #include "welcome/NewProjectPopup.h"
 #include "welcome/ProjectSettingsPopup.h"
+#include "workspace/CommandPalette.h"
 #include "workspace/FileTreeView.h"
 #include "workspace/FilesPanel.h"
 #include "workspace/SidePanel.h"
@@ -105,6 +107,8 @@ void MainWindow::setTheme(const QString &name)
     historyView_->applyTheme(theme_);
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
+    goToPopup_->applyTheme(theme_);
+    commandPalette_->applyTheme(theme_);
     serverNotice_->applyTheme(theme_);
     unsavedEditNotice_->applyTheme(theme_);
     toolsNotice_->applyTheme(theme_);

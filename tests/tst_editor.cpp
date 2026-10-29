@@ -746,6 +746,13 @@ private slots:
         QCOMPARE(editor.text(), QString("int  x;\r\nint y;\r\n"));
     }
 
+    void anEditorOpensOntoItsTabWithoutAFrame()
+    {
+        const EditorWidget editor(Theme::kodamiko());
+
+        QCOMPARE(editor.frameWidth(), 0);
+    }
+
     void formatDocumentRunsClangFormat()
     {
         if (QStandardPaths::findExecutable("clang-format").isEmpty())

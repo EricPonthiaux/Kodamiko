@@ -4,6 +4,7 @@
 #include "search/FindInFiles.h"
 #include "search/FindInFilesPopup.h"
 
+#include <QLabel>
 #include <QLineEdit>
 #include <QSignalSpy>
 #include <QStandardPaths>
@@ -109,6 +110,39 @@ private slots:
         QCOMPARE(finished.last().at(0).value<QList<FindMatch>>().size(), 2);
     }
 
+    void popupRecoversFromEmptyAndInvalidSearches()
+    {
+        const QTemporaryDir dir;
+        write(dir.filePath("a.txt"), "needle here\n");
+        QWidget window;
+        window.resize(1000, 800);
+        window.show();
+        FindInFilesPopup popup(Theme::kodamiko(), &window);
+        popup.setFolder(dir.path());
+        popup.popup();
+        const auto *empty = popup.findChild<QLabel *>("searchEmpty");
+        QVERIFY(empty);
+        QVERIFY(empty->isVisible());
+        QVERIFY(!popup.results()->isVisible());
+        popup.setOptions(false, false, true);
+        popup.searchField()->setText("[");
+        popup.searchNow();
+        QVERIFY(empty->isVisible());
+        QVERIFY(!empty->text().isEmpty());
+        QVERIFY(popup.findChild<QLabel *>("searchSummary")->text().contains("regular expression"));
+        QTest::keyClick(popup.searchField(), Qt::Key_Return);
+        QVERIFY(popup.isVisible());
+        popup.searchField()->setText("missing");
+        popup.searchNow();
+        QTRY_VERIFY(!popup.isSearching());
+        QVERIFY(empty->text().contains("No matches"));
+        popup.searchField()->setText("needle");
+        popup.searchNow();
+        QTRY_COMPARE(popup.results()->topLevelItemCount(), 1);
+        QVERIFY(popup.results()->isVisible());
+        QVERIFY(!empty->isVisible());
+    }
+
     void popupListsAndOpensMatches()
     {
         const QTemporaryDir dir;
@@ -123,7 +157,7 @@ private slots:
         QTRY_COMPARE(popup.results()->topLevelItemCount(), 1);
         // Leading spaces are not shown.
         QCOMPARE(popup.results()->topLevelItem(0)->text(0), QString("second needle here"));
-        QCOMPARE(popup.results()->topLevelItem(0)->text(1), QString("a.txt 2"));
+        QCOMPARE(popup.results()->topLevelItem(0)->text(1), QString("a.txt:2"));
         QTest::keyClick(popup.searchField(), Qt::Key_Return);
         QTRY_COMPARE(chosen.size(), 1);
         QCOMPARE(chosen.first().at(1).toInt(), 1);

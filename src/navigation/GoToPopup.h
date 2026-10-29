@@ -9,6 +9,8 @@
 
 class QCheckBox;
 class QLineEdit;
+class QLabel;
+struct Theme;
 class QTabBar;
 class QTreeWidget;
 class RecentFiles;
@@ -36,6 +38,7 @@ public:
     // Working folder: the list of its files is reread at each opening.
     void setFolder(const QString &folder);
     void popup(Tab tab);
+    void applyTheme(const Theme &theme);
 
     Tab tab() const;
     void setTab(Tab tab);
@@ -73,6 +76,7 @@ private:
         int symbol = -1; // in symbols_
     };
 
+    void updateSummary();
     void scanFiles();
     void filter();
     void filterFiles(const QString &query, QList<Entry> &entries) const;
@@ -96,6 +100,8 @@ private:
     int generation_ = 0;
     QThreadPool pool_;
 
+    QLabel *summary_;
+    QLabel *empty_;
     QTabBar *tabs_;
     QCheckBox *editedByClaude_;
     QLineEdit *search_;

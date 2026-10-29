@@ -127,6 +127,7 @@ private slots:
         QTest::addColumn<QString>("themeName");
         QTest::newRow("kodamiko-11pt-480px") << 480 << 11 << QStringLiteral("kodamiko");
         QTest::newRow("kodamiko-slate-15pt-480px") << 480 << 15 << QStringLiteral("kodamiko-slate");
+        QTest::newRow("kodamiko-pearl-11pt-1024px") << 1024 << 11 << QStringLiteral("kodamiko-pearl");
         for (const QString &themeName : {QStringLiteral("kodamiko"), QStringLiteral("kodamiko-slate")}) {
             for (int fontSize : {11, 15, 22}) {
                 for (int width : {640, 800, 1024, 1440, 1920}) {
@@ -242,12 +243,13 @@ private slots:
         QCOMPARE_GT(middle.red() - middle.green(), 100);
     }
 
-    void compactMenuKeepsActionsAndRunStopWorking()
+    void narrowBarKeepsMenusVisibleAndQuickActionsAndRunStopWorking()
     {
         Window window(Theme::kodamiko());
         window.show(640);
-        auto *menuButton = window.title->findChild<QToolButton *>("mainMenuButton");
+        auto *menuButton = window.title->findChild<QToolButton *>("titleActionsOverflow");
         QTRY_VERIFY(menuButton->isVisible());
+        QVERIFY(window.title->menuBar()->isVisible());
         const QSignalSpy searched(&window.search, &QAction::triggered);
         QTimer::singleShot(0, menuButton->menu(), &QMenu::close);
         QTest::mouseClick(menuButton, Qt::LeftButton);
@@ -320,7 +322,8 @@ private slots:
 
         window.root.resize(800, window.root.height());
         QTRY_VERIFY(project->width() < wideProjectWidth);
-        QVERIFY(project->width() >= project->boundedWidth());
+        QVERIFY(project->width() >= project->minimumSizeHint().width());
+        QVERIFY(window.title->menuBar()->isVisible());
         QVERIFY(isInside(window.title->windowButton(WindowButton::Kind::Close), window.title));
     }
 
@@ -329,10 +332,8 @@ private slots:
         Window window(Theme::kodamiko());
         window.show(1920);
         QVERIFY(QTest::qWaitForWindowExposed(&window.root));
-        const auto *project = window.title->findChild<QToolButton *>("projectChip");
-        const auto *runBlock = window.title->findChild<QFrame *>("runBlock");
-
-        const auto groupCenter = [&] { return (project->geometry().left() + runBlock->geometry().right()) / 2; };
+        const auto *group = window.title->findChild<QFrame *>("titleProjectGroup");
+        const auto groupCenter = [&] { return group->geometry().center().x(); };
 
         QTRY_VERIFY(qAbs(groupCenter() - window.title->width() / 2) <= 1);
         // Long labels take the room before the centering does: shorter ones

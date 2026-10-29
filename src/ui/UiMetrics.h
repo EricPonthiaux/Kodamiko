@@ -15,8 +15,8 @@ class QWidget;
 // (Preferences ▸ Fonts), so that the bars grow with their text.
 namespace UiMetrics {
 
-// The window's title bar, with the menus (HEADER_HEIGHT_NORMAL).
-constexpr int titleBarHeight = 40;
+// The window's title bar, with room above and below its menus and controls.
+constexpr int titleBarHeight = 52;
 // Its chips and buttons (MainToolbar.Button.size).
 constexpr int toolbarButtonSize = 30;
 // The icon of a chip (the project's folder).

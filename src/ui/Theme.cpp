@@ -296,6 +296,57 @@ Theme kdkClay()
     return theme;
 }
 
+// Warm ivory surfaces, a coral accent, and dark syntax colors that remain
+// legible on paper. The selection keeps the editor's dark foreground.
+Theme kdkPearl()
+{
+    Theme theme;
+    theme.name = QStringLiteral("kodamiko-pearl");
+    theme.title = QStringLiteral("Kodamiko-Pearl");
+    theme.isDark = false;
+    theme.font = editorFont();
+    theme.background = QColor("#fffdf9");
+    theme.foreground = QColor("#383630");
+    theme.caret = QColor("#b14f42");
+    theme.caretLine = QColor("#f5eee6");
+    theme.selection = QColor("#e8d8ca");
+    theme.marginBackground = theme.background;
+    theme.marginForeground = QColor("#857c72");
+    theme.currentLineNumber = QColor("#60564c");
+    theme.braceMatch = QColor("#dfd2c2");
+    theme.findHighlight = QColor("#e1b867");
+    theme.error = QColor("#a33f43");
+    theme.warning = QColor("#916122");
+    theme.window = QColor("#f0ece6");
+    theme.button = QColor("#e7e0d7");
+    theme.alternateBase = QColor("#f6f3ed");
+    theme.highlight = QColor("#8d5644");
+    theme.accent = QColor("#b14f42");
+    theme.accentText = theme.foreground;
+    theme.mutedText = QColor("#746b60");
+    theme.border = QColor("#cfc7bd");
+    theme.line = QColor("#e1dbd2");
+    theme.hover = QColor("#e7e0d7");
+    theme.onAccent = QColor("#fffdf9");
+    theme.syntaxStyles = {
+        {"comment", italic("#6b6258")},         {"string", plain("#3e5e3c")},
+        {"string.special", plain("#365962")},   {"escape", plain("#365962")},
+        {"number", plain("#784532")},           {"constant", plain("#784532")},
+        {"constant.builtin", plain("#784532")}, {"keyword", plain("#88384a")},
+        {"operator", plain("#54554c")},         {"type", plain("#694d2a")},
+        {"type.builtin", plain("#694d2a")},     {"constructor", plain("#694d2a")},
+        {"module", plain("#694d2a")},           {"function", plain("#365962")},
+        {"function.builtin", plain("#365962")}, {"variable", plain("#383630")},
+        {"variable.builtin", plain("#784532")}, {"variable.parameter", italic("#694b63")},
+        {"property", plain("#694b63")},         {"label", plain("#784532")},
+        {"attribute", plain("#694b63")},        {"tag", plain("#88384a")},
+        {"punctuation", plain("#54554c")},      {"punctuation.special", plain("#88384a")},
+        {"embedded", plain("#383630")},         {"heading", bold("#365962")},
+        {"diff.plus", plain("#3e5e3c")},        {"diff.minus", plain("#88384a")},
+    };
+    return theme;
+}
+
 } // namespace
 
 Theme Theme::kodamiko()
@@ -353,7 +404,7 @@ Theme Theme::kodamiko()
 
 QList<Theme> Theme::all()
 {
-    QList<Theme> themes{kodamiko(), kdkNight(), kdkViolet(), kdkStratos(), kdkBloom(), kdkClay()};
+    QList<Theme> themes{kodamiko(), kdkNight(), kdkViolet(), kdkStratos(), kdkBloom(), kdkClay(), kdkPearl()};
     themes += MaterialThemes::all();
     return themes;
 }

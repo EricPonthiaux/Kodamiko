@@ -22,13 +22,10 @@ class QSpacerItem;
 class QTabBar;
 class QToolButton;
 
-// Kodamiko's own title bar, in the manner of IntelliJ's main toolbar: the menu
-// at the left; in the middle, the project (with the recent folders) and the
-// run block (the configuration and its Run or Stop button, on a tinted
-// background); at the right, the search actions, then a divider and the
-// window controls. The middle group stays centered on the bar while the room
-// allows it. Its controls share one height. Dragging its empty parts moves
-// the window, a double-click maximizes it.
+// A single row: visible menus, a shared frame for the project and runner,
+// quick action icons, and the window controls. The project
+// group stays centered while space allows; labels shorten before menus
+// overflow. Dragging empty space moves the window; double-click maximizes it.
 class TitleBar : public QWidget {
     Q_OBJECT
 
@@ -86,10 +83,10 @@ private:
         QToolButton *button;
         QString iconName;
         QColor color;
-        int inset = 0; // smaller by this, inside the run block
+        int inset = 2; // room for the group's one-pixel border
     };
 
-    ElidingToolButton *addChip();
+    QFrame *createProjectGroup();
     QFrame *createRunBlock();
     // `color` defaults to the theme's foreground.
     QToolButton *actionButton(QAction *action, const QString &iconName, const QColor &color = {});
@@ -106,9 +103,9 @@ private:
     void centerProjectGroup();
     // The width of the visible `widgets`, each with the gap after it.
     int sideWidth(std::initializer_list<const QWidget *> widgets) const;
-    // The run block's width with its configuration at its bounded width.
-    int boundedRunBlockWidth() const;
-    void rebuildCompactMenu();
+    // The shared group's width with both labels at their bounded widths.
+    int boundedProjectGroupWidth() const;
+    void rebuildActionsMenu();
     void scheduleLayout();
 
     Theme theme_;
@@ -118,9 +115,11 @@ private:
     BrandLogo *logo_;
     QPointer<QTabBar> logoColumn_;
     QMenuBar *menuBar_;
-    QToolButton *menuButton_;
-    QMenu *compactMenu_;
-    ElidingToolButton *project_;
+    QToolButton *actionsOverflow_;
+    QMenu *actionsMenu_;
+    QFrame *projectGroup_ = nullptr;
+    QFrame *projectDivider_ = nullptr;
+    ElidingToolButton *project_ = nullptr;
     QFrame *runBlock_ = nullptr;
     ElidingToolButton *run_ = nullptr;
     QFrame *runDivider_ = nullptr;
@@ -129,7 +128,7 @@ private:
     QToolButton *stopButton_ = nullptr;
     bool running_ = false;
     QHBoxLayout *actions_;
-    QWidget *actionGroup_;
+    QFrame *actionGroup_;
     QList<QAction *> secondaryActions_;
     bool layoutScheduled_ = false;
 

@@ -71,17 +71,18 @@ private slots:
         QStringList names;
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
-        // Kodamiko's first, then Kodamiko-Night, Kodamiko-Violet, Kodamiko-Stratos, Kodamiko-Bloom, Kodamiko-Clay and
-        // the Material ones.
-        QCOMPARE(names.size(), 14);
+        // Kodamiko's own themes precede the Material ones.
+        QCOMPARE(names.size(), 15);
         QCOMPARE(names.first(), QString("kodamiko"));
         QVERIFY(std::ranges::all_of(names.mid(1), [](const QString &name) { return name.startsWith("kodamiko-"); }));
         const Theme violet = Theme::named("kodamiko-violet");
         QCOMPARE(violet.name, QString("kodamiko-violet"));
         QVERIFY(violet.accent.isValid() && violet.window.isValid() && violet.findHighlight.isValid());
         QVERIFY(violet.syntaxStyleIndex(u"function.method") >= 0);
-        // They are all dark.
-        QVERIFY(std::ranges::all_of(Theme::all(), [](const Theme &theme) { return theme.isDark; }));
+        const Theme pearl = Theme::named("kodamiko-pearl");
+        QCOMPARE(pearl.name, QString("kodamiko-pearl"));
+        QVERIFY(!pearl.isDark);
+        QVERIFY(pearl.background.lightnessF() > pearl.foreground.lightnessF());
         // Every theme has the interface colors the controls' style sheet uses.
         for (const Theme &theme : Theme::all()) {
             for (const QColor &color : {theme.window, theme.button, theme.alternateBase, theme.highlight, theme.accent,

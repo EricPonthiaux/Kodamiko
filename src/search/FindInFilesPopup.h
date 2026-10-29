@@ -61,6 +61,10 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
+    QWidget *createFilters();
+    QWidget *createResultsPane();
+    QWidget *createPreviewPane();
+    void setEmptyMessage(const QString &text);
     void scheduleSearch();
     void showResults(const QList<FindMatch> &matches, bool truncated, int filesSearched);
     QString summaryText(bool truncated, qsizetype fileCount) const;
@@ -79,14 +83,17 @@ private:
     QList<FindMatch> matches_;
     QTimer searchTimer_;
 
-    QLabel *summary_;
-    QLineEdit *search_;
-    QToolButton *matchCase_;
-    QToolButton *wholeWords_;
-    QToolButton *regularExpression_;
-    QCheckBox *useMask_;
-    QLineEdit *mask_;
-    QTreeWidget *results_;
-    EditorWidget *preview_;
+    QLabel *summary_ = nullptr;
+    QLabel *empty_ = nullptr;
+    QWidget *previewPane_ = nullptr;
+    QLabel *previewLocation_ = nullptr;
+    QLineEdit *search_ = nullptr;
+    QToolButton *matchCase_ = nullptr;
+    QToolButton *wholeWords_ = nullptr;
+    QToolButton *regularExpression_ = nullptr;
+    QCheckBox *useMask_ = nullptr;
+    QLineEdit *mask_ = nullptr;
+    QTreeWidget *results_ = nullptr;
+    EditorWidget *preview_ = nullptr;
     QString previewPath_;
 };

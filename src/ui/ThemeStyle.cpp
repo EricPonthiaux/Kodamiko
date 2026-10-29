@@ -179,9 +179,9 @@ QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-t
 QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; border-top-left-radius: 3px; border-top-right-radius: 3px; }
 QTabWidget#terminalTabs QTabBar::tab:selected, QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
 EditorTabs QTabBar { background: @window; }
-EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 7px 12px; margin-top: 4px; min-width: 64px; max-width: 240px; border: 1px solid transparent; border-top: 2px solid transparent; border-bottom: none; border-top-left-radius: 6px; border-top-right-radius: 6px; }
+EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 8px 12px 9px; margin-top: 4px; min-width: 64px; max-width: 240px; border: 1px solid transparent; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
 EditorTabs QTabBar::tab:hover { background: @hover; color: @text; }
-EditorTabs QTabBar::tab:selected { background: @base; color: @accentText; border-color: @line; border-top-color: @accent; }
+EditorTabs QTabBar::tab:selected { background: @base; color: @text; border-color: @line; border-bottom: none; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
 QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 0 10px; min-width: 0; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 4px; }
 QTabBar#modeTabs::tab:hover { background: @hover; color: @text; }
@@ -239,20 +239,22 @@ TitleBar QMenuBar { background: transparent; border: none; }
 TitleBar QMenuBar::item { padding: 6px 10px; border-radius: 5px; }
 TitleBar QMenuBar::item:selected, TitleBar QMenuBar::item:pressed { background: @hover; color: @text; }
 TitleBar QMenuBar QToolButton { padding: 0; border: none; }
-TitleBar QToolButton#mainMenuButton { padding: 0; border-radius: 5px; }
-TitleBar QToolButton#mainMenuButton::menu-indicator { image: none; width: 0; }
-TitleBar QToolButton#chip:hover, TitleBar QToolButton#chip:pressed { background: @hover; }
-TitleBar QToolButton#projectChip { padding: 0 8px; border: 1px solid @line; border-radius: 5px; background: @panel; }
-TitleBar QToolButton#projectChip:hover, TitleBar QToolButton#projectChip:pressed { background: @hover; border-color: @border; }
+TitleBar QToolButton#titleActionsOverflow { padding: 0; border: none; border-radius: 4px; background: transparent; }
+TitleBar QToolButton#titleActionsOverflow:hover, TitleBar QToolButton#titleActionsOverflow:pressed { background: @hover; }
+TitleBar QToolButton#titleActionsOverflow::menu-indicator { image: none; width: 0; }
+TitleBar QFrame#titleProjectGroup { background: @panel; border: 1px solid @border; border-radius: 4px; }
+TitleBar QFrame#titleActions { background: transparent; border: none; }
+TitleBar QToolButton#projectChip { padding: 0 8px; border: none; border-radius: 3px; background: @projectTint; }
+TitleBar QToolButton#projectChip:hover, TitleBar QToolButton#projectChip:pressed { background: @projectHover; }
 TitleBar QToolButton#projectChip::menu-indicator { image: none; width: 0; }
-TitleBar QToolButton#titleAction { padding: 0; border-radius: 3px; }
+TitleBar QToolButton#titleAction { padding: 0; border: none; background: transparent; border-radius: 3px; }
 TitleBar QToolButton#titleAction:hover, TitleBar QToolButton#titleAction:pressed { background: @hover; }
-QFrame#runBlock { background: @runTint; border: 1px solid @runBorder; border-radius: 4px; }
+QFrame#runBlock { background: transparent; border: none; }
 QFrame#runBlock QToolButton { background: transparent; border: none; border-radius: 3px; padding: 0 8px; }
 QFrame#runBlock QToolButton#runAction { padding: 0; }
-QFrame#runBlock QToolButton:hover, QFrame#runBlock QToolButton:pressed { background: @runHover; }
+QFrame#runBlock QToolButton:hover, QFrame#runBlock QToolButton:pressed { background: @hover; }
 QFrame#runBlock QToolButton::menu-indicator { image: none; width: 0; }
-QFrame#runDivider { background: @runBorder; }
+QFrame#runDivider, QFrame#projectDivider { background: @border; border: none; }
 TitleBar QFrame#titleDivider { background: @line; }
 QToolButton#chip { padding: 4px 9px; border-radius: 3px; }
 QToolButton#chip:hover { background: @button; }
@@ -319,10 +321,9 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         // The checked segment of a mode selector (preview, diagram panel).
         {"@modeActive", mixed(theme.window, theme.accent, 0.16)},
         {"@modeBorder", mixed(theme.window, theme.accent, 0.35)},
-        // The run block: barely tinted with the accent, so the eye finds it.
-        {"@runTint", mixed(theme.window, theme.accent, 0.08)},
-        {"@runBorder", mixed(theme.window, theme.accent, 0.2)},
-        {"@runHover", mixed(theme.window, theme.accent, 0.18)},
+        // The project is the tinted segment of the shared project/runner frame.
+        {"@projectTint", mixed(theme.alternateBase, theme.accent, 0.08)},
+        {"@projectHover", mixed(theme.alternateBase, theme.accent, 0.18)},
     };
     for (const auto &[name, color] : colors)
         sheet.replace(name, color.name(color.alpha() == 255 ? QColor::HexRgb : QColor::HexArgb));

@@ -3,9 +3,11 @@
 #include "GoToPopup.h"
 
 #include "RecentFiles.h"
-#include "ui/PopupMetrics.h"
+#include "ui/FileIcons.h"
 #include "ui/PopupSearchField.h"
+#include "ui/SearchPopupWidgets.h"
 #include "ui/ThemeStyle.h"
+#include "ui/UiMetrics.h"
 #include "workspace/CommandPalette.h"
 #include "workspace/ProjectFiles.h"
 
@@ -15,6 +17,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QTabBar>
@@ -98,12 +101,16 @@ std::optional<int> symbolScore(const SymbolLocation &symbol, const QString &name
 } // namespace
 
 GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
-    : OverlayPopup(QStringLiteral("goTo"), QSizeF(0.55, 0.6), QSize(640, 400), parent)
+    : OverlayPopup(QStringLiteral("goTo"), QSizeF(0.5, 0.52), QSize(600, 380), parent)
     , index_(index)
     , recent_(recent)
 {
     setBehavior(Behavior::Transient);
     pool_.setMaxThreadCount(1);
+
+    setAccessibleName(tr("Go to File or Symbol"));
+    summary_ = SearchPopup::resultSummary(this);
+    empty_ = SearchPopup::emptyState(this);
 
     tabs_ = new QTabBar(this);
     tabs_->setObjectName(QStringLiteral("goToTabs"));
@@ -127,6 +134,7 @@ GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
     connect(editedByClaude_, &QCheckBox::toggled, this, &GoToPopup::filter);
 
     search_ = new PopupSearchField(this);
+    search_->setAccessibleName(tr("Search"));
     search_->installEventFilter(this);
     connect(search_, &QLineEdit::textChanged, this, &GoToPopup::filter);
     connect(search_, &QLineEdit::returnPressed, this, &GoToPopup::openCurrent);
@@ -140,13 +148,15 @@ GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
     list_->setFocusPolicy(Qt::NoFocus);
     list_->setFrameShape(QFrame::NoFrame);
     list_->setTextElideMode(Qt::ElideLeft); // the end of a path tells the most
-    list_->header()->setStretchLastSection(true);
-    list_->header()->setSectionResizeMode(0, QHeaderView::Interactive);
+    list_->setColumnHidden(1, true);
+    list_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    list_->setItemDelegate(new SearchPopup::ResultDelegate(list_));
+    list_->setAccessibleName(tr("Navigation results"));
+    UiMetrics::setScaledIconSize(list_, 16);
     connect(list_, &QTreeWidget::itemClicked, this, &GoToPopup::openCurrent);
 
     auto *header = new QHBoxLayout;
-    const QMargins room = PopupMetrics::searchMargins;
-    header->setContentsMargins(room.left(), room.top(), room.right(), 0);
+    header->setContentsMargins(0, 0, 10, 0);
     header->addWidget(tabs_);
     header->addStretch();
     header->addWidget(editedByClaude_);
@@ -156,8 +166,15 @@ GoToPopup::GoToPopup(SymbolIndex *index, RecentFiles *recent, QWidget *parent)
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
     layout->addLayout(header);
-    layout->addWidget(search_);
-    layout->addWidget(list_);
+    layout->addWidget(SearchPopup::searchArea(search_, this));
+    layout->addWidget(list_, 1);
+    layout->addWidget(empty_, 1);
+    layout->addWidget(SearchPopup::footer({{tr("↑ ↓"), tr("Navigate")},
+                                           {tr("Enter"), tr("Open")},
+                                           {tr("Tab"), tr("Switch list")},
+                                           {tr("Esc"), tr("Close")}},
+                                          summary_, this));
+    applyTheme(ThemeStyle::applied());
 }
 
 GoToPopup::~GoToPopup()
@@ -205,7 +222,6 @@ void GoToPopup::popup(Tab tab)
         return;
 
     showCentered();
-    list_->setColumnWidth(0, list_->width() * 2 / 5);
     search_->setFocus();
 }
 
@@ -282,37 +298,54 @@ void GoToPopup::filter()
     QList<Entry> entries;
     switch (tab()) {
     case Tab::Files:
-        search_->setPlaceholderText(tr("Type a file name, optionally followed by “:line”"));
+        search_->setPlaceholderText(tr("File name or path (:line)"));
         filterFiles(query, entries);
         break;
     case Tab::Symbols:
-        search_->setPlaceholderText(tr("Type a symbol name (“Class::method” narrows it down)"));
+        search_->setPlaceholderText(tr("Symbol name or Class::method"));
         filterSymbols(query, entries);
         break;
     case Tab::Recent:
-        search_->setPlaceholderText(tr("Type to filter the recent files"));
+        search_->setPlaceholderText(tr("Filter recent files"));
         filterRecent(query, entries);
         break;
     }
     shown_ = entries;
 
+    updateSummary();
     list_->clear();
-    const QColor gray = ThemeStyle::applied().mutedText;
+    const Theme &theme = ThemeStyle::applied();
     for (qsizetype i = 0; i < shown_.size(); ++i) {
         auto *item = new QTreeWidgetItem(list_, {shown_[i].title, shown_[i].location});
         item->setData(0, Qt::UserRole, QVariant::fromValue(i));
         item->setToolTip(0, shown_[i].filePath);
-        item->setForeground(1, gray);
+        item->setData(0, SearchPopup::ResultDelegate::detailRole, shown_[i].location);
+        item->setData(0, Qt::AccessibleTextRole, shown_[i].title + QLatin1Char(' ') + shown_[i].location);
+        item->setIcon(0, FileIcons::file(shown_[i].filePath, theme.isDark));
     }
+    list_->setVisible(!shown_.isEmpty());
+    empty_->setVisible(shown_.isEmpty());
     if (shown_.isEmpty()) {
-        auto *item = new QTreeWidgetItem(list_, {emptyMessage(query)});
-        item->setFlags(Qt::NoItemFlags);
+        empty_->setText(emptyMessage(query));
         return;
     }
     // Recent Files opens on the previous file, as Ctrl+Tab would.
     const bool previousFile =
         tab() == Tab::Recent && query.isEmpty() && !editedByClaude_->isChecked() && list_->topLevelItemCount() > 1;
     list_->setCurrentItem(list_->topLevelItem(previousFile ? 1 : 0));
+}
+
+void GoToPopup::applyTheme(const Theme &theme)
+{
+    setStyleSheet(SearchPopup::styleSheet(theme));
+    for (int row = 0; row < list_->topLevelItemCount(); ++row)
+        list_->topLevelItem(row)->setIcon(0, FileIcons::file(shown_[row].filePath, theme.isDark));
+}
+
+void GoToPopup::updateSummary()
+{
+    const QString count = shown_.size() == 1 ? tr("1 result") : tr("%1 results").arg(shown_.size());
+    summary_->setText(shown_.size() == maxShown ? tr("First %1 results").arg(maxShown) : count);
 }
 
 QString GoToPopup::emptyMessage(const QString &query) const
@@ -325,7 +358,9 @@ QString GoToPopup::emptyMessage(const QString &query) const
         return tr("Indexing in progress…");
     if (tab() == Tab::Recent && query.isEmpty())
         return editedByClaude_->isChecked() ? tr("Claude has not edited any file yet") : tr("No recent files");
-    return tr("Nothing found");
+    if (tab() == Tab::Symbols && query.isEmpty())
+        return tr("Type a symbol name");
+    return tr("No results found");
 }
 
 QString GoToPopup::relativePath(const QString &path) const
@@ -491,7 +526,7 @@ bool GoToPopup::eventFilter(QObject *watched, QEvent *event)
         default:
             return QFrame::eventFilter(watched, event);
         }
-        if (target >= 0 && (list_->topLevelItem(target)->flags() & Qt::ItemIsEnabled))
+        if (target >= 0 && target < count && (list_->topLevelItem(target)->flags() & Qt::ItemIsEnabled))
             list_->setCurrentItem(list_->topLevelItem(target));
         return true;
     }
