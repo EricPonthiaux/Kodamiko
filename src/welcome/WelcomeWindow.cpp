@@ -261,7 +261,9 @@ void WelcomeWindow::filter(const QString &text)
 {
     const int shownCount = showMatches(*list_, text, featuredPath_);
     count_->setText(QString::number(shownCount));
-    const bool isListed = listHeading_->isVisibleTo(this);
+    // Not isVisibleTo: on the way back from a form, the welcome page is
+    // still hidden in the stack when the list is filtered.
+    const bool isListed = !listHeading_->isHidden();
     list_->setVisible(isListed && shownCount > 0);
     noMatch_->setVisible(isListed && shownCount == 0);
     const QListWidgetItem *current = list_->currentItem();

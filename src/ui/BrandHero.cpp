@@ -3,7 +3,6 @@
 #include "BrandHero.h"
 
 #include "AppFonts.h"
-#include "ThemeStyle.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -194,22 +193,12 @@ void paintSculpture(QPainter &painter, const Sculpture &sculpture, const Theme &
     halo.setColorAt(1, withAlpha(theme.accent, 0));
     painter.fillRect(block.adjusted(-block.height(), -block.height(), block.height(), block.height()), halo);
 
-    // Lit from the left, as a polished bar.
-    QLinearGradient caret(sculpture.caret.topLeft(), sculpture.caret.topRight());
-    caret.setColorAt(0, ThemeStyle::mixed(theme.window, theme.foreground, 0.55));
-    caret.setColorAt(0.45, theme.foreground);
-    caret.setColorAt(0.75, ThemeStyle::mixed(theme.window, theme.foreground, 0.8));
-    caret.setColorAt(1, ThemeStyle::mixed(theme.window, theme.foreground, 0.45));
     painter.setPen(Qt::NoPen);
-    painter.setBrush(caret);
+    painter.setBrush(theme.foreground);
     const qreal caretRadius = sculpture.caret.width() / 2;
     painter.drawRoundedRect(sculpture.caret, caretRadius, caretRadius);
 
-    QLinearGradient fill(block.topLeft(), block.bottomRight());
-    fill.setColorAt(0, ThemeStyle::mixed(theme.accent, theme.foreground, 0.45));
-    fill.setColorAt(0.6, theme.accent);
-    fill.setColorAt(1, ThemeStyle::mixed(theme.accent, theme.window, 0.5));
-    painter.setBrush(fill);
+    painter.setBrush(theme.accent);
     const qreal blockRadius = block.width() / 4;
     painter.drawRoundedRect(block, blockRadius, blockRadius);
 }

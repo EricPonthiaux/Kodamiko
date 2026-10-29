@@ -1419,6 +1419,21 @@ private slots:
         QVERIFY(window.findChild<ProjectSetupPanel *>()->isVisibleTo(&window));
     }
 
+    void cancellingANewProjectListsTheProjectsAgain()
+    {
+        const QTemporaryDir dir;
+        QDir(dir.path()).mkpath("alpha");
+        QDir(dir.path()).mkpath("beta");
+        ProjectStore::save(ProjectStore::touch(dir.filePath("alpha")));
+        ProjectStore::save(ProjectStore::touch(dir.filePath("beta")));
+        WelcomeWindow window;
+        window.showNewProject();
+
+        emit window.newProjectForm()->cancelled();
+
+        QVERIFY(window.projectList()->isVisibleTo(&window));
+    }
+
     void newInstanceStartsOnTheFolderGiven()
     {
         const QString folder = QDir::temp().filePath("project");
