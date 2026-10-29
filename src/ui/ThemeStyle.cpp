@@ -3,6 +3,7 @@
 #include "ThemeStyle.h"
 
 #include "PopupMetrics.h"
+#include "UiMetrics.h"
 
 #include <QApplication>
 #include <QDir>
@@ -189,10 +190,14 @@ QTabWidget#terminalTabs QTabBar::tab:first, QTabBar#goToTabs::tab:first { border
 QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
 QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; border-top-left-radius: 3px; border-top-right-radius: 3px; }
 QTabWidget#terminalTabs QTabBar::tab:selected, QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
-EditorTabs QTabBar { background: @window; }
-EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 8px 12px 9px; margin-top: 4px; min-width: 64px; max-width: 240px; border: 1px solid transparent; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
+EditorTabs QTabBar, SidePanel QFrame#viewHeader { background: @window; }
+EditorTabs QTabBar::tab, SidePanel QFrame#viewHeaderTab { margin-top: @tabTopMarginpx; border: 1px solid transparent; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
+EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 8px 12px 9px; min-width: 64px; max-width: 240px; }
 EditorTabs QTabBar::tab:hover { background: @hover; color: @text; }
-EditorTabs QTabBar::tab:selected { background: @base; color: @text; border-color: @line; border-bottom: none; }
+EditorTabs QTabBar::tab:selected, SidePanel QFrame#viewHeaderTab { background: @base; color: @text; border-color: @line; border-bottom: none; }
+SidePanel > QWidget { background: @base; }
+SidePanel QFrame#viewHeader { border: none; }
+SidePanel QFrame#viewHeaderTab { border-left: none; border-top-left-radius: 0; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
 QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 0 10px; min-width: 0; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 4px; }
 QTabBar#modeTabs::tab:hover { background: @hover; color: @text; }
@@ -220,7 +225,7 @@ QTabBar#sideTabs { background: transparent; }
 QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 0 2px 4px; background: transparent; border: 1px solid transparent; border-right: none; border-top-left-radius: 4px; border-bottom-left-radius: 4px; color: @muted; }
 QTabBar#sideTabs::tab:hover { background: @hover; color: @text; }
 QTabBar#sideTabs::tab:selected { background: @base; border-color: @line; border-top-right-radius: 0; border-bottom-right-radius: 0; color: @text; }
-QTabBar#sideTabs::tab:first { margin-top: 0; border-top: none; border-top-left-radius: 0; }
+QTabBar#sideTabs::tab:first { margin-top: 0; }
 QHeaderView::section { background: @panel; color: @muted; border: none; border-bottom: 1px solid @line; padding: 4px 6px; }
 QTreeView, QTreeWidget, QListView { background: @base; border: none; outline: 0; }
 QTreeView { padding-top: 6px; }
@@ -288,7 +293,7 @@ QWidget#statusGroup QToolButton#chip { background: @hover; border-color: @line; 
 QLabel#statusHeading { color: @muted; font-weight: 600; }
 QToolButton#statusOverflow { padding: 0; border: 1px solid transparent; border-radius: 4px; }
 QFrame#viewHeader { border: none; border-bottom: 1px solid @line; }
-FilesPanel QFrame#viewHeader { background: @base; border: none; }
+QFrame#viewHeaderTab { border: none; }
 QToolButton#viewSelector { padding: 4px 6px; border-radius: 3px; }
 QToolButton#viewSelector:hover, QToolButton#viewSelector:pressed { background: @button; }
 QToolButton#viewSelector::menu-indicator { image: none; width: 0; }
@@ -310,6 +315,7 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
     // The popups' shared sizes (PopupMetrics), then the colors.
     sheet.replace(QStringLiteral("@frameRadius"), QString::number(PopupMetrics::frameRadius));
     sheet.replace(QStringLiteral("@rowRadius"), QString::number(PopupMetrics::rowRadius));
+    sheet.replace(QStringLiteral("@tabTopMargin"), QString::number(UiMetrics::tabTopMargin));
     const QList<std::pair<QString, QColor>> colors = {
         {"@reviewOnAccent", theme.isDark ? theme.background : theme.onAccent},
         {"@reviewAccent", theme.isDark ? mixed(theme.accent, theme.foreground, 0.5) : theme.accent},

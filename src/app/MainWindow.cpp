@@ -416,6 +416,7 @@ QWidget *MainWindow::createEditPage()
     sidebar_->addView(hierarchyView_, {}, tr("Hierarchy"));
     sidebar_->addView(problemsView_, {}, tr("Problems"));
     sidebar_->addView(claudeConfigView_, {}, tr("Claude"));
+    sidebar_->alignHeadersWith(editorTabs_->tabBar());
     titleBar_->alignLogoWith(sidebar_->tabBar());
 
     editSplitter_ = new GripSplitter(Qt::Horizontal, this);

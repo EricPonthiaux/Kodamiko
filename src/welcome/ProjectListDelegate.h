@@ -12,10 +12,10 @@ class QDate;
 class QDateTime;
 
 // Paints the welcome window's list of projects: each project with its
-// initials, its name, its folder, the languages it is set up for, when it
-// was opened last and a ⋯ button for its menu; a project whose folder is
-// gone gets a Locate… button instead of its languages. The list can also
-// hold the headings of its groups (headingRole).
+// initials (ProjectAvatar), its name, its folder, when it was opened last
+// and a ⋯ button for its menu, shown on the row under the mouse or
+// selected; a project whose folder is gone gets a Locate… button. The
+// list can also hold the headings of its groups (headingRole).
 class ProjectListDelegate : public QStyledItemDelegate {
 public:
     // A project's ProjectConfig.
@@ -45,11 +45,6 @@ protected:
 private:
     void paintHeading(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;
     void paintProject(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;
-    // Paints the chips from `right` leftwards; returns where they end.
-    qreal paintChips(QPainter *painter,
-                     const QStyleOptionViewItem &option,
-                     const QModelIndex &index,
-                     qreal right) const;
 
     Theme theme_;
     Actions actions_;

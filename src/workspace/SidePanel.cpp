@@ -3,6 +3,8 @@
 #include "SidePanel.h"
 
 #include "ui/Motion.h"
+#include "ui/UiMetrics.h"
+#include "ui/ViewHeader.h"
 
 #include <QEvent>
 #include <QImage>
@@ -155,7 +157,7 @@ SidePanel::SidePanel(QWidget *parent)
     auto *layout = new QVBoxLayout(strip_);
     // The bar paints the full-height separator; its selected tab reaches
     // the panel without a margin between their matching backgrounds.
-    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setContentsMargins(0, UiMetrics::tabTopMargin, 0, 0);
     layout->setSpacing(0);
     tabBar_->setObjectName(QStringLiteral("sideTabs"));
     tabBar_->setShape(QTabBar::RoundedWest);
@@ -182,11 +184,18 @@ SidePanel::SidePanel(QWidget *parent)
 
 int SidePanel::addView(QWidget *view, const QIcon &icon, const QString &title)
 {
+    view->setAttribute(Qt::WA_StyledBackground);
     addWidget(view);
     const QSignalBlocker blocker(tabBar_); // no unfolding while being built
     const int index = tabBar_->addTab(icon, title);
     tabBar_->updateGeometry();
     return index;
+}
+
+void SidePanel::alignHeadersWith(QTabBar *tabs)
+{
+    for (auto *header : findChildren<ViewHeader *>())
+        header->alignWith(tabs);
 }
 
 QTabBar *SidePanel::tabBar() const

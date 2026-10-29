@@ -27,6 +27,8 @@ constexpr int iconSize = 16;
 // The header of a side panel, its line under it included
 // (ToolWindow.Header.height).
 constexpr int panelHeaderHeight = 41;
+// The shared space above the editor tabs and the side panel's tab-shaped header.
+constexpr int tabTopMargin = 4;
 
 // `referencePx`, given for an 11 pt interface font, at the application
 // font's size.

@@ -33,6 +33,14 @@ const QColor stopColor("#d9534f");
 constexpr int groupInset = 2;
 // Between a divider's ends and the top or bottom of a control.
 constexpr int dividerInset = 6;
+// The project and run group stands taller than the bar's other controls:
+// what is opened and run, the bar's main choice.
+constexpr int projectGroupExtraHeight = 6;
+
+int projectGroupHeight()
+{
+    return UiMetrics::controlHeight() + UiMetrics::scaled(projectGroupExtraHeight);
+}
 
 // The width the bar's layout gives `widget`: its hint within its limits.
 int hintedWidth(const QWidget *widget)
@@ -261,6 +269,7 @@ void TitleBar::setRunActions(QAction *run, QAction *stop)
             continue;
         entry.button->setObjectName(QStringLiteral("runAction"));
         entry.inset = groupInset;
+        entry.isInProjectGroup = true;
         sizeActionButton(entry);
         runActions_->addWidget(entry.button);
     }
@@ -274,16 +283,17 @@ void TitleBar::applyMetrics()
     const int control = UiMetrics::controlHeight();
     layout_->setSpacing(UiMetrics::scaled(groupSpacing));
     actionsOverflow_->setFixedSize(control, control);
-    projectGroup_->setFixedHeight(control);
+    const int projectHeight = projectGroupHeight();
+    projectGroup_->setFixedHeight(projectHeight);
     actionGroup_->setFixedHeight(control);
-    project_->setFixedHeight(control - groupInset);
+    project_->setFixedHeight(projectHeight - groupInset);
     const int folderSize = UiMetrics::scaled(UiMetrics::chipIconSize);
     project_->setIconSize(QSize(folderSize, folderSize));
-    runBlock_->setFixedHeight(control - groupInset);
-    run_->setFixedHeight(control - groupInset);
+    runBlock_->setFixedHeight(projectHeight - groupInset);
+    run_->setFixedHeight(projectHeight - groupInset);
     run_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
-    runDivider_->setFixedSize(1, control - 2 * dividerInset);
-    projectDivider_->setFixedSize(1, control - groupInset);
+    runDivider_->setFixedSize(1, projectHeight - 2 * dividerInset);
+    projectDivider_->setFixedSize(1, projectHeight - groupInset);
     controlsDivider_->setFixedSize(1, control - 2 * dividerInset);
     for (const ActionButton &entry : std::as_const(actionButtons_))
         sizeActionButton(entry);
@@ -423,7 +433,8 @@ void TitleBar::resizeEvent(QResizeEvent *event)
 
 void TitleBar::sizeActionButton(const ActionButton &entry)
 {
-    const int size = UiMetrics::controlHeight() - entry.inset;
+    const int height = entry.isInProjectGroup ? projectGroupHeight() : UiMetrics::controlHeight();
+    const int size = height - entry.inset;
     entry.button->setFixedSize(size, size);
     entry.button->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
 }

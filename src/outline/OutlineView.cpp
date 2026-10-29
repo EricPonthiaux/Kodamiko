@@ -73,9 +73,9 @@ OutlineView::OutlineView(QWidget *parent)
     stack_->addWidget(placeholder_);
     stack_->addWidget(tree_);
 
-    // Same margins as the scope box above the file tree.
+    // Keep the filter inset from the shared tab header and tree edges.
     auto *toolbar = new QHBoxLayout;
-    toolbar->setContentsMargins(4, 2, 2, 2);
+    toolbar->setContentsMargins(6, 6, 6, 0);
     toolbar->addWidget(filter_);
 
     connect(header_->addButton(QStringLiteral("expand-all"), tr("Expand All")), &QToolButton::clicked, this,

@@ -9,6 +9,7 @@
 class QAction;
 class QActionGroup;
 class QToolButton;
+class ViewHeader;
 
 // Files pane of the side panel: a header above the file tree, as in
 // IntelliJ's Project view. The view selector (Project, Changed Files,
@@ -50,6 +51,7 @@ signals:
 private:
     FileTreeView *tree_;
     void updateScopeText();
+    ViewHeader *header_;
 
     QToolButton *scope_;
     QActionGroup *scopes_;

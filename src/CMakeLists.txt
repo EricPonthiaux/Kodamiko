@@ -347,13 +347,17 @@ add_library(kdk_core STATIC
     welcome/LanguageChoices.cpp
     welcome/NewProjectForm.cpp
     welcome/NewProjectPopup.cpp
+    welcome/ProjectAvatar.cpp
     welcome/ProjectListDelegate.cpp
     welcome/ProjectSettingsPopup.cpp
     welcome/ProjectSetupForm.cpp
     welcome/ProjectSetupFormUi.cpp
     welcome/ProjectSetupPanel.cpp
     welcome/ProvisioningView.cpp
+    welcome/ResumeCard.cpp
+    welcome/WelcomeHero.cpp
     welcome/WelcomeWindow.cpp
+    welcome/WelcomeWindowUi.cpp
     workspace/CommandPalette.cpp
     workspace/ChoicePopup.cpp
     workspace/EntryPopups.cpp

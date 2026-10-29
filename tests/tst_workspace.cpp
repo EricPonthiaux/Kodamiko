@@ -19,6 +19,7 @@
 #include "ui/TrailingLayout.h"
 #include "ui/TrailingTabButton.h"
 #include "ui/TreeMetrics.h"
+#include "ui/UiMetrics.h"
 #include "ui/ViewHeader.h"
 #include "ui/WindowFrame.h"
 #include "workspace/ChoicePopup.h"
@@ -443,16 +444,14 @@ private slots:
         QCOMPARE(image.pixelColor(lastColumn, int(tabs->tabRect(1).center().y() * ratio)), theme.line);
         // Nothing of the tab over the panel beside it.
         auto *files = panel->currentWidget();
-        files->setAutoFillBackground(true);
-        QPalette palette = files->palette();
-        palette.setColor(QPalette::Window, Qt::red);
-        files->setPalette(palette);
+        files->setStyleSheet(QStringLiteral("background: red;"));
         const QImage beside = window.grab().toImage();
         const int panelColumn = int(panel->mapTo(&window, QPoint()).x() * beside.devicePixelRatio()) + 1;
         QCOMPARE(beside.pixelColor(panelColumn, int(open.center().y() * ratio)), QColor(Qt::red));
-        // The first tab starts at the top, level with the panel's header.
+        // The strip and the header leave the same space above their tabs.
         QCOMPARE(open.top(), 0);
-        QCOMPARE(pixel(open.center().x(), 0), theme.background);
+        QCOMPARE(tabs->mapTo(&window, open.topLeft()).y(), UiMetrics::tabTopMargin);
+        QCOMPARE(pixel(open.center().x(), 0), theme.line);
         ThemeStyle::apply(Theme::kodamiko());
     }
 

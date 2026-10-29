@@ -30,6 +30,7 @@ public:
     QTabBar *tabBar() const;
 
     int addView(QWidget *view, const QIcon &icon, const QString &title);
+    void alignHeadersWith(QTabBar *tabs);
     // The tabs and their separator; the open tab shares the panel's background.
     void applyTheme(const Theme &theme);
     void setViewIcon(QWidget *view, const QIcon &icon);

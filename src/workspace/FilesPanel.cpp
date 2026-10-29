@@ -2,13 +2,9 @@
 
 #include "FilesPanel.h"
 
-#include "ui/AppFonts.h"
-#include "ui/UiIcons.h"
-#include "ui/UiMetrics.h"
+#include "ui/ViewHeader.h"
 
 #include <QActionGroup>
-#include <QFrame>
-#include <QHBoxLayout>
 #include <QMenu>
 #include <QShortcut>
 #include <QToolButton>
@@ -30,7 +26,6 @@ FilesPanel::FilesPanel(QWidget *parent)
     scope_->setFocusPolicy(Qt::NoFocus);
     scope_->setPopupMode(QToolButton::InstantPopup);
     scope_->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    AppFonts::setInterfaceFont(scope_, 1);
     auto *scopeMenu = new QMenu(scope_);
     scopes_ = new QActionGroup(this);
     scopes_->setExclusive(true);
@@ -60,27 +55,17 @@ FilesPanel::FilesPanel(QWidget *parent)
         });
     }
 
-    // Icons only, all the same size (see setIconColor).
-    const auto addButton = [this](const QString &toolTip) {
-        auto *button = new QToolButton(this);
-        button->setToolTip(toolTip);
-        button->setAutoRaise(true);
-        button->setFocusPolicy(Qt::NoFocus);
-        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-        UiMetrics::setScaledIconSize(button);
-        UiMetrics::setScaledSize(button, QSize(26, 24));
-        return button;
-    };
-    select_ = addButton(tr("Select Opened File (Alt+F1)"));
+    header_ = new ViewHeader(scope_, this);
+    select_ = header_->addButton(QStringLiteral("locate"), tr("Select Opened File (Alt+F1)"));
     connect(select_, &QToolButton::clicked, this, &FilesPanel::selectOpenedFileRequested);
-    collapse_ = addButton(tr("Collapse All"));
+    collapse_ = header_->addButton(QStringLiteral("collapse-all"), tr("Collapse All"));
     QToolButton *collapse = collapse_;
     connect(collapse, &QToolButton::clicked, this, [this] {
         tree_->collapseAll();
         if (const QModelIndex root = tree_->model()->index(0, 0, tree_->rootIndex()); root.isValid())
             tree_->expand(root); // the working folder stays open
     });
-    options_ = addButton(tr("Options"));
+    options_ = header_->addButton(QStringLiteral("more"), tr("Options"));
     QToolButton *options = options_;
     options->setPopupMode(QToolButton::InstantPopup);
     options->setStyleSheet(QStringLiteral("QToolButton::menu-indicator { image: none; width: 0; }"));
@@ -123,23 +108,10 @@ FilesPanel::FilesPanel(QWidget *parent)
     setTreeOptions(tree_->treeOptions());
     options->setMenu(menu);
 
-    // The header shares the tree's background, with room around its controls.
-    auto *header = new QFrame(this);
-    header->setObjectName(QStringLiteral("viewHeader"));
-    UiMetrics::setScaledHeight(header, UiMetrics::panelHeaderHeight);
-    auto *toolbar = new QHBoxLayout(header);
-    toolbar->setContentsMargins(6, 0, 6, 0);
-    toolbar->setSpacing(2);
-    toolbar->addWidget(scope_);
-    toolbar->addStretch(1);
-    toolbar->addWidget(select_);
-    toolbar->addWidget(collapse);
-    toolbar->addWidget(options);
-
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(header);
+    layout->addWidget(header_);
     layout->addWidget(tree_, 1);
 }
 
@@ -207,7 +179,5 @@ void FilesPanel::setFilterWhileTyping(bool enabled)
 
 void FilesPanel::setIconColor(const QColor &color)
 {
-    select_->setIcon(UiIcons::icon(QStringLiteral("locate"), color));
-    collapse_->setIcon(UiIcons::icon(QStringLiteral("collapse-all"), color));
-    options_->setIcon(UiIcons::icon(QStringLiteral("more"), color));
+    header_->setIconColor(color);
 }

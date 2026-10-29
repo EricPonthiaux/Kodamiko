@@ -6,25 +6,21 @@
 #include "ProjectListDelegate.h"
 #include "ProjectSetupForm.h"
 #include "ProjectSetupPanel.h"
+#include "ResumeCard.h"
 #include "projects/ProjectStore.h"
 #include "recipes/RecipeLibrary.h"
 #include "settings/Preferences.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Toolchains.h"
 #include "ui/AboutPopup.h"
-#include "ui/AppFonts.h"
-#include "ui/BrandMark.h"
 #include "ui/ContextMenus.h"
 #include "ui/PopupWidgets.h"
 #include "ui/ThemeStyle.h"
-#include "ui/TitleBar.h"
-#include "ui/UiIcons.h"
+#include "ui/WindowControls.h"
 #include "ui/WindowFrame.h"
 
-#include <QApplication>
 #include <QDir>
 #include <QFileDialog>
-#include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -40,25 +36,36 @@
 
 namespace {
 
-constexpr int windowWidth = 1152;
-constexpr int windowHeight = 640;
-constexpr int sideWidth = 248;
-constexpr int brandMarkSize = 44;
-constexpr int emptyMarkSize = 72;
-constexpr int emptyTextWidth = 380;
+// The welcome, as the mockup has it; a form (New Project, a project's
+// setup) needs more room, which the window grows to when it shows one.
+constexpr QSize welcomeSize{880, 520};
+constexpr QSize formSize{904, 640};
 
 constexpr const char *welcomeRules = R"(
-QWidget#welcomeSide { background: @panel; border-right: 1px solid @line; }
-QLabel#welcomeVersion { color: @muted; border: 1px solid @line; border-radius: 8px; padding: 0 7px; }
-QWidget#welcomeSide QPushButton { text-align: left; padding: 7px 12px; border-radius: 6px; }
-QWidget#welcomeEmpty QPushButton { padding: 7px 18px; border-radius: 6px; }
-QWidget#welcomeSide QPushButton#welcomeLink { background: transparent; border: none; color: @muted; padding: 6px 8px; }
-QWidget#welcomeSide QPushButton#welcomeLink:hover { background: @hover; color: @text; }
-QFrame#welcomeLinks, QFrame#welcomeKeyHints { border: none; border-top: 1px solid @line; }
-QLineEdit#welcomeSearch { padding: 6px 10px; border-radius: 6px; }
+QFrame#welcomeTitleBar { border: none; border-bottom: 1px solid @line; }
+QLabel#welcomeVersion { color: @muted; border: 1px solid @border; border-radius: 3px; padding: 1px 5px; }
+QLabel#welcomeCaption, QLabel#welcomeCount, QLabel#welcomeNumber { color: @muted; }
+QLabel#welcomeNumber { color: @border; }
+QLabel#welcomeEyebrow { color: @accent; }
+QFrame#welcomePanel { border: none; border-left: 1px solid @line; }
+QFrame#welcomeFooter { border: none; border-top: 1px solid @line; }
+QFrame#welcomeRule { background: @line; border: none; }
+QPushButton#welcomeLink { background: transparent; border: none; color: @muted; padding: 4px 6px; }
+QPushButton#welcomeLink:hover { color: @text; }
+QPushButton#welcomeAction { padding: 8px 12px; border-radius: 5px; }
+QLineEdit#welcomeSearch { padding: 3px 6px; border-radius: 5px; }
 QListWidget#welcomeProjects { background: transparent; border: none; outline: none; }
+QLabel#templateChip { color: @muted; border: 1px solid @border; border-radius: 3px; padding: 3px 7px; }
 QLabel#keyCap { color: @text; background: @panel; border: 1px solid @line; border-bottom: 2px solid @line; border-radius: 4px; padding: 0 5px; }
 )";
+
+QString welcomeStyleSheet(const Theme &theme)
+{
+    // popupStyleSheet replaces the other colors.
+    QString rules = QString::fromLatin1(welcomeRules);
+    rules.replace(QStringLiteral("@border"), theme.border.name());
+    return popupStyleSheet(theme, rules);
+}
 
 using Roles = ProjectListDelegate;
 
@@ -88,6 +95,38 @@ QListWidgetItem *findProject(const QListWidget &list, const QString &path)
     return nullptr;
 }
 
+// Shows the projects matching `text`, and the headings of their groups;
+// the one at `featuredPath`, on the card, only in a search. Returns how
+// many projects show.
+int showMatches(const QListWidget &list, const QString &text, const QString &featuredPath)
+{
+    QListWidgetItem *heading = nullptr;
+    int shownCount = 0;
+    for (int i = 0; i < list.count(); ++i) {
+        QListWidgetItem *item = list.item(i);
+        if (isHeading(item)) {
+            // Hidden until a project of its group is shown.
+            heading = item;
+            heading->setHidden(true);
+            continue;
+        }
+        const bool isOnCard = text.isEmpty() && pathOf(item) == featuredPath;
+        const bool shown = !isOnCard && matches(item, text);
+        item->setHidden(!shown);
+        if (!shown)
+            continue;
+        ++shownCount;
+        if (heading)
+            heading->setHidden(false);
+    }
+    return shownCount;
+}
+
+bool isEnter(const QKeyEvent *key)
+{
+    return key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter;
+}
+
 } // namespace
 
 WelcomeWindow::WelcomeWindow(QWidget *parent)
@@ -105,9 +144,11 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     preferences.applyTypography(theme_);
     ThemeStyle::apply(theme_);
     setWindowTitle(tr("Welcome to Kodamiko"));
-    resize(windowWidth, windowHeight);
+    resize(welcomeSize);
 
-    pages_->addWidget(createProjectsPage());
+    configureList();
+    welcomePage_ = createWelcomePage();
+    pages_->addWidget(welcomePage_);
     pages_->addWidget(setup_);
     setup_->applyTheme(theme_);
     connect(setup_, &ProjectSetupPanel::done, this, &WelcomeWindow::projectChosen);
@@ -118,17 +159,14 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     // Its languages, detected from the template's files, to check.
     connect(newProject_, &NewProjectForm::created, this, &WelcomeWindow::configure);
 
-    auto *layout = new QHBoxLayout(this);
+    auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(createSide());
+    titleBar_ = createTitleBar();
+    layout->addWidget(titleBar_);
     layout->addWidget(pages_, 1);
 
-    setStyleSheet(popupStyleSheet(theme_, QString::fromLatin1(welcomeRules)));
-    // A square as high as the search beside it, not a title bar's control:
-    // its height comes from the style sheet, so after it.
-    const int searchHeight = search_->sizeHint().height();
-    close_->setFixedSize(searchHeight, searchHeight);
+    setStyleSheet(welcomeStyleSheet(theme_));
 #ifdef Q_OS_MACOS
     close_->hide();
 #else
@@ -138,99 +176,13 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     frame_->applyTheme(theme_);
 
     reload();
-    search_->setFocus();
+    focusFirstChoice();
 }
 
 WelcomeWindow::~WelcomeWindow() = default;
 
-QWidget *WelcomeWindow::createSide()
+void WelcomeWindow::configureList()
 {
-    // Dragging the side moves the window.
-    auto *side = new QWidget(this);
-    side->setObjectName(QStringLiteral("welcomeSide"));
-    side->setAttribute(Qt::WA_StyledBackground);
-    side->setFixedWidth(sideWidth);
-    side->installEventFilter(this);
-
-    auto *logo = new QLabel(side);
-    logo->setPixmap(BrandMark::markPixmap(brandMarkSize, theme_, devicePixelRatioF()));
-    auto *name = new QLabel(QStringLiteral("Kodamiko"), side);
-    AppFonts::setInterfaceFont(name, 1.5);
-    auto *version = new QLabel(QCoreApplication::applicationVersion(), side);
-    version->setObjectName(QStringLiteral("welcomeVersion"));
-    AppFonts::setInterfaceFont(version, 0.85, QFont::Normal);
-    auto *identity = new QVBoxLayout;
-    identity->setSpacing(3);
-    identity->addWidget(name);
-    identity->addWidget(version, 0, Qt::AlignLeft);
-    auto *brand = new QHBoxLayout;
-    brand->setSpacing(12);
-    brand->addWidget(logo);
-    brand->addLayout(identity, 1);
-
-    auto *hint = new QLabel(tr("Each project keeps its languages, runtimes and servers. Kodamiko downloads what they "
-                               "need into its own folder."),
-                            side);
-    hint->setObjectName(QStringLiteral("footerHint"));
-    hint->setWordWrap(true);
-    AppFonts::setInterfaceFont(hint, 0.92, QFont::Normal);
-
-    auto *links = new QFrame(side);
-    links->setObjectName(QStringLiteral("welcomeLinks"));
-    auto *about = new QPushButton(tr("About Kodamiko"), links);
-    about->setObjectName(QStringLiteral("welcomeLink"));
-    connect(about, &QPushButton::clicked, this, &WelcomeWindow::showAbout);
-    auto *linksLayout = new QVBoxLayout(links);
-    linksLayout->setContentsMargins(0, 10, 0, 0);
-    linksLayout->addWidget(about);
-
-    auto *layout = new QVBoxLayout(side);
-    layout->setContentsMargins(24, 28, 24, 20);
-    layout->setSpacing(8);
-    layout->addLayout(brand);
-    layout->addSpacing(28);
-    addProjectButtons(layout, side);
-    layout->addStretch();
-    layout->addWidget(hint);
-    layout->addSpacing(8);
-    layout->addWidget(links);
-    return side;
-}
-
-void WelcomeWindow::addProjectButtons(QBoxLayout *layout, QWidget *parent)
-{
-    auto *create =
-        new QPushButton(UiIcons::icon(QStringLiteral("plus"), theme_.accentText), tr("New Project…"), parent);
-    create->setDefault(true);
-    connect(create, &QPushButton::clicked, this, &WelcomeWindow::showNewProject);
-    auto *import =
-        new QPushButton(UiIcons::icon(QStringLiteral("folder"), theme_.foreground), tr("Import Project…"), parent);
-    connect(import, &QPushButton::clicked, this, &WelcomeWindow::importProject);
-    layout->addWidget(create);
-    layout->addWidget(import);
-}
-
-QWidget *WelcomeWindow::createProjectsPage()
-{
-    auto *projects = new QWidget(this);
-    projects->installEventFilter(this);
-    search_->setObjectName(QStringLiteral("welcomeSearch"));
-    search_->setPlaceholderText(tr("Search projects"));
-    search_->setClearButtonEnabled(true);
-    search_->installEventFilter(this);
-    connect(search_, &QLineEdit::textChanged, this, &WelcomeWindow::filter);
-    // Kodamiko's frame has no title bar: a close button of its own.
-    close_ = new WindowButton(WindowButton::Kind::Close, projects);
-    close_->applyTheme(theme_);
-    close_->setCorners(WindowButton::Corners::Rounded);
-    close_->setToolTip(tr("Close"));
-    connect(close_, &QAbstractButton::clicked, this, &QWidget::close);
-    auto *top = new QHBoxLayout;
-    top->setSpacing(8);
-    top->addWidget(search_, 1);
-    top->addStretch(); // keeps the close button on the right without the search
-    top->addWidget(close_);
-
     list_->setObjectName(QStringLiteral("welcomeProjects"));
     const ProjectListDelegate::Actions actions{
         .showMenu = [this](const QModelIndex &index,
@@ -241,85 +193,10 @@ QWidget *WelcomeWindow::createProjectsPage()
     list_->setMouseTracking(true);
     list_->setContextMenuPolicy(Qt::CustomContextMenu);
     list_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    list_->installEventFilter(this);
     connect(list_, &QListWidget::itemActivated, this, [this](QListWidgetItem *item) { open(pathOf(item)); });
     connect(list_, &QWidget::customContextMenuRequested, this, &WelcomeWindow::showContextMenu);
-
-    emptyState_ = createEmptyState();
-    keyHints_ = createKeyHints();
-    auto *layout = new QVBoxLayout(projects);
-    layout->setContentsMargins(32, 28, 24, 16);
-    layout->setSpacing(16);
-    layout->addLayout(top);
-    layout->addWidget(list_, 1);
-    layout->addWidget(emptyState_, 1);
-    layout->addWidget(keyHints_);
-    return projects;
-}
-
-QWidget *WelcomeWindow::createEmptyState()
-{
-    auto *empty = new QWidget(this);
-    empty->setObjectName(QStringLiteral("welcomeEmpty"));
-    auto *mark = new QLabel(empty);
-    mark->setPixmap(BrandMark::markPixmap(emptyMarkSize, theme_, devicePixelRatioF()));
-    auto *title = new QLabel(tr("Start your first project"), empty);
-    AppFonts::setInterfaceFont(title, 1.3);
-    auto *text = new QLabel(tr("Create one from a template, or import a folder you already have. Kodamiko sets up its "
-                               "languages and downloads the tools they need."),
-                            empty);
-    text->setObjectName(QStringLiteral("footerHint"));
-    text->setWordWrap(true);
-    text->setAlignment(Qt::AlignCenter);
-    text->setFixedWidth(emptyTextWidth);
-    auto *buttons = new QHBoxLayout;
-    buttons->setSpacing(10);
-    buttons->addStretch();
-    addProjectButtons(buttons, empty);
-    buttons->addStretch();
-
-    auto *layout = new QVBoxLayout(empty);
-    layout->setSpacing(10);
-    layout->addStretch();
-    layout->addWidget(mark, 0, Qt::AlignHCenter);
-    layout->addSpacing(6);
-    layout->addWidget(title, 0, Qt::AlignHCenter);
-    layout->addWidget(text, 0, Qt::AlignHCenter);
-    layout->addSpacing(10);
-    layout->addLayout(buttons);
-    layout->addStretch();
-    return empty;
-}
-
-QWidget *WelcomeWindow::createKeyHints()
-{
-    const QList<std::pair<QStringList, QString>> hints = {
-        {{QStringLiteral("↵")}, tr("Open")},
-        {{QStringLiteral("↑"), QStringLiteral("↓")}, tr("Move")},
-        {{QStringLiteral("Del")}, tr("Remove from list")},
-        {{QStringLiteral("⋯")}, tr("Project settings")},
-    };
-    auto *frame = new QFrame(this);
-    frame->setObjectName(QStringLiteral("welcomeKeyHints"));
-    auto *layout = new QHBoxLayout(frame);
-    layout->setContentsMargins(0, 12, 0, 0);
-    layout->setSpacing(18);
-    for (const auto &[keys, action] : hints) {
-        auto *hint = new QHBoxLayout;
-        hint->setSpacing(4);
-        for (const QString &key : keys) {
-            auto *cap = new QLabel(key, frame);
-            cap->setObjectName(QStringLiteral("keyCap"));
-            AppFonts::setInterfaceFont(cap, 0.85, QFont::Medium);
-            hint->addWidget(cap);
-        }
-        hint->addSpacing(2);
-        auto *label = new QLabel(action, frame);
-        label->setObjectName(QStringLiteral("footerHint"));
-        hint->addWidget(label);
-        layout->addLayout(hint);
-    }
-    layout->addStretch();
-    return frame;
 }
 
 void WelcomeWindow::reload()
@@ -342,12 +219,25 @@ void WelcomeWindow::reload()
     if (QListWidgetItem *item = findProject(*list_, current))
         list_->setCurrentItem(item);
 
-    const bool hasProjects = !present.isEmpty() || !missing.isEmpty();
-    search_->setVisible(hasProjects);
-    list_->setVisible(hasProjects);
-    keyHints_->setVisible(hasProjects);
-    emptyState_->setVisible(!hasProjects);
+    // The one opened last, on the card.
+    featuredPath_ = present.isEmpty() ? QString() : present.first().path;
+    if (!present.isEmpty())
+        card_->setProject(present.first());
+    showProjectsState(present.size() + missing.size());
     filter(search_->text());
+}
+
+void WelcomeWindow::showProjectsState(qsizetype projectCount)
+{
+    const bool hasProjects = projectCount > 0;
+    eyebrow_->setText(hasProjects ? tr("YOUR WORKSPACE") : tr("YOUR NEXT CHAPTER"));
+    title_->setText(hasProjects ? tr("Pick up your flow.") : tr("What will you make?"));
+    description_->setVisible(!hasProjects);
+    card_->setVisible(!featuredPath_.isEmpty());
+    // A single project is on the card: nothing else to list or search.
+    listHeading_->setVisible(projectCount > 1);
+    navigationHints_->setVisible(hasProjects);
+    firstSteps_->setVisible(!hasProjects);
 }
 
 void WelcomeWindow::addHeading(const QString &title)
@@ -368,25 +258,35 @@ QListWidgetItem *WelcomeWindow::addProject(const ProjectConfig &project)
 
 void WelcomeWindow::filter(const QString &text)
 {
-    QListWidgetItem *heading = nullptr;
-    QListWidgetItem *firstShown = nullptr;
+    const int shownCount = showMatches(*list_, text, featuredPath_);
+    count_->setText(QString::number(shownCount));
+    const bool isListed = listHeading_->isVisibleTo(this);
+    list_->setVisible(isListed && shownCount > 0);
+    noMatch_->setVisible(isListed && shownCount == 0);
+    const QListWidgetItem *current = list_->currentItem();
+    QListWidgetItem *firstShown = firstShownProject();
+    if (firstShown && (!current || current->isHidden()))
+        list_->setCurrentItem(firstShown);
+}
+
+QListWidgetItem *WelcomeWindow::firstShownProject() const
+{
     for (int i = 0; i < list_->count(); ++i) {
         QListWidgetItem *item = list_->item(i);
-        if (isHeading(item)) {
-            // Hidden until a project of its group is shown.
-            heading = item;
-            heading->setHidden(true);
-            continue;
-        }
-        const bool shown = matches(item, text);
-        item->setHidden(!shown);
-        if (shown && heading)
-            heading->setHidden(false);
-        if (shown && !firstShown)
-            firstShown = item;
+        if (!isHeading(item) && !item->isHidden())
+            return item;
     }
-    if (firstShown && (!list_->currentItem() || list_->currentItem()->isHidden()))
-        list_->setCurrentItem(firstShown);
+    return nullptr;
+}
+
+void WelcomeWindow::focusFirstChoice()
+{
+    if (card_->isVisibleTo(this))
+        card_->setFocus();
+    else if (listHeading_->isVisibleTo(this))
+        search_->setFocus();
+    else
+        newButton_->setFocus();
 }
 
 void WelcomeWindow::open(const QString &path)
@@ -404,7 +304,7 @@ void WelcomeWindow::open(const QString &path)
         return;
     }
     setup_->load(*saved);
-    pages_->setCurrentIndex(1);
+    showForm(setup_);
     setup_->download(*saved);
 }
 
@@ -420,19 +320,34 @@ void WelcomeWindow::configure(const QString &path)
             ProjectSetupForm::detectedProject(saved.value_or(ProjectConfig{.path = path}), *toolchains_, &detected);
         setup_->load(project, detected);
     }
-    pages_->setCurrentIndex(1);
+    showForm(setup_);
 }
 
 void WelcomeWindow::showProjects()
 {
     reload();
-    pages_->setCurrentIndex(0);
-    search_->setFocus();
+    titleBar_->show();
+    pages_->setCurrentWidget(welcomePage_);
+    focusFirstChoice();
+}
+
+void WelcomeWindow::showForm(QWidget *page)
+{
+    // The forms have a header of their own, which closes them.
+    titleBar_->hide();
+    pages_->setCurrentWidget(page);
+    const QSize grown = size().expandedTo(formSize);
+    if (grown == size())
+        return;
+    // Grown around its centre, where the user looks.
+    const QSize growth = grown - size();
+    move(pos() - QPoint(growth.width() / 2, growth.height() / 2));
+    resize(grown);
 }
 
 void WelcomeWindow::showNewProject()
 {
-    pages_->setCurrentWidget(newProject_);
+    showForm(newProject_);
     newProject_->reset();
 }
 
@@ -484,6 +399,13 @@ void WelcomeWindow::showContextMenu(const QPoint &position)
         showMenu(item, list_->viewport()->mapToGlobal(position));
 }
 
+void WelcomeWindow::showCardMenu(const QPoint &position)
+{
+    // The card's project is in the list too, hidden.
+    if (QListWidgetItem *item = findProject(*list_, featuredPath_))
+        showMenu(item, card_->mapToGlobal(position));
+}
+
 void WelcomeWindow::showMenu(QListWidgetItem *item, QPoint globalPosition)
 {
     const QString path = pathOf(item);
@@ -500,34 +422,91 @@ void WelcomeWindow::showMenu(QListWidgetItem *item, QPoint globalPosition)
 
 bool WelcomeWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    // The empty parts of the window move it, like a title bar.
-    if (event->type() == QEvent::MouseButtonPress && watched != search_) {
-        const auto *mouse = static_cast<QMouseEvent *>(event);
-        if (mouse->button() == Qt::LeftButton && windowHandle() && frame_->isFrameless()) {
-            windowHandle()->startSystemMove();
-            return true;
-        }
-    }
-    // From the search field, the arrows move in the list.
-    if (event->type() == QEvent::KeyPress && watched == search_) {
-        auto *key = static_cast<QKeyEvent *>(event);
-        if (key->key() == Qt::Key_Down || key->key() == Qt::Key_Up || key->key() == Qt::Key_PageDown ||
-            key->key() == Qt::Key_PageUp) {
-            QApplication::sendEvent(list_, key);
-            return true;
-        }
-        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && list_->currentItem() &&
-            !list_->currentItem()->isHidden()) {
-            open(pathOf(list_->currentItem()));
-            return true;
-        }
+    if (moveWindow(watched, event))
+        return true;
+    if (event->type() == QEvent::KeyPress) {
+        const auto *key = static_cast<QKeyEvent *>(event);
+        if (watched == search_)
+            return searchKeyPressed(key);
+        if (watched == card_)
+            return cardKeyPressed(key);
+        if (watched == list_)
+            return listKeyPressed(key);
     }
     return QWidget::eventFilter(watched, event);
 }
 
+bool WelcomeWindow::moveWindow(QObject *watched, const QEvent *event)
+{
+    // The empty parts of the window move it, like a title bar; the
+    // controls watched for their keys keep their clicks.
+    const bool isControl = watched == search_ || watched == card_ || watched == list_;
+    if (event->type() != QEvent::MouseButtonPress || isControl)
+        return false;
+    const auto *mouse = static_cast<const QMouseEvent *>(event);
+    if (mouse->button() != Qt::LeftButton || !windowHandle() || !frame_->isFrameless())
+        return false;
+    windowHandle()->startSystemMove();
+    return true;
+}
+
+bool WelcomeWindow::searchKeyPressed(const QKeyEvent *key)
+{
+    const QListWidgetItem *current = list_->currentItem();
+    const bool hasCurrent = current && !current->isHidden();
+    if ((key->key() == Qt::Key_Down || key->key() == Qt::Key_PageDown) && hasCurrent) {
+        list_->setFocus();
+        return true;
+    }
+    if (key->key() == Qt::Key_Up && card_->isVisible()) {
+        card_->setFocus();
+        return true;
+    }
+    if (isEnter(key) && hasCurrent) {
+        open(pathOf(current));
+        return true;
+    }
+    if (key->key() == Qt::Key_Escape && !search_->text().isEmpty()) {
+        search_->clear();
+        return true;
+    }
+    return false;
+}
+
+bool WelcomeWindow::cardKeyPressed(const QKeyEvent *key)
+{
+    if (isEnter(key)) {
+        card_->click();
+        return true;
+    }
+    if (key->key() != Qt::Key_Down)
+        return false;
+    // Down the list, or to the search above an empty one.
+    if (QListWidgetItem *first = firstShownProject()) {
+        list_->setCurrentItem(first);
+        list_->setFocus();
+    } else if (search_->isVisible()) {
+        search_->setFocus();
+    }
+    return true;
+}
+
+bool WelcomeWindow::listKeyPressed(const QKeyEvent *key)
+{
+    const bool isAtTop = list_->currentItem() == firstShownProject();
+    if (key->key() != Qt::Key_Up || !isAtTop)
+        return false;
+    // Up from the first row, back to the card.
+    if (card_->isVisible())
+        card_->setFocus();
+    else
+        search_->setFocus();
+    return true;
+}
+
 void WelcomeWindow::keyPressEvent(QKeyEvent *event)
 {
-    if (pages_->currentIndex() == 0) {
+    if (pages_->currentWidget() == welcomePage_) {
         if (event->key() == Qt::Key_Delete && list_->hasFocus()) {
             remove(list_->currentItem());
             return;

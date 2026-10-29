@@ -2,11 +2,10 @@
 
 #include "ClaudeConfigView.h"
 
-#include "ui/AppFonts.h"
 #include "ui/ContextMenus.h"
 #include "ui/FileIcons.h"
 #include "ui/UiIcons.h"
-#include "ui/UiMetrics.h"
+#include "ui/ViewHeader.h"
 #include "workspace/EntryPopups.h"
 
 #include <QAction>
@@ -17,8 +16,6 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QFrame>
-#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QMenu>
 #include <QScrollBar>
@@ -126,7 +123,6 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     levelSelector_->setFocusPolicy(Qt::NoFocus);
     levelSelector_->setPopupMode(QToolButton::InstantPopup);
     levelSelector_->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    AppFonts::setInterfaceFont(levelSelector_, 1);
     auto *levelMenu = new QMenu(levelSelector_);
     levels_ = new QActionGroup(this);
     levels_->setExclusive(true);
@@ -143,19 +139,9 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
     levelSelector_->setMenu(levelMenu);
     updateLevelText();
 
-    // Icons only, all the same size (see setIconColor), as in the Files pane.
-    const auto addButton = [this](const QString &toolTip) {
-        auto *button = new QToolButton(this);
-        button->setToolTip(toolTip);
-        button->setAutoRaise(true);
-        button->setFocusPolicy(Qt::NoFocus);
-        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-        UiMetrics::setScaledIconSize(button);
-        UiMetrics::setScaledSize(button, QSize(26, 24));
-        return button;
-    };
+    auto *header = new ViewHeader(levelSelector_, this);
     const QString noIndicator = QStringLiteral("QToolButton::menu-indicator { image: none; width: 0; }");
-    new_ = addButton(tr("New Skill, Agent, Command or Rule"));
+    new_ = header->addButton(QStringLiteral("plus"), tr("New Skill, Agent, Command or Rule"));
     new_->setPopupMode(QToolButton::InstantPopup);
     new_->setStyleSheet(noIndicator);
     auto *newMenu = new QMenu(new_);
@@ -164,9 +150,9 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
             addNewActions(newMenu->addMenu(itemNoun(category)), category);
     }
     new_->setMenu(newMenu);
-    reload_ = addButton(tr("Reload"));
+    reload_ = header->addButton(QStringLiteral("refresh"), tr("Reload"));
     connect(reload_, &QToolButton::clicked, this, &ClaudeConfigView::refresh);
-    options_ = addButton(tr("Options"));
+    options_ = header->addButton(QStringLiteral("more"), tr("Options"));
     options_->setPopupMode(QToolButton::InstantPopup);
     options_->setStyleSheet(noIndicator);
     auto *optionsMenu = new QMenu(options_);
@@ -177,18 +163,6 @@ ClaudeConfigView::ClaudeConfigView(QWidget *parent)
                            [] { QDesktopServices::openUrl(QUrl::fromLocalFile(ClaudeConfig::configDir())); });
     optionsMenu->setToolTipsVisible(true);
     options_->setMenu(optionsMenu);
-
-    auto *header = new QFrame(this);
-    header->setObjectName(QStringLiteral("viewHeader"));
-    UiMetrics::setScaledHeight(header, UiMetrics::panelHeaderHeight);
-    auto *toolbar = new QHBoxLayout(header);
-    toolbar->setContentsMargins(10, 0, 6, 0);
-    toolbar->setSpacing(2);
-    toolbar->addWidget(levelSelector_);
-    toolbar->addStretch(1);
-    toolbar->addWidget(new_);
-    toolbar->addWidget(reload_);
-    toolbar->addWidget(options_);
 
     tree_->setColumnCount(2);
     tree_->header()->hide();
