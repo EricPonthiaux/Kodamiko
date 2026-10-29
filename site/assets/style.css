@@ -1,13 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 
-/* Geist and Geist Mono are served with the site so that every visitor sees
-   the same type; their license is fonts/OFL.txt. */
+/* Inter and Geist Mono are served with the site so that every visitor sees
+   the same type; their licenses are fonts/Inter-OFL.txt and fonts/OFL.txt.
+   Inter is cut down to the Latin scripts, punctuation and arrows the pages
+   use, and keeps its optical size axis: the titles take its display cut. */
 @font-face {
-  font-family: "Geist";
+  font-family: "Inter";
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("fonts/Geist-Variable.woff2") format("woff2");
+  src: url("fonts/Inter-Variable.woff2") format("woff2");
 }
 
 @font-face {
@@ -18,44 +20,47 @@
   src: url("fonts/GeistMono-Variable.woff2") format("woff2");
 }
 
-/* The brand colors come from packaging/brand/kodamiko-icon.svg. The site is dark
-   by default, like the editor its screenshots show. */
+/* The colors are those of Kodamiko's violet theme (kodamiko-violet in
+   src/ui/Theme.cpp): its near-black panels, its violets and its coral
+   accent. The site is dark by default, like the editor its screenshots
+   show; the light variant keeps the violet tint and a deeper coral, so that
+   text in the accent still reads at 4.5:1. */
 :root {
-  --bg: #0d0f13;
-  --surface: #12151b;
-  --surface-raised: #181c24;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #eceef3;
-  --text-muted: #9ba2b1;
-  --text-subtle: #6f7686;
-  --accent: #4f7cf0;
-  --accent-strong: #84a3f7;
-  --accent-soft: rgba(79, 124, 240, 0.12);
-  --glow: rgba(79, 124, 240, 0.16);
+  --bg: #1a1224;
+  --surface: #1f1729;
+  --surface-raised: #2b2045;
+  --border: rgba(230, 224, 240, 0.08);
+  --border-strong: rgba(230, 224, 240, 0.15);
+  --text: #f5f0fa;
+  --text-muted: #a59cb8;
+  --text-subtle: #9286b0;
+  --accent: #f84a5e;
+  --accent-strong: #ff8fa0;
+  --accent-soft: rgba(248, 74, 94, 0.13);
+  --glow: rgba(213, 156, 255, 0.14);
   --radius: 10px;
   --content-width: 1120px;
-  --dot: rgba(255, 255, 255, 0.09);
-  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dot: rgba(230, 224, 240, 0.09);
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #fbfbfc;
-    --surface: #f4f5f8;
+    --bg: #fbf9fd;
+    --surface: #f4f0f9;
     --surface-raised: #ffffff;
-    --border: rgba(15, 20, 30, 0.09);
-    --border-strong: rgba(15, 20, 30, 0.16);
-    --text: #12151b;
-    --text-muted: #555c6b;
-    --text-subtle: #808797;
-    --accent: #3461d8;
-    --accent-strong: #2a52c4;
-    --accent-soft: rgba(52, 97, 216, 0.08);
-    --glow: rgba(52, 97, 216, 0.1);
-    --dot: rgba(15, 20, 30, 0.12);
+    --border: rgba(31, 23, 41, 0.09);
+    --border-strong: rgba(31, 23, 41, 0.16);
+    --text: #1f1729;
+    --text-muted: #5a4e72;
+    --text-subtle: #706588;
+    --accent: #e03a52;
+    --accent-strong: #c42a44;
+    --accent-soft: rgba(224, 58, 82, 0.08);
+    --glow: rgba(90, 63, 150, 0.1);
+    --dot: rgba(31, 23, 41, 0.12);
     color-scheme: light;
   }
 }
@@ -272,18 +277,18 @@ code {
 }
 
 /* The first line of the title fills the container at most: --title-em is its
-   width in em, in Geist SemiBold with its tracking, plus a margin. On a phone
+   width in em, in Inter SemiBold with its tracking, plus a margin. On a phone
    it may wrap. */
 .hero h1 {
-  --title-em: 13.5;
+  --title-em: 12.9;
   margin: 28px auto 0;
   font-size: min(5.75rem, 100cqi / var(--title-em));
   line-height: 1;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.03em;
 }
 
 .hero h1:lang(fr) {
-  --title-em: 16.5;
+  --title-em: 15.75;
 }
 
 .hero h1 .accent {
@@ -322,11 +327,11 @@ code {
   }
 
   .hero h1 {
-    --title-em: 8;
+    --title-em: 7.75;
   }
 
   .hero h1:lang(fr) {
-    --title-em: 9.5;
+    --title-em: 9;
   }
 
   .hero .lead {
@@ -503,7 +508,7 @@ section.alt {
   max-width: 760px;
   font-size: clamp(1.65rem, 3.4vw, 2.35rem);
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.022em;
 }
 
 .section-lead {
@@ -578,7 +583,7 @@ section.alt {
   margin: 0 0 16px;
   font-size: clamp(1.45rem, 2.6vw, 1.9rem);
   line-height: 1.2;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.018em;
 }
 
 .showcase-text p {
