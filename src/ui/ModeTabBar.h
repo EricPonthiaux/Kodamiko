@@ -4,13 +4,13 @@
 
 #include <QTabBar>
 
-// The tabs of the status bar's mode switcher: as high as the bars' other
-// boxes (UiMetrics::controlHeight), so that they never stand taller than a
-// tab and leave room above and below them in the bar.
+// The status bar's mode switcher: inset segments on a shared rounded track,
+// as high as the bars' other boxes (UiMetrics::controlHeight).
 class ModeTabBar : public QTabBar {
 public:
     using QTabBar::QTabBar;
 
 protected:
+    void paintEvent(QPaintEvent *event) override;
     QSize tabSizeHint(int index) const override;
 };

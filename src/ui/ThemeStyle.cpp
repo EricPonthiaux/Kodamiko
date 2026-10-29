@@ -199,9 +199,12 @@ SidePanel > QWidget { background: @base; }
 SidePanel QFrame#viewHeader { border: none; }
 SidePanel QFrame#viewHeaderTab { border-left: none; border-top-left-radius: 0; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
-QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 0 10px; min-width: 0; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 4px; }
+QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 0 10px; margin: 3px 2px; min-width: 0; border: 1px solid transparent; border-radius: 4px; }
+QTabBar#modeTabs::tab:first { margin-left: 3px; }
+QTabBar#modeTabs::tab:last { margin-right: 3px; }
 QTabBar#modeTabs::tab:hover { background: @hover; color: @text; }
-QTabBar#modeTabs::tab:selected { background: @checked; color: @accentText; border-color: @line; border-bottom-color: @accent; }
+QTabBar#modeTabs::tab:selected { background: @modeActive; color: @accentText; border: 1px solid @modeBorder; }
+QTabBar#modeTabs::tab:selected:hover { background: @modeHover; }
 QTabBar::scroller { width: 56px; }
 QTabBar QToolButton { background: @window; border: none; border-radius: 0; padding: 0; }
 QTabBar QToolButton:hover { background: @button; }
@@ -341,13 +344,12 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         {"@highlight", theme.highlight},
         // The inactive editor, terminal and mode tabs, set back from the window as in KDE's Breeze.
         {"@tabs", theme.window.darker(120)},
-        // The current mode: a checked flat button in Breeze.
-        {"@checked", withAlpha(theme.foreground, 0.125)},
         {"@slate", selectionColor(theme)},
         {"@separator", withAlpha(theme.line, 0.7)},
         // The checked segment of a mode selector (preview, diagram panel).
         {"@modeActive", mixed(theme.window, theme.accent, 0.16)},
         {"@modeBorder", mixed(theme.window, theme.accent, 0.35)},
+        {"@modeHover", mixed(theme.window, theme.accent, 0.23)},
         // The project is the tinted segment of the shared project/runner frame.
         {"@projectTint", mixed(theme.alternateBase, theme.accent, 0.08)},
         {"@projectHover", mixed(theme.alternateBase, theme.accent, 0.18)},

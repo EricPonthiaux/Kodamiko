@@ -147,8 +147,10 @@ int WorkspaceStatusBar::expandedModesWidth() const
     for (int i = 0; i < modes_->count(); ++i) {
         if (!modes_->isTabVisible(i))
             continue;
-        width += modes_->fontMetrics().horizontalAdvance(modeLabels_.at(i)) + modes_->iconSize().width() +
-                 UiMetrics::scaled(28);
+        // Keep the style's actual icon, padding and margin widths, even
+        // when the inactive labels have been removed for the compact bar.
+        width += modes_->tabRect(i).width() + modes_->fontMetrics().horizontalAdvance(modeLabels_.at(i)) -
+                 modes_->fontMetrics().horizontalAdvance(modes_->tabText(i));
     }
     return width;
 }
