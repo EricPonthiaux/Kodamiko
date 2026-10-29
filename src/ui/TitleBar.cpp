@@ -35,11 +35,13 @@ constexpr int groupInset = 2;
 constexpr int dividerInset = 6;
 // The project and run group stands taller than the bar's other controls:
 // what is opened and run, the bar's main choice.
-constexpr int projectGroupExtraHeight = 6;
+constexpr int projectGroupExtraHeight = 3;
 
+// No taller than a tab, as every box of the bars (UiMetrics::controlHeight):
+// with a large font, the boxes reach a tab's height already.
 int projectGroupHeight()
 {
-    return UiMetrics::controlHeight() + UiMetrics::scaled(projectGroupExtraHeight);
+    return std::min(UiMetrics::controlHeight() + UiMetrics::scaled(projectGroupExtraHeight), UiMetrics::tabHeight());
 }
 
 // The width the bar's layout gives `widget`: its hint within its limits.

@@ -83,7 +83,7 @@ private:
         QToolButton *button;
         QString iconName;
         QColor color;
-        int inset = 2; // room for the group's one-pixel border
+        int inset = 2;                 // room for the group's one-pixel border
         bool isInProjectGroup = false; // Run and Stop: as tall as the run block
     };
 
