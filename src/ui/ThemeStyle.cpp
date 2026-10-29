@@ -143,7 +143,7 @@ QMenuBar { background: @window; border-bottom: 1px solid @line; }
 QMenuBar::item { padding: 5px 10px; border-radius: 5px; background: transparent; }
 QMenuBar::item:selected, QMenuBar::item:pressed { background: @hover; color: @text; }
 QMenu { background: @panel; color: @text; border: 1px solid @border; border-radius: @frameRadiuspx; padding: 6px; }
-QMenu::item { padding: 6px 28px 6px 22px; border: 1px solid transparent; border-radius: @rowRadiuspx; }
+QMenu::item { padding: 6px 28px 6px 22px; border: 1px solid transparent; border-radius: @menuRowRadiuspx; }
 QMenu::icon { padding-left: 32px; }
 QMenu#projectMenu::icon { padding-left: 44px; }
 QMenu::item:selected { color: @text; background: @slate; }
@@ -317,6 +317,7 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
     // The popups' shared sizes (PopupMetrics), then the colors.
     sheet.replace(QStringLiteral("@frameRadius"), QString::number(PopupMetrics::frameRadius));
     sheet.replace(QStringLiteral("@rowRadius"), QString::number(PopupMetrics::rowRadius));
+    sheet.replace(QStringLiteral("@menuRowRadius"), QString::number(PopupMetrics::menuRowRadius));
     sheet.replace(QStringLiteral("@tabTopMargin"), QString::number(UiMetrics::tabTopMargin));
     const QList<std::pair<QString, QColor>> colors = {
         {"@reviewOnAccent", theme.isDark ? theme.background : theme.onAccent},

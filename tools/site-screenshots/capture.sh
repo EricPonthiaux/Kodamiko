@@ -8,9 +8,9 @@
 #   tools/site-screenshots/capture.sh <work-folder> [scale] [theme]
 #
 # <work-folder> is deleted first: give it a folder of its own. The scale is 1
-# or 2 (the -2x images). The theme is a theme's name, "kodamiko" by default
-# (the site's blue; the README's picture is "kodamiko-violet"). The build
-# folder is build-debug, built beforehand.
+# or 2 (the -2x images). The theme is a theme's name, "kodamiko-violet" by
+# default, whose tones the site shares. The build folder is build-debug,
+# built beforehand.
 #
 # Kodamiko runs with its own HOME and configuration: nothing of the user's
 # settings is read or written. Claude sessions use the user's real Claude
@@ -21,7 +21,7 @@ set -euo pipefail
 
 work=${1:?work folder}
 scale=${2:-1}
-theme=${3:-kodamiko}
+theme=${3:-kodamiko-violet}
 repo=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 build=$repo/build-debug
 screenWidth=1600

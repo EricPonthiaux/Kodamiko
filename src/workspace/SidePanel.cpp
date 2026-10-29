@@ -9,6 +9,7 @@
 #include <QEvent>
 #include <QImage>
 #include <QPainter>
+#include <QPointer>
 #include <QSplitter>
 #include <QStyleOptionTab>
 #include <QStylePainter>
@@ -43,7 +44,34 @@ public:
         update();
     }
 
+    void alignWith(QTabBar *tabs)
+    {
+        if (editorTabBar_)
+            editorTabBar_->removeEventFilter(this);
+        editorTabBar_ = tabs;
+        tabs->installEventFilter(this);
+        updateWidth();
+    }
+
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        const bool tabsChanged = event->type() == QEvent::Resize || event->type() == QEvent::Show ||
+                                 event->type() == QEvent::LayoutRequest || event->type() == QEvent::FontChange ||
+                                 event->type() == QEvent::StyleChange;
+        if (watched == editorTabBar_ && tabsChanged)
+            QMetaObject::invokeMethod(this, &SideTabBar::updateWidth, Qt::QueuedConnection);
+        return QTabBar::eventFilter(watched, event);
+    }
+
 protected:
+    QSize tabSizeHint(int index) const override
+    {
+        QSize size = QTabBar::tabSizeHint(index);
+        if (editorTabBar_)
+            size.setWidth(alignedWidth());
+        return size;
+    }
+
     void paintEvent(QPaintEvent *) override
     {
         QStylePainter painter(this);
@@ -66,6 +94,15 @@ protected:
     }
 
 private:
+    int alignedWidth() const
+    {
+        // The same thickness around the workspace, including the tabs' outer margin.
+        return editorTabBar_ && editorTabBar_->count() > 0 ? editorTabBar_->sizeHint().height()
+                                                           : UiMetrics::scaled(UiMetrics::panelHeaderHeight);
+    }
+
+    void updateWidth() { setFixedWidth(alignedWidth()); }
+
     // The line between the strip and the panel, open beside the open tab,
     // whose background reaches the panel's. Hovered tabs keep it. A filled
     // column rather than a line: at a fractional scale, a line falls between
@@ -143,6 +180,7 @@ private:
     }
 
     const SidePanel *panel_;
+    QPointer<QTabBar> editorTabBar_;
     Theme theme_;
 };
 
@@ -194,6 +232,7 @@ int SidePanel::addView(QWidget *view, const QIcon &icon, const QString &title)
 
 void SidePanel::alignHeadersWith(QTabBar *tabs)
 {
+    tabBar_->alignWith(tabs);
     for (auto *header : findChildren<ViewHeader *>())
         header->alignWith(tabs);
 }

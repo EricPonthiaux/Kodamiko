@@ -30,6 +30,7 @@ public:
     QTabBar *tabBar() const;
 
     int addView(QWidget *view, const QIcon &icon, const QString &title);
+    // The headers' height and the vertical strip's width follow the editor tabs' height.
     void alignHeadersWith(QTabBar *tabs);
     // The tabs and their separator; the open tab shares the panel's background.
     void applyTheme(const Theme &theme);

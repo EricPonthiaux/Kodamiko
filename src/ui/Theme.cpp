@@ -347,6 +347,204 @@ Theme kdkPearl()
     return theme;
 }
 
+// Boreal light: a deep green night, mint focus and lavender/cyan syntax.
+Theme kdkAurora()
+{
+    Theme theme;
+    theme.name = QStringLiteral("kodamiko-aurora");
+    theme.title = QStringLiteral("Kodamiko-Aurora");
+    theme.font = editorFont();
+    theme.background = QColor("#102522");
+    theme.foreground = QColor("#e0f1e9");
+    theme.caret = QColor("#82edc1");
+    theme.caretLine = QColor("#19312d");
+    theme.selection = QColor("#294a43");
+    theme.marginBackground = theme.background;
+    theme.marginForeground = QColor("#6e9186");
+    theme.currentLineNumber = QColor("#b3decd");
+    theme.braceMatch = QColor("#36574d");
+    theme.findHighlight = QColor("#e9cd90");
+    theme.error = QColor("#f59baf");
+    theme.warning = QColor("#e9cd90");
+    theme.window = QColor("#0b1b19");
+    theme.button = QColor("#213b34");
+    theme.alternateBase = QColor("#19312d");
+    theme.highlight = QColor("#305b4e");
+    theme.accent = QColor("#82edc1");
+    theme.accentText = QColor("#b4f5dc");
+    theme.onAccent = QColor("#0b1b19");
+    theme.mutedText = QColor("#9db8ad");
+    theme.border = QColor("#345148");
+    theme.line = QColor("#263c35");
+    theme.hover = QColor("#203b34");
+    theme.syntaxStyles = {
+        {"comment", italic("#94afa3")},         {"string", plain("#b7e4a0")},
+        {"string.special", plain("#92ddd8")},   {"escape", plain("#92ddd8")},
+        {"number", plain("#f1c995")},           {"constant", plain("#f1c995")},
+        {"constant.builtin", plain("#f1c995")}, {"keyword", plain("#cbb7f5")},
+        {"operator", plain("#92ddd8")},         {"type", plain("#8ee3c0")},
+        {"type.builtin", plain("#8ee3c0")},     {"constructor", plain("#8ee3c0")},
+        {"module", plain("#8ee3c0")},           {"function", plain("#a1cef5")},
+        {"function.builtin", plain("#92ddd8")}, {"variable", plain("#e0f1e9")},
+        {"variable.builtin", plain("#f2b3ce")}, {"variable.parameter", italic("#d7caee")},
+        {"property", plain("#d7caee")},         {"label", plain("#f2b3ce")},
+        {"attribute", plain("#d7caee")},        {"tag", plain("#f2b3ce")},
+        {"punctuation", plain("#b4cdc3")},      {"punctuation.special", plain("#cbb7f5")},
+        {"embedded", plain("#e0f1e9")},         {"heading", bold("#8ee3c0")},
+        {"diff.plus", plain("#b7e4a0")},        {"diff.minus", plain("#f2b3ce")},
+    };
+    return theme;
+}
+
+// An orchid nebula: plum surfaces, rose light and champagne-colored types.
+Theme kdkNebula()
+{
+    Theme theme;
+    theme.name = QStringLiteral("kodamiko-nebula");
+    theme.title = QStringLiteral("Kodamiko-Nebula");
+    theme.font = editorFont();
+    theme.background = QColor("#261b30");
+    theme.foreground = QColor("#f0e5f4");
+    theme.caret = QColor("#eda4dc");
+    theme.caretLine = QColor("#32263d");
+    theme.selection = QColor("#503550");
+    theme.marginBackground = theme.background;
+    theme.marginForeground = QColor("#95839f");
+    theme.currentLineNumber = QColor("#debfdf");
+    theme.braceMatch = QColor("#614562");
+    theme.findHighlight = QColor("#f2d09c");
+    theme.error = QColor("#ff9da9");
+    theme.warning = QColor("#edc18b");
+    theme.window = QColor("#191320");
+    theme.button = QColor("#3b2b44");
+    theme.alternateBase = QColor("#32263d");
+    theme.highlight = QColor("#664165");
+    theme.accent = QColor("#eda4dc");
+    theme.accentText = QColor("#f7c9eb");
+    theme.onAccent = QColor("#26132b");
+    theme.mutedText = QColor("#b8a3c2");
+    theme.border = QColor("#513b59");
+    theme.line = QColor("#3b2b43");
+    theme.hover = QColor("#3a2b43");
+    theme.syntaxStyles = {
+        {"comment", italic("#b29cbb")},         {"string", plain("#b7dfbc")},
+        {"string.special", plain("#a2dcdf")},   {"escape", plain("#a2dcdf")},
+        {"number", plain("#efb4c4")},           {"constant", plain("#efb4c4")},
+        {"constant.builtin", plain("#efb4c4")}, {"keyword", plain("#eab0e1")},
+        {"operator", plain("#a2dcdf")},         {"type", plain("#eed1a4")},
+        {"type.builtin", plain("#eed1a4")},     {"constructor", plain("#eed1a4")},
+        {"module", plain("#eed1a4")},           {"function", plain("#b8c4ff")},
+        {"function.builtin", plain("#a2dcdf")}, {"variable", plain("#f0e5f4")},
+        {"variable.builtin", plain("#ffb4b6")}, {"variable.parameter", italic("#e3c2ed")},
+        {"property", plain("#d3b5f5")},         {"label", plain("#ffb4b6")},
+        {"attribute", plain("#d3b5f5")},        {"tag", plain("#ffb4b6")},
+        {"punctuation", plain("#ccb9d4")},      {"punctuation.special", plain("#eab0e1")},
+        {"embedded", plain("#f0e5f4")},         {"heading", bold("#eab0e1")},
+        {"diff.plus", plain("#b7dfbc")},        {"diff.minus", plain("#ffb4b6")},
+    };
+    return theme;
+}
+
+// Neural signals in a midnight-blue space: ice cyan, periwinkle and lilac.
+Theme kdkSynapse()
+{
+    Theme theme;
+    theme.name = QStringLiteral("kodamiko-synapse");
+    theme.title = QStringLiteral("Kodamiko-Synapse");
+    theme.font = editorFont();
+    theme.background = QColor("#101d32");
+    theme.foreground = QColor("#e1ebfa");
+    theme.caret = QColor("#79ddf2");
+    theme.caretLine = QColor("#192a43");
+    theme.selection = QColor("#29435c");
+    theme.marginBackground = theme.background;
+    theme.marginForeground = QColor("#7b91b1");
+    theme.currentLineNumber = QColor("#b6d7f2");
+    theme.braceMatch = QColor("#385873");
+    theme.findHighlight = QColor("#f2d394");
+    theme.error = QColor("#ff9fb6");
+    theme.warning = QColor("#f0c58b");
+    theme.window = QColor("#0a1324");
+    theme.button = QColor("#20334e");
+    theme.alternateBase = QColor("#192a43");
+    theme.highlight = QColor("#305475");
+    theme.accent = QColor("#79ddf2");
+    theme.accentText = QColor("#b0edfa");
+    theme.onAccent = QColor("#0a1324");
+    theme.mutedText = QColor("#9aafcc");
+    theme.border = QColor("#344b6b");
+    theme.line = QColor("#243550");
+    theme.hover = QColor("#203550");
+    theme.syntaxStyles = {
+        {"comment", italic("#95a7c1")},         {"string", plain("#a7e5cf")},
+        {"string.special", plain("#8edfeb")},   {"escape", plain("#8edfeb")},
+        {"number", plain("#f2c59d")},           {"constant", plain("#f2c59d")},
+        {"constant.builtin", plain("#f2c59d")}, {"keyword", plain("#c4b7ff")},
+        {"operator", plain("#8edfeb")},         {"type", plain("#96d5f5")},
+        {"type.builtin", plain("#96d5f5")},     {"constructor", plain("#96d5f5")},
+        {"module", plain("#96d5f5")},           {"function", plain("#a6c1ff")},
+        {"function.builtin", plain("#8edfeb")}, {"variable", plain("#e1ebfa")},
+        {"variable.builtin", plain("#f4b0d5")}, {"variable.parameter", italic("#d4c4f1")},
+        {"property", plain("#b7cdec")},         {"label", plain("#f4b0d5")},
+        {"attribute", plain("#b7cdec")},        {"tag", plain("#f4b0d5")},
+        {"punctuation", plain("#b4c5df")},      {"punctuation.special", plain("#c4b7ff")},
+        {"embedded", plain("#e1ebfa")},         {"heading", bold("#8edfeb")},
+        {"diff.plus", plain("#a7e5cf")},        {"diff.minus", plain("#f4b0d5")},
+    };
+    return theme;
+}
+
+// Opalescent daylight: cool pearl and lavender surfaces, amethyst focus,
+// and deep teal, blue and mulberry inks rather than pastel-colored text.
+Theme kdkOpal()
+{
+    Theme theme;
+    theme.name = QStringLiteral("kodamiko-opal");
+    theme.title = QStringLiteral("Kodamiko-Opal");
+    theme.isDark = false;
+    theme.font = editorFont();
+    theme.background = QColor("#faf8ff");
+    theme.foreground = QColor("#343049");
+    theme.caret = QColor("#7150a1");
+    theme.caretLine = QColor("#efebf7");
+    theme.selection = QColor("#dfd6ef");
+    theme.marginBackground = theme.background;
+    theme.marginForeground = QColor("#837792");
+    theme.currentLineNumber = QColor("#66517e");
+    theme.braceMatch = QColor("#d4c8e7");
+    theme.findHighlight = QColor("#e4c98f");
+    theme.error = QColor("#9c3956");
+    theme.warning = QColor("#815b21");
+    theme.window = QColor("#eee9f5");
+    theme.button = QColor("#e3dcec");
+    theme.alternateBase = QColor("#f3eff9");
+    theme.highlight = QColor("#685084");
+    theme.accent = QColor("#7150a1");
+    theme.accentText = QColor("#594078");
+    theme.onAccent = QColor("#faf8ff");
+    theme.mutedText = QColor("#71627f");
+    theme.border = QColor("#c6b9d7");
+    theme.line = QColor("#dcd3e7");
+    theme.hover = QColor("#e7e0f0");
+    theme.syntaxStyles = {
+        {"comment", italic("#6e5f7b")},         {"string", plain("#315e52")},
+        {"string.special", plain("#285969")},   {"escape", plain("#285969")},
+        {"number", plain("#7a4930")},           {"constant", plain("#7a4930")},
+        {"constant.builtin", plain("#7a4930")}, {"keyword", plain("#69418b")},
+        {"operator", plain("#285969")},         {"type", plain("#355278")},
+        {"type.builtin", plain("#355278")},     {"constructor", plain("#355278")},
+        {"module", plain("#355278")},           {"function", plain("#34518f")},
+        {"function.builtin", plain("#285969")}, {"variable", plain("#343049")},
+        {"variable.builtin", plain("#803d60")}, {"variable.parameter", italic("#6b4976")},
+        {"property", plain("#6b4976")},         {"label", plain("#803d60")},
+        {"attribute", plain("#6b4976")},        {"tag", plain("#803d60")},
+        {"punctuation", plain("#585068")},      {"punctuation.special", plain("#69418b")},
+        {"embedded", plain("#343049")},         {"heading", bold("#69418b")},
+        {"diff.plus", plain("#315e52")},        {"diff.minus", plain("#803d60")},
+    };
+    return theme;
+}
+
 } // namespace
 
 Theme Theme::kodamiko()
@@ -404,7 +602,8 @@ Theme Theme::kodamiko()
 
 QList<Theme> Theme::all()
 {
-    QList<Theme> themes{kodamiko(), kdkNight(), kdkViolet(), kdkStratos(), kdkBloom(), kdkClay(), kdkPearl()};
+    QList<Theme> themes{kodamiko(), kdkNight(),  kdkViolet(), kdkStratos(), kdkBloom(), kdkClay(),
+                        kdkPearl(), kdkAurora(), kdkNebula(), kdkSynapse(), kdkOpal()};
     themes += MaterialThemes::all();
     return themes;
 }

@@ -72,7 +72,7 @@ private slots:
         for (const Theme &theme : Theme::all())
             names.append(theme.name);
         // Kodamiko's own themes precede the Material ones.
-        QCOMPARE(names.size(), 15);
+        QCOMPARE(names.size(), 19);
         QCOMPARE(names.first(), QString("kodamiko"));
         QVERIFY(std::ranges::all_of(names.mid(1), [](const QString &name) { return name.startsWith("kodamiko-"); }));
         const Theme violet = Theme::named("kodamiko-violet");

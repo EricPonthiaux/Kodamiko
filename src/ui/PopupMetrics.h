@@ -15,6 +15,9 @@ namespace PopupMetrics {
 constexpr int frameRadius = 4;
 // Corners of a row's selection and hover.
 constexpr int rowRadius = 2;
+// Corners of a menu item's hover: rounder than a list row's, as a menu's
+// items stand apart inside its padding rather than fill a list.
+constexpr int menuRowRadius = 4;
 // A list row of one line (List.rowHeight); UiMetrics::scaled.
 constexpr int rowHeight = 24;
 // Room between a row's edge and its icon or text.

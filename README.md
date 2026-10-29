@@ -122,6 +122,17 @@ Ctrl+Shift+P opens the command palette, Ctrl+Shift+N goes to a file,
 Ctrl+Alt+K adds the selected lines to Claude's prompt, and right-clicking
 code offers *Explain*, *Review* and *Write Tests*.
 
+Choose colors in *View ▸ Theme* or *Preferences ▸ Appearance*, which shows
+a preview of each theme. Four palettes draw on auroras, nebulae and light
+to give the editor a more luminous atmosphere:
+
+| Theme | Appearance |
+|---|---|
+| Kodamiko-Aurora | Deep green, mint light and lavender syntax |
+| Kodamiko-Nebula | Dark plum, orchid pink and champagne |
+| Kodamiko-Synapse | Midnight blue, ice cyan and periwinkle |
+| Kodamiko-Opal | Light pearl, lavender surfaces and amethyst accents |
+
 ### Recipes
 
 A *recipe* is how to make one kind of project on one system: a Qt Widgets
