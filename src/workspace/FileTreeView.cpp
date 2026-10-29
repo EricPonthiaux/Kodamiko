@@ -23,11 +23,13 @@
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QHelpEvent>
+#include <QItemSelectionModel>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenu>
 #include <QMimeData>
 #include <QPainter>
+#include <QPainterPath>
 #include <QScrollBar>
 #include <QSortFilterProxyModel>
 #include <QStyledItemDelegate>
@@ -99,6 +101,8 @@ QList<qsizetype> matchedPositions(const QString &text, const QString &query)
 
 // Space between the counts and letters at the end of a row.
 constexpr int badgeSpacing = 6;
+constexpr int selectionInset = 4;
+constexpr qreal selectionRadius = 4;
 
 } // namespace
 
@@ -178,7 +182,7 @@ private:
             const int width = metrics.horizontalAdvance(badge);
             if (right - width < nameEnd)
                 break;
-            painter->setPen(selected ? QColor(Qt::white) : color);
+            painter->setPen(selected ? option.palette.color(QPalette::Text) : color);
             painter->drawText(QRect(right - width, option.rect.top(), width, option.rect.height()),
                               Qt::AlignRight | Qt::AlignVCenter, badge);
             right -= width + badgeSpacing;
@@ -1225,6 +1229,23 @@ void FileTreeView::scrollContentsBy(int dx, int dy)
     // The pinned rows are drawn over the contents: scrolling would move them.
     if (dy != 0)
         viewport()->update();
+}
+
+void FileTreeView::drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+    if (!selectionModel()->isSelected(index)) {
+        QTreeView::drawRow(painter, option, index);
+        return;
+    }
+    // Round the whole row, including its branches, rather than just the
+    // file's label. The style keeps the selection's focus and theme colors.
+    const QRectF row(selectionInset, option.rect.top(), viewport()->width() - 2 * selectionInset, option.rect.height());
+    QPainterPath outline;
+    outline.addRoundedRect(row, selectionRadius, selectionRadius);
+    painter->save();
+    painter->setClipPath(outline, Qt::IntersectClip);
+    QTreeView::drawRow(painter, option, index);
+    painter->restore();
 }
 
 void FileTreeView::drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const

@@ -30,7 +30,7 @@ public:
     QTabBar *tabBar() const;
 
     int addView(QWidget *view, const QIcon &icon, const QString &title);
-    // Colors of the tabs' labels.
+    // The tabs and their separator; the open tab shares the panel's background.
     void applyTheme(const Theme &theme);
     void setViewIcon(QWidget *view, const QIcon &icon);
     // Shows `view`, unfolding the panel.

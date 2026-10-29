@@ -412,6 +412,50 @@ private slots:
         QCOMPARE(visibility.size(), 4);
     }
 
+    void theOpenSideTabReachesThePanelFromTheTop()
+    {
+        const Theme theme = Theme::kodamiko();
+        ThemeStyle::apply(theme);
+        QWidget window;
+        auto *layout = new QHBoxLayout(&window);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
+        auto *panel = new SidePanel(&window);
+        panel->addView(new QWidget, {}, "Files");
+        panel->addView(new QWidget, {}, "Outline");
+        panel->applyTheme(theme);
+        layout->addWidget(panel->strip());
+        layout->addWidget(panel, 1);
+        window.resize(600, 400);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+        QTabBar *tabs = panel->tabBar();
+        const QImage image = tabs->grab().toImage();
+        // In device pixels: at a scale of 1.5, a column could stay uncovered.
+        const qreal ratio = image.devicePixelRatio();
+        const auto pixel = [&](qreal x, qreal y) { return image.pixelColor(int(x * ratio), int(y * ratio)); };
+        const int lastColumn = image.width() - 1;
+        const QRect open = tabs->tabRect(0);
+        // No separator between the open tab and the panel, whose background
+        // it shares; the separator stays beside the other tabs.
+        QCOMPARE(image.pixelColor(lastColumn, int(open.center().y() * ratio)), theme.background);
+        QCOMPARE(image.pixelColor(lastColumn, int(tabs->tabRect(1).center().y() * ratio)), theme.line);
+        // Nothing of the tab over the panel beside it.
+        auto *files = panel->currentWidget();
+        files->setAutoFillBackground(true);
+        QPalette palette = files->palette();
+        palette.setColor(QPalette::Window, Qt::red);
+        files->setPalette(palette);
+        const QImage beside = window.grab().toImage();
+        const int panelColumn = int(panel->mapTo(&window, QPoint()).x() * beside.devicePixelRatio()) + 1;
+        QCOMPARE(beside.pixelColor(panelColumn, int(open.center().y() * ratio)), QColor(Qt::red));
+        // The first tab starts at the top, level with the panel's header.
+        QCOMPARE(open.top(), 0);
+        QCOMPARE(pixel(open.center().x(), 0), theme.background);
+        ThemeStyle::apply(Theme::kodamiko());
+    }
+
     void frameResizesFromItsEdges()
     {
         const QSize size(800, 600);

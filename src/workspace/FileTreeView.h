@@ -186,6 +186,7 @@ protected:
     void focusOutEvent(QFocusEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
+    void drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
     void scrollContentsBy(int dx, int dy) override;
     void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
     void dragEnterEvent(QDragEnterEvent *event) override;

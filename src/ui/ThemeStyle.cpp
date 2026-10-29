@@ -190,7 +190,7 @@ QTabBar::scroller { width: 56px; }
 QTabBar QToolButton { background: @window; border: none; border-radius: 0; padding: 0; }
 QTabBar QToolButton:hover { background: @button; }
 QTabBar QToolButton:disabled { background: @window; }
-QWidget#sideStrip { background: @window; border-right: 1px solid @border; }
+QWidget#sideStrip { background: @window; border: none; }
 QFrame#foldedPane { background: @window; border: none; border-right: 1px solid @line; }
 QWidget#diagramToolbar { background: @base; border-bottom: 1px solid @line; }
 QWidget#diagramToolbar QToolButton { color: @text; background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 3px 8px; }
@@ -206,10 +206,10 @@ QWidget#diagramToolbar QFrame#diagramZoom QToolButton { border: 1px solid transp
 QWidget#diagramToolbar QFrame#diagramZoom QToolButton:focus { border-color: @accent; }
 QWidget#diagramInspectorHeader { background: @base; border-bottom: 1px solid @line; }
 QTabBar#sideTabs { background: transparent; }
-QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 4px; background: transparent; border: 1px solid transparent; border-radius: 3px; color: @muted; }
-QTabBar#sideTabs::tab:hover { background: transparent; border-color: @accent; color: @text; }
-QTabBar#sideTabs::tab:selected { background: @checked; border-color: @border; color: @accentText; }
-QTabBar#sideTabs::tab:selected:hover { border-color: @accent; }
+QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 0 2px 4px; background: transparent; border: 1px solid transparent; border-right: none; border-top-left-radius: 4px; border-bottom-left-radius: 4px; color: @muted; }
+QTabBar#sideTabs::tab:hover { background: @hover; color: @text; }
+QTabBar#sideTabs::tab:selected { background: @base; border-color: @line; border-top-right-radius: 0; border-bottom-right-radius: 0; color: @text; }
+QTabBar#sideTabs::tab:first { margin-top: 0; border-top: none; border-top-left-radius: 0; }
 QHeaderView::section { background: @panel; color: @muted; border: none; border-bottom: 1px solid @line; padding: 4px 6px; }
 QTreeView, QTreeWidget, QListView { background: @base; border: none; outline: 0; }
 QTreeView { padding-top: 6px; }
@@ -276,6 +276,7 @@ QWidget#statusGroup QToolButton#chip { background: @hover; border-color: @line; 
 QLabel#statusHeading { color: @muted; font-weight: 600; }
 QToolButton#statusOverflow { padding: 0; border: 1px solid transparent; border-radius: 4px; }
 QFrame#viewHeader { border: none; border-bottom: 1px solid @line; }
+FilesPanel QFrame#viewHeader { background: @base; border: none; }
 QToolButton#viewSelector { padding: 4px 6px; border-radius: 3px; }
 QToolButton#viewSelector:hover, QToolButton#viewSelector:pressed { background: @button; }
 QToolButton#viewSelector::menu-indicator { image: none; width: 0; }
@@ -314,7 +315,7 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
         {"@highlight", theme.highlight},
         // The inactive editor, terminal and mode tabs, set back from the window as in KDE's Breeze.
         {"@tabs", theme.window.darker(120)},
-        // The side tab of the open panel: a checked flat button in Breeze.
+        // The current mode: a checked flat button in Breeze.
         {"@checked", withAlpha(theme.foreground, 0.125)},
         {"@slate", selectionColor(theme)},
         {"@separator", withAlpha(theme.line, 0.7)},

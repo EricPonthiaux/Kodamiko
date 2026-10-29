@@ -123,7 +123,7 @@ FilesPanel::FilesPanel(QWidget *parent)
     setTreeOptions(tree_->treeOptions());
     options->setMenu(menu);
 
-    // The header: room around its controls, a line under it.
+    // The header shares the tree's background, with room around its controls.
     auto *header = new QFrame(this);
     header->setObjectName(QStringLiteral("viewHeader"));
     UiMetrics::setScaledHeight(header, UiMetrics::panelHeaderHeight);

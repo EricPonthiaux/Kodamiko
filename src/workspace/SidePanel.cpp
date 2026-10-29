@@ -27,11 +27,17 @@ constexpr int unfoldedWidthPx = 260;
 // hinted, hence blurred; an image turned a quarter moves whole pixels.
 class SideTabBar : public QTabBar {
 public:
-    using QTabBar::QTabBar;
+    SideTabBar(const SidePanel *panel, QWidget *parent)
+        : QTabBar(parent)
+        , panel_(panel)
+    {
+        connect(panel, &SidePanel::panelVisibilityChanged, this, qOverload<>(&QWidget::update));
+    }
 
     void applyTheme(const Theme &theme)
     {
         theme_ = theme;
+        updateGeometry();
         update();
     }
 
@@ -40,12 +46,14 @@ protected:
     {
         QStylePainter painter(this);
         const int hovered = underMouse() ? tabAt(mapFromGlobal(QCursor::pos())) : -1;
+        const int open = panel_->isPanelVisible() ? currentIndex() : -1;
         for (int i = 0; i < count(); ++i) {
-            QStyleOptionTab option;
-            initStyleOption(&option, i);
-            painter.drawControl(QStyle::CE_TabBarTabShape, option);
-            drawLabel(painter, option.rect, i, labelColor(i, hovered));
+            if (i != open)
+                drawTab(painter, i, hovered);
         }
+        drawSeparator(painter, open);
+        if (open >= 0)
+            drawTab(painter, open, hovered);
     }
 
     bool event(QEvent *event) override
@@ -56,16 +64,48 @@ protected:
     }
 
 private:
+    // The line between the strip and the panel, open beside the open tab,
+    // whose background reaches the panel's. Hovered tabs keep it. A filled
+    // column rather than a line: at a fractional scale, a line falls between
+    // device pixels and leaves the last one bare.
+    void drawSeparator(QPainter &painter, int open) const
+    {
+        const int x = width() - 1;
+        if (open < 0) {
+            painter.fillRect(QRect(x, 0, 1, height()), theme_.line);
+            return;
+        }
+        const QRect tab = tabRect(open);
+        painter.fillRect(QRect(x, 0, 1, tab.top()), theme_.line);
+        painter.fillRect(QRect(QPoint(x, tab.bottom() + 1), QPoint(x, height() - 1)), theme_.line);
+    }
+
+    void drawTab(QStylePainter &painter, int index, int hovered) const
+    {
+        QStyleOptionTab option;
+        initStyleOption(&option, index);
+        const QRect labelRect = option.rect;
+        // One column past the bar, whose edge clips it: it never paints over
+        // the panel. Up to its own edge only, the tab's last device pixel is
+        // half covered at a scale of 1.25 or 1.75, a line between it and the
+        // panel.
+        option.rect.setRight(width());
+        if (!panel_->isPanelVisible())
+            option.state &= ~QStyle::State_Selected;
+        painter.drawControl(QStyle::CE_TabBarTabShape, option);
+        drawLabel(painter, labelRect, index, labelColor(index, hovered));
+    }
+
     QColor labelColor(int index, int hovered) const
     {
-        if (index == currentIndex())
-            return theme_.accentText;
+        if (index == currentIndex() && panel_->isPanelVisible())
+            return theme_.foreground;
         if (index == hovered)
             return theme_.foreground;
         return theme_.mutedText;
     }
 
-    void drawLabel(QPainter &painter, const QRect &rect, int index, const QColor &color)
+    void drawLabel(QPainter &painter, const QRect &rect, int index, const QColor &color) const
     {
         const qreal ratio = devicePixelRatioF();
         const QImage image = levelLabel(QSize(rect.height(), rect.width()), index, color);
@@ -100,24 +140,23 @@ private:
         return image;
     }
 
+    const SidePanel *panel_;
     Theme theme_;
 };
 
 SidePanel::SidePanel(QWidget *parent)
     : QStackedWidget(parent)
     , strip_(new QWidget(parent))
-    , tabBar_(new SideTabBar(strip_))
+    , tabBar_(new SideTabBar(this, strip_))
 {
     strip_->setObjectName(QStringLiteral("sideStrip"));
     strip_->setAttribute(Qt::WA_StyledBackground);
+    strip_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     auto *layout = new QVBoxLayout(strip_);
-    // With the tabs' own margins (see ThemeStyle: 2 pixels above and below,
-    // 4 at the sides), the first tab is as far from the bar above, and from
-    // the strip's sides, as the tabs are from each other.
-    layout->setContentsMargins(0, 2, 0, 2);
+    // The bar paints the full-height separator; its selected tab reaches
+    // the panel without a margin between their matching backgrounds.
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(tabBar_);
-    layout->addStretch(1);
     tabBar_->setObjectName(QStringLiteral("sideTabs"));
     tabBar_->setShape(QTabBar::RoundedWest);
     tabBar_->setDocumentMode(true);
@@ -125,9 +164,11 @@ SidePanel::SidePanel(QWidget *parent)
     tabBar_->setExpanding(false);
     tabBar_->setUsesScrollButtons(true);
     // Shorter than its tabs on a short window, which then scroll.
-    tabBar_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    tabBar_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     tabBar_->setFocusPolicy(Qt::NoFocus);
     tabBar_->setAttribute(Qt::WA_Hover);
+    tabBar_->ensurePolished();
+    layout->addWidget(tabBar_, 1);
     connect(tabBar_, &QTabBar::currentChanged, this, [this](int index) {
         setCurrentIndex(index);
         setPanelVisible(true);
