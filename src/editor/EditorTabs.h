@@ -15,6 +15,7 @@
 #include <functional>
 #include <optional>
 
+class BrandHero;
 class DiagramView;
 class ImageView;
 class TabBarBaseLine;
@@ -156,15 +157,15 @@ signals:
     void openFilesChanged();
 
 protected:
-    void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void tabInserted(int index) override;
     void tabRemoved(int index) override;
 
 private:
     // Makes the window compose with the GPU before a preview needs it.
     void composeWithGpuFromTheStart();
-    // Kodamiko's mark, centered, when no file is open.
-    void paintEmptyMark();
+    // The welcome's illustration, shown when no file is open.
+    void createEmptyHero();
     // Adds a tab, before the preview's.
     int addPage(QWidget *page, const QString &title);
     // The tab showing the file at `absolutePath`, null if none.
@@ -223,6 +224,7 @@ private:
 
     Theme theme_;
     TabBarBaseLine *baseLine_ = nullptr; // over the tab bar, which owns it
+    BrandHero *emptyHero_ = nullptr;     // over the empty area, hidden while a tab is open
     QString projectFolder_;
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer

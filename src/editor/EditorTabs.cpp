@@ -7,7 +7,7 @@
 #include "CodeFormatter.h"
 #include "EditorWidget.h"
 #include "PreviewPage.h"
-#include "ui/BrandMark.h"
+#include "ui/BrandHero.h"
 #include "ui/ContextMenus.h"
 #include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
@@ -24,7 +24,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMenu>
-#include <QPainter>
 #include <QPointer>
 #include <QRhiWidget>
 #include <QTabBar>
@@ -35,13 +34,6 @@
 #include <utility>
 
 namespace {
-
-// The mark shown when no file is open: a fraction of the area's short side,
-// within bounds so it stays a discreet watermark.
-constexpr qreal emptyMarkShare = 0.22;
-constexpr qreal emptyMarkMinimumSize = 48;
-constexpr qreal emptyMarkMaximumSize = 160;
-constexpr qreal emptyMarkOpacity = 0.35;
 
 // The bytes of `filePath`; empty if it cannot be read.
 QByteArray readFile(const QString &filePath)
@@ -97,7 +89,17 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     new HoverCloseButtons(tabBar());
     baseLine_ = new TabBarBaseLine(tabBar());
     baseLine_->setColor(theme_.line);
+    createEmptyHero();
     composeWithGpuFromTheStart();
+}
+
+void EditorTabs::createEmptyHero()
+{
+    // The welcome's illustration over the empty area; the clicks go through
+    // it, to the tab bar under it.
+    emptyHero_ = new BrandHero(theme_, this);
+    emptyHero_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    emptyHero_->setGeometry(rect());
 }
 
 void EditorTabs::composeWithGpuFromTheStart()
@@ -111,30 +113,16 @@ void EditorTabs::composeWithGpuFromTheStart()
     gpuComposition->hide();
 }
 
-void EditorTabs::paintEvent(QPaintEvent *event)
+void EditorTabs::resizeEvent(QResizeEvent *event)
 {
-    QTabWidget::paintEvent(event);
-    if (count() == 0)
-        paintEmptyMark();
-}
-
-void EditorTabs::paintEmptyMark()
-{
-    const qreal shortSide = std::min(width(), height());
-    const qreal size = std::clamp(shortSide * emptyMarkShare, emptyMarkMinimumSize, emptyMarkMaximumSize);
-    QRectF area(0, 0, size, size);
-    area.moveCenter(QRectF(rect()).center());
-
-    // A watermark: the caret muted, unlike the other marks' text color.
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setOpacity(emptyMarkOpacity);
-    BrandMark::paint(&painter, area, {.caret = theme_.mutedText, .block = theme_.accent});
+    QTabWidget::resizeEvent(event);
+    emptyHero_->setGeometry(rect());
 }
 
 void EditorTabs::tabInserted(int index)
 {
     QTabWidget::tabInserted(index);
+    emptyHero_->hide();
     emit openFilesChanged();
 }
 
@@ -142,7 +130,7 @@ void EditorTabs::tabRemoved(int index)
 {
     QTabWidget::tabRemoved(index);
     preview_.tabRemoved();
-    update(); // the last tab gone, the mark appears
+    emptyHero_->setVisible(count() == 0);
     emit openFilesChanged();
 }
 
@@ -1025,7 +1013,7 @@ void EditorTabs::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     baseLine_->setColor(theme.line);
-    update();
+    emptyHero_->applyTheme(theme);
     for (int i = 0; i < count(); ++i)
         updateTabIcon(widget(i));
     for (int i = 0; i < count(); ++i) {
