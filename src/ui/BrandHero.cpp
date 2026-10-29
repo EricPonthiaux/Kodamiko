@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "WelcomeHero.h"
+#include "BrandHero.h"
 
-#include "ui/AppFonts.h"
-#include "ui/ThemeStyle.h"
+#include "AppFonts.h"
+#include "ThemeStyle.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -312,19 +312,30 @@ void paintCopy(QPainter &painter, const HeroLayout &layout, const HeroFonts &fon
 
 } // namespace
 
-WelcomeHero::WelcomeHero(Theme theme, QWidget *parent)
+BrandHero::BrandHero(Theme theme, QWidget *parent)
     : QWidget(parent)
     , theme_(std::move(theme))
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    setAccessibleName(tr("You and Claude. Two cursors, one flow."));
+    AppFonts::followApplicationFont(this, [this] {
+        updateGeometry();
+        update();
+    });
 }
 
-QSize WelcomeHero::sizeHint() const
+void BrandHero::applyTheme(const Theme &theme)
+{
+    theme_ = theme;
+    update();
+}
+
+QSize BrandHero::sizeHint() const
 {
     return preferredSize;
 }
 
-QSize WelcomeHero::minimumSizeHint() const
+QSize BrandHero::minimumSizeHint() const
 {
     const HeroFonts fonts = fontsFor(font());
     const HeroLayout layout = layoutOf(QRectF(0, 0, preferredSize.width(), preferredSize.height()), fonts);
@@ -332,7 +343,7 @@ QSize WelcomeHero::minimumSizeHint() const
     return {preferredSize.width() * 3 / 4, int(std::ceil(text + minimumArtHeight))};
 }
 
-void WelcomeHero::paintEvent(QPaintEvent *)
+void BrandHero::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);

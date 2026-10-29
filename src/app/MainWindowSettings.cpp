@@ -42,6 +42,7 @@
 #include "ui/Motion.h"
 #include "ui/NoticeBar.h"
 #include "ui/Snackbar.h"
+#include "ui/TabBarBaseLine.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
@@ -97,6 +98,7 @@ void MainWindow::setTheme(const QString &name)
     hierarchyView_->setIconColor(theme_.foreground);
     sidebar_->applyTheme(theme_);
     editorTabs_->applyTheme(theme_);
+    terminalTabBaseLine_->setColor(theme_.line);
     for (int i = 0; i < terminalTabs_->count(); ++i) {
         if (auto *terminal = qobject_cast<TerminalWidget *>(terminalTabs_->widget(i)))
             terminal->applyTheme(theme_);

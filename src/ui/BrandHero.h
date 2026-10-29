@@ -2,21 +2,24 @@
 
 #pragma once
 
-#include "ui/Theme.h"
+#include "Theme.h"
 
 #include <QWidget>
 
-// The left side of the welcome window ("Constellation", see
+// The shared brand panel of Welcome and About ("Constellation", see
 // docs/mockups/welcome.html): Kodamiko's mark as a sculpture of light, its
 // thin caret (you) beside its block (Claude), at the centre of fine orbits
 // on a field of stars, above a headline. Painted in the colors of the
 // theme, which it follows as the mark does: the caret in the text color,
 // the block in the accent. Still: no animation.
-class WelcomeHero : public QWidget {
+class BrandHero : public QWidget {
     Q_OBJECT
 
 public:
-    WelcomeHero(Theme theme, QWidget *parent);
+    BrandHero(Theme theme, QWidget *parent);
+
+    // Repaints the illustration and its copy in the current theme.
+    void applyTheme(const Theme &theme);
 
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;

@@ -13,6 +13,15 @@ namespace {
 
 constexpr int gap = 4;
 
+// QTabWidget's style-sheet layout reserves the corner's size hint, even
+// when it has a fixed size. An empty QWidget has no size hint of its own.
+class TabButtonSpace : public QWidget {
+public:
+    using QWidget::QWidget;
+
+    QSize sizeHint() const override { return minimumSize(); }
+};
+
 // Square, as wide as `button` would be, rather than as tall as the bar.
 // Of the bar's height parity: centered on it to the pixel.
 QSize buttonSize(const QAbstractButton *button, int barHeight)
@@ -29,7 +38,7 @@ TrailingTabButton::TrailingTabButton(QTabWidget *tabs, QAbstractButton *button)
     : QObject(tabs)
     , tabs_(tabs)
     , button_(button)
-    , room_(new QWidget(tabs))
+    , room_(new TabButtonSpace(tabs))
 {
     button_->setParent(tabs_);
     // The tab bar stops before this empty corner: room for the button when
@@ -79,7 +88,7 @@ void TrailingTabButton::place()
     const QSize endSize = endButton_ ? buttonSize(endButton_, barRect.height()) : QSize();
     const int top = barRect.top() + (barRect.height() - size.height()) / 2;
     // The icons may have come since.
-    room_->setFixedWidth(size.width() + gap + (endButton_ ? endSize.width() + gap : 0));
+    room_->setFixedSize(size.width() + gap + (endButton_ ? endSize.width() + gap : 0), barRect.height());
     if (endButton_) {
         endButton_->setVisible(bar->isVisible());
         const int endTop = barRect.top() + (barRect.height() - endSize.height()) / 2;

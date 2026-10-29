@@ -72,8 +72,15 @@ private:
     void installNpm(const DownloadSource &source);
     void installQt();
     // Moves `content` to `target` and marks it complete; a failure leaves the
-    // previous install of `target` in place.
-    void complete(const QString &content, const QString &target);
+    // previous install of `target` in place. A move that fails is tried
+    // again for a while (`attempt` counts the tries): an antivirus may hold
+    // the files just unpacked.
+    void complete(const QString &content, const QString &target, int attempt = 0);
+    // Sets the previous install of `target` aside and moves `content` to
+    // it; on failure, puts the previous install back and returns why.
+    [[nodiscard]] QString moveInPlace(const QString &content, const QString &target) const;
+    // Where the previous install of the current step waits, in its staging.
+    QString previousFolder() const;
     // Makes the files moved to `target` usable and marks them complete; an
     // error when they are not what the step expects.
     QString finishInstall(const QString &target) const;

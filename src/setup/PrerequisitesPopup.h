@@ -43,6 +43,8 @@ protected:
 
 private:
     void rebuild();
+    QFrame *createSummary();
+    QWidget *createFooter();
     // A program's state and, unless it is fine, how to install it.
     QFrame *createCard(const Prerequisite &prerequisite);
     // The install command, with buttons to copy and run it.

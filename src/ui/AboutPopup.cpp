@@ -3,20 +3,22 @@
 #include "AboutPopup.h"
 
 #include "AppFonts.h"
-#include "BrandMark.h"
 #include "Motion.h"
+#include "Paragraph.h"
 #include "PopupFooter.h"
-#include "PopupMetrics.h"
 #include "PopupWidgets.h"
 #include "RotatingQuote.h"
+#include "ThemeStyle.h"
+#include "UiMetrics.h"
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
 
@@ -26,9 +28,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-constexpr int markSizePx = 64;
 constexpr int heartSizePx = 16;
-constexpr std::chrono::milliseconds markGrowDuration = 700ms;
 // A heartbeat: two quick pulses, then a rest.
 constexpr std::chrono::milliseconds heartbeatDuration = 1200ms;
 constexpr qreal heartbeatPeak = 1.25;
@@ -36,9 +36,42 @@ const QColor heartColor{0xe5, 0x48, 0x5c};
 
 constexpr auto authorEmail = "ponthiaux.eric@protonmail.com";
 
+constexpr auto aboutRules = R"(
+QWidget#pageContent { background: @window; }
+QFrame#aboutDetails, QFrame#aboutIdentity, QFrame#aboutContact { background: transparent; border: none; }
+QLabel#aboutVersion { color: @muted; background: transparent; border: 1px solid @line; border-radius: 3px; padding: 3px 6px; }
+QLabel#aboutEyebrow { color: @accent; }
+QFrame#aboutQuote { background: @quoteTint; border: 1px solid @quoteBorder; border-radius: 7px; }
+QPushButton { padding: 7px 18px; border-radius: 5px; }
+)";
+
 QString emailLink()
 {
     return QStringLiteral("<a href=\"mailto:%1\">%1</a>").arg(QLatin1String(authorEmail));
+}
+
+QLabel *eyebrow(const QString &text, QWidget *parent)
+{
+    auto *label = new QLabel(text, parent);
+    label->setObjectName(QStringLiteral("aboutEyebrow"));
+    AppFonts::followApplicationFont(label, [label] {
+        QFont font = AppFonts::codeFont(QApplication::font().pointSizeF() * 0.72);
+        font.setLetterSpacing(QFont::AbsoluteSpacing, 1.4);
+        label->setFont(font);
+    });
+    return label;
+}
+
+QFrame *quoteCard(QWidget *parent)
+{
+    auto *card = new QFrame(parent);
+    card->setObjectName(QStringLiteral("aboutQuote"));
+    auto *layout = new QVBoxLayout(card);
+    layout->setContentsMargins(16, 14, 16, 14);
+    layout->setSpacing(10);
+    layout->addWidget(eyebrow(AboutPopup::tr("A THOUGHT TO CODE BY"), card));
+    layout->addWidget(new RotatingQuote(card));
+    return card;
 }
 
 // A heart filling the unit square, drawn with two cubic curves per side.
@@ -57,60 +90,6 @@ QPainterPath heartPath()
 
 } // namespace
 
-// Kodamiko's mark, which grows from the center to its full size.
-class AboutPopup::Mark : public QWidget {
-public:
-    explicit Mark(QWidget *parent)
-        : QWidget(parent)
-        , grow_(new QVariantAnimation(this))
-    {
-        setFixedSize(markSizePx, markSizePx);
-        grow_->setDuration(int(markGrowDuration.count()));
-        grow_->setStartValue(0.0);
-        grow_->setEndValue(1.0);
-        grow_->setEasingCurve(Motion::enterCurve());
-        connect(grow_, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
-            scale_ = value.toReal();
-            update();
-        });
-        Motion::track(grow_);
-    }
-
-    void setColors(const BrandMark::Colors &colors)
-    {
-        colors_ = colors;
-        update();
-    }
-
-    // Grows the mark from nothing; shows it whole at once without motion.
-    void play()
-    {
-        grow_->stop();
-        if (!Motion::policy().isEnabled()) {
-            scale_ = 1;
-            update();
-            return;
-        }
-        grow_->start();
-    }
-
-protected:
-    void paintEvent(QPaintEvent *) override
-    {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        const qreal side = width() * scale_;
-        QRectF area(0, 0, side, side);
-        area.moveCenter(QRectF(rect()).center());
-        BrandMark::paint(&painter, area, colors_);
-    }
-
-private:
-    QVariantAnimation *grow_;
-    BrandMark::Colors colors_;
-    qreal scale_ = 1;
-};
-
 // A red heart that beats while it is shown and motion is on.
 class AboutPopup::Heart : public QWidget {
 public:
@@ -118,7 +97,7 @@ public:
         : QWidget(parent)
         , beat_(new QVariantAnimation(this))
     {
-        setFixedSize(heartSizePx, heartSizePx);
+        UiMetrics::setScaledSize(this, QSize(heartSizePx, heartSizePx));
         beat_->setDuration(int(heartbeatDuration.count()));
         beat_->setLoopCount(-1);
         beat_->setKeyValueAt(0.0, 1.0);
@@ -169,48 +148,16 @@ private:
 };
 
 AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
-    : OverlayPopup(QStringLiteral("about"), QSizeF(0.3, 0.3), QSize(440, 400), parent)
+    : OverlayPopup(QStringLiteral("about"), QSizeF(0.6, 0.6), QSize(800, 540), parent)
     , header_(new PopupHeader(QStringLiteral("document"), tr("About Kodamiko"), this))
-    , mark_(new Mark(this))
 {
     connect(header_, &PopupHeader::closeRequested, this, &OverlayPopup::dismiss);
 
-    auto *name = new QLabel(QStringLiteral("Kodamiko"), this);
-    AppFonts::setInterfaceFont(name, 1.4);
-    auto *version = new QLabel(tr("Version %1").arg(QCoreApplication::applicationVersion()), this);
-    version->setObjectName(QStringLiteral("settingsDescription"));
-    auto *identity = new QVBoxLayout;
-    identity->setSpacing(0);
-    identity->addWidget(name);
-    identity->addWidget(version);
-    auto *brand = new QHBoxLayout;
-    brand->setSpacing(16);
-    brand->addWidget(mark_);
-    brand->addLayout(identity, 1);
-
-    auto *email = new QLabel(emailLink(), this);
-    email->setTextFormat(Qt::RichText);
-    email->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    email->setOpenExternalLinks(true);
-    auto *contact = new QVBoxLayout;
-    contact->setSpacing(6);
-    contact->addWidget(new QLabel(tr("Contact"), this));
-    contact->addWidget(email);
-
-    auto *love = new QHBoxLayout;
-    love->setSpacing(6);
-    love->addWidget(new QLabel(tr("Made with love"), this));
-    love->addWidget(new Heart(this));
-    love->addStretch();
-
-    auto *body = new QVBoxLayout;
-    body->setContentsMargins(PopupMetrics::bodyMargins);
-    body->setSpacing(20);
-    body->addLayout(brand);
-    body->addLayout(contact);
-    body->addWidget(new RotatingQuote(this));
-    body->addStretch();
-    body->addLayout(love);
+    auto *scroll = new QScrollArea(this);
+    scroll->setObjectName(QStringLiteral("pageScroll"));
+    scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setWidget(createBody());
 
     auto *footer = new PopupFooter(this);
     footer->setHint(tr("Enter or Esc to close"));
@@ -223,24 +170,110 @@ AboutPopup::AboutPopup(const Theme &theme, QWidget *parent)
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
     layout->addWidget(header_);
-    layout->addLayout(body, 1);
+    layout->addWidget(scroll, 1);
     layout->addWidget(footer);
 
     applyTheme(theme);
+}
+
+QFrame *AboutPopup::createIdentity()
+{
+    auto *identity = new QFrame(this);
+    identity->setObjectName(QStringLiteral("aboutIdentity"));
+    auto *name = new QLabel(QStringLiteral("Kodamiko"), identity);
+    AppFonts::setInterfaceFont(name, 2.2, QFont::Normal, -0.7);
+    auto *description = new QLabel(identity);
+    description->setObjectName(QStringLiteral("settingsDescription"));
+    Paragraph::setText(description, tr("Your editor. Your agent. In sync."));
+    auto *version = new QLabel(tr("Version %1").arg(QCoreApplication::applicationVersion()), identity);
+    version->setObjectName(QStringLiteral("aboutVersion"));
+    version->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    AppFonts::followApplicationFont(
+        version, [version] { version->setFont(AppFonts::codeFont(QApplication::font().pointSizeF() * 0.75)); });
+    auto *license = new QLabel(tr("Open source · GPL v3"), identity);
+    license->setObjectName(QStringLiteral("settingsDescription"));
+    AppFonts::setInterfaceFont(license, 0.85, QFont::Normal);
+    auto *metadata = new QHBoxLayout;
+    metadata->setSpacing(10);
+    metadata->addWidget(version, 0, Qt::AlignLeft);
+    metadata->addWidget(license);
+    metadata->addStretch();
+
+    auto *layout = new QVBoxLayout(identity);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(8);
+    layout->addWidget(eyebrow(tr("ABOUT THE EDITOR"), identity));
+    layout->addWidget(name);
+    layout->addWidget(description);
+    layout->addSpacing(6);
+    layout->addLayout(metadata);
+    return identity;
+}
+
+QFrame *AboutPopup::createContact()
+{
+    auto *contact = new QFrame(this);
+    contact->setObjectName(QStringLiteral("aboutContact"));
+    auto *email = new QLabel(emailLink(), contact);
+    email->setTextFormat(Qt::RichText);
+    email->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    email->setOpenExternalLinks(true);
+    email->setWordWrap(true);
+    auto *layout = new QVBoxLayout(contact);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(6);
+    layout->addWidget(eyebrow(tr("GET IN TOUCH"), contact));
+    layout->addWidget(email);
+    return contact;
+}
+
+QFrame *AboutPopup::createDetails()
+{
+    auto *content = new QFrame(this);
+    content->setObjectName(QStringLiteral("aboutDetails"));
+    auto *love = new QHBoxLayout;
+    love->setSpacing(6);
+    auto *madeWithLove = new QLabel(tr("Made with love"), content);
+    madeWithLove->setObjectName(QStringLiteral("settingsDescription"));
+    love->addWidget(madeWithLove);
+    love->addWidget(new Heart(content));
+    love->addStretch();
+
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(0, 4, 0, 4);
+    layout->setSpacing(24);
+    layout->addWidget(createIdentity());
+    layout->addWidget(createContact());
+    layout->addWidget(quoteCard(content));
+    layout->addStretch();
+    layout->addLayout(love);
+    return content;
+}
+
+QWidget *AboutPopup::createBody()
+{
+    auto *content = new QWidget(this);
+    content->setObjectName(QStringLiteral("pageContent"));
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(24, 24, 24, 24);
+    layout->setSpacing(0);
+    layout->addWidget(createDetails(), 1);
+    return content;
 }
 
 void AboutPopup::popup()
 {
     showCentered();
     setFocus();
-    mark_->play();
 }
 
 void AboutPopup::applyTheme(const Theme &theme)
 {
-    setStyleSheet(popupStyleSheet(theme));
+    QString rules = QString::fromLatin1(aboutRules);
+    rules.replace(QStringLiteral("@quoteTint"), ThemeStyle::mixed(theme.window, theme.accent, 0.06).name());
+    rules.replace(QStringLiteral("@quoteBorder"), ThemeStyle::mixed(theme.window, theme.accent, 0.25).name());
+    setStyleSheet(popupStyleSheet(theme, rules));
     header_->applyTheme(theme);
-    mark_->setColors(BrandMark::colorsFor(theme));
 }
 
 void AboutPopup::keyPressEvent(QKeyEvent *event)

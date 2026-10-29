@@ -294,6 +294,7 @@ add_library(kdk_core STATIC
     toolchains/Toolchains.cpp
     ui/AboutPopup.cpp
     ui/AppFonts.cpp
+    ui/BrandHero.cpp
     ui/BrandLogo.cpp
     ui/BrandMark.cpp
     ui/BusyIndicator.cpp
@@ -355,7 +356,6 @@ add_library(kdk_core STATIC
     welcome/ProjectSetupPanel.cpp
     welcome/ProvisioningView.cpp
     welcome/ResumeCard.cpp
-    welcome/WelcomeHero.cpp
     welcome/WelcomeWindow.cpp
     welcome/WelcomeWindowUi.cpp
     workspace/CommandPalette.cpp

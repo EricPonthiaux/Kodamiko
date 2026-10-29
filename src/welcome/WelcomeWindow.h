@@ -20,13 +20,12 @@ class QPushButton;
 class QStackedWidget;
 class ResumeCard;
 class Toolchains;
-class WelcomeHero;
 class WindowButton;
 class WindowFrame;
 
 // The window Kodamiko opens with, before the main one (docs/mockups/
 // welcome.html, "Constellation"): on the left, the mark at the centre of
-// its orbits (WelcomeHero); on the right, the project opened last on a card
+// its orbits (BrandHero); on the right, the project opened last on a card
 // to continue it, the other projects to search and reopen (those whose
 // folder is gone listed apart, to locate), New Project (NewProjectForm) and
 // Import Project. Without any project, it shows how to start one. Its

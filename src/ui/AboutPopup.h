@@ -6,11 +6,11 @@
 #include "Theme.h"
 
 class PopupHeader;
+class QFrame;
 
-// About Kodamiko: its mark, which grows in each time the popup opens, its name,
-// its version, the author's email addresses (they open the user's mail
-// program), a rotating quotation about writing software and "Made with love"
-// beside a beating heart.
+// About Kodamiko: its version, a contact link, a rotating quotation and
+// "Made with love" beside a beating heart, in a full-width panel styled
+// like Welcome. The content scrolls when the window or font needs it.
 class AboutPopup : public OverlayPopup {
     Q_OBJECT
 
@@ -24,9 +24,12 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
-    class Mark;
     class Heart;
 
+    QFrame *createIdentity();
+    QFrame *createContact();
+    QFrame *createDetails();
+    QWidget *createBody();
+
     PopupHeader *header_;
-    Mark *mark_;
 };

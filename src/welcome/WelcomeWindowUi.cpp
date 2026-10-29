@@ -3,10 +3,10 @@
 // The parts of the welcome window, built once by its constructor.
 
 #include "ResumeCard.h"
-#include "WelcomeHero.h"
 #include "WelcomeWindow.h"
 #include "recipes/RecipeLibrary.h"
 #include "ui/AppFonts.h"
+#include "ui/BrandHero.h"
 #include "ui/BrandMark.h"
 #include "ui/UiIcons.h"
 #include "ui/WindowControls.h"
@@ -132,7 +132,7 @@ QWidget *WelcomeWindow::createTitleBar()
 QWidget *WelcomeWindow::createWelcomePage()
 {
     auto *page = new QWidget(this);
-    auto *hero = new WelcomeHero(theme_, page);
+    auto *hero = new BrandHero(theme_, page);
     hero->installEventFilter(this);
 
     // The panel stands off the window's edges, a line on its left only.

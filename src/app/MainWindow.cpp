@@ -64,6 +64,7 @@
 #include "ui/ModeTabBar.h"
 #include "ui/NoticeBar.h"
 #include "ui/Snackbar.h"
+#include "ui/TabBarBaseLine.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
 #include "ui/TrailingTabButton.h"
@@ -635,8 +636,11 @@ QWidget *MainWindow::createTerminalPage()
     terminalTabs_->setObjectName(QStringLiteral("terminalTabs"));
     terminalTabs_->setTabsClosable(true);
     terminalTabs_->setDocumentMode(true);
-    terminalTabs_->tabBar()->setDrawBase(false);
+    terminalTabs_->tabBar()->setExpanding(false);
+    terminalTabs_->tabBar()->setElideMode(Qt::ElideRight);
     new HoverCloseButtons(terminalTabs_->tabBar());
+    terminalTabBaseLine_ = new TabBarBaseLine(terminalTabs_->tabBar());
+    terminalTabBaseLine_->setColor(theme_.line);
     connect(terminalTabs_, &QTabWidget::tabCloseRequested, this, [this](int index) {
         QWidget *terminal = terminalTabs_->widget(index);
         if (terminal == claudeTerminal_)

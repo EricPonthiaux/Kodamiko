@@ -184,17 +184,16 @@ QTabBar::tab { background: transparent; color: @muted; padding: 8px 16px; border
 QTabBar::tab:hover { color: @text; background: @panel; }
 QTabBar::tab:selected { color: @accentText; background: @base; border-bottom: 2px solid @accent; }
 QTabBar::tab:bottom:selected { border-bottom: none; border-top: 2px solid @accent; }
-QTabWidget#terminalTabs QTabBar::tab, QTabBar#goToTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
-QTabWidget#terminalTabs QTabBar::tab { padding: 7px 12px 9px; margin-top: 4px; border: 1px solid transparent; border-top: 2px solid transparent; border-bottom: none; }
-QTabWidget#terminalTabs QTabBar::tab:first, QTabBar#goToTabs::tab:first { border-top-left-radius: 3px; }
-QTabWidget#terminalTabs QTabBar::tab:last, QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
-QTabWidget#terminalTabs QTabBar::tab:hover, QTabBar#goToTabs::tab:hover { background: @hover; color: @text; border-top-left-radius: 3px; border-top-right-radius: 3px; }
-QTabWidget#terminalTabs QTabBar::tab:selected, QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
-EditorTabs QTabBar, SidePanel QFrame#viewHeader { background: @window; }
-EditorTabs QTabBar::tab, SidePanel QFrame#viewHeaderTab { margin-top: @tabTopMarginpx; border: 1px solid transparent; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
-EditorTabs QTabBar::tab { background: transparent; color: @muted; padding: 8px 12px 9px; min-width: 64px; max-width: 240px; }
-EditorTabs QTabBar::tab:hover { background: @hover; color: @text; }
-EditorTabs QTabBar::tab:selected, SidePanel QFrame#viewHeaderTab { background: @base; color: @text; border-color: @line; border-bottom: none; }
+QTabBar#goToTabs::tab { background: @tabs; color: @muted; padding: 6px 12px; min-width: 56px; border: none; }
+QTabBar#goToTabs::tab:first { border-top-left-radius: 3px; }
+QTabBar#goToTabs::tab:last { border-top-right-radius: 3px; }
+QTabBar#goToTabs::tab:hover { background: @hover; color: @text; border-top-left-radius: 3px; border-top-right-radius: 3px; }
+QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 1px solid @line; border-bottom: none; border-top: 2px solid @accent; border-top-left-radius: 3px; border-top-right-radius: 3px; }
+EditorTabs QTabBar, QTabWidget#terminalTabs QTabBar, SidePanel QFrame#viewHeader { background: @window; }
+EditorTabs QTabBar::tab, QTabWidget#terminalTabs QTabBar::tab, SidePanel QFrame#viewHeaderTab { margin-top: @tabTopMarginpx; border: 1px solid transparent; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
+EditorTabs QTabBar::tab, QTabWidget#terminalTabs QTabBar::tab { background: transparent; color: @muted; padding: 8px 12px 9px; min-width: 64px; max-width: 240px; }
+EditorTabs QTabBar::tab:hover, QTabWidget#terminalTabs QTabBar::tab:hover { background: @hover; color: @text; }
+EditorTabs QTabBar::tab:selected, QTabWidget#terminalTabs QTabBar::tab:selected, SidePanel QFrame#viewHeaderTab { background: @base; color: @text; border-color: @line; border-bottom: none; }
 SidePanel > QWidget { background: @base; }
 SidePanel QFrame#viewHeader { border: none; }
 SidePanel QFrame#viewHeaderTab { border-left: none; border-top-left-radius: 0; }

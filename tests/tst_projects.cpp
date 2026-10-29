@@ -9,6 +9,7 @@
 #include "recipes/RecipeLibrary.h"
 #include "support/SystemFixtures.h"
 #include "system/Executables.h"
+#include "system/Host.h"
 #include "toolchains/InstallPlan.h"
 #include "toolchains/Installer.h"
 #include "toolchains/QtRepository.h"
@@ -729,6 +730,53 @@ private slots:
         QVERIFY(toolchains.isInstalled("maven", "3.9.16"));
         QVERIFY(QFileInfo::exists(mvn));
         QVERIFY(!QFileInfo::exists(toolchains.installFolder("maven", "3.9.16") + "/README"));
+    }
+
+    void aDestinationBlockedForAMomentStillGetsTheInstall()
+    {
+        // Windows' antivirus holds the files it scans; a folder made read-only
+        // blocks the move the same way, where its permissions are enforced.
+        if (Host::operatingSystem() == OperatingSystem::Windows)
+            QSKIP("A read-only folder does not block a move on Windows");
+        if (QStandardPaths::findExecutable("tar").isEmpty())
+            QSKIP("No tar");
+        QTemporaryDir dir;
+        write(dir.filePath("source/maven/bin/mvn"), "#!/bin/sh\necho maven\n");
+        QProcess tar;
+        tar.start("tar", {"-czf", dir.filePath("maven.tar.gz"), "-C", dir.filePath("source"), "maven"});
+        QVERIFY(tar.waitForFinished());
+        Toolchains toolchains(dir.filePath("toolchains"), false);
+        const QString tools = QFileInfo(toolchains.installFolder("maven", "3.9.16")).absolutePath();
+        QVERIFY(QDir().mkpath(tools));
+        const QFile::Permissions writable = QFile::permissions(tools);
+        QFile::setPermissions(tools, QFile::ReadOwner | QFile::ExeOwner);
+        if (QFileInfo(tools).isWritable())
+            QSKIP("Permissions are not enforced for this user");
+        QTimer::singleShot(400, [&] { QFile::setPermissions(tools, writable); });
+        Installer installer(&toolchains);
+        const DownloadSource source{.url = QUrl::fromLocalFile(dir.filePath("maven.tar.gz")),
+                                    .fileName = "maven.tar.gz",
+                                    .checksumUrl = {},
+                                    .checksum = {},
+                                    .algorithm = ChecksumAlgorithm::Sha256,
+                                    .format = ArchiveFormat::TarGz,
+                                    .error = {}};
+        QSignalSpy finished(&installer, &Installer::finished);
+        QSignalSpy steps(&installer, &Installer::stepFinished);
+
+        installer.run({{.tool = "maven",
+                        .version = "3.9.16",
+                        .title = "maven 3.9.16",
+                        .reason = {},
+                        .kit = {},
+                        .modules = {},
+                        .source = source,
+                        .check = "bin/mvn"}});
+
+        QVERIFY(finished.wait(10000));
+        QFile::setPermissions(tools, writable);
+        QCOMPARE(steps.first().at(1).toString(), QString());
+        QVERIFY(toolchains.isInstalled("maven", "3.9.16"));
     }
 
     void plansWhatIsMissing()

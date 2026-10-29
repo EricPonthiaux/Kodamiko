@@ -18,8 +18,16 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStandardPaths>
+#include <QTimer>
+
+#include <array>
 
 namespace {
+
+// Windows' antivirus scans the files just unpacked and holds them open
+// meanwhile: moving their folder in place fails until it is done. The move
+// is tried again after each of these delays, about 15 s in all.
+constexpr std::array<int, 7> moveRetryDelaysMs = {100, 250, 500, 1000, 2000, 4000, 8000};
 
 QNetworkRequest requestFor(const QUrl &url)
 {
@@ -70,6 +78,22 @@ QString missingUnpackerError(ArchiveFormat format)
         return QObject::tr("An npm package is installed by npm, not unpacked");
     }
     return {};
+}
+
+// `error`, followed on Windows by what may have blocked or removed the
+// files unpacked in `root`: its antivirus.
+QString withAntivirusHint(const QString &error, const QString &root)
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::Windows:
+        return QObject::tr("%1. An antivirus may be scanning or holding the files: try again, or exclude %2 from "
+                           "its scans")
+            .arg(error, QDir::toNativeSeparators(root));
+    case OperatingSystem::MacOS:
+    case OperatingSystem::Linux:
+        return error;
+    }
+    return error;
 }
 
 // Puts the install that `complete` set aside back in place.
@@ -372,24 +396,25 @@ void Installer::extract(const DownloadSource &source, const QString &archive)
     process_ = process;
     process->setProcessChannelMode(QProcess::MergedChannels);
     const int generation = generation_;
-    connect(process, &QProcess::finished, this,
-            [this, process, generation, content, archive](int code, QProcess::ExitStatus status) {
-                process->deleteLater();
-                if (generation != generation_)
-                    return;
-                if (status != QProcess::NormalExit || code != 0) {
-                    fail(tr("Cannot unpack %1: %2")
-                             .arg(QFileInfo(archive).fileName(), QString::fromLocal8Bit(process->readAll()).trimmed()));
-                    return;
-                }
-                QFile::remove(archive);
-                // Archives holding a single folder (jdk-17.0.2+8/): its contents.
-                const QFileInfoList children =
-                    QDir(content).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
-                const InstallStep &step = steps_.at(index_);
-                complete(children.size() == 1 && children.first().isDir() ? children.first().filePath() : content,
-                         toolchains_->installFolder(step.tool, step.version));
-            });
+    connect(
+        process, &QProcess::finished, this,
+        [this, process, generation, content, archive](int code, QProcess::ExitStatus status) {
+            process->deleteLater();
+            if (generation != generation_)
+                return;
+            if (status != QProcess::NormalExit || code != 0) {
+                const QString output = QString::fromLocal8Bit(process->readAll()).trimmed();
+                fail(withAntivirusHint(tr("Cannot unpack %1: %2").arg(QFileInfo(archive).fileName(), output), root_));
+                return;
+            }
+            QFile::remove(archive);
+            // Archives holding a single folder (jdk-17.0.2+8/): its contents.
+            const QFileInfoList children =
+                QDir(content).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
+            const InstallStep &step = steps_.at(index_);
+            complete(children.size() == 1 && children.first().isDir() ? children.first().filePath() : content,
+                     toolchains_->installFolder(step.tool, step.version));
+        });
     connect(process, &QProcess::errorOccurred, this, [this, process, generation](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart || generation != generation_)
             return;
@@ -486,23 +511,23 @@ void Installer::installQt()
     qt->start();
 }
 
-void Installer::complete(const QString &content, const QString &target)
+void Installer::complete(const QString &content, const QString &target, int attempt)
 {
-    // The previous install stays until the new one proves usable: a failed
-    // reinstall leaves the tool as it was.
-    const QString previous = stagingFolder() + QStringLiteral("/previous");
-    if (QFileInfo::exists(target) && !QDir().rename(target, previous)) {
-        fail(tr("Cannot replace %1: a program may be using it").arg(QDir::toNativeSeparators(target)));
+    if (const QString error = moveInPlace(content, target); !error.isEmpty()) {
+        if (attempt < int(moveRetryDelaysMs.size())) {
+            const int generation = generation_;
+            QTimer::singleShot(moveRetryDelaysMs.at(attempt), this, [this, generation, content, target, attempt] {
+                if (generation == generation_)
+                    complete(content, target, attempt + 1);
+            });
+            return;
+        }
+        fail(withAntivirusHint(error, root_));
         return;
     }
-    QDir().mkpath(QFileInfo(target).absolutePath());
-    const bool isMoved = QDir().rename(content, target);
-    QString error =
-        isMoved ? finishInstall(target) : tr("Cannot move the files to %1").arg(QDir::toNativeSeparators(target));
-    if (!error.isEmpty()) {
-        if (isMoved)
-            QDir(target).removeRecursively();
-        if (!restorePrevious(previous, target))
+    if (QString error = finishInstall(target); !error.isEmpty()) {
+        QDir(target).removeRecursively();
+        if (!restorePrevious(previousFolder(), target))
             error += tr(", and the previous install could not be put back");
         fail(error);
         return;
@@ -511,6 +536,28 @@ void Installer::complete(const QString &content, const QString &target)
     toolchains_->refresh();
     emit stepFinished(index_, QString());
     nextStep();
+}
+
+QString Installer::moveInPlace(const QString &content, const QString &target) const
+{
+    // The previous install stays until the new one proves usable: a failed
+    // reinstall leaves the tool as it was.
+    const QString previous = previousFolder();
+    if (QFileInfo::exists(target) && !QDir().rename(target, previous))
+        return tr("Cannot replace %1: a program may be using it").arg(QDir::toNativeSeparators(target));
+    QDir().mkpath(QFileInfo(target).absolutePath());
+    if (QDir().rename(content, target))
+        return {};
+    // Back in place between two tries: a cancel meanwhile loses nothing.
+    QString error = tr("Cannot move the files to %1").arg(QDir::toNativeSeparators(target));
+    if (!restorePrevious(previous, target))
+        error += tr(", and the previous install could not be put back");
+    return error;
+}
+
+QString Installer::previousFolder() const
+{
+    return stagingFolder() + QStringLiteral("/previous");
 }
 
 QString Installer::finishInstall(const QString &target) const
@@ -531,7 +578,7 @@ QString Installer::finishInstall(const QString &target) const
         toolchains_->installedExecutable(step.tool, step.version).isEmpty() && ToolCatalog::find(step.tool);
     // Unpacked, but not as expected: not usable.
     if (lacksCheck || lacksExecutable)
-        return tr("%1 does not contain the expected files").arg(step.title);
+        return withAntivirusHint(tr("%1 does not contain the expected files").arg(step.title), root_);
     return {};
 }
 

@@ -92,6 +92,7 @@ class SnapshotsPopup;
 class StashesPopup;
 class OccurrenceIndex;
 class SymbolIndex;
+class TabBarBaseLine;
 class TerminalWidget;
 class TitleBar;
 class Toolchains;
@@ -617,6 +618,7 @@ private:
     ClaudeConfigView *claudeConfigView_ = nullptr;
     SidePanel *sidebar_ = nullptr;
     QTabWidget *terminalTabs_ = nullptr;
+    TabBarBaseLine *terminalTabBaseLine_ = nullptr;
     QToolButton *newTerminalButton_ = nullptr;      // "+" at the right of the terminal tabs
     QToolButton *emptyNewTerminalButton_ = nullptr; // the same, when no terminal is open
     TerminalWidget *claudeTerminal_ = nullptr;
