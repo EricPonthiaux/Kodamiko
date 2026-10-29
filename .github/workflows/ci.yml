@@ -6,6 +6,13 @@ name: CI
 on:
   push:
     branches: [main]
+    # A push that only changes the site or the documentation would rebuild
+    # the same packages for half an hour.
+    paths-ignore:
+      - "site/**"
+      - "docs/**"
+      - "README.md"
+      - ".github/workflows/pages.yml"
 
 env:
   # aqtinstall 3.3.0, which install-qt-action uses, does not find Qt 6.11+
