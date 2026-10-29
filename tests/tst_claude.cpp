@@ -109,6 +109,25 @@ private slots:
         QCOMPARE(permission->permissionSuggestions.size(), 1);
     }
 
+    void leavesAQuestionFromClaudeToTheTerminal()
+    {
+        const auto question = claude_.parseHook(
+            R"({"hook_event_name":"PermissionRequest","tool_name":"AskUserQuestion","tool_input":{"questions":[]}})");
+
+        QVERIFY(question);
+        QCOMPARE(question->kind, HookEvent::Kind::NeedsAttention);
+        QVERIFY(question->toolDetail.isEmpty());
+    }
+
+    void leavesAPlanToReviewToTheTerminal()
+    {
+        const auto plan = claude_.parseHook(
+            R"({"hook_event_name":"PermissionRequest","tool_name":"ExitPlanMode","tool_input":{"plan":"Rename the panel"}})");
+
+        QVERIFY(plan);
+        QCOMPARE(plan->kind, HookEvent::Kind::NeedsAttention);
+    }
+
     void answersAPermissionRequestWithTheUsersDecision()
     {
         HookEvent request{};

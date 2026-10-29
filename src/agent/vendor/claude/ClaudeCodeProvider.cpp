@@ -25,6 +25,15 @@ bool waitsForUser(const QString &notificationType)
     return types.contains(notificationType);
 }
 
+// The tools whose permission request is a question for the user, which
+// Claude Code shows in the terminal with its choices: Allow or Deny would
+// skip the question or cancel it.
+bool asksTheUser(const QString &toolName)
+{
+    static const QStringList tools{QStringLiteral("AskUserQuestion"), QStringLiteral("ExitPlanMode")};
+    return tools.contains(toolName);
+}
+
 // The files an editing tool works on.
 QStringList findEditedFiles(const QJsonObject &event)
 {
@@ -191,8 +200,17 @@ std::optional<HookEvent> ClaudeCodeProvider::parseHook(const QByteArray &json) c
         return event;
     }
     if (eventName == QLatin1String("PermissionRequest")) {
+        const QString toolName = object.value(QLatin1String("tool_name")).toString();
+        if (asksTheUser(toolName)) {
+            event.kind = HookEvent::Kind::NeedsAttention;
+            event.message =
+                toolName == QLatin1String("ExitPlanMode")
+                    ? QCoreApplication::translate("ClaudeCodeProvider", "Claude has a plan for you to review")
+                    : QCoreApplication::translate("ClaudeCodeProvider", "Claude asks you a question");
+            return event;
+        }
         event.kind = HookEvent::Kind::PermissionRequested;
-        event.message = object.value(QLatin1String("tool_name")).toString();
+        event.message = toolName;
         event.toolDetail = toolDetail(object.value(QLatin1String("tool_input")).toObject());
         event.permissionSuggestions = object.value(QLatin1String("permission_suggestions")).toArray();
         return event;
