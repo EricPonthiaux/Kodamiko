@@ -4,9 +4,12 @@
 
 #include "AppFonts.h"
 #include "Motion.h"
+#include "SnackbarButton.h"
 #include "ThemeStyle.h"
 #include "UiIcons.h"
 
+#include <QAbstractTextDocumentLayout>
+#include <QApplication>
 #include <QEnterEvent>
 #include <QEvent>
 #include <QHBoxLayout>
@@ -14,39 +17,37 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPropertyAnimation>
-#include <QPushButton>
+#include <QScopedValueRollback>
+#include <QScrollArea>
+#include <QScrollBar>
+#include <QStyle>
+#include <QTextCursor>
+#include <QTextDocument>
+#include <QTextEdit>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
-// Room around the card for its shadow.
 constexpr int shadowRoomPx = 12;
 constexpr int shadowSpreadPx = 8;
 constexpr int shadowDropPx = 3;
-constexpr qreal cornerRadiusPx = 4;
-// The strip on its left edge, in the accent color.
+constexpr qreal cornerRadiusPx = 10;
 constexpr qreal accentStripPx = 3;
-constexpr int iconSizePx = 20;
-constexpr int widestPx = 640;
+constexpr int iconSizePx = 22;
+constexpr int widestPx = 720;
 constexpr int narrowestPx = 360;
-// What surrounds the texts in a row: the margins, the icon, the close button.
-constexpr int textChromePx = 110;
-// What surrounds the buttons in their row: the margins.
-constexpr int actionsChromePx = 40;
-// The detail shows this many of its lines at most.
-constexpr int detailLineLimit = 8;
-// Above the window's bottom edge, well clear of the status bar and of the
-// last lines of an editor or a terminal.
-constexpr int bottomMarginPx = 72;
+constexpr int paddingPx = 16;
+constexpr int gapPx = 12;
+constexpr int actionGapPx = 8;
+constexpr int bottomMarginPx = 48;
 constexpr int sideMarginPx = 16;
-// It rises this far as it appears.
 constexpr int slideDistancePx = 14;
 
-// The width of the longest line of `text` in `metrics`.
 int longestLineWidth(const QFontMetrics &metrics, const QString &text)
 {
     int widest = 0;
@@ -55,17 +56,9 @@ int longestLineWidth(const QFontMetrics &metrics, const QString &text)
     return widest;
 }
 
-// `detail` as shown: its first lines only, and a path or a long command may
-// break after a slash (a zero-width space there), as QLabel breaks only
-// between words.
-QString shownDetail(const QString &detail)
+QFont detailFont(const QWidget *widget)
 {
-    QStringList lines = detail.split(QLatin1Char('\n'));
-    if (lines.size() > detailLineLimit) {
-        lines = lines.first(detailLineLimit);
-        lines.append(QStringLiteral("…"));
-    }
-    return lines.join(QLatin1Char('\n')).replace(QLatin1Char('/'), QStringLiteral("/\u200b"));
+    return AppFonts::codeFont(widget->font().pointSizeF() * 0.95);
 }
 
 } // namespace
@@ -74,34 +67,38 @@ Snackbar::Snackbar(QWidget *window)
     : QFrame(window)
     , theme_(Theme::kodamiko())
     , icon_(new QLabel(this))
-    , title_(new QLabel(this))
-    , detail_(new QLabel(this))
+    , body_(new QTextEdit(this))
     , waiting_(new QLabel(this))
-    , actions_(new QHBoxLayout)
-    , close_(new QToolButton(this))
+    , controls_(new QWidget(this))
+    , footer_(new QScrollArea(this))
+    , actionContent_(new QWidget(footer_))
+    , actions_(new QBoxLayout(QBoxLayout::LeftToRight, actionContent_))
+    , close_(new QToolButton(controls_))
     , expiry_(new QTimer(this))
+    , slide_(new QPropertyAnimation(this, "pos", this))
 {
     Q_ASSERT(window);
     setAttribute(Qt::WA_TranslucentBackground);
     setFocusPolicy(Qt::NoFocus);
-    setContentsMargins(shadowRoomPx, shadowRoomPx, shadowRoomPx, shadowRoomPx);
-
     icon_->setFixedSize(iconSizePx, iconSizePx);
-    AppFonts::setInterfaceFont(title_, 1.0);
-    title_->setTextFormat(Qt::PlainText);
-    title_->setWordWrap(true);
-    detail_->setTextFormat(Qt::PlainText);
-    detail_->setWordWrap(true);
-    detail_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    // The card's width is chosen from the texts (placedGeometry()): a word
-    // longer than it must not widen it.
-    title_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    detail_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    detail_->setForegroundRole(QPalette::PlaceholderText);
+    body_->setObjectName(QStringLiteral("snackbarMessage"));
+    body_->setReadOnly(true);
+    body_->setFocusPolicy(Qt::TabFocus);
+    body_->setFrameShape(QFrame::NoFrame);
+    body_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    body_->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    body_->setStyleSheet(QStringLiteral("QTextEdit { background: transparent; border: none; padding: 0; }"));
+    body_->viewport()->setAutoFillBackground(false);
+    body_->document()->setDocumentMargin(0);
+    body_->setMinimumSize(0, 0);
+    body_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
     waiting_->setForegroundRole(QPalette::PlaceholderText);
+    waiting_->setAlignment(Qt::AlignCenter);
     close_->setAutoRaise(true);
     close_->setFocusPolicy(Qt::TabFocus);
+    close_->setFixedSize(28, 28);
     expiry_->setSingleShot(true);
+    Motion::track(slide_);
 
     connect(close_, &QToolButton::clicked, this, [this] {
         if (queue_.isEmpty())
@@ -112,31 +109,47 @@ Snackbar::Snackbar(QWidget *window)
             dismissed();
     });
     connect(expiry_, &QTimer::timeout, close_, &QToolButton::click);
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *focused) {
+        if (focused && isAncestorOf(focused))
+            expiry_->stop();
+        else if (!queue_.isEmpty() && !underMouse() && queue_.first().message.duration)
+            expiry_->start(*queue_.first().message.duration);
+    });
 
-    // The icon, the title and the close button; the detail under the title;
-    // the buttons on a row of their own, so that the texts take every line
-    // they need.
-    auto *header = new QHBoxLayout;
-    header->setSpacing(10);
-    header->addWidget(icon_, 0, Qt::AlignTop);
-    header->addWidget(title_, 1);
-    header->addWidget(waiting_, 0, Qt::AlignTop);
-    header->addWidget(close_, 0, Qt::AlignTop);
-    auto *detail = new QHBoxLayout;
-    detail->addSpacing(iconSizePx + header->spacing());
-    detail->addWidget(detail_, 1);
-    actions_->setSpacing(6);
+    auto *controls = new QVBoxLayout(controls_);
+    controls->setContentsMargins(0, 0, 0, 0);
+    controls->setSpacing(4);
+    controls->addWidget(close_);
+    controls->addWidget(waiting_);
+    auto *message = new QHBoxLayout;
+    message->setSpacing(gapPx);
+    message->addWidget(icon_, 0, Qt::AlignTop);
+    message->addWidget(body_, 1);
+    message->addWidget(controls_, 0, Qt::AlignTop);
+
+    footer_->setObjectName(QStringLiteral("snackbarActions"));
+    footer_->setFrameShape(QFrame::NoFrame);
+    footer_->setFocusPolicy(Qt::NoFocus);
+    footer_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    footer_->setMinimumSize(0, 0);
+    footer_->setWidget(actionContent_);
+    footer_->viewport()->setAutoFillBackground(false);
+    actionContent_->setAutoFillBackground(false);
+    actions_->setContentsMargins(0, 0, 0, 0);
+    actions_->setSpacing(actionGapPx);
+    actions_->setSizeConstraint(QLayout::SetNoConstraint);
     actions_->addStretch();
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(int(accentStripPx) + 14, 10, 10, 10);
-    layout->setSpacing(6);
-    layout->addLayout(header);
-    layout->addLayout(detail);
-    layout->addSpacing(4);
-    layout->addLayout(actions_);
+    layout->setSizeConstraint(QLayout::SetNoConstraint);
+    layout->setContentsMargins(shadowRoomPx + paddingPx, shadowRoomPx + paddingPx, shadowRoomPx + paddingPx,
+                               shadowRoomPx + paddingPx);
+    layout->setSpacing(gapPx);
+    layout->addLayout(message, 1);
+    layout->addWidget(footer_);
 
     window->installEventFilter(this);
+    applyTheme(theme_);
     hide();
 }
 
@@ -148,8 +161,8 @@ Snackbar::Id Snackbar::post(SnackbarMessage message)
         showFirst();
         slideIn();
     } else {
-        waiting_->setText(tr("+%1").arg(queue_.size() - 1));
-        waiting_->show();
+        updateWaiting();
+        place();
     }
     return id;
 }
@@ -164,8 +177,8 @@ void Snackbar::withdraw(Id id)
         return;
     }
     queue_.erase(entry);
-    waiting_->setText(tr("+%1").arg(queue_.size() - 1));
-    waiting_->setVisible(queue_.size() > 1);
+    updateWaiting();
+    place();
 }
 
 QString Snackbar::shownTitle() const
@@ -177,9 +190,10 @@ void Snackbar::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     close_->setIcon(UiIcons::icon(QStringLiteral("close"), theme.mutedText));
-    detail_->setFont(AppFonts::codeFont(font().pointSizeF() * 0.95));
-    if (!queue_.isEmpty())
-        showFirst();
+    if (!queue_.isEmpty()) {
+        updateText();
+        place();
+    }
     update();
 }
 
@@ -190,13 +204,23 @@ bool Snackbar::eventFilter(QObject *watched, QEvent *event)
     return QFrame::eventFilter(watched, event);
 }
 
+bool Snackbar::event(QEvent *event)
+{
+    const bool handled = QFrame::event(event);
+    if (queue_.isEmpty() || placing_)
+        return handled;
+    if (event->type() == QEvent::FontChange)
+        updateText();
+    if (event->type() == QEvent::LayoutRequest || event->type() == QEvent::FontChange)
+        place();
+    return handled;
+}
+
 void Snackbar::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QRectF card = QRectF(rect()).adjusted(shadowRoomPx, shadowRoomPx, -shadowRoomPx, -shadowRoomPx);
-
-    // A soft shadow, a little lower than the card: it floats over the text.
     painter.setPen(Qt::NoPen);
     const int shadowAlpha = theme_.isDark ? 70 : 34;
     for (int i = shadowSpreadPx; i > 0; --i) {
@@ -205,8 +229,6 @@ void Snackbar::paintEvent(QPaintEvent *)
         painter.drawRoundedRect(card.adjusted(-i, -i + shadowDropPx, i, i + shadowDropPx), cornerRadiusPx + i,
                                 cornerRadiusPx + i);
     }
-
-    // Raised above the window's panels, so that it reads as a layer of its own.
     QPainterPath shape;
     shape.addRoundedRect(card.adjusted(0.5, 0.5, -0.5, -0.5), cornerRadiusPx, cornerRadiusPx);
     painter.fillPath(shape, ThemeStyle::mixed(theme_.window, theme_.foreground, theme_.isDark ? 0.08 : 0.02));
@@ -216,22 +238,60 @@ void Snackbar::paintEvent(QPaintEvent *)
     painter.restore();
     painter.setPen(QPen(theme_.border, 1));
     painter.drawPath(shape);
+    if (!footer_->isHidden()) {
+        const int dividerY = footer_->y() - gapPx / 2;
+        painter.setPen(QPen(ThemeStyle::mixed(theme_.window, theme_.border, 0.65), 1));
+        painter.drawLine(footer_->x(), dividerY, footer_->geometry().right(), dividerY);
+    }
 }
 
 void Snackbar::enterEvent(QEnterEvent *event)
 {
-    // A message does not go away while the user reads it.
     expiry_->stop();
     QFrame::enterEvent(event);
 }
 
 void Snackbar::leaveEvent(QEvent *event)
 {
-    if (!queue_.isEmpty()) {
-        if (const std::optional<std::chrono::milliseconds> duration = queue_.first().message.duration)
+    if (!queue_.isEmpty() && !isAncestorOf(QApplication::focusWidget())) {
+        if (const auto duration = queue_.first().message.duration)
             expiry_->start(*duration);
     }
     QFrame::leaveEvent(event);
+}
+
+void Snackbar::updateText()
+{
+    const SnackbarMessage &message = queue_.first().message;
+    const int scroll = body_->verticalScrollBar()->value();
+    body_->clear();
+    QTextCursor cursor(body_->document());
+    QTextCharFormat titleFormat;
+    QFont titleFont = font();
+    titleFont.setWeight(QFont::DemiBold);
+    titleFormat.setFont(titleFont);
+    titleFormat.setForeground(theme_.foreground);
+    cursor.insertText(message.title, titleFormat);
+    if (!message.detail.isEmpty()) {
+        QTextBlockFormat block;
+        block.setBottomMargin(gapPx);
+        cursor.setBlockFormat(block);
+        cursor.insertBlock(QTextBlockFormat());
+        QTextCharFormat codeFormat;
+        codeFormat.setFont(detailFont(this));
+        codeFormat.setForeground(theme_.mutedText);
+        cursor.insertText(message.detail, codeFormat);
+    }
+    body_->moveCursor(QTextCursor::Start);
+    body_->setAccessibleName(message.title);
+    body_->verticalScrollBar()->setValue(scroll);
+}
+
+void Snackbar::updateWaiting()
+{
+    waiting_->setText(tr("+%1").arg(queue_.size() - 1));
+    waiting_->setToolTip(tr("%n more message(s)", nullptr, int(queue_.size() - 1)));
+    waiting_->setVisible(queue_.size() > 1);
 }
 
 void Snackbar::showFirst()
@@ -239,24 +299,17 @@ void Snackbar::showFirst()
     const SnackbarMessage &message = queue_.first().message;
     icon_->setPixmap(message.icon.pixmap(QSize(iconSizePx, iconSizePx), devicePixelRatioF()));
     icon_->setVisible(!message.icon.isNull());
-    title_->setText(message.title);
-    detail_->setText(shownDetail(message.detail));
-    detail_->setVisible(!message.detail.isEmpty());
+    updateText();
+    body_->verticalScrollBar()->setValue(0);
     close_->setToolTip(message.closeToolTip.isEmpty() ? tr("Close") : message.closeToolTip);
-    waiting_->setText(tr("+%1").arg(queue_.size() - 1));
-    waiting_->setVisible(queue_.size() > 1);
+    close_->setAccessibleName(close_->toolTip());
+    updateWaiting();
     rebuildActions();
-    if (message.duration)
+    if (message.duration && !underMouse() && !isAncestorOf(QApplication::focusWidget()))
         expiry_->start(*message.duration);
     else
         expiry_->stop();
-    // The style sheet sets the labels' fonts as they are polished: the size
-    // depends on them.
     ensurePolished();
-    // The rows keep the sizes of the texts before until the next pass of the
-    // event loop: they measure the new ones now, for the height placed.
-    layout()->invalidate();
-    layout()->activate();
     place();
     show();
     raise();
@@ -268,6 +321,7 @@ void Snackbar::closeFirst()
         return;
     queue_.removeFirst();
     expiry_->stop();
+    slide_->stop();
     if (!queue_.isEmpty()) {
         showFirst();
         return;
@@ -280,51 +334,97 @@ void Snackbar::rebuildActions()
 {
     // A button may be the one being clicked: it goes once its signal returns.
     for (QPushButton *button : actionButtons_) {
+        actions_->removeWidget(button);
         button->hide();
         button->deleteLater();
     }
     actionButtons_.clear();
     const Id id = queue_.first().id;
     for (const SnackbarAction &action : queue_.first().message.actions) {
-        auto *button = new QPushButton(action.text, this);
-        // A click leaves the focus where the user types.
-        button->setFocusPolicy(Qt::TabFocus);
+        auto *button = new SnackbarButton(action.text, actionContent_);
         button->setDefault(action.emphasis == SnackbarAction::Emphasis::Primary);
-        button->setAutoDefault(false);
-        button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         connect(button, &QPushButton::clicked, this, [this, id, run = action.run] {
-            // The action may post or withdraw messages: close this one first.
             withdraw(id);
             if (run)
                 run();
         });
         actions_->addWidget(button);
         actionButtons_.append(button);
+        button->show();
     }
+    footer_->setVisible(!actionButtons_.isEmpty());
+    footer_->verticalScrollBar()->setValue(0);
+}
+
+int Snackbar::arrangeActions(int width)
+{
+    if (actionButtons_.isEmpty())
+        return 0;
+    int naturalWidth = (int(actionButtons_.size()) - 1) * actionGapPx;
+    for (const QPushButton *button : actionButtons_)
+        naturalWidth += button->sizeHint().width();
+    const bool stacked = naturalWidth > width;
+    actions_->setDirection(stacked ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    int height = 0;
+    for (QPushButton *button : actionButtons_) {
+        const int buttonWidth = stacked ? width : button->sizeHint().width();
+        const int buttonHeight = button->heightForWidth(buttonWidth);
+        button->setFixedSize(buttonWidth, buttonHeight);
+        height = stacked ? height + buttonHeight : std::max(height, buttonHeight);
+    }
+    if (stacked)
+        height += (int(actionButtons_.size()) - 1) * actionGapPx;
+    actionContent_->setFixedSize(width, height);
+    actions_->activate();
+    return height;
 }
 
 void Snackbar::place()
 {
-    if (!queue_.isEmpty())
-        setGeometry(placedGeometry());
-}
-
-QRect Snackbar::placedGeometry() const
-{
+    if (queue_.isEmpty() || placing_)
+        return;
+    const QScopedValueRollback guard(placing_, true);
+    slide_->stop();
     const QWidget *window = parentWidget();
-    const int available = window->width() - 2 * sideMarginPx;
-    // Wide enough for the texts on one line each, and for the buttons, within
-    // bounds: past them, the texts wrap.
-    const SnackbarMessage &message = queue_.first().message;
-    const int textWidth = std::max(title_->fontMetrics().horizontalAdvance(message.title),
-                                   longestLineWidth(detail_->fontMetrics(), message.detail));
-    const int naturalWidth = std::max(textWidth + textChromePx, actions_->sizeHint().width() + actionsChromePx);
-    const int cardWidth = std::clamp(naturalWidth, std::min(narrowestPx, available), std::min(widestPx, available));
-    // The wrapped texts' height follows the width.
-    const int cardHeight = heightForWidth(cardWidth + 2 * shadowRoomPx) - 2 * shadowRoomPx;
-    const QRect card((window->width() - cardWidth) / 2, window->height() - bottomMarginPx - cardHeight, cardWidth,
-                     cardHeight);
-    return card.adjusted(-shadowRoomPx, -shadowRoomPx, shadowRoomPx, shadowRoomPx);
+    const QMargins margins = layout()->contentsMargins();
+    const int horizontalChrome = margins.left() + margins.right();
+    const int verticalChrome = margins.top() + margins.bottom();
+    const int availableWidth = std::max(1, window->width() - 2 * sideMarginPx);
+    const int controlWidth = controls_->sizeHint().width() + gapPx;
+    const int iconWidth = icon_->isHidden() ? 0 : iconSizePx + gapPx;
+    const auto &message = queue_.first().message;
+    const int textWidth = std::max(longestLineWidth(body_->fontMetrics(), message.title),
+                                   longestLineWidth(QFontMetrics(detailFont(this)), message.detail));
+    int actionWidth = 0;
+    for (const QPushButton *button : actionButtons_)
+        actionWidth += button->sizeHint().width() + actionGapPx;
+    const int naturalWidth = horizontalChrome + std::max(textWidth + controlWidth + iconWidth, actionWidth);
+    const int width =
+        std::clamp(naturalWidth, std::min(narrowestPx, availableWidth), std::min(widestPx, availableWidth));
+    const int innerWidth = std::max(1, width - horizontalChrome);
+    const int scrollbarWidth = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    const int bodyWidth = std::max(1, innerWidth - controlWidth - iconWidth - scrollbarWidth);
+    body_->document()->setTextWidth(bodyWidth);
+    const int textHeight = int(std::ceil(body_->document()->size().height())) + 2;
+    const int controlsHeight = controls_->sizeHint().height();
+    const int messageHeight = std::max({textHeight, controlsHeight, iconSizePx});
+    const int bottom = std::min(bottomMarginPx, window->height() / 10);
+    const int availableHeight = std::max(1, window->height() - bottom - sideMarginPx);
+    const int footerGap = actionButtons_.isEmpty() ? 0 : gapPx;
+    const int maxActionHeight = std::max(1, availableHeight - verticalChrome - controlsHeight - footerGap);
+    int actionHeight = arrangeActions(innerWidth);
+    if (actionHeight > maxActionHeight)
+        actionHeight = arrangeActions(std::max(1, innerWidth - scrollbarWidth));
+    const int footerHeight = std::min(actionHeight, maxActionHeight);
+    footer_->setFixedHeight(footerHeight);
+    const int fixedHeight = verticalChrome + footerHeight + footerGap;
+    // Use at most 60% of a normal window; short windows give priority to the
+    // controls and at least a few readable lines before scrolling the text.
+    const int preferredHeight = std::max(window->height() * 3 / 5, fixedHeight + controlsHeight);
+    const int height = std::min({fixedHeight + messageHeight, preferredHeight, availableHeight});
+    setGeometry((window->width() - width) / 2, window->height() - bottom - height, width, height);
+    layout()->activate();
+    update();
 }
 
 void Snackbar::slideIn()
@@ -332,12 +432,10 @@ void Snackbar::slideIn()
     if (!Motion::policy().isEnabled())
         return;
     Motion::fadeIn(this);
-    const QPoint end = placedGeometry().topLeft();
-    auto *animation = new QPropertyAnimation(this, "pos", this);
-    animation->setStartValue(end + QPoint(0, slideDistancePx));
-    animation->setEndValue(end);
-    animation->setDuration(int(Motion::enterDuration.count()));
-    animation->setEasingCurve(Motion::enterCurve());
-    Motion::track(animation);
-    animation->start(QAbstractAnimation::DeleteWhenStopped);
+    const QPoint end = pos();
+    slide_->setStartValue(end + QPoint(0, slideDistancePx));
+    slide_->setEndValue(end);
+    slide_->setDuration(int(Motion::enterDuration.count()));
+    slide_->setEasingCurve(Motion::enterCurve());
+    slide_->start();
 }

@@ -42,6 +42,38 @@ QJsonArray parseActors(const QString &list)
     return actors;
 }
 
+// The steps in the journey's order: along the links, from each step no link
+// leads to. Not the board's order, which a click changes (a selected step is
+// brought to front). Steps the links do not reach (a cycle) come last, in the
+// board's order.
+std::vector<const JourneyTaskShape *> stepsInOrder(const Board &board)
+{
+    QHash<QString, QString> next;
+    QSet<QString> reached;
+    for (const auto &link : board.links()) {
+        if (!next.contains(link->from))
+            next.insert(link->from, link->to);
+        reached.insert(link->to);
+    }
+    std::vector<const JourneyTaskShape *> steps;
+    QSet<QString> written;
+    const auto follow = [&](QString id) {
+        while (!id.isEmpty() && !written.contains(id)) {
+            written.insert(id);
+            if (const auto *step = dynamic_cast<const JourneyTaskShape *>(board.shape(id)))
+                steps.push_back(step);
+            id = next.value(id);
+        }
+    };
+    for (const auto &s : board.shapes()) {
+        if (!reached.contains(s->id))
+            follow(s->id);
+    }
+    for (const auto &s : board.shapes())
+        follow(s->id);
+    return steps;
+}
+
 class MermaidJourney : public Codec {
 public:
     QString id() const override { return QStringLiteral("mermaid-journey"); }
@@ -102,17 +134,14 @@ public:
 
     QString serialize(const Board &board, const QJsonObject &meta) const override
     {
-        // The source has no links: the steps are written in the board's
+        // The source has no links: the steps are written in the journey's
         // order, a section heading whenever the section changes.
         QStringList out{QStringLiteral("journey")};
         const QString title = meta.value(QStringLiteral("title")).toString();
         if (!title.isEmpty())
             out.append(QStringLiteral("  title ") + title);
         std::optional<QString> section;
-        for (const auto &s : board.shapes()) {
-            const auto *step = dynamic_cast<const JourneyTaskShape *>(s.get());
-            if (!step)
-                continue;
+        for (const JourneyTaskShape *step : stepsInOrder(board)) {
             const QString current = step->section.isEmpty() ? defaultSection() : step->section;
             if (!section || current != *section) {
                 section = current;

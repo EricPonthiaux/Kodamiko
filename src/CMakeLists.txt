@@ -314,6 +314,7 @@ add_library(kdk_core STATIC
     ui/Motion.cpp
     ui/NoticeBar.cpp
     ui/Snackbar.cpp
+    ui/SnackbarButton.cpp
     ui/OverlayPopup.cpp
     ui/TabBarBaseLine.cpp
     ui/Paragraph.cpp

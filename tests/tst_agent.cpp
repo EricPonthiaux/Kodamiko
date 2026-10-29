@@ -33,6 +33,7 @@
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QTextEdit>
 #include <QToolButton>
 #include <QtTest>
 
@@ -340,7 +341,7 @@ private slots:
         QVERIFY(fixture.button(QStringLiteral("Always Allow")));
     }
 
-    void aSnackbarMessageIsAsTallAsItsTextsNeed()
+    void aSnackbarKeepsTheWholePermissionDescription()
     {
         QWidget window;
         window.resize(800, 600);
@@ -356,7 +357,10 @@ private slots:
             .actions = {{QStringLiteral("Deny"), {}}, {QStringLiteral("Allow"), {}}},
         });
 
-        QCOMPARE(snackbar->height(), snackbar->heightForWidth(snackbar->width()));
+        const auto *body = snackbar->findChild<QTextEdit *>();
+        QVERIFY(body);
+        QVERIFY(body->toPlainText().endsWith(QStringLiteral("first line\nsecond line\nthird line")));
+        QVERIFY(window.rect().contains(snackbar->geometry()));
     }
 
     void projectCheckReportsItsExitCodeAndOutput()

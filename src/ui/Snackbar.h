@@ -11,9 +11,12 @@
 #include <functional>
 #include <optional>
 
-class QHBoxLayout;
+class QBoxLayout;
 class QLabel;
+class QPropertyAnimation;
 class QPushButton;
+class QScrollArea;
+class QTextEdit;
 class QTimer;
 class QToolButton;
 
@@ -32,8 +35,8 @@ struct SnackbarAction {
 struct SnackbarMessage {
     QIcon icon;
     QString title;
-    // Lines under the title, in the code font (a command, a path, a diff):
-    // wrapped, and cut after a few lines.
+    // Lines under the title, in the code font (a command, a path, a diff).
+    // Wrapped without altering the text; long messages scroll in full.
     QString detail;
     QList<SnackbarAction> actions;
     // Closes the message by itself after this long; without one, it stays
@@ -47,11 +50,10 @@ struct SnackbarMessage {
 };
 
 // A short message at the bottom of the window, over its contents, in the
-// manner of Material's snackbars: an icon, a title, detail lines, a row of
-// buttons and a close button; the texts take the lines they need. It never
-// takes the focus: the user keeps typing where they were, and reaches its
-// buttons with the mouse or Tab. The messages posted while one is shown
-// wait their turn, and their count is shown.
+// manner of Material's snackbars. The message scrolls when needed; actions
+// stay below it and stack when the window is narrow. Posting never takes
+// focus: the user keeps typing where they were, and reaches its controls
+// with the mouse or Tab. Messages posted while one is shown wait their turn.
 //
 // It is a child of the window it shows in, and places itself as the window
 // is resized.
@@ -80,6 +82,7 @@ public:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 protected:
+    bool event(QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
@@ -94,9 +97,10 @@ private:
     // Closes the message shown and shows the next, if any.
     void closeFirst();
     void rebuildActions();
+    void updateText();
+    void updateWaiting();
+    int arrangeActions(int width);
     void place();
-    // Where it goes, shadow included, at the bottom center of the window.
-    QRect placedGeometry() const;
     void slideIn();
 
     QList<Entry> queue_;
@@ -104,11 +108,15 @@ private:
     Theme theme_;
 
     QLabel *icon_;
-    QLabel *title_;
-    QLabel *detail_;
+    QTextEdit *body_;
     QLabel *waiting_;
-    QHBoxLayout *actions_;
+    QWidget *controls_;
+    QScrollArea *footer_;
+    QWidget *actionContent_;
+    QBoxLayout *actions_;
     QList<QPushButton *> actionButtons_;
     QToolButton *close_;
     QTimer *expiry_;
+    QPropertyAnimation *slide_;
+    bool placing_ = false;
 };

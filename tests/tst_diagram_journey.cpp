@@ -146,6 +146,21 @@ private slots:
         QCOMPARE(serialized.count(QStringLiteral("section Journey")), 1);
     }
 
+    // Selecting a step brings it to front: the steps are still written in the
+    // journey's order, so that read again each keeps its key and its place.
+    void writesTheStepsInTheJourneysOrder()
+    {
+        const Model model = parse(QStringLiteral("journey\n  section A\n    One: 3\n    Two: 3\n  section B\n"
+                                                 "    Three: 3\n"));
+        Board board;
+        buildBoard(board, codec(), model);
+        const QString before = codec().serialize(board, model.meta);
+        board.bringToFront(step(board, QStringLiteral("step1"))->id);
+        board.bringToFront(step(board, QStringLiteral("step2"))->id);
+        QCOMPARE(board.shapes().back()->key, QStringLiteral("step2"));
+        QCOMPARE(codec().serialize(board, model.meta), before);
+    }
+
     // shape-board-layout.test.js: a step keeps all its texts in its box.
     void keepsItsTextsInsideTheBox()
     {
