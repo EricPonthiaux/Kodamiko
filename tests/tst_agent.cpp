@@ -3,6 +3,7 @@
 #include "agent/AgentActivity.h"
 #include "agent/AgentIndicator.h"
 #include "agent/AgentProviders.h"
+#include "agent/DiagramRequestPopup.h"
 #include "agent/HookServer.h"
 #include "agent/PermissionPrompts.h"
 #include "agent/ProjectCheck.h"
@@ -16,8 +17,10 @@
 #include "agent/ReviewProgressView.h"
 #include "agent/ReviewSession.h"
 #include "agent/ReviewSketch.h"
+#include "agent/ReviewText.h"
 #include "agent/ReviewView.h"
 #include "agent/vendor/claude/ClaudeCodeProvider.h"
+#include "diagnostics/ProblemStore.h"
 #include "support/FakeReviewer.h"
 #include "ui/Snackbar.h"
 #include "ui/StepTimeline.h"
@@ -25,6 +28,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLabel>
+#include <QLineEdit>
 #include <QLocalSocket>
 #include <QPushButton>
 #include <QSignalSpy>
@@ -45,6 +49,15 @@ QStringList shownTexts(const QWidget &widget)
             texts.append(label->text());
     }
     return texts;
+}
+
+QPushButton *buttonWithText(const QWidget &widget, const QString &text)
+{
+    for (QPushButton *button : widget.findChildren<QPushButton *>()) {
+        if (button->text() == text)
+            return button;
+    }
+    return nullptr;
 }
 
 // A finished review of three findings, an error and a warning in a.cpp and
@@ -411,19 +424,18 @@ private slots:
         ReviewSession session({.workDir = folder.path(), .subject = "the code", .agent = &agent});
         ReviewPage page;
         page.show();
-        QPushButton *start = nullptr;
-        for (QPushButton *button : page.findChildren<QPushButton *>()) {
-            if (button->text() == "Review the Staged Changes")
-                start = button;
-        }
-        const auto *findings = page.findChild<ReviewFindingsPanel *>();
-        QVERIFY(start && start->isVisible());
-        QVERIFY(!findings->isVisible());
+        QPushButton *start = buttonWithText(page, "Review the Staged Changes");
+        if (!start)
+            QFAIL("The invitation has no start button");
+        QVERIFY(start->isVisible());
+        QVERIFY(!page.findChild<ReviewView *>());
         const QSignalSpy requested(&page, &ReviewPage::reviewRequested);
         start->click();
         QCOMPARE(requested.size(), 1);
 
         page.setSession(&session);
+        const auto *findings = page.findChild<ReviewFindingsView *>();
+        QVERIFY(findings);
         session.start();
 
         QVERIFY(!start->isVisible());
@@ -454,7 +466,7 @@ private slots:
         QVERIFY(view.findChild<ReviewFindingCard *>()->isVisible());
     }
 
-    void aReviewWithoutFindingsKeepsItsTextUnderItsTitle()
+    void aCleanReviewKeepsItsSummaryWithItsHeading()
     {
         const QTemporaryDir folder;
         const FakeReviewer agent(QStringLiteral(R"({"summary": "Sound.", "findings": []})"));
@@ -471,7 +483,30 @@ private slots:
                 summary = label;
         }
         QVERIFY(summary);
-        QVERIFY2(summary->mapTo(&view, QPoint()).y() < 200, "the summary is spread down the tab");
+        const auto *title = view.findChild<QLabel *>("reviewCleanTitle");
+        QVERIFY(title && title->isVisible());
+        const int gap = summary->mapTo(&view, QPoint()).y() - title->mapTo(&view, title->rect().bottomLeft()).y();
+        QVERIFY2(gap >= 0 && gap < 60, "the summary is separated from its heading");
+    }
+
+    void returnInTheDiagramsFileNameDrawsOnce()
+    {
+        QWidget window;
+        window.resize(900, 700);
+        DiagramRequestPopup popup(Theme::kodamiko(), &window);
+        window.show();
+        int drawings = 0;
+        popup.popup({.location = "docs", .kinds = {DiagramKinds::find("flowchart")}, .initialName = "flows/login"},
+                    [&drawings](const QString &, const QString &, const QString &) {
+                        ++drawings;
+                        return QString();
+                    });
+        auto *name = popup.findChild<QLineEdit *>();
+        QVERIFY(name);
+
+        QTest::keyClick(name, Qt::Key_Return);
+
+        QCOMPARE(drawings, 1);
     }
 
     void findingsAreGroupedByFile()
@@ -552,13 +587,159 @@ private slots:
             return static_cast<QPushButton *>(nullptr);
         };
 
-        barButton("Resolve All")->click();
+        barButton("Fix visible")->click();
 
         QTRY_COMPARE(buttonsNamed("Dismiss"), qsizetype(3));
-        QVERIFY(!barButton("Resolve All")->isEnabled());
-        QVERIFY(!barButton("Send All to Claude")->isEnabled());
-        QCOMPARE(buttonsNamed("Send to Claude"), qsizetype(0));
-        QCOMPARE(buttonsNamed("Resolve"), qsizetype(0));
+        QVERIFY(!barButton("Fix visible")->isEnabled());
+        QVERIFY(!barButton("Prepare prompt")->isEnabled());
+        QCOMPARE(buttonsNamed("Prepare prompt"), qsizetype(0));
+        QCOMPARE(buttonsNamed("Ask Claude to fix"), qsizetype(0));
+    }
+
+    void anInterruptedReviewFreezesItsClockAndCanStartAgain()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ReviewView view({.workDir = folder.path(), .subject = "the code", .agent = &agent});
+        view.show();
+        view.session()->start();
+
+        buttonWithText(view, "Stop review")->click();
+
+        QCOMPARE(view.session()->state(), ReviewSession::State::Interrupted);
+        const auto elapsed = view.session()->elapsed();
+        QTest::qWait(30);
+        QCOMPARE(view.session()->elapsed(), elapsed);
+        QVERIFY(shownTexts(view).contains("The review did not finish."));
+        QVERIFY(view.session()->findings().isEmpty());
+        buttonWithText(*view.findChild<ReviewProgressView *>(), "Review Again")->click();
+        QTRY_COMPARE(view.session()->state(), ReviewSession::State::Finished);
+    }
+
+    void undoDismissRestoresTheOriginalOrderAndHandoffStatus()
+    {
+        ReviewedFindings review;
+        const auto original = review.session.findings();
+        review.session.resolve({original.first()});
+        review.session.dismiss({original.first(), original.last()});
+        QCOMPARE(review.session.findings().size(), 1);
+        QCOMPARE(review.session.reportedFindingCount(), 3);
+
+        review.session.undoDismiss();
+
+        QCOMPARE(review.session.findings(), original);
+        QVERIFY(review.session.isResolving(original.first()));
+        QVERIFY(!review.session.canUndoDismiss());
+    }
+
+    void undoDismissRepublishesTheFindingInTheEditor()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ProblemStore problems(nullptr);
+        ReviewSession session(
+            {.workDir = folder.path(), .subject = "the code", .agent = &agent, .problems = &problems});
+        session.start();
+        QTRY_COMPARE(session.state(), ReviewSession::State::Finished);
+        const QString path = session.findings().first().path;
+        session.dismiss(session.findings());
+        QVERIFY(problems.reviewProblems(path).isEmpty());
+
+        session.undoDismiss();
+
+        QCOMPARE(problems.reviewProblems(path).size(), 1);
+    }
+
+    void aCleanReviewKeepsTheFailedCheckVisible()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(QStringLiteral(R"({"summary":"No concrete issue.","findings":[]})"));
+        ReviewView view({.workDir = folder.path(), .subject = "the code", .checkCommand = "exit 3", .agent = &agent});
+        view.show();
+        view.session()->start();
+        QTRY_COMPARE(view.session()->state(), ReviewSession::State::CheckFailed);
+
+        view.session()->reviewAnyway();
+
+        QTRY_COMPARE(view.session()->state(), ReviewSession::State::Finished);
+        QVERIFY(shownTexts(view).contains("The project check failed. It still needs attention before committing."));
+    }
+
+    void aNewRunForgetsThePreviousDismissals()
+    {
+        ReviewedFindings review;
+        review.session.dismiss(review.session.findings());
+        QVERIFY(review.session.canUndoDismiss());
+
+        review.session.start();
+
+        QVERIFY(!review.session.canUndoDismiss());
+        QTRY_COMPARE(review.session.state(), ReviewSession::State::Finished);
+        review.session.undoDismiss();
+        QCOMPARE(review.session.findings().size(), 3);
+    }
+
+    void aFilterClearsSelectionAndLimitsTheBulkHandoff()
+    {
+        ReviewedFindings review;
+        ReviewFindingsView view;
+        view.setSession(&review.session);
+        view.show();
+        auto *list = view.findChild<ReviewFindingsList *>();
+        QTest::keyClick(list, Qt::Key_Up);
+        QCOMPARE(list->selectedFindings().size(), 1);
+        const QSignalSpy resolved(&review.session, &ReviewSession::resolveRequested);
+
+        for (QToolButton *button : view.findChildren<QToolButton *>()) {
+            if (button->text() == "Warnings 2")
+                button->click();
+        }
+        QVERIFY(list->selectedFindings().isEmpty());
+        buttonWithText(view, "Fix visible")->click();
+
+        QCOMPARE(resolved.size(), 1);
+        const QString prompt = resolved.first().first().toString();
+        QVERIFY(!prompt.contains("Off by one."));
+        QVERIFY(prompt.contains("Unused value.") && prompt.contains("Leaks the file."));
+    }
+
+    void theLastDismissedFindingCanBeRestoredFromTheReview()
+    {
+        const QTemporaryDir folder;
+        const FakeReviewer agent(FakeReviewer::oneFindingReport);
+        ReviewView view({.workDir = folder.path(), .subject = "the code", .agent = &agent});
+        view.show();
+        view.session()->start();
+        QTRY_COMPARE(view.session()->state(), ReviewSession::State::Finished);
+
+        view.session()->dismiss(view.session()->findings());
+
+        QVERIFY(view.findChild<ReviewFindingsView *>()->isVisible());
+        QVERIFY(ReviewText::summary(*view.session()).contains("dismissed"));
+        auto *undo = buttonWithText(view, "Undo dismissal");
+        QVERIFY(undo && undo->isVisible());
+        undo->click();
+        QCOMPARE(view.session()->findings().size(), 1);
+        QVERIFY(view.findChild<ReviewFindingCard *>()->isVisible());
+    }
+
+    void retryingTheReviewPageRequestsFreshStagedChanges()
+    {
+        ReviewedFindings review;
+        ReviewPage page;
+        page.setSession(&review.session);
+        page.show();
+        const QSignalSpy requested(&page, &ReviewPage::reviewRequested);
+        const QSignalSpy restarted(&review.session, &ReviewSession::stateChanged);
+
+        const auto *view = page.findChild<ReviewView *>();
+        for (QPushButton *button : view->findChildren<QPushButton *>()) {
+            if (button->text() == "Review Again" && button->isVisible())
+                button->click();
+        }
+
+        QCOMPARE(requested.size(), 1);
+        QCOMPARE(restarted.size(), 0);
     }
 
     void projectCheckKeepsTheLastLinesOfItsOutput()

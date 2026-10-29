@@ -7,6 +7,7 @@
 #include <QWidget>
 
 class QLabel;
+class QBoxLayout;
 class QPushButton;
 class QTimer;
 class ReviewSketch;
@@ -15,8 +16,8 @@ class StepTimeline;
 // The page of a review tab (ReviewView) while the review runs, as the tab
 // of a diagram being drawn: a page of code that reads itself (ReviewSketch),
 // what is reviewed, the reviewer's steps on a timeline, the time spent, and
-// Cancel. When the review fails, the error stays with Review Again and
-// Close; the other outcomes are the tab's other page.
+// Stop review. Failures and interruptions stay visible with Review Again
+// and Close; the other outcomes are the tab's other pages.
 class ReviewProgressView : public QWidget {
     Q_OBJECT
 
@@ -25,14 +26,19 @@ public:
     ReviewProgressView(ReviewSession *session, QWidget *parent);
 
 signals:
-    // Cancel, once the session is stopped, or Close.
+    // Close the review; stopping it instead leaves its outcome visible.
     void closeRequested();
+    void reviewRequested();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     QLayout *createButtons();
     void onStateChanged(ReviewSession::State state);
     void showRunning();
     void showFailure();
+    void showInterrupted();
     // The session's steps not on the timeline yet.
     void showNewSteps();
     void updateElapsed();
@@ -46,6 +52,10 @@ private:
     StepTimeline *steps_;
     QLabel *elapsedLabel_;
     QLabel *error_;
+    QLabel *kind_ = nullptr;
+    QWidget *column_ = nullptr;
+    QWidget *reading_ = nullptr;
+    QBoxLayout *readingLayout_ = nullptr;
     QPushButton *cancel_;
     QPushButton *retry_;
     QPushButton *close_;

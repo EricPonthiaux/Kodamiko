@@ -20,9 +20,9 @@
 namespace {
 
 constexpr int groupSpacingPx = 2;
-constexpr int cardSpacingPx = 4;
+constexpr int cardSpacingPx = 10;
 // The cards under their file's name, past its caret.
-constexpr int cardIndentPx = 14;
+constexpr int cardIndentPx = 0;
 constexpr int groupBottomPx = 10;
 constexpr int visibleMarginPx = 8;
 
@@ -32,7 +32,7 @@ QString emptyText(ReviewFindingsList::Filter filter)
 {
     switch (filter) {
     case ReviewFindingsList::Filter::All:
-        return ReviewFindingsList::tr("No findings left.");
+        return ReviewFindingsList::tr("All findings have been dismissed.\nThe code has not been reviewed again.");
     case ReviewFindingsList::Filter::Errors:
         return ReviewFindingsList::tr("No errors left.");
     case ReviewFindingsList::Filter::Warnings:
@@ -79,6 +79,7 @@ void ReviewFindingsList::setSession(ReviewSession *session)
         session_->disconnect(this);
     session_ = session;
     selected_.clear();
+    expanded_.clear();
     current_.reset();
     anchor_.reset();
     foldedPaths_.clear();
@@ -92,6 +93,8 @@ void ReviewFindingsList::setSession(ReviewSession *session)
 void ReviewFindingsList::setFilter(Filter filter)
 {
     filter_ = filter;
+    selected_.clear();
+    anchor_.reset();
     rebuild();
 }
 
@@ -167,6 +170,12 @@ ReviewFindingCard *ReviewFindingsList::createCard(const Finding &finding, QWidge
     const auto status =
         session_->isResolving(finding) ? ReviewFindingCard::Status::Sent : ReviewFindingCard::Status::Open;
     auto *card = new ReviewFindingCard(finding, status, session_->agentName(), parent);
+    card->setExpanded(expanded_.contains(finding));
+    connect(card, &ReviewFindingCard::detailsToggled, this, [this, finding](bool expanded) {
+        expanded_.removeOne(finding);
+        if (expanded)
+            expanded_.append(finding);
+    });
     cards_.append(card);
     connect(card, &ReviewFindingCard::pressed, this, [this, finding](Qt::KeyboardModifiers modifiers) {
         setFocus(Qt::MouseFocusReason);

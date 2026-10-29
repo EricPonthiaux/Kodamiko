@@ -13,10 +13,10 @@ class QToolButton;
 
 // A review's findings (ReviewSession) to go through and act on: a bar with
 // how many findings, errors and warnings are left, which also filter the
-// list, then Resolve, Send to <agent> and Dismiss for the selected findings,
-// or Resolve All and Send All for the findings shown when none is selected;
-// under it, the findings grouped by file (ReviewFindingsList). In a review's
-// tab (ReviewView) and over the diff (ReviewFindingsPanel) alike.
+// list, then actions to fix, prepare a prompt, or dismiss the selection.
+// Without a selection, handoffs use only the filtered findings. File groups
+// (ReviewFindingsList) and undo follow the toolbar, in a review's tab and
+// over the diff alike.
 class ReviewFindingsView : public QWidget {
     Q_OBJECT
 
@@ -46,4 +46,5 @@ private:
     QPushButton *resolve_ = nullptr;
     QPushButton *send_ = nullptr;
     QPushButton *dismiss_ = nullptr;
+    QWidget *undoNotice_ = nullptr;
 };

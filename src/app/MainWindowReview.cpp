@@ -150,6 +150,7 @@ QWidget *MainWindow::createReviewPage()
     reviewPage_->setAgentName(agentProvider_->name());
     connect(reviewPage_, &ReviewPage::reviewRequested, this, &MainWindow::reviewStagedChanges);
     connect(reviewPage_, &ReviewPage::closeRequested, this, &MainWindow::closeStagedReview);
+    connect(reviewPage_, &ReviewPage::inspectRequested, this, [this] { setMode(Mode::Diff); });
     connect(reviewPage_, &ReviewPage::findingRequested, this, [this](const ReviewReport::Finding &finding) {
         setMode(Mode::Diff);
         changesView_->goToFinding(finding);

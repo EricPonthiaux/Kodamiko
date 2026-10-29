@@ -81,8 +81,7 @@ QLayout *ReviewBar::createButtons()
     reviewAnyway_->setToolTip(tr("Review the code although the check failed, telling the reviewer the failure"));
     connect(cancel_, &QPushButton::clicked, this, [this] {
         if (session_)
-            session_->stop();
-        emit closeRequested();
+            session_->interrupt();
     });
     connect(reviewAnyway_, &QPushButton::clicked, this, [this] {
         if (session_)
@@ -146,6 +145,12 @@ void ReviewBar::onStateChanged(ReviewSession::State state)
         return;
     case ReviewSession::State::Failed:
         showFailure();
+        return;
+    case ReviewSession::State::Interrupted:
+        setText(tr("The review did not finish"),
+                tr("No complete report is available. Start a new review when you are ready."));
+        retry_->show();
+        close_->show();
         return;
     }
 }

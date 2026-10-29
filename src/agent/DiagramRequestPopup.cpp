@@ -67,7 +67,8 @@ DiagramRequestPopup::DiagramRequestPopup(const Theme &theme, QWidget *parent)
 
     name_->setPlaceholderText(tr("File name, with “/” to create subfolders"));
     connect(name_, &QLineEdit::textEdited, this, [this] { showError({}); });
-    connect(name_, &QLineEdit::returnPressed, this, &DiagramRequestPopup::draw);
+    // Enter in the name draws through keyPressEvent: QLineEdit passes the key
+    // on to the popup after returnPressed, which drew a second time.
 
     error_->setObjectName(QStringLiteral("diagramError"));
     error_->hide();

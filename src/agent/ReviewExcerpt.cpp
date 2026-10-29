@@ -4,6 +4,7 @@
 
 #include "ReviewText.h"
 #include "ui/AppFonts.h"
+#include "ui/ThemeStyle.h"
 
 #include <QFile>
 #include <QPainter>
@@ -17,10 +18,10 @@
 namespace {
 
 // The lines shown before and after the finding's.
-constexpr int contextLines = 1;
+constexpr int contextLines = 2;
 constexpr int tabWidth = 4;
 constexpr qreal fontScale = 0.92;
-constexpr int paddingPx = 4;
+constexpr int paddingPx = 10;
 // Between two lines, over the font's line spacing.
 constexpr int lineGapPx = 2;
 // The width it asks for, in characters of the code font.
@@ -102,7 +103,7 @@ void ReviewExcerpt::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::Antialiasing);
     QPainterPath background;
     background.addRoundedRect(QRectF(rect()), cornerRadiusPx, cornerRadiusPx);
-    painter.fillPath(background, palette().color(QPalette::AlternateBase));
+    painter.fillPath(background, palette().color(QPalette::Base));
     painter.setClipPath(background);
 
     const QFontMetrics metrics = fontMetrics();
@@ -120,7 +121,9 @@ void ReviewExcerpt::paintEvent(QPaintEvent *)
         painter.drawText(QRect(row.left(), row.top(), numberWidth - numberGapPx, row.height()),
                          Qt::AlignRight | Qt::AlignVCenter, QString::number(line.number));
         const QString text = metrics.elidedText(line.text, Qt::ElideRight, textWidth);
-        painter.setPen(palette().color(isFinding ? QPalette::Text : QPalette::PlaceholderText));
+        const QColor context =
+            ThemeStyle::mixed(palette().color(QPalette::Base), palette().color(QPalette::Text), 0.72);
+        painter.setPen(isFinding ? palette().color(QPalette::Text) : context);
         painter.drawText(row.adjusted(numberWidth, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter, text);
         if (!isFinding)
             continue;

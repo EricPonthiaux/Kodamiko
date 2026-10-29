@@ -2,9 +2,9 @@
 
 #include "ReviewPage.h"
 
-#include "ReviewBar.h"
-#include "ReviewFindingsPanel.h"
+#include "ReviewView.h"
 #include "ui/AppFonts.h"
+#include "ui/ThemeStyle.h"
 
 #include <QLabel>
 #include <QPushButton>
@@ -19,28 +19,16 @@ constexpr int invitationWidthPx = 520;
 
 ReviewPage::ReviewPage(QWidget *parent)
     : QWidget(parent)
-    , bar_(new ReviewBar(this))
-    , findings_(new ReviewFindingsPanel(this))
 {
     invitation_ = createInvitation();
     setAutoFillBackground(true);
     setBackgroundRole(QPalette::Base);
-    findings_->setClosable(false);
     connect(start_, &QPushButton::clicked, this, &ReviewPage::reviewRequested);
-    connect(bar_, &ReviewBar::reviewAgainRequested, this, &ReviewPage::reviewRequested);
-    connect(bar_, &ReviewBar::closeRequested, this, &ReviewPage::closeRequested);
-    connect(bar_, &ReviewBar::findingsRequested, findings_, [this] { findings_->setFocus(); });
-    connect(findings_, &ReviewFindingsPanel::findingRequested, this, &ReviewPage::findingRequested);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(marginPx, marginPx, marginPx, marginPx);
     layout->setSpacing(marginPx);
     layout->addWidget(invitation_, 1);
-    layout->addWidget(bar_);
-    layout->addWidget(findings_, 1);
-    // Below a bar alone, the page's background.
-    layout->addStretch();
-    showState();
 }
 
 QWidget *ReviewPage::createInvitation()
@@ -68,16 +56,25 @@ QWidget *ReviewPage::createInvitation()
 
 void ReviewPage::setSession(ReviewSession *session)
 {
-    if (session_)
-        session_->disconnect(this);
-    session_ = session;
-    bar_->setSession(session);
-    findings_->setSession(session);
-    if (session) {
-        connect(session, &ReviewSession::stateChanged, this, &ReviewPage::showState);
-        connect(session, &ReviewSession::findingsChanged, this, &ReviewPage::showState);
+    if (session_ == session)
+        return;
+    if (view_) {
+        view_->hide();
+        layout()->removeWidget(view_);
+        view_->disconnect(this);
+        view_->deleteLater();
+        view_ = nullptr;
     }
-    showState();
+    session_ = session;
+    invitation_->setVisible(!session);
+    if (session) {
+        view_ = new ReviewView(session, this);
+        layout()->addWidget(view_);
+        connect(view_, &ReviewView::reviewRequested, this, &ReviewPage::reviewRequested);
+        connect(view_, &ReviewView::closeRequested, this, &ReviewPage::closeRequested);
+        connect(view_, &ReviewView::inspectRequested, this, &ReviewPage::inspectRequested);
+        connect(view_, &ReviewView::findingRequested, this, &ReviewPage::findingRequested);
+    }
 }
 
 void ReviewPage::setAgentName(const QString &name)
@@ -93,14 +90,5 @@ void ReviewPage::setAgentName(const QString &name)
 
 void ReviewPage::applyTheme(const Theme &theme)
 {
-    findings_->applyTheme(theme);
-}
-
-void ReviewPage::showState()
-{
-    invitation_->setVisible(!session_);
-    // The bar hides itself without a session.
-    const bool hasFindings =
-        session_ && session_->state() == ReviewSession::State::Finished && !session_->findings().isEmpty();
-    findings_->setVisible(hasFindings);
+    setPalette(ThemeStyle::palette(theme));
 }

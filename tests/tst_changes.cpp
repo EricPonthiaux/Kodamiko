@@ -588,13 +588,13 @@ private slots:
         const auto card = [&view] { return view.findChild<ReviewFindingCard *>(); };
         const QSignalSpy resolved(session, &ReviewSession::resolveRequested);
 
-        buttonWithText(card(), "Resolve")->click();
+        buttonWithText(card(), "Ask Claude to fix")->click();
 
         QTRY_COMPARE(resolved.size(), 1);
         QVERIFY(resolved.first().first().toString().contains("Off by one."));
-        QTRY_VERIFY(!buttonWithText(card(), "Resolve"));
+        QTRY_VERIFY(!buttonWithText(card(), "Ask Claude to fix"));
         const QList<QLabel *> labels = card()->findChildren<QLabel *>();
-        QVERIFY(std::ranges::any_of(labels, [](const QLabel *label) { return label->text() == "✓ Sent to Claude"; }));
+        QVERIFY(std::ranges::any_of(labels, [](const QLabel *label) { return label->text() == "Handed to Claude"; }));
     }
 
     void reviewAgainAsksForANewReviewOfTheStagedChanges()

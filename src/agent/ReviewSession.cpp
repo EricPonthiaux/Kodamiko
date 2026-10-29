@@ -67,7 +67,7 @@ QString ReviewSession::reviewerName() const
 
 std::chrono::milliseconds ReviewSession::elapsed() const
 {
-    if (state_ == State::Running)
+    if (state_ == State::Running && clock_.isValid())
         return elapsedBefore_ + std::chrono::milliseconds(clock_.elapsed());
     return elapsed_;
 }
@@ -80,6 +80,8 @@ void ReviewSession::start()
     error_.clear();
     summary_.clear();
     findings_.clear();
+    reportedFindingCount_ = 0;
+    dismissals_.clear();
     resolving_.clear();
     rawAnswer_.clear();
     publishFindings();
@@ -110,10 +112,18 @@ void ReviewSession::stop()
     run_->stop();
 }
 
+void ReviewSession::interrupt()
+{
+    if (state_ != State::Running)
+        return;
+    stop();
+    setState(State::Interrupted);
+}
+
 void ReviewSession::setState(State state)
 {
     if (state != State::Running)
-        elapsed_ = elapsedBefore_ + std::chrono::milliseconds(clock_.elapsed());
+        elapsed_ = elapsed();
     state_ = state;
     emit stateChanged(state);
 }
@@ -174,6 +184,7 @@ void ReviewSession::onRunFinished(const AgentRun::Outcome &outcome)
     if (const std::optional<ReviewReport::Report> report = ReviewReport::parse(outcome.answer, workDir_)) {
         summary_ = report->summary;
         findings_ = report->findings;
+        reportedFindingCount_ = findings_.size();
         publishFindings();
     } else {
         rawAnswer_ = outcome.answer;
@@ -196,10 +207,21 @@ void ReviewSession::fail(const QString &error)
 
 void ReviewSession::dismiss(const QList<ReviewReport::Finding> &findings)
 {
+    const QList<ReviewReport::Finding> before = findings_;
     const qsizetype removed =
         findings_.removeIf([&findings](const ReviewReport::Finding &finding) { return findings.contains(finding); });
     if (removed == 0)
         return;
+    dismissals_.append(before);
+    publishFindings();
+    emit findingsChanged();
+}
+
+void ReviewSession::undoDismiss()
+{
+    if (dismissals_.isEmpty())
+        return;
+    findings_ = dismissals_.takeLast();
     publishFindings();
     emit findingsChanged();
 }

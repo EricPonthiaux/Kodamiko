@@ -155,6 +155,17 @@ QPushButton { background: @button; border: 1px solid @border; border-radius: 3px
 QPushButton:hover { border-color: @highlight; }
 QPushButton:pressed { background: @highlight; }
 QPushButton:default { color: @onAccent; border: 1px solid @accent; background: @accent; }
+QPushButton#reviewPrimary { color: @reviewOnAccent; border: 1px solid @reviewAccent; background: @reviewAccent; }
+QPushButton#reviewPrimary:disabled { color: @muted; border-color: @line; background: @button; }
+QLabel#reviewKind { color: @reviewAccent; }
+QLabel#reviewMuted { color: @muted; }
+QLabel#reviewSuccessSymbol { color: @reviewSuccess; background: @reviewSuccessTint; border: 1px solid @line; border-radius: 28px; }
+QLabel#reviewFailureSymbol { color: @reviewError; background: @reviewErrorTint; border: 1px solid @line; border-radius: 9px; }
+QLabel#reviewError, QLabel#reviewWarning { padding: 4px 7px; border-radius: 4px; }
+QLabel#reviewError { color: @reviewError; background: @reviewErrorTint; }
+QLabel#reviewWarning { color: @reviewWarning; background: @reviewWarningTint; }
+QToolButton#reviewLine { color: @muted; background: transparent; padding: 0; }
+QToolButton#reviewLine:hover { color: @reviewAccent; }
 QPushButton:disabled { color: @muted; border-color: @line; }
 QToolButton { border-radius: 3px; padding: 2px 5px; }
 QToolButton:hover { background: @button; }
@@ -220,6 +231,7 @@ QListWidget#projectRecipes::item { padding: 10px 14px; margin: 3px 0; border-rad
 QListWidget#projectRecipes::item:hover { background: @hover; }
 QListWidget#projectRecipes::item:selected { background: @slate; color: @text; }
 QFrame#card { background: @panel; border: 1px solid @line; border-radius: 4px; }
+QFrame#reviewReadingCard { background: @panel; border: 1px solid @line; border-radius: 7px; }
 QFrame#viewTitleBar { border: none; border-bottom: 1px solid @line; }
 QFrame#fileActions { border: none; border-bottom: 1px solid @line; }
 QFrame#commitPanel { border: none; border-top: 1px solid @line; }
@@ -299,6 +311,14 @@ QComboBox QAbstractItemView { background: @panel; border: 1px solid @border; sel
     sheet.replace(QStringLiteral("@frameRadius"), QString::number(PopupMetrics::frameRadius));
     sheet.replace(QStringLiteral("@rowRadius"), QString::number(PopupMetrics::rowRadius));
     const QList<std::pair<QString, QColor>> colors = {
+        {"@reviewOnAccent", theme.isDark ? theme.background : theme.onAccent},
+        {"@reviewAccent", theme.isDark ? mixed(theme.accent, theme.foreground, 0.5) : theme.accent},
+        {"@reviewSuccessTint", withAlpha(theme.isDark ? QColor("#b5dba1") : QColor("#397647"), 0.07)},
+        {"@reviewSuccess", theme.isDark ? QColor("#b5dba1") : QColor("#397647")},
+        {"@reviewErrorTint", withAlpha(theme.error, 0.08)},
+        {"@reviewError", theme.error},
+        {"@reviewWarningTint", withAlpha(theme.warning, 0.08)},
+        {"@reviewWarning", theme.warning},
         {"@accentText", theme.accentText},
         {"@accent", theme.accent},
         {"@onAccent", theme.onAccent},

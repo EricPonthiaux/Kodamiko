@@ -39,7 +39,9 @@ QString summary(const ReviewSession &session)
 {
     if (!session.findings().isEmpty())
         return session.summary();
-    const QString none = tr("No problems found.");
+    const QString none = session.reportedFindingCount() > 0
+                             ? tr("All findings have been dismissed. The code has not been reviewed again.")
+                             : tr("No findings this time.");
     return session.summary().isEmpty() ? none : session.summary() + QLatin1Char('\n') + none;
 }
 

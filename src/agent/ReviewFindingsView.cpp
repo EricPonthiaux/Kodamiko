@@ -34,12 +34,6 @@ QIcon dotIcon(const QColor &color, qreal devicePixelRatio)
     return {pixmap};
 }
 
-// "1 error", "3 errors".
-QString countText(qsizetype count, const QString &one, const QString &many)
-{
-    return count == 1 ? one : many.arg(count);
-}
-
 } // namespace
 
 ReviewFindingsView::ReviewFindingsView(QWidget *parent)
@@ -55,6 +49,20 @@ ReviewFindingsView::ReviewFindingsView(QWidget *parent)
     layout->setSpacing(barSpacingPx);
     layout->addLayout(createBar());
     layout->addWidget(list_, 1);
+    undoNotice_ = new QWidget(this);
+    auto *undoLayout = new QHBoxLayout(undoNotice_);
+    undoLayout->setContentsMargins(0, 8, 0, 0);
+    auto *notice = new QLabel(tr("Dismissed findings can be restored."), undoNotice_);
+    notice->setObjectName(QStringLiteral("reviewMuted"));
+    auto *undo = new QPushButton(tr("Undo dismissal"), undoNotice_);
+    connect(undo, &QPushButton::clicked, this, [this] {
+        if (session_)
+            session_->undoDismiss();
+    });
+    undoLayout->addWidget(notice);
+    undoLayout->addStretch();
+    undoLayout->addWidget(undo);
+    layout->addWidget(undoNotice_);
     updateBar();
 }
 
@@ -65,9 +73,9 @@ QLayout *ReviewFindingsView::createBar()
     warnings_ = createFilter(ReviewFindingsList::Filter::Warnings, ReviewText::warningColor(palette()));
     all_->setChecked(true);
     selection_ = new QLabel(this);
-    selection_->setForegroundRole(QPalette::PlaceholderText);
+    selection_->setObjectName(QStringLiteral("reviewMuted"));
     resolve_ = new QPushButton(this);
-    resolve_->setDefault(true);
+    resolve_->setObjectName(QStringLiteral("reviewPrimary"));
     send_ = new QPushButton(this);
     dismiss_ = new QPushButton(tr("Dismiss"), this);
     dismiss_->setToolTip(tr("Remove the selected findings from the review and the editor (Del)"));
@@ -88,9 +96,9 @@ QLayout *ReviewFindingsView::createBar()
     bar->addWidget(warnings_);
     bar->addStretch();
     bar->addWidget(selection_);
-    bar->addWidget(resolve_);
     bar->addWidget(send_);
     bar->addWidget(dismiss_);
+    bar->addWidget(resolve_);
     return bar;
 }
 
@@ -100,7 +108,6 @@ QToolButton *ReviewFindingsView::createFilter(ReviewFindingsList::Filter filter,
     button->setCheckable(true);
     button->setAutoExclusive(true);
     button->setAutoRaise(true);
-    button->setFocusPolicy(Qt::NoFocus);
     if (!dotColor.isEmpty()) {
         button->setIcon(dotIcon(QColor(dotColor), devicePixelRatioF()));
         button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
@@ -120,9 +127,9 @@ void ReviewFindingsView::updateBar()
     const QList<Finding> findings = session_ ? session_->findings() : QList<Finding>();
     const qsizetype errors = std::ranges::count_if(
         findings, [](const Finding &finding) { return finding.severity == Diagnostic::Severity::Error; });
-    all_->setText(countText(findings.size(), tr("1 finding"), tr("%1 findings")));
-    errors_->setText(countText(errors, tr("1 error"), tr("%1 errors")));
-    warnings_->setText(countText(findings.size() - errors, tr("1 warning"), tr("%1 warnings")));
+    all_->setText(tr("All %1").arg(findings.size()));
+    errors_->setText(tr("Errors %1").arg(errors));
+    warnings_->setText(tr("Warnings %1").arg(findings.size() - errors));
 
     const qsizetype selected = list_->selectedFindings().size();
     const bool hasSelection = selected > 0;
@@ -130,15 +137,16 @@ void ReviewFindingsView::updateBar()
     selection_->setText(hasSelection ? tr("%1 selected").arg(selected) : QString());
     // Resolve and Send leave out the findings handed over to be fixed.
     const bool canHandOver = session_ && !session_->notHandedOver(targets()).isEmpty();
-    resolve_->setText(hasSelection ? tr("Resolve") : tr("Resolve All"));
+    resolve_->setText(hasSelection ? tr("Fix selected") : tr("Fix visible"));
     resolve_->setToolTip(tr("Have the %1 session that wrote the code check these problems and fix those that are "
                             "real (R)")
                              .arg(agent));
     resolve_->setEnabled(canHandOver);
-    send_->setText(hasSelection ? tr("Send to %1").arg(agent) : tr("Send All to %1").arg(agent));
+    send_->setText(tr("Prepare prompt"));
     send_->setToolTip(tr("Type these findings in %1's prompt, for you to complete and send").arg(agent));
     send_->setEnabled(canHandOver);
     dismiss_->setVisible(hasSelection);
+    undoNotice_->setVisible(session_ && session_->canUndoDismiss());
 }
 
 QList<Finding> ReviewFindingsView::targets() const

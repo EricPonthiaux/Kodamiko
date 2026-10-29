@@ -4,7 +4,6 @@
 
 #include "ReviewText.h"
 #include "ui/Motion.h"
-#include "ui/ThemeStyle.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -102,9 +101,6 @@ constexpr qreal numberWidthShare = 0.35;
 constexpr qreal markGapPx = 6;
 // Between a line's text and its wavy underline.
 constexpr qreal waveGapPx = 2;
-// How much of the placeholder text's color the card takes, as in
-// DiagramSketch, so that both waits look alike.
-constexpr qreal cardLift = 0.33;
 
 QColor withAlpha(QColor color, qreal alpha)
 {
@@ -121,8 +117,7 @@ void drawCard(QPainter &painter, const QRectF &card, const QPalette &palette)
 {
     QPainterPath shape;
     shape.addRoundedRect(card, cornerRadiusPx, cornerRadiusPx);
-    painter.fillPath(shape, ThemeStyle::mixed(palette.color(QPalette::AlternateBase),
-                                              palette.color(QPalette::PlaceholderText), cardLift));
+    painter.fillPath(shape, palette.color(QPalette::Base));
     painter.setPen(QPen(withAlpha(palette.color(QPalette::PlaceholderText), 0.25), 1));
     painter.setBrush(Qt::NoBrush);
     painter.drawPath(shape);

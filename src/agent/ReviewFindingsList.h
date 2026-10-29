@@ -83,6 +83,7 @@ private:
     QList<ReviewFindingCard *> cards_; // of the unfolded files, in their order
     QSet<QString> foldedPaths_;
     QList<ReviewReport::Finding> selected_;
+    QList<ReviewReport::Finding> expanded_;
     std::optional<ReviewReport::Finding> current_;
     std::optional<ReviewReport::Finding> anchor_; // where a Shift selection starts
 };

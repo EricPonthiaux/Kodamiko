@@ -9,15 +9,12 @@
 
 class QLabel;
 class QPushButton;
-class ReviewBar;
-class ReviewFindingsPanel;
+class ReviewView;
 struct Theme;
 
 // The Review mode: the step between editing and the diff, when it is turned
-// on. Without a review, what it is for and a button that starts one of the
-// staged changes; with one, its progress (ReviewBar), then its findings
-// over the rest of the page (ReviewFindingsPanel), which lead to their
-// place in the diff.
+// on. An invitation starts a review of staged changes; ReviewView presents
+// the run and its outcomes, and findings lead to their place in the diff.
 class ReviewPage : public QWidget {
     Q_OBJECT
 
@@ -35,8 +32,9 @@ signals:
     // The start button, or Review Again: a review of the staged changes as
     // they are now.
     void reviewRequested();
-    // Cancel or Close: the review is over.
+    // Close: discard this review and return to the invitation.
     void closeRequested();
+    void inspectRequested();
     // A finding activated (a double click, Enter, or a click on its line):
     // its place in the diff.
     void findingRequested(const ReviewReport::Finding &finding);
@@ -44,14 +42,9 @@ signals:
 private:
     // Also sets invitationText_ and start_.
     QWidget *createInvitation();
-    // The invitation without a review, the review otherwise; the findings
-    // once there are some.
-    void showState();
-
     QPointer<ReviewSession> session_;
     QWidget *invitation_ = nullptr;
     QLabel *invitationText_ = nullptr;
     QPushButton *start_ = nullptr;
-    ReviewBar *bar_;
-    ReviewFindingsPanel *findings_;
+    ReviewView *view_ = nullptr;
 };

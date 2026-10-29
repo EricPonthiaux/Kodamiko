@@ -52,7 +52,8 @@ public:
         Running, // the check or the reviewer
         CheckFailed,
         Finished, // a report, or an answer that is not one (rawAnswer())
-        Failed
+        Failed,
+        Interrupted // stopped by the user; no complete report
     };
 
     explicit ReviewSession(Request review, QObject *parent = nullptr);
@@ -64,6 +65,8 @@ public:
     void reviewAnyway();
     // Stops the check or the reviewer; the state stays as it was.
     void stop();
+    // Stops an active run and keeps an interrupted result visible for retry.
+    void interrupt();
 
     State state() const { return state_; }
 
@@ -93,11 +96,20 @@ public:
     // Finished: the findings left, the most severe first.
     const QList<ReviewReport::Finding> &findings() const { return findings_; }
 
+    // Findings in the original report, including those dismissed since.
+    qsizetype reportedFindingCount() const { return reportedFindingCount_; }
+
     // Finished: the answer, when it is not the JSON asked for.
     const QString &rawAnswer() const { return rawAnswer_; }
 
     // Leaves `findings` out of the findings and the ProblemStore.
     void dismiss(const QList<ReviewReport::Finding> &findings);
+    // Restores the most recent dismissal, in its original order and with its
+    // handoff status. Starting a new run clears the dismissal history.
+    void undoDismiss();
+
+    bool canUndoDismiss() const { return !dismissals_.isEmpty(); }
+
     // A finding handed over to be fixed is not resolved nor sent again: the
     // session that fixes it has it already.
     //
@@ -162,6 +174,8 @@ private:
     QString error_;
     QString summary_;
     QList<ReviewReport::Finding> findings_;
+    qsizetype reportedFindingCount_ = 0;
+    QList<QList<ReviewReport::Finding>> dismissals_;
     QList<ReviewReport::Finding> resolving_;
     QString rawAnswer_;
 };
