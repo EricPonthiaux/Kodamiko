@@ -40,16 +40,17 @@ public:
 
 private:
     struct Command {
-        QString name; // "Git: Stage All"
+        QString name;     // "Git: Stage All"
+        QString menuPath; // "Git": taken with the name, as the action's text may change
         QAction *action{};
     };
 
     void filter();
     void runCurrent();
 
-    QLabel *summary_;
-    QLabel *empty_;
-    QLineEdit *search_;
-    QTreeWidget *list_;
+    QLabel *summary_ = nullptr;
+    QLabel *empty_ = nullptr;
+    QLineEdit *search_ = nullptr;
+    QTreeWidget *list_ = nullptr;
     QList<Command> commands_;
 };

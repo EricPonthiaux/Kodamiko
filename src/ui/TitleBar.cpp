@@ -159,7 +159,9 @@ QFrame *TitleBar::createProjectGroup()
     projectGroup_ = new QFrame(this);
     projectGroup_->setObjectName(QStringLiteral("titleProjectGroup"));
     auto *row = new QHBoxLayout(projectGroup_);
-    row->setContentsMargins(1, 1, 1, 1);
+    // Its style sheet's border is already its contents margin (groupInset):
+    // one more pixel pushed the tinted project chip over the bottom border.
+    row->setContentsMargins(0, 0, 0, 0);
     row->setSpacing(0);
     project_ = new ElidingToolButton(projectGroup_);
     project_->setTextSuffix(QStringLiteral("  ▾"));

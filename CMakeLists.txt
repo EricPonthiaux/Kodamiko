@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(Kodamiko
-    VERSION 0.1.0
+    VERSION 1.0.1
     DESCRIPTION "C/C++/Java/JavaScript source editor with an integrated Claude terminal"
     LANGUAGES C CXX)
 if(APPLE)

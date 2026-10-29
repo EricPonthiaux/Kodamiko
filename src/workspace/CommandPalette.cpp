@@ -24,6 +24,12 @@ namespace {
 
 constexpr int visibleRows = 12;
 
+struct MenuCommand {
+    QString menuPath; // "Git", "View: Theme"
+    QString title;    // "Stage All"
+    QAction *action{};
+};
+
 // "Save &All" → "Save All"; "&&" stays a literal "&".
 QString withoutMnemonic(QString text)
 {
@@ -33,16 +39,16 @@ QString withoutMnemonic(QString text)
     return text;
 }
 
-void collect(const QMenu *menu, const QString &prefix, QList<QPair<QString, QAction *>> &commands)
+void collect(const QMenu *menu, const QString &menuPath, QList<MenuCommand> &commands)
 {
     for (QAction *action : menu->actions()) {
         if (action->isSeparator() || !action->isVisible() || !action->isEnabled())
             continue;
-        const QString name = withoutMnemonic(action->text());
+        const QString title = withoutMnemonic(action->text());
         if (const QMenu *submenu = action->menu())
-            collect(submenu, prefix + name + QStringLiteral(": "), commands);
+            collect(submenu, menuPath + QStringLiteral(": ") + title, commands);
         else
-            commands.append({prefix + name, action});
+            commands.append({menuPath, title, action});
     }
 }
 
@@ -93,13 +99,13 @@ CommandPalette::CommandPalette(QWidget *parent)
 void CommandPalette::popup(const QMenuBar *menuBar)
 {
     commands_.clear();
-    QList<QPair<QString, QAction *>> found;
+    QList<MenuCommand> found;
     for (const QAction *action : menuBar->actions()) {
         if (const QMenu *menu = action->menu())
-            collect(menu, withoutMnemonic(action->text()) + QStringLiteral(": "), found);
+            collect(menu, withoutMnemonic(action->text()), found);
     }
-    for (const auto &[name, action] : found)
-        commands_.append({name, action});
+    for (const auto &[menuPath, title, action] : found)
+        commands_.append({menuPath + QStringLiteral(": ") + title, menuPath, action});
 
     search_->clear();
     filter();
@@ -149,7 +155,7 @@ void CommandPalette::filter()
         const QString title = withoutMnemonic(command.action->text());
         item->setText(0, title);
         item->setData(0, Qt::AccessibleTextRole, command.name);
-        item->setData(0, SearchPopup::ResultDelegate::detailRole, command.name.chopped(title.size() + 2));
+        item->setData(0, SearchPopup::ResultDelegate::detailRole, command.menuPath);
         item->setToolTip(0, command.name);
         item->setData(0, Qt::UserRole, QVariant::fromValue(index));
         item->setForeground(1, ThemeStyle::applied().mutedText);
