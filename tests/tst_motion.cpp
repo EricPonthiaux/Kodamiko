@@ -167,6 +167,31 @@ private slots:
         QTRY_VERIFY(window.findChildren<QLabel *>("motionExit").isEmpty());
     }
 
+    // A window smaller than the panel's minimum: the panel fills it, and
+    // dragging its edge keeps it there.
+    void anOverlayPanelResizedInASmallWindowStaysInside()
+    {
+        QWidget window;
+        window.resize(500, 400);
+        window.show();
+        OverlayPopup popup("smallWindow", QSizeF(0.5, 0.5), QSize(800, 540), &window);
+        popup.showCentered();
+        const QRect allowed = window.rect().adjusted(-OverlayPopup::shadowWidth, -OverlayPopup::shadowWidth,
+                                                     OverlayPopup::shadowWidth, OverlayPopup::shadowWidth);
+        const QPoint leftEdge(OverlayPopup::shadowWidth - 2, popup.height() / 2);
+
+        QTest::mousePress(&popup, Qt::LeftButton, {}, leftEdge);
+        QTest::mouseMove(&popup, leftEdge + QPoint(-60, 0));
+        QTest::mouseRelease(&popup, Qt::LeftButton, {}, leftEdge + QPoint(-60, 0));
+
+        QVERIFY2(allowed.contains(popup.geometry()), qPrintable(QStringLiteral("%1,%2 %3x%4")
+                                                                    .arg(popup.geometry().x())
+                                                                    .arg(popup.geometry().y())
+                                                                    .arg(popup.width())
+                                                                    .arg(popup.height())));
+        popup.dismiss();
+    }
+
     void anOverlayPanelExitsWithoutTheWindowBackgroundAroundIt()
     {
         QWidget window;

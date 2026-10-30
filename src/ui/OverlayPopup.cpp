@@ -192,14 +192,21 @@ void OverlayPopup::mouseMoveEvent(QMouseEvent *event)
     const QRect bounds = availableArea().adjusted(-shadowWidth, -shadowWidth, shadowWidth, shadowWidth);
     const QSize smallest = minimum_ + QSize(2 * shadowWidth, 2 * shadowWidth);
     QRect rect = dragGeometry_;
+    // In a window smaller than the minimum size, the panel already fills it:
+    // the window's edge wins, and the range never inverts (std::clamp's
+    // precondition).
     if (resizeEdges_ & Qt::LeftEdge)
-        rect.setLeft(std::clamp(rect.left() + delta.x(), bounds.left(), rect.right() - smallest.width()));
+        rect.setLeft(std::clamp(rect.left() + delta.x(), bounds.left(),
+                                std::max(bounds.left(), rect.right() - smallest.width())));
     if (resizeEdges_ & Qt::RightEdge)
-        rect.setRight(std::clamp(rect.right() + delta.x(), rect.left() + smallest.width(), bounds.right()));
+        rect.setRight(std::clamp(rect.right() + delta.x(), std::min(bounds.right(), rect.left() + smallest.width()),
+                                 bounds.right()));
     if (resizeEdges_ & Qt::TopEdge)
-        rect.setTop(std::clamp(rect.top() + delta.y(), bounds.top(), rect.bottom() - smallest.height()));
+        rect.setTop(std::clamp(rect.top() + delta.y(), bounds.top(),
+                               std::max(bounds.top(), rect.bottom() - smallest.height())));
     if (resizeEdges_ & Qt::BottomEdge)
-        rect.setBottom(std::clamp(rect.bottom() + delta.y(), rect.top() + smallest.height(), bounds.bottom()));
+        rect.setBottom(std::clamp(rect.bottom() + delta.y(), std::min(bounds.bottom(), rect.top() + smallest.height()),
+                                  bounds.bottom()));
     setGeometry(rect);
 }
 
