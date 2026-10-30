@@ -273,7 +273,7 @@ QStringList runtimeVersions(const QString &family)
 QString defaultRuntimeVersion(const QString &family)
 {
     if (family == QLatin1String("java"))
-        return QStringLiteral("21");
+        return QStringLiteral("25"); // the latest LTS
     if (family == QLatin1String("javascript"))
         return QStringLiteral("24"); // the active LTS
     if (family == QLatin1String("cpp"))

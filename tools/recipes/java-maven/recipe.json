@@ -2,11 +2,21 @@
     "$schema": "https://raw.githubusercontent.com/EricPonthiaux/Kodamiko/main/tools/schemas/recipe.schema.json",
     "title": "Java · Maven",
     "language": "java",
-    "description": "pom.xml (JDK 21, downloaded if the machine has none) and src/main/java/Main.java, built with Maven. Debug waits for a debugger on port 5005.",
+    "description": "pom.xml (the JDK chosen below, downloaded if the machine has none) and src/main/java/Main.java, built with Maven. Debug waits for a debugger on port 5005.",
+    "parameters": [
+        {
+            "name": "java",
+            "title": "Java",
+            "values": [
+                "25",
+                "21"
+            ]
+        }
+    ],
     "requires": [
         {
             "tool": "jdk",
-            "version": "21",
+            "version": "{{java}}",
             "path": [
                 "{{home}}/bin"
             ],
