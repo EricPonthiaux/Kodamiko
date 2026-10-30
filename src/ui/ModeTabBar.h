@@ -13,4 +13,8 @@ public:
 protected:
     void paintEvent(QPaintEvent *event) override;
     QSize tabSizeHint(int index) const override;
+    void tabLayoutChange() override;
+
+private:
+    QSize laidOutSizeHint_; // the size its layout last heard of
 };

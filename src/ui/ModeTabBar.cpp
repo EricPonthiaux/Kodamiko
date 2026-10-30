@@ -23,6 +23,20 @@ void ModeTabBar::paintEvent(QPaintEvent *event)
     QTabBar::paintEvent(event);
 }
 
+// QTabBar does not tell its layout when a tab is hidden or shown
+// (setTabVisible): the bar would keep a hidden mode's room, its frame
+// running empty past the last tab. Only a new size is told, which keeps the
+// layout from looping.
+void ModeTabBar::tabLayoutChange()
+{
+    QTabBar::tabLayoutChange();
+    const QSize hint = sizeHint();
+    if (hint == laidOutSizeHint_)
+        return;
+    laidOutSizeHint_ = hint;
+    updateGeometry();
+}
+
 QSize ModeTabBar::tabSizeHint(int index) const
 {
     QSize size = QTabBar::tabSizeHint(index);

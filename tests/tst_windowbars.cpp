@@ -429,6 +429,19 @@ private slots:
         }
     }
 
+    void modeTrackEndsAtTheLastTabWhetherTheTerminalIsDetachedOrBack()
+    {
+        Window window(Theme::kodamiko());
+        window.show(1920);
+        QVERIFY(QTest::qWaitForWindowExposed(&window.root));
+
+        window.modes->setTabVisible(0, false);
+        QTRY_COMPARE(window.modes->width(), window.modes->tabRect(3).right() + 1);
+
+        window.modes->setTabVisible(0, true);
+        QTRY_COMPARE(window.modes->width(), window.modes->tabRect(3).right() + 1);
+    }
+
     void editorFormatMenuWorksFromTheStatusPopup()
     {
         const QTemporaryDir directory;
