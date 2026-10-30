@@ -55,6 +55,15 @@ void acceptVersion(const RepositoryInfo &repository, const QStringList &paths, C
 // in the index. A snapshot of the file is taken first.
 void writeResolution(const RepositoryInfo &repository, const QString &path, const QByteArray &content);
 
+// Resolves a file renamed differently on each side by keeping it at
+// `keptPath` with `content`: the conflicted paths `paths` (repository paths:
+// the ancestor's and each side's) are removed from the index and the disk.
+// A snapshot of them is taken first.
+void resolveRename(const RepositoryInfo &repository,
+                   const QStringList &paths,
+                   const QString &keptPath,
+                   const QByteArray &content);
+
 // What each side of the conflicts is, for the user: a branch, or a commit
 // and its title ("1a2b3c4 Fix the rounding").
 struct ConflictSides {

@@ -2,6 +2,8 @@
 
 #include "FilePatch.h"
 
+#include "LibGit2.h"
+
 #include <QRegularExpression>
 
 #include <algorithm>
@@ -169,6 +171,25 @@ bool DiffHunk::isChange(int line) const
 {
     const QByteArray &text = lines.at(line);
     return text.startsWith('+') || text.startsWith('-');
+}
+
+FilePatch FilePatch::between(QByteArrayView before, QByteArrayView after, const QString &path)
+{
+    const libgit2::Session session;
+    const QByteArray name = path.toUtf8();
+    git_diff_options options;
+    git_diff_options_init(&options, GIT_DIFF_OPTIONS_VERSION);
+    options.flags = GIT_DIFF_FORCE_TEXT;
+    git_patch *patch = nullptr;
+    libgit2::check(git_patch_from_buffers(&patch, before.data(), size_t(before.size()), name.constData(), after.data(),
+                                          size_t(after.size()), name.constData(), &options),
+                   "Comparing two versions of a file");
+    const libgit2::Ptr<git_patch> patchGuard(patch);
+    git_buf buffer = GIT_BUF_INIT;
+    libgit2::check(git_patch_to_buf(&buffer, patch), "Formatting the diff");
+    const QByteArray text(buffer.ptr, qsizetype(buffer.size));
+    git_buf_dispose(&buffer);
+    return parse(text);
 }
 
 FilePatch FilePatch::parse(const QByteArray &patch)

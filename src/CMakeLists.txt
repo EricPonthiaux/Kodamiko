@@ -212,6 +212,7 @@ add_library(kdk_core STATIC
     lsp/LspCompletionProvider.cpp
     lsp/LspProtocol.cpp
     lsp/ServerTasksLabel.cpp
+    merge/MergeChoicePanel.cpp
     merge/MergeDocument.cpp
     merge/MergeGutter.cpp
     merge/MergePane.cpp

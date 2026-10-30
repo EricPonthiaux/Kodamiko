@@ -11,10 +11,12 @@
 #include <QThreadPool>
 #include <QWidget>
 
+#include <functional>
 #include <map>
 #include <memory>
 
 class GitCommands;
+class MergeChoicePanel;
 class MergeTextPanel;
 class QLabel;
 class QListWidget;
@@ -24,9 +26,10 @@ class QVBoxLayout;
 // The conflicts of the operation in progress (merge, rebase, cherry-pick,
 // revert, a stash applied) to resolve: the conflicted files at the left,
 // the chosen one at the right, in three columns for a text file
-// (MergeTextPanel). Each file keeps its resolution until it is saved, which
-// marks it resolved, or until git's versions of it change. Once no file is
-// left, the operation goes on from the view.
+// (MergeTextPanel), as a choice otherwise (MergeChoicePanel). A text file
+// keeps its resolution until it is saved, which marks it resolved, or until
+// git's versions of it change. Once no file is left, the operation goes on
+// from the view.
 class MergeView : public QWidget {
     Q_OBJECT
 
@@ -67,7 +70,11 @@ private:
     QWidget *createFooter();
     void showConflicts(const Conflicts &conflicts);
     void showFile(int row);
+    // A conflict without lines to combine: a choice resolves it.
+    void showChoices(const ConflictVersions::File &file);
     void showMessage(const QString &message);
+    // Runs `job`, which resolves files in git, then reads the conflicts again.
+    void resolve(const QString &title, const std::function<QString()> &job);
     void saveCurrentFile();
     void updateList();
     void updateBar();
@@ -92,6 +99,7 @@ private:
     QVBoxLayout *fileArea_ = nullptr;
     QLabel *message_ = nullptr;
     QPointer<MergeTextPanel> panel_;
+    QPointer<MergeChoicePanel> choices_;
     QLabel *hint_ = nullptr;
     QPushButton *save_ = nullptr;
     QPushButton *abort_ = nullptr;

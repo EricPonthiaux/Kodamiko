@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "git/ConflictVersions.h"
+#include "git/FilePatch.h"
 #include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/Integration.h"
@@ -164,6 +165,26 @@ struct OneConflict {
         return nullptr;
     }
 };
+
+QPushButton *buttonWithText(const QWidget &parent, const QString &text)
+{
+    for (QPushButton *button : parent.findChildren<QPushButton *>()) {
+        if (button->text() == text)
+            return button;
+    }
+    return nullptr;
+}
+
+// A merge view of the conflicts left by merging "other", once read.
+std::unique_ptr<MergeView> viewOf(const QTemporaryDir &dir, GitCommands &commands)
+{
+    auto view = std::make_unique<MergeView>(dir.path(), Theme::named("kodamiko"), &commands);
+    view->show();
+    auto *list = view->findChild<QListWidget *>();
+    if (!QTest::qWaitFor([list] { return list->count() > 0; }))
+        qWarning("the merge view read no conflict");
+    return view;
+}
 
 const ConflictVersions::File *fileAt(const QList<ConflictVersions::File> &files, const QString &path)
 {
@@ -399,6 +420,32 @@ private slots:
         QCOMPARE(read(dir, "a.txt"), QByteArray("main and other\n"));
         QVERIFY(ConflictVersions::read(infoOf(dir)).isEmpty());
         QCOMPARE(git(dir, {"show", ":a.txt"}), QByteArray("main and other\n"));
+    }
+
+    void keepingOneNameResolvesARenameOnBothSides()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"utils.py", "def slugify(text):\n    return text\n"}});
+        commitOn(dir, "other", [&dir] { git(dir, {"mv", "utils.py", "strings.py"}); });
+        commitOn(dir, "main", [&dir] { git(dir, {"mv", "utils.py", "text.py"}); });
+        mergeOther(dir);
+
+        Integration::resolveRename(infoOf(dir), {"utils.py", "text.py", "strings.py"}, "strings.py",
+                                   "def slugify(text):\n    return text\n");
+
+        QVERIFY(ConflictVersions::read(infoOf(dir)).isEmpty());
+        QVERIFY(QFileInfo::exists(dir.filePath("strings.py")));
+        QVERIFY(!QFileInfo::exists(dir.filePath("text.py")));
+        QCOMPARE(git(dir, {"status", "--porcelain"}), QByteArray("R  text.py -> strings.py\n"));
+    }
+
+    void thePatchBetweenTwoVersionsShowsTheirDifference()
+    {
+        const FilePatch patch = FilePatch::between("a\nb\n", "a\nB\n", "f.txt");
+
+        QCOMPARE(patch.hunks.size(), 1);
+        QCOMPARE(patch.addedLines(), 1);
+        QCOMPARE(patch.removedLines(), 1);
     }
 
     void namesTheBranchesOfAMerge()
@@ -657,6 +704,56 @@ private slots:
         QVERIFY(ConflictVersions::read(infoOf(merge.dir)).isEmpty());
         QVERIFY(merge.button("Continue merge")->isVisible());
         QVERIFY(merge.button("Continue merge")->isEnabled());
+    }
+
+    void deletingAFileTheOtherSideChangedResolvesIt()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"gone.txt", "a\n"}});
+        commitOn(dir, "other", [&dir] { write(dir, "gone.txt", "changed\n"); });
+        commitOn(dir, "main", [&dir] { QFile::remove(dir.filePath("gone.txt")); });
+        mergeOther(dir);
+        GitCommands commands;
+        const std::unique_ptr<MergeView> view = viewOf(dir, commands);
+
+        buttonWithText(*view, "Delete the File")->click();
+
+        QTRY_COMPARE(view->findChild<QListWidget *>()->count(), 0);
+        QVERIFY(!QFileInfo::exists(dir.filePath("gone.txt")));
+        QVERIFY(ConflictVersions::read(infoOf(dir)).isEmpty());
+    }
+
+    void keepingTheNameOneSideGaveResolvesARename()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"utils.py", "def slugify(text):\n    return text\n"}});
+        commitOn(dir, "other", [&dir] { git(dir, {"mv", "utils.py", "strings.py"}); });
+        commitOn(dir, "main", [&dir] { git(dir, {"mv", "utils.py", "text.py"}); });
+        mergeOther(dir);
+        GitCommands commands;
+        const std::unique_ptr<MergeView> view = viewOf(dir, commands);
+
+        buttonWithText(*view, "Keep This Name")->click();
+
+        QTRY_COMPARE(view->findChild<QListWidget *>()->count(), 0);
+        QVERIFY(QFileInfo::exists(dir.filePath("text.py")));
+        QVERIFY(!QFileInfo::exists(dir.filePath("strings.py")));
+    }
+
+    void takingTheIncomingVersionOfABinaryFileResolvesIt()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"logo.png", QByteArray("\x89PNG\0base", 9)}});
+        commitOn(dir, "other", [&dir] { write(dir, "logo.png", QByteArray("\x89PNG\0other", 10)); });
+        commitOn(dir, "main", [&dir] { write(dir, "logo.png", QByteArray("\x89PNG\0main", 9)); });
+        mergeOther(dir);
+        GitCommands commands;
+        const std::unique_ptr<MergeView> view = viewOf(dir, commands);
+
+        buttonWithText(*view, "Take other's Version")->click();
+
+        QTRY_COMPARE(view->findChild<QListWidget *>()->count(), 0);
+        QCOMPARE(read(dir, "logo.png"), QByteArray("\x89PNG\0other", 10));
     }
 
 private:

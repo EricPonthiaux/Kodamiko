@@ -40,6 +40,9 @@ struct FilePatch {
     QList<DiffHunk> hunks;
 
     static FilePatch parse(const QByteArray &patch);
+    // The diff from `before` to `after`, two versions of the file at `path`
+    // (repository path), as git writes it. Throws GitError.
+    static FilePatch between(QByteArrayView before, QByteArrayView after, const QString &path);
 
     // Number of lines in the diff: header, then for each hunk its "@@" line
     // and its lines.

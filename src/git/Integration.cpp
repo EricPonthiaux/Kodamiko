@@ -202,6 +202,18 @@ void writeResolution(const RepositoryInfo &repository, const QString &path, cons
     GitOperations::stage(repository, {path});
 }
 
+void resolveRename(const RepositoryInfo &repository,
+                   const QStringList &paths,
+                   const QString &keptPath,
+                   const QByteArray &content)
+{
+    Snapshots::create(repository, QObject::tr("Before keeping %1").arg(keptPath), paths);
+    Git::run(repository.workDir,
+             QStringList{QStringLiteral("rm"), QStringLiteral("-q"), QStringLiteral("-f"), QStringLiteral("--")} +
+                 paths);
+    writeResolution(repository, keptPath, content);
+}
+
 ConflictSides conflictSides(const RepositoryInfo &repository)
 {
     const QString &workDir = repository.workDir;

@@ -2,6 +2,7 @@
 
 #include "MergeView.h"
 
+#include "MergeChoicePanel.h"
 #include "MergeTextPanel.h"
 #include "MergeTexts.h"
 #include "git/GitCommands.h"
@@ -47,6 +48,8 @@ MergeView::MergeView(QString folder, Theme theme, GitCommands *commands, QWidget
 {
     list_->setFixedWidth(listWidthPx);
     list_->setFrameShape(QFrame::NoFrame);
+    list_->setWordWrap(true);
+    list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     connect(list_, &QListWidget::currentRowChanged, this, &MergeView::showFile);
     message_->setObjectName(QStringLiteral("pageDescription"));
     message_->setAlignment(Qt::AlignCenter);
@@ -99,6 +102,8 @@ void MergeView::applyTheme(const Theme &theme)
     theme_ = theme;
     if (panel_)
         panel_->applyTheme(theme);
+    if (choices_)
+        choices_->applyTheme(theme);
 }
 
 QWidget *MergeView::createBar()
@@ -197,24 +202,26 @@ void MergeView::showConflicts(const Conflicts &conflicts)
 
 void MergeView::showFile(int row)
 {
-    if (panel_) {
-        panel_->hide();
-        panel_->deleteLater();
-        panel_ = nullptr;
+    for (QWidget *shown : {static_cast<QWidget *>(panel_), static_cast<QWidget *>(choices_)}) {
+        if (shown) {
+            shown->hide();
+            shown->deleteLater();
+        }
     }
+    panel_ = nullptr;
+    choices_ = nullptr;
     updateFooter();
     if (row < 0 || row >= conflicts_.files.size())
         return;
     const ConflictVersions::File &file = conflicts_.files[row];
     MergeDocument *document = documentOf(file);
+    message_->hide();
     if (!document) {
-        showMessage(tr("%1: %2.\nFor now, resolve it from the Diff view's menu: Accept Current Version or Accept "
-                       "Incoming Version.")
-                        .arg(file.path, MergeTexts::fileState(file, conflicts_.sides, nullptr)));
+        showChoices(file);
         updateBar();
+        updateFooter();
         return;
     }
-    message_->hide();
     panel_ = new MergeTextPanel(theme_, {file.path, document, conflicts_.sides}, this);
     connect(panel_, &MergeTextPanel::documentChanged, this, [this] {
         updateList();
@@ -226,6 +233,35 @@ void MergeView::showFile(int row)
     updateList();
     updateBar();
     updateFooter();
+}
+
+void MergeView::showChoices(const ConflictVersions::File &file)
+{
+    choices_ = new MergeChoicePanel(theme_, file, conflicts_.sides, this);
+    connect(choices_, &MergeChoicePanel::sideChosen, this, [this, path = file.path](Integration::ConflictSide side) {
+        resolve(tr("Resolving %1").arg(path), [repository = conflicts_.repository, path, side] {
+            Integration::acceptVersion(repository, {path}, side);
+            return tr("%1 is resolved.").arg(path);
+        });
+    });
+    connect(choices_, &MergeChoicePanel::nameChosen, this, [this, file](const QString &kept) {
+        const QStringList paths{file.path, file.current ? file.current->path : QString(),
+                                file.incoming ? file.incoming->path : QString()};
+        resolve(tr("Keeping %1").arg(kept),
+                [repository = conflicts_.repository, paths, kept, content = contentOf(file.current)] {
+                    Integration::resolveRename(repository, paths, kept, content);
+                    return tr("%1 is resolved.").arg(kept);
+                });
+    });
+    fileArea_->addWidget(choices_);
+}
+
+void MergeView::resolve(const QString &title, const std::function<QString()> &job)
+{
+    commands_->run(title, job, [view = QPointer(this)] {
+        if (view)
+            view->reload();
+    });
 }
 
 void MergeView::showMessage(const QString &message)
@@ -240,16 +276,11 @@ void MergeView::saveCurrentFile()
     const MergeDocument *document = file ? openedDocument(file->path) : nullptr;
     if (!document || !document->isResolved())
         return;
-    commands_->run(
-        tr("Resolving %1").arg(file->path),
-        [repository = conflicts_.repository, path = file->path, content = document->resultText()] {
-            Integration::writeResolution(repository, path, content);
-            return tr("%1 is resolved.").arg(path);
-        },
-        [view = QPointer(this)] {
-            if (view)
-                view->reload();
-        });
+    resolve(tr("Resolving %1").arg(file->path),
+            [repository = conflicts_.repository, path = file->path, content = document->resultText()] {
+                Integration::writeResolution(repository, path, content);
+                return tr("%1 is resolved.").arg(path);
+            });
 }
 
 void MergeView::updateList()
@@ -267,9 +298,10 @@ void MergeView::updateBar()
     for (const auto &[path, resolution] : resolutions_)
         unresolved += resolution.document->unresolvedCount();
     const qsizetype files = conflicts_.files.size();
-    summary_->setText(files == 0 ? QString()
-                                 : tr("%n file(s) in conflict", nullptr, int(files)) + QStringLiteral(" · ") +
-                                       tr("%n conflict(s) left in the files opened", nullptr, unresolved));
+    QString summary = files == 0 ? QString() : tr("%n file(s) in conflict", nullptr, int(files));
+    if (!resolutions_.empty())
+        summary += QStringLiteral(" · ") + tr("%n conflict(s) left in the files opened", nullptr, unresolved);
+    summary_->setText(summary);
     previous_->setEnabled(panel_);
     next_->setEnabled(panel_);
 }
@@ -282,7 +314,7 @@ void MergeView::updateFooter()
     const ConflictVersions::File *file = currentFile();
     const MergeDocument *document = file ? openedDocument(file->path) : nullptr;
     const bool canSave = document && document->isResolved() && !commands_->isBusy();
-    save_->setVisible(!isDone);
+    save_->setVisible(!isDone && document);
     save_->setEnabled(canSave);
     abort_->setText(tr("Abort %1").arg(operation));
     abort_->setVisible(hasOperation);
@@ -292,7 +324,9 @@ void MergeView::updateFooter()
     close_->setVisible(isDone && !hasOperation);
     if (isDone)
         hint_->setText(hasOperation ? tr("Every file is resolved: the %1 can go on.").arg(operation) : QString());
-    else if (document && !document->isResolved())
+    else if (!document)
+        hint_->setText(tr("A choice resolves the file at once; Kodamiko takes a snapshot first."));
+    else if (!document->isResolved())
         hint_->setText(tr("Take a side, both, or type the result for each conflict, then save."));
     else
         hint_->setText(tr("Saving writes the result and marks the file resolved."));
