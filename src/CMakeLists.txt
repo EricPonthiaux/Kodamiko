@@ -212,6 +212,7 @@ add_library(kdk_core STATIC
     lsp/LspCompletionProvider.cpp
     lsp/LspProtocol.cpp
     lsp/ServerTasksLabel.cpp
+    merge/MergeDocument.cpp
     navigation/CodeIntelligence.cpp
     navigation/CodeIntelligenceCodeActions.cpp
     navigation/CodeIntelligenceHierarchy.cpp

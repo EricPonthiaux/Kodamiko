@@ -5,6 +5,7 @@
 #include "git/Integration.h"
 #include "git/RepositoryStatus.h"
 #include "git/ThreeWayMerge.h"
+#include "merge/MergeDocument.h"
 
 #include <QFileInfo>
 #include <QStandardPaths>
@@ -15,6 +16,7 @@ namespace {
 
 using ThreeWayMerge::Chunk;
 using ThreeWayMerge::ChunkKind;
+using Choice = MergeDocument::Choice;
 
 void write(const QTemporaryDir &dir, const QString &path, const QByteArray &content)
 {
@@ -119,6 +121,14 @@ const ConflictVersions::File *fileAt(const QList<ConflictVersions::File> &files,
 {
     const auto found = std::ranges::find(files, path, &ConflictVersions::File::path);
     return found == files.end() ? nullptr : &*found;
+}
+
+// A document with, in order: a line only main changed, a conflict, and a
+// line only "other" changed (segments 1, 3 and 5).
+MergeDocument threeChanges()
+{
+    return MergeDocument(
+        ThreeWayMerge::merge("a\nb\nc\nd\ne\nf\ng\n", "a\nB\nc\nmain\ne\nf\ng\n", "a\nb\nc\nother\ne\nF\ng\n"));
 }
 
 } // namespace
@@ -371,6 +381,132 @@ private slots:
 
         QCOMPARE(sides.current, QString("main"));
         QVERIFY2(sides.incoming.endsWith(" Change a"), qPrintable(sides.incoming));
+    }
+
+    // MergeDocument
+
+    void aNewDocumentTakesEachSideChangesAndLeavesConflictsOpen()
+    {
+        const MergeDocument document = threeChanges();
+
+        QCOMPARE(document.resultText(), QByteArray("a\nB\nc\nd\ne\nF\ng\n"));
+        QVERIFY(!document.isResolved());
+        QCOMPARE(document.unresolvedCount(), 1);
+        QCOMPARE(document.segments()[3].choice, Choice::Unresolved);
+    }
+
+    void takingASideResolvesTheConflict()
+    {
+        MergeDocument document = threeChanges();
+
+        document.choose(3, Choice::Incoming);
+
+        QCOMPARE(document.resultText(), QByteArray("a\nB\nc\nother\ne\nF\ng\n"));
+        QVERIFY(document.isResolved());
+    }
+
+    void takingBothSidesKeepsTheOrderChosen()
+    {
+        MergeDocument document = threeChanges();
+
+        document.choose(3, Choice::IncomingThenCurrent);
+
+        QCOMPARE(document.resultLines(3), (QByteArrayList{"other\n", "main\n"}));
+        QCOMPARE(document.resultRange(5), (MergeDocument::LineRange{6, 1}));
+    }
+
+    void bothSidesOfTheLastLineStayOnTheirOwnLines()
+    {
+        MergeDocument document(ThreeWayMerge::merge("a\r\nb", "a\r\nmain", "a\r\nother"));
+
+        document.choose(1, Choice::CurrentThenIncoming);
+
+        QCOMPARE(document.resultText(), QByteArray("a\r\nmain\nother"));
+    }
+
+    void keepingTheCurrentSideOfAnIncomingChangeUndoesIt()
+    {
+        MergeDocument document = threeChanges();
+
+        document.choose(5, Choice::Current);
+
+        QCOMPARE(document.resultLines(5), QByteArrayList{"f\n"});
+    }
+
+    void typingInAConflictResolvesItWithTheTypedLines()
+    {
+        MergeDocument document = threeChanges();
+
+        document.replaceResultLines(3, 1, {"main and other\n"});
+
+        QCOMPARE(document.segments()[3].choice, Choice::Edited);
+        QCOMPARE(document.resultText(), QByteArray("a\nB\nc\nmain and other\ne\nF\ng\n"));
+        QVERIFY(document.isResolved());
+    }
+
+    void anEditAcrossStretchesJoinsThem()
+    {
+        MergeDocument document = threeChanges();
+
+        document.replaceResultLines(1, 3, {"one line\n"});
+
+        QCOMPARE(document.segments().size(), 5);
+        const MergeDocument::Segment &joined = document.segments()[1];
+        QCOMPARE(joined.chunk.kind, ChunkKind::Conflict);
+        QCOMPARE(joined.chunk.current, (QByteArrayList{"B\n", "c\n", "main\n"}));
+        QCOMPARE(document.resultText(), QByteArray("a\none line\ne\nF\ng\n"));
+        QVERIFY(document.isResolved());
+    }
+
+    void typingWhereAnOpenConflictHasNoLinesGoesToIt()
+    {
+        MergeDocument document(ThreeWayMerge::merge("a\n", "a\nmain\n", "a\nother\n"));
+        QCOMPARE(document.resultRange(1), (MergeDocument::LineRange{1, 0}));
+
+        document.replaceResultLines(1, 0, {"typed\n"});
+
+        QCOMPARE(document.segments().size(), 2);
+        QCOMPARE(document.segments()[1].choice, Choice::Edited);
+        QCOMPARE(document.resultText(), QByteArray("a\ntyped\n"));
+    }
+
+    void undoAndRedoAChoice()
+    {
+        MergeDocument document = threeChanges();
+        document.choose(3, Choice::Current);
+
+        document.undo();
+
+        QCOMPARE(document.segments()[3].choice, Choice::Unresolved);
+        QVERIFY(document.canRedo());
+        document.redo();
+        QCOMPARE(document.segments()[3].choice, Choice::Current);
+        QVERIFY(!document.canRedo());
+    }
+
+    void aNewChangeAfterUndoForgetsTheRedo()
+    {
+        MergeDocument document = threeChanges();
+        document.choose(3, Choice::Current);
+        document.undo();
+
+        document.choose(3, Choice::Incoming);
+
+        QVERIFY(!document.canRedo());
+        QVERIFY(document.canUndo());
+    }
+
+    void resolvingTheRestIsOneChange()
+    {
+        MergeDocument document(ThreeWayMerge::merge("a\nb\nc\nd\ne\n", "A\nb\nc\nd\nE\n", "1\nb\nc\nd\n5\n"));
+        QCOMPARE(document.unresolvedCount(), 2);
+
+        document.resolveRemaining(Choice::Incoming);
+
+        QCOMPARE(document.resultText(), QByteArray("1\nb\nc\nd\n5\n"));
+        document.undo();
+        QCOMPARE(document.unresolvedCount(), 2);
+        QVERIFY(!document.canUndo());
     }
 
 private:
