@@ -320,6 +320,11 @@ private slots:
         QVERIFY(saved.open(QIODevice::ReadOnly));
         QVERIFY(saved.readAll().contains("return 2;"));
 
+        // A file that is not open is not saved, and the answer says why.
+        QCOMPARE(text(editor.call(QStringLiteral("save_files"),
+                                  {{QStringLiteral("paths"), QJsonArray{QStringLiteral("src/closed.cpp")}}})),
+                 QStringLiteral("Not saved: src/closed.cpp (not open in Kodamiko)"));
+
         editor.call(QStringLiteral("notify_user"), {{QStringLiteral("message"), QStringLiteral("Done")}});
         QCOMPARE(editor.message, QStringLiteral("Done"));
     }
@@ -740,6 +745,19 @@ private slots:
                      .isEmpty());
     }
 #endif
+
+    // A missing file is reported, not checked as an empty one without problems.
+    void reportsAFileItCannotReadForDiagnostics()
+    {
+        CodeEditor editor;
+
+        const QJsonObject result = editor.callJson("get_diagnostics", {{"paths", QJsonArray{"src/Mian.cpp"}}});
+
+        QCOMPARE(result.value("errors").toInt(), 0);
+        const QJsonArray unreadable = result.value("unreadable").toArray();
+        QCOMPARE(unreadable.size(), 1);
+        QVERIFY(unreadable.first().toString().startsWith(QString("Cannot read src/Mian.cpp: ")));
+    }
 
     void renamesAFileAndItsIncludes()
     {

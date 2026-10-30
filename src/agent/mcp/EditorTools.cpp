@@ -133,14 +133,16 @@ void openFile(const KDKToolContext &context, const QJsonObject &arguments, const
     reply(McpResult::message(QStringLiteral("Opened %1").arg(context.relative(path))));
 }
 
-// Saves the open file at `path` if it has changes; false if it could not be.
-bool saveOpenFile(const KDKToolContext &context, const QString &path)
+// Saves the open file at `path` if it has changes; false, with `error`, if
+// it could not be.
+bool saveOpenFile(const KDKToolContext &context, const QString &path, QString *error)
 {
     EditorWidget *editor = context.tabs->editorFor(path);
-    if (!editor)
+    if (!editor) {
+        *error = QStringLiteral("not open in Kodamiko");
         return false;
-    QString error;
-    return !editor->isModified() || editor->save(&error);
+    }
+    return !editor->isModified() || editor->save(error);
 }
 
 void saveFiles(const KDKToolContext &context, const QJsonObject &arguments, const McpReply &reply)
@@ -155,8 +157,8 @@ void saveFiles(const KDKToolContext &context, const QJsonObject &arguments, cons
     QStringList failed;
     for (const QJsonValue &value : paths) {
         const QString path = context.absolute(value.toString());
-        if (!saveOpenFile(context, path))
-            failed.append(context.relative(path));
+        if (QString error; !saveOpenFile(context, path, &error))
+            failed.append(QStringLiteral("%1 (%2)").arg(context.relative(path), error));
     }
     reply(failed.isEmpty() ? McpResult::message(QStringLiteral("Saved"))
                            : McpResult::error(QStringLiteral("Not saved: %1").arg(failed.join(QStringLiteral(", ")))));

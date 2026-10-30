@@ -142,12 +142,12 @@ public:
     // types, enumerations): the problem, or an empty string.
     static QString validate(const QJsonObject &schema, const QJsonObject &arguments);
 
+    // Tells the subscribed sessions that the resource at `uri` changed.
+    void notifyResourceUpdated(const QString &uri) { emit resourceUpdated(uri); }
+
 signals:
     // A resource changed: subscribed sessions are told.
     void resourceUpdated(const QString &uri);
-
-public:
-    void notifyResourceUpdated(const QString &uri) { emit resourceUpdated(uri); }
 
 private:
     QList<McpTool> tools_;

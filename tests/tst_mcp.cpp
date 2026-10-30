@@ -187,6 +187,15 @@ private slots:
                         {QStringLiteral("arguments"), QJsonObject{{QStringLiteral("text"), QStringLiteral("a")},
                                                                   {QStringLiteral("mode"), QStringLiteral("title")}}}}),
             QStringLiteral("Argument \"mode\" must be one of: upper, lower"));
+        // A number too large for any integer type is refused, not converted.
+        QCOMPARE(errorOf(80, {{QStringLiteral("name"), QStringLiteral("echo")},
+                              {QStringLiteral("arguments"), QJsonObject{{QStringLiteral("text"), QStringLiteral("a")},
+                                                                        {QStringLiteral("times"), 1e300}}}}),
+                 QStringLiteral("Argument \"times\" must be of type integer"));
+        QCOMPARE(errorOf(81, {{QStringLiteral("name"), QStringLiteral("echo")},
+                              {QStringLiteral("arguments"), QJsonObject{{QStringLiteral("text"), QStringLiteral("a")},
+                                                                        {QStringLiteral("times"), 2.5}}}}),
+                 QStringLiteral("Argument \"times\" must be of type integer"));
         session.handleMessage(request(9, QStringLiteral("nope/nope")));
         QCOMPARE(last().value(QStringLiteral("error")).toObject().value(QStringLiteral("code")).toInt(), -32601);
 

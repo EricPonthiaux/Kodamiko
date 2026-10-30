@@ -4,6 +4,8 @@
 
 #include <QRegularExpression>
 
+#include <cmath>
+
 McpResult McpResult::json(const QJsonValue &value, const QString &text)
 {
     McpResult result;
@@ -140,6 +142,14 @@ QStringList McpRegistry::readOnlyToolPermissions(const QString &server) const
 
 namespace {
 
+// The integers a JSON number holds exactly (±2^53), compared without
+// converting to an integer type: 1e300 would not fit one.
+bool isWholeNumber(double number)
+{
+    constexpr double largestExact = 9007199254740992.0;
+    return std::abs(number) <= largestExact && std::trunc(number) == number;
+}
+
 bool hasType(const QJsonValue &value, const QString &type)
 {
     if (type == QLatin1String("string"))
@@ -149,7 +159,7 @@ bool hasType(const QJsonValue &value, const QString &type)
     if (type == QLatin1String("number"))
         return value.isDouble();
     if (type == QLatin1String("integer"))
-        return value.isDouble() && value.toDouble() == double(qint64(value.toDouble()));
+        return value.isDouble() && isWholeNumber(value.toDouble());
     if (type == QLatin1String("array"))
         return value.isArray();
     if (type == QLatin1String("object"))

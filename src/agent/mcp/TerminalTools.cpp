@@ -13,6 +13,7 @@
 #include <QPointer>
 #include <QTimer>
 
+#include <algorithm>
 #include <memory>
 
 namespace KDKTools {
@@ -26,6 +27,8 @@ constexpr int maximumLines = 2000;
 constexpr int outputLines = 200;
 constexpr int progressMs = 3000;
 constexpr int defaultTimeoutSeconds = 300;
+// A day: longer waits are a mistake, and their milliseconds would not fit an int.
+constexpr int maximumTimeoutSeconds = 24 * 60 * 60;
 // Without waiting: the first lines the command prints, shortly after it starts.
 constexpr int noWaitMs = 500;
 
@@ -161,8 +164,8 @@ void runInTerminal(const KDKToolContext &context,
         reply(McpResult::error(QStringLiteral("The terminal could not start")));
         return;
     }
-    const int timeoutSeconds =
-        std::max(0, arguments.value(QStringLiteral("timeoutSeconds")).toInt(defaultTimeoutSeconds));
+    const int timeoutSeconds = std::clamp(
+        arguments.value(QStringLiteral("timeoutSeconds")).toInt(defaultTimeoutSeconds), 0, maximumTimeoutSeconds);
     const auto run = std::make_shared<PendingRun>();
     const Answer answer = answerOnce(terminal, run, reply);
     QObject::connect(terminal, &TerminalWidget::finished, terminal,
@@ -212,8 +215,9 @@ void registerTerminalTools(McpRegistry &registry, const KDKToolContext &context)
          .inputSchema =
              object({{QStringLiteral("command"), string(QStringLiteral("Shell command, run in the project's folder"))},
                      {QStringLiteral("title"), string(QStringLiteral("Tab title (optional)"))},
-                     {QStringLiteral("timeoutSeconds"), integer(QStringLiteral("How long to wait for it to end "
-                                                                               "(default 300; 0: do not wait)"))}},
+                     {QStringLiteral("timeoutSeconds"),
+                      integer(QStringLiteral("How long to wait for it to end "
+                                             "(default 300, at most a day; 0: do not wait)"))}},
                     {QStringLiteral("command")})},
         describeRun, [context](const QJsonObject &arguments, const McpReply &reply, const McpProgress &progress) {
             runInTerminal(context, arguments, reply, progress);

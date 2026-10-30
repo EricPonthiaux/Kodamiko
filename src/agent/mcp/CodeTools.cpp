@@ -38,14 +38,20 @@ using namespace LspProtocol;
 // How long a server may take to report problems after a change.
 constexpr int diagnosticsWaitMs = 4000;
 
-QString textOf(const KDKToolContext &context, const QString &path)
+// `path`'s text as the user sees it: its unsaved changes, or the file; none,
+// with `error` if given, when the file cannot be read (missing, unreadable).
+std::optional<QString> textOf(const KDKToolContext &context, const QString &path, QString *error)
 {
     const QHash<QString, QString> buffers = context.tabs->unsavedTexts();
     if (buffers.contains(path))
         return buffers.value(path);
-    QString error;
-    const std::optional<DecodedText> decoded = TextFile::load(path, &error);
-    return decoded ? decoded->text : QString();
+    QString reason;
+    const std::optional<DecodedText> decoded = TextFile::load(path, &reason);
+    if (decoded)
+        return decoded->text;
+    if (error)
+        *error = QStringLiteral("Cannot read %1: %2").arg(context.relative(path), reason);
+    return std::nullopt;
 }
 
 QString severityName(int severity)
@@ -89,8 +95,10 @@ LspClient *serverFor(const KDKToolContext &context, const QString &path, QString
                                                       editor->utf8Bytes().toByteArray());
         }
     }
-    const bool changed =
-        context.languageServers->syncDocument(client, path, languageId, textOf(context, path).toUtf8());
+    const std::optional<QString> text = textOf(context, path, error);
+    if (!text)
+        return nullptr;
+    const bool changed = context.languageServers->syncDocument(client, path, languageId, text->toUtf8());
     if (sent)
         *sent = changed;
     return client;
@@ -130,7 +138,8 @@ QJsonArray locationsJson(const KDKToolContext &context, const QList<Location> &l
     QJsonArray array;
     for (const Location &location : locations) {
         if (!lines.contains(location.filePath))
-            lines.insert(location.filePath, textOf(context, location.filePath).split(QLatin1Char('\n')));
+            lines.insert(location.filePath,
+                         textOf(context, location.filePath, nullptr).value_or(QString()).split(QLatin1Char('\n')));
         const QStringList &text = lines[location.filePath];
         array.append(QJsonObject{{QStringLiteral("file"), context.relative(location.filePath)},
                                  {QStringLiteral("line"), location.range.start.line + 1},
@@ -233,6 +242,11 @@ public:
     {
         for (const QString &path : paths) {
             QString error;
+            // A missing file would read as an empty one, without problems.
+            if (!textOf(context, path, &error)) {
+                unreadable_.append(error);
+                continue;
+            }
             bool sent = false;
             if (serverFor(context, path, &error, &sent) &&
                 (sent || context.languageServers->diagnostics(path).isEmpty()))
@@ -265,6 +279,8 @@ private:
         QJsonObject result{{QStringLiteral("files"), files}, {QStringLiteral("errors"), errors}};
         if (!waiting_.isEmpty())
             result.insert(QStringLiteral("notYetChecked"), QJsonArray::fromStringList(pendingPaths()));
+        if (!unreadable_.isEmpty())
+            result.insert(QStringLiteral("unreadable"), QJsonArray::fromStringList(unreadable_));
         reply_(McpResult::json(result));
         deleteLater();
     }
@@ -281,6 +297,7 @@ private:
     McpReply reply_;
     QStringList paths_;
     QSet<QString> waiting_;
+    QStringList unreadable_; // why files could not be read
     bool done_ = false;
 };
 
@@ -589,7 +606,7 @@ McpResult formattedResult(const KDKToolContext &context,
     if (formatted == text)
         return McpResult::message(QStringLiteral("Already formatted"));
     // Typed or written meanwhile: the formatted text would erase it.
-    if (textOf(context, path) != text)
+    if (textOf(context, path, nullptr) != text)
         return McpResult::error(
             QStringLiteral("%1 changed while it was formatted: nothing applied").arg(context.relative(path)));
     if (EditorWidget *editor = context.tabs->editorFor(path)) {
@@ -609,7 +626,13 @@ void formatFile(const KDKToolContext &context, const QJsonObject &arguments, con
         reply(McpResult::error(QStringLiteral("No formatter for this kind of file")));
         return;
     }
-    const QString text = textOf(context, path);
+    QString readError;
+    const std::optional<QString> read = textOf(context, path, &readError);
+    if (!read) {
+        reply(McpResult::error(readError));
+        return;
+    }
+    const QString text = *read;
     const QString folder = context.folder();
     inBackground(
         [command = *command, folder, text] {
