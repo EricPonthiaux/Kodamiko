@@ -193,6 +193,13 @@
                 "additionalProperties": false
             }
         },
+        "servers": {
+            "description": "The servers Kodamiko knows, by name (\"jdtls\"), as the recipe's projects run them: their version and the runtime they run on.",
+            "type": "object",
+            "additionalProperties": {
+                "$ref": "#/definitions/server"
+            }
+        },
         "serverOptions": {
             "description": "What the recipe adds to the options of a server Kodamiko knows, by its name (\"typescript-language-server\"): objects merged key by key, anything else replaced. {{project}} in their texts stands for the project's folder.",
             "type": "object",
@@ -214,6 +221,39 @@
     },
     "additionalProperties": false,
     "definitions": {
+        "server": {
+            "description": "How the recipe's projects run a server Kodamiko knows: in place of the version the project chose and of the runtime Kodamiko's catalog gives it.",
+            "type": "object",
+            "properties": {
+                "version": {
+                    "description": "The server's version Kodamiko downloads, e.g. \"1.62.0\".",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "runtime": {
+                    "description": "What the server itself runs on, whatever the project's runtime, e.g. {\"tool\": \"jdk\", \"version\": \"25\"} for jdtls 1.62.0.",
+                    "type": "object",
+                    "required": [
+                        "tool",
+                        "version"
+                    ],
+                    "properties": {
+                        "tool": {
+                            "description": "A runtime Kodamiko knows how to install: \"jdk\", \"node\".",
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "version": {
+                            "description": "Its major version.",
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
         "strings": {
             "type": "array",
             "items": {

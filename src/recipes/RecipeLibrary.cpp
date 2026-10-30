@@ -119,4 +119,18 @@ QList<ToolRequirement> requirementsOf(const ProjectConfig &project)
     return requirements;
 }
 
+ProjectConfig withRecipeServers(ProjectConfig project)
+{
+    const QList<Recipe> recipes = recipesOf(project);
+    for (LanguageSetup &setup : project.languages) {
+        const auto recipe = std::ranges::find(recipes, setup.recipe, &Recipe::id);
+        if (!setup.enabled || recipe == recipes.end())
+            continue;
+        const auto server = recipe->servers.constFind(setup.server);
+        if (server != recipe->servers.cend() && !server->version.isEmpty())
+            setup.serverVersion = server->version;
+    }
+    return project;
+}
+
 } // namespace RecipeLibrary

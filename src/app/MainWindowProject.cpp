@@ -101,6 +101,7 @@ void MainWindow::openFolder(const QString &folder)
         project_.configured = true;
         ProjectStore::save(project_);
     }
+    project_ = RecipeLibrary::withRecipeServers(project_);
     languageServers_->setProject(project_, toolchains_.get(), recipeServers(project_, *toolchains_));
     warmUpLanguageServers();
     if (preferencesPopup_)
@@ -288,7 +289,7 @@ void MainWindow::applyProject(const ProjectConfig &project)
     if (QDir(project.path).absolutePath() != folder_)
         return; // another project's downloads, finished after a switch
     const bool recipesChanged = project.recipes() != project_.recipes();
-    project_ = project;
+    project_ = RecipeLibrary::withRecipeServers(project);
     languageServers_->setProject(project_, toolchains_.get(), recipeServers(project_, *toolchains_));
     runner_->setProject(project_, toolchains_.get());
     // Its runtimes may have been downloaded just now.

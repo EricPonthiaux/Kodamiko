@@ -86,6 +86,10 @@ LanguageServers::Additions additionsOf(const QList<Recipe> &recipes,
                                                  .settings = filled(it->settings, folder).toObject()};
             additions.options.insert(it.key(), LanguageServers::merged(additions.options.value(it.key()), added));
         }
+        for (auto it = recipe.servers.cbegin(); it != recipe.servers.cend(); ++it) {
+            if (!it->runtime.tool.isEmpty())
+                additions.runtimes.insert(it.key(), it->runtime);
+        }
     }
     return additions;
 }

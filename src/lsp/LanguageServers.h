@@ -5,6 +5,7 @@
 #include "LspClient.h"
 #include "LspProtocol.h"
 #include "projects/ProjectConfig.h"
+#include "toolchains/InstallPlan.h"
 #include "toolchains/JavaRuntimes.h"
 
 #include <QHash>
@@ -63,6 +64,9 @@ public:
         // Merged into the options of the server of that name: objects
         // merged key by key, anything else replaced.
         QHash<QString, Options> options;
+        // The runtime the server of that name runs on ({"jdk", "25"} for
+        // jdtls), in place of Kodamiko's catalog's.
+        QHash<QString, ToolRequirement> runtimes;
 
         bool operator==(const Additions &) const = default;
     };
@@ -164,8 +168,8 @@ public:
     void warmUp(const QString &path, const QString &languageId, const QByteArray &text);
 
     // How jdtls is started: its own Java command (no Python needed), with
-    // `java`, a JDK of version 21 or more. nullopt, with `error`, if
-    // impossible.
+    // `java`, a JDK of version `minimumJava` or more. nullopt, with `error`,
+    // if impossible.
     struct Launch {
         QString program;
         QStringList arguments;
@@ -175,6 +179,7 @@ public:
     static std::optional<Launch> jdtlsLaunch(const QString &jdtlsProgram,
                                              const QString &dataFolder,
                                              const std::optional<JavaRuntime> &java,
+                                             int minimumJava,
                                              QString *error);
 
     // `runtimeHome` and `runtimeExecutable` are the project's JDK or Python.
@@ -214,6 +219,9 @@ private:
     // Kodamiko's npm installs are scripts: `command` then runs them with a
     // Node recent enough. False, failed, if there is none.
     bool runScriptWithNode(const LanguageServerSpec &spec, ServerCommand &command);
+    // The major version of Java jdtls itself needs: its recipe's, else
+    // Kodamiko's catalog's.
+    int jdtlsJavaVersion() const;
     // The Java jdtls itself runs on, if any.
     std::optional<JavaRuntime> jdtlsJava() const;
     // Turns `command` into jdtls's Java command; `runtime` is the

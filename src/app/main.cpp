@@ -171,6 +171,19 @@ private:
     }
 };
 
+// Before the application exists. The first preview's web view would switch
+// its window from raster to GPU composition, which destroys and recreates
+// the native window: the whole window would disappear for a moment. Every
+// window composes with the GPU from its creation instead, with the
+// platform's default graphics API, the one Qt WebEngine uses (Direct3D 11 on
+// Windows, Metal on macOS). A hidden QRhiWidget did it before Qt 6.12, which
+// on macOS no longer gives the window a Metal surface yet flushes it through
+// Metal: the window never painted.
+void composeWindowsWithGpu()
+{
+    qputenv("QT_WIDGETS_RHI", "1");
+}
+
 // Kodamiko's downloads, from its application data to ~/.kodamiko/tools, once.
 void adoptLegacyToolchains()
 {
@@ -228,6 +241,7 @@ int main(int argc, char *argv[])
 {
     // Required by Qt WebEngine (Markdown preview), before the application exists.
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+    composeWindowsWithGpu();
     PreviewSite::registerScheme();
     const QApplication app(argc, argv);
     DesktopIntegration::identifyApplication();

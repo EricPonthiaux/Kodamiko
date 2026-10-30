@@ -596,6 +596,24 @@ private slots:
         QCOMPARE(plugins.first().toObject().value("location").toString(), project);
     }
 
+    void theJavaRecipeSaysWhichJdtlsRunsOnWhichJava()
+    {
+        const QTemporaryDir dir;
+        const Toolchains toolchains(dir.filePath("tools"), false);
+        const Recipe recipe = builtIn("java-maven");
+
+        QCOMPARE(recipe.servers.value("jdtls").version, QString("1.62.0"));
+        // Its Java is installed, not put in the project's environment.
+        const ToolRequirement runtime{.tool = "jdk", .version = "25", .server = "jdtls"};
+        QVERIFY(recipe.tools().contains(runtime));
+        QVERIFY(std::ranges::none_of(recipe.requirements, [](const RecipeRequirement &requirement) {
+            return requirement.tool.version == "25";
+        }));
+        const LanguageServers::Additions additions =
+            RecipeServers::additionsOf({recipe}, dir.filePath("project"), toolchains);
+        QCOMPARE(additions.runtimes.value("jdtls"), runtime);
+    }
+
     void aRequiredToolGoesWhereTheRecipeSays()
     {
         const QTemporaryDir dir;

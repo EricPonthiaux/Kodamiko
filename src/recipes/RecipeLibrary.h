@@ -49,5 +49,8 @@ QList<Recipe> recipesOf(const ProjectConfig &project, QStringList *missing = nul
 // The requirements of `project`'s recipes, in their order; none for a
 // recipe that is not installed.
 QList<ToolRequirement> requirementsOf(const ProjectConfig &project);
+// `project` with each enabled language's server at the version its recipe
+// says (Recipe::servers), in place of the one chosen.
+ProjectConfig withRecipeServers(ProjectConfig project);
 
 } // namespace RecipeLibrary

@@ -34,6 +34,15 @@
             }
         }
     ],
+    "servers": {
+        "jdtls": {
+            "version": "1.62.0",
+            "runtime": {
+                "tool": "jdk",
+                "version": "25"
+            }
+        }
+    },
     "run": [
         {
             "name": "Build",

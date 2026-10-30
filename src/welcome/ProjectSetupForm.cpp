@@ -234,6 +234,26 @@ void ProjectSetupForm::updatePage(Page &page)
     updateListItem(page);
 }
 
+void ProjectSetupForm::showRecipeServer(const Page &page, const Recipe &recipe) const
+{
+    const auto server = recipe.servers.constFind(page.server->currentData().toString());
+    const bool isSet = server != recipe.servers.cend() && !server->version.isEmpty();
+    page.serverVersion->setEnabled(!isSet);
+    page.serverVersion->setToolTip(isSet ? tr("Set by the recipe") : QString());
+    if (!isSet)
+        return;
+    // The recipe's version, whether Kodamiko's catalog offers it or not.
+    const QSignalBlocker blocker(page.serverVersion);
+    if (page.serverVersion->findData(server->version) < 0) {
+        page.serverVersion->addItem(server->version, server->version);
+        const bool isInstalled = toolchains_->isInstalled(page.server->currentData().toString(), server->version);
+        page.serverVersion->setItemData(page.serverVersion->count() - 1,
+                                        isInstalled ? tr("✓ Downloaded") : tr("Will download"),
+                                        LanguageChoices::stateRole);
+    }
+    page.serverVersion->setCurrentIndex(page.serverVersion->findData(server->version));
+}
+
 void ProjectSetupForm::updateRecipe(const Page &page)
 {
     Paragraph::setText(page.recipeState, page.recipe->currentData(Qt::ToolTipRole).toString());
@@ -242,9 +262,12 @@ void ProjectSetupForm::updateRecipe(const Page &page)
     if (found == recipes_.end()) {
         Paragraph::setText(page.recipeTags, tr("Runtime & language server"));
         page.recipeTags->show();
+        page.serverVersion->setEnabled(true);
+        page.serverVersion->setToolTip({});
         return;
     }
     const Recipe recipe = found->withValues(project_.recipeValues);
+    showRecipeServer(page, recipe);
     QStringList tags;
     for (const RecipeRequirement &requirement : recipe.requirements) {
         const ToolSpec *tool = ToolCatalog::find(requirement.tool.tool);

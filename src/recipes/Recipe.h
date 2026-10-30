@@ -40,6 +40,16 @@ struct RecipeRequirement {
     bool operator==(const RecipeRequirement &) const = default;
 };
 
+// How the recipe's projects run a server Kodamiko knows: its version, and
+// the runtime it runs on, whatever the project's (jdtls 1.62.0 needs a JDK
+// 25, for a Java 21 project too).
+struct RecipeServer {
+    QString version;         // "1.62.0"
+    ToolRequirement runtime; // {"jdk", "25"}; no tool: none said
+
+    bool operator==(const RecipeServer &) const = default;
+};
+
 // A prompt of the recipe, typed in the agent's prompt from the Project menu
 // for the user to complete.
 struct RecipePrompt {
@@ -138,6 +148,9 @@ struct Recipe {
     QList<RecipeLanguageServer> languageServers;
     // By the name of a server Kodamiko knows ("typescript-language-server").
     QMap<QString, RecipeServerOptions> serverOptions;
+    // By the name of a server Kodamiko knows ("jdtls"): its version and
+    // runtime, in place of the project's choice and Kodamiko's catalog.
+    QMap<QString, RecipeServer> servers;
 
     // The folder of the recipe's skills for the agent (--plugin-dir), empty
     // when it has none.
@@ -146,7 +159,8 @@ struct Recipe {
     bool isFor(const QString &system) const;
     // Its run configurations with {{identifier}} replaced.
     QList<RunConfiguration> runConfigurationsFor(const QString &identifier) const;
-    // The tools of its requirements, for InstallPlan.
+    // The tools of its requirements, then the runtimes of its servers, for
+    // InstallPlan.
     QList<ToolRequirement> tools() const;
     // Its setup commands as one configuration, run in the project's root
     // with {{identifier}} replaced; nullopt when it has none.
@@ -197,7 +211,8 @@ constexpr auto setupName = "Recipe Setup";
 //    "languageServers": [{"name": "angular", "tool": "angular-language-server",
 //                         "script": "node_modules/@angular/language-server/index.js",
 //                         "arguments": ["--stdio"], "languages": ["html"], "triggerCharacters": "<."}],
-//    "serverOptions": {"typescript-language-server": {"initialization": {...}, "settings": {...}}}}
+//    "serverOptions": {"typescript-language-server": {"initialization": {...}, "settings": {...}}},
+//    "servers": {"jdtls": {"version": "1.62.0", "runtime": {"tool": "jdk", "version": "25"}}}}
 // A download is chosen for this system and processor: "windows-x64",
 // "linux-aarch64"..., else "windows", "linux", "macos", else "any". It
 // gives a "checksum" (the hash itself) or a "checksumUrl"; "algorithm" is

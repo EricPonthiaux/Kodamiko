@@ -76,14 +76,26 @@ private:
     QList<InstallStep> steps_;
 };
 
+// The servers whose runtime the recipes give (ToolRequirement::server).
+QStringList serversRunBy(const QList<ToolRequirement> &required)
+{
+    QStringList servers;
+    for (const ToolRequirement &requirement : required) {
+        if (!requirement.server.isEmpty())
+            servers.append(requirement.server);
+    }
+    return servers;
+}
+
 // What the server runs on: always for jdtls (Kodamiko starts it with Java), for
-// Kodamiko's own npm installs otherwise.
+// Kodamiko's own npm installs otherwise; the recipe's when it gives one.
 void planServerRuntime(const ToolSpec &server,
                        const LanguageSetup &setup,
                        const Toolchains &toolchains,
+                       const QStringList &runByRecipes,
                        PlannedSteps &steps)
 {
-    if (server.runtime.isEmpty())
+    if (server.runtime.isEmpty() || runByRecipes.contains(server.id))
         return;
     const bool needsRuntime = !isSystem(setup.serverVersion) || server.runtime == QLatin1String("jdk");
     if (!needsRuntime)
@@ -95,7 +107,10 @@ void planServerRuntime(const ToolSpec &server,
                   QObject::tr("runs %1").arg(server.id));
 }
 
-void planLanguage(const LanguageSetup &setup, const Toolchains &toolchains, PlannedSteps &steps)
+void planLanguage(const LanguageSetup &setup,
+                  const Toolchains &toolchains,
+                  const QStringList &runByRecipes,
+                  PlannedSteps &steps)
 {
     const QString family = ProjectLanguages::title(setup.language);
     const QString runtime = ToolCatalog::runtimeOf(setup.language);
@@ -106,7 +121,7 @@ void planLanguage(const LanguageSetup &setup, const Toolchains &toolchains, Plan
     if (!server)
         return;
     const bool system = isSystem(setup.serverVersion);
-    planServerRuntime(*server, setup, toolchains, steps);
+    planServerRuntime(*server, setup, toolchains, runByRecipes, steps);
     if (!system && !toolchains.isInstalled(server->id, setup.serverVersion))
         steps.add(server->id, setup.serverVersion, QObject::tr("%1 language server").arg(family));
 }
@@ -189,7 +204,9 @@ void planRequirement(const ToolRequirement &requirement, const Toolchains &toolc
         return;
     const QString version =
         requirement.version.isEmpty() ? ToolCatalog::defaultRuntimeVersion(spec->family) : requirement.version;
-    steps.add(requirement.tool, version, QObject::tr("required by the recipe"));
+    steps.add(requirement.tool, version,
+              requirement.server.isEmpty() ? QObject::tr("required by the recipe")
+                                           : QObject::tr("runs %1").arg(requirement.server));
 }
 
 // Why `requirement` cannot be met, empty when it can.
@@ -225,9 +242,10 @@ QList<InstallStep> plan(const ProjectConfig &config,
     PlannedSteps steps;
     for (const ToolRequirement &requirement : required)
         planRequirement(requirement, toolchains, steps);
+    const QStringList runByRecipes = serversRunBy(required);
     for (const LanguageSetup &setup : config.languages) {
         if (setup.enabled)
-            planLanguage(setup, toolchains, steps);
+            planLanguage(setup, toolchains, runByRecipes, steps);
     }
     return steps.runtimesFirst();
 }

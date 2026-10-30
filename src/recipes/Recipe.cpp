@@ -221,6 +221,20 @@ QMap<QString, RecipeServerOptions> serverOptionsOf(const QJsonObject &object)
     return options;
 }
 
+QMap<QString, RecipeServer> serversOf(const QJsonObject &object)
+{
+    QMap<QString, RecipeServer> servers;
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        const QJsonObject server = it.value().toObject();
+        const QJsonObject runtime = server.value(QStringLiteral("runtime")).toObject();
+        servers.insert(
+            it.key(),
+            {.version = textOf(server, "version"),
+             .runtime = {.tool = textOf(runtime, "tool"), .version = textOf(runtime, "version"), .server = it.key()}});
+    }
+    return servers;
+}
+
 // `text` with each {{name}} of `values` replaced.
 QString filled(QString text, const QMap<QString, QString> &values)
 {
@@ -345,6 +359,10 @@ QList<ToolRequirement> Recipe::tools() const
     QList<ToolRequirement> tools;
     for (const RecipeRequirement &requirement : requirements)
         tools.append(requirement.tool);
+    for (const RecipeServer &server : servers) {
+        if (!server.runtime.tool.isEmpty())
+            tools.append(server.runtime);
+    }
     return tools;
 }
 
@@ -387,6 +405,10 @@ Recipe Recipe::withValues(const QMap<QString, QString> &chosen) const
         options.initialization = filled(options.initialization, placeholders);
         options.settings = filled(options.settings, placeholders);
     }
+    for (RecipeServer &server : recipe.servers) {
+        server.version = filled(server.version, placeholders);
+        server.runtime.version = filled(server.runtime.version, placeholders);
+    }
     return recipe;
 }
 
@@ -420,6 +442,7 @@ std::optional<Recipe> parse(const QByteArray &recipeJson, const QString &folder,
     recipe.parameters = parametersOf(object.value(QStringLiteral("parameters")));
     recipe.languageServers = languageServersOf(object.value(QStringLiteral("languageServers")));
     recipe.serverOptions = serverOptionsOf(object.value(QStringLiteral("serverOptions")).toObject());
+    recipe.servers = serversOf(object.value(QStringLiteral("servers")).toObject());
     return recipe;
 }
 

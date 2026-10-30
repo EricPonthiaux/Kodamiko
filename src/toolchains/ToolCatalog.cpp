@@ -191,7 +191,9 @@ QList<ToolSpec> all()
     // Started with Java directly; the script tells where the install is.
     jdtls.executables = {QStringLiteral("bin/jdtls"), QStringLiteral("bin/jdtls.bat")};
     jdtls.runtime = jdkId;
-    jdtls.minimumRuntime = 21;
+    // For a project without a recipe: a recipe says its own (its "servers").
+    // jdtls 1.62.0's Eclipse bundles need Java 25.
+    jdtls.minimumRuntime = 25;
     tools.append(jdtls);
 
     ToolSpec typescript;

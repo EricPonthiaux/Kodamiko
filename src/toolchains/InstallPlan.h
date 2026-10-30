@@ -52,6 +52,9 @@ struct ToolRequirement {
     // of the PATH.
     std::optional<DownloadSource> download;
     QString check;
+    // The language server it runs ("jdtls"), as its recipe says
+    // (Recipe::servers): in place of the runtime of Kodamiko's catalog.
+    QString server;
     bool operator==(const ToolRequirement &) const = default;
 };
 

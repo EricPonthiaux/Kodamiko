@@ -25,7 +25,6 @@
 #include <QFileInfo>
 #include <QMenu>
 #include <QPointer>
-#include <QRhiWidget>
 #include <QTabBar>
 #include <QTimer>
 
@@ -90,7 +89,6 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     baseLine_ = new TabBarBaseLine(tabBar());
     baseLine_->setColor(theme_.line);
     createEmptyBackdrop();
-    composeWithGpuFromTheStart();
 }
 
 void EditorTabs::createEmptyBackdrop()
@@ -100,17 +98,6 @@ void EditorTabs::createEmptyBackdrop()
     emptyBackdrop_ = new EmptyEditorBackdrop(theme_, this);
     emptyBackdrop_->setAttribute(Qt::WA_TransparentForMouseEvents);
     emptyBackdrop_->setGeometry(rect());
-}
-
-void EditorTabs::composeWithGpuFromTheStart()
-{
-    // The first preview's web view switches its window from raster to GPU
-    // composition, which destroys and recreates the native window: the whole
-    // window disappears for a moment. A hidden RHI widget makes the window
-    // compose with the GPU from its creation, with the platform's default
-    // graphics API, the one Qt WebEngine uses (Direct3D 11 on Windows).
-    auto *gpuComposition = new QRhiWidget(this);
-    gpuComposition->hide();
 }
 
 void EditorTabs::resizeEvent(QResizeEvent *event)

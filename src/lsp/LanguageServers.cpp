@@ -285,16 +285,19 @@ QStringList LanguageServers::describe() const
 std::optional<LanguageServers::Launch> LanguageServers::jdtlsLaunch(const QString &jdtlsProgram,
                                                                     const QString &dataFolder,
                                                                     const std::optional<JavaRuntime> &java,
+                                                                    int minimumJava,
                                                                     QString *error)
 {
-    if (!java || java->majorVersion < 21) {
+    if (!java || java->majorVersion < minimumJava) {
         const std::optional<JavaRuntime> found = JavaRuntimes::newestOfAll();
-        *error = found ? tr("jdtls needs Java 21 or newer; the newest Java found is Java %1 (%2). Install a recent "
+        *error = found ? tr("jdtls needs Java %1 or newer; the newest Java found is Java %2 (%3). Install a recent "
                             "JDK (or point JAVA_HOME to one), then Retry.")
+                             .arg(minimumJava)
                              .arg(found->majorVersion)
                              .arg(found->home)
-                       : tr("jdtls needs Java 21 or newer, and no Java was found. Install a recent JDK, then "
-                            "Retry.");
+                       : tr("jdtls needs Java %1 or newer, and no Java was found. Install a recent JDK, then "
+                            "Retry.")
+                             .arg(minimumJava);
         return std::nullopt;
     }
 
@@ -418,12 +421,22 @@ bool LanguageServers::runScriptWithNode(const LanguageServerSpec &spec, ServerCo
     return true;
 }
 
+int LanguageServers::jdtlsJavaVersion() const
+{
+    const QString jdtls = QStringLiteral("jdtls");
+    if (const auto runtime = additions_.runtimes.constFind(jdtls); runtime != additions_.runtimes.cend())
+        return runtime->version.toInt();
+    const ToolSpec *spec = ToolCatalog::find(jdtls);
+    return spec ? spec->minimumRuntime : 0;
+}
+
 std::optional<JavaRuntime> LanguageServers::jdtlsJava() const
 {
-    // jdtls itself runs on Java 21 or more, whatever the project's.
+    // jdtls itself runs on its own Java, whatever the project's.
+    const int minimum = jdtlsJavaVersion();
     if (!toolchains_)
-        return JavaRuntimes::newest(21);
-    if (const std::optional<RuntimeInstall> jdk = toolchains_->runtimeAtLeast(QStringLiteral("jdk"), 21))
+        return JavaRuntimes::newest(minimum);
+    if (const std::optional<RuntimeInstall> jdk = toolchains_->runtimeAtLeast(QStringLiteral("jdk"), minimum))
         return JavaRuntime{jdk->home, jdk->executable, jdk->version.toInt()};
     return std::nullopt;
 }
@@ -437,7 +450,7 @@ bool LanguageServers::launchJdtls(const LanguageServerSpec &spec, const RuntimeI
         QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/jdtls/") + id;
     QDir().mkpath(data);
     QString error;
-    const std::optional<Launch> launch = jdtlsLaunch(command.program, data, jdtlsJava(), &error);
+    const std::optional<Launch> launch = jdtlsLaunch(command.program, data, jdtlsJava(), jdtlsJavaVersion(), &error);
     if (!launch) {
         fail(spec, error);
         return false;

@@ -102,6 +102,9 @@ private:
     void fillServerVersions(const Page &page, const QString &server, const QString &selected);
     void updatePage(Page &page);
     void updateRecipe(const Page &page);
+    // The version of the page's server `recipe` sets, if it sets one:
+    // chosen, and not to change.
+    void showRecipeServer(const Page &page, const Recipe &recipe) const;
     void updateAvailability(Page &page);
     // The languages used first; `keep` stays selected.
     void fillList(const QString &keep);

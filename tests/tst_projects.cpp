@@ -785,13 +785,18 @@ private slots:
         const Toolchains toolchains(dir.path(), false);
         ProjectConfig config;
         config.languages.append({"java", true, "17", {}, "jdtls", "1.62.0"});
-        // jdtls itself runs on Java 21.
-        QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"JDK 17", "JDK 21", "jdtls 1.62.0"}));
+        // jdtls itself runs on Java 25.
+        QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"JDK 17", "JDK 25", "jdtls 1.62.0"}));
 
-        fakeInstall(toolchains, "jdk", "21", javaExecutable);
+        // Unless a recipe says which Java it runs on.
+        const QList<ToolRequirement> recipeRuntime{{.tool = "jdk", .version = "21", .server = "jdtls"}};
+        QCOMPARE(titles(InstallPlan::plan(config, toolchains, recipeRuntime)),
+                 (QStringList{"JDK 21", "JDK 17", "jdtls 1.62.0"}));
+
+        fakeInstall(toolchains, "jdk", "25", javaExecutable);
         fakeInstall(toolchains, "jdtls", "1.62.0", "bin/jdtls");
         QCOMPARE(titles(InstallPlan::plan(config, toolchains, {})), (QStringList{"JDK 17"}));
-        config.languages[0].runtimeVersion = "21";
+        config.languages[0].runtimeVersion = "25";
         QVERIFY(InstallPlan::plan(config, toolchains, {}).isEmpty());
 
         // A server needing Node brings one; disabled languages need nothing.
