@@ -30,8 +30,22 @@ constexpr int defaultTimeoutSeconds = 300;
 constexpr int noWaitMs = 500;
 
 using TerminalTabs = QList<std::pair<QString, TerminalWidget *>>;
-// Answers a run_in_terminal call: finished or not, and the exit code if so.
-using Answer = std::function<void(bool finished, int exitCode)>;
+
+// How a run_in_terminal call ends.
+enum class RunEnd {
+    Finished,     // the command exited
+    StillRunning, // the timeout passed first
+    Closed,       // the user closed its tab, which stops it
+};
+// Answers a run_in_terminal call, with the exit code if it finished.
+using Answer = std::function<void(RunEnd end, int exitCode)>;
+
+// A run_in_terminal call waiting for its answer. The terminal's last lines
+// are kept as it runs: a tab the user closes is deleted without a word.
+struct PendingRun {
+    bool answered = false;
+    QString output;
+};
 
 // The command run by the user's shell, then the shell exits.
 ProcessSpec commandSpec(const QString &folder, const QString &command)
@@ -78,43 +92,56 @@ QString describeRun(const QJsonObject &arguments)
     return QStringLiteral("run “%1” in a terminal").arg(arguments.value(QStringLiteral("command")).toString());
 }
 
-// Replies once with what `terminal` shows: when the command ends, or at the
-// timeout, whichever comes first.
-Answer answerOnce(TerminalWidget *terminal, const McpReply &reply)
+// Replies once with what `terminal` shows: when the command ends, at the
+// timeout, or when its tab is closed, whichever comes first.
+Answer answerOnce(TerminalWidget *terminal, const std::shared_ptr<PendingRun> &run, const McpReply &reply)
 {
     const QPointer<TerminalWidget> guard(terminal);
-    const auto answered = std::make_shared<bool>(false);
-    return [guard, reply, answered](bool finished, int exitCode) {
-        if (*answered)
+    return [guard, run, reply](RunEnd end, int exitCode) {
+        if (run->answered)
             return;
-        *answered = true;
-        QJsonObject result{
-            {QStringLiteral("finished"), finished},
-            {QStringLiteral("output"), guard ? guard->lastLines(outputLines).join(QLatin1Char('\n')) : QString()}};
-        if (finished)
+        run->answered = true;
+        // A closed tab's terminal is being destroyed: only what was kept is left.
+        const bool isShown = guard && end != RunEnd::Closed;
+        const QString output = isShown ? guard->lastLines(outputLines).join(QLatin1Char('\n')) : run->output;
+        QJsonObject result{{QStringLiteral("finished"), end == RunEnd::Finished}, {QStringLiteral("output"), output}};
+        if (end == RunEnd::Finished)
             result.insert(QStringLiteral("exitCode"), exitCode);
+        if (end == RunEnd::Closed)
+            result.insert(QStringLiteral("closedByUser"), true);
         reply(McpResult::json(result));
     };
 }
 
-// Reports the terminal's last line every few seconds, and answers unfinished
-// once `timeoutSeconds` have passed.
-void watchUntilTimeout(TerminalWidget *terminal, int timeoutSeconds, const McpProgress &progress, const Answer &answer)
+// Reports the terminal's last line every few seconds, keeping its output for
+// a closed tab, until the call is answered; answers unfinished once
+// `timeoutSeconds` have passed.
+void watchUntilTimeout(TerminalWidget *terminal,
+                       int timeoutSeconds,
+                       const std::shared_ptr<PendingRun> &run,
+                       const McpProgress &progress,
+                       const Answer &answer)
 {
-    const QPointer<TerminalWidget> guard(terminal);
     auto *ticker = new QTimer(terminal);
     ticker->setInterval(progressMs);
     const auto started = std::make_shared<int>(0);
-    QObject::connect(ticker, &QTimer::timeout, terminal, [guard, ticker, started, timeoutSeconds, progress, answer] {
-        *started += progressMs;
-        if (*started >= timeoutSeconds * 1000) {
-            ticker->stop();
-            answer(false, 0);
-            return;
-        }
-        const QStringList last = guard ? guard->lastLines(1) : QStringList();
-        progress(*started / 1000.0, timeoutSeconds, last.value(0));
-    });
+    QObject::connect(ticker, &QTimer::timeout, terminal,
+                     [terminal, ticker, started, timeoutSeconds, run, progress, answer] {
+                         // Answered as the command ended: no progress for a
+                         // finished request, which MCP forbids.
+                         if (run->answered) {
+                             ticker->deleteLater();
+                             return;
+                         }
+                         *started += progressMs;
+                         if (*started >= timeoutSeconds * 1000) {
+                             ticker->stop();
+                             answer(RunEnd::StillRunning, 0);
+                             return;
+                         }
+                         run->output = terminal->lastLines(outputLines).join(QLatin1Char('\n'));
+                         progress(*started / 1000.0, timeoutSeconds, terminal->lastLines(1).value(0));
+                     });
     ticker->start();
 }
 
@@ -136,13 +163,18 @@ void runInTerminal(const KDKToolContext &context,
     }
     const int timeoutSeconds =
         std::max(0, arguments.value(QStringLiteral("timeoutSeconds")).toInt(defaultTimeoutSeconds));
-    const Answer answer = answerOnce(terminal, reply);
-    QObject::connect(terminal, &TerminalWidget::finished, terminal, [answer](int exitCode) { answer(true, exitCode); });
+    const auto run = std::make_shared<PendingRun>();
+    const Answer answer = answerOnce(terminal, run, reply);
+    QObject::connect(terminal, &TerminalWidget::finished, terminal,
+                     [answer](int exitCode) { answer(RunEnd::Finished, exitCode); });
+    // Closing the tab deletes the terminal without emitting finished, and
+    // the timers go with it: without this, the call would never be answered.
+    QObject::connect(terminal, &QObject::destroyed, [answer] { answer(RunEnd::Closed, 0); });
     if (timeoutSeconds == 0) {
-        QTimer::singleShot(noWaitMs, terminal, [answer] { answer(false, 0); });
+        QTimer::singleShot(noWaitMs, terminal, [answer] { answer(RunEnd::StillRunning, 0); });
         return;
     }
-    watchUntilTimeout(terminal, timeoutSeconds, progress, answer);
+    watchUntilTimeout(terminal, timeoutSeconds, run, progress, answer);
 }
 
 } // namespace
@@ -174,7 +206,8 @@ void registerTerminalTools(McpRegistry &registry, const KDKToolContext &context)
          .description = QStringLiteral(
              "Runs a shell command in a new Kodamiko terminal tab the user watches (a dev server, a long build, an "
              "interactive tool), and returns its exit code and last lines once it ends, or what it printed so far "
-             "after the timeout (it keeps running). The user is asked first. For quick commands whose output only "
+             "after the timeout (it keeps running), or closedByUser if the user closed its tab, which stops it. The "
+             "user is asked first. For quick commands whose output only "
              "you need, use your own shell instead."),
          .inputSchema =
              object({{QStringLiteral("command"), string(QStringLiteral("Shell command, run in the project's folder"))},

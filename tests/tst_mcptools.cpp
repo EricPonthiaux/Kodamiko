@@ -619,6 +619,52 @@ private slots:
                     .contains(QStringLiteral("hello")));
     }
 
+    // Once the command ended and the call is answered, no progress follows.
+    void stopsReportingProgressOnceTheRunIsAnswered()
+    {
+        Editor editor;
+        int answers = 0;
+        int lateProgress = 0;
+        QObject::connect(&editor.session, &McpSession::sent, [&answers, &lateProgress](const QJsonObject &sent) {
+            if (sent.contains(QStringLiteral("result")))
+                ++answers;
+            else if (answers > 0 && sent.value(QStringLiteral("method")) == QStringLiteral("notifications/progress"))
+                ++lateProgress;
+        });
+
+        editor.session.handleMessage(
+            QJsonObject{{QStringLiteral("jsonrpc"), QStringLiteral("2.0")},
+                        {QStringLiteral("id"), 9001},
+                        {QStringLiteral("method"), QStringLiteral("tools/call")},
+                        {QStringLiteral("params"),
+                         QJsonObject{{QStringLiteral("name"), QStringLiteral("run_in_terminal")},
+                                     {QStringLiteral("arguments"),
+                                      QJsonObject{{QStringLiteral("command"), QStringLiteral("exit 0")}}},
+                                     {QStringLiteral("_meta"), QJsonObject{{QStringLiteral("progressToken"), 7}}}}}});
+        QTRY_COMPARE_WITH_TIMEOUT(answers, 1, 20000);
+        // Longer than two of the progress reports' intervals.
+        QTest::qWait(7000);
+
+        QCOMPARE(lateProgress, 0);
+    }
+
+    // Closing the tab stops the command: the call is answered, with what the
+    // terminal showed.
+    void answersARunWhoseTabTheUserCloses()
+    {
+        Editor editor;
+        // After the first progress report, which keeps the output.
+        QTimer::singleShot(4000, [&editor] { delete editor.terminals.takeFirst(); });
+
+        const QJsonObject result =
+            structured(editor.call(QStringLiteral("run_in_terminal"),
+                                   {{QStringLiteral("command"), QStringLiteral("echo started; sleep 60")}}, 20000));
+
+        QVERIFY(!result.value(QStringLiteral("finished")).toBool());
+        QVERIFY(result.value(QStringLiteral("closedByUser")).toBool());
+        QVERIFY(result.value(QStringLiteral("output")).toString().contains(QStringLiteral("started")));
+    }
+
 #ifdef KDK_WITH_DIAGRAMS
     // A diagram the user looks at: its content and selection, changes made
     // in the open diagram.
