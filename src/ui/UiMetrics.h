@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <QMargins>
 #include <QSize>
 
 class QAbstractButton;
@@ -17,6 +18,12 @@ namespace UiMetrics {
 
 // The window's title bar, with room above and below its menus and controls.
 constexpr int titleBarHeight = 52;
+// The thin, single-line title bars of the welcome and New Project windows.
+constexpr int compactTitleBarHeight = 34;
+// Their close button, their content's margins and the spacing between their items.
+constexpr QSize compactCloseButtonSize{32, 24};
+constexpr QMargins compactTitleBarMargins{16, 0, 5, 0};
+constexpr int compactTitleBarSpacing = 6;
 // Its chips and buttons (MainToolbar.Button.size).
 constexpr int toolbarButtonSize = 30;
 // The icon of a chip (the project's folder).

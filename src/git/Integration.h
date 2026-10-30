@@ -50,6 +50,25 @@ enum class ConflictSide {
 // side deleted is deleted. A snapshot of the files is taken first.
 void acceptVersion(const RepositoryInfo &repository, const QStringList &paths, ConflictSide side);
 
+// Writes `content` as the resolution of the conflicted file `path`
+// (repository path), creating its folder if needed, and marks it resolved
+// in the index. A snapshot of the file is taken first.
+void writeResolution(const RepositoryInfo &repository, const QString &path, const QByteArray &content);
+
+// What each side of the conflicts is, for the user: a branch, or a commit
+// and its title ("1a2b3c4 Fix the rounding").
+struct ConflictSides {
+    QString current;
+    QString incoming;
+
+    bool operator==(const ConflictSides &) const = default;
+};
+
+// The sides of the operation in progress. During a rebase the current side
+// is the branch rebased onto and the incoming side the commit replayed;
+// without an operation (a stash applied), the incoming side is the stash.
+ConflictSides conflictSides(const RepositoryInfo &repository);
+
 // Whether `operation` can be continued, aborted and skipped from the editor.
 bool canContinue(const QString &operation);
 bool canSkip(const QString &operation);

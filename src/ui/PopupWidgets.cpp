@@ -357,7 +357,7 @@ void SettingsCard::addWidget(QWidget *widget)
 
 // PopupHeader
 
-PopupHeader::PopupHeader(QString iconName, const QString &title, QWidget *parent)
+PopupHeader::PopupHeader(QString iconName, const QString &title, QWidget *parent, Style style)
     : QFrame(parent)
     , iconName_(std::move(iconName))
     , icon_(new QLabel(this))
@@ -366,21 +366,27 @@ PopupHeader::PopupHeader(QString iconName, const QString &title, QWidget *parent
     , buttons_(new QHBoxLayout)
     , close_(new QToolButton(this))
 {
+    const bool compact = style == Style::Compact;
     setObjectName(QStringLiteral("popupHeader"));
-    AppFonts::setInterfaceFont(title_, 1.1, QFont::DemiBold);
+    AppFonts::setInterfaceFont(title_, compact ? 0.85 : 1.1, compact ? QFont::Medium : QFont::DemiBold);
     subtitle_->setObjectName(QStringLiteral("pageDescription"));
     subtitle_->hide();
     close_->setAutoRaise(true);
     close_->setFocusPolicy(Qt::NoFocus);
     close_->setToolTip(tr("Close (Esc)"));
-    UiMetrics::setScaledSize(close_, QSize(26, 26));
+    if (compact) {
+        setFixedHeight(UiMetrics::compactTitleBarHeight);
+        close_->setFixedSize(UiMetrics::compactCloseButtonSize);
+    } else {
+        UiMetrics::setScaledSize(close_, QSize(26, 26));
+    }
     connect(close_, &QToolButton::clicked, this, &PopupHeader::closeRequested);
     buttons_->setSpacing(6);
 
     auto *layout = new QGridLayout(this);
-    layout->setContentsMargins(16, 10, 10, 10);
-    layout->setHorizontalSpacing(8);
-    layout->setVerticalSpacing(2);
+    layout->setContentsMargins(compact ? UiMetrics::compactTitleBarMargins : QMargins(16, 10, 10, 10));
+    layout->setHorizontalSpacing(compact ? UiMetrics::compactTitleBarSpacing : 8);
+    layout->setVerticalSpacing(compact ? 0 : 2);
     layout->addWidget(icon_, 0, 0, Qt::AlignVCenter);
     layout->addWidget(title_, 0, 1, Qt::AlignVCenter);
     layout->addLayout(buttons_, 0, 2, Qt::AlignVCenter);

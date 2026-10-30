@@ -27,6 +27,8 @@ struct Free {
 
     void operator()(git_index *p) const { git_index_free(p); }
 
+    void operator()(git_index_conflict_iterator *p) const { git_index_conflict_iterator_free(p); }
+
     void operator()(git_diff *p) const { git_diff_free(p); }
 
     void operator()(git_patch *p) const { git_patch_free(p); }

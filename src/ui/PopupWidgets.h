@@ -87,7 +87,13 @@ class PopupHeader : public QFrame {
     Q_OBJECT
 
 public:
-    PopupHeader(QString iconName, const QString &title, QWidget *parent);
+    enum class Style {
+        Standard,
+        Compact
+    };
+
+    // Compact matches the welcome title bar; intended for a title without a subtitle.
+    PopupHeader(QString iconName, const QString &title, QWidget *parent, Style style = Style::Standard);
 
     void setTitle(const QString &title);
 

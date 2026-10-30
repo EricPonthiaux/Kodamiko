@@ -6,6 +6,7 @@
 #include "ui/AppFonts.h"
 #include "ui/BrandMark.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 #include "ui/WindowControls.h"
 
 #include <QApplication>
@@ -22,9 +23,7 @@
 namespace {
 
 // A thin bar: the welcome has its mark, name and close button, without menus.
-constexpr int titleBarHeight = 34;
 constexpr int titleMarkSize = 18;
-constexpr QSize closeButtonSize{32, 24};
 constexpr int searchWidth = 206;
 
 // A key, or keys, then what it does: "↵ Open".
@@ -75,13 +74,13 @@ QWidget *WelcomeWindow::createTitleBar()
     close_->applyTheme(theme_);
     close_->setCorners(WindowButton::Corners::Rounded);
     close_->setToolTip(tr("Close"));
-    close_->setFixedSize(closeButtonSize);
+    close_->setFixedSize(UiMetrics::compactCloseButtonSize);
     connect(close_, &QAbstractButton::clicked, this, &QWidget::close);
 
-    bar->setFixedHeight(titleBarHeight);
+    bar->setFixedHeight(UiMetrics::compactTitleBarHeight);
     auto *layout = new QHBoxLayout(bar);
-    layout->setContentsMargins(16, 0, 5, 0);
-    layout->setSpacing(6);
+    layout->setContentsMargins(UiMetrics::compactTitleBarMargins);
+    layout->setSpacing(UiMetrics::compactTitleBarSpacing);
     layout->addWidget(mark, 0, Qt::AlignVCenter);
     layout->addWidget(name, 1);
     layout->addWidget(close_, 0, Qt::AlignRight | Qt::AlignVCenter);

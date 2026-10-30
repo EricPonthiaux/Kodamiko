@@ -7,7 +7,11 @@
 #include "GitProcess.h"
 #include "Snapshots.h"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QObject>
+#include <QSaveFile>
 #include <QSet>
 
 namespace Integration {
@@ -82,6 +86,44 @@ QSet<QString> pathsWithStage(const RepositoryInfo &repository, const QStringList
     return result;
 }
 
+// "1a2b3c4 Fix the rounding" for the commit `ref` names.
+QString commitTitle(const QString &workDir, const QString &ref)
+{
+    return QString::fromUtf8(Git::run(workDir, {QStringLiteral("log"), QStringLiteral("-1"),
+                                                QStringLiteral("--format=%h %s"), ref, QStringLiteral("--")}))
+        .trimmed();
+}
+
+// The local branch whose last commit `ref` names, or the commit's title.
+QString branchOrCommit(const QString &workDir, const QString &ref)
+{
+    // "undefined" when no branch has the commit, "main~2" for a commit
+    // before the branch's last one.
+    const QString name = QString::fromUtf8(Git::run(workDir, {QStringLiteral("name-rev"), QStringLiteral("--name-only"),
+                                                              QStringLiteral("--refs=refs/heads/*"), ref}))
+                             .trimmed();
+    const bool isBranchTip =
+        name != QLatin1String("undefined") && !name.contains(QLatin1Char('~')) && !name.contains(QLatin1Char('^'));
+    return isBranchTip ? name : commitTitle(workDir, ref);
+}
+
+// The commit a rebase replays its commits onto, as its state files keep it
+// (rebase-merge for the merge backend, rebase-apply for the apply one).
+QString rebaseOnto(const RepositoryInfo &repository)
+{
+    for (const QString &folder : {QStringLiteral("rebase-merge"), QStringLiteral("rebase-apply")}) {
+        QFile file(QDir(repository.gitDir).filePath(folder + QStringLiteral("/onto")));
+        if (file.open(QIODevice::ReadOnly))
+            return QString::fromUtf8(file.readAll()).trimmed();
+    }
+    return QStringLiteral("HEAD");
+}
+
+QString currentBranch(const RepositoryInfo &repository)
+{
+    return repository.branch.isEmpty() ? repository.headId : repository.branch;
+}
+
 } // namespace
 
 QString merge(const RepositoryInfo &repository, const QString &branch)
@@ -146,6 +188,35 @@ void acceptVersion(const RepositoryInfo &repository, const QStringList &paths, C
         Git::run(repository.workDir,
                  QStringList{QStringLiteral("rm"), QStringLiteral("-q"), QStringLiteral("-f"), QStringLiteral("--")} +
                      deleted);
+}
+
+void writeResolution(const RepositoryInfo &repository, const QString &path, const QByteArray &content)
+{
+    Snapshots::create(repository, QObject::tr("Before resolving %1").arg(path), {path});
+    const QString filePath = QDir(repository.workDir).filePath(path);
+    QDir().mkpath(QFileInfo(filePath).absolutePath());
+    QSaveFile file(filePath);
+    const bool isWritten = file.open(QIODevice::WriteOnly) && file.write(content) == content.size() && file.commit();
+    if (!isWritten)
+        throw GitError(QObject::tr("Cannot write %1: %2").arg(path, file.errorString()));
+    GitOperations::stage(repository, {path});
+}
+
+ConflictSides conflictSides(const RepositoryInfo &repository)
+{
+    const QString &workDir = repository.workDir;
+    const QString command = commandOf(repository.operation);
+    if (command == QLatin1String("merge"))
+        return {currentBranch(repository), branchOrCommit(workDir, QStringLiteral("MERGE_HEAD"))};
+    if (command == QLatin1String("rebase"))
+        return {branchOrCommit(workDir, rebaseOnto(repository)), commitTitle(workDir, QStringLiteral("REBASE_HEAD"))};
+    if (command == QLatin1String("cherry-pick"))
+        return {currentBranch(repository), commitTitle(workDir, QStringLiteral("CHERRY_PICK_HEAD"))};
+    if (command == QLatin1String("revert")) {
+        return {currentBranch(repository),
+                QObject::tr("Revert of %1").arg(commitTitle(workDir, QStringLiteral("REVERT_HEAD")))};
+    }
+    return {currentBranch(repository), QObject::tr("Stashed changes")};
 }
 
 bool canContinue(const QString &operation)

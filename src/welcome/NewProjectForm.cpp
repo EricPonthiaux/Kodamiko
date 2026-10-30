@@ -56,7 +56,7 @@ QIcon templateIcon(const Recipe &recipe)
 
 NewProjectForm::NewProjectForm(QWidget *parent)
     : QWidget(parent)
-    , header_(new PopupHeader(QStringLiteral("plus"), tr("New Project"), this))
+    , header_(new PopupHeader(QStringLiteral("plus"), tr("New Project"), this, PopupHeader::Style::Compact))
     , name_(new QLineEdit(this))
     , location_(new QLineEdit(this))
     , recipeList_(new QListWidget(this))

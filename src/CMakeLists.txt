@@ -172,6 +172,7 @@ add_library(kdk_core STATIC
     git/CommitLog.cpp
     git/FileBlame.cpp
     git/ConflictMarkers.cpp
+    git/ConflictVersions.cpp
     git/ContentMatcher.cpp
     git/CredentialCache.cpp
     git/FilePatch.cpp
@@ -188,6 +189,7 @@ add_library(kdk_core STATIC
     git/RepositoryWatcher.cpp
     git/Snapshots.cpp
     git/Stashes.cpp
+    git/ThreeWayMerge.cpp
     git/Worktrees.cpp
     history/CommitDelegate.cpp
     history/CommitGraph.cpp
