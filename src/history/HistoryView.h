@@ -54,6 +54,8 @@ public:
     // keeps the chosen commit if it still exists.
     void refresh();
     void focusFilter();
+    // Reloads without filters and selects this commit (a full or abbreviated ID).
+    void revealCommit(const QString &id);
     // Only the commits that modify `relativePath` (a file or folder of the
     // open folder); empty shows them all again. Reloads the history.
     void setPathFilter(const QString &relativePath);
@@ -186,10 +188,11 @@ private:
     bool refreshPending_ = false;
     int commitLimit_ = 0; // commits to read, see loadMoreIfAtEnd()
     CommitDelegate *commitDelegate_;
-    int graphLanes_ = 0;    // of the list's graph; 0 without one
-    QString detailsWanted_; // commit whose details are being read
-    QString fileToKeep_;    // scrolled to again once the commit is read again
-    QString unfoldedId_;    // the commit whose row shows its message; empty: none
+    int graphLanes_ = 0;     // of the list's graph; 0 without one
+    QString detailsWanted_;  // commit whose details are being read
+    QString fileToKeep_;     // scrolled to again once the commit is read again
+    QString unfoldedId_;     // the commit whose row shows its message; empty: none
+    QString commitToReveal_; // selected after the next log read
 
     // The diff's share of the view's width.
     double diffShare_ = 0.6;

@@ -316,6 +316,16 @@ void HistoryView::refresh()
     });
 }
 
+void HistoryView::revealCommit(const QString &id)
+{
+    commitToReveal_ = id;
+    filter_->clear();
+    setPathFilter({});
+    linesByAge_->setChecked(false);
+    setCommitListFolded(false);
+    refresh();
+}
+
 void HistoryView::onLogRead(const std::optional<CommitLog> &log, const QString &error, int generation)
 {
     reading_ = false;
@@ -328,6 +338,18 @@ void HistoryView::onLogRead(const std::optional<CommitLog> &log, const QString &
     // Refreshed on every repository change: rebuilt only if it changed.
     if (log != log_ || error != error_)
         showLog(log, error);
+    if (!commitToReveal_.isEmpty()) {
+        for (int i = 0; i < commits_->topLevelItemCount(); ++i) {
+            QTreeWidgetItem *item = commits_->topLevelItem(i);
+            if (item->data(0, idRole).toString().startsWith(commitToReveal_)) {
+                commits_->setCurrentItem(item);
+                commits_->scrollToItem(item);
+                unfoldOnly(item);
+                break;
+            }
+        }
+        commitToReveal_.clear();
+    }
     updateSummary();
     emit refreshed();
     loadMoreIfAtEnd(); // reached while reading
