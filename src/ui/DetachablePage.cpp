@@ -99,7 +99,7 @@ void DetachablePage::detach()
         window_->move(stack_->mapToGlobal(QPoint(windowOffsetPx, windowOffsetPx)));
     }
     window_->installEventFilter(this);
-    DesktopIntegration::followActiveSpace(window_.get());
+    chooseSpaceBehavior();
     window_->show();
     raiseWindow();
     saveState();
@@ -133,9 +133,25 @@ void DetachablePage::raiseWindow()
     // Out of the taskbar if minimized, but still maximized or full screen
     // if it was: showNormal() would undo that.
     window_->setWindowState(window_->windowState() & ~Qt::WindowMinimized);
+    chooseSpaceBehavior();
     window_->show();
     window_->raise();
     window_->activateWindow();
+}
+
+bool DetachablePage::isWindowActive() const
+{
+    return window_ && window_->isActiveWindow();
+}
+
+void DetachablePage::toggleFullScreen()
+{
+    if (!window_)
+        return;
+    // Asked for: even over the main window's full-screen Space.
+    if (!window_->isFullScreen())
+        DesktopIntegration::allowOwnFullScreenSpace(window_.get());
+    window_->setWindowState(window_->windowState() ^ Qt::WindowFullScreen);
 }
 
 void DetachablePage::setWindowTitle(const QString &title)
@@ -154,7 +170,23 @@ void DetachablePage::setFrameless(bool frameless)
     titleBar_->setVisible(frameless);
     // The new window flags recreated the native window, shown again.
     if (window_->isVisible())
+        chooseSpaceBehavior();
+}
+
+// macOS lets a window either join another's full-screen Space or have one
+// of its own, not both: the window joins the main one's while over it, and
+// can go full screen by itself elsewhere (on another screen).
+void DetachablePage::chooseSpaceBehavior()
+{
+    // In its own full-screen Space: a change would take it out.
+    if (window_->isFullScreen())
+        return;
+    const QWidget *main = stack_->window();
+    const bool isOverMainFullScreen = main->isFullScreen() && window_->screen() == main->screen();
+    if (isOverMainFullScreen)
         DesktopIntegration::followActiveSpace(window_.get());
+    else
+        DesktopIntegration::allowOwnFullScreenSpace(window_.get());
 }
 
 void DetachablePage::applyTheme(const Theme &theme)
@@ -185,6 +217,10 @@ bool DetachablePage::eventFilter(QObject *watched, QEvent *event)
     case QEvent::WindowActivate:
     case QEvent::WindowDeactivate:
         emit windowActivationChanged();
+        break;
+    case QEvent::Move: // perhaps to another screen
+    case QEvent::WindowStateChange:
+        chooseSpaceBehavior();
         break;
     default:
         break;

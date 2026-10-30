@@ -28,6 +28,10 @@ void identifyApplication();
 // window) and again after every change of its window flags, which
 // recreates the native window.
 void followActiveSpace(QWidget *window);
+// Undoes followActiveSpace: `window` can go full screen in a Space of its
+// own (macOS's green button) but no longer joins another window's. Same
+// conditions as followActiveSpace.
+void allowOwnFullScreenSpace(QWidget *window);
 
 // Makes `menu` the menu of the application's icon in the Dock (macOS),
 // above the system's own items. Not owned: it must outlive its use there.

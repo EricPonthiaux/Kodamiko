@@ -44,6 +44,16 @@ void DesktopIntegration::followActiveSpace(QWidget *window)
                                   | NSWindowCollectionBehaviorMoveToActiveSpace;
 }
 
+// AppKit allows one of the two full-screen behaviors at a time.
+void DesktopIntegration::allowOwnFullScreenSpace(QWidget *window)
+{
+    NSWindow *nsWindow = nativeWindow(window);
+    nsWindow.collectionBehavior =
+        (nsWindow.collectionBehavior
+         & ~(NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorMoveToActiveSpace))
+        | NSWindowCollectionBehaviorFullScreenPrimary;
+}
+
 void DesktopIntegration::setDockMenu(QMenu *menu)
 {
     menu->setAsDockMenu();

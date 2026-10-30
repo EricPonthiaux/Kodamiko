@@ -969,9 +969,15 @@ void MainWindow::toggleTerminalMode()
     setMode(mode_ == Mode::Terminal ? modeBeforeTerminal_ : Mode::Terminal);
 }
 
-// Leaving full screen gives the window back maximized if it was.
+// Leaving full screen gives the window back maximized if it was. The
+// terminals' window shares the menu's shortcuts: pressed there, the
+// shortcut is for it.
 void MainWindow::toggleFullScreen()
 {
+    if (terminalWindow_->isWindowActive()) {
+        terminalWindow_->toggleFullScreen();
+        return;
+    }
     setWindowState(windowState() ^ Qt::WindowFullScreen);
 }
 

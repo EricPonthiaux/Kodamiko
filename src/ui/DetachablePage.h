@@ -41,12 +41,18 @@ public:
 
     bool isDetached() const { return window_ != nullptr; }
 
+    // Whether the window is the active one; false while attached.
+    bool isWindowActive() const;
+
     // Moves the page into its window, where it was last (or over the stack).
     void detach();
     // Brings the page back to its place in the stack.
     void attach();
     // Brings the window to the front, activated; nothing while attached.
     void raiseWindow();
+    // Puts the window in full screen, in a Space of its own on macOS, or
+    // takes it out; nothing while attached.
+    void toggleFullScreen();
     void setWindowTitle(const QString &title);
     // Frameless: Kodamiko's frame and title bar around the window, as around
     // the main one; otherwise the system's.
@@ -66,6 +72,9 @@ signals:
 private:
     QWidget *createPlaceholder();
     void saveState() const;
+    // Whether the window joins the main window's full-screen Space or can
+    // have one of its own (macOS).
+    void chooseSpaceBehavior();
 
     QStackedWidget *stack_;
     QWidget *page_;

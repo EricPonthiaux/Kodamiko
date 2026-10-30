@@ -93,7 +93,7 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
 
 void EditorTabs::createEmptyBackdrop()
 {
-    // A tint over the empty area; the clicks go through it, to the tab bar
+    // The mark over the empty area; the clicks go through it, to the tab bar
     // under it.
     emptyBackdrop_ = new EmptyEditorBackdrop(theme_, this);
     emptyBackdrop_->setAttribute(Qt::WA_TransparentForMouseEvents);

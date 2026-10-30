@@ -14,6 +14,10 @@ void DesktopIntegration::followActiveSpace(QWidget * /*window*/)
 {
 }
 
+void DesktopIntegration::allowOwnFullScreenSpace(QWidget * /*window*/)
+{
+}
+
 // The menu of the taskbar's or the launcher's icon is the system's.
 void DesktopIntegration::setDockMenu(QMenu * /*menu*/)
 {
