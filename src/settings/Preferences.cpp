@@ -19,7 +19,8 @@ Preferences Preferences::load()
         preferences.theme = QStringLiteral("kodamiko");      // the light themes are gone
     preferences.codeFontFamily = settings.value(QStringLiteral("codeFont/family")).toString();
     preferences.codeFontSize =
-        std::clamp(settings.value(QStringLiteral("codeFont/size"), 11).toInt(), minimumFontSize, maximumFontSize);
+        std::clamp(settings.value(QStringLiteral("codeFont/size"), AppFonts::defaultFontSize()).toInt(),
+                   minimumFontSize, maximumFontSize);
     preferences.codeFontWeight =
         std::clamp(settings.value(QStringLiteral("codeFont/weight"), int(QFont::Normal)).toInt(), int(QFont::Thin),
                    int(QFont::Black));
@@ -32,9 +33,9 @@ Preferences Preferences::load()
         const int size = settings.value(key, 0).toInt();
         return size <= 0 ? 0 : std::clamp(size, minimumFontSize, maximumFontSize);
     };
-    // 0 before 11 was the default: the system's size.
+    // 0 before a size was the default: the system's size.
     const int interfaceFontSize = fontSize(QStringLiteral("interfaceFont/size"));
-    preferences.interfaceFontSize = interfaceFontSize > 0 ? interfaceFontSize : AppFonts::defaultInterfaceSize;
+    preferences.interfaceFontSize = interfaceFontSize > 0 ? interfaceFontSize : AppFonts::defaultFontSize();
     preferences.treeFontSize = fontSize(QStringLiteral("treeFont/size"));
     preferences.systemTitleBar = settings.value(QStringLiteral("systemTitleBar"), false).toBool();
     preferences.animations = settings.value(QStringLiteral("interface/animations"), true).toBool();

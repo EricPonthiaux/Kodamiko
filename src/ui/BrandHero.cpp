@@ -43,7 +43,7 @@ BrandType typeFor(const QFont &base)
     QFont name = base;
     name.setPointSizeF(base.pointSizeF() * 3.1);
     name.setWeight(QFont::DemiBold);
-    name.setLetterSpacing(QFont::AbsoluteSpacing, -0.65 * base.pointSizeF() / AppFonts::defaultInterfaceSize);
+    name.setLetterSpacing(QFont::AbsoluteSpacing, -0.65 * base.pointSizeF() / AppFonts::referenceInterfaceSize);
     QFont tagline = base;
     tagline.setPointSizeF(base.pointSizeF() * 1.05);
     tagline.setWeight(QFont::Normal);

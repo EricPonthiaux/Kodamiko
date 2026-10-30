@@ -21,9 +21,13 @@ namespace AppFonts {
 // Registers the embedded fonts (once); needs the application to exist.
 void load();
 
-// The interface font's size unless Preferences ▸ Fonts sets one; the
-// size UiMetrics gives IntelliJ's sizes for.
-constexpr int defaultInterfaceSize = 11;
+// The interface font's size UiMetrics gives IntelliJ's sizes for: the
+// paddings and bars grow and shrink from it with the font.
+constexpr int referenceInterfaceSize = 11;
+
+// The size of the interface and code fonts unless Preferences ▸ Fonts sets
+// one: 14 on macOS, 11 elsewhere.
+int defaultFontSize();
 
 // The interface font at the system's size (not the application font's,
 // which follows Preferences).

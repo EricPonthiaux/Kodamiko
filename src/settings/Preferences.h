@@ -19,14 +19,14 @@ struct Preferences {
     // Appearance
     QString theme = QStringLiteral("kodamiko-violet"); // Theme::name
     QString codeFontFamily;                            // empty: the embedded Droid Sans Mono
-    int codeFontSize = 11;
+    int codeFontSize = AppFonts::defaultFontSize();
     int codeFontWeight = QFont::Normal; // QFont::Light, Normal or Medium
     // Lines of code at this multiple of the font size.
     double codeLineHeight = AppFonts::defaultLineHeight;
     // Programming ligatures in the editor ("->" drawn as an arrow).
     bool ligatures = false;
     // Menus, tabs, panels and dialogs.
-    int interfaceFontSize = AppFonts::defaultInterfaceSize;
+    int interfaceFontSize = AppFonts::defaultFontSize();
     // The side trees (files, outline, changes); 0: the code font's size,
     // never below the interface's.
     int treeFontSize = 0;

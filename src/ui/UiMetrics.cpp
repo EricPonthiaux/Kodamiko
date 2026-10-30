@@ -21,7 +21,7 @@ int scaled(int referencePx)
     // the points of Preferences, which are the same pixels on every system.
     const QFont font = QGuiApplication::font();
     const qreal fontSize = font.pointSizeF() > 0 ? font.pointSizeF() : QFontInfo(font).pointSizeF();
-    return qRound(referencePx * AppFonts::kdkPoints(fontSize) / AppFonts::defaultInterfaceSize);
+    return qRound(referencePx * AppFonts::kdkPoints(fontSize) / AppFonts::referenceInterfaceSize);
 }
 
 int tabHeight()

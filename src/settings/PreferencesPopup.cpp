@@ -264,7 +264,7 @@ QWidget *PreferencesPopup::createFontsPage()
     fontCard->addWidget(fontPreview_);
     addGroup(layout, tr("Code font"), fontCard);
 
-    // Interface font: Ubuntu Sans, 11 pt unless another size is chosen.
+    // Interface font: Ubuntu Sans, at AppFonts::defaultFontSize() unless another size is chosen.
     auto *interfaceCard = new SettingsCard(nullptr, SettingsCard::TogglePlacement::AfterTitle);
     interfaceFontSize_ = new QSpinBox;
     interfaceFontSize_->setRange(Preferences::minimumFontSize, Preferences::maximumFontSize);

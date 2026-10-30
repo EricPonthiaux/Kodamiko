@@ -813,7 +813,7 @@ private slots:
         LanguageSetup setup;
         setup.language = "java";
         toolchains.complete(setup);
-        QCOMPARE(setup.runtimeVersion, QString("21"));
+        QCOMPARE(setup.runtimeVersion, QString("25"));
         QCOMPARE(setup.server, QString("jdtls"));
         QCOMPARE(setup.serverVersion, QString("1.62.0")); // nothing installed: the newest
         fakeInstall(toolchains, "jdk", "17", javaExecutable);

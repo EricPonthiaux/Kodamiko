@@ -157,7 +157,7 @@ private slots:
     {
         const Window window;
 
-        applyPreferences(withSizes(2 * AppFonts::defaultInterfaceSize, 0), window);
+        applyPreferences(withSizes(2 * AppFonts::referenceInterfaceSize, 0), window);
 
         QCOMPARE(window.titleBar->height(), 2 * UiMetrics::titleBarHeight);
         QCOMPARE(window.panelHeader()->height(), 2 * UiMetrics::panelHeaderHeight);
@@ -172,7 +172,7 @@ private slots:
     {
         const Window window;
 
-        applyPreferences(withSizes(2 * AppFonts::defaultInterfaceSize, 0), window);
+        applyPreferences(withSizes(2 * AppFonts::referenceInterfaceSize, 0), window);
 
         const QToolButton *collapse = nullptr;
         for (const QToolButton *button : window.files->findChildren<QToolButton *>()) {
@@ -306,11 +306,18 @@ private slots:
         QCOMPARE(preferencePoints(window.files->tree()->font()), 16);
     }
 
-    void defaultInterfaceSizeIsEleven()
+    void defaultFontSizesAreFourteenOnMacOSAndElevenElsewhere()
     {
-        QCOMPARE(preferencePoints(Preferences().interfaceFont()), 11);
+#ifdef Q_OS_MACOS
+        constexpr int defaultSize = 14;
+#else
+        constexpr int defaultSize = 11;
+#endif
+        QCOMPARE(preferencePoints(Preferences().interfaceFont()), defaultSize);
+        QCOMPARE(Preferences().codeFontSize, defaultSize);
         QSettings().setValue(QStringLiteral("interfaceFont/size"), 0); // "System", before
-        QCOMPARE(Preferences::load().interfaceFontSize, 11);
+        QCOMPARE(Preferences::load().interfaceFontSize, defaultSize);
+        QCOMPARE(Preferences::load().codeFontSize, defaultSize);
     }
 };
 

@@ -2,6 +2,8 @@
 
 #include "AppFonts.h"
 
+#include "system/Host.h"
+
 #include <QEvent>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -81,6 +83,18 @@ void load()
         addFont(QStringLiteral(":/fonts/JetBrainsMonoNL-%1.ttf").arg(QLatin1String(style)));
         addFont(QStringLiteral(":/fonts/JetBrainsMono-%1.ttf").arg(QLatin1String(style)));
     }
+}
+
+int defaultFontSize()
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::MacOS:
+        return 14;
+    case OperatingSystem::Windows:
+    case OperatingSystem::Linux:
+        break;
+    }
+    return 11;
 }
 
 QFont interfaceFont()
