@@ -574,11 +574,14 @@ private slots:
         QCOMPARE(editor.asked.last(), QStringLiteral("commit the reverse of commit HEAD"));
         QCOMPARE(readFile(), QByteArray("one\n"));
 
-        // Renamed, then deleted: its commit is on main, no force needed.
+        // Renamed, then deleted with force: the cherry-pick made another
+        // commit, so the branch's is not on main.
         editor.call(QStringLiteral("rename_branch"), {{QStringLiteral("name"), QStringLiteral("topic")},
                                                       {QStringLiteral("newName"), QStringLiteral("done")}});
         QVERIFY(Branches::local(folder).contains(QStringLiteral("done")));
-        editor.call(QStringLiteral("delete_branch"), {{QStringLiteral("name"), QStringLiteral("done")}});
+        editor.call(QStringLiteral("delete_branch"),
+                    {{QStringLiteral("name"), QStringLiteral("done")}, {QStringLiteral("force"), true}});
+        QCOMPARE(editor.asked.last(), QStringLiteral("delete the branch done, even with commits no other branch has"));
         QCOMPARE(Branches::local(folder), QStringList{QStringLiteral("main")});
 
         // A stash dropped without being applied.
