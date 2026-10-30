@@ -14,6 +14,8 @@ QList<DiagramKind> available()
     QList<DiagramKind> kinds;
 #ifdef KDK_WITH_DIAGRAMS
     for (const diagram::Family *family : diagram::allFamilies()) {
+        if (family->id == QLatin1String("productvision") || family->id == QLatin1String("explainer"))
+            continue;
         const QString extension = diagram::document::extension(family->id);
         if (!extension.isEmpty())
             kinds.append({family->id, family->title, extension, diagram::document::blank(family->id)});
