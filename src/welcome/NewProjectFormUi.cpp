@@ -202,10 +202,6 @@ QWidget *NewProjectForm::createDetails()
     layout->setContentsMargins(28, 24, 28, 16);
     layout->setSpacing(6);
     layout->addWidget(eyebrow(tr("02 / MAKE IT YOURS"), content));
-    auto *title = new QLabel(tr("Your next big idea."), content);
-    title->setWordWrap(true);
-    AppFonts::setInterfaceFont(title, 1.9, QFont::Normal);
-    layout->addWidget(title);
     layout->addWidget(caption(tr("Give it a name. We'll set up the starting point."), content));
     layout->addSpacing(12);
     name_->setObjectName(QStringLiteral("projectName"));

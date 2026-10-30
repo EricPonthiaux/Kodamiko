@@ -96,7 +96,7 @@ QWidget *WelcomeWindow::createWelcomePage()
     rule->setObjectName(QStringLiteral("welcomeRule"));
     rule->setFixedHeight(1);
     auto *contentLayout = new QVBoxLayout(content);
-    contentLayout->setContentsMargins(36, 24, 36, 24);
+    contentLayout->setContentsMargins(20, 20, 20, 20);
     contentLayout->setSpacing(0);
     contentLayout->addWidget(createProjectsPanel(), 1);
     contentLayout->addSpacing(16);
