@@ -10,10 +10,14 @@
 #include "merge/MergeDocument.h"
 #include "merge/MergeGutter.h"
 #include "merge/MergePane.h"
+#include "merge/MergeTextPanel.h"
+#include "merge/MergeRequest.h"
 #include "merge/MergeView.h"
 #include "merge/SimpleConflicts.h"
+#include "support/FakeReviewer.h"
 #include "ui/Theme.h"
 
+#include <QAbstractButton>
 #include <QFileInfo>
 #include <QListWidget>
 #include <QPushButton>
@@ -167,9 +171,9 @@ struct OneConflict {
     }
 };
 
-QPushButton *buttonWithText(const QWidget &parent, const QString &text)
+QAbstractButton *buttonWithText(const QWidget &parent, const QString &text)
 {
-    for (QPushButton *button : parent.findChildren<QPushButton *>()) {
+    for (QAbstractButton *button : parent.findChildren<QAbstractButton *>()) {
         if (button->text() == text)
             return button;
     }
@@ -316,6 +320,77 @@ private slots:
 
         QCOMPARE(resolvedWith(chunks, &Chunk::current), gitMergeFile(base, current, incoming, "--ours"));
         QCOMPARE(resolvedWith(chunks, &Chunk::incoming), gitMergeFile(base, current, incoming, "--theirs"));
+    }
+
+    // MergeRequest and proposals
+
+    void theAgentReadsEachOpenConflictBetweenNumberedMarkers()
+    {
+        MergeDocument document(ThreeWayMerge::merge("a\nb\nz\n", "a\nmain\nz\n", "a\nother\nz\n"));
+
+        const MergeRequest::Conflicts conflicts = MergeRequest::conflicts(document, {"main", "other"});
+
+        QCOMPARE(conflicts.chunks.size(), 1);
+        QCOMPARE(conflicts.text, QByteArray("a\n<<<<<<< conflict 1: main (current side)\nmain\n"
+                                            "||||||| common ancestor\nb\n=======\nother\n"
+                                            ">>>>>>> conflict 1: other (incoming side)\nz\n"));
+    }
+
+    void anAnswerBecomesTheLinesOfEachProposal()
+    {
+        const Chunk conflict{ChunkKind::Conflict, {"b\r\n"}, {"main\r\n"}, {"other\r\n"}};
+        const QString answer = R"({"proposals": [
+            {"conflict": 1, "resolution": "lines", "lines": "main\nother", "why": "Both matter."},
+            {"conflict": 2, "resolution": "current", "why": "No such conflict."}]})";
+
+        const std::optional<MergeRequest::Proposals> proposals = MergeRequest::parse(answer, {conflict});
+
+        QVERIFY(proposals);
+        QCOMPARE(proposals->size(), 1);
+        QCOMPARE(proposals->first().first, conflict);
+        QCOMPARE(proposals->first().second.lines, (QByteArrayList{"main\r\n", "other\r\n"}));
+        QCOMPARE(proposals->first().second.reason, QString("Both matter."));
+        QCOMPARE(MergeRequest::parse("Sorry, I cannot.", {conflict}), std::nullopt);
+    }
+
+    void aProposalShowsUntilItIsAcceptedOrRejected()
+    {
+        MergeDocument document = threeChanges();
+        document.propose(document.segments()[3].chunk, {{"proposed\n"}, "why"});
+
+        QCOMPARE(document.resultLines(3), QByteArrayList{"proposed\n"});
+        QVERIFY(!document.isResolved());
+        document.acceptProposal(3);
+        QCOMPARE(document.segments()[3].choice, Choice::Suggested);
+        QVERIFY(document.isResolved());
+        document.undo();
+        QVERIFY(document.proposalFor(3));
+        document.rejectProposal(3);
+        QVERIFY(!document.proposalFor(3));
+        QCOMPARE(document.resultLines(3), QByteArrayList{"d\n"});
+    }
+
+    void theAgentsProposalIsAcceptedFromTheView()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"a.txt", "a\nbase\nz\n"}});
+        commitOn(dir, "other", [&dir] { write(dir, "a.txt", "a\nother\nz\n"); });
+        commitOn(dir, "main", [&dir] { write(dir, "a.txt", "a\nmain\nz\n"); });
+        mergeOther(dir);
+        const FakeReviewer agent(R"({"proposals": [{"conflict": 1, "resolution": "lines",)"
+                                 R"( "lines": "main and other\n", "why": "Both sides matter."}]})");
+        GitCommands commands;
+        const std::unique_ptr<MergeView> view = viewOf(dir, commands);
+        view->setAgent(&agent);
+        auto *list = view->findChild<QListWidget *>();
+
+        buttonWithText(*view, "Ask Claude")->click();
+
+        QTRY_VERIFY(buttonWithText(*view, "Accept"));
+        QTRY_VERIFY(buttonWithText(*view, "Accept")->isVisible());
+        QVERIFY(list->item(0)->text().endsWith("0 of 1 conflict(s) resolved"));
+        buttonWithText(*view, "Accept")->click();
+        QVERIFY2(list->item(0)->text().endsWith("Resolved, not saved yet"), qPrintable(list->item(0)->text()));
     }
 
     // SimpleConflicts
@@ -708,7 +783,7 @@ private slots:
         view.show();
         auto *list = view.findChild<QListWidget *>();
         QTRY_COMPARE(list->count(), 1);
-        QVERIFY(list->item(0)->text().endsWith("1 conflict(s) left"));
+        QVERIFY(list->item(0)->text().endsWith("0 of 1 conflict(s) resolved"));
         const MergePane *pane = view.findChild<MergePane *>();
         const int rowHeight = int(pane->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0L));
         MergeGutter *gutter = view.findChild<MergeGutter *>();
@@ -735,24 +810,83 @@ private slots:
         QVERIFY(QTest::qWaitForWindowActive(merge.view.get()));
         result->setFocus();
         QTest::keyClick(result, Qt::Key_Z, Qt::ControlModifier);
-        QCOMPARE(merge.state(), QString("1 conflict(s) left"));
+        QCOMPARE(merge.state(), QString("0 of 1 conflict(s) resolved"));
         QCOMPARE(result->bytes(), QByteArray("a\nbase\nz\n"));
+    }
+
+    void theViewKnowsWhichConflictItShowsAndMovesOnOnceOneIsResolved()
+    {
+        QTemporaryDir dir;
+        initRepository(dir, {{"a.txt", "a\nbase 1\nb\nc\nd\ne\nbase 2\nz\n"}});
+        commitOn(dir, "other", [&dir] { write(dir, "a.txt", "a\nother 1\nb\nc\nd\ne\nother 2\nz\n"); });
+        commitOn(dir, "main", [&dir] { write(dir, "a.txt", "a\nmain 1\nb\nc\nd\ne\nmain 2\nz\n"); });
+        mergeOther(dir);
+        GitCommands commands;
+        const auto view = viewOf(dir, commands);
+        MergeTextPanel *panel = nullptr;
+        QTRY_VERIFY((panel = view->findChild<MergeTextPanel *>()));
+        using enum ConflictState;
+        QCOMPARE(panel->conflictStates(), (QList<ConflictState>{Open, Open}));
+        QCOMPARE(panel->currentConflict(), 0);
+
+        panel->goToConflict(MergeTextPanel::Direction::Next);
+        QCOMPARE(panel->currentConflict(), 1);
+        panel->goToConflict(MergeTextPanel::Direction::Next);
+        QCOMPARE(panel->currentConflict(), 0); // round to the first
+
+        // The first conflict's arrow: the view moves on to the second.
+        QSignalSpy resolved(panel, &MergeTextPanel::conflictResolved);
+        emit panel->findChild<MergeGutter *>()->takeRequested(1);
+        QCOMPARE(resolved.count(), 1);
+        QCOMPARE(resolved.at(0), (QVariantList{0, 1}));
+        QCOMPARE(panel->conflictStates(), (QList<ConflictState>{Resolved, Open}));
+        QTRY_COMPARE(panel->currentConflict(), 1);
+        QCOMPARE(view->findChild<QListWidget *>()->item(0)->text().section('\n', 1),
+                 QString("1 of 2 conflict(s) resolved"));
+    }
+
+    void savingOneFileLeavesTheOtherConflictsOpen()
+    {
+        QTemporaryDir dir;
+        initRepository(dir, {{"a.txt", "a\nbase\nz\n"}, {"b.txt", "b\nbase\nz\n"}});
+        commitOn(dir, "other", [&dir] {
+            write(dir, "a.txt", "a\nother\nz\n");
+            write(dir, "b.txt", "b\nother\nz\n");
+        });
+        commitOn(dir, "main", [&dir] {
+            write(dir, "a.txt", "a\nmain\nz\n");
+            write(dir, "b.txt", "b\nmain\nz\n");
+        });
+        mergeOther(dir);
+
+        // The snapshot taken first must not trip over b.txt's conflict.
+        Integration::writeResolution(infoOf(dir), "a.txt", "a\ncombined\nz\n");
+
+        QCOMPARE(read(dir, "a.txt"), QByteArray("a\ncombined\nz\n"));
+        const QList<ConflictVersions::File> left = ConflictVersions::read(infoOf(dir));
+        QCOMPARE(left.size(), 1);
+        QCOMPARE(left.first().path, QString("b.txt"));
     }
 
     void savingWritesTheResultAndOffersToContinue()
     {
         OneConflict merge;
         QTRY_COMPARE(merge.list->count(), 1);
-        QVERIFY(!merge.button("Save and Mark Resolved")->isEnabled());
-        merge.button("Take All")->click();
+        QVERIFY(!merge.button("Save Resolution")->isEnabled());
+        QPushButton *takeYours = merge.view->findChild<QWidget *>("mergeCurrentHeader")->findChild<QPushButton *>();
+        QVERIFY(takeYours->isVisible());
+        takeYours->click();
+        // Nothing left to take: Take Yours and Take Incoming go.
+        QVERIFY(!takeYours->isVisible());
+        QVERIFY(!merge.view->findChild<QWidget *>("mergeIncomingHeader")->findChild<QPushButton *>()->isVisible());
 
-        merge.button("Save and Mark Resolved")->click();
+        merge.button("Save Resolution")->click();
 
         QTRY_COMPARE(merge.list->count(), 0);
         QCOMPARE(read(merge.dir, "a.txt"), QByteArray("a\nmain\nz\n"));
         QVERIFY(ConflictVersions::read(infoOf(merge.dir)).isEmpty());
-        QVERIFY(merge.button("Continue merge")->isVisible());
-        QVERIFY(merge.button("Continue merge")->isEnabled());
+        QVERIFY(merge.button("Finish Merge")->isVisible());
+        QVERIFY(merge.button("Finish Merge")->isEnabled());
     }
 
     void theButtonResolvesTheSimpleConflictsOfTheFileShown()
@@ -765,12 +899,12 @@ private slots:
         GitCommands commands;
         const std::unique_ptr<MergeView> view = viewOf(dir, commands);
         auto *list = view->findChild<QListWidget *>();
-        QVERIFY(list->item(0)->text().endsWith("1 conflict(s) left"));
+        QVERIFY(list->item(0)->text().endsWith("0 of 1 conflict(s) resolved"));
 
         buttonWithText(*view, "Resolve Simple Conflicts")->click();
 
         QVERIFY(list->item(0)->text().endsWith("Resolved, not saved yet"));
-        QVERIFY(buttonWithText(*view, "Save and Mark Resolved")->isEnabled());
+        QVERIFY(buttonWithText(*view, "Save Resolution")->isEnabled());
     }
 
     void deletingAFileTheOtherSideChangedResolvesIt()

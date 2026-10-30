@@ -71,7 +71,8 @@ Chunk joinedChunk(const QList<Segment> &segments)
     return chunk;
 }
 
-QByteArrayList linesOf(const Segment &segment)
+// The lines `segment`'s choice takes, a proposal aside.
+QByteArrayList chosenLines(const Segment &segment)
 {
     const Chunk &chunk = segment.chunk;
     switch (segment.choice) {
@@ -87,6 +88,7 @@ QByteArrayList linesOf(const Segment &segment)
         return concatenated(chunk.incoming, chunk.current);
     case Choice::Edited:
     case Choice::Combined:
+    case Choice::Suggested:
         return segment.edited;
     }
     return {};
@@ -102,7 +104,7 @@ MergeDocument::MergeDocument(const QList<ThreeWayMerge::Chunk> &chunks)
 
 QByteArrayList MergeDocument::resultLines(int segment) const
 {
-    return linesOf(segments_.at(segment));
+    return shownLines(segments_.at(segment));
 }
 
 MergeDocument::LineRange MergeDocument::resultRange(int segment) const
@@ -114,7 +116,7 @@ QByteArray MergeDocument::resultText() const
 {
     QByteArray text;
     for (const Segment &segment : segments_)
-        text += linesOf(segment).join();
+        text += shownLines(segment).join();
     return text;
 }
 
@@ -130,7 +132,7 @@ int MergeDocument::unresolvedCount() const
 
 void MergeDocument::choose(int segment, Choice choice)
 {
-    Q_ASSERT(choice != Choice::Edited && choice != Choice::Combined);
+    Q_ASSERT(choice != Choice::Edited && choice != Choice::Combined && choice != Choice::Suggested);
     if (segments_.at(segment).choice == choice)
         return;
     remember();
@@ -140,7 +142,8 @@ void MergeDocument::choose(int segment, Choice choice)
 
 void MergeDocument::resolveRemaining(Choice choice)
 {
-    Q_ASSERT(choice != Choice::Edited && choice != Choice::Combined && choice != Choice::Unresolved);
+    Q_ASSERT(choice != Choice::Edited && choice != Choice::Combined && choice != Choice::Suggested &&
+             choice != Choice::Unresolved);
     if (isResolved())
         return;
     remember();
@@ -191,6 +194,66 @@ void MergeDocument::replaceResultLines(int first, int count, const QByteArrayLis
     segments_.insert(firstSegment, {joinedChunk(joined), Choice::Edited, before + lines + after});
 }
 
+void MergeDocument::propose(const ThreeWayMerge::Chunk &conflict, const Proposal &proposal)
+{
+    proposals_.removeIf([&conflict](const auto &entry) { return entry.first == conflict; });
+    proposals_.append({conflict, proposal});
+}
+
+const MergeDocument::Proposal *MergeDocument::proposalFor(int segment) const
+{
+    const Segment &shown = segments_.at(segment);
+    if (shown.choice != Choice::Unresolved)
+        return nullptr;
+    const auto found = std::ranges::find(proposals_, shown.chunk, &std::pair<Chunk, Proposal>::first);
+    return found == proposals_.end() ? nullptr : &found->second;
+}
+
+void MergeDocument::acceptProposal(int segment)
+{
+    const Proposal *proposal = proposalFor(segment);
+    if (!proposal)
+        return;
+    const QByteArrayList lines = proposal->lines;
+    remember();
+    segments_[segment].choice = Choice::Suggested;
+    segments_[segment].edited = lines;
+}
+
+void MergeDocument::rejectProposal(int segment)
+{
+    const Chunk &conflict = segments_.at(segment).chunk;
+    proposals_.removeIf([&conflict](const auto &entry) { return entry.first == conflict; });
+}
+
+int MergeDocument::acceptAllProposals()
+{
+    QList<Segment> accepted = segments_;
+    int count = 0;
+    for (int i = 0; i < accepted.size(); ++i) {
+        if (const Proposal *proposal = proposalFor(i)) {
+            accepted[i].choice = Choice::Suggested;
+            accepted[i].edited = proposal->lines;
+            ++count;
+        }
+    }
+    if (count > 0) {
+        remember();
+        segments_ = std::move(accepted);
+    }
+    return count;
+}
+
+QByteArrayList MergeDocument::shownLines(const Segment &segment) const
+{
+    if (segment.choice == Choice::Unresolved) {
+        const auto found = std::ranges::find(proposals_, segment.chunk, &std::pair<Chunk, Proposal>::first);
+        if (found != proposals_.end())
+            return found->second.lines;
+    }
+    return chosenLines(segment);
+}
+
 void MergeDocument::undo()
 {
     isTyping_ = false;
@@ -221,7 +284,7 @@ QList<MergeDocument::LineRange> MergeDocument::resultRanges() const
     QList<LineRange> ranges;
     int line = 0;
     for (const Segment &segment : segments_) {
-        const int count = int(linesOf(segment).size());
+        const int count = int(shownLines(segment).size());
         ranges.append({line, count});
         line += count;
     }

@@ -12,6 +12,7 @@
 #include "agent/PermissionPrompts.h"
 #include "agent/ReviewPage.h"
 #include "changes/ChangesView.h"
+#include "merge/MergeWindow.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "terminal/TerminalWidget.h" // IWYU pragma: keep (TerminalWidget * -> QWidget * needs the full type)
@@ -119,6 +120,8 @@ void MainWindow::setAgentProvider(const AgentProvider &provider)
         terminalTabs_->setTabText(terminalTabs_->indexOf(claudeTerminal_), provider.name());
     filesPanel_->setAgentName(provider.name());
     changesView_->setAgent(provider.name(), provider.iconName());
+    if (mergeWindow_)
+        mergeWindow_->setAgent(&provider);
     reviewPage_->setAgentName(provider.name());
     changesView_->applyTheme(theme_);
     for (QAction *action : std::as_const(drawDiagramActions_))

@@ -64,6 +64,7 @@
 #include "ui/MessagePopup.h"
 #include "ui/ModeTabBar.h"
 #include "ui/NoticeBar.h"
+#include "ui/PulsingButton.h"
 #include "ui/Snackbar.h"
 #include "ui/TabBarBaseLine.h"
 #include "ui/ThemeStyle.h"
@@ -320,7 +321,7 @@ void MainWindow::createGitViews()
             [this](const QString &request) { typeInClaudePrompt(request, PromptEntry::Submitted); });
     connect(changesView_, &ChangesView::reviewRequested, this, &MainWindow::reviewStagedChanges);
     connect(changesView_, &ChangesView::reviewCloseRequested, this, &MainWindow::closeStagedReview);
-    connect(changesView_, &ChangesView::continueRequested, gitActions_, &GitActions::continueOperation);
+    connect(changesView_, &ChangesView::continueRequested, this, &MainWindow::openMergeView);
     connect(changesView_, &ChangesView::skipRequested, gitActions_, &GitActions::skipCommit);
     connect(changesView_, &ChangesView::abortRequested, gitActions_, &GitActions::abortOperation);
     connect(changesView_, &ChangesView::mergeViewRequested, this, &MainWindow::openMergeView);
@@ -765,6 +766,15 @@ void MainWindow::createStatusBar()
     branchButton_->hide();
     connect(branchButton_, &QToolButton::clicked, this, &MainWindow::showBranches);
 
+    // A merge, rebase… stopped on conflicts: the way back to its window.
+    resumeButton_ = new PulsingButton(this);
+    resumeButton_->setObjectName(QStringLiteral("chip"));
+    resumeButton_->setAutoRaise(true);
+    resumeButton_->setFocusPolicy(Qt::NoFocus);
+    resumeButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    resumeButton_->hide();
+    connect(resumeButton_, &QToolButton::clicked, this, &MainWindow::openMergeView);
+
     cancelGitButton_ = new QToolButton(this);
     cancelGitButton_->setAutoRaise(true);
     cancelGitButton_->setFocusPolicy(Qt::NoFocus);
@@ -784,8 +794,9 @@ void MainWindow::createStatusBar()
     bar->addGroup(tr("Language Servers"), {serverTasks});
     bar->addGroup(tr("Agent Usage"), {usageLabel_});
     bar->addGroup(tr("Editor"), {editorStatus_});
-    bar->addGroup(tr("Git"), {branchButton_, syncButton_, cancelGitButton_});
-    for (QToolButton *button : {syncButton_, branchButton_, cancelGitButton_}) {
+    bar->addGroup(tr("Git"), {branchButton_, resumeButton_, syncButton_, cancelGitButton_});
+    for (QToolButton *button :
+         std::initializer_list<QToolButton *>{syncButton_, branchButton_, resumeButton_, cancelGitButton_}) {
         UiMetrics::setControlHeight(button);
         UiMetrics::setScaledIconSize(button);
     }
@@ -817,6 +828,11 @@ void MainWindow::restoreTitleBarFrame(const QSettings &settings)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    if (mergeWindow_ && gitCommands_->isBusy()) {
+        showStatus(tr("Wait for the Git operation to finish before closing the project."));
+        event->ignore();
+        return;
+    }
     if (!confirmCloseWhileWorking()) {
         event->ignore();
         return;

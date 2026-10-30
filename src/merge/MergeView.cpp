@@ -2,25 +2,39 @@
 
 #include "MergeView.h"
 
+#include "ConflictNavigator.h"
 #include "MergeChoicePanel.h"
+#include "MergeProposals.h"
+#include "MergeReadyPanel.h"
 #include "MergeTextPanel.h"
 #include "MergeTexts.h"
+#include "agent/AgentProvider.h"
+#include "changes/DiffView.h"
 #include "git/GitCommands.h"
 #include "git/ThreeWayMerge.h"
 #include "ui/AppFonts.h"
+#include "ui/GripSplitter.h"
+#include "ui/PopupWidgets.h"
+#include "ui/UiIcons.h"
+#include "ui/ViewHeader.h"
 
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
+#include <QSettings>
+#include <QStackedWidget>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 namespace {
 
 constexpr int listWidthPx = 260;
-constexpr int barMarginPx = 10;
-constexpr int barSpacingPx = 8;
+constexpr int listMinimumWidthPx = 160;
+const QString sidebarKey = QStringLiteral("mergeWindow/sidebar");
 
 using ConflictVersions::Kind;
 
@@ -43,10 +57,11 @@ MergeView::MergeView(QString folder, Theme theme, GitCommands *commands, QWidget
     , folder_(std::move(folder))
     , theme_(std::move(theme))
     , commands_(commands)
+    , proposals_(new MergeProposals(this))
     , list_(new QListWidget(this))
     , message_(new QLabel(this))
 {
-    list_->setFixedWidth(listWidthPx);
+    pool_.setMaxThreadCount(1);
     list_->setFrameShape(QFrame::NoFrame);
     list_->setWordWrap(true);
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -54,132 +69,119 @@ MergeView::MergeView(QString folder, Theme theme, GitCommands *commands, QWidget
     message_->setObjectName(QStringLiteral("pageDescription"));
     message_->setAlignment(Qt::AlignCenter);
     message_->setWordWrap(true);
-    connect(commands_, &GitCommands::busyChanged, this, &MergeView::updateFooter);
+    connect(commands_, &GitCommands::busyChanged, this, [this](bool busy) {
+        working_->setEnabled(!busy);
+        updateFooter();
+    });
+    connectProposals();
 
     auto *fileArea = new QWidget(this);
     fileArea_ = new QVBoxLayout(fileArea);
     fileArea_->setContentsMargins(0, 0, 0, 0);
     fileArea_->addWidget(message_);
 
-    auto *body = new QHBoxLayout;
-    body->setSpacing(0);
-    body->addWidget(list_);
-    body->addWidget(fileArea, 1);
+    auto *workbench = new QWidget(this);
+    auto *workbenchLayout = new QVBoxLayout(workbench);
+    workbenchLayout->setContentsMargins(0, 0, 0, 0);
+    workbenchLayout->setSpacing(0);
+    workbenchLayout->addWidget(createBar());
+    workbenchLayout->addWidget(fileArea, 1);
+    QWidget *sidebar = createSidebar();
+    sidebar->setMinimumWidth(listMinimumWidthPx);
+    auto *body = new GripSplitter(Qt::Horizontal, this);
+    body->setChildrenCollapsible(false);
+    body->addWidget(sidebar);
+    body->addWidget(workbench);
+    body->setStretchFactor(1, 1);
+    if (!body->restoreState(QSettings().value(sidebarKey).toByteArray()))
+        body->setSizes({listWidthPx, 4 * listWidthPx});
+    connect(body, &QSplitter::splitterMoved, this, [body] { QSettings().setValue(sidebarKey, body->saveState()); });
+    working_ = body;
+    pages_ = new QStackedWidget(this);
+    pages_->addWidget(working_);
+    ready_ = new MergeReadyPanel(this);
+    connect(ready_, &MergeReadyPanel::messageChanged, this, &MergeView::updateFooter);
+    pages_->addWidget(ready_);
+    review_ = new DiffView(theme_, this);
+    review_->setObjectName(QStringLiteral("mergeReview"));
+    pages_->addWidget(review_);
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(createBar());
-    layout->addLayout(body, 1);
+    layout->addWidget(createTitleBar());
+    layout->addWidget(pages_, 1);
     layout->addWidget(createFooter());
     showMessage(tr("Reading the conflicts…"));
+    applyTheme(theme_);
     reload();
 }
 
 MergeView::~MergeView() = default;
 
-void MergeView::reload()
-{
-    pool_.start([this, folder = folder_] {
-        Conflicts conflicts;
-        try {
-            const std::optional<RepositoryInfo> repository = RepositoryInfo::read(folder);
-            if (repository) {
-                conflicts.repository = *repository;
-                conflicts.files = ConflictVersions::read(*repository);
-                conflicts.sides = Integration::conflictSides(*repository);
-            } else {
-                conflicts.error = tr("This folder is not in a git repository.");
-            }
-        } catch (const GitError &error) {
-            conflicts.error = error.message();
-        }
-        QMetaObject::invokeMethod(this, [this, conflicts] { showConflicts(conflicts); }, Qt::QueuedConnection);
-    });
-}
-
 void MergeView::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    setStyleSheet(popupStyleSheet(
+        theme, QStringLiteral("QWidget#mergeSidebar { background: @base; }"
+                              "QWidget#mergeSidebar QListWidget { padding: 4px 6px; }"
+                              "QLabel#mergeLegend { color: @muted; padding: 8px 12px 12px; }"
+                              "QWidget#mergeFooter { border-top: 1px solid @line; }"
+                              "QLabel#mergeReadyFiles { padding: 12px 0; border-top: 1px solid @line; border-bottom: "
+                              "1px solid @line; }")));
+    filesHeader_->setIconColor(theme.foreground);
+    fileHeader_->setIconColor(theme.foreground);
+    navigator_->applyTheme(theme);
+    ready_->applyTheme(theme);
+    review_->applyTheme(theme);
     if (panel_)
         panel_->applyTheme(theme);
     if (choices_)
         choices_->applyTheme(theme);
 }
 
-QWidget *MergeView::createBar()
-{
-    auto *bar = new QWidget(this);
-    title_ = new QLabel(bar);
-    AppFonts::setInterfaceFont(title_, 1.05, QFont::DemiBold);
-    title_->setTextFormat(Qt::PlainText);
-    summary_ = new QLabel(bar);
-    summary_->setObjectName(QStringLiteral("pageDescription"));
-    previous_ = new QPushButton(tr("Previous Conflict"), bar);
-    previous_->setToolTip(tr("Shift+F7"));
-    next_ = new QPushButton(tr("Next Conflict"), bar);
-    next_->setToolTip(tr("F7"));
-    resolveSimple_ = new QPushButton(tr("Resolve Simple Conflicts"), bar);
-    resolveSimple_->setToolTip(tr("Resolve the conflicts where the sides differ only by whitespace or changed "
-                                  "different words"));
-    connect(resolveSimple_, &QPushButton::clicked, this, &MergeView::resolveSimpleConflicts);
-    connect(previous_, &QPushButton::clicked, this, [this] {
-        if (panel_)
-            panel_->goToConflict(MergeTextPanel::Direction::Previous);
-    });
-    connect(next_, &QPushButton::clicked, this, [this] {
-        if (panel_)
-            panel_->goToConflict(MergeTextPanel::Direction::Next);
-    });
-    auto *layout = new QHBoxLayout(bar);
-    layout->setContentsMargins(barMarginPx, barMarginPx, barMarginPx, barMarginPx);
-    layout->setSpacing(barSpacingPx);
-    layout->addWidget(title_);
-    layout->addWidget(summary_);
-    layout->addStretch();
-    layout->addWidget(resolveSimple_);
-    layout->addWidget(previous_);
-    layout->addWidget(next_);
-    return bar;
-}
-
-QWidget *MergeView::createFooter()
-{
-    auto *footer = new QWidget(this);
-    hint_ = new QLabel(footer);
-    hint_->setObjectName(QStringLiteral("pageDescription"));
-    save_ = new QPushButton(tr("Save and Mark Resolved"), footer);
-    save_->setToolTip(tr("Write the result to the file and mark it resolved in git"));
-    abort_ = new QPushButton(footer);
-    continue_ = new QPushButton(footer);
-    continue_->setDefault(true);
-    close_ = new QPushButton(tr("Close"), footer);
-    connect(save_, &QPushButton::clicked, this, &MergeView::saveCurrentFile);
-    connect(abort_, &QPushButton::clicked, this, &MergeView::abortRequested);
-    connect(continue_, &QPushButton::clicked, this, &MergeView::continueRequested);
-    connect(close_, &QPushButton::clicked, this, &MergeView::closeRequested);
-    auto *layout = new QHBoxLayout(footer);
-    layout->setContentsMargins(barMarginPx, barMarginPx, barMarginPx, barMarginPx);
-    layout->setSpacing(barSpacingPx);
-    layout->addWidget(hint_, 1);
-    layout->addWidget(save_);
-    layout->addWidget(abort_);
-    layout->addWidget(continue_);
-    layout->addWidget(close_);
-    return footer;
-}
-
 void MergeView::showConflicts(const Conflicts &conflicts)
 {
     // Reloads follow every change of the repository: most change nothing.
-    if (hasRead_ && conflicts == conflicts_)
+    if (finalizing_ || (hasRead_ && conflicts == conflicts_))
         return;
+    const bool ended = Integration::canContinue(conflicts_.repository.operation) &&
+                       conflicts.repository.operation.isEmpty() && conflicts.files.isEmpty() &&
+                       conflicts.error.isEmpty();
     hasRead_ = true;
     conflicts_ = conflicts;
+    if (conflicts.completedMerge) {
+        emit mergeCompleted(
+            {.operation = tr("merge"), .sides = conflicts.sides, .commitId = conflicts.repository.headId});
+        return;
+    }
+    if (ended) {
+        emit operationEnded();
+        return;
+    }
+    rememberPaths(conflicts);
     std::erase_if(resolutions_, [&conflicts](const auto &entry) {
         return std::ranges::find(conflicts.files, entry.second.file) == conflicts.files.end();
     });
     title_->setText(MergeTexts::title(conflicts.repository.operation, conflicts.sides));
     const QString selected = list_->currentItem() ? list_->currentItem()->data(Qt::UserRole).toString() : QString();
+    rebuildFiles();
+    showConflictState(selected);
+}
+
+void MergeView::rememberPaths(const Conflicts &conflicts)
+{
+    for (const QString &path : conflicts.paths) {
+        if (!mergedPaths_.contains(path))
+            mergedPaths_.append(path);
+    }
+    for (const ConflictVersions::File &file : conflicts.files) {
+        if (!mergedPaths_.contains(file.path))
+            mergedPaths_.append(file.path);
+    }
+}
+
+void MergeView::rebuildFiles()
+{
     {
         const QSignalBlocker block(list_);
         list_->clear();
@@ -190,19 +192,31 @@ void MergeView::showConflicts(const Conflicts &conflicts)
         }
     }
     updateList();
+}
+
+void MergeView::showConflictState(const QString &selected)
+{
+    const Conflicts &conflicts = conflicts_;
     if (!conflicts.error.isEmpty()) {
+        pages_->setCurrentWidget(working_);
         showFile(-1);
         showMessage(conflicts.error);
     } else if (conflicts_.files.isEmpty()) {
         showFile(-1);
         showMessage(conflicts.repository.operation.isEmpty() ? tr("No conflict is left.")
                                                              : tr("Every conflict is resolved."));
+        if (Integration::canContinue(conflicts.repository.operation))
+            showReady();
+        else
+            pages_->setCurrentWidget(working_);
     } else {
+        pages_->setCurrentWidget(working_);
         const auto found = std::ranges::find(conflicts_.files, selected, &ConflictVersions::File::path);
         // From no row after the clear: showFile() follows.
         list_->setCurrentRow(found == conflicts_.files.end() ? 0 : int(found - conflicts_.files.begin()));
     }
     updateBar();
+    updateFooter();
 }
 
 void MergeView::showFile(int row)
@@ -219,6 +233,8 @@ void MergeView::showFile(int row)
     if (row < 0 || row >= conflicts_.files.size())
         return;
     const ConflictVersions::File &file = conflicts_.files[row];
+    fileTitle_->setText(file.path);
+    fileTitle_->setToolTip(file.path);
     MergeDocument *document = documentOf(file);
     message_->hide();
     if (!document) {
@@ -227,12 +243,15 @@ void MergeView::showFile(int row)
         updateFooter();
         return;
     }
-    panel_ = new MergeTextPanel(theme_, {file.path, document, conflicts_.sides}, this);
+    panel_ =
+        new MergeTextPanel(theme_, {file.path, document, conflicts_.sides, agent_ ? agent_->name() : QString()}, this);
     connect(panel_, &MergeTextPanel::documentChanged, this, [this] {
         updateList();
         updateBar();
         updateFooter();
     });
+    connect(panel_, &MergeTextPanel::conflictsChanged, this, &MergeView::updateNavigator);
+    connect(panel_, &MergeTextPanel::conflictResolved, this, &MergeView::onConflictResolved);
     fileArea_->addWidget(panel_);
     panel_->setFocus();
     updateList();
@@ -308,45 +327,29 @@ void MergeView::updateList()
 
 void MergeView::updateBar()
 {
-    int unresolved = 0;
-    for (const auto &[path, resolution] : resolutions_)
-        unresolved += resolution.document->unresolvedCount();
     const qsizetype files = conflicts_.files.size();
-    QString summary = files == 0 ? QString() : tr("%n file(s) in conflict", nullptr, int(files));
-    if (!resolutions_.empty())
-        summary += QStringLiteral(" · ") + tr("%n conflict(s) left in the files opened", nullptr, unresolved);
-    summary_->setText(summary);
-    previous_->setEnabled(panel_);
-    next_->setEnabled(panel_);
+    const int total = int(mergedPaths_.size());
+    const int ready = std::max(0, total - int(files));
+    summary_->setText(tr("%1 of %2 files ready").arg(ready).arg(total));
+    updateNavigator();
     const ConflictVersions::File *file = currentFile();
     const MergeDocument *document = file ? openedDocument(file->path) : nullptr;
     resolveSimple_->setEnabled(panel_ && document && !document->isResolved());
+    updateAgentButton();
 }
 
-void MergeView::updateFooter()
+void MergeView::updateNavigator()
 {
-    const QString &operation = conflicts_.repository.operation;
-    const bool hasOperation = Integration::canContinue(operation);
-    const bool isDone = hasRead_ && conflicts_.error.isEmpty() && conflicts_.files.isEmpty();
-    const ConflictVersions::File *file = currentFile();
-    const MergeDocument *document = file ? openedDocument(file->path) : nullptr;
-    const bool canSave = document && document->isResolved() && !commands_->isBusy();
-    save_->setVisible(!isDone && document);
-    save_->setEnabled(canSave);
-    abort_->setText(tr("Abort %1").arg(operation));
-    abort_->setVisible(hasOperation);
-    continue_->setText(tr("Continue %1").arg(operation));
-    continue_->setVisible(hasOperation);
-    continue_->setEnabled(isDone && !commands_->isBusy());
-    close_->setVisible(isDone && !hasOperation);
-    if (isDone)
-        hint_->setText(hasOperation ? tr("Every file is resolved: the %1 can go on.").arg(operation) : QString());
-    else if (!document)
-        hint_->setText(tr("A choice resolves the file at once; Kodamiko takes a snapshot first."));
-    else if (!document->isResolved())
-        hint_->setText(tr("Take a side, both, or type the result for each conflict, then save."));
+    if (panel_)
+        navigator_->setConflicts(panel_->conflictStates(), panel_->currentConflict());
     else
-        hint_->setText(tr("Saving writes the result and marks the file resolved."));
+        navigator_->setConflicts({}, -1);
+}
+
+void MergeView::onConflictResolved(int index, int next)
+{
+    hint_->setText(next < 0 ? tr("Conflict %1 resolved: none is left in this file, it can be saved.").arg(index + 1)
+                            : tr("Conflict %1 resolved. On to conflict %2…").arg(index + 1).arg(next + 1));
 }
 
 const ConflictVersions::File *MergeView::currentFile() const

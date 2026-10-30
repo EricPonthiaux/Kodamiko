@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "app/MainWindow.h"
+#include "merge/MergeWindow.h"
 #include "ui/DetachablePage.h"
 #include "ui/TitleBar.h"
 #include "ui/WindowFrame.h"
@@ -10,6 +11,8 @@
 void MainWindow::setSystemTitleBar(bool system)
 {
     frame_->setFrameless(!system);
+    if (mergeWindow_)
+        mergeWindow_->setFrameless(!system);
     terminalWindow_->setFrameless(!system);
     titleBar_->setWindowControlsVisible(!system);
     statusBar()->setSizeGripEnabled(system); // Kodamiko's frame resizes from its edges

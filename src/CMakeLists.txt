@@ -213,13 +213,28 @@ add_library(kdk_core STATIC
     lsp/LspCompletionProvider.cpp
     lsp/LspProtocol.cpp
     lsp/ServerTasksLabel.cpp
+    merge/ConflictNavigator.cpp
+    merge/ConflictState.cpp
     merge/MergeChoicePanel.cpp
+    merge/MergeCompletedPopup.cpp
     merge/MergeDocument.cpp
+    merge/MergeFocusFrame.cpp
     merge/MergeGutter.cpp
+    merge/MergeOverview.cpp
     merge/MergePane.cpp
+    merge/MergeProposalBar.cpp
+    merge/MergeProposals.cpp
+    merge/MergeRequest.cpp
+    merge/MergeReadyPanel.cpp
     merge/MergeTextPanel.cpp
+    merge/MergeTextPanelProposals.cpp
     merge/MergeTexts.cpp
     merge/MergeView.cpp
+    merge/MergeViewAgent.cpp
+    merge/MergeViewLayout.cpp
+    merge/MergeViewRead.cpp
+    merge/MergeViewReview.cpp
+    merge/MergeWindow.cpp
     merge/SimpleConflicts.cpp
     navigation/CodeIntelligence.cpp
     navigation/CodeIntelligenceCodeActions.cpp

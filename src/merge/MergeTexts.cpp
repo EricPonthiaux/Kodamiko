@@ -6,6 +6,8 @@
 
 #include <QObject>
 
+#include <algorithm>
+
 namespace {
 
 using ConflictVersions::Kind;
@@ -62,7 +64,12 @@ QString fileState(const ConflictVersions::File &file,
 {
     if (document) {
         const int left = document->unresolvedCount();
-        return left == 0 ? QObject::tr("Resolved, not saved yet") : QObject::tr("%n conflict(s) left", nullptr, left);
+        if (left == 0)
+            return QObject::tr("Resolved, not saved yet");
+        const auto total = std::ranges::count_if(document->segments(), [](const MergeDocument::Segment &segment) {
+            return segment.chunk.kind == ThreeWayMerge::ChunkKind::Conflict;
+        });
+        return QObject::tr("%1 of %n conflict(s) resolved", nullptr, int(total)).arg(total - left);
     }
     if (file.isBinary)
         return QObject::tr("Binary file changed on both sides");

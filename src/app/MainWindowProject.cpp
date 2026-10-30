@@ -15,9 +15,12 @@
 #include "diagnostics/ProblemsView.h"
 #include "editor/EditorTabs.h"
 #include "git/FileStatuses.h"
+#include "git/GitCommands.h"
 #include "history/HistoryView.h"
 #include "index/OccurrenceIndex.h"
 #include "lsp/LanguageServers.h"
+#include "merge/MergeCompletedPopup.h"
+#include "merge/MergeWindow.h"
 #include "navigation/GoToPopup.h"
 #include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
@@ -61,6 +64,10 @@ LanguageServers::Additions recipeServers(const ProjectConfig &project, const Too
 
 void MainWindow::openFolder(const QString &folder)
 {
+    if (mergeWindow_ && gitCommands_->isBusy()) {
+        showStatus(tr("Wait for the Git operation to finish before switching projects."));
+        return;
+    }
     if (!folder_.isEmpty()) {
         saveSession();
         if (!editorTabs_->closeAll())
@@ -70,8 +77,13 @@ void MainWindow::openFolder(const QString &folder)
     folder_ = QDir(folder).absolutePath();
     // The previous project's review: its findings and their requests name
     // that project's files and session.
-    if (folder_ != previousFolder)
+    if (folder_ != previousFolder) {
         closeStagedReview();
+        clearMergeWindow();
+        hasConflicts_ = false;
+        if (mergeCompleted_)
+            mergeCompleted_->dismiss();
+    }
     projectWindowServer_.listen(folder_); // if it fails, only the other processes do not see the project open
     setAgentProvider(projectAgentProvider());
     fileTree_->setRootPath(folder_);

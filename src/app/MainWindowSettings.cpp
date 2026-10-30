@@ -24,7 +24,8 @@
 #include "editor/FindBar.h"
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
-#include "merge/MergeView.h"
+#include "merge/MergeCompletedPopup.h"
+#include "merge/MergeWindow.h"
 #include "navigation/GoToPopup.h"
 #include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
@@ -42,6 +43,7 @@
 #include "ui/MessagePopup.h"
 #include "ui/Motion.h"
 #include "ui/NoticeBar.h"
+#include "ui/PulsingButton.h"
 #include "ui/Snackbar.h"
 #include "ui/TabBarBaseLine.h"
 #include "ui/ThemeStyle.h"
@@ -89,6 +91,8 @@ void MainWindow::setTheme(const QString &name)
     branchButton_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme_.mutedText));
     if (auto *bar = qobject_cast<WorkspaceStatusBar *>(statusBar()))
         bar->setDividerColor(theme_.line);
+    resumeButton_->setIcon(UiIcons::icon(QStringLiteral("diff"), theme_.accent));
+    resumeButton_->setPulseColor(theme_.accent);
     fileTree_->setSearchHighlight(theme_.findHighlight);
     fileTree_->setDarkIcons(theme_.isDark);
     filesPanel_->setIconColor(theme_.foreground);
@@ -111,8 +115,10 @@ void MainWindow::setTheme(const QString &name)
     snackbar_->applyTheme(theme_);
     reviewPage_->applyTheme(theme_);
     historyView_->applyTheme(theme_);
-    if (mergeView_)
-        mergeView_->applyTheme(theme_);
+    if (mergeWindow_)
+        mergeWindow_->applyTheme(theme_);
+    if (mergeCompleted_)
+        mergeCompleted_->applyTheme(theme_);
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
     goToPopup_->applyTheme(theme_);

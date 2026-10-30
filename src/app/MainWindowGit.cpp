@@ -23,7 +23,9 @@
 #include "git/Integration.h"
 #include "git/RepositoryWatcher.h"
 #include "history/HistoryView.h"
-#include "merge/MergeView.h"
+#include "merge/MergeCompletedPopup.h"
+#include "merge/MergeWindow.h"
+#include "ui/PulsingButton.h"
 #include "ui/TitleBar.h"
 #include "workspace/ChoicePopup.h"
 #include "workspace/EntryPopups.h"
@@ -86,7 +88,8 @@ void MainWindow::createGitServices()
         updateRepositoryInfo();
     });
     connect(gitCommands_, &GitCommands::failed, this, [this](const QString &title, const QString &error) {
-        showNotice({.title = tr("%1: failed").arg(title), .location = {}, .message = error, .details = {}}, this);
+        QWidget *owner = mergeWindow_ && mergeWindow_->isVisible() ? static_cast<QWidget *>(mergeWindow_) : this;
+        showNotice({.title = tr("%1: failed").arg(title), .location = {}, .message = error, .details = {}}, owner);
         updateRepositoryInfo();
         stopClosingAgents(tr("%1 failed").arg(title));
     });
@@ -114,6 +117,9 @@ void MainWindow::createGitServices()
     gitActions_ = new GitActions(gitCommands_, this, [this] { return folder_; }, this);
     connect(gitActions_, &GitActions::changed, this, &MainWindow::onRepositoryChanged);
     connect(gitActions_, &GitActions::statusMessage, this, &MainWindow::showStatus);
+    connect(gitActions_, &GitActions::integrationFinished, this, &MainWindow::onIntegrationFinished);
+    connect(gitActions_, &GitActions::integrationAborted, this, &MainWindow::clearMergeWindow);
+    connect(gitActions_, &GitActions::stoppedOnConflicts, this, &MainWindow::onStoppedOnConflicts);
     repositoryWatcher_ = new RepositoryWatcher(this);
     connect(repositoryWatcher_, &RepositoryWatcher::changed, this, &MainWindow::onRepositoryChanged);
 }
@@ -146,7 +152,8 @@ void MainWindow::createGitMenu()
     git->addAction(tr("&Branches…"), QKeySequence(tr("Ctrl+Alt+B")), this, &MainWindow::showBranches);
     git->addAction(tr("&New Branch…"), this, &MainWindow::showNewBranch);
     git->addSeparator();
-    continueAction_ = git->addAction(tr("&Continue Merge or Rebase"), gitActions_, &GitActions::continueOperation);
+    git->addAction(tr("Resolve &Conflicts…"), this, &MainWindow::openMergeView);
+    continueAction_ = git->addAction(tr("&Continue Merge or Rebase"), this, &MainWindow::openMergeView);
     skipAction_ = git->addAction(tr("S&kip Commit"), gitActions_, &GitActions::skipCommit);
     abortAction_ = git->addAction(tr("&Abort Merge or Rebase…"), gitActions_, &GitActions::abortOperation);
     for (QAction *action : {continueAction_, skipAction_, abortAction_})
@@ -232,6 +239,11 @@ void MainWindow::updateRepositoryInfo()
     continueAction_->setEnabled(Integration::canContinue(operation));
     abortAction_->setEnabled(Integration::canContinue(operation));
     skipAction_->setEnabled(Integration::canSkip(operation));
+    // An operation git cannot continue from here is finished in a terminal.
+    resumeButton_->setVisible(Integration::canContinue(operation));
+    resumeButton_->setText(tr("Resume %1").arg(operation));
+    resumeButton_->setToolTip(
+        tr("A %1 is in progress: open its window to resolve the conflicts and finish it").arg(operation));
     if (!info) {
         branchButton_->hide();
         syncButton_->hide();
@@ -245,7 +257,7 @@ void MainWindow::updateRepositoryInfo()
         text += QStringLiteral(" ↓%1").arg(info->behind);
     if (info->unborn)
         text += tr(" — no commits");
-    if (!operation.isEmpty())
+    if (!operation.isEmpty() && !Integration::canContinue(operation))
         text += tr(" — %1 in progress").arg(operation);
     branchButton_->setText(text);
     QString tooltip = info->unborn
@@ -269,6 +281,8 @@ void MainWindow::onRepositoryChanged()
 {
     mcpRegistry_.notifyResourceUpdated(QStringLiteral("kodamiko://git/status"));
     updateRepositoryInfo();
+    if (mergeWindow_)
+        mergeWindow_->reload();
     refreshIndexes();                 // branch switch, pull…
     editorTabs_->reloadChangeBases(); // staging, commit…
     if (mode_ == Mode::Diff && !gitCommands_->isBusy())
@@ -368,17 +382,46 @@ void MainWindow::showSnapshots()
 
 void MainWindow::openMergeView()
 {
-    setMode(Mode::Edit);
-    if (mergeView_) {
-        editorTabs_->setCurrentWidget(mergeView_);
-        mergeView_->reload();
-        return;
+    if (!mergeWindow_) {
+        mergeWindow_ = new MergeWindow(folder_, theme_, gitCommands_, this);
+        mergeWindow_->setAgent(agentProvider_);
+        connect(mergeWindow_, &MergeWindow::changed, this, &MainWindow::onRepositoryChanged);
+        connect(mergeWindow_, &MergeWindow::finished, this, &MainWindow::onIntegrationFinished);
+        connect(mergeWindow_, &MergeWindow::aborted, this, &MainWindow::clearMergeWindow);
     }
-    mergeView_ = new MergeView(folder_, theme_, gitCommands_);
-    connect(mergeView_, &MergeView::continueRequested, gitActions_, &GitActions::continueOperation);
-    connect(mergeView_, &MergeView::abortRequested, gitActions_, &GitActions::abortOperation);
-    connect(mergeView_, &MergeView::closeRequested, this, [this] { editorTabs_->closePage(mergeView_); });
-    editorTabs_->showPage(mergeView_, tr("Merge"), QStringLiteral("branch"));
+    mergeWindow_->open();
+}
+
+void MainWindow::onStoppedOnConflicts(const QString &title, const QString &report)
+{
+    openMergeView();
+    mergeWindow_->showStop(title, report);
+    updateRepositoryInfo();
+}
+
+void MainWindow::clearMergeWindow()
+{
+    if (!mergeWindow_)
+        return;
+    mergeWindow_->hide();
+    mergeWindow_->deleteLater();
+    mergeWindow_ = nullptr;
+}
+
+void MainWindow::onIntegrationFinished(const Integration::Completion &completion)
+{
+    clearMergeWindow();
+    hasConflicts_ = false;
+    setMode(Mode::Edit);
+    bringToFront();
+    if (!mergeCompleted_) {
+        mergeCompleted_ = new MergeCompletedPopup(theme_, this);
+        connect(mergeCompleted_, &MergeCompletedPopup::commitRequested, this, [this](const QString &id) {
+            setMode(Mode::History);
+            historyView_->revealCommit(id);
+        });
+    }
+    mergeCompleted_->popup(completion);
 }
 
 void MainWindow::followConflicts(const QStringList &paths)
@@ -387,6 +430,6 @@ void MainWindow::followConflicts(const QStringList &paths)
     hasConflicts_ = !paths.isEmpty();
     if (appeared)
         openMergeView();
-    else if (mergeView_)
-        mergeView_->reload();
+    else if (mergeWindow_)
+        mergeWindow_->reload();
 }

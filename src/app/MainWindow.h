@@ -12,6 +12,7 @@
 #include "agent/mcp/McpRegistry.h"
 #include "agent/vendor/claude/CodeRequest.h"
 #include "editor/MergeConflicts.h"
+#include "git/Integration.h"
 #include "navigation/RecentFiles.h"
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectWindowServer.h"
@@ -45,7 +46,8 @@ class CompletionService;
 class DetachablePage;
 class EditorStatus;
 class EditorTabs;
-class MergeView;
+class MergeWindow;
+class MergeCompletedPopup;
 class EditErrorCheck;
 class EditorWidget;
 class FileStatusReader;
@@ -86,6 +88,7 @@ class QSystemTrayIcon;
 class QTabBar;
 class QTabWidget;
 class QToolButton;
+class PulsingButton;
 class RepositoryWatcher;
 class Runner;
 class SidePanel;
@@ -498,9 +501,12 @@ private:
     // The review tab of `subject` (a CodeRequest::describe() result), named
     // after `title`. The project's check runs first.
     void openReview(const QString &subject, const QString &title);
-    // The merge view of the project's conflicts, in a tab; brought to the
-    // front and read again if it is open.
+    // Opens or resumes the dedicated window, preserving unsaved resolutions.
     void openMergeView();
+    // Opens the merge window at once, git's report over it.
+    void onStoppedOnConflicts(const QString &title, const QString &report);
+    void clearMergeWindow();
+    void onIntegrationFinished(const Integration::Completion &completion);
     // Opens the merge view when files fall into conflict (a merge, a rebase,
     // a stash applied that stops); reads it again on any other change.
     void followConflicts(const QStringList &paths);
@@ -641,7 +647,8 @@ private:
     ChangesView *changesView_ = nullptr;
     HistoryView *historyView_ = nullptr;
     ReviewPage *reviewPage_ = nullptr;
-    QPointer<MergeView> mergeView_;        // a tab's page; null when none is open
+    QPointer<MergeWindow> mergeWindow_; // closing hides it until the merge ends
+    MergeCompletedPopup *mergeCompleted_ = nullptr;
     bool hasConflicts_ = false;            // as of the last followConflicts()
     QPointer<ReviewSession> stagedReview_; // a child; null without a review of the staged changes
     GitCommands *gitCommands_ = nullptr;
@@ -653,6 +660,7 @@ private:
     AgentIndicator *agentIndicator_ = nullptr; // status bar: Claude's activity, opens the session
     QToolButton *branchButton_ = nullptr;      // status bar: branch, Branches popup
     QToolButton *syncButton_ = nullptr;        // status bar: fetch, pull, push
+    PulsingButton *resumeButton_ = nullptr;    // status bar: back to the merge in progress
     QToolButton *cancelGitButton_ = nullptr;   // status bar: stops a fetch, push…
     QString gitProgress_;                      // the status bar message of a fetch, push… in progress
     QAction *continueAction_ = nullptr;        // Git menu: the operation in progress

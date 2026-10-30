@@ -30,6 +30,7 @@ public:
         Merged,   // changed on one side and taken without a conflict
         Conflict, // a conflict still open
         Edited,   // lines the user wrote
+        Proposed, // lines the agent proposes, or proposed
     };
 
     struct Stretch {

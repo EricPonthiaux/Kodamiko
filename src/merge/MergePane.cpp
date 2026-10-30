@@ -5,6 +5,7 @@
 #include "syntax/HighlighterFactory.h"
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
+#include "ui/ThemeStyle.h"
 
 #include <Qsci/qscicommand.h>
 #include <Qsci/qscicommandset.h>
@@ -19,7 +20,7 @@ constexpr int stripWidthPx = 3;
 
 // A background marker and a strip marker per shade but None, in the order
 // of MergePane::Shade.
-constexpr int shadeCount = 5;
+constexpr int shadeCount = 6;
 constexpr int firstBackgroundMarker = 0;
 constexpr int firstStripMarker = firstBackgroundMarker + shadeCount;
 
@@ -35,9 +36,12 @@ QColor mix(const QColor &a, const QColor &b, double share)
 // tell the sides apart in lightness too.
 std::array<QColor, shadeCount> shadeColors(const Theme &theme)
 {
-    return {theme.isDark ? QColor("#6ea0ff") : QColor("#0969da"), theme.isDark ? QColor("#f0b45a") : QColor("#9a6700"),
-            theme.isDark ? QColor("#39c5cf") : QColor("#1b7c83"), theme.isDark ? QColor("#ff6b6b") : QColor("#cf222e"),
-            theme.accent};
+    return {theme.isDark ? QColor("#6ea0ff") : QColor("#0969da"),
+            theme.isDark ? QColor("#f0b45a") : QColor("#9a6700"),
+            theme.isDark ? QColor("#39c5cf") : QColor("#1b7c83"),
+            theme.isDark ? QColor("#ff6b6b") : QColor("#cf222e"),
+            theme.accent,
+            theme.isDark ? QColor("#d59cff") : QColor("#8250df")};
 }
 
 int markerIndex(Shade shade)
@@ -55,6 +59,8 @@ int markerIndex(Shade shade)
         return 3;
     case Shade::Edited:
         return 4;
+    case Shade::Proposed:
+        return 5;
     }
     return -1;
 }
@@ -151,6 +157,11 @@ void MergePane::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     setPaper(theme.background);
+    // Behind the transparent scroll bars: the code's background.
+    QPalette background = ThemeStyle::palette(theme);
+    background.setColor(QPalette::Window, theme.background);
+    setPalette(background);
+    setAutoFillBackground(true);
     setColor(theme.foreground);
     setFont(theme.font);
     setSelectionBackgroundColor(theme.selection);

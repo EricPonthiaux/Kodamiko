@@ -7,6 +7,7 @@
 #include <QByteArray>
 #include <QByteArrayList>
 #include <QList>
+#include <QString>
 
 #include <utility>
 
@@ -14,26 +15,37 @@
 // the file's stretches (ThreeWayMerge), each with what the result takes
 // from it. A stretch only one side changed takes that side's lines; a
 // conflict is open until a side, both, or the user's own lines are chosen.
-// Every change can be undone. No widget: the view shows it and edits it.
+// An open conflict may have a proposal from the agent (MergeProposals),
+// shown in its place until it is accepted or rejected. Every change can be
+// undone. No widget: the view shows it and edits it.
 class MergeDocument {
 public:
     // What the result takes from a stretch.
     enum class Choice {
-        Unresolved,          // a conflict not decided yet: the ancestor's lines meanwhile
+        Unresolved,          // a conflict not decided yet: its proposal's lines, or the ancestor's, meanwhile
         Current,             // the current side's lines
         Incoming,            // the incoming side's
         CurrentThenIncoming, // both, the current side's first
         IncomingThenCurrent, // both, the incoming side's first
         Edited,              // lines the user wrote (replaceResultLines())
         Combined,            // each side's changes of different words (SimpleConflicts)
+        Suggested,           // the lines of a proposal accepted
     };
 
     struct Segment {
         ThreeWayMerge::Chunk chunk;
         Choice choice = Choice::Unresolved;
-        QByteArrayList edited; // the lines of Choice::Edited and Choice::Combined
+        QByteArrayList edited; // the lines of Edited, Combined and Suggested
 
         bool operator==(const Segment &) const = default;
+    };
+
+    // Lines the agent proposes for a conflict, and why.
+    struct Proposal {
+        QByteArrayList lines;
+        QString reason;
+
+        bool operator==(const Proposal &) const = default;
     };
 
     // Lines of the result, from 0.
@@ -57,8 +69,9 @@ public:
     bool isResolved() const;
     int unresolvedCount() const;
 
-    // Takes `choice` for `segment`; not Choice::Edited or Choice::Combined,
-    // which only replaceResultLines() and resolveSimpleConflicts() give.
+    // Takes `choice` for `segment`; not Edited, Combined or Suggested, which
+    // replaceResultLines(), resolveSimpleConflicts() and acceptProposal()
+    // give.
     void choose(int segment, Choice choice);
     // Takes `choice` for every conflict still open, as one change.
     void resolveRemaining(Choice choice);
@@ -75,6 +88,18 @@ public:
 
     void finishTyping() { isTyping_ = false; }
 
+    // Proposes `proposal` for the conflict `conflict`: shown while a segment
+    // with that stretch is open. Not a change: nothing to undo. A conflict
+    // the user has since joined with others never shows it.
+    void propose(const ThreeWayMerge::Chunk &conflict, const Proposal &proposal);
+    // The proposal shown at `segment`, if it is open and has one.
+    const Proposal *proposalFor(int segment) const;
+    // Takes the proposal shown at `segment` (a change), or forgets it.
+    void acceptProposal(int segment);
+    void rejectProposal(int segment);
+    // Takes every proposal shown, as one change; returns how many.
+    int acceptAllProposals();
+
     bool canUndo() const { return !history_.isEmpty(); }
 
     bool canRedo() const { return !undone_.isEmpty(); }
@@ -83,6 +108,8 @@ public:
     void redo();
 
 private:
+    // The lines the result shows for `segment`.
+    QByteArrayList shownLines(const Segment &segment) const;
     void remember();
     QList<LineRange> resultRanges() const;
     // The segments the replacement of `count` lines from `first` touches:
@@ -96,4 +123,7 @@ private:
     QList<QList<Segment>> undone_;
     // The last change was a replacement: the next one joins it.
     bool isTyping_ = false;
+    // By the conflict's stretch, which stays the same as long as the
+    // segment is not joined with others.
+    QList<std::pair<ThreeWayMerge::Chunk, Proposal>> proposals_;
 };
