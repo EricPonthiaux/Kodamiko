@@ -88,8 +88,12 @@ struct Family {
 
     // A layout of its own instead of Graphviz (sequence lanes).
     std::function<void(Board &)> autoArrange;
+    // Its layout can place newcomers on a copy without moving saved nodes.
+    bool preservePlacedShapes = false;
     // Drawn under everything (sequence fragments).
     std::function<void(QPainter &, const Board &)> drawUnderlay;
+    // Structural labels that must stay legible over lifelines and shapes.
+    std::function<void(QPainter &, const Board &)> drawOverlay;
     // Labels that depend on the whole diagram (state transitions).
     std::function<void(Board &)> resolveLabels;
 };

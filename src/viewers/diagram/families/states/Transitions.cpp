@@ -25,8 +25,7 @@ qreal labelHeight(const Board &board, const Link &link)
 {
     if (link.label.isEmpty())
         return 24;
-    const auto &o = board.style().linkLabel;
-    return link.label.split(QLatin1Char('\n')).size() * (o.fontPx + 2) + o.padY * 2;
+    return link.labelBox(board).height;
 }
 
 // The ends of a self-loop and its quadratic's control point, beyond the
@@ -121,9 +120,18 @@ QPointF TransitionLink::labelPos(const Route &r, const Board &board) const
         return *placed;
     if (from == to) {
         const qreal offset = selfOffset(board);
-        return {r.b.x() + 34 + offset * 0.25, r.a.y() - 20 - offset};
+        const qreal clearance = std::max<qreal>(20, labelBox(board).height / 2 + 8);
+        return {r.b.x() + 34 + offset * 0.25, r.a.y() - clearance - offset};
     }
     return Link::labelPos(r, board);
+}
+
+LinkStyle TransitionLink::drawStyle(const Board &board, bool selected) const
+{
+    LinkStyle style = Link::drawStyle(board, selected, 1.65);
+    if (!selected && !parseColor(customColor).isValid())
+        style.color = board.style().state.line;
+    return style;
 }
 
 void TransitionLink::draw(QPainter &painter, const Board &board, bool selected) const
@@ -216,6 +224,40 @@ struct LabelChoice {
     QRectF box;
 };
 
+// Clipping a compound edge to its composite can leave less room than the
+// label Graphviz placed on the original route. Try the nearby outside edges
+// of its endpoints so the label does not erase their borders or its arrow.
+std::vector<LabelCandidate> reservedCandidates(QPointF point,
+                                               const Link::LabelBox &size,
+                                               const Shape &from,
+                                               const Shape &to)
+{
+    const qreal dx = size.width / 2 + 10;
+    const qreal dy = size.height / 2 + 10;
+    const auto a = from.rect();
+    const auto b = to.rect();
+    std::vector<LabelCandidate> candidates;
+    for (const qreal x : {point.x(), a.left() - dx, a.right() + dx, b.left() - dx, b.right() + dx}) {
+        for (const qreal y : {point.y(), a.top() - dy, a.bottom() + dy, b.top() - dy, b.bottom() + dy}) {
+            const qreal distance = std::hypot(x - point.x(), y - point.y());
+            candidates.push_back({0.5 + distance / 100, {x, y}});
+        }
+    }
+    return candidates;
+}
+
+LabelObstacles reservedObstacles(const Board &board, const Link &link, const LabelObstacles &placed)
+{
+    LabelObstacles result;
+    result.labels = placed.labels;
+    for (const auto &shape : board.shapes()) {
+        const bool endpoint = shape->id == link.from || shape->id == link.to;
+        if (!shape->isGraphvizCluster() || endpoint)
+            result.shapes.push_back(shape->rect().adjusted(-4, -4, 4, 4));
+    }
+    return result;
+}
+
 std::vector<TransitionLink *> labelledTransitions(const Board &board)
 {
     std::vector<TransitionLink *> links;
@@ -264,20 +306,21 @@ std::optional<LabelChoice> leastColliding(const std::vector<LabelCandidate> &can
 void placeLabel(TransitionLink &link, const Board &board, LabelObstacles &obstacles)
 {
     const std::optional<Route> r = link.route(board);
-    if (!r)
-        return;
-    const Link::LabelBox size = link.labelBox(board);
-    // After a layout, dot placed every label together and avoided their
-    // collisions: that result is kept. This pass is for after a manual
-    // move, when the curve and its `lp` no longer hold.
-    if (r->labelPoint) {
-        obstacles.labels.push_back(paddedBoxAt(*r->labelPoint, size));
-        return;
-    }
-    const std::optional<LabelChoice> best = leastColliding(labelCandidates(link, *r, board), size, obstacles);
     const Shape *a = board.shape(link.from);
     const Shape *b = board.shape(link.to);
-    if (!best || !a || !b)
+    if (!r || !a || !b)
+        return;
+    const Link::LabelBox size = link.labelBox(board);
+    std::optional<LabelChoice> best;
+    const bool touchesFrame = a->isGraphvizCluster() || b->isGraphvizCluster();
+    if (r->labelPoint || touchesFrame) {
+        const LabelObstacles nearby = reservedObstacles(board, link, obstacles);
+        const QPointF preferred = r->labelPoint.value_or(link.labelPos(*r, board));
+        best = leastColliding(reservedCandidates(preferred, size, *a, *b), size, nearby);
+    } else {
+        best = leastColliding(labelCandidates(link, *r, board), size, obstacles);
+    }
+    if (!best)
         return;
     link.placement = TransitionLink::Placement{best->point, QPointF(a->x, a->y), QPointF(b->x, b->y)};
     obstacles.labels.push_back(best->box);

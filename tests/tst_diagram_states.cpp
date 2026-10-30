@@ -472,7 +472,7 @@ private slots:
         board.setFamily(&families::states());
         auto *s = static_cast<StateShape *>(board.addShape("state", QJsonObject{{"text", "Ready"}}));
         const QSizeF compact(s->w, s->h);
-        QCOMPARE(compact.width(), 150.0);
+        QVERIFY(compact.width() >= 180);
         s->text = "Detailed business validation";
         s->desc = {"This description is long enough that it has to stay entirely visible"};
         board.measureShape(*s);

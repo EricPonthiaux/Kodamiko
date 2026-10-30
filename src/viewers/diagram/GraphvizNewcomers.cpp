@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "Board.h"
+#include "Family.h"
 #include "Graphviz.h"
 
 #include <QHash>
@@ -24,7 +25,9 @@ QHash<QString, QPointF> fullLayoutPositions(const Board &board, const ArrangeOpt
     scratch.fromJson(board.toJson());
     scratch.meta = board.meta;
     QHash<QString, QPointF> positions;
-    if (!autoArrange(scratch, options))
+    if (scratch.family() && scratch.family()->autoArrange)
+        scratch.family()->autoArrange(scratch);
+    else if (!autoArrange(scratch, options))
         return positions;
     for (const auto &s : scratch.shapes())
         positions.insert(s->id, QPointF(s->x, s->y));

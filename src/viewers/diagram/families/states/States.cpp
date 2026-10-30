@@ -16,13 +16,14 @@ namespace diagram::states {
 
 namespace {
 
-const Font font(13);
-constexpr qreal titleFontPx = 14;
+const Font font(14, 400, false, true);
+constexpr qreal titleFontPx = 17;
 const Font titleFont(titleFontPx, 600);
-constexpr qreal lineHeight = 20;
-constexpr qreal pad = 14;
+constexpr qreal lineHeight = 22;
+constexpr qreal titleLineHeight = 24;
+constexpr qreal pad = 18;
 // A composite's title band, above its children.
-constexpr qreal containerTitleHeight = 38;
+constexpr qreal containerTitleHeight = 44;
 constexpr qreal containerMinWidth = 300;
 constexpr qreal containerMinHeight = 210;
 
@@ -42,11 +43,6 @@ QStringList wrapAll(const Font &f, const QStringList &texts, qreal width)
     for (const QString &t : texts)
         lines += text::wrap(f, t, width);
     return lines;
-}
-
-QPainterPath circle(QPointF center, qreal radius)
-{
-    return ellipse(center, radius, radius);
 }
 
 } // namespace
@@ -77,7 +73,7 @@ QJsonObject StateElement::toJson() const
 // StateShape
 
 StateShape::StateShape()
-    : StateElement(QStringLiteral("state"), 150, 60)
+    : StateElement(QStringLiteral("state"), 180, 64)
 {
 }
 
@@ -114,12 +110,22 @@ void StateShape::measure(const Board &)
     constexpr qreal maxWidth = 360;
     const qreal widest = std::max(text::widest(titleFont, text::wrap(titleFont, text, maxWidth - pad * 2)),
                                   text::widest(font, wrapAll(font, desc, maxWidth - pad * 2)));
-    w = std::ceil(std::max<qreal>(150, std::min(maxWidth, widest + pad * 2)));
+    w = std::ceil(std::max<qreal>(180, std::min(maxWidth, widest + pad * 2)));
     lines_ = wrapAll(font, desc, w - pad * 2);
     titleLines_ = text::wrap(titleFont, text, w - pad * 2);
-    const qsizetype titleCount = std::max<qsizetype>(1, titleLines_.size());
-    const qreal body = lines_.isEmpty() ? 0 : lines_.size() * lineHeight + pad;
-    h = std::max<qreal>(48, titleCount * lineHeight + pad * 2 + body);
+    const qreal body = lines_.isEmpty() ? 0 : lines_.size() * lineHeight + 20;
+    h = headerHeight() + body;
+}
+
+qreal StateShape::headerHeight() const
+{
+    return std::max<qreal>(64, std::max<qsizetype>(1, titleLines_.size()) * titleLineHeight + pad * 2);
+}
+
+QColor StateShape::stateFill(const QColor &fallback) const
+{
+    const QColor own = parseColor(fill);
+    return fillColor(!own.isValid() || own == QColor(Qt::white) ? fallback : own);
 }
 
 void StateShape::resizeTo(qreal width, qreal height, const Board &board)
@@ -142,7 +148,8 @@ void StateShape::onDoubleClick(Board &board)
                 desc.append(line.trimmed());
         }
     };
-    spec.color = board.style().palette.ink;
+    const QColor ink = board.style().state.ink;
+    spec.color = readableTextColor(stateFill(board.style().state.fill), ink, ink);
     spec.font = font;
     spec.lineHeight = lineHeight;
     spec.enterCommits = false;
@@ -153,36 +160,42 @@ void StateShape::onDoubleClick(Board &board)
 void StateShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QColor own = parseColor(fill);
-    const QColor nativeFill = !own.isValid() || own == QColor(Qt::white) ? style.tones.sage : own;
-    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    shadowFill(painter, path, fillColor(nativeFill), style);
-    stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : shapeBorderWidth);
-    if (state.editing)
-        return;
-    painter.save();
-    painter.setClipPath(path, Qt::IntersectClip);
-    const QColor ink = textColor(style.palette.ink);
-    // Without a description the name floats dead center; otherwise it heads
-    // the box.
-    qreal ty = !lines_.isEmpty() ? y + pad + lineHeight / 2 : cy() - ((titleLines_.size() - 1) * lineHeight) / 2;
+    const QPainterPath path = roundRect(rect(), 10);
+    painter.fillPath(path, stateFill(style.state.fill));
+    if (!state.editing) {
+        painter.save();
+        painter.setClipPath(path, Qt::IntersectClip);
+        drawContent(painter, style);
+        painter.restore();
+    }
+    const QColor edge = state.selected ? style.shape.selectedStroke : strokeColor(style.state.stroke);
+    stroke(painter, path, edge, state.selected ? 2.5 : 1.2);
+}
+
+void StateShape::drawContent(QPainter &painter, const Style &style) const
+{
+    const qreal band = lines_.isEmpty() ? h : headerHeight();
+    const QColor header = stateFill(style.state.header);
+    painter.fillRect(QRectF(x, y, w, band), header);
+    const QColor ink = readableTextColor(header, style.state.ink, style.state.ink);
+    const Align align = lines_.isEmpty() ? Align::Center : Align::Left;
+    const qreal left = lines_.isEmpty() ? cx() : x + pad;
+    qreal top = y + band / 2 - (titleLines_.size() - 1) * titleLineHeight / 2;
     for (const QString &line : titleLines_) {
-        text::draw(painter, titleFont, line, QPointF(cx(), ty), ink, Align::Center, Baseline::Middle);
-        ty += lineHeight;
+        text::draw(painter, titleFont, line, QPointF(left, top), ink, align, Baseline::Middle);
+        top += titleLineHeight;
     }
-    ty -= lineHeight / 2;
-    if (!lines_.isEmpty()) {
-        ty += pad / 2;
-        strokeLine(painter, QPointF(x, ty - pad / 4), QPointF(x + w, ty - pad / 4), style.palette.separator, 1);
-        ty += pad / 2;
-        const QColor muted = textColor(style.palette.inkMuted);
-        for (const QString &line : lines_) {
-            text::draw(painter, font, line, QPointF(x + pad, ty), muted, Align::Left, Baseline::Top);
-            ty += lineHeight;
-        }
+    if (lines_.isEmpty())
+        return;
+    const QColor body = stateFill(style.state.fill);
+    const QColor muted = readableTextColor(body, style.state.mutedInk, style.state.mutedInk);
+    const QColor separator = body == style.state.fill ? style.state.separator : mix(body, muted, 0.3);
+    strokeLine(painter, QPointF(x, y + band), QPointF(x + w, y + band), separator, 1);
+    top = y + band + 10;
+    for (const QString &line : lines_) {
+        text::draw(painter, font, line, QPointF(x + pad, top), muted, Align::Left, Baseline::Top);
+        top += lineHeight;
     }
-    painter.restore();
 }
 
 QList<Property> StateShape::properties() const
@@ -310,223 +323,33 @@ void StateContainerShape::onDoubleClick(Board &board)
     spec.set = [this](const QString &value) {
         text = value.trimmed().isEmpty() ? defaultContainerText() : value.trimmed();
     };
-    spec.color = board.style().palette.ink;
-    spec.font = font;
-    spec.lineHeight = lineHeight;
-    spec.rect = [this] { return QRectF(x + pad, y + 9, w - pad * 2, 22); };
+    const QColor ink = board.style().state.ink;
+    spec.color = readableTextColor(fillColor(board.style().state.containerHeader), ink, ink);
+    spec.font = titleFont;
+    spec.lineHeight = titleLineHeight;
+    spec.rect = [this] { return QRectF(x + pad, y + 10, w - pad * 2, titleLineHeight); };
     board.beginTextEdit(this, spec);
 }
 
 void StateContainerShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    painter.save();
-    painter.setOpacity(painter.opacity() * (customFill.isEmpty() ? 0.72 : 0.55));
-    shadowFill(painter, path, fillColor(style.tones.group.isValid() ? style.tones.group : style.tones.sage), style);
-    painter.restore();
-    stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : shapeBorderWidth);
-    strokeLine(painter, QPointF(x, y + containerTitleHeight), QPointF(x + w, y + containerTitleHeight),
-               style.palette.separator, 1);
-    if (state.editing)
-        return;
-    text::draw(painter, titleFont, text, QPointF(x + pad, y + containerTitleHeight / 2), textColor(style.palette.ink),
-               Align::Left, Baseline::Middle);
-}
-
-// ---------------------------------------------------------------------------
-// RoundShape
-
-RoundShape::RoundShape(const QString &typeName, qreal size)
-    : StateElement(typeName, size, size)
-{
-}
-
-bool RoundShape::hitTest(QPointF p) const
-{
-    const qreal dx = p.x() - cx();
-    const qreal dy = p.y() - cy();
-    return dx * dx + dy * dy <= (w / 2) * (w / 2);
-}
-
-QPointF RoundShape::borderPoint(QPointF toward) const
-{
-    const qreal dx = toward.x() - cx();
-    const qreal dy = toward.y() - cy();
-    if (!dx && !dy)
-        return {cx(), cy()};
-    const qreal t = (w / 2) / std::hypot(dx, dy);
-    return {cx() + dx * t, cy() + dy * t};
-}
-
-QString RoundShape::displayText() const
-{
-    return type == QLatin1String("initial") ? tr("Initial state") : tr("Final state");
-}
-
-void RoundShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
-{
-    const Style &style = board.style();
-    const QPointF center(cx(), cy());
-    const QPainterPath outer = circle(center, w / 2);
-    if (type == QLatin1String("initial")) {
-        shadowFill(painter, outer, fillColor(state.selected ? style.shape.selectedStroke : style.palette.solid), style);
-        if (!customFill.isEmpty())
-            stroke(painter, outer, strokeColor(style.palette.solid), shapeBorderWidth);
-        return;
-    }
-    // The final state: a ring around a bullet.
-    const QColor color = fillColor(state.selected ? style.shape.selectedStroke : style.palette.solid);
-    shadowFill(painter, outer, style.background, style);
-    stroke(painter, outer, strokeColor(color), 1.5);
-    painter.fillPath(circle(center, w / 2 - 4), color);
-}
-
-// ---------------------------------------------------------------------------
-// ChoiceShape
-
-ChoiceShape::ChoiceShape()
-    : StateElement(QStringLiteral("choice"), 36, 36)
-{
-}
-
-void ChoiceShape::load(const QJsonObject &props)
-{
-    StateElement::load(props);
-    text = jsonString(props, QStringLiteral("text"));
-}
-
-QJsonObject ChoiceShape::toJson() const
-{
-    QJsonObject json = StateElement::toJson();
-    json.insert(QStringLiteral("text"), text);
-    return json;
-}
-
-void ChoiceShape::measure(const Board &)
-{
-    if (text.trimmed().isEmpty()) {
-        w = h = 36;
-        lines_.clear();
-        return;
-    }
-    const qreal widest = text::widest(font, text::wrap(font, text, 140));
-    // A diamond narrows toward its vertices: the extra room keeps every line
-    // inside its central readable area.
-    w = std::ceil(std::max<qreal>(96, std::min<qreal>(210, widest + 52)));
-    lines_ = text::wrap(font, text, w - 52);
-    h = std::ceil(std::max<qreal>(72, lines_.size() * lineHeight + 42));
-}
-
-void ChoiceShape::resizeTo(qreal width, qreal height, const Board &board)
-{
-    StateElement::resizeTo(width, height, board);
-    lines_ = text.trimmed().isEmpty() ? QStringList() : text::wrap(font, text, std::max<qreal>(20, w - 52));
-}
-
-void ChoiceShape::onDoubleClick(Board &board)
-{
-    TextEditSpec spec;
-    spec.get = [this] { return text; };
-    spec.set = [this](const QString &value) { text = value.trimmed(); };
-    spec.color = board.style().palette.ink;
-    spec.font = font;
-    spec.lineHeight = lineHeight;
-    spec.align = Align::Center;
-    spec.rect = [this] { return QRectF(x + w * 0.22, y + h * 0.24, w * 0.56, h * 0.52); };
-    board.beginTextEdit(this, spec);
-}
-
-QPointF ChoiceShape::borderPoint(QPointF toward) const
-{
-    const qreal dx = toward.x() - cx();
-    const qreal dy = toward.y() - cy();
-    if (!dx && !dy)
-        return {cx(), cy()};
-    const qreal t = 1 / (std::abs(dx) / (w / 2) + std::abs(dy) / (h / 2));
-    return {cx() + dx * t, cy() + dy * t};
-}
-
-QStringList ChoiceShape::graphvizNodeAttributes(const Board &, const QString &, qreal width, qreal height) const
-{
-    // Graphviz routes against the visible diamond, not the measurement box
-    // around it: otherwise transitions stop short of the outline.
-    return {QStringLiteral("shape=diamond"),
-            QStringLiteral("fixedsize=true"),
-            QStringLiteral("margin=0"),
-            QStringLiteral("label=\"\""),
-            QStringLiteral("width=") + QString::number(std::max<qreal>(1, width) / 72, 'f', 3),
-            QStringLiteral("height=") + QString::number(std::max<qreal>(1, height) / 72, 'f', 3)};
-}
-
-QPainterPath ChoiceShape::outline() const
-{
-    return polygon({{cx(), y}, {x + w, cy()}, {cx(), y + h}, {x, cy()}});
-}
-
-void ChoiceShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
-{
-    const Style &style = board.style();
-    const QPainterPath path = outline();
-    shadowFill(painter, path, fillColor(style.tones.warm), style);
-    stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : shapeBorderWidth);
-    if (state.editing || text.isEmpty())
-        return;
+    const QPainterPath path = roundRect(rect(), 10);
+    painter.fillPath(path, fillColor(style.state.container));
     painter.save();
     painter.setClipPath(path, Qt::IntersectClip);
-    const QColor ink = textColor(style.palette.ink);
-    const QStringList lines = lines_.isEmpty() ? QStringList{text} : lines_;
-    qreal ty = cy() - ((lines.size() - 1) * lineHeight) / 2;
-    for (const QString &line : lines) {
-        text::draw(painter, font, line, QPointF(cx(), ty), ink, Align::Center, Baseline::Middle);
-        ty += lineHeight;
-    }
+    painter.fillRect(QRectF(x, y, w, containerTitleHeight), fillColor(style.state.containerHeader));
     painter.restore();
-}
-
-// ---------------------------------------------------------------------------
-// ForkJoinShape
-
-ForkJoinShape::ForkJoinShape(const QString &typeName)
-    : StateElement(typeName, 100, 12)
-{
-}
-
-QString ForkJoinShape::displayText() const
-{
-    return type == QLatin1String("fork") ? tr("Fork") : tr("Join");
-}
-
-void ForkJoinShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
-{
-    const Style &style = board.style();
-    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    shadowFill(painter, path, fillColor(state.selected ? style.shape.selectedStroke : style.palette.solid), style);
-    if (!customFill.isEmpty())
-        stroke(painter, path, strokeColor(style.palette.solid), shapeBorderWidth);
-}
-
-QList<Property> ForkJoinShape::properties() const
-{
-    return {{QStringLiteral("kind"),
-             tr("Kind"),
-             Property::Kind::Choice,
-             {{QStringLiteral("fork"), tr("Fork")}, {QStringLiteral("join"), tr("Join")}}}};
-}
-
-QVariant ForkJoinShape::propertyValue(const QString &propertyId) const
-{
-    return propertyId == QLatin1String("kind") ? QVariant(type) : QVariant();
-}
-
-void ForkJoinShape::setPropertyValue(const QString &propertyId, const QVariant &value)
-{
-    // Same bar, other meaning: the type follows the choice.
-    const bool isBarKind = value == QLatin1String("fork") || value == QLatin1String("join");
-    if (propertyId == QLatin1String("kind") && isBarKind)
-        type = value.toString();
+    const QColor edge = state.selected ? style.shape.selectedStroke : strokeColor(style.state.stroke);
+    stroke(painter, path, edge, state.selected ? 2.5 : 1.2);
+    const QColor ink = readableTextColor(fillColor(style.state.containerHeader), style.state.ink, style.state.ink);
+    const QColor separator =
+        customFill.isEmpty() ? style.state.separator : mix(fillColor(style.state.container), ink, 0.3);
+    strokeLine(painter, QPointF(x, y + containerTitleHeight), QPointF(x + w, y + containerTitleHeight), separator, 1);
+    if (state.editing)
+        return;
+    text::draw(painter, titleFont, text, QPointF(x + pad, y + containerTitleHeight / 2), ink, Align::Left,
+               Baseline::Middle);
 }
 
 } // namespace diagram::states

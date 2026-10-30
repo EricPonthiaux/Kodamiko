@@ -5,6 +5,7 @@
 // tests of sidecar's product-vision.test.js and the mind map parts of its
 // family tests that make sense outside of a browser.
 
+#include "ui/Theme.h"
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Canvas.h"
 #include "viewers/diagram/Document.h"
@@ -21,6 +22,7 @@
 #include <QtTest>
 
 #include <array>
+#include <cmath>
 #include <optional>
 
 using namespace diagram;
@@ -141,6 +143,37 @@ void paints(const Board &board)
     image.fill(Qt::white);
     QPainter painter(&image);
     Canvas::paintBoard(painter, board);
+}
+
+qreal relativeLuminance(const QColor &color)
+{
+    const auto channel = [](qreal value) {
+        return value <= 0.04045 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+    };
+    return channel(color.redF()) * 0.2126 + channel(color.greenF()) * 0.7152 + channel(color.blueF()) * 0.0722;
+}
+
+qreal contrast(const QColor &a, const QColor &b)
+{
+    const qreal first = relativeLuminance(a);
+    const qreal second = relativeLuminance(b);
+    return (std::max(first, second) + 0.05) / (std::min(first, second) + 0.05);
+}
+
+QColor bodyPixel(const Shape &shape, const Board &board)
+{
+    QImage image(qCeil(shape.w) + 8, qCeil(shape.h) + 8, QImage::Format_ARGB32_Premultiplied);
+    image.fill(board.style().background);
+    QPainter painter(&image);
+    painter.translate(4 - shape.x, 4 - shape.y);
+    shape.draw(painter, board, {});
+    painter.end();
+    return image.pixelColor(12, qRound(shape.h / 2) + 4);
+}
+
+mindmap::MindNode *mindNode(const Board &board, const QString &key)
+{
+    return dynamic_cast<mindmap::MindNode *>(byKey(board, key));
 }
 
 const char *const kProduct = "mindmap\n"
@@ -299,23 +332,26 @@ private slots:
     {
         Board board;
         board.setFamily(&families::mindmap());
-        const std::array fonts{Font(16, 600), Font(14, 500), Font(13)};
-        const std::array<qreal, 3> padX{24, 18, 10};
-        const std::array<qreal, 3> padY{16, 12, 6};
-        const std::array<qreal, 3> lineHeights{23, 20, 19};
+        TextEditSpec editor;
+        board.setTextEditor([&editor](Shape *, Link *, const TextEditSpec &spec) { editor = spec; });
+        qreal previousFont = 100;
         for (int depth : {0, 1, 2, 5}) {
-            const Shape *s = board.addShape(
+            Shape *s = board.addShape(
                 {}, {{QStringLiteral("text"), QStringLiteral("Idea")}, {QStringLiteral("depth"), depth}});
-            const auto l = std::size_t(mindmap::level(depth));
-            QCOMPARE(s->w, text::width(fonts[l], QStringLiteral("Idea")) + padX[l] * 2);
-            QCOMPARE(s->h, lineHeights[l] + padY[l] * 2);
+            s->onDoubleClick(board);
+            QVERIFY(editor.font.px >= 14);
+            QVERIFY(editor.font.px <= previousFont);
+            QVERIFY(editor.rect().width() >= text::width(editor.font, QStringLiteral("Idea")) - 0.01);
+            QVERIFY(editor.rect().height() >= editor.lineHeight);
+            QVERIFY(s->rect().contains(editor.rect()));
+            previousFont = editor.font.px;
         }
         // A long text wraps at the level's width.
         const Shape *wide =
             board.addShape({}, {{QStringLiteral("text"), QStringLiteral("word ").repeated(40).trimmed()},
                                 {QStringLiteral("depth"), 1}});
-        QVERIFY(wide->w <= 190 + 18 * 2 + 0.5);
-        QVERIFY(wide->h > 20 + 12 * 2);
+        QVERIFY(wide->w < 280);
+        QVERIFY(wide->h > 100);
     }
 
     void nodesAreResizable()
@@ -337,12 +373,155 @@ private slots:
         for (const auto &l : board.links()) {
             const auto *from = dynamic_cast<const mindmap::MindNode *>(board.shape(l->from));
             QVERIFY(from);
-            const QString width = from->depth == 0 ? QStringLiteral("2.500") : QStringLiteral("1.750");
+            const QString width = from->depth == 0 ? QStringLiteral("3.500") : QStringLiteral("1.500");
             QCOMPARE(l->graphvizAttributes(board),
                      (QStringList{QStringLiteral("arrowhead=none"), QStringLiteral("penwidth=") + width}));
-            QCOMPARE(l->drawStyle(board, false).width, from->depth == 0 ? 2.5 : 1.75);
-            QCOMPARE(l->drawStyle(board, false).color, board.style().palette.lifeline);
+            QCOMPARE(l->drawStyle(board, false).width, from->depth == 0 ? 3.5 : 1.5);
+            const auto *target = static_cast<const mindmap::MindNode *>(board.shape(l->to));
+            QCOMPARE(l->drawStyle(board, false).color, target->branchColor(board.style()));
         }
+    }
+
+    void colorsFollowTheBranchWithoutChangingTheSource()
+    {
+        Board board;
+        const Codec &codec = mindmapCodec();
+        buildBoard(board, codec, parsed(codec, QStringLiteral("mindmap\n root\n  A\n   A1\n    A2\n  B\n   B1\n")));
+        const auto color = [&](const QString &key) { return mindNode(board, key)->branchColor(board.style()); };
+        QCOMPARE(color(QStringLiteral("A")), color(QStringLiteral("A2")));
+        QCOMPARE(color(QStringLiteral("B")), color(QStringLiteral("B1")));
+        QVERIFY(color(QStringLiteral("A")) != color(QStringLiteral("B")));
+        const QByteArray original = board.snapshot();
+        const QColor before = color(QStringLiteral("A"));
+        board.setStyle(Style::fromTheme(Theme::named(QStringLiteral("kodamiko-pearl"))));
+        QVERIFY(color(QStringLiteral("A")) != before);
+        QCOMPARE(color(QStringLiteral("A")), color(QStringLiteral("A2")));
+        QCOMPARE(board.snapshot(), original);
+        Board restored;
+        restored.setFamily(board.family());
+        restored.setStyle(board.style());
+        // Undo snapshots sort ids, which may change the order of links.
+        restored.applySnapshot(original);
+        QCOMPARE(mindNode(restored, QStringLiteral("A2"))->branchColor(restored.style()), color(QStringLiteral("A")));
+    }
+
+    void themesKeepEveryLevelLegible_data()
+    {
+        QTest::addColumn<QString>("themeName");
+        for (const Theme &theme : Theme::all())
+            QTest::newRow(qPrintable(theme.name)) << theme.name;
+        QTest::newRow("print") << QStringLiteral("print");
+    }
+
+    void themesKeepEveryLevelLegible()
+    {
+        QFETCH(const QString, themeName);
+        Board board;
+        board.setStyle(themeName == QLatin1String("print") ? Style::printed()
+                                                           : Style::fromTheme(Theme::named(themeName)));
+        const Codec &codec = mindmapCodec();
+        buildBoard(board, codec, parsed(codec, codec.blank()));
+        TextEditSpec editor;
+        board.setTextEditor([&editor](Shape *, Link *, const TextEditSpec &spec) { editor = spec; });
+        for (const auto &shape : board.shapes()) {
+            shape->onDoubleClick(board);
+            const QColor background = bodyPixel(*shape, board);
+            QVERIFY2(contrast(editor.color, background) >= 4.5, qPrintable(shape->displayText()));
+        }
+        for (const QColor &branch : board.style().mindmap.branches)
+            QVERIFY(contrast(branch, board.style().background) >= 3);
+    }
+
+    void customColorsSurviveThemeChanges()
+    {
+        Board board;
+        const Codec &codec = mindmapCodec();
+        buildBoard(board, codec, parsed(codec, codec.blank()));
+        Shape &shape = *board.shapes().front();
+        Link &link = *board.links().front();
+        shape.customFill = QStringLiteral("#ffe1b6");
+        link.customColor = QStringLiteral("#b53675");
+        link.customWidth = 4;
+        const QByteArray original = board.snapshot();
+        for (const QString &theme : {QStringLiteral("kodamiko"), QStringLiteral("kodamiko-pearl")}) {
+            board.setStyle(Style::fromTheme(Theme::named(theme)));
+            QCOMPARE(bodyPixel(shape, board), QColor(QStringLiteral("#ffe1b6")));
+            QCOMPARE(link.drawStyle(board, false).color, QColor(QStringLiteral("#b53675")));
+            QCOMPARE(link.drawStyle(board, false).width, 4.0);
+            QCOMPARE(board.snapshot(), original);
+        }
+    }
+
+    void laysOutBranchesOnBothSidesWithoutOverlaps()
+    {
+        Board board;
+        const Codec &codec = mindmapCodec();
+        buildBoard(
+            board, codec,
+            parsed(codec, QStringLiteral("mindmap\n root\n  A\n   A1\n   A2\n  B\n   B1\n  C\n   C1\n  D\n   D1\n")));
+        Canvas canvas(&board);
+        QVERIFY(canvas.arrange(false));
+        const Shape *root = byKey(board, QStringLiteral("root"));
+        QVERIFY(byKey(board, QStringLiteral("A"))->x < root->x);
+        QVERIFY(byKey(board, QStringLiteral("B"))->x > root->x);
+        QVERIFY(!overlaps(board));
+        const QByteArray arranged = board.snapshot();
+        QVERIFY(canvas.arrange(false));
+        QCOMPARE(board.snapshot(), arranged);
+    }
+
+    void nativeLayoutHandlesCyclesAndDisconnectedNodes()
+    {
+        Board board;
+        board.setFamily(&families::mindmap());
+        const Shape *a = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("A")}});
+        const Shape *b = board.addShape({}, {{QStringLiteral("text"), QStringLiteral("B")}});
+        board.addShape({}, {{QStringLiteral("text"), QStringLiteral("Isolated")}});
+        board.addLink({}, a->id, b->id);
+        board.addLink({}, b->id, a->id);
+        mindmap::arrange(board);
+        QVERIFY(!overlaps(board));
+        QCOMPARE(board.shapes().size(), size_t(3));
+    }
+
+    void branchHitTestingFollowsTheDrawnCurve()
+    {
+        Board board;
+        const Codec &codec = mindmapCodec();
+        buildBoard(board, codec, parsed(codec, codec.blank()));
+        mindmap::arrange(board);
+        for (const auto &link : board.links()) {
+            const auto route = link->route(board);
+            QVERIFY(route);
+            QCOMPARE(route->curve.size(), size_t(4));
+            const auto &p = route->curve;
+            const QPointF midpoint = (p[0] + p[1] * 3 + p[2] * 3 + p[3]) / 8;
+            QVERIFY(link->hitTest(board, midpoint, 1));
+            QVERIFY(link->bounds(board)->adjusted(-1, -1, 1, 1).contains(midpoint));
+            const auto *target = static_cast<const mindmap::MindNode *>(board.shape(link->to));
+            if (target->depth >= 2)
+                QCOMPARE(route->b.y(), target->y + target->h);
+        }
+    }
+
+    void settlingANewBranchPreservesSavedPositions()
+    {
+        Board board;
+        const Codec &codec = mindmapCodec();
+        document::Loaded loaded;
+        QVERIFY(loadInto(board, QStringLiteral("ideas.mmd"), QByteArray(kProduct), &loaded));
+        Canvas canvas(&board);
+        canvas.settle(loaded, false);
+        const QRectF agent = byKey(board, QStringLiteral("Agent"))->rect();
+        QString source = QString::fromUtf8(document::save(board, codec));
+        source.replace(QStringLiteral("    Documents\n"), QStringLiteral("    Inserted\n    Documents\n"));
+        QVERIFY(loadInto(board, QStringLiteral("ideas.mmd"), source.toUtf8(), &loaded));
+        QCOMPARE(loaded.unplaced.size(), 1);
+        canvas.settle(loaded, false);
+        const QRectF restored = byKey(board, QStringLiteral("Agent"))->rect();
+        QVERIFY(std::abs(restored.x() - agent.x()) <= 0.1);
+        QVERIFY(std::abs(restored.y() - agent.y()) <= 0.1);
+        QVERIFY(!overlaps(board));
     }
 
     void depthFollowsTheBranches()
@@ -360,6 +539,8 @@ private slots:
         QVERIFY(board.connect(path->id, created->id));
         board.resolveLabels();
         QCOMPARE(static_cast<mindmap::MindNode *>(created)->depth, 3);
+        QCOMPARE(static_cast<mindmap::MindNode *>(created)->branchColor(board.style()),
+                 static_cast<const mindmap::MindNode *>(path)->branchColor(board.style()));
         QVERIFY(created->h < bubbleHeight);
     }
 

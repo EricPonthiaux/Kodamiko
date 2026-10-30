@@ -3,6 +3,7 @@
 // UML class diagrams: the classifier box, the relations, and the Mermaid and
 // PlantUML codecs (ported from sidecar's class-diagram.test.js).
 
+#include "ui/Theme.h"
 #include "viewers/diagram/Board.h"
 #include "viewers/diagram/Canvas.h"
 #include "viewers/diagram/Document.h"
@@ -16,6 +17,7 @@
 #include <QPainter>
 #include <QtTest>
 
+#include <cmath>
 #include <optional>
 
 using namespace diagram;
@@ -102,6 +104,43 @@ graphviz::ArrangeOptions options(const Board &board)
     o.stackDisconnected = f.graphvizStackDisconnected;
     o.adaptiveDirection = f.graphvizAdaptiveDirection;
     return o;
+}
+
+qreal luminance(const QColor &color)
+{
+    const auto channel = [](qreal value) {
+        return value <= 0.04045 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+    };
+    return channel(color.redF()) * 0.2126 + channel(color.greenF()) * 0.7152 + channel(color.blueF()) * 0.0722;
+}
+
+qreal contrast(const QColor &a, const QColor &b)
+{
+    const qreal first = luminance(a);
+    const qreal second = luminance(b);
+    return (std::max(first, second) + 0.05) / (std::min(first, second) + 0.05);
+}
+
+QImage paintedClass(const ClassShape &shape, const Board &board, ShapeState state = {})
+{
+    QImage image(qCeil(shape.w) + 16, qCeil(shape.h) + 16, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.translate(8 - shape.x, 8 - shape.y);
+    shape.draw(painter, board, state);
+    return image;
+}
+
+bool hasPixels(const QImage &image, QRect area)
+{
+    area = area.intersected(image.rect());
+    for (int y = area.top(); y <= area.bottom(); ++y) {
+        for (int x = area.left(); x <= area.right(); ++x) {
+            if (image.pixelColor(x, y).alpha())
+                return true;
+        }
+    }
+    return false;
 }
 
 const char *const kAllMarkers = R"(classDiagram
@@ -230,24 +269,30 @@ private slots:
                                                                 {"methods", QJsonArray{"+execute(): Result"}}});
         auto *c = dynamic_cast<ClassShape *>(s);
         QVERIFY(c);
-        // Header (1 line) + two sections of one member each.
-        QCOMPARE(c->h, 116.0);
+        const qreal populatedHeight = c->h;
         const qreal shortWidth = c->w;
+        TextEditSpec editor;
+        board.setTextEditor([&editor](Shape *, Link *, const TextEditSpec &spec) { editor = spec; });
 
         c->methods = {QStringLiteral("+runABusinessOperationWithAVeryDetailedName(argument: ComplexType): Result")};
         board.measureShape(*c);
         QVERIFY(c->w > shortWidth);
-        QVERIFY(c->w >= text::width(Font(12.5), c->methods.front()) + 28);
+        c->onDoubleClick(board);
+        QVERIFY(editor.font.mono);
+        QVERIFY(editor.font.px >= 14);
+        QVERIFY(editor.rect().width() >= text::width(editor.font, c->methods.front()));
 
         c->attributes.clear();
         c->methods.clear();
         board.measureShape(*c);
-        QCOMPARE(c->w, 150.0);
-        QCOMPARE(c->h, 48.0 + 14 + 14);
+        QVERIFY(c->w < shortWidth);
+        QVERIFY(c->h < populatedHeight);
+        const qreal plainHeight = c->h;
 
         c->stereotype = QStringLiteral("interface");
         board.measureShape(*c);
-        QCOMPARE(c->h, 68.0 + 14 + 14);
+        QVERIFY(c->h > plainHeight);
+        QVERIFY(c->h < populatedHeight);
     }
 
     void editsTheWholeClassAsText()
@@ -313,6 +358,126 @@ private slots:
         QCOMPARE(l.label, QStringLiteral("specializes")); // a label of the user's stays
         l.setPropertyValue(QStringLiteral("toCard"), QStringLiteral(" 1..* "));
         QCOMPARE(l.propertyValue(QStringLiteral("toCard")).toString(), QStringLiteral("1..*"));
+    }
+
+    void keepsHeadersAndMembersLegibleInEveryTheme_data()
+    {
+        QTest::addColumn<QString>("themeName");
+        for (const Theme &theme : Theme::all())
+            QTest::newRow(qPrintable(theme.name)) << theme.name;
+        QTest::newRow("print") << QStringLiteral("print");
+    }
+
+    void keepsHeadersAndMembersLegibleInEveryTheme()
+    {
+        QFETCH(const QString, themeName);
+        Board board;
+        board.setFamily(&families::classes());
+        board.setStyle(themeName == QLatin1String("print") ? Style::printed()
+                                                           : Style::fromTheme(Theme::named(themeName)));
+        auto *shape = static_cast<ClassShape *>(board.addShape({}, {{"name", "Contract"},
+                                                                    {"stereotype", "interface"},
+                                                                    {"attributes", QJsonArray{"-id: UUID"}},
+                                                                    {"methods", QJsonArray{"+verify(): bool"}}}));
+        const QImage image = paintedClass(*shape, board);
+        const QColor header = image.pixelColor(16, 28);
+        const QColor body = image.pixelColor(16, qRound(shape->h) - 2);
+        QVERIFY(header != body);
+        QVERIFY(contrast(board.style().classifier.ink, header) >= 4.5);
+        QVERIFY(contrast(board.style().classifier.mutedInk, header) >= 4.5);
+        QVERIFY(contrast(board.style().classifier.line, board.style().background) >= 3);
+        TextEditSpec editor;
+        board.setTextEditor([&editor](Shape *, Link *, const TextEditSpec &spec) { editor = spec; });
+        shape->onDoubleClick(board);
+        QVERIFY(contrast(editor.color, body) >= 4.5);
+        QVERIFY(editor.font.mono);
+    }
+
+    void changingThemesPreservesContentAndCustomColors()
+    {
+        Board board;
+        board.setFamily(&families::classes());
+        auto *shape = static_cast<ClassShape *>(
+            board.addShape({}, {{"name", "Custom"}, {"methods", QJsonArray{"+run(): void"}}}));
+        const Shape *other = board.addShape({}, {{"name", "Other"}});
+        board.selectShape(shape->id);
+        QVERIFY(board.paintSelection(QStringLiteral("#ffe1b6")));
+        Link *link = board.addLink({}, shape->id, other->id);
+        link->customColor = QStringLiteral("#af3379");
+        link->customWidth = 4;
+        link->customLineStyle = QStringLiteral("dotted");
+        const QByteArray original = board.snapshot();
+        TextEditSpec editor;
+        board.setTextEditor([&editor](Shape *, Link *, const TextEditSpec &spec) { editor = spec; });
+        for (const QString &name : {QStringLiteral("kodamiko"), QStringLiteral("kodamiko-pearl")}) {
+            board.setStyle(Style::fromTheme(Theme::named(name)));
+            const QImage image = paintedClass(*shape, board);
+            QCOMPARE(image.pixelColor(16, 28), QColor(QStringLiteral("#ffe1b6")));
+            QCOMPARE(image.pixelColor(16, qRound(shape->h) - 2), QColor(QStringLiteral("#ffe1b6")));
+            shape->onDoubleClick(board);
+            QVERIFY(contrast(editor.color, QColor(QStringLiteral("#ffe1b6"))) >= 4.5);
+            QCOMPARE(link->drawStyle(board, false).color, QColor(QStringLiteral("#af3379")));
+            QCOMPARE(link->drawStyle(board, false).width, 4.0);
+            QCOMPARE(linkDash(*link), (QList<qreal>{2, 5}));
+            QCOMPARE(board.snapshot(), original);
+        }
+    }
+
+    void selectionRemainsVisibleOnAPaintedClass()
+    {
+        Board board;
+        board.setFamily(&families::classes());
+        const auto *shape = static_cast<ClassShape *>(board.addShape({}, {{"name", "Selected"}}));
+        board.selectShape(shape->id);
+        QVERIFY(board.paintSelection(QStringLiteral("#ffe1b6")));
+        for (const Theme &theme : Theme::all()) {
+            board.setStyle(Style::fromTheme(theme));
+            const QImage image = paintedClass(*shape, board, {.selected = true});
+            QCOMPARE(image.pixelColor(8, 8 + qRound(shape->h / 2)), theme.accent);
+        }
+    }
+
+    void cardinalitiesFollowTheirOwnEndOfACurve()
+    {
+        Board board;
+        board.setFamily(&families::classes());
+        const Shape *a = board.addShape({}, {{"name", "A"}, {"x", 100}, {"y", 100}});
+        const Shape *b = board.addShape({}, {{"name", "B"}, {"x", 500}, {"y", 350}});
+        auto *link = static_cast<ClassLink *>(
+            board.addLink({}, a->id, b->id, {{"label", ""}, {"fromCard", "0..*"}, {"toCard", "1"}}));
+        link->spline = Spline{.points = {{200, 200}, {200, 300}, {400, 400}, {500, 400}},
+                              .fromAnchor = {a->x, a->y},
+                              .toAnchor = {b->x, b->y}};
+        QImage image(800, 600, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+        QPainter painter(&image);
+        link->drawLabel(painter, board, false);
+        painter.end();
+        // The source leaves downwards, the target arrives from the left.
+        QVERIFY(hasPixels(image, QRect(205, 210, 60, 50)));
+        QVERIFY(hasPixels(image, QRect(440, 405, 60, 40)));
+        QVERIFY(!hasPixels(image, QRect(200, 150, 100, 45)));
+        const auto bounds = link->bounds(board);
+        QVERIFY(bounds);
+        const QRect covered = bounds->adjusted(-1, -1, 1, 1).toAlignedRect();
+        QVERIFY(!hasPixels(image, QRect(0, 0, image.width(), covered.top())));
+        QVERIFY(
+            !hasPixels(image, QRect(0, covered.bottom() + 1, image.width(), image.height() - covered.bottom() - 1)));
+    }
+
+    void preservesSelectedRelationMarkersAndCustomWidths()
+    {
+        Board board;
+        board.setFamily(&families::classes());
+        ClassLink link;
+        link.load({{"kind", "composition"}});
+        const LinkStyle normal = link.drawStyle(board, false);
+        QCOMPARE(normal.color, board.style().classifier.line);
+        const LinkStyle selected = link.drawStyle(board, true);
+        QCOMPARE(selected.markerScale, normal.markerScale);
+        QVERIFY(selected.width > normal.width);
+        link.customWidth = normal.width * 2;
+        QCOMPARE(link.graphvizAttributes(board), QStringList{"arrowsize=3.600"});
     }
 
     void reservesTheMarkersInTheLayout()
@@ -598,8 +763,8 @@ private slots:
         classifier.y = 0;
 
         const auto title = classifier.codeReferenceAt(QPointF(40, 20));
-        const auto attribute = classifier.codeReferenceAt(QPointF(40, 65));
-        const auto method = classifier.codeReferenceAt(QPointF(40, 99));
+        const auto attribute = classifier.codeReferenceAt(QPointF(40, 78));
+        const auto method = classifier.codeReferenceAt(QPointF(40, 115));
 
         QVERIFY(title && attribute && method);
         QCOMPARE(title->name, QStringLiteral("AgentActivity"));

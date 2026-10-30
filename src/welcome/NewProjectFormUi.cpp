@@ -4,8 +4,10 @@
 #include "ui/AppFonts.h"
 #include "ui/Paragraph.h"
 #include "ui/PopupFooter.h"
+#include "ui/PopupMetrics.h"
 #include "ui/PopupWidgets.h"
 #include "ui/UiIcons.h"
+#include "ui/UiMetrics.h"
 
 #include <QCheckBox>
 #include <QHBoxLayout>
@@ -22,11 +24,11 @@
 
 namespace {
 
-constexpr int templatePanelWidth = 272;
+// As wide as Project Settings' language column.
+constexpr int templatePanelWidth = 232;
 constexpr int templateIconSize = 32;
-constexpr int templateRowPadding = 12;
+constexpr int templateRowPadding = 10;
 constexpr int templateRowInset = 3;
-constexpr int fieldHeight = 36;
 
 constexpr auto formRules = R"(
 QFrame#projectTemplatePanel { background: @window; border: none; border-right: 1px solid @line; }
@@ -35,9 +37,7 @@ QLabel#projectCaption, QLabel#projectDestination { color: @muted; }
 QLabel#projectRecipeTitle { color: @text; }
 QFrame#projectRecipeDetails { background: @panel; border: 1px solid @line; border-radius: 6px; }
 QFrame#projectGitOption { background: transparent; border: none; border-top: 1px solid @line; }
-QLineEdit#projectName, QLineEdit#projectLocation { padding: 7px 10px; border-radius: 5px; }
-QPushButton#projectBrowse { padding: 7px 10px; border-radius: 5px; }
-QPushButton#projectCreate, QPushButton#projectCancel { padding: 8px 16px; border-radius: 5px; }
+QLineEdit#projectName, QLineEdit#projectLocation { padding: 6px 10px; border-radius: 5px; }
 QListWidget#projectRecipes::item { padding: 0; margin: 0; border: none; background: transparent; }
 QScrollArea#projectDetails { border: none; background: transparent; }
 QWidget#projectDetailsContent { background: transparent; }
@@ -47,7 +47,6 @@ QLabel *caption(const QString &text, QWidget *parent)
 {
     auto *label = new QLabel(parent);
     label->setObjectName(QStringLiteral("projectCaption"));
-    AppFonts::setInterfaceFont(label, 0.86, QFont::Normal);
     Paragraph::setText(label, text);
     return label;
 }
@@ -63,7 +62,7 @@ QLabel *eyebrow(const QString &text, QWidget *parent)
 QLabel *fieldLabel(const QString &text, QWidget *field)
 {
     auto *label = new QLabel(text, field->parentWidget());
-    AppFonts::setInterfaceFont(label, 0.9, QFont::DemiBold);
+    AppFonts::setInterfaceFont(label, 1, QFont::DemiBold);
     label->setBuddy(field);
     return label;
 }
@@ -171,16 +170,16 @@ QWidget *NewProjectForm::createTemplatePanel()
 {
     auto *panel = new QFrame(this);
     panel->setObjectName(QStringLiteral("projectTemplatePanel"));
-    panel->setFixedWidth(templatePanelWidth);
+    AppFonts::followApplicationFont(panel, [panel] { panel->setFixedWidth(UiMetrics::scaled(templatePanelWidth)); });
     auto *layout = new QVBoxLayout(panel);
-    layout->setContentsMargins(18, 24, 18, 18);
+    layout->setContentsMargins(12, 18, 12, 16);
     layout->setSpacing(6);
     layout->addWidget(eyebrow(tr("01 / START WITH"), panel));
     auto *title = new QLabel(tr("Choose a template"), panel);
     title->setWordWrap(true);
-    AppFonts::setInterfaceFont(title, 1.15, QFont::DemiBold);
+    AppFonts::setInterfaceFont(title, 1, QFont::DemiBold);
     layout->addWidget(title);
-    layout->addSpacing(10);
+    layout->addSpacing(6);
     recipeList_->setObjectName(QStringLiteral("projectRecipes"));
     recipeList_->setAccessibleName(tr("Project templates"));
     recipeList_->setItemDelegate(new TemplateDelegate(recipeList_));
@@ -199,14 +198,13 @@ QWidget *NewProjectForm::createDetails()
     auto *content = new QWidget(this);
     content->setObjectName(QStringLiteral("projectDetailsContent"));
     auto *layout = new QVBoxLayout(content);
-    layout->setContentsMargins(28, 24, 28, 16);
+    layout->setContentsMargins(PopupMetrics::bodyMargins);
     layout->setSpacing(6);
     layout->addWidget(eyebrow(tr("02 / MAKE IT YOURS"), content));
     layout->addWidget(caption(tr("Give it a name. We'll set up the starting point."), content));
     layout->addSpacing(12);
     name_->setObjectName(QStringLiteral("projectName"));
     name_->setAccessibleName(tr("Project name"));
-    name_->setMinimumHeight(fieldHeight);
     name_->installEventFilter(this);
     layout->addWidget(fieldLabel(tr("Project name"), name_));
     layout->addWidget(name_);
@@ -228,12 +226,10 @@ QWidget *NewProjectForm::createLocationFields()
     layout->setSpacing(8);
     location_->setObjectName(QStringLiteral("projectLocation"));
     location_->setAccessibleName(tr("Project location"));
-    location_->setMinimumHeight(fieldHeight);
     location_->setMinimumWidth(0);
     location_->installEventFilter(this);
     browse_ = new QPushButton(tr("Browse…"), fields);
     browse_->setObjectName(QStringLiteral("projectBrowse"));
-    browse_->setMinimumHeight(fieldHeight);
     browse_->installEventFilter(this);
     connect(browse_, &QPushButton::clicked, this, &NewProjectForm::browse);
     auto *row = new QHBoxLayout;
@@ -257,13 +253,12 @@ QWidget *NewProjectForm::createRecipeDetails()
     card->setObjectName(QStringLiteral("projectRecipeDetails"));
     auto *layout = new QVBoxLayout(card);
     layout->setContentsMargins(14, 12, 14, 12);
-    layout->setSpacing(7);
+    layout->setSpacing(6);
     recipeTitle_->setObjectName(QStringLiteral("projectRecipeTitle"));
     recipeTitle_->setTextFormat(Qt::PlainText);
     recipeTitle_->setWordWrap(true);
-    AppFonts::setInterfaceFont(recipeTitle_, 0.92, QFont::DemiBold);
+    AppFonts::setInterfaceFont(recipeTitle_, 1, QFont::DemiBold);
     description_->setObjectName(QStringLiteral("projectCaption"));
-    AppFonts::setInterfaceFont(description_, 0.84, QFont::Normal);
     layout->addWidget(recipeTitle_);
     layout->addWidget(description_);
     auto *parameterRow = new QHBoxLayout(parameters_);
@@ -279,9 +274,9 @@ QWidget *NewProjectForm::createGitOption()
     auto *card = new QFrame(this);
     card->setObjectName(QStringLiteral("projectGitOption"));
     auto *layout = new QVBoxLayout(card);
-    layout->setContentsMargins(0, 16, 0, 0);
+    layout->setContentsMargins(0, 12, 0, 0);
     layout->setSpacing(4);
-    AppFonts::setInterfaceFont(git_, 0.9, QFont::DemiBold);
+    AppFonts::setInterfaceFont(git_, 1, QFont::DemiBold);
     git_->installEventFilter(this);
     layout->addWidget(git_);
     auto *text = caption(tr("Track changes from your very first commit."), card);
@@ -293,9 +288,7 @@ QWidget *NewProjectForm::createGitOption()
 QWidget *NewProjectForm::createFooter()
 {
     auto *footer = new PopupFooter(this);
-    footer->layout()->setContentsMargins(24, 14, 24, 14);
     summary_ = footer->hint();
-    AppFonts::setInterfaceFont(summary_, 0.85, QFont::Normal);
     auto *cancel = new QPushButton(tr("Cancel"), footer);
     cancel->setObjectName(QStringLiteral("projectCancel"));
     create_ = new QPushButton(tr("Create project"), footer);

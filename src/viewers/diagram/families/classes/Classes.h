@@ -43,6 +43,11 @@ public:
     QString stereotype; // "interface", "abstract"…; empty for a plain class
     QStringList attributes;
     QStringList methods;
+
+private:
+    void drawHeader(QPainter &painter, const Style &style) const;
+    void drawMembers(QPainter &painter, const Style &style) const;
+    QColor bodyInk(const Style &style) const;
 };
 
 class ClassLink : public Link {
@@ -52,7 +57,10 @@ public:
     void load(const QJsonObject &props) override;
     QJsonObject toJson() const override;
     QStringList graphvizAttributes(const Board &board) const override;
+    LinkStyle drawStyle(const Board &board, bool selected) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
+    void drawLabel(QPainter &painter, const Board &board, bool editing) const override;
+    std::optional<QRectF> bounds(const Board &board) const override;
     QList<Property> properties() const override;
     QVariant propertyValue(const QString &propertyId) const override;
     void setPropertyValue(const QString &propertyId, const QVariant &value) override;
@@ -65,7 +73,8 @@ public:
 
 private:
     void drawMarker(QPainter &painter, const Board &board, const Route &route, const LinkStyle &style) const;
-    void drawCards(QPainter &painter, const Board &board, const Route &route, qreal angle) const;
+    std::array<QRectF, 2> cardRects(const Board &board, const Route &route) const;
+    void drawCards(QPainter &painter, const Board &board, const Route &route) const;
 };
 
 } // namespace diagram::classes

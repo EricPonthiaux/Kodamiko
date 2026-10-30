@@ -11,6 +11,8 @@
 #include <QString>
 #include <QStringList>
 
+#include <array>
+
 class QPainter;
 struct Theme;
 
@@ -73,6 +75,47 @@ struct Style {
     } link;
 
     Tones tones;
+
+    struct {
+        QColor rootFill;
+        QColor rootStroke;
+        std::array<QColor, 6> branches;
+        qreal fillTint = 0.12;
+    } mindmap;
+
+    struct {
+        QColor fill;
+        QColor header;
+        QColor stroke;
+        QColor separator;
+        QColor line;
+        QColor ink;
+        QColor mutedInk;
+    } classifier;
+
+    struct {
+        QColor header;
+        QColor stroke;
+        QColor lifeline;
+        QColor line;
+        QColor fragment;
+        QColor fragmentStroke;
+        QColor ink;
+        QColor mutedInk;
+    } sequence;
+
+    struct {
+        QColor fill;
+        QColor header;
+        QColor stroke;
+        QColor separator;
+        QColor container;
+        QColor containerHeader;
+        QColor line;
+        QColor marker;
+        QColor ink;
+        QColor mutedInk;
+    } state;
 
     struct {
         qreal fontPx = 12, padX = 6, padY = 3;

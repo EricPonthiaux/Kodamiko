@@ -453,22 +453,21 @@ private slots:
                                                           {QStringLiteral("y"), 20},
                                                           {QStringLiteral("w"), 150},
                                                           {QStringLiteral("h"), 44}});
-        QCOMPARE(api->w, 150.0);
-        // One line of text needs 48 px (sidecar's test leaves the shape
-        // unmeasured at 44): the lanes start under the measured header.
-        QCOMPARE(api->h, 48.0);
+        QVERIFY(api->w >= 180);
+        QVERIFY(api->h >= 64);
         const MessageLink *self = message(board, api->id, api->id, {{QStringLiteral("order"), 0}});
         QVERIFY(self);
         const std::optional<Route> r = self->route(board);
         QVERIFY(r);
-        const std::vector<QPointF> expected{{75, 112}, {131, 112}, {131, 130}, {75, 130}};
+        const qreal x = api->cx();
+        const qreal y = messageY(board, 0);
+        const std::vector<QPointF> expected{{x, y}, {x + 56, y}, {x + 56, y + 18}, {x, y + 18}};
         QCOMPARE(r->points, expected);
-        QVERIFY(self->hitTest(board, QPointF(131, 121), 2));
-        QVERIFY(!self->hitTest(board, QPointF(75, 121), 2));
+        QVERIFY(self->hitTest(board, QPointF(x + 56, y + 9), 2));
+        QVERIFY(!self->hitTest(board, QPointF(x, y + 9), 2));
     }
 
-    // Message labels sit right on their link.
-    void labelsAreCenteredOnTheirMessage()
+    void labelsClearTheirMessageAndSelfLoop()
     {
         Board board;
         board.setFamily(&families::sequence());
@@ -479,12 +478,13 @@ private slots:
         const MessageLink *back = message(
             board, a->id, a->id, {{QStringLiteral("order"), 1}, {QStringLiteral("label"), QStringLiteral("Callback")}});
         const Route r = *call->route(board);
-        QCOMPARE(call->labelPos(r, board), QPointF((r.a.x() + r.b.x()) / 2, r.a.y()));
+        QCOMPARE(call->labelPos(r, board).x(), (r.a.x() + r.b.x()) / 2);
+        QVERIFY(call->labelPos(r, board).y() + call->labelBox(board).height / 2 < r.a.y());
         const Route s = *back->route(board);
-        QCOMPARE(back->labelPos(s, board), QPointF(s.a.x() + 56, s.a.y() + 9));
+        QVERIFY(back->labelPos(s, board).x() - back->labelBox(board).width / 2 > s.a.x() + 56);
         // The loop and its label are part of what is framed.
         QVERIFY(back->bounds(board)->right() > s.a.x() + 56);
-        QVERIFY(!call->bounds(board));
+        QVERIFY(call->bounds(board)->contains(call->labelPos(r, board)));
     }
 
     // Filled participants show their next handle on the lifeline, and a
@@ -534,7 +534,7 @@ private slots:
         const QList<Port> ports = a->connectionPorts(board);
         QCOMPARE(ports.size(), 1);
         QCOMPARE(QPointF(ports[0].x, ports[0].y), QPointF(a->cx(), messageY(board, 0)));
-        QVERIFY(ports[0].y - (a->y + a->h) <= 44);
+        QVERIFY(ports[0].y - (a->y + a->h) <= 50);
         QCOMPARE(b->connectionPorts(board).size(), 1);
         QCOMPARE(b->connectionPorts(board)[0].y, messageY(board, 0));
     }
@@ -591,9 +591,8 @@ private slots:
         message(board, a->id, b->id, {{QStringLiteral("order"), 0}, {QStringLiteral("fragments"), fragment("", "")}});
         message(board, b->id, a->id,
                 {{QStringLiteral("order"), 1}, {QStringLiteral("fragments"), fragment("else", "invalid")}});
-        // 24 px for the alt header (sidecar's 132 with an unmeasured 44 px header).
-        QCOMPARE(messageY(board, 0), a->y + a->h + 44 + 24);
-        QCOMPARE(messageY(board, 1) - messageY(board, 0), 66.0); // the else adds 22 px to the 44 px step
+        QVERIFY(messageY(board, 0) > a->y + a->h + 50);
+        QVERIFY(messageY(board, 1) - messageY(board, 0) >= 80);
     }
 
     void fragmentStatementsFollowTheStack()

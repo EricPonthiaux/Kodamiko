@@ -1,0 +1,35 @@
+stateDiagram-v2
+  direction RL
+  state "On disk only" as onDisk
+  state "Open in a tab, unsaved changes" as unsaved
+  state "Open in a tab, saved" as saved
+  [*] --> onDisk
+  onDisk --> onDisk : get_file_text reads the disk
+  onDisk --> onDisk : open_file, no such file (error)
+  onDisk --> onDisk : save_files, not open (error)
+  onDisk --> saved : open_file, at a line if given
+  saved --> saved : get_file_text reads the disk
+  saved --> saved : save_files, nothing to save
+  saved --> unsaved : the user edits
+  unsaved --> unsaved : get_file_text reads the buffer
+  unsaved --> unsaved : save_files fails (error)
+  unsaved --> saved : save_files
+  saved --> onDisk : the user closes the tab
+
+%% Layout kept by Kodamiko (positions, sizes, colors, curves)
+%% kodamiko {"key":"onDisk","x":746,"y":149}
+%% kodamiko {"key":"[*i]","x":954.9,"y":164}
+%% kodamiko {"key":"unsaved","x":0,"y":149}
+%% kodamiko {"key":"saved","x":376,"y":149}
+%% kodamiko {"c":[954.5,173,944.6,173,927,173,907.9,173],"e":[896.1,173],"link":"[*i]>onDisk","n":0}
+%% kodamiko {"link":"onDisk>onDisk","lp":[821,96],"n":0}
+%% kodamiko {"link":"onDisk>onDisk","lp":[821,53],"n":1}
+%% kodamiko {"link":"onDisk>onDisk","lp":[821,10],"n":2}
+%% kodamiko {"c":[745.5,173,688.1,173,608.4,173,547.2,173],"e":[535.2,173],"link":"onDisk>saved","lp":[640.5,163],"n":0}
+%% kodamiko {"link":"saved>saved","lp":[455.5,96],"n":0}
+%% kodamiko {"link":"saved>saved","lp":[455.5,53],"n":1}
+%% kodamiko {"c":[375.8,173,336.6,173,288.3,173,244.1,173],"e":[232.3,173],"link":"saved>unsaved","lp":[304,163],"n":0}
+%% kodamiko {"link":"unsaved>unsaved","lp":[116,96],"n":0}
+%% kodamiko {"link":"unsaved>unsaved","lp":[116,53],"n":1}
+%% kodamiko {"c":[216.1,197.5,256.7,204.5,304.1,208.9,347,203,352.8,202.2,358.8,201.2,364.8,200],"e":[376.3,197.5],"link":"unsaved>saved","lp":[304,193],"n":0}
+%% kodamiko {"c":[534.6,197.5,544.4,199.8,554.4,201.7,564,203,631.3,212.2,649.6,212.6,717,203,722.5,202.2,728.3,201.2,734,200],"e":[745.7,197.3],"link":"saved>onDisk","lp":[640.5,193],"n":0}

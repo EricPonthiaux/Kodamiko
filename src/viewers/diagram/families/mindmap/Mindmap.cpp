@@ -9,7 +9,6 @@
 #include <QCoreApplication>
 #include <QHash>
 #include <QPainter>
-#include <QPainterPathStroker>
 #include <QSet>
 
 #include <algorithm>
@@ -22,24 +21,42 @@ namespace diagram::mindmap {
 namespace {
 
 // Per presentation level: root, depth 1, depth 2+.
-const std::array<Font, 3> fonts{Font(16, 600), Font(14, 500), Font(13)};
-constexpr std::array<qreal, 3> lineHeights{23, 20, 19};
-constexpr std::array<qreal, 3> padX{24, 18, 10};
-constexpr std::array<qreal, 3> padY{16, 12, 6};
-constexpr std::array<qreal, 3> maxTextWidths{220, 190, 170};
+const std::array<Font, 3> fonts{Font(22, 600), Font(17, 550), Font(14)};
+constexpr std::array<qreal, 3> lineHeights{29, 24, 21};
+constexpr std::array<qreal, 3> padX{28, 20, 12};
+constexpr std::array<qreal, 3> padY{20, 14, 8};
+constexpr std::array<qreal, 3> maxTextWidths{260, 210, 190};
 
 QString tr(const char *text)
 {
     return QCoreApplication::translate("MindmapDiagram", text);
 }
 
-// The text's native color: white on the root's solid fill, the ink on the
-// bubbles, muted on the leaves.
-QColor nativeInkOf(int depth, const Palette &palette)
+QPointF sideAnchor(const Shape &shape, qreal direction)
 {
-    if (depth == 0)
-        return {Qt::white};
-    return depth == 1 ? palette.ink : palette.inkMuted;
+    const auto *node = dynamic_cast<const MindNode *>(&shape);
+    const bool leaf = node && node->depth >= 2 && !parseColor(shape.customFill).isValid();
+    return {direction > 0 ? shape.x + shape.w : shape.x, leaf ? shape.y + shape.h : shape.cy()};
+}
+
+Route branchRoute(const Shape &a, const Shape &b)
+{
+    Route result;
+    const bool horizontal = a.x + a.w <= b.x || b.x + b.w <= a.x;
+    if (horizontal) {
+        const qreal direction = b.cx() >= a.cx() ? 1 : -1;
+        result.a = sideAnchor(a, direction);
+        result.b = sideAnchor(b, -direction);
+        const qreal bend = (result.b.x() - result.a.x()) / 2;
+        result.curve = {result.a, result.a + QPointF(bend, 0), result.b - QPointF(bend, 0), result.b};
+    } else {
+        const qreal direction = b.cy() >= a.cy() ? 1 : -1;
+        result.a = {a.cx(), direction > 0 ? a.y + a.h : a.y};
+        result.b = {b.cx(), direction > 0 ? b.y : b.y + b.h};
+        const qreal bend = (result.b.y() - result.a.y()) / 2;
+        result.curve = {result.a, result.a + QPointF(0, bend), result.b - QPointF(0, bend), result.b};
+    }
+    return result;
 }
 
 } // namespace
@@ -97,7 +114,7 @@ void MindNode::onDoubleClick(Board &board)
     TextEditSpec spec;
     spec.get = [this] { return text; };
     spec.set = [this](const QString &value) { text = value; };
-    spec.color = depth == 0 ? QColor(Qt::white) : board.style().palette.ink;
+    spec.color = inkColor(board.style());
     spec.font = fonts[l];
     spec.lineHeight = lineHeights[l];
     spec.align = Align::Center;
@@ -115,7 +132,7 @@ void MindNode::draw(QPainter &painter, const Board &board, const ShapeState &sta
     drawBody(painter, style, state.selected);
     if (state.editing)
         return;
-    const QColor ink = textColor(nativeInkOf(depth, style.palette));
+    const QColor ink = inkColor(style);
     qreal ty = cy() - ((std::max<qsizetype>(1, lines_.size()) - 1) * lineHeights[l]) / 2;
     for (const QString &line : lines_) {
         text::draw(painter, fonts[l], line, QPointF(cx(), ty), ink, Align::Center, Baseline::Middle);
@@ -123,40 +140,43 @@ void MindNode::draw(QPainter &painter, const Board &board, const ShapeState &sta
     }
 }
 
+QColor MindNode::branchColor(const Style &style) const
+{
+    if (branchIndex < 0)
+        return style.mindmap.rootStroke;
+    return style.mindmap.branches[size_t(branchIndex) % style.mindmap.branches.size()];
+}
+
+QColor MindNode::bodyColor(const Style &style) const
+{
+    if (depth == 0)
+        return fillColor(style.mindmap.rootFill);
+    return fillColor(mix(style.palette.paper, branchColor(style), style.mindmap.fillTint));
+}
+
+QColor MindNode::inkColor(const Style &style) const
+{
+    const bool openLeaf = depth >= 2 && !parseColor(customFill).isValid();
+    const QColor paper = openLeaf ? style.palette.paper : bodyColor(style);
+    return readableTextColor(paper, style.palette.ink, style.palette.ink);
+}
+
 void MindNode::drawBody(QPainter &painter, const Style &style, bool selected) const
 {
-    // Every bubble is rounded-sm, like the states and the rest of the board:
-    // no fully rounded stadium for the root and the first level.
-    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    if (!customFill.isEmpty()) {
-        shadowFill(painter, path, fillColor(style.palette.fill), style);
-        stroke(painter, path, strokeColor(selected ? style.shape.selectedStroke : style.shape.stroke),
-               selected ? 2 : shapeBorderWidth);
-    } else if (depth == 0) {
-        shadowFill(painter, path, style.palette.solid, style);
-        if (selected)
-            stroke(painter, path, style.shape.selectedStroke, 2);
-    } else if (depth == 1) {
-        shadowFill(painter, path, style.tones.sage, style);
-        stroke(painter, path, selected ? style.shape.selectedStroke : style.shape.stroke,
-               selected ? 2 : shapeBorderWidth);
-    } else {
+    if (depth >= 2 && !parseColor(customFill).isValid()) {
         drawLeafBody(painter, style, selected);
+        return;
     }
+    const QPainterPath path = roundRect(rect(), depth == 0 ? 20 : 12);
+    painter.fillPath(path, bodyColor(style));
+    const QColor edge = selected ? style.shape.selectedStroke : strokeColor(branchColor(style));
+    stroke(painter, path, edge, selected ? 2.5 : 1.25);
 }
 
 void MindNode::drawLeafBody(QPainter &painter, const Style &style, bool selected) const
 {
-    // A leaf: no box, a fine underline carries the text (Mermaid's deepest
-    // level). The selection still outlines the hit box so that it stays
-    // graspable. The underline gets the short shadow of the bodies.
-    QPainterPath underline;
-    underline.moveTo(x + 2, y + h);
-    underline.lineTo(x + w - 2, y + h);
-    QPainterPathStroker stroker;
-    stroker.setWidth(1.5);
-    stroker.setCapStyle(Qt::RoundCap);
-    shadowFill(painter, stroker.createStroke(underline), style.palette.lifeline, style);
+    // The underline meets the incoming branch and keeps its color.
+    strokeLine(painter, QPointF(x, y + h), QPointF(x + w, y + h), branchColor(style), 1.25);
     if (selected)
         stroke(painter, roundRect(x - 2, y - 2, w + 4, h + 4, shapeRadiusSm), style.shape.selectedStroke, 1.5);
 }
@@ -172,7 +192,7 @@ MindLink::MindLink()
 qreal MindLink::nativeWidth(const Board &board) const
 {
     const auto *source = dynamic_cast<const MindNode *>(board.shape(from));
-    return source && source->depth == 0 ? 2.5 : 1.75;
+    return source && source->depth == 0 ? 3.5 : 1.5;
 }
 
 QStringList MindLink::graphvizAttributes(const Board &board) const
@@ -184,10 +204,19 @@ QStringList MindLink::graphvizAttributes(const Board &board) const
 LinkStyle MindLink::drawStyle(const Board &board, bool selected) const
 {
     LinkStyle style = Link::drawStyle(board, selected, nativeWidth(board));
-    // Branches are drawn in the lifeline's soft ink, not the connectors' one.
-    if (!parseColor(customColor).isValid() && !selected)
-        style.color = board.style().palette.lifeline;
+    const auto *target = dynamic_cast<const MindNode *>(board.shape(to));
+    if (target && !parseColor(customColor).isValid() && !selected)
+        style.color = target->branchColor(board.style());
     return style;
+}
+
+std::optional<Route> MindLink::route(const Board &board) const
+{
+    const Shape *a = board.shape(from);
+    const Shape *b = board.shape(to);
+    if (!a || !b)
+        return std::nullopt;
+    return branchRoute(*a, *b);
 }
 
 void MindLink::draw(QPainter &painter, const Board &board, bool selected) const
@@ -195,20 +224,8 @@ void MindLink::draw(QPainter &painter, const Board &board, bool selected) const
     const std::optional<Route> r = route(board);
     if (!r)
         return;
-    const QPointF a = r->a;
-    const QPointF b = r->b;
-    // Control point: the midpoint pushed slightly aside, an organic bow.
-    const QPointF m = (a + b) / 2;
-    const qreal dx = b.x() - a.x();
-    const qreal dy = b.y() - a.y();
-    const qreal length = std::hypot(dx, dy) > 0 ? std::hypot(dx, dy) : 1;
-    const qreal bow = std::min<qreal>(length * 0.12, 26);
-    const QPointF control(m.x() - (dy / length) * bow, m.y() + (dx / length) * bow);
-    QPainterPath path;
-    path.moveTo(a);
-    path.quadTo(control, b);
     const LinkStyle style = drawStyle(board, selected);
-    stroke(painter, path, style.color, style.width, linkDash(*this));
+    strokeBody(painter, *r, {style.color, style.width, linkDash(*this), 0, 0});
 }
 
 } // namespace diagram::mindmap
@@ -237,30 +254,52 @@ Branches branchesOf(const Board &board)
     return branches;
 }
 
-// Breadth first from the nodes nobody points to, which keep their depth.
-QHash<QString, int> depthsFromRoots(const Board &board)
+struct Presentation {
+    int depth = 1;
+    int branch = -1;
+};
+
+QString nodeIdentity(const Board &board, const QString &id)
+{
+    const Shape *shape = board.shape(id);
+    return shape && !shape->key.isEmpty() ? shape->key : id;
+}
+
+QList<QString> orderedChildren(const Board &board, QList<QString> children)
+{
+    std::sort(children.begin(), children.end(),
+              [&board](const QString &a, const QString &b) { return nodeIdentity(board, a) < nodeIdentity(board, b); });
+    return children;
+}
+
+// Breadth first from the nodes nobody points to. A root's child starts a
+// color; every descendant inherits it, even when attached interactively.
+QHash<QString, Presentation> presentationsFromRoots(const Board &board)
 {
     const Branches branches = branchesOf(board);
-    QHash<QString, int> depths;
+    QHash<QString, Presentation> presentations;
     std::deque<QString> queue;
     for (const auto &s : board.shapes()) {
         const auto *node = dynamic_cast<const mindmap::MindNode *>(s.get());
         if (node && !branches.hasParent.contains(s->id)) {
-            depths.insert(s->id, node->depth);
+            presentations.insert(s->id, {node->depth, -1});
             queue.push_back(s->id);
         }
     }
     while (!queue.empty()) {
         const QString parent = queue.front();
         queue.pop_front();
-        for (const QString &child : branches.children.value(parent)) {
-            if (depths.contains(child))
+        const Presentation inherited = presentations.value(parent);
+        int nextBranch = 0;
+        for (const QString &child : orderedChildren(board, branches.children.value(parent))) {
+            if (presentations.contains(child))
                 continue;
-            depths.insert(child, depths.value(parent) + 1);
+            const int branch = inherited.depth == 0 ? nextBranch++ : inherited.branch;
+            presentations.insert(child, {inherited.depth + 1, branch});
             queue.push_back(child);
         }
     }
-    return depths;
+    return presentations;
 }
 
 // The depth follows the branches: a node attached to another one takes the
@@ -268,12 +307,16 @@ QHash<QString, int> depthsFromRoots(const Board &board)
 // nobody points to keep theirs (the root, a new idea).
 void resolveDepths(const Board &board)
 {
-    const QHash<QString, int> depths = depthsFromRoots(board);
+    const QHash<QString, Presentation> presentations = presentationsFromRoots(board);
     for (const auto &s : board.shapes()) {
         auto *node = dynamic_cast<mindmap::MindNode *>(s.get());
-        if (!node || !depths.contains(s->id) || depths.value(s->id) == node->depth)
+        if (!node)
             continue;
-        node->depth = depths.value(s->id);
+        const Presentation look = presentations.value(s->id, {node->depth, -1});
+        node->branchIndex = look.branch;
+        if (look.depth == node->depth)
+            continue;
+        node->depth = look.depth;
         board.measureShape(*node);
     }
 }
@@ -292,6 +335,9 @@ const Family &mindmap()
         f.defaultShape = QStringLiteral("mind");
         f.defaultLink = QStringLiteral("mind");
         f.resolveLabels = resolveDepths;
+        f.autoArrange = arrange;
+        f.preservePlacedShapes = true;
+        f.routeLinksOnMove = false;
         return f;
     }();
     return family;

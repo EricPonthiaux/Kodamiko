@@ -42,6 +42,41 @@ qreal luminance(const QColor &color)
            0.0722 * channelLuminance(color.blueF());
 }
 
+QColor contrastingColor(const QColor &seed, const QColor &paper, qreal minimum)
+{
+    const qreal background = luminance(paper);
+    const QColor toward = readableTextColor(paper, Qt::black);
+    for (int step = 0; step <= 20; ++step) {
+        const QColor color = mix(seed, toward, step / 20.0);
+        const qreal foreground = luminance(color);
+        const qreal contrast = (std::max(background, foreground) + 0.05) / (std::min(background, foreground) + 0.05);
+        if (contrast >= minimum)
+            return color;
+    }
+    return toward;
+}
+
+QColor syntaxColor(const Theme &theme, QStringView capture)
+{
+    const int index = theme.syntaxStyleIndex(capture);
+    return index >= 0 ? theme.syntaxStyles[index].second.foreground : theme.accent;
+}
+
+void mindmapColors(Style &style, const Theme &theme)
+{
+    const std::array seeds{theme.accent,
+                           syntaxColor(theme, u"type"),
+                           syntaxColor(theme, u"keyword"),
+                           syntaxColor(theme, u"number"),
+                           syntaxColor(theme, u"string"),
+                           syntaxColor(theme, u"function")};
+    for (size_t i = 0; i < seeds.size(); ++i)
+        style.mindmap.branches[i] = contrastingColor(seeds[i], theme.background, 3);
+    style.mindmap.rootStroke = style.mindmap.branches.front();
+    style.mindmap.fillTint = theme.isDark ? 0.18 : 0.07;
+    style.mindmap.rootFill = mix(theme.background, style.mindmap.rootStroke, theme.isDark ? 0.24 : 0.09);
+}
+
 void finish(Style &style)
 {
     const Palette &p = style.palette;
@@ -57,6 +92,46 @@ void finish(Style &style)
     style.linkLabel.color = p.labelInk;
     style.port.fill = p.handle;
     style.port.stroke = p.border;
+}
+
+void classifierColors(Style &style, const Theme &theme)
+{
+    auto &colors = style.classifier;
+    colors.fill = mix(theme.background, theme.foreground, theme.isDark ? 0.04 : 0.015);
+    colors.header = mix(theme.background, theme.accent, theme.isDark ? 0.19 : 0.075);
+    colors.stroke = contrastingColor(mix(theme.background, theme.foreground, 0.38), colors.fill, 3);
+    colors.separator = mix(colors.fill, colors.stroke, 0.55);
+    colors.line = contrastingColor(mix(theme.background, theme.foreground, 0.64), theme.background, 3);
+    colors.ink = theme.foreground;
+    colors.mutedInk = contrastingColor(mix(theme.background, theme.foreground, 0.78), colors.header, 4.5);
+}
+
+void sequenceColors(Style &style, const Theme &theme)
+{
+    auto &colors = style.sequence;
+    colors.header = mix(theme.background, theme.accent, theme.isDark ? 0.19 : 0.075);
+    colors.fragment = mix(theme.background, theme.foreground, theme.isDark ? 0.018 : 0.008);
+    colors.stroke = contrastingColor(mix(theme.background, theme.foreground, 0.5), colors.header, 3);
+    colors.lifeline = mix(theme.background, theme.foreground, 0.36);
+    colors.line = contrastingColor(mix(theme.background, theme.foreground, 0.64), colors.fragment, 3);
+    colors.fragmentStroke = mix(theme.background, theme.foreground, 0.4);
+    colors.ink = theme.foreground;
+    colors.mutedInk = contrastingColor(mix(theme.background, theme.foreground, 0.78), colors.fragment, 4.5);
+}
+
+void stateColors(Style &style, const Theme &theme)
+{
+    auto &colors = style.state;
+    colors.fill = mix(theme.background, theme.foreground, theme.isDark ? 0.035 : 0.015);
+    colors.header = mix(theme.background, theme.accent, theme.isDark ? 0.19 : 0.075);
+    colors.stroke = contrastingColor(mix(theme.background, theme.foreground, 0.5), colors.header, 3);
+    colors.separator = mix(colors.fill, colors.stroke, 0.55);
+    colors.container = mix(theme.background, theme.foreground, theme.isDark ? 0.018 : 0.008);
+    colors.containerHeader = mix(theme.background, theme.accent, theme.isDark ? 0.10 : 0.035);
+    colors.line = contrastingColor(mix(theme.background, theme.foreground, 0.64), colors.container, 3);
+    colors.marker = contrastingColor(mix(theme.background, theme.foreground, 0.85), colors.container, 3);
+    colors.ink = theme.foreground;
+    colors.mutedInk = contrastingColor(mix(theme.background, theme.foreground, 0.78), colors.fill, 4.5);
 }
 
 } // namespace
@@ -92,6 +167,16 @@ Style Style::printed()
     t.external = rgb(0xeeeeee);
     t.group = rgb(0xe8eaf6);
     t.strong = p.solid;
+    style.mindmap.branches = {rgb(0x315f9e), rgb(0x296958), rgb(0x72539f), rgb(0x875b1d), rgb(0x487239), rgb(0x9b526f)};
+    style.mindmap.rootStroke = style.mindmap.branches.front();
+    style.mindmap.rootFill = mix(p.paper, style.mindmap.rootStroke, 0.07);
+    style.mindmap.fillTint = 0.06;
+    style.classifier = {Qt::white,     rgb(0xedf3fc), rgb(0x8391a5), rgb(0xcfd8e4),
+                        rgb(0x62778e), rgb(0x233147), rgb(0x52637a)};
+    style.sequence = {rgb(0xedf3fc), rgb(0x8391a5), rgb(0xaab4c3), rgb(0x62778e),
+                      rgb(0xf5f7fa), rgb(0xaab4c3), rgb(0x233147), rgb(0x52637a)};
+    style.state = {Qt::white,     rgb(0xedf3fc), rgb(0x8391a5), rgb(0xcfd8e4), rgb(0xf5f7fa),
+                   rgb(0xedf3fc), rgb(0x62778e), rgb(0x52637a), rgb(0x233147), rgb(0x52637a)};
     finish(style);
     return style;
 }
@@ -133,6 +218,10 @@ Style Style::fromTheme(const Theme &theme)
     t.external = mix(paper, ink, 0.10);
     t.group = mix(paper, accent, 0.10 * tint);
     t.strong = p.solid;
+    mindmapColors(style, theme);
+    classifierColors(style, theme);
+    sequenceColors(style, theme);
+    stateColors(style, theme);
     finish(style);
     return style;
 }

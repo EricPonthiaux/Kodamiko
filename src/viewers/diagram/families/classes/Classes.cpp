@@ -18,11 +18,15 @@ namespace diagram::classes {
 
 namespace {
 
-const Font font(12.5);
-const Font titleFont(14, 600);
-const Font abstractTitleFont(14, 600, true);
-constexpr qreal lineHeight = 20;
-constexpr qreal pad = 14;
+const Font memberFont(14, 400, false, true);
+const Font stereotypeFont(12.5);
+const Font titleFont(17, 600);
+const Font abstractTitleFont(17, 600, true);
+constexpr qreal lineHeight = 22;
+constexpr qreal titleLineHeight = 24;
+constexpr qreal stereotypeLineHeight = 18;
+constexpr qreal pad = 18;
+constexpr qreal sectionPad = 8;
 
 QString tr(const char *text)
 {
@@ -32,13 +36,39 @@ QString tr(const char *text)
 // The name and «stereotype» lines of a class box.
 qreal headerHeight(const QString &stereotype)
 {
-    return (stereotype.isEmpty() ? 1 : 2) * lineHeight + pad * 2;
+    return titleLineHeight + pad * 2 + (stereotype.isEmpty() ? 0 : stereotypeLineHeight);
 }
 
 // The attributes' or the methods' section, an empty one included.
 qreal sectionHeight(qsizetype memberCount)
 {
-    return memberCount ? qreal(memberCount) * lineHeight + pad : pad;
+    return qreal(memberCount) * lineHeight + sectionPad * 2;
+}
+
+QColor inkOn(const QColor &background, const QColor &preferred)
+{
+    return readableTextColor(background, preferred, preferred);
+}
+
+void drawRows(QPainter &painter, const QStringList &members, QPointF position, const QColor &ink)
+{
+    for (const QString &member : members) {
+        text::draw(painter, memberFont, member, position, ink, Align::Left, Baseline::Top);
+        position.ry() += lineHeight;
+    }
+}
+
+QRectF avoidLabel(QRectF card, const QRectF &label, QPointF normal)
+{
+    if (label.isEmpty() || !card.intersects(label.adjusted(-4, -4, 4, 4)))
+        return card;
+    const QPointF delta = card.center() - label.center();
+    const qreal current = delta.x() * normal.x() + delta.y() * normal.y();
+    const qreal clearance = (std::abs(normal.x()) * (card.width() + label.width()) +
+                             std::abs(normal.y()) * (card.height() + label.height())) /
+                                2 +
+                            6;
+    return card.translated(normal * (clearance - current));
 }
 
 // The member on the row at `y` of a section whose first row starts at `top`,
@@ -254,12 +284,12 @@ void ClassShape::measure(const Board &)
     // Width follows the longest member line; height follows the member
     // count. UML members are never wrapped when drawn: the box really
     // follows the longest signature instead of cutting it.
-    qreal widest = text::width(titleFont, name);
+    qreal widest = text::width(stereotype == QLatin1String("abstract") ? abstractTitleFont : titleFont, name);
     if (!stereotype.isEmpty())
-        widest = std::max(widest, text::width(titleFont, QStringLiteral("«%1»").arg(stereotype)));
+        widest = std::max(widest, text::width(stereotypeFont, QStringLiteral("«%1»").arg(stereotype)));
     for (const QString &member : attributes + methods)
-        widest = std::max(widest, text::width(font, member));
-    w = std::ceil(std::max<qreal>(150, widest + pad * 2));
+        widest = std::max(widest, text::width(memberFont, member));
+    w = std::ceil(std::max<qreal>(180, widest + pad * 2));
     h = headerHeight(stereotype) + sectionHeight(attributes.size()) + sectionHeight(methods.size());
 }
 
@@ -269,8 +299,7 @@ std::optional<CodeReference> ClassShape::codeReferenceAt(QPointF point) const
         codeLink.isEmpty() ? codeReferenceIn(name) : codeReferenceOf(codeLink);
     if (!classReference)
         return std::nullopt;
-    // The rows as draw() lays them out, half a padding below each separator.
-    const qreal attributesTop = y + headerHeight(stereotype) + pad / 2;
+    const qreal attributesTop = y + headerHeight(stereotype) + sectionPad;
     const qreal methodsTop = attributesTop + sectionHeight(attributes.size());
     QString member = memberAt(attributes, attributesTop, point.y());
     if (member.isEmpty())
@@ -328,8 +357,8 @@ void ClassShape::onDoubleClick(Board &board)
     TextEditSpec spec;
     spec.get = [this] { return editText(); };
     spec.set = [this](const QString &value) { setEditText(value); };
-    spec.color = board.style().palette.ink;
-    spec.font = font;
+    spec.color = bodyInk(board.style());
+    spec.font = memberFont;
     spec.lineHeight = lineHeight;
     spec.align = Align::Left;
     spec.rect = [this] { return QRectF(x + pad, y + pad, w - pad * 2, h - pad * 2); };
@@ -340,43 +369,50 @@ void ClassShape::onDoubleClick(Board &board)
 void ClassShape::draw(QPainter &painter, const Board &board, const ShapeState &state) const
 {
     const Style &style = board.style();
-    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    shadowFill(painter, path, fillColor(style.tones.cool), style);
-    stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : shapeBorderWidth);
-    if (state.editing)
-        return;
+    const QPainterPath path = roundRect(rect(), 8);
+    painter.fillPath(path, fillColor(style.classifier.fill));
+    if (!state.editing) {
+        painter.save();
+        painter.setClipPath(path, Qt::IntersectClip);
+        drawHeader(painter, style);
+        drawMembers(painter, style);
+        painter.restore();
+    }
+    const QColor edge = state.selected ? style.shape.selectedStroke : strokeColor(style.classifier.stroke);
+    stroke(painter, path, edge, state.selected ? 2.5 : 1.25);
+}
 
-    painter.save();
-    painter.setClipPath(path, Qt::IntersectClip);
-    qreal ty = y + pad;
-    const QColor ink = textColor(style.palette.ink);
+QColor ClassShape::bodyInk(const Style &style) const
+{
+    return inkOn(fillColor(style.classifier.fill), style.classifier.ink);
+}
+
+void ClassShape::drawHeader(QPainter &painter, const Style &style) const
+{
+    const QColor fill = fillColor(style.classifier.header);
+    painter.fillRect(QRectF(x, y, w, headerHeight(stereotype)), fill);
+    qreal top = y + pad;
     if (!stereotype.isEmpty()) {
-        text::draw(painter, font, QStringLiteral("«%1»").arg(stereotype), QPointF(cx(), ty),
-                   textColor(style.palette.inkMuted), Align::Center, Baseline::Top);
-        ty += lineHeight;
+        text::draw(painter, stereotypeFont, QStringLiteral("«%1»").arg(stereotype), QPointF(x + pad, top),
+                   inkOn(fill, style.classifier.mutedInk), Align::Left, Baseline::Top);
+        top += stereotypeLineHeight;
     }
-    text::draw(painter, stereotype == QLatin1String("abstract") ? abstractTitleFont : titleFont, name,
-               QPointF(cx(), ty), ink, Align::Center, Baseline::Top);
-    ty += lineHeight + pad;
+    const Font &font = stereotype == QLatin1String("abstract") ? abstractTitleFont : titleFont;
+    text::draw(painter, font, name, QPointF(x + pad, top), inkOn(fill, style.classifier.ink), Align::Left,
+               Baseline::Top);
+}
 
-    const auto separator = [&] {
-        strokeLine(painter, QPointF(x, ty - pad / 2), QPointF(x + w, ty - pad / 2), style.palette.separator, 1);
-    };
-    separator();
-    ty += pad / 2;
-    for (const QString &member : attributes) {
-        text::draw(painter, font, member, QPointF(x + pad, ty), ink, Align::Left, Baseline::Top);
-        ty += lineHeight;
-    }
-    ty += pad / 2;
-    separator();
-    ty += pad / 2;
-    for (const QString &member : methods) {
-        text::draw(painter, font, member, QPointF(x + pad, ty), ink, Align::Left, Baseline::Top);
-        ty += lineHeight;
-    }
-    painter.restore();
+void ClassShape::drawMembers(QPainter &painter, const Style &style) const
+{
+    const qreal attributesTop = y + headerHeight(stereotype);
+    const qreal methodsTop = attributesTop + sectionHeight(attributes.size());
+    QColor separator = style.classifier.separator;
+    if (parseColor(customFill).isValid())
+        separator = mix(fillColor(style.classifier.fill), bodyInk(style), 0.3);
+    for (const qreal top : {attributesTop, methodsTop})
+        strokeLine(painter, QPointF(x, top), QPointF(x + w, top), separator, 1);
+    drawRows(painter, attributes, QPointF(x + pad, attributesTop + sectionPad), bodyInk(style));
+    drawRows(painter, methods, QPointF(x + pad, methodsTop + sectionPad), bodyInk(style));
 }
 
 QList<Property> ClassShape::properties() const
@@ -456,7 +492,16 @@ QStringList ClassLink::graphvizAttributes(const Board &board) const
         markerLength = standard;
     if (!markerLength)
         return {QStringLiteral("arrowhead=none")};
-    return {QStringLiteral("arrowsize=") + QString::number(markerLength / 10, 'f', 3)};
+    return {QStringLiteral("arrowsize=") +
+            QString::number(markerLength * drawStyle(board, false).markerScale / 10, 'f', 3)};
+}
+
+LinkStyle ClassLink::drawStyle(const Board &board, bool selected) const
+{
+    LinkStyle style = Link::drawStyle(board, selected, 1.65);
+    if (!selected && !parseColor(customColor).isValid())
+        style.color = board.style().classifier.line;
+    return style;
 }
 
 void ClassLink::draw(QPainter &painter, const Board &board, bool selected) const
@@ -465,7 +510,6 @@ void ClassLink::draw(QPainter &painter, const Board &board, bool selected) const
     if (!r)
         return;
     const LinkStyle style = drawStyle(board, selected);
-    const qreal angle = arrivalAngle(*r);
     const bool dashed =
         kind == QLatin1String("realization") || kind == QLatin1String("dependency") || kind == QLatin1String("dotted");
     // The body stops at the base of a closed marker (triangle, diamond); the
@@ -479,7 +523,6 @@ void ClassLink::draw(QPainter &painter, const Board &board, bool selected) const
         painter, *r,
         {style.color, style.width, dashed ? QList<qreal>{6, 4} : QList<qreal>{}, markerLength * style.markerScale, 0});
     drawMarker(painter, board, *r, style);
-    drawCards(painter, board, *r, angle);
 }
 
 void ClassLink::drawMarker(QPainter &painter, const Board &board, const Route &r, const LinkStyle &style) const
@@ -501,23 +544,82 @@ void ClassLink::drawMarker(QPainter &painter, const Board &board, const Route &r
     }
 }
 
-void ClassLink::drawCards(QPainter &painter, const Board &board, const Route &r, qreal angle) const
+std::array<QRectF, 2> ClassLink::cardRects(const Board &board, const Route &r) const
 {
-    // Cardinalities near each end, set back along the line and offset
-    // perpendicular to it.
-    if (fromCard.isEmpty() && toCard.isEmpty())
-        return;
-    const auto &o = board.style().linkLabel;
-    const auto place = [&](const QString &card, QPointF at, qreal sign) {
+    const Font font(board.style().linkLabel.fontPx);
+    const LabelBox labelSize = labelBox(board);
+    QRectF labelRect;
+    if (!label.isEmpty()) {
+        const QPointF center = labelPos(r, board);
+        labelRect = QRectF(center.x() - labelSize.width / 2, center.y() - labelSize.height / 2, labelSize.width,
+                           labelSize.height);
+    }
+    const auto place = [&](const QString &card, QPointF at, qreal angle, qreal clearance) {
         if (card.isEmpty())
-            return;
-        const qreal back = 18 * sign;
-        const QPointF p(at.x() - back * std::cos(angle) + 12 * std::cos(angle - M_PI / 2),
-                        at.y() - back * std::sin(angle) + 12 * std::sin(angle - M_PI / 2));
-        text::draw(painter, Font(o.fontPx), card, p, o.color, Align::Center, Baseline::Middle);
+            return QRectF();
+        const QSizeF size(text::width(font, card) + 8, font.px + 6);
+        const QPointF along(std::cos(angle), std::sin(angle));
+        const QPointF normal(along.y(), -along.x());
+        const qreal advance =
+            clearance + (std::abs(along.x()) * size.width() + std::abs(along.y()) * size.height()) / 2;
+        const qreal offset = 5 + (std::abs(normal.x()) * size.width() + std::abs(normal.y()) * size.height()) / 2;
+        const QPointF center = at + along * advance + normal * offset;
+        return avoidLabel(QRectF(center - QPointF(size.width() / 2, size.height() / 2), size), labelRect, normal);
     };
-    place(fromCard, r.a, -1);
-    place(toCard, r.b, 1);
+    // Each end uses its own tangent; a bent relation can arrive and leave
+    // in different directions. The target also reserves its UML marker.
+    return {place(fromCard, r.a, departureAngle(r), 10),
+            place(toCard, r.b, arrivalAngle(r) + M_PI, 20 * drawStyle(board, false).markerScale)};
+}
+
+void ClassLink::drawCards(QPainter &painter, const Board &board, const Route &r) const
+{
+    const auto boxes = cardRects(board, r);
+    const std::array cards{fromCard, toCard};
+    const Style &style = board.style();
+    const QColor ink = inkOn(style.background, style.classifier.ink);
+    for (size_t i = 0; i < cards.size(); ++i) {
+        if (boxes[i].isEmpty())
+            continue;
+        painter.fillPath(roundRect(boxes[i], 3), style.background);
+        text::draw(painter, Font(style.linkLabel.fontPx), cards[i], boxes[i].center(), ink, Align::Center,
+                   Baseline::Middle);
+    }
+}
+
+void ClassLink::drawLabel(QPainter &painter, const Board &board, bool editing) const
+{
+    const auto r = route(board);
+    if (!r)
+        return;
+    drawCards(painter, board, *r);
+    if (label.isEmpty() || editing)
+        return;
+    const Style &style = board.style();
+    const LabelBox box = labelBox(board);
+    const QPointF center = labelPos(*r, board);
+    const QRectF rect(center.x() - box.width / 2, center.y() - box.height / 2, box.width, box.height);
+    painter.fillPath(roundRect(rect, 3), style.background);
+    qreal top = center.y() - (box.lines.size() - 1) * box.lineHeight / 2;
+    const QColor ink = inkOn(style.background, style.classifier.mutedInk);
+    for (const QString &line : box.lines) {
+        text::draw(painter, Font(style.linkLabel.fontPx), line, QPointF(center.x(), top), ink, Align::Center,
+                   Baseline::Middle);
+        top += box.lineHeight;
+    }
+}
+
+std::optional<QRectF> ClassLink::bounds(const Board &board) const
+{
+    auto bounds = Link::bounds(board);
+    const auto r = route(board);
+    if (!r)
+        return bounds;
+    for (const QRectF &card : cardRects(board, *r)) {
+        if (!card.isEmpty())
+            bounds = bounds ? bounds->united(card) : card;
+    }
+    return bounds;
 }
 
 QList<Property> ClassLink::properties() const

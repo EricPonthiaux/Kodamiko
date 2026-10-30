@@ -8,18 +8,14 @@ namespace diagram {
 struct Model;
 }
 
-// Mind maps, ported from sidecar's mindmap-diagram.js: presented the way
-// Mermaid presents one, but on the board's own palette instead of Mermaid's
-// branch colors:
-//   depth 0 (root)  solid pill, white bold text: the center of gravity
-//   depth 1         rounded bubbles, regular ink
-//   depth 2+        no box: muted text over a fine underline (Mermaid's leaves)
-// Branches are smooth arrow-less curves; the visual weight decreases with
-// depth.
+// Mind maps: a prominent center, tinted topics and open, underlined leaves.
+// Each root branch has a theme-aware color inherited by its descendants.
+// Curves have no arrows and become finer away from the center.
 namespace diagram::mindmap {
 
 // The presentation level of a depth: 0, 1, or 2 for every deeper node.
 int level(int depth);
+void arrange(Board &board);
 
 class MindNode : public Shape {
 public:
@@ -31,6 +27,7 @@ public:
     void resizeTo(qreal width, qreal height, const Board &board) override;
     void onDoubleClick(Board &board) override;
     void draw(QPainter &painter, const Board &board, const ShapeState &state) const override;
+    QColor branchColor(const Style &style) const;
 
     QString displayText() const override { return text; }
 
@@ -39,11 +36,15 @@ public:
     // resolveLabels) so that a node keeps the look its place in the tree gives
     // it when the source is read again.
     int depth = 1;
+    // Derived from the tree, never serialized as a user color.
+    int branchIndex = -1;
 
 private:
     // The bubble (or a leaf's underline) and its selection outline.
     void drawBody(QPainter &painter, const Style &style, bool selected) const;
     void drawLeafBody(QPainter &painter, const Style &style, bool selected) const;
+    QColor bodyColor(const Style &style) const;
+    QColor inkColor(const Style &style) const;
 
     QStringList lines_;
 };
@@ -54,6 +55,7 @@ public:
     MindLink();
 
     QStringList graphvizAttributes(const Board &board) const override;
+    std::optional<Route> route(const Board &board) const override;
     LinkStyle drawStyle(const Board &board, bool selected) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
 

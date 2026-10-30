@@ -5,6 +5,7 @@
 #include "WelcomeWindow.h"
 #include "ui/AppFonts.h"
 #include "ui/BrandMark.h"
+#include "ui/PopupMetrics.h"
 #include "ui/UiIcons.h"
 #include "ui/UiMetrics.h"
 #include "ui/WindowControls.h"
@@ -96,12 +97,12 @@ QWidget *WelcomeWindow::createWelcomePage()
     rule->setObjectName(QStringLiteral("welcomeRule"));
     rule->setFixedHeight(1);
     auto *contentLayout = new QVBoxLayout(content);
-    contentLayout->setContentsMargins(20, 20, 20, 20);
+    contentLayout->setContentsMargins(PopupMetrics::bodyMargins);
     contentLayout->setSpacing(0);
     contentLayout->addWidget(createProjectsPanel(), 1);
-    contentLayout->addSpacing(16);
+    contentLayout->addSpacing(PopupMetrics::bodySpacing);
     contentLayout->addWidget(rule);
-    contentLayout->addSpacing(16);
+    contentLayout->addSpacing(PopupMetrics::bodySpacing);
     contentLayout->addWidget(createProjectButtons(), 0, Qt::AlignRight);
 
     auto *layout = new QVBoxLayout(page);
@@ -129,7 +130,7 @@ QWidget *WelcomeWindow::createProjectsPanel()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(createListHeading());
-    layout->addSpacing(12);
+    layout->addSpacing(8);
     layout->addWidget(list_, 1);
     layout->addWidget(noMatch_, 1);
     layout->addWidget(firstSteps_, 1);
@@ -171,12 +172,11 @@ QWidget *WelcomeWindow::createFirstSteps()
     steps->setObjectName(QStringLiteral("welcomeEmptyState"));
     auto *title = new QLabel(tr("No recent projects"), steps);
     title->setAlignment(Qt::AlignCenter);
-    AppFonts::setInterfaceFont(title, 1.1, QFont::Medium);
+    AppFonts::setInterfaceFont(title, 1, QFont::DemiBold);
     auto *text = new QLabel(tr("Create a project from a template, or open an existing folder."), steps);
     text->setObjectName(QStringLiteral("footerHint"));
     text->setAlignment(Qt::AlignCenter);
     text->setWordWrap(true);
-    AppFonts::setInterfaceFont(text, 0.95, QFont::Normal);
 
     auto *layout = new QVBoxLayout(steps);
     layout->setContentsMargins(20, 16, 20, 16);
@@ -194,19 +194,17 @@ QWidget *WelcomeWindow::createProjectButtons()
     newButton_ = new QPushButton(UiIcons::icon(QStringLiteral("plus"), theme_.onAccent), tr("New project"), buttons);
     newButton_->setObjectName(QStringLiteral("welcomeAction"));
     newButton_->setDefault(true);
-    AppFonts::setInterfaceFont(newButton_, 0.95, QFont::Medium);
     newButton_->setToolTip(tr("Create a project from a template (N)"));
     connect(newButton_, &QPushButton::clicked, this, &WelcomeWindow::showNewProject);
     auto *import =
         new QPushButton(UiIcons::icon(QStringLiteral("folder"), theme_.foreground), tr("Open folder"), buttons);
     import->setObjectName(QStringLiteral("welcomeAction"));
-    AppFonts::setInterfaceFont(import, 0.95, QFont::Medium);
     import->setToolTip(tr("Add a folder you already have (O)"));
     connect(import, &QPushButton::clicked, this, &WelcomeWindow::importProject);
 
     auto *layout = new QHBoxLayout(buttons);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(10);
+    layout->setSpacing(PopupMetrics::footerSpacing);
     layout->addWidget(newButton_, 1);
     layout->addWidget(import, 1);
     return buttons;

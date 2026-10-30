@@ -54,6 +54,9 @@ public:
 
 private:
     void wrapLines();
+    qreal headerHeight() const;
+    QColor stateFill(const QColor &fallback) const;
+    void drawContent(QPainter &painter, const Style &style) const;
 
     QStringList titleLines_;
     QStringList lines_;
@@ -172,7 +175,13 @@ public:
     // Self-transitions loop out of the shape's top-right corner.
     std::optional<Route> route(const Board &board) const override;
     QPointF labelPos(const Route &route, const Board &board) const override;
+    LabelBox labelBox(const Board &board) const override;
+    QString graphvizHtmlLabel(const Board &board) const override;
+    bool hitTest(const Board &board, QPointF point, qreal tolerance) const override;
+    LinkStyle drawStyle(const Board &board, bool selected) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
+    void drawLabel(QPainter &painter, const Board &board, bool editing) const override;
+    void onDoubleClick(Board &board) override;
     // Transitions almost always carry a label: parallels keep a pill's
     // height between them, not just a stroke's.
     qreal parallelSpread(const Board &board) const override;
@@ -195,9 +204,10 @@ private:
     std::optional<QPointF> validPlacement(const Board &board) const;
 };
 
-// The family's last layout pass (sidecar's resolveStateLabels): a label
-// never leaves its transition; among points sampled along it, the one that
-// overlaps the states and the other labels least is kept.
+// The family's last layout pass: keep Graphviz's labels where they fit;
+// labels on clipped compound edges can move beside their endpoints. After
+// a manual move, sample points along the route to avoid the states and the
+// other labels.
 void resolveLabels(const Board &board);
 
 } // namespace diagram::states

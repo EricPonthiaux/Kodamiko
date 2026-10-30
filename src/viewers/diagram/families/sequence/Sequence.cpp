@@ -21,14 +21,13 @@ using namespace detail;
 
 namespace {
 
-const Font font(14);
-constexpr qreal lineHeight = 20;
-constexpr qreal pad = 14;
+const Font font(17, 600);
+constexpr qreal lineHeight = 24;
+constexpr qreal pad = 18;
 constexpr qreal maxWidth = 320;
 
-constexpr qreal lifelineTail = 28;   // lifeline overshoot below the last message
-constexpr qreal selfLoopHeight = 18; // vertical drop of a self-message loop
-constexpr qreal portAnchorGap = 14;  // the link handle right under the header
+constexpr qreal lifelineTail = 28;  // lifeline overshoot below the last message
+constexpr qreal portAnchorGap = 14; // the link handle right under the header
 
 QString tr(const char *text)
 {
@@ -52,7 +51,7 @@ const QList<std::pair<QString, QString>> &kindChoices()
 // ParticipantShape
 
 ParticipantShape::ParticipantShape()
-    : Shape(QStringLiteral("participant"), 150, 44)
+    : Shape(QStringLiteral("participant"), 180, 64)
 {
 }
 
@@ -81,10 +80,10 @@ void ParticipantShape::measure(const Board &)
 {
     const QStringList probe = text::wrap(font, text, maxWidth - pad * 2);
     const qreal widest = std::max<qreal>(0, text::widest(font, probe));
-    w = std::ceil(std::max<qreal>(120, std::min(maxWidth, widest + pad * 2)));
+    w = std::ceil(std::max<qreal>(180, std::min(maxWidth, widest + pad * 2)));
     lines_ = text::wrap(font, text, w - pad * 2);
     h = isActor() ? std::max<qreal>(80, 56 + lines_.size() * lineHeight)
-                  : std::max<qreal>(44, lines_.size() * lineHeight + pad * 2);
+                  : std::max<qreal>(64, lines_.size() * lineHeight + pad * 2);
 }
 
 void ParticipantShape::resizeTo(qreal width, qreal height, const Board &board)
@@ -132,7 +131,7 @@ void ParticipantShape::onDoubleClick(Board &board)
     TextEditSpec spec;
     spec.get = [this] { return text; };
     spec.set = [this](const QString &value) { text = value; };
-    spec.color = board.style().palette.ink;
+    spec.color = isActor() ? board.style().sequence.ink : headerInk(board.style());
     spec.font = font;
     spec.lineHeight = lineHeight;
     spec.align = Align::Center;
@@ -149,28 +148,14 @@ void ParticipantShape::onDoubleClick(Board &board)
 // a bar never closed runs to the last message.
 void ParticipantShape::drawActivations(QPainter &painter, const Board &board) const
 {
-    const QList<const MessageLink *> list = orderedMessages(board);
-    QList<int> starts;
-    QList<std::pair<int, int>> intervals;
-    int lastOrder = 0;
-    for (const MessageLink *m : list) {
-        lastOrder = std::max(lastOrder, m->order.value_or(0));
-        if (m->activation == QLatin1String("+") && m->to == id)
-            starts.append(m->order.value_or(0));
-        if (m->activation == QLatin1String("-") && m->from == id && !starts.isEmpty())
-            intervals.append({starts.takeLast(), m->order.value_or(0)});
-    }
-    while (!starts.isEmpty())
-        intervals.append({starts.takeLast(), lastOrder});
     const Style &style = board.style();
-    for (const auto &[start, end] : intervals) {
-        const qreal top = messageY(board, start) - 6;
-        const qreal bottom = messageY(board, end) + 12;
-        const QRectF bar(cx() - 5, top, 10, std::max<qreal>(18, bottom - top));
-        painter.fillRect(bar, style.palette.labelBg);
-        QPainterPath path;
-        path.addRect(bar);
-        stroke(painter, path, style.palette.border, 1);
+    for (const ActivationSpan &span : activationSpans(board, id)) {
+        const qreal top = messageY(board, span.start);
+        const qreal bottom = activationBottom(board, span);
+        const QRectF bar(cx() - 5 + span.depth * 4, top, 10, std::max<qreal>(18, bottom - top));
+        const QPainterPath path = roundRect(bar, 2);
+        painter.fillPath(path, headerFill(style));
+        stroke(painter, path, style.sequence.stroke, 1.2);
     }
 }
 
@@ -180,7 +165,7 @@ void ParticipantShape::draw(QPainter &painter, const Board &board, const ShapeSt
     // The lifeline first, under the header.
     const qreal end = lifelineEnd(board);
     strokeLine(painter, QPointF(cx(), y + h), QPointF(cx(), std::max(end, y + h + lifelineTail)),
-               style.palette.lifeline, 1.5, {5, 5});
+               style.sequence.lifeline, 1.2, {3, 7});
     drawActivations(painter, board);
     if (isActor())
         drawActor(painter, style, state);
@@ -193,7 +178,7 @@ void ParticipantShape::drawActor(QPainter &painter, const Style &style, const Sh
     // The silhouette and its text share one color: the selection's, else
     // the user's fill, else the border's.
     const QColor custom = parseColor(customFill);
-    QColor color = custom.isValid() ? custom : style.palette.border;
+    QColor color = custom.isValid() ? custom : style.sequence.stroke;
     if (state.selected)
         color = style.shape.selectedStroke;
     QPainterPath figure = ellipse(QPointF(cx(), y + 11), 7, 7);
@@ -205,30 +190,38 @@ void ParticipantShape::drawActor(QPainter &painter, const Style &style, const Sh
     figure.lineTo(cx() - 11, y + 50);
     figure.moveTo(cx(), y + 38);
     figure.lineTo(cx() + 11, y + 50);
-    const qreal width = state.selected ? 2 : shapeBorderWidth;
-    // sidecar's small shadow under the silhouette.
-    stroke(painter, figure.translated(0, 2), style.palette.shadow, width + 1);
-    stroke(painter, figure, strokeColor(color), width);
+    const qreal width = state.selected ? 2.5 : 1.5;
+    stroke(painter, figure, color, width);
     if (state.editing)
         return;
     qreal ty = y + 56;
     for (const QString &line : lines_) {
-        text::draw(painter, font, line, QPointF(cx(), ty), color, Align::Center, Baseline::Top);
+        text::draw(painter, font, line, QPointF(cx(), ty), style.sequence.ink, Align::Center, Baseline::Top);
         ty += lineHeight;
     }
 }
 
-void ParticipantShape::drawHeader(QPainter &painter, const Style &style, const ShapeState &state) const
+QColor ParticipantShape::headerFill(const Style &style) const
 {
     const QColor own = parseColor(fill);
-    const QColor nativeFill = !own.isValid() || own == QColor(Qt::white) ? style.tones.cool : own;
-    const QPainterPath path = roundRect(x, y, w, h, shapeRadiusSm);
-    shadowFill(painter, path, fillColor(nativeFill), style);
-    stroke(painter, path, strokeColor(state.selected ? style.shape.selectedStroke : style.palette.border),
-           state.selected ? 2 : shapeBorderWidth);
+    const QColor nativeFill = !own.isValid() || own == QColor(Qt::white) ? style.sequence.header : own;
+    return fillColor(nativeFill);
+}
+
+QColor ParticipantShape::headerInk(const Style &style) const
+{
+    return readableTextColor(headerFill(style), style.sequence.ink, style.sequence.ink);
+}
+
+void ParticipantShape::drawHeader(QPainter &painter, const Style &style, const ShapeState &state) const
+{
+    const QPainterPath path = roundRect(rect(), 8);
+    painter.fillPath(path, headerFill(style));
+    const QColor edge = state.selected ? style.shape.selectedStroke : strokeColor(style.sequence.stroke);
+    stroke(painter, path, edge, state.selected ? 2.5 : 1.2);
     if (state.editing)
         return;
-    const QColor ink = textColor(style.palette.ink);
+    const QColor ink = headerInk(style);
     qreal ty = cy() - ((lines_.size() - 1) * lineHeight) / 2;
     for (const QString &line : lines_) {
         text::draw(painter, font, line, QPointF(cx(), ty), ink, Align::Center, Baseline::Middle);
@@ -241,7 +234,12 @@ void ParticipantShape::drawHeader(QPainter &painter, const Style &style, const S
 std::optional<QRectF> ParticipantShape::bounds(const Board &board) const
 {
     const qreal end = lifelineEnd(board);
-    return QRectF(x, y, w, std::max(end, y + h) - y);
+    QRectF bounds(x, y, w, std::max(end, y + h) - y);
+    if (!board.shapes().empty() && board.shapes().front().get() == this) {
+        if (const auto frames = fragmentBounds(board))
+            bounds = bounds.united(*frames);
+    }
+    return bounds;
 }
 
 QList<Property> ParticipantShape::properties() const
@@ -312,95 +310,6 @@ QJsonObject MessageLink::toJson() const
         json.insert(QStringLiteral("fragments"), array);
     }
     return json;
-}
-
-std::optional<Route> MessageLink::route(const Board &board) const
-{
-    const Shape *a = board.shape(from);
-    const Shape *b = board.shape(to);
-    if (!a || !b)
-        return std::nullopt;
-    if (!order)
-        order = maxOrder(board) + 1;
-    const qreal lane = messageY(board, *order);
-    Route r;
-    r.a = QPointF(a->cx(), lane);
-    if (from == to) {
-        r.b = QPointF(a->cx(), lane + selfLoopHeight);
-        r.points = {r.a, QPointF(a->cx() + selfLoopWidth, lane),
-                    QPointF(a->cx() + selfLoopWidth, lane + selfLoopHeight), r.b};
-        return r;
-    }
-    r.b = QPointF(b->cx(), lane);
-    return r;
-}
-
-// Labels sit right on their message: the middle of the segment, or the far
-// side of a self-message's loop.
-QPointF MessageLink::labelPos(const Route &r, const Board &) const
-{
-    if (from == to)
-        return {r.a.x() + selfLoopWidth, r.a.y() + selfLoopHeight / 2};
-    return {(r.a.x() + r.b.x()) / 2, r.a.y()};
-}
-
-// A self-message's loop (and its label on the right) overflows the
-// lifeline: declared for framing, or it falls off the screen.
-std::optional<QRectF> MessageLink::bounds(const Board &board) const
-{
-    const std::optional<Route> r = route(board);
-    if (!r || from != to)
-        return std::nullopt;
-    const qreal right = r->a.x() + selfLoopWidth + 34 + (label.isEmpty() ? 0 : label.size() * 4);
-    return QRectF(QPointF(r->a.x(), r->a.y()), QPointF(right, r->b.y()));
-}
-
-void MessageLink::draw(QPainter &painter, const Board &board, bool selected) const
-{
-    const std::optional<Route> r = route(board);
-    if (!r)
-        return;
-    const LinkStyle style = drawStyle(board, selected);
-    BodyOptions body;
-    body.color = style.color;
-    body.width = style.width;
-    if (line == QLatin1String("dashed"))
-        body.dash = {6, 4};
-    body.trim = head == QLatin1String("arrow") ? arrowBaseInset(style.arrow) : 0;
-    body.trimStart = startHead == QLatin1String("arrow") ? arrowBaseInset(style.arrow) : 0;
-    strokeBody(painter, *r, body);
-    drawHead(painter, board, style, {head, r->b, arrivalAngle(*r)});
-    if (startHead != QLatin1String("none"))
-        drawHead(painter, board, style, {startHead, r->a, departureAngle(*r) + M_PI});
-}
-
-void MessageLink::drawHead(QPainter &painter,
-                           const Board &board,
-                           const LinkStyle &style,
-                           const HeadPlacement &placement) const
-{
-    const QString &kind = placement.kind;
-    const QPointF tip = placement.tip;
-    const qreal angle = placement.angle;
-    if (kind == QLatin1String("arrow")) {
-        fillArrowHead(painter, tip, angle, style.arrow, style.color);
-    } else if (kind == QLatin1String("open")) {
-        const qreal spread = 0.5;
-        const qreal length = (board.style().link.arrow + 2) * style.markerScale;
-        QPainterPath path;
-        path.moveTo(tip.x() - length * std::cos(angle - spread), tip.y() - length * std::sin(angle - spread));
-        path.lineTo(tip);
-        path.lineTo(tip.x() - length * std::cos(angle + spread), tip.y() - length * std::sin(angle + spread));
-        stroke(painter, path, style.color, style.width);
-    } else if (kind == QLatin1String("cross")) {
-        const qreal s = 5 * style.markerScale;
-        QPainterPath cross;
-        cross.moveTo(tip.x() - s, tip.y() - s);
-        cross.lineTo(tip.x() + s, tip.y() + s);
-        cross.moveTo(tip.x() - s, tip.y() + s);
-        cross.lineTo(tip.x() + s, tip.y() - s);
-        stroke(painter, cross, style.color, style.width);
-    }
 }
 
 QList<Property> MessageLink::properties() const
@@ -474,6 +383,7 @@ const Family &sequence()
         f.routeLinksOnMove = false;
         f.autoArrange = arrange;
         f.drawUnderlay = drawFragments;
+        f.drawOverlay = drawFragmentLabels;
         const auto preset = [](const char *id, const QString &label, const QString &text, const char *kind) {
             return ElementPreset{
                 QString::fromLatin1(id),

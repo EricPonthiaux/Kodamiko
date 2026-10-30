@@ -444,6 +444,8 @@ void Canvas::drawGuides(QPainter &painter) const
 
 void Canvas::drawLinkOverlays(QPainter &painter) const
 {
+    if (const Family *family = board_->family(); family && family->drawOverlay)
+        family->drawOverlay(painter, *board_);
     // Labels and selected endpoints last, above the shapes they cross.
     for (const auto &l : board_->links()) {
         l->drawLabel(painter, *board_, l->id == editLink_ && isEditingText());
@@ -514,6 +516,8 @@ void Canvas::paintBoard(QPainter &painter, const Board &board)
         l->draw(painter, board, false);
     for (const Shape *s : foreground)
         s->draw(painter, board, ShapeState{});
+    if (const Family *family = board.family(); family && family->drawOverlay)
+        family->drawOverlay(painter, board);
     for (const auto &l : board.links())
         l->drawLabel(painter, board, false);
 }

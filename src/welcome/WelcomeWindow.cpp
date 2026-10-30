@@ -47,7 +47,6 @@ QFrame#welcomeFooter { border: none; border-top: 1px solid @line; }
 QFrame#welcomeRule { background: @line; border: none; }
 QPushButton#welcomeLink { background: transparent; border: none; color: @muted; padding: 4px 6px; }
 QPushButton#welcomeLink:hover { color: @text; }
-QPushButton#welcomeAction { padding: 8px 12px; border-radius: 5px; }
 QLineEdit#welcomeSearch { padding: 3px 6px; border-radius: 5px; }
 QListWidget#welcomeProjects { background: transparent; border: none; outline: none; }
 QLabel#keyCap { color: @text; background: @panel; border: 1px solid @line; border-bottom: 2px solid @line; border-radius: 4px; padding: 0 5px; }

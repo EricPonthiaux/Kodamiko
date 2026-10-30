@@ -91,6 +91,8 @@ private:
     // The UML silhouette with its text below, or the header box.
     void drawActor(QPainter &painter, const Style &style, const ShapeState &state) const;
     void drawHeader(QPainter &painter, const Style &style, const ShapeState &state) const;
+    QColor headerFill(const Style &style) const;
+    QColor headerInk(const Style &style) const;
 
     QStringList lines_;
 };
@@ -107,9 +109,13 @@ public:
     // lane, or the loop of a self-message. A message drawn interactively has
     // no rank yet: it takes the next lane.
     std::optional<Route> route(const Board &board) const override;
+    LabelBox labelBox(const Board &board) const override;
     QPointF labelPos(const Route &route, const Board &board) const override;
-    std::optional<QRectF> bounds(const Board &board) const override;
+    bool hitTest(const Board &board, QPointF point, qreal tolerance) const override;
+    LinkStyle drawStyle(const Board &board, bool selected) const override;
     void draw(QPainter &painter, const Board &board, bool selected) const override;
+    void drawLabel(QPainter &painter, const Board &board, bool editing) const override;
+    void onDoubleClick(Board &board) override;
 
     bool routesItself() const override { return true; }
 
@@ -144,5 +150,6 @@ private:
 void arrange(const Board &board);
 // The fragments' frames, headers and branch separators.
 void drawFragments(QPainter &painter, const Board &board);
+void drawFragmentLabels(QPainter &painter, const Board &board);
 
 } // namespace diagram::sequence

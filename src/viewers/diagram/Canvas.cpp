@@ -428,7 +428,7 @@ void Canvas::settle(const document::Loaded &loaded, bool animate)
     if (loaded.needsArrange) {
         arrange(animate);
     } else if (!loaded.unplaced.isEmpty()) {
-        if (family->autoArrange) {
+        if (family->autoArrange && !family->preservePlacedShapes) {
             // Its own layout follows the source's order: it places everything.
             arrange(animate);
         } else {
