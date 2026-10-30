@@ -119,6 +119,7 @@ add_library(kdk_core STATIC
     changes/DiscardConfirmation.cpp
     changes/FileChangeDelegate.cpp
     changes/GitActions.cpp
+    changes/GitActionsIntegration.cpp
     changes/HunkActions.cpp
     changes/IdentityPopup.cpp
     changes/NewBranchPopup.cpp

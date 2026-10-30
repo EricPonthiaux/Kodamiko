@@ -4,6 +4,7 @@
 
 #include "git/FileChange.h"
 #include "git/GitProcess.h"
+#include "git/Integration.h"
 #include "git/RepositoryStatus.h"
 
 #include <QObject>
@@ -43,6 +44,8 @@ public:
     void rebase(const QString &onto);
 
     void continueOperation();
+    // Same finalization as Continue, with a reviewed merge commit message.
+    void finishMerge(const QString &message);
     void abortOperation();
     void skipCommit();
 
@@ -59,12 +62,24 @@ signals:
     // An operation changed the repository.
     void changed();
     void statusMessage(const QString &message);
+    // The operation actually finished; resolving its last file is not enough.
+    void integrationFinished(const Integration::Completion &completion);
+    void integrationAborted();
+    // An operation stopped on conflicts, with git's report: not a failure,
+    // the files are left to resolve.
+    void stoppedOnConflicts(const QString &title, const QString &report);
 
 private:
     using Operation = std::function<QString(const RepositoryInfo &repository)>;
     using RemoteOperation = std::function<QString(const RepositoryInfo &, const Git::Feedback &)>;
 
-    void run(const QString &title, Operation operation, std::function<bool(const GitError &)> onFailure = {});
+    void run(const QString &title,
+             Operation operation,
+             std::function<bool(const GitError &)> onFailure = {},
+             std::function<void()> onSuccess = {});
+    // Captures the sides before Git removes its operation state; reports
+    // success only after the whole merge/rebase/sequence has ended.
+    void runIntegration(const QString &title, Integration::Completion completion, Operation operation);
     void runRemote(const QString &title,
                    RemoteOperation operation,
                    std::function<bool(const GitError &)> onFailure = {},

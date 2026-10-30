@@ -4,6 +4,7 @@
 
 #include "RepositoryStatus.h"
 
+#include <QMetaType>
 #include <QString>
 #include <QStringList>
 
@@ -35,8 +36,14 @@ QString revert(const RepositoryInfo &repository, const QString &id);
 // resolution and go on, give up and restore the state from before, or (a
 // rebase only) leave out the commit that stopped it.
 void continueOperation(const RepositoryInfo &repository);
+// Finishes a merge with the reviewed message. Refuses other operations and
+// empty messages; commit hooks still run and can leave the merge unfinished.
+void finishMerge(const RepositoryInfo &repository, const QString &message);
 void abortOperation(const RepositoryInfo &repository);
 void skipCommit(const RepositoryInfo &repository);
+
+// Whether the index has conflicted files, left by an operation that stopped.
+bool hasConflicts(const RepositoryInfo &repository);
 
 // A side of the conflicts of the operation in progress (see
 // ConflictMarkers): the branch checked out, or what is brought into it.
@@ -73,6 +80,14 @@ struct ConflictSides {
     bool operator==(const ConflictSides &) const = default;
 };
 
+// A successful integration, after Git reports no operation left. Used by
+// the dedicated window and its confirmation; never emitted for an abort.
+struct Completion {
+    QString operation;
+    ConflictSides sides;
+    QString commitId;
+};
+
 // The sides of the operation in progress. During a rebase the current side
 // is the branch rebased onto and the incoming side the commit replayed;
 // without an operation (a stash applied), the incoming side is the stash.
@@ -83,3 +98,5 @@ bool canContinue(const QString &operation);
 bool canSkip(const QString &operation);
 
 } // namespace Integration
+
+Q_DECLARE_METATYPE(Integration::Completion)

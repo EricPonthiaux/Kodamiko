@@ -27,6 +27,22 @@ RepositoryInfo repositoryOf(const QString &folder)
     return *repository;
 }
 
+// Git reports a stop on conflicts as a failure: the conflicted files it
+// leaves, when there were none before, tell it apart from the other failures.
+GitError withConflicts(const GitError &error, const QString &folder, bool hadConflicts)
+{
+    if (hadConflicts || error.kind() != GitError::Kind::General)
+        return error;
+    try {
+        const std::optional<RepositoryInfo> repository = RepositoryInfo::read(folder);
+        if (repository && Integration::hasConflicts(*repository))
+            return GitError(error.message(), GitError::Kind::Conflicts);
+    } catch (const GitError &) {
+        // The repository cannot be read: the first failure is the one to report.
+    }
+    return error;
+}
+
 QString pushBranch(const RepositoryInfo &repository, const Git::Feedback &feedback)
 {
     return Remotes::push(repository, feedback);
@@ -56,14 +72,34 @@ std::optional<RepositoryInfo> GitActions::repository()
     return repository;
 }
 
-void GitActions::run(const QString &title, Operation operation, std::function<bool(const GitError &)> onFailure)
+void GitActions::run(const QString &title,
+                     Operation operation,
+                     std::function<bool(const GitError &)> onFailure,
+                     std::function<void()> onSuccess)
 {
     commands_->run(
-        title, [folder = folder_(), operation = std::move(operation)] { return operation(repositoryOf(folder)); },
-        [this] { emit changed(); },
-        [this, onFailure = std::move(onFailure)](const GitError &error) {
+        title,
+        [folder = folder_(), operation = std::move(operation)] {
+            const RepositoryInfo repository = repositoryOf(folder);
+            const bool hadConflicts = Integration::hasConflicts(repository);
+            try {
+                return operation(repository);
+            } catch (const GitError &error) {
+                throw withConflicts(error, folder, hadConflicts);
+            }
+        },
+        [this, onSuccess = std::move(onSuccess)] {
+            emit changed();
+            if (onSuccess)
+                onSuccess();
+        },
+        [this, title, onFailure = std::move(onFailure)](const GitError &error) {
             // A failure can leave the repository changed too (conflicts).
             emit changed();
+            if (error.kind() == GitError::Kind::Conflicts) {
+                emit stoppedOnConflicts(title, error.message());
+                return true;
+            }
             return onFailure && onFailure(error);
         });
 }
@@ -76,7 +112,13 @@ void GitActions::runRemote(const QString &title,
     commands_->runLong(
         title,
         [folder = folder_(), operation = std::move(operation)](const Git::Feedback &feedback) {
-            return operation(repositoryOf(folder), feedback);
+            const RepositoryInfo repository = repositoryOf(folder);
+            const bool hadConflicts = Integration::hasConflicts(repository);
+            try {
+                return operation(repository, feedback);
+            } catch (const GitError &error) {
+                throw withConflicts(error, folder, hadConflicts);
+            }
         },
         [this, onSuccess = std::move(onSuccess)] {
             emit changed();
@@ -87,6 +129,10 @@ void GitActions::runRemote(const QString &title,
             emit changed();
             if (error.kind() == GitError::Kind::Cancelled) {
                 emit statusMessage(tr("%1: cancelled").arg(title));
+                return true;
+            }
+            if (error.kind() == GitError::Kind::Conflicts) {
+                emit stoppedOnConflicts(title, error.message());
                 return true;
             }
             return onFailure && onFailure(error);
@@ -384,54 +430,6 @@ void GitActions::trackBranch(const QString &remoteBranch)
             throw GitError(QObject::tr("HEAD is detached: switch to a branch first"));
         Branches::setUpstream(repository, repository.branch, remoteBranch);
         return QObject::tr("%1 now tracks %2").arg(repository.branch, remoteBranch);
-    });
-}
-
-void GitActions::merge(const QString &branch)
-{
-    run(tr("Merge"), [branch](const RepositoryInfo &repository) {
-        Integration::merge(repository, branch);
-        return QObject::tr("Merged %1 into %2").arg(branch, repository.branch);
-    });
-}
-
-void GitActions::rebase(const QString &onto)
-{
-    run(tr("Rebase"), [onto](const RepositoryInfo &repository) {
-        Integration::rebase(repository, onto);
-        return QObject::tr("Rebased %1 onto %2").arg(repository.branch, onto);
-    });
-}
-
-void GitActions::continueOperation()
-{
-    run(tr("Continue"), [](const RepositoryInfo &repository) {
-        Integration::continueOperation(repository);
-        return QObject::tr("The %1 went on").arg(repository.operation);
-    });
-}
-
-void GitActions::abortOperation()
-{
-    const std::optional<RepositoryInfo> current = repository();
-    if (!current || current->operation.isEmpty())
-        return;
-    confirm(tr("Abort"),
-            tr("Abort the %1? The branch and the files go back to how they were before it started.")
-                .arg(current->operation),
-            tr("Abort %1").arg(current->operation), [this] {
-                run(tr("Abort"), [](const RepositoryInfo &repository) {
-                    Integration::abortOperation(repository);
-                    return QObject::tr("The %1 was aborted").arg(repository.operation);
-                });
-            });
-}
-
-void GitActions::skipCommit()
-{
-    run(tr("Skip"), [](const RepositoryInfo &repository) {
-        Integration::skipCommit(repository);
-        return QObject::tr("Commit skipped");
     });
 }
 

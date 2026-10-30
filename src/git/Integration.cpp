@@ -154,6 +154,15 @@ void continueOperation(const RepositoryInfo &repository)
     Git::run(repository.workDir, {commandOrThrow(repository), QStringLiteral("--continue")});
 }
 
+void finishMerge(const RepositoryInfo &repository, const QString &message)
+{
+    if (repository.operation != QObject::tr("merge"))
+        throw GitError(QObject::tr("No merge is in progress"));
+    if (message.trimmed().isEmpty())
+        throw GitError(QObject::tr("Enter a message for the merge commit"));
+    GitOperations::commit(repository, message, false);
+}
+
 void abortOperation(const RepositoryInfo &repository)
 {
     Git::run(repository.workDir, {commandOrThrow(repository), QStringLiteral("--abort")});
@@ -164,6 +173,12 @@ void skipCommit(const RepositoryInfo &repository)
     if (!canSkip(repository.operation))
         throw GitError(QObject::tr("Only a rebase, cherry-pick or revert can skip a commit"));
     Git::run(repository.workDir, {commandOrThrow(repository), QStringLiteral("--skip")});
+}
+
+bool hasConflicts(const RepositoryInfo &repository)
+{
+    const QByteArray unmerged = Git::run(repository.workDir, {QStringLiteral("ls-files"), QStringLiteral("-u")});
+    return !unmerged.isEmpty();
 }
 
 void acceptVersion(const RepositoryInfo &repository, const QStringList &paths, ConflictSide side)
