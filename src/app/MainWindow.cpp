@@ -323,6 +323,7 @@ void MainWindow::createGitViews()
     connect(changesView_, &ChangesView::continueRequested, gitActions_, &GitActions::continueOperation);
     connect(changesView_, &ChangesView::skipRequested, gitActions_, &GitActions::skipCommit);
     connect(changesView_, &ChangesView::abortRequested, gitActions_, &GitActions::abortOperation);
+    connect(changesView_, &ChangesView::mergeViewRequested, this, &MainWindow::openMergeView);
 
     historyView_ = new HistoryView(theme_, this);
     connect(historyView_, &HistoryView::checkoutRequested, gitActions_, &GitActions::checkoutCommit);

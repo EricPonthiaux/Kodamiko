@@ -45,6 +45,7 @@ class CompletionService;
 class DetachablePage;
 class EditorStatus;
 class EditorTabs;
+class MergeView;
 class EditErrorCheck;
 class EditorWidget;
 class FileStatusReader;
@@ -497,6 +498,9 @@ private:
     // The review tab of `subject` (a CodeRequest::describe() result), named
     // after `title`. The project's check runs first.
     void openReview(const QString &subject, const QString &title);
+    // The merge view of the project's conflicts, in a tab; brought to the
+    // front and read again if it is open.
+    void openMergeView();
     // What a review of `subject` is asked; `patch`, a unified diff, holds
     // the changes to review (empty: the code as it is).
     ReviewSession::Request reviewRequest(const QString &subject, const QByteArray &patch = {}) const;
@@ -634,6 +638,7 @@ private:
     ChangesView *changesView_ = nullptr;
     HistoryView *historyView_ = nullptr;
     ReviewPage *reviewPage_ = nullptr;
+    QPointer<MergeView> mergeView_;        // a tab's page; null when none is open
     QPointer<ReviewSession> stagedReview_; // a child; null without a review of the staged changes
     GitCommands *gitCommands_ = nullptr;
     AgentMergeQueue *agentMerges_ = nullptr;

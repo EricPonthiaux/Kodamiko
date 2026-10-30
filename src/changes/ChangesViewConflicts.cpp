@@ -46,6 +46,7 @@ void ChangesView::addConflictActions(QMenu &menu, const QList<FileRef> &selectio
     if (conflicted.isEmpty())
         return;
     const bool busy = commands_->isBusy();
+    menu.addAction(tr("Resolve in Merge View"), this, &ChangesView::mergeViewRequested);
     menu.addAction(tr("Accept Current Version"), this,
                    [this, conflicted] { acceptVersion(conflicted, Integration::ConflictSide::Current); })
         ->setEnabled(!busy);

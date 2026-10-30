@@ -24,6 +24,7 @@
 #include "editor/FindBar.h"
 #include "history/HistoryView.h"
 #include "lsp/LanguageServers.h"
+#include "merge/MergeView.h"
 #include "navigation/GoToPopup.h"
 #include "navigation/HierarchyView.h"
 #include "navigation/UsagesView.h"
@@ -107,6 +108,8 @@ void MainWindow::setTheme(const QString &name)
     snackbar_->applyTheme(theme_);
     reviewPage_->applyTheme(theme_);
     historyView_->applyTheme(theme_);
+    if (mergeView_)
+        mergeView_->applyTheme(theme_);
     findBar_->applyTheme(theme_);
     findInFiles_->applyTheme(theme_);
     goToPopup_->applyTheme(theme_);

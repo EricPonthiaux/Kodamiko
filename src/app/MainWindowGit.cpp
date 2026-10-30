@@ -23,6 +23,7 @@
 #include "git/Integration.h"
 #include "git/RepositoryWatcher.h"
 #include "history/HistoryView.h"
+#include "merge/MergeView.h"
 #include "ui/TitleBar.h"
 #include "workspace/ChoicePopup.h"
 #include "workspace/EntryPopups.h"
@@ -363,4 +364,16 @@ std::optional<QString> MainWindow::askCredentials(const QString &prompt)
 void MainWindow::showSnapshots()
 {
     snapshotsPopup_->popup(folder_);
+}
+
+void MainWindow::openMergeView()
+{
+    setMode(Mode::Edit);
+    if (mergeView_) {
+        editorTabs_->setCurrentWidget(mergeView_);
+        mergeView_->reload();
+        return;
+    }
+    mergeView_ = new MergeView(folder_, theme_);
+    editorTabs_->showPage(mergeView_, tr("Merge"), QStringLiteral("branch"));
 }

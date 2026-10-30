@@ -150,6 +150,9 @@ signals:
     void continueRequested();
     void skipRequested();
     void abortRequested();
+    // The conflicts of the operation in progress, to resolve in the merge
+    // view.
+    void mergeViewRequested();
 
 private:
     enum class Section {

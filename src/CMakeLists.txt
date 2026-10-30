@@ -213,6 +213,10 @@ add_library(kdk_core STATIC
     lsp/LspProtocol.cpp
     lsp/ServerTasksLabel.cpp
     merge/MergeDocument.cpp
+    merge/MergeGutter.cpp
+    merge/MergePane.cpp
+    merge/MergeTextPanel.cpp
+    merge/MergeView.cpp
     navigation/CodeIntelligence.cpp
     navigation/CodeIntelligenceCodeActions.cpp
     navigation/CodeIntelligenceHierarchy.cpp

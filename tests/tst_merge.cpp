@@ -6,8 +6,13 @@
 #include "git/RepositoryStatus.h"
 #include "git/ThreeWayMerge.h"
 #include "merge/MergeDocument.h"
+#include "merge/MergeGutter.h"
+#include "merge/MergePane.h"
+#include "merge/MergeView.h"
+#include "ui/Theme.h"
 
 #include <QFileInfo>
+#include <QListWidget>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -509,9 +514,57 @@ private slots:
         QVERIFY(!document.canUndo());
     }
 
+    // MergeView
+
+    void listsTheConflictedFilesAndShowsTheFirst()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"a.txt", "base\n"}, {"b.txt", "base\n"}});
+        commitOn(dir, "other", [&dir] {
+            write(dir, "a.txt", "other\n");
+            write(dir, "b.txt", "other\n");
+        });
+        commitOn(dir, "main", [&dir] {
+            write(dir, "a.txt", "main\n");
+            write(dir, "b.txt", "main\n");
+        });
+        mergeOther(dir);
+
+        MergeView view(dir.path(), Theme::named("kodamiko"));
+
+        auto *list = view.findChild<QListWidget *>();
+        QTRY_COMPARE(list->count(), 2);
+        QCOMPARE(list->currentRow(), 0);
+        QVERIFY(list->item(0)->text().startsWith("a.txt\n"));
+        QCOMPARE(view.findChildren<MergePane *>().size(), 3);
+    }
+
+    void anArrowTakesItsSideIntoTheResult()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"a.txt", "a\nbase\nz\n"}});
+        commitOn(dir, "other", [&dir] { write(dir, "a.txt", "a\nother\nz\n"); });
+        commitOn(dir, "main", [&dir] { write(dir, "a.txt", "a\nmain\nz\n"); });
+        mergeOther(dir);
+        MergeView view(dir.path(), Theme::named("kodamiko"));
+        view.resize(1200, 600);
+        view.show();
+        auto *list = view.findChild<QListWidget *>();
+        QTRY_COMPARE(list->count(), 1);
+        QVERIFY(list->item(0)->text().endsWith("1 conflict(s) left"));
+        const MergePane *pane = view.findChild<MergePane *>();
+        const int rowHeight = int(pane->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0L));
+        MergeGutter *gutter = view.findChild<MergeGutter *>();
+
+        // The conflict is the second row.
+        QTest::mouseClick(gutter, Qt::LeftButton, {}, QPoint(gutter->width() / 2, rowHeight + rowHeight / 2));
+
+        QVERIFY2(list->item(0)->text().endsWith("Resolved, not saved yet"), qPrintable(list->item(0)->text()));
+    }
+
 private:
     QTemporaryFile config_;
 };
 
-QTEST_GUILESS_MAIN(TestMerge)
+QTEST_MAIN(TestMerge)
 #include "tst_merge.moc"
