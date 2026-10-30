@@ -76,16 +76,11 @@ QLayout *ReviewFindingsView::createBar()
     selection_->setObjectName(QStringLiteral("reviewMuted"));
     resolve_ = new QPushButton(this);
     resolve_->setObjectName(QStringLiteral("reviewPrimary"));
-    send_ = new QPushButton(this);
     dismiss_ = new QPushButton(tr("Dismiss"), this);
     dismiss_->setToolTip(tr("Remove the selected findings from the review and the editor (Del)"));
     connect(resolve_, &QPushButton::clicked, this, [this] {
         if (session_)
             session_->resolve(targets());
-    });
-    connect(send_, &QPushButton::clicked, this, [this] {
-        if (session_)
-            session_->send(targets());
     });
     connect(dismiss_, &QPushButton::clicked, this, [this] { list_->dismiss(list_->selectedFindings()); });
 
@@ -96,7 +91,6 @@ QLayout *ReviewFindingsView::createBar()
     bar->addWidget(warnings_);
     bar->addStretch();
     bar->addWidget(selection_);
-    bar->addWidget(send_);
     bar->addWidget(dismiss_);
     bar->addWidget(resolve_);
     return bar;
@@ -135,16 +129,13 @@ void ReviewFindingsView::updateBar()
     const bool hasSelection = selected > 0;
     const QString agent = session_ ? session_->agentName() : QString();
     selection_->setText(hasSelection ? tr("%1 selected").arg(selected) : QString());
-    // Resolve and Send leave out the findings handed over to be fixed.
+    // Resolve leaves out the findings handed over to be fixed.
     const bool canHandOver = session_ && !session_->notHandedOver(targets()).isEmpty();
     resolve_->setText(hasSelection ? tr("Fix selected") : tr("Fix visible"));
     resolve_->setToolTip(tr("Have the %1 session that wrote the code check these problems and fix those that are "
                             "real (R)")
                              .arg(agent));
     resolve_->setEnabled(canHandOver);
-    send_->setText(tr("Prepare prompt"));
-    send_->setToolTip(tr("Type these findings in %1's prompt, for you to complete and send").arg(agent));
-    send_->setEnabled(canHandOver);
     dismiss_->setVisible(hasSelection);
     undoNotice_->setVisible(session_ && session_->canUndoDismiss());
 }

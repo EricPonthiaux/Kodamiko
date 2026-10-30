@@ -595,8 +595,6 @@ private slots:
 
         QTRY_COMPARE(buttonsNamed("Dismiss"), qsizetype(3));
         QVERIFY(!barButton("Fix visible")->isEnabled());
-        QVERIFY(!barButton("Prepare prompt")->isEnabled());
-        QCOMPARE(buttonsNamed("Prepare prompt"), qsizetype(0));
         QCOMPARE(buttonsNamed("Ask Claude to fix"), qsizetype(0));
     }
 

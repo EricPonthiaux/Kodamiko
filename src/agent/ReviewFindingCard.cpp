@@ -148,10 +148,6 @@ QWidget *ReviewFindingCard::createActions(Status status, const QString &agentNam
     connect(dismiss, &QPushButton::clicked, this, &ReviewFindingCard::dismissRequested);
     actions->addWidget(dismiss);
     if (status == Status::Open) {
-        QPushButton *send = createAction(
-            tr("Prepare prompt"), tr("Type this finding in %1's prompt, for you to complete and send").arg(agentName));
-        connect(send, &QPushButton::clicked, this, &ReviewFindingCard::sendRequested);
-        actions->addWidget(send);
         QPushButton *resolve =
             createAction(tr("Ask %1 to fix").arg(agentName),
                          tr("Have the %1 session that wrote the code check this problem and fix it if "

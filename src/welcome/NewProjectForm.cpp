@@ -16,6 +16,8 @@
 #include <QDir>
 #include <QEvent>
 #include <QFileDialog>
+#include <QHash>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -33,6 +35,22 @@ namespace {
 constexpr auto locationKey = "newProject/location";
 constexpr auto recipeKey = "newProject/recipe";
 constexpr auto gitKey = "newProject/git";
+
+QIcon templateIcon(const Recipe &recipe)
+{
+    // Frameworks take precedence over their language; IDs also cover the MSVC variants.
+    static const QHash<QString, QString> brands = {
+        {QStringLiteral("angular"), QStringLiteral("angular")},
+        {QStringLiteral("qt-widgets"), QStringLiteral("qt")},
+        {QStringLiteral("qt-widgets-msvc"), QStringLiteral("qt")},
+        {QStringLiteral("typescript-node"), QStringLiteral("typescript")},
+        {QStringLiteral("cpp"), QStringLiteral("cpp")},
+        {QStringLiteral("java"), QStringLiteral("java")},
+        {QStringLiteral("python"), QStringLiteral("python")},
+    };
+    const QString name = brands.value(recipe.id, brands.value(recipe.language));
+    return name.isEmpty() ? QIcon() : QIcon(QStringLiteral(":/template-icons/%1.png").arg(name));
+}
 
 } // namespace
 
@@ -67,6 +85,7 @@ void NewProjectForm::configureFields()
     recipes_ = RecipeLibrary::available(RecipeLibrary::defaultSources());
     for (const Recipe &recipe : std::as_const(recipes_)) {
         auto *item = new QListWidgetItem(recipe.title, recipeList_);
+        item->setIcon(templateIcon(recipe));
         item->setToolTip(recipe.description);
         if (recipe.id == lastRecipe || !recipeList_->currentItem())
             recipeList_->setCurrentItem(item);

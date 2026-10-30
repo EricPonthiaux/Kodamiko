@@ -24,7 +24,7 @@ public:
         Sent // handed over to be fixed (ReviewSession::isResolving())
     };
 
-    // `agentName` names the Send button.
+    // `agentName` names the Fix button and the handed-over mark.
     ReviewFindingCard(const ReviewReport::Finding &finding, Status status, const QString &agentName, QWidget *parent);
 
     const ReviewReport::Finding &finding() const { return finding_; }
@@ -41,7 +41,6 @@ signals:
     // A double click, or a click on the line: the finding's place.
     void activated();
     void resolveRequested();
-    void sendRequested();
     void dismissRequested();
     void detailsToggled(bool expanded);
 

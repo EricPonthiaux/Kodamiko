@@ -9,6 +9,7 @@
 
 #include <QCheckBox>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -23,7 +24,8 @@ namespace {
 
 constexpr int templatePanelWidth = 272;
 constexpr int templateIconSize = 32;
-constexpr int templateRowPadding = 7;
+constexpr int templateRowPadding = 12;
+constexpr int templateRowInset = 3;
 constexpr int fieldHeight = 36;
 
 constexpr auto formRules = R"(
@@ -74,14 +76,15 @@ public:
 
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &) const override
     {
-        return {0, std::max(templateIconSize, 2 * option.fontMetrics.height() + 2) + 2 * templateRowPadding};
+        const int contentHeight = std::max(templateIconSize, 2 * option.fontMetrics.height() + 2);
+        return {0, contentHeight + 2 * (templateRowPadding + templateRowInset)};
     }
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing);
-        const QRect area = option.rect.adjusted(0, 3, -1, -3);
+        const QRect area = option.rect.adjusted(0, templateRowInset, -1, -templateRowInset);
         const bool selected = option.state & QStyle::State_Selected;
         const bool hovered = option.state & QStyle::State_MouseOver;
         const QColor accent = option.palette.color(QPalette::Link);
@@ -92,17 +95,21 @@ public:
         painter->setBrush(selected || hovered ? tint : QColor(Qt::transparent));
         painter->drawRoundedRect(area.adjusted(1, 1, -1, -1), 6, 6);
 
-        const QRect icon(area.left() + 12, area.center().y() - templateIconSize / 2, templateIconSize,
-                         templateIconSize);
+        const QRect icon(area.left() + 12, area.top() + templateRowPadding, templateIconSize, templateIconSize);
         painter->setPen(Qt::NoPen);
         painter->setBrush(tint);
         painter->drawRoundedRect(icon, 5, 5);
         const QString title = index.data().toString();
         const QStringList parts = title.split(QStringLiteral(" · "));
-        const QString iconName = parts.size() > 1 ? QStringLiteral("code") : QStringLiteral("folder");
-        UiIcons::icon(iconName, selected ? accent : muted).paint(painter, icon.adjusted(7, 7, -7, -7));
+        const QIcon brand = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
+        if (!brand.isNull()) {
+            brand.paint(painter, icon.adjusted(4, 4, -4, -4));
+        } else {
+            const QString iconName = parts.size() > 1 ? QStringLiteral("code") : QStringLiteral("folder");
+            UiIcons::icon(iconName, selected ? accent : muted).paint(painter, icon.adjusted(7, 7, -7, -7));
+        }
         paintText(painter, option, parts,
-                  QRect(icon.right() + 12, area.top(), area.right() - icon.right() - 36, area.height()));
+                  QRect(icon.right() + 12, icon.top(), area.right() - icon.right() - 36, area.bottom() - icon.top()));
         if (selected) {
             const QRect check(area.right() - 22, area.center().y() - 7, 14, 14);
             UiIcons::icon(QStringLiteral("check"), accent).paint(painter, check);
@@ -120,18 +127,21 @@ private:
         title.setWeight(QFont::DemiBold);
         QFont detail = option.font;
         detail.setPointSizeF(detail.pointSizeF() * 0.82);
-        const int lineHeight = option.fontMetrics.height();
-        const int top = area.center().y() - lineHeight - 1;
+        const QFontMetrics titleMetrics(title);
+        const QFontMetrics detailMetrics(detail);
+        // Align the visible capitals with the icon, rather than the font's ascender space.
+        const int titleBaseline = area.top() + titleMetrics.capHeight();
+        const int detailBaseline = titleBaseline + titleMetrics.descent() + 3 + detailMetrics.ascent();
         painter->setFont(title);
         painter->setPen(option.palette.color(QPalette::Text));
-        painter->drawText(QRect(area.left(), top, area.width(), lineHeight), Qt::AlignVCenter,
-                          QFontMetrics(title).elidedText(parts.first(), Qt::ElideRight, area.width()));
+        painter->drawText(QPoint(area.left(), titleBaseline),
+                          titleMetrics.elidedText(parts.first(), Qt::ElideRight, area.width()));
         painter->setFont(detail);
         painter->setPen(option.palette.color(QPalette::PlaceholderText));
         const QString subtitle =
             parts.size() > 1 ? parts.sliced(1).join(QStringLiteral(" · ")) : QObject::tr("A blank canvas");
-        painter->drawText(QRect(area.left(), top + lineHeight + 3, area.width(), lineHeight), Qt::AlignVCenter,
-                          QFontMetrics(detail).elidedText(subtitle, Qt::ElideRight, area.width()));
+        painter->drawText(QPoint(area.left(), detailBaseline),
+                          detailMetrics.elidedText(subtitle, Qt::ElideRight, area.width()));
     }
 };
 

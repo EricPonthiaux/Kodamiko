@@ -13,7 +13,7 @@ class QToolButton;
 
 // A review's findings (ReviewSession) to go through and act on: a bar with
 // how many findings, errors and warnings are left, which also filter the
-// list, then actions to fix, prepare a prompt, or dismiss the selection.
+// list, then actions to fix or dismiss the selection.
 // Without a selection, handoffs use only the filtered findings. File groups
 // (ReviewFindingsList) and undo follow the toolbar, in a review's tab and
 // over the diff alike.
@@ -44,7 +44,6 @@ private:
     QToolButton *warnings_ = nullptr;
     QLabel *selection_ = nullptr;
     QPushButton *resolve_ = nullptr;
-    QPushButton *send_ = nullptr;
     QPushButton *dismiss_ = nullptr;
     QWidget *undoNotice_ = nullptr;
 };

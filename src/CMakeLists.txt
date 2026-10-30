@@ -430,6 +430,20 @@ target_link_libraries(kdk_core PUBLIC
     qscintilla tree_sitter_grammars vterm git2 cmark_gfm)
 kdk_add_queries(kdk_core)
 
+# Original language and framework logos for the project templates.
+# PNG exports keep these available even when Qt's SVG plugin is not installed.
+qt_add_resources(kdk_core template_icons
+    PREFIX /template-icons
+    BASE ${PROJECT_SOURCE_DIR}/third_party/devicon
+    FILES
+        ${PROJECT_SOURCE_DIR}/third_party/devicon/angular.png
+        ${PROJECT_SOURCE_DIR}/third_party/devicon/cpp.png
+        ${PROJECT_SOURCE_DIR}/third_party/devicon/java.png
+        ${PROJECT_SOURCE_DIR}/third_party/devicon/python.png
+        ${PROJECT_SOURCE_DIR}/third_party/devicon/qt.png
+        ${PROJECT_SOURCE_DIR}/third_party/devicon/typescript.png
+        ${PROJECT_SOURCE_DIR}/third_party/devicon/LICENSE)
+
 # GitHub's Markdown style sheets and icons, for the Markdown preview.
 qt_add_resources(kdk_core markdown_assets
     PREFIX /markdown

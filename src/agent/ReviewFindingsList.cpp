@@ -182,10 +182,6 @@ ReviewFindingCard *ReviewFindingsList::createCard(const Finding &finding, QWidge
         select(finding, modifiers);
     });
     connect(card, &ReviewFindingCard::activated, this, [this, finding] { emit findingRequested(finding); });
-    connect(card, &ReviewFindingCard::sendRequested, this, [this, finding] {
-        if (session_)
-            session_->send({finding});
-    });
     // Queued: resolving and dismissing rebuild the cards, this one among them.
     connect(
         card, &ReviewFindingCard::resolveRequested, this, [this, finding] { resolve({finding}); },

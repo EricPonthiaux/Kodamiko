@@ -10,10 +10,12 @@
 #include "ui/UiMetrics.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -26,6 +28,8 @@
 #include <QVBoxLayout>
 
 namespace {
+
+constexpr qreal navigationTitleScale = 0.95;
 
 constexpr auto preferencesRules = R"(
 QLabel#preferencePageIcon { background: @slate; border: 1px solid @line; border-radius: 8px; }
@@ -90,18 +94,31 @@ QWidget *navigationRow(const QString &icon, const QString &title, QWidget *paren
     symbol->setAlignment(Qt::AlignCenter);
     UiMetrics::setScaledSize(symbol, QSize(32, 32));
     auto *name = new QLabel(title, row);
-    AppFonts::setInterfaceFont(name, 0.95, QFont::DemiBold);
+    name->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    AppFonts::setInterfaceFont(name, navigationTitleScale, QFont::DemiBold);
     auto *description = new QLabel(navigationDescription(icon), row);
     description->setObjectName(QStringLiteral("preferenceNavDescription"));
     AppFonts::setInterfaceFont(description, 0.8, QFont::Normal);
     auto *text = new QVBoxLayout;
+    text->setAlignment(Qt::AlignTop);
     text->setSpacing(4);
     text->addWidget(name);
     text->addWidget(description);
+    auto *iconColumn = new QVBoxLayout;
+    iconColumn->addWidget(symbol);
+    iconColumn->addStretch();
+    AppFonts::followApplicationFont(row, [iconColumn] {
+        // Use the application font: the name's font follower may run after this one.
+        QFont font = QApplication::font();
+        font.setPointSizeF(font.pointSizeF() * navigationTitleScale);
+        font.setWeight(QFont::DemiBold);
+        const QFontMetrics metrics(font);
+        iconColumn->setContentsMargins(0, metrics.ascent() - metrics.capHeight(), 0, 0);
+    });
     auto *layout = new QHBoxLayout(row);
     layout->setContentsMargins(8, 10, 8, 10);
     layout->setSpacing(10);
-    layout->addWidget(symbol);
+    layout->addLayout(iconColumn);
     layout->addLayout(text, 1);
     return row;
 }
