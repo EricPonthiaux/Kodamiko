@@ -874,7 +874,8 @@ private slots:
         QTRY_COMPARE(merge.list->count(), 1);
         QVERIFY(!merge.button("Save Resolution")->isEnabled());
         QPushButton *takeYours = merge.view->findChild<QWidget *>("mergeCurrentHeader")->findChild<QPushButton *>();
-        QVERIFY(takeYours->isVisible());
+        // The panel is shown once the event loop runs, after the list fills.
+        QTRY_VERIFY(takeYours->isVisible());
         takeYours->click();
         // Nothing left to take: Take Yours and Take Incoming go.
         QVERIFY(!takeYours->isVisible());
