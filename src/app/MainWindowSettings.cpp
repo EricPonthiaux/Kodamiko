@@ -48,6 +48,7 @@
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
 #include "ui/WindowFrame.h"
+#include "ui/WorkspaceStatusBar.h"
 #include "welcome/NewProjectPopup.h"
 #include "welcome/ProjectSettingsPopup.h"
 #include "workspace/CommandPalette.h"
@@ -86,6 +87,8 @@ void MainWindow::setTheme(const QString &name)
     frame_->applyTheme(theme_);
     terminalWindow_->applyTheme(theme_);
     branchButton_->setIcon(UiIcons::icon(QStringLiteral("branch"), theme_.mutedText));
+    if (auto *bar = qobject_cast<WorkspaceStatusBar *>(statusBar()))
+        bar->setDividerColor(theme_.line);
     fileTree_->setSearchHighlight(theme_.findHighlight);
     fileTree_->setDarkIcons(theme_.isDark);
     filesPanel_->setIconColor(theme_.foreground);

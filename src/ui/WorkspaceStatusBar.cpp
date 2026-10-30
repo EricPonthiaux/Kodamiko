@@ -10,26 +10,62 @@
 #include <QBoxLayout>
 #include <QFrame>
 #include <QLabel>
+#include <QPainter>
 #include <QScreen>
 #include <QTabBar>
 #include <QToolButton>
 
 #include <algorithm>
+#include <functional>
 
 namespace {
 
 constexpr int boxGapPx = 4;
 // Between the mode track and the window's right edge, which it touched.
 constexpr int trailingMarginPx = 8;
+// Between two items: room for the divider in the middle.
+constexpr int itemGapPx = 13;
+// Between a divider's ends and the top or bottom of a control, as in the title bar.
+constexpr int dividerInsetPx = 6;
 
 class StatusRow : public QWidget {
 public:
-    using QWidget::QWidget;
+    StatusRow(QWidget *parent, std::function<void(QPainter &)> paintOver)
+        : QWidget(parent)
+        , paintOver_(std::move(paintOver))
+    {
+    }
 
     // Expanded details must not impose a minimum width on the window: the
     // bar needs to receive the resize before moving them into the popup.
     QSize minimumSizeHint() const override { return {0, QWidget::minimumSizeHint().height()}; }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        QWidget::paintEvent(event);
+        QPainter painter(this);
+        paintOver_(painter);
+    }
+
+private:
+    std::function<void(QPainter &)> paintOver_;
 };
+
+// The widgets `widget` is made of when it lays several out in a row, or
+// `widget` itself.
+QList<const QWidget *> partsOf(const QWidget *widget)
+{
+    const auto *row = qobject_cast<const QBoxLayout *>(widget->layout());
+    if (!row)
+        return {widget};
+    QList<const QWidget *> parts;
+    for (int i = 0; i < row->count(); ++i) {
+        if (const QWidget *part = row->itemAt(i)->widget())
+            parts.append(part);
+    }
+    return parts;
+}
 
 } // namespace
 
@@ -38,7 +74,7 @@ WorkspaceStatusBar::WorkspaceStatusBar(QTabBar *modes, QWidget *parent)
     , modes_(modes)
 {
     setSizeGripEnabled(false);
-    trailing_ = new StatusRow(this);
+    trailing_ = new StatusRow(this, [this](QPainter &painter) { paintDividers(painter); });
     trailing_->setObjectName(QStringLiteral("statusTrailing"));
     trailingLayout_ = new QHBoxLayout(trailing_);
     trailingLayout_->setContentsMargins(0, 0, 0, 0);
@@ -77,12 +113,14 @@ WorkspaceStatusBar::WorkspaceStatusBar(QTabBar *modes, QWidget *parent)
         more_->setFixedSize(control, control);
         more_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
         modes_->setIconSize(UiMetrics::scaledSquare(UiMetrics::iconSize));
-        trailingLayout_->setSpacing(UiMetrics::scaled(8));
+        trailingLayout_->setSpacing(UiMetrics::scaled(itemGapPx));
         // Room above and below the boxes: they stand in the middle of the
         // bar, clear of its line.
         const int gap = UiMetrics::scaled(boxGapPx);
         trailingLayout_->setContentsMargins(0, gap, UiMetrics::scaled(trailingMarginPx), gap);
-        detailsLayout_->setSpacing(UiMetrics::scaled(12));
+        detailsLayout_->setSpacing(UiMetrics::scaled(itemGapPx));
+        for (const Group &group : std::as_const(groups_))
+            group.row->setSpacing(UiMetrics::scaled(itemGapPx));
         scheduleLayout();
     });
 }
@@ -100,9 +138,12 @@ void WorkspaceStatusBar::addGroup(const QString &title, const QList<QWidget *> &
     column->addWidget(heading);
     auto *row = new QHBoxLayout;
     row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(2);
+    row->setSpacing(UiMetrics::scaled(itemGapPx));
     column->addLayout(row);
     for (QWidget *widget : widgets) {
+        if (auto *parts = qobject_cast<QBoxLayout *>(widget->layout())) {
+            AppFonts::followApplicationFont(widget, [parts] { parts->setSpacing(UiMetrics::scaled(itemGapPx)); });
+        }
         const bool hidden = widget->isHidden();
         row->addWidget(widget);
         widget->setVisible(!hidden);
@@ -115,6 +156,47 @@ void WorkspaceStatusBar::addGroup(const QString &title, const QList<QWidget *> &
     detailsLayout_->addWidget(panel);
     groups_.append({panel, heading, row, widgets});
     scheduleLayout();
+}
+
+void WorkspaceStatusBar::setDividerColor(const QColor &color)
+{
+    dividerColor_ = color;
+    trailing_->update();
+}
+
+QList<const QWidget *> WorkspaceStatusBar::barItems() const
+{
+    QList<const QWidget *> items;
+    for (const Group &group : groups_) {
+        if (group.inPopup || group.panel->isHidden())
+            continue;
+        for (const QWidget *widget : group.widgets) {
+            for (const QWidget *part : partsOf(widget)) {
+                if (part->isVisibleTo(trailing_))
+                    items.append(part);
+            }
+        }
+    }
+    for (const QWidget *widget : {static_cast<const QWidget *>(more_), static_cast<const QWidget *>(modes_)}) {
+        if (widget->isVisibleTo(trailing_))
+            items.append(widget);
+    }
+    return items;
+}
+
+void WorkspaceStatusBar::paintDividers(QPainter &painter) const
+{
+    if (!dividerColor_.isValid())
+        return;
+    const QList<const QWidget *> items = barItems();
+    const int inset = UiMetrics::scaled(dividerInsetPx);
+    const int top = trailing_->contentsRect().top() + trailingLayout_->contentsMargins().top() + inset;
+    const int bottom = trailing_->height() - trailingLayout_->contentsMargins().bottom() - inset;
+    for (qsizetype i = 1; i < items.size(); ++i) {
+        const int left = items[i - 1]->mapTo(trailing_, QPoint(items[i - 1]->width(), 0)).x();
+        const int right = items[i]->mapTo(trailing_, QPoint(0, 0)).x();
+        painter.fillRect(QRect((left + right) / 2, top, 1, std::max(0, bottom - top)), dividerColor_);
+    }
 }
 
 void WorkspaceStatusBar::scheduleLayout()
@@ -186,6 +268,7 @@ void WorkspaceStatusBar::updateResponsiveLayout()
     const int spare = arrangeGroups(available - tabWidth - gap - (overflow ? more_->width() + gap : 0));
     widenLabels(spare);
     trailing_->updateGeometry();
+    trailing_->update(); // the dividers follow the items
 }
 
 int WorkspaceStatusBar::arrangeGroups(int available)
