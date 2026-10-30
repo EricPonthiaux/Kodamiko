@@ -8,6 +8,7 @@
 #include "projects/ProjectConfig.h"
 #include "projects/ProjectWindowServer.h"
 #include "settings/Preferences.h"
+#include "system/Host.h"
 #include "toolchains/Toolchains.h"
 #include "ui/BrandMark.h"
 #include "ui/ClickableCursors.h"
@@ -199,6 +200,22 @@ void adoptLegacyToolchains()
 
 void showWelcome();
 
+// On macOS a project opens zoomed to fill the screen, beside the Dock and the
+// menu bar rather than in a full-screen Space; elsewhere it keeps the size it
+// had when last closed.
+void showProjectWindow(QWidget *window)
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::MacOS:
+        window->showMaximized();
+        return;
+    case OperatingSystem::Windows:
+    case OperatingSystem::Linux:
+        window->show();
+        return;
+    }
+}
+
 // A main window on `folder`; Close Project brings the welcome window back.
 void openProject(const QString &folder)
 {
@@ -206,7 +223,7 @@ void openProject(const QString &folder)
     window->setAttribute(Qt::WA_DeleteOnClose);
     StrayWindowCheck::allow(window);
     QObject::connect(window, &MainWindow::projectClosed, [] { showWelcome(); });
-    window->show();
+    showProjectWindow(window);
 }
 
 // The projects opened before; the one chosen opens in a main window.
