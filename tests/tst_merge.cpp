@@ -11,6 +11,7 @@
 #include "merge/MergeGutter.h"
 #include "merge/MergePane.h"
 #include "merge/MergeView.h"
+#include "merge/SimpleConflicts.h"
 #include "ui/Theme.h"
 
 #include <QFileInfo>
@@ -315,6 +316,54 @@ private slots:
 
         QCOMPARE(resolvedWith(chunks, &Chunk::current), gitMergeFile(base, current, incoming, "--ours"));
         QCOMPARE(resolvedWith(chunks, &Chunk::incoming), gitMergeFile(base, current, incoming, "--theirs"));
+    }
+
+    // SimpleConflicts
+
+    void changesToDifferentWordsOfALineCombine()
+    {
+        const Chunk conflict{
+            ChunkKind::Conflict, {"price = 10 * rate\n"}, {"price = 12 * rate\n"}, {"price = 10 * tax\n"}};
+
+        QCOMPARE(SimpleConflicts::resolve(conflict), QByteArrayList{"price = 12 * tax\n"});
+    }
+
+    void changesToTheSameWordStayAConflict()
+    {
+        const Chunk conflict{ChunkKind::Conflict, {"limit = 100\n"}, {"limit = 50\n"}, {"limit = 80\n"}};
+
+        QCOMPARE(SimpleConflicts::resolve(conflict), std::nullopt);
+    }
+
+    void sidesThatDifferOnlyByWhitespaceTakeTheCurrentOne()
+    {
+        const Chunk conflict{ChunkKind::Conflict, {"a(b)\n"}, {"a( b )\n"}, {"a(b )\n", "\n"}};
+
+        QCOMPARE(SimpleConflicts::resolve(conflict), QByteArrayList{"a( b )\n"});
+    }
+
+    void wordsCombineAcrossLinesWithTheirLineEndings()
+    {
+        const Chunk conflict{
+            ChunkKind::Conflict, {"one\r\n", "two\r\n"}, {"ONE\r\n", "two\r\n"}, {"one\r\n", "TWO\r\n"}};
+
+        QCOMPARE(SimpleConflicts::resolve(conflict), (QByteArrayList{"ONE\r\n", "TWO\r\n"}));
+    }
+
+    void resolvingTheSimpleConflictsLeavesTheOthersAsOneChange()
+    {
+        MergeDocument document(ThreeWayMerge::merge("x = 1 + y\nmid\nmid\nmid\nlimit = 100\n",
+                                                    "x = 2 + y\nmid\nmid\nmid\nlimit = 50\n",
+                                                    "x = 1 + z\nmid\nmid\nmid\nlimit = 80\n"));
+        QCOMPARE(document.unresolvedCount(), 2);
+
+        QCOMPARE(document.resolveSimpleConflicts(), 1);
+
+        QCOMPARE(document.segments().first().choice, Choice::Combined);
+        QCOMPARE(document.resultLines(0), QByteArrayList{"x = 2 + z\n"});
+        QCOMPARE(document.unresolvedCount(), 1);
+        document.undo();
+        QCOMPARE(document.unresolvedCount(), 2);
     }
 
     // ConflictVersions
@@ -704,6 +753,24 @@ private slots:
         QVERIFY(ConflictVersions::read(infoOf(merge.dir)).isEmpty());
         QVERIFY(merge.button("Continue merge")->isVisible());
         QVERIFY(merge.button("Continue merge")->isEnabled());
+    }
+
+    void theButtonResolvesTheSimpleConflictsOfTheFileShown()
+    {
+        const QTemporaryDir dir;
+        initRepository(dir, {{"a.txt", "price = 10 * rate\n"}});
+        commitOn(dir, "other", [&dir] { write(dir, "a.txt", "price = 10 * tax\n"); });
+        commitOn(dir, "main", [&dir] { write(dir, "a.txt", "price = 12 * rate\n"); });
+        mergeOther(dir);
+        GitCommands commands;
+        const std::unique_ptr<MergeView> view = viewOf(dir, commands);
+        auto *list = view->findChild<QListWidget *>();
+        QVERIFY(list->item(0)->text().endsWith("1 conflict(s) left"));
+
+        buttonWithText(*view, "Resolve Simple Conflicts")->click();
+
+        QVERIFY(list->item(0)->text().endsWith("Resolved, not saved yet"));
+        QVERIFY(buttonWithText(*view, "Save and Mark Resolved")->isEnabled());
     }
 
     void deletingAFileTheOtherSideChangedResolvesIt()

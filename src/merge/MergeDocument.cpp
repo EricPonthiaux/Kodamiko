@@ -2,6 +2,8 @@
 
 #include "MergeDocument.h"
 
+#include "SimpleConflicts.h"
+
 #include <QtAssert>
 
 #include <algorithm>
@@ -84,6 +86,7 @@ QByteArrayList linesOf(const Segment &segment)
     case Choice::IncomingThenCurrent:
         return concatenated(chunk.incoming, chunk.current);
     case Choice::Edited:
+    case Choice::Combined:
         return segment.edited;
     }
     return {};
@@ -127,7 +130,7 @@ int MergeDocument::unresolvedCount() const
 
 void MergeDocument::choose(int segment, Choice choice)
 {
-    Q_ASSERT(choice != Choice::Edited);
+    Q_ASSERT(choice != Choice::Edited && choice != Choice::Combined);
     if (segments_.at(segment).choice == choice)
         return;
     remember();
@@ -137,7 +140,7 @@ void MergeDocument::choose(int segment, Choice choice)
 
 void MergeDocument::resolveRemaining(Choice choice)
 {
-    Q_ASSERT(choice != Choice::Edited && choice != Choice::Unresolved);
+    Q_ASSERT(choice != Choice::Edited && choice != Choice::Combined && choice != Choice::Unresolved);
     if (isResolved())
         return;
     remember();
@@ -145,6 +148,26 @@ void MergeDocument::resolveRemaining(Choice choice)
         if (segment.choice == Choice::Unresolved)
             segment.choice = choice;
     }
+}
+
+int MergeDocument::resolveSimpleConflicts()
+{
+    QList<Segment> resolved = segments_;
+    int count = 0;
+    for (Segment &segment : resolved) {
+        if (segment.choice != Choice::Unresolved)
+            continue;
+        if (const std::optional<QByteArrayList> lines = SimpleConflicts::resolve(segment.chunk)) {
+            segment.choice = Choice::Combined;
+            segment.edited = *lines;
+            ++count;
+        }
+    }
+    if (count > 0) {
+        remember();
+        segments_ = std::move(resolved);
+    }
+    return count;
 }
 
 void MergeDocument::replaceResultLines(int first, int count, const QByteArrayList &lines)

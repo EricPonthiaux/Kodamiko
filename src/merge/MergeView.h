@@ -76,6 +76,8 @@ private:
     // Runs `job`, which resolves files in git, then reads the conflicts again.
     void resolve(const QString &title, const std::function<QString()> &job);
     void saveCurrentFile();
+    // In the file shown, the conflicts that need no one to decide.
+    void resolveSimpleConflicts();
     void updateList();
     void updateBar();
     void updateFooter();
@@ -93,6 +95,7 @@ private:
     std::map<QString, Resolution> resolutions_;
     QLabel *title_ = nullptr;
     QLabel *summary_ = nullptr;
+    QPushButton *resolveSimple_ = nullptr;
     QPushButton *previous_ = nullptr;
     QPushButton *next_ = nullptr;
     QListWidget *list_ = nullptr;

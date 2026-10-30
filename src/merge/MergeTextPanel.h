@@ -40,6 +40,8 @@ public:
     MergeTextPanel(const Theme &theme, const File &file, QWidget *parent);
 
     void goToConflict(Direction direction);
+    // Resolves the conflicts that need no one to decide; returns how many.
+    int resolveSimpleConflicts();
     void applyTheme(const Theme &theme);
 
 signals:

@@ -118,6 +118,10 @@ QWidget *MergeView::createBar()
     previous_->setToolTip(tr("Shift+F7"));
     next_ = new QPushButton(tr("Next Conflict"), bar);
     next_->setToolTip(tr("F7"));
+    resolveSimple_ = new QPushButton(tr("Resolve Simple Conflicts"), bar);
+    resolveSimple_->setToolTip(tr("Resolve the conflicts where the sides differ only by whitespace or changed "
+                                  "different words"));
+    connect(resolveSimple_, &QPushButton::clicked, this, &MergeView::resolveSimpleConflicts);
     connect(previous_, &QPushButton::clicked, this, [this] {
         if (panel_)
             panel_->goToConflict(MergeTextPanel::Direction::Previous);
@@ -132,6 +136,7 @@ QWidget *MergeView::createBar()
     layout->addWidget(title_);
     layout->addWidget(summary_);
     layout->addStretch();
+    layout->addWidget(resolveSimple_);
     layout->addWidget(previous_);
     layout->addWidget(next_);
     return bar;
@@ -283,6 +288,15 @@ void MergeView::saveCurrentFile()
             });
 }
 
+void MergeView::resolveSimpleConflicts()
+{
+    if (!panel_)
+        return;
+    const int count = panel_->resolveSimpleConflicts();
+    hint_->setText(count == 0 ? tr("No conflict left is simple: the sides changed the same words.")
+                              : tr("%n simple conflict(s) resolved: check them, then save.", nullptr, count));
+}
+
 void MergeView::updateList()
 {
     for (int row = 0; row < list_->count(); ++row) {
@@ -304,6 +318,9 @@ void MergeView::updateBar()
     summary_->setText(summary);
     previous_->setEnabled(panel_);
     next_->setEnabled(panel_);
+    const ConflictVersions::File *file = currentFile();
+    const MergeDocument *document = file ? openedDocument(file->path) : nullptr;
+    resolveSimple_->setEnabled(panel_ && document && !document->isResolved());
 }
 
 void MergeView::updateFooter()

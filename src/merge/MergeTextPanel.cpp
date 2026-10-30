@@ -45,6 +45,7 @@ bool takes(Choice choice, Side side)
         return true;
     case Choice::Unresolved:
     case Choice::Edited:
+    case Choice::Combined:
         return false;
     }
     return false;
@@ -86,6 +87,7 @@ Shade resultShade(const Segment &segment)
         return segment.chunk.kind == ChunkKind::Conflict ? Shade::Incoming : Shade::Merged;
     case Choice::CurrentThenIncoming:
     case Choice::IncomingThenCurrent:
+    case Choice::Combined:
         return Shade::Merged;
     }
     return Shade::None;
@@ -177,6 +179,14 @@ void MergeTextPanel::goToConflict(Direction direction)
             target = *before;
     }
     result_->setFirstVisibleLine(std::max(0, segmentRows_[target] - rowsAboveConflict));
+}
+
+int MergeTextPanel::resolveSimpleConflicts()
+{
+    const int count = document_.resolveSimpleConflicts();
+    if (count > 0)
+        refresh();
+    return count;
 }
 
 void MergeTextPanel::applyTheme(const Theme &theme)

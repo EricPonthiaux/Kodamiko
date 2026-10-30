@@ -25,12 +25,13 @@ public:
         CurrentThenIncoming, // both, the current side's first
         IncomingThenCurrent, // both, the incoming side's first
         Edited,              // lines the user wrote (replaceResultLines())
+        Combined,            // each side's changes of different words (SimpleConflicts)
     };
 
     struct Segment {
         ThreeWayMerge::Chunk chunk;
         Choice choice = Choice::Unresolved;
-        QByteArrayList edited; // the lines of Choice::Edited
+        QByteArrayList edited; // the lines of Choice::Edited and Choice::Combined
 
         bool operator==(const Segment &) const = default;
     };
@@ -56,11 +57,14 @@ public:
     bool isResolved() const;
     int unresolvedCount() const;
 
-    // Takes `choice` for `segment`; not Choice::Edited, which only
-    // replaceResultLines() gives.
+    // Takes `choice` for `segment`; not Choice::Edited or Choice::Combined,
+    // which only replaceResultLines() and resolveSimpleConflicts() give.
     void choose(int segment, Choice choice);
     // Takes `choice` for every conflict still open, as one change.
     void resolveRemaining(Choice choice);
+    // Resolves the open conflicts that need no one to decide
+    // (SimpleConflicts), as one change; returns how many.
+    int resolveSimpleConflicts();
     // Replaces `count` lines of the result from `first` by `lines`, as the
     // user types them: the stretches the lines belong to become one, with
     // the lines the user wrote. An insertion between two stretches goes to

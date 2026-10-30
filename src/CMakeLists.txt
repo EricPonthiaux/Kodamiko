@@ -219,6 +219,7 @@ add_library(kdk_core STATIC
     merge/MergeTextPanel.cpp
     merge/MergeTexts.cpp
     merge/MergeView.cpp
+    merge/SimpleConflicts.cpp
     navigation/CodeIntelligence.cpp
     navigation/CodeIntelligenceCodeActions.cpp
     navigation/CodeIntelligenceHierarchy.cpp
