@@ -12,6 +12,7 @@
 #include "ui/ThemeStyle.h"
 
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QPushButton>
 #include <QSettings>
@@ -456,14 +457,37 @@ void MergeTextPanel::addShortcuts()
     add(QKeySequence(Qt::Key_F7), [this] { goToConflict(Direction::Next); });
     add(QKeySequence(Qt::SHIFT | Qt::Key_F7), [this] { goToConflict(Direction::Previous); });
     add(QKeySequence(Qt::ALT | Qt::Key_F7), [this] { goToNextOpenConflict(); });
-    add(QKeySequence::Undo, [this] {
+    // Undo and redo are read from the panes' keys rather than shortcuts:
+    // the keys reach the pane on every system, a shortcut not always on macOS.
+    for (MergePane *pane : {current_, result_, incoming_})
+        pane->installEventFilter(this);
+}
+
+bool MergeTextPanel::eventFilter(QObject *watched, QEvent *event)
+{
+    const bool isKey = event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride;
+    if (!isKey)
+        return QWidget::eventFilter(watched, event);
+    auto *key = static_cast<QKeyEvent *>(event);
+    const bool isHistoryKey = key->matches(QKeySequence::Undo) || key->matches(QKeySequence::Redo);
+    if (!isHistoryKey)
+        return QWidget::eventFilter(watched, event);
+    // The window's own shortcuts leave these keys to the panes.
+    if (event->type() == QEvent::ShortcutOverride) {
+        event->accept();
+        return true;
+    }
+    return undoOrRedo(key);
+}
+
+bool MergeTextPanel::undoOrRedo(const QKeyEvent *key)
+{
+    if (key->matches(QKeySequence::Undo))
         document_.undo();
-        refresh();
-    });
-    add(QKeySequence::Redo, [this] {
+    else
         document_.redo();
-        refresh();
-    });
+    refresh();
+    return true;
 }
 
 void MergeTextPanel::take(int segment, Choice side)

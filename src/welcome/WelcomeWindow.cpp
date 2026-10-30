@@ -445,6 +445,11 @@ bool WelcomeWindow::searchKeyPressed(const QKeyEvent *key)
 
 bool WelcomeWindow::listKeyPressed(const QKeyEvent *key)
 {
+    // On macOS, a list does not activate its item on Enter.
+    if (isEnter(key) && list_->currentItem()) {
+        open(pathOf(list_->currentItem()));
+        return true;
+    }
     const bool isAtTop = list_->currentItem() == firstShownProject();
     if (key->key() != Qt::Key_Up || !isAtTop)
         return false;

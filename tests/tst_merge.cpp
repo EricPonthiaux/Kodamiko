@@ -803,7 +803,7 @@ private slots:
         const long end = result->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, 1L);
 
         result->SendScintilla(QsciScintillaBase::SCI_SETSEL, start, end);
-        result->SendScintilla(QsciScintillaBase::SCI_REPLACESEL, 0UL, "main and other");
+        result->SendScintilla(QsciScintillaBase::SCI_REPLACESEL, uintptr_t{0}, "main and other");
 
         QCOMPARE(merge.state(), QString("Resolved, not saved yet"));
         QCOMPARE(result->bytes(), QByteArray("a\nmain and other\nz\n"));

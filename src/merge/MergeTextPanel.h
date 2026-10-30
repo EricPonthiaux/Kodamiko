@@ -75,6 +75,7 @@ signals:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void layOut(const Integration::ConflictSides &sides);
@@ -96,6 +97,8 @@ private:
     void updateOverview();
     QList<int> proposalSegments() const;
     void addShortcuts();
+    // Undo and redo are the document's: true when `key` was one of them.
+    bool undoOrRedo(const QKeyEvent *key);
     void take(int segment, MergeDocument::Choice side);
     // The user typed in the result: the document follows.
     void onResultEdited();
