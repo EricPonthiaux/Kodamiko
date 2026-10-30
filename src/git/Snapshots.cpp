@@ -116,6 +116,23 @@ void addExisting(const RepositoryInfo &repository, const QStringList &paths, con
              environment);
 }
 
+// The files still in conflict outside the snapshot's paths, during a merge or
+// a rebase, take their version of HEAD in the temporary index: git cannot
+// write a tree with conflicted entries.
+void settleOtherConflicts(const RepositoryInfo &repository, const QHash<QString, QString> &environment)
+{
+    const QStringList unmerged = Git::splitNul(Git::run(repository.workDir,
+                                                        {QStringLiteral("diff"), QStringLiteral("--name-only"),
+                                                         QStringLiteral("-z"), QStringLiteral("--diff-filter=U")},
+                                                        {}, environment));
+    if (unmerged.isEmpty())
+        return;
+    Git::run(repository.workDir,
+             QStringList{QStringLiteral("reset"), QStringLiteral("-q"), QStringLiteral("HEAD"), QStringLiteral("--")} +
+                 unmerged,
+             {}, environment);
+}
+
 // Whether the most recent snapshot has the same tree, paths and scope.
 bool matchesLastSnapshot(const RepositoryInfo &repository,
                          const QString &tree,
@@ -189,6 +206,7 @@ QString createSnapshot(const RepositoryInfo &repository, const SnapshotRequest &
     environment.insert(QStringLiteral("GIT_INDEX_FILE"), index);
 
     addExisting(repository, paths, environment);
+    settleOtherConflicts(repository, environment);
     const QString tree =
         QString::fromUtf8(Git::run(repository.workDir, {QStringLiteral("write-tree")}, {}, environment)).trimmed();
     if (request.skipIfUnchanged && matchesLastSnapshot(repository, tree, paths, request.wholeWorkingTree))
