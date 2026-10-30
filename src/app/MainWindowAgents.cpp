@@ -357,7 +357,9 @@ void MainWindow::closeWindowOnceAgentsClosed()
     if (!isClosingAgents_ || !isAgentWorkDone)
         return;
     isClosingAgents_ = false;
-    close();
+    // Refused at the unsaved files: a later close is no Close Project.
+    if (!close())
+        closingProject_ = false;
 }
 
 void MainWindow::stopClosingAgents(const QString &reason)

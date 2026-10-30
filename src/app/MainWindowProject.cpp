@@ -68,6 +68,10 @@ void MainWindow::openFolder(const QString &folder)
     }
     const QString previousFolder = folder_;
     folder_ = QDir(folder).absolutePath();
+    // The previous project's review: its findings and their requests name
+    // that project's files and session.
+    if (folder_ != previousFolder)
+        closeStagedReview();
     projectWindowServer_.listen(folder_); // if it fails, only the other processes do not see the project open
     setAgentProvider(projectAgentProvider());
     fileTree_->setRootPath(folder_);
@@ -261,10 +265,10 @@ ProjectSettingsPopup *MainWindow::projectSettings()
     // Built on first use: its toolchain panel takes tens of milliseconds,
     // too long for every project opening.
     if (!projectSettings_) {
-        projectSettings_ = new ProjectSettingsPopup(toolchains_.get(), theme_, this);
-        connect(projectSettings_, &ProjectSettingsPopup::applied, this, &MainWindow::applyProject);
+        projectSettings_ = std::make_unique<ProjectSettingsPopup>(toolchains_.get(), theme_, this);
+        connect(projectSettings_.get(), &ProjectSettingsPopup::applied, this, &MainWindow::applyProject);
     }
-    return projectSettings_;
+    return projectSettings_.get();
 }
 
 void MainWindow::applyProject(const ProjectConfig &project)

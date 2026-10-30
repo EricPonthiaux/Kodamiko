@@ -89,7 +89,9 @@ void MainWindow::reviewStagedChanges()
             *patch = stagedPatch(*status);
             return QString();
         },
-        [this, patch](const QString &, const QString &error) {
+        [this, patch, folder = folder_](const QString &, const QString &error) {
+            if (folder != folder_)
+                return; // another project opened meanwhile: the patch is the previous one's
             if (!error.isEmpty()) {
                 showStatus(tr("Could not read the changes to review: %1").arg(error));
                 return;

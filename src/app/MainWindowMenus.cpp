@@ -315,9 +315,8 @@ void MainWindow::createViewMenu()
         setSystemTitleBar(system);
         QSettings().setValue(QStringLiteral("systemTitleBar"), system);
     });
-#ifdef Q_OS_MACOS
-    systemTitleBar_->setVisible(false); // macOS keeps its own frame and traffic lights
-#endif
+    // macOS keeps its own frame and traffic lights.
+    systemTitleBar_->setVisible(Host::operatingSystem() != OperatingSystem::MacOS);
 }
 
 void MainWindow::createEditMenu()

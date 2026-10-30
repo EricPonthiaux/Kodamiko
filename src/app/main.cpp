@@ -265,6 +265,13 @@ int main(int argc, char *argv[])
         return QApplication::exec();
     }
     const QString folder = QDir(arguments.first()).absolutePath();
+    if (!QFileInfo(folder).isDir()) {
+        // A file or a mistyped path would open as a broken project, and be
+        // remembered among the recent ones.
+        qWarning("Kodamiko opens folders: %s is not one", qPrintable(QDir::toNativeSeparators(folder)));
+        showWelcome();
+        return QApplication::exec();
+    }
     // Already open in another process: its window comes forward instead.
     if (ProjectWindows::raise(folder))
         return 0;

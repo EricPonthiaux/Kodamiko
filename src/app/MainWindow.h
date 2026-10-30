@@ -587,7 +587,9 @@ private:
     ProjectConfig project_;
     QList<Recipe> recipes_; // those of the project's languages that are installed
     EnvironmentAdditions recipeEnvironment_;
-    ProjectSettingsPopup *projectSettings_ = nullptr;
+    // Destroyed with the members, before toolchains_ which it uses, rather
+    // than with the window's children after them. Built on first use.
+    std::unique_ptr<ProjectSettingsPopup> projectSettings_;
     NewProjectPopup *newProjectPopup_ = nullptr; // built on first use
     NoticeBar *toolsNotice_ = nullptr;
     bool closingProject_ = false;

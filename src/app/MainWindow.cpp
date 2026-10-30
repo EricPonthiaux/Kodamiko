@@ -53,6 +53,7 @@
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "setup/Prerequisites.h"
+#include "system/Host.h"
 #include "terminal/TerminalWidget.h"
 #include "toolchains/Toolchains.h"
 #include "ui/BusyIndicator.h"
@@ -159,6 +160,19 @@ QString nameOf(MainWindow::Mode mode)
     return {};
 }
 
+// The Control key as Qt names it: Meta on macOS, where Cmd+C copies.
+Qt::KeyboardModifiers controlKey()
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::MacOS:
+        return Qt::MetaModifier;
+    case OperatingSystem::Windows:
+    case OperatingSystem::Linux:
+        return Qt::ControlModifier;
+    }
+    return Qt::ControlModifier;
+}
+
 } // namespace
 
 MainWindow::MainWindow(const QString &folder, QWidget *parent)
@@ -208,7 +222,6 @@ MainWindow::~MainWindow()
     // signals reach the window's slots; the servers' own destructor would
     // run after the window's.
     languageServers_->stopAll();
-    delete projectSettings_;
 }
 
 void MainWindow::createWidgets(const Preferences &preferences)
@@ -997,11 +1010,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
     const auto *key = event->type() == QEvent::KeyPress ? dynamic_cast<const QKeyEvent *>(event) : nullptr;
     if (watched == claudeTerminal_ && key) {
-#ifdef Q_OS_MACOS
-        const Qt::KeyboardModifiers control = Qt::MetaModifier; // the Control key; Cmd+C copies
-#else
-        const Qt::KeyboardModifiers control = Qt::ControlModifier;
-#endif
+        const Qt::KeyboardModifiers control = controlKey();
         // Ctrl+C twice would quit Claude and leave the tab dead: it
         // becomes Escape, which interrupts the response.
         if (key->key() == Qt::Key_C && key->modifiers() == control) {

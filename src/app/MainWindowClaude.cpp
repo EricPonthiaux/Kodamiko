@@ -495,7 +495,7 @@ void MainWindow::registerMcpTools()
     context.intelligence = intelligence_;
     context.git = gitCommands_;
     context.menus = titleBar_->menuBar();
-    context.showMessage = [this](const QString &message) { statusBar()->showMessage(message, 5000); };
+    context.showMessage = [this](const QString &message) { showStatus(message); };
     context.terminals = [this] {
         QList<std::pair<QString, TerminalWidget *>> terminals;
         for (int i = 0; i < terminalTabs_->count(); ++i) {
