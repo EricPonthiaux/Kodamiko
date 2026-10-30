@@ -332,7 +332,12 @@ int TitleBar::boundedProjectGroupWidth() const
 
 void TitleBar::updateResponsiveLayout()
 {
-    layout_->setSpacing(UiMetrics::scaled(width() < UiMetrics::scaled(600) ? groupSpacing / 2 : groupSpacing));
+    // setSpacing() invalidates the layout even with the same value, and the
+    // LayoutRequest that follows schedules this again: without the check,
+    // the bar lays itself out forever and the window never paints.
+    const int spacing = UiMetrics::scaled(width() < UiMetrics::scaled(600) ? groupSpacing / 2 : groupSpacing);
+    if (spacing != layout_->spacing())
+        layout_->setSpacing(spacing);
     fitLogoToMenuTitles();
     // Measure the expanded controls at their bounded widths, independent of
     // which groups were hidden or how far the labels grew on the previous

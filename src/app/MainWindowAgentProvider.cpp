@@ -34,6 +34,15 @@ namespace {
 // users first changed these commands' shortcuts.
 const QString stableAgentName = QStringLiteral("Claude");
 
+// `text` with `agentName` in place of its %1. A setting's label often names
+// no agent while its tool tip does: arg() would warn about the missing %1.
+QString withAgentName(const QString &text, const QString &agentName)
+{
+    if (!text.contains(QLatin1String("%1")))
+        return text;
+    return text.arg(agentName);
+}
+
 } // namespace
 
 const AgentProvider &MainWindow::projectAgentProvider() const
@@ -46,10 +55,10 @@ const AgentProvider &MainWindow::projectAgentProvider() const
 QAction *MainWindow::nameAfterAgent(QAction *action, const QString &text, const QString &toolTip)
 {
     agentNamedActions_.append({action, text, toolTip});
-    Keymap::setStableName(action, QString(text).arg(stableAgentName));
-    action->setText(QString(text).arg(agentProvider_->name()));
+    Keymap::setStableName(action, withAgentName(text, stableAgentName));
+    action->setText(withAgentName(text, agentProvider_->name()));
     if (!toolTip.isEmpty())
-        action->setToolTip(QString(toolTip).arg(agentProvider_->name()));
+        action->setToolTip(withAgentName(toolTip, agentProvider_->name()));
     return action;
 }
 
@@ -109,9 +118,9 @@ void MainWindow::setAgentProvider(const AgentProvider &provider)
     agentSessions_.setAgentName(provider.name());
     agentIndicator_->setProvider(&provider);
     for (const AgentNamedAction &named : std::as_const(agentNamedActions_)) {
-        named.action->setText(QString(named.text).arg(provider.name()));
+        named.action->setText(withAgentName(named.text, provider.name()));
         if (!named.toolTip.isEmpty())
-            named.action->setToolTip(QString(named.toolTip).arg(provider.name()));
+            named.action->setToolTip(withAgentName(named.toolTip, provider.name()));
     }
     for (QAction *action : agentProviderActions_->actions())
         action->setChecked(action->data().toString() == AgentProviders::key(provider));
