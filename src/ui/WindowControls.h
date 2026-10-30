@@ -22,10 +22,11 @@ public:
         Close
     };
 
-    // The shape of the hover background: square in a title bar, against
-    // the window's edge; rounded among the content's buttons.
+    // The shape of the hover background: a rounded square inside a title
+    // bar's height, the click still taken on all of it; or rounded over the
+    // whole button, among the content's buttons.
     enum class Corners {
-        Square,
+        Inset,
         Rounded
     };
 
@@ -43,7 +44,7 @@ private:
     void fillBackground(QPainter &painter, const QColor &background) const;
 
     Kind kind_;
-    Corners corners_ = Corners::Square;
+    Corners corners_ = Corners::Inset;
     Theme theme_;
     HoverProgress hover_{this};
 };

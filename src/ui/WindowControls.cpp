@@ -4,7 +4,6 @@
 
 #include "ThemeStyle.h"
 #include "UiMetrics.h"
-#include "WindowFrame.h"
 
 #include <QEvent>
 #include <QHBoxLayout>
@@ -23,6 +22,9 @@ constexpr qreal maxGlyphHalfPx = 5;
 constexpr qreal heightPerGlyphHalf = 8;
 // As the menu items' (ThemeStyle).
 constexpr qreal roundedRadiusPx = 4;
+// The button drawn inside a title bar: a square as high as the bar's other
+// controls, centered in the area it takes the clicks in.
+constexpr int insetButtonSidePx = 28;
 
 } // namespace
 
@@ -65,23 +67,16 @@ void WindowButton::leaveEvent(QEvent *event)
 
 void WindowButton::fillBackground(QPainter &painter, const QColor &background) const
 {
-    switch (corners_) {
-    case Corners::Square: {
-        // Against the window's edge, the window's rounded corner cuts it.
-        const QPainterPath windowShape = WindowFrame::roundedContent(this->window());
-        QPainterPath fill;
-        fill.addRect(QRectF(rect()));
-        if (!windowShape.isEmpty())
-            fill = fill.intersected(windowShape.translated(-mapTo(this->window(), QPointF(0, 0))));
-        painter.fillPath(fill, background);
-        return;
+    QRectF area = rect();
+    if (corners_ == Corners::Inset) {
+        const qreal side =
+            std::min<qreal>({qreal(width()), qreal(height()), qreal(UiMetrics::scaled(insetButtonSidePx))});
+        area = QRectF(0, 0, side, side);
+        area.moveCenter(QRectF(rect()).center());
     }
-    case Corners::Rounded:
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(background);
-        painter.drawRoundedRect(QRectF(rect()), roundedRadiusPx, roundedRadiusPx);
-        return;
-    }
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(background);
+    painter.drawRoundedRect(area, roundedRadiusPx, roundedRadiusPx);
 }
 
 void WindowButton::paintEvent(QPaintEvent *)
