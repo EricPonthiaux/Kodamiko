@@ -66,6 +66,7 @@
 #include "ui/NoticeBar.h"
 #include "ui/PulsingButton.h"
 #include "ui/Snackbar.h"
+#include "ui/Spinner.h"
 #include "ui/TabBarBaseLine.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
@@ -797,6 +798,7 @@ void MainWindow::createStatusBar()
     cancelGitButton_->setAutoRaise(true);
     cancelGitButton_->setFocusPolicy(Qt::NoFocus);
     cancelGitButton_->setToolTip(tr("Stop the git operation"));
+    Spinner::surround(cancelGitButton_);
     cancelGitButton_->hide();
     connect(cancelGitButton_, &QToolButton::clicked, gitCommands_, &GitCommands::cancel);
     editorStatus_ = new EditorStatus(this);

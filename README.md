@@ -196,6 +196,11 @@ The permission is needed because the EPL 1.0 is not compatible with the GPL,
 and the diagram editor links Graphviz's library. It covers Kodamiko's own code
 only; the other components keep their licenses.
 
+**Trademarks.** The GPL covers the code, not the name or the logo: as
+section 7(e) of the GPL v3 allows, *Kodamiko* and its K mark are not
+licensed with it. What you may do with them, and what needs permission, is
+in `TRADEMARKS.md`; a modified version takes another name.
+
 Third-party components:
 
 | Component | Distributed | License |

@@ -18,14 +18,19 @@ public:
     // Shows it turning, or hides it.
     void setSpinning(bool spinning);
 
+    // Adds a ring around a control's icon while the control is visible.
+    // It follows the control's size and lets all pointer input through.
+    static void surround(QWidget *control);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     void updateMotion();
 
     QTimer *timer_;
-    int penWidthPx_;
     int angle_ = 0;
     bool spinning_ = false;
 };

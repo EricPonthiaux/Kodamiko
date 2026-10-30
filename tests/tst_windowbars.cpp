@@ -5,6 +5,8 @@
 #include "ui/AppFonts.h"
 #include "ui/ElidingToolButton.h"
 #include "ui/ModeTabBar.h"
+#include "ui/Motion.h"
+#include "ui/Spinner.h"
 #include "ui/ThemeStyle.h"
 #include "ui/TitleBar.h"
 #include "ui/UiIcons.h"
@@ -85,7 +87,11 @@ struct Window {
         branch->setIcon(UiIcons::icon("branch", theme.mutedText));
         branch->setText("feature/a-very-long-branch-name-for-responsive-layout ↑2");
         branch->setToolTip(branch->text());
-        cancel->setText("Stop Git");
+        cancel->setIcon(UiIcons::icon("stop", theme.mutedText));
+        cancel->setToolTip("Stop the git operation");
+        UiMetrics::setControlHeight(cancel);
+        UiMetrics::setScaledIconSize(cancel);
+        Spinner::surround(cancel);
         cancel->hide();
         status->addGroup("Git", {branch, cancel});
         auto *body = new QLabel("Editor workspace", &root);
@@ -118,6 +124,62 @@ private slots:
         font.setPointSize(11);
         QApplication::setFont(font);
         ThemeStyle::apply(Theme::kodamiko());
+        Motion::policy().setEnabled(true);
+    }
+
+    void cleanup() { Motion::policy().setEnabled(true); }
+
+    void stopRingsAnimateWithoutInterceptingClicks_data()
+    {
+        QTest::addColumn<QString>("themeName");
+        QTest::addColumn<int>("fontSize");
+        QTest::newRow("dark") << QStringLiteral("kodamiko") << 11;
+        QTest::newRow("light-large") << QStringLiteral("kodamiko-pearl") << 22;
+    }
+
+    void stopRingsAnimateWithoutInterceptingClicks()
+    {
+        QFETCH(const QString, themeName);
+        QFETCH(const int, fontSize);
+        QFont font = QApplication::font();
+        font.setPointSize(fontSize);
+        QApplication::setFont(font);
+        const Theme theme = Theme::named(themeName);
+        ThemeStyle::apply(theme);
+        Window window(theme);
+        window.title->setRunConfiguration({.name = "Build", .menu = &window.runMenu, .running = true});
+        window.cancel->show();
+        window.show(1920);
+        QVERIFY(QTest::qWaitForWindowExposed(&window.root));
+        const auto buttons = window.title->findChildren<QToolButton *>("runAction");
+        const QSignalSpy stopped(&window.stop, &QAction::triggered);
+        const QSignalSpy cancelled(window.cancel, &QToolButton::clicked);
+        for (QToolButton *button : {buttons.last(), window.cancel}) {
+            const auto *ring = button->findChild<Spinner *>();
+            QVERIFY(ring);
+            QVERIFY(ring->isVisible());
+            QVERIFY(button->rect().contains(ring->geometry()));
+            QVERIFY(!button->childAt(button->rect().center()));
+            const QImage before = button->grab().toImage();
+            QTRY_VERIFY(button->grab().toImage() != before);
+            QTest::mouseClick(button, Qt::LeftButton);
+        }
+        QCOMPARE(stopped.count(), 1);
+        QCOMPARE(cancelled.count(), 1);
+        Motion::policy().setEnabled(false);
+        const QImage still = window.cancel->grab().toImage();
+        QTest::qWait(80);
+        QCOMPARE(window.cancel->grab().toImage(), still);
+        const QString preview = qEnvironmentVariable("KDK_BAR_PREVIEW_DIR");
+        if (!preview.isEmpty())
+            window.root.grab().save(preview + "/stop-ring-" + QString::fromLatin1(QTest::currentDataTag()) + ".png");
+        window.root.hide();
+        Motion::policy().setEnabled(true);
+        for (const Spinner *ring : window.root.findChildren<Spinner *>())
+            QVERIFY(!ring->findChild<QTimer *>()->isActive());
+        window.root.show();
+        for (const Spinner *ring : window.root.findChildren<Spinner *>())
+            QTRY_VERIFY(ring->findChild<QTimer *>()->isActive());
     }
 
     void barsKeepControlsInsideTheWindow_data()

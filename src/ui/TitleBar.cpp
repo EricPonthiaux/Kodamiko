@@ -6,6 +6,7 @@
 #include "BrandLogo.h"
 #include "ElidingToolButton.h"
 #include "FileIcons.h"
+#include "Spinner.h"
 #include "UiIcons.h"
 #include "UiMetrics.h"
 
@@ -267,6 +268,7 @@ void TitleBar::setRunActions(QAction *run, QAction *stop)
 {
     runButton_ = actionButton(run, QStringLiteral("run"), runColor);
     stopButton_ = actionButton(stop, QStringLiteral("stop"), stopColor);
+    Spinner::surround(stopButton_);
     // One shown at a time, at the same place and size: nothing moves.
     for (ActionButton &entry : actionButtons_) {
         if (entry.button != runButton_ && entry.button != stopButton_)
