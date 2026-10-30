@@ -37,4 +37,8 @@ struct Chunk {
 // sides added at the edges of a conflict are left out of it, as BothSame.
 QList<Chunk> merge(QByteArrayView base, QByteArrayView current, QByteArrayView incoming);
 
+// The lines of `text`, each with its line ending; the last one may have
+// none.
+QByteArrayList lines(QByteArrayView text);
+
 } // namespace ThreeWayMerge

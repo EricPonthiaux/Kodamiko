@@ -501,6 +501,9 @@ private:
     // The merge view of the project's conflicts, in a tab; brought to the
     // front and read again if it is open.
     void openMergeView();
+    // Opens the merge view when files fall into conflict (a merge, a rebase,
+    // a stash applied that stops); reads it again on any other change.
+    void followConflicts(const QStringList &paths);
     // What a review of `subject` is asked; `patch`, a unified diff, holds
     // the changes to review (empty: the code as it is).
     ReviewSession::Request reviewRequest(const QString &subject, const QByteArray &patch = {}) const;
@@ -639,6 +642,7 @@ private:
     HistoryView *historyView_ = nullptr;
     ReviewPage *reviewPage_ = nullptr;
     QPointer<MergeView> mergeView_;        // a tab's page; null when none is open
+    bool hasConflicts_ = false;            // as of the last followConflicts()
     QPointer<ReviewSession> stagedReview_; // a child; null without a review of the staged changes
     GitCommands *gitCommands_ = nullptr;
     AgentMergeQueue *agentMerges_ = nullptr;

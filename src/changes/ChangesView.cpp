@@ -380,6 +380,7 @@ void ChangesView::showStatus(std::optional<RepositoryStatus> status, const QStri
     const DiffPosition position = diffPosition();
 
     status_ = std::move(status);
+    announceConflicts();
     forgetCleanClaudeEdits();
     rebuildList();
     restoreSelection(selected, current);

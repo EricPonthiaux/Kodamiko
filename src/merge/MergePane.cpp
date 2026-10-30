@@ -6,6 +6,9 @@
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
 
+#include <Qsci/qscicommand.h>
+#include <Qsci/qscicommandset.h>
+
 #include <array>
 
 namespace {
@@ -85,14 +88,42 @@ MergePane::MergePane(const Theme &theme, const QString &path, QWidget *parent)
 
 MergePane::~MergePane() = default;
 
+void MergePane::makeEditable()
+{
+    isEditable_ = true;
+    setReadOnly(false);
+    setCaretLineVisible(true);
+    // Undo is the document's (MergeDocument), which also undoes the sides
+    // taken: Scintilla leaves its keys free, and its history is emptied at
+    // each showStretches(). It keeps one meanwhile: its notifications only
+    // carry the deleted text then, which QScintilla's accessibility needs.
+    for (const QsciCommand::Command command : {QsciCommand::Undo, QsciCommand::Redo}) {
+        QsciCommand *bound = standardCommands()->find(command);
+        bound->setKey(0);
+        bound->setAlternateKey(0);
+    }
+}
+
+QByteArray MergePane::bytes() const
+{
+    const long length = SendScintilla(SCI_GETLENGTH);
+    QByteArray text(length + 1, '\0');
+    SendScintilla(SCI_GETTEXT, length + 1, text.data());
+    text.chop(1);
+    return text;
+}
+
 void MergePane::showStretches(const QList<Stretch> &stretches)
 {
     QByteArray text;
     for (const Stretch &stretch : stretches)
         text += stretch.lines.join();
-    setReadOnly(false);
-    SendScintilla(SCI_SETTEXT, text.constData());
-    setReadOnly(true);
+    // The text the user just typed stays, with its caret.
+    if (text != bytes()) {
+        setReadOnly(false);
+        SendScintilla(SCI_SETTEXT, text.constData());
+        setReadOnly(!isEditable_);
+    }
     SendScintilla(SCI_ANNOTATIONCLEARALL);
     markerDeleteAll();
 
@@ -110,6 +141,8 @@ void MergePane::showStretches(const QList<Stretch> &stretches)
         addPadding(line + count - 1, stretch.rows - count);
         line += count;
     }
+    if (isEditable_)
+        SendScintilla(SCI_EMPTYUNDOBUFFER);
     const int digits = int(QString::number(std::max(lines(), 1)).size());
     setMarginWidth(numberMargin, QString(digits + 1, QLatin1Char('9')));
 }
@@ -121,6 +154,8 @@ void MergePane::applyTheme(const Theme &theme)
     setColor(theme.foreground);
     setFont(theme.font);
     setSelectionBackgroundColor(theme.selection);
+    setCaretLineBackgroundColor(theme.caretLine);
+    setCaretForegroundColor(theme.caret);
     ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     // The highlighter resets every style: the margins' come after.
     if (highlighter_)

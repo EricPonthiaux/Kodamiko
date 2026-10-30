@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "git/ConflictVersions.h"
+#include "git/GitCommands.h"
 #include "git/GitProcess.h"
 #include "git/Integration.h"
 #include "git/RepositoryStatus.h"
@@ -13,6 +14,7 @@
 
 #include <QFileInfo>
 #include <QListWidget>
+#include <QPushButton>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -121,6 +123,47 @@ QByteArray gitMergeFile(const QByteArray &base,
     write(dir, "incoming", incoming);
     return git(dir, {"merge-file", "-p", option, "current", "base", "incoming"});
 }
+
+// A merge view of a.txt, whose second line main and "other" changed.
+struct OneConflict {
+    QTemporaryDir dir;
+    GitCommands commands;
+    std::unique_ptr<MergeView> view;
+    QListWidget *list = nullptr;
+
+    OneConflict()
+    {
+        initRepository(dir, {{"a.txt", "a\nbase\nz\n"}});
+        commitOn(dir, "other", [this] { write(dir, "a.txt", "a\nother\nz\n"); });
+        commitOn(dir, "main", [this] { write(dir, "a.txt", "a\nmain\nz\n"); });
+        mergeOther(dir);
+        view = std::make_unique<MergeView>(dir.path(), Theme::named("kodamiko"), &commands);
+        view->resize(1200, 600);
+        view->show();
+        view->activateWindow();
+        list = view->findChild<QListWidget *>();
+    }
+
+    QString state() const { return list->item(0)->text().section('\n', 1); }
+
+    MergePane *result() const
+    {
+        for (MergePane *pane : view->findChildren<MergePane *>()) {
+            if (!pane->isReadOnly())
+                return pane;
+        }
+        return nullptr;
+    }
+
+    QPushButton *button(const QString &text) const
+    {
+        for (QPushButton *button : view->findChildren<QPushButton *>()) {
+            if (button->text() == text)
+                return button;
+        }
+        return nullptr;
+    }
+};
 
 const ConflictVersions::File *fileAt(const QList<ConflictVersions::File> &files, const QString &path)
 {
@@ -475,6 +518,22 @@ private slots:
         QCOMPARE(document.resultText(), QByteArray("a\ntyped\n"));
     }
 
+    void linesTypedOneAfterTheOtherAreUndoneTogether()
+    {
+        MergeDocument document = threeChanges();
+        document.replaceResultLines(3, 1, {"m\n"});
+        document.replaceResultLines(3, 1, {"mo\n"});
+        document.finishTyping();
+        document.replaceResultLines(3, 1, {"mor\n"});
+
+        document.undo();
+        QCOMPARE(document.resultLines(3), QByteArrayList{"mo\n"});
+        document.undo();
+
+        QCOMPARE(document.segments()[3].choice, Choice::Unresolved);
+        QVERIFY(!document.canUndo());
+    }
+
     void undoAndRedoAChoice()
     {
         MergeDocument document = threeChanges();
@@ -529,8 +588,9 @@ private slots:
             write(dir, "b.txt", "main\n");
         });
         mergeOther(dir);
+        GitCommands commands;
 
-        MergeView view(dir.path(), Theme::named("kodamiko"));
+        MergeView view(dir.path(), Theme::named("kodamiko"), &commands);
 
         auto *list = view.findChild<QListWidget *>();
         QTRY_COMPARE(list->count(), 2);
@@ -546,7 +606,8 @@ private slots:
         commitOn(dir, "other", [&dir] { write(dir, "a.txt", "a\nother\nz\n"); });
         commitOn(dir, "main", [&dir] { write(dir, "a.txt", "a\nmain\nz\n"); });
         mergeOther(dir);
-        MergeView view(dir.path(), Theme::named("kodamiko"));
+        GitCommands commands;
+        MergeView view(dir.path(), Theme::named("kodamiko"), &commands);
         view.resize(1200, 600);
         view.show();
         auto *list = view.findChild<QListWidget *>();
@@ -560,6 +621,42 @@ private slots:
         QTest::mouseClick(gutter, Qt::LeftButton, {}, QPoint(gutter->width() / 2, rowHeight + rowHeight / 2));
 
         QVERIFY2(list->item(0)->text().endsWith("Resolved, not saved yet"), qPrintable(list->item(0)->text()));
+    }
+
+    void typingInTheResultResolvesTheConflictAndUndoTakesItBack()
+    {
+        OneConflict merge;
+        QTRY_COMPARE(merge.list->count(), 1);
+        MergePane *result = merge.result();
+        const long start = result->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, 1L);
+        const long end = result->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, 1L);
+
+        result->SendScintilla(QsciScintillaBase::SCI_SETSEL, start, end);
+        result->SendScintilla(QsciScintillaBase::SCI_REPLACESEL, 0UL, "main and other");
+
+        QCOMPARE(merge.state(), QString("Resolved, not saved yet"));
+        QCOMPARE(result->bytes(), QByteArray("a\nmain and other\nz\n"));
+        QVERIFY(QTest::qWaitForWindowActive(merge.view.get()));
+        result->setFocus();
+        QTest::keyClick(result, Qt::Key_Z, Qt::ControlModifier);
+        QCOMPARE(merge.state(), QString("1 conflict(s) left"));
+        QCOMPARE(result->bytes(), QByteArray("a\nbase\nz\n"));
+    }
+
+    void savingWritesTheResultAndOffersToContinue()
+    {
+        OneConflict merge;
+        QTRY_COMPARE(merge.list->count(), 1);
+        QVERIFY(!merge.button("Save and Mark Resolved")->isEnabled());
+        merge.button("Take All")->click();
+
+        merge.button("Save and Mark Resolved")->click();
+
+        QTRY_COMPARE(merge.list->count(), 0);
+        QCOMPARE(read(merge.dir, "a.txt"), QByteArray("a\nmain\nz\n"));
+        QVERIFY(ConflictVersions::read(infoOf(merge.dir)).isEmpty());
+        QVERIFY(merge.button("Continue merge")->isVisible());
+        QVERIFY(merge.button("Continue merge")->isEnabled());
     }
 
 private:

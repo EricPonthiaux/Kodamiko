@@ -3,6 +3,8 @@
 #include "MergeView.h"
 
 #include "MergeTextPanel.h"
+#include "MergeTexts.h"
+#include "git/GitCommands.h"
 #include "git/ThreeWayMerge.h"
 #include "ui/AppFonts.h"
 
@@ -27,11 +29,6 @@ bool isText(const ConflictVersions::File &file)
     return hasBothSides && !file.isBinary;
 }
 
-QString pathOf(const std::optional<ConflictVersions::Version> &version)
-{
-    return version ? version->path : QString();
-}
-
 // Empty for a version the file does not have.
 QByteArray contentOf(const std::optional<ConflictVersions::Version> &version)
 {
@@ -40,10 +37,11 @@ QByteArray contentOf(const std::optional<ConflictVersions::Version> &version)
 
 } // namespace
 
-MergeView::MergeView(QString folder, Theme theme, QWidget *parent)
+MergeView::MergeView(QString folder, Theme theme, GitCommands *commands, QWidget *parent)
     : QWidget(parent)
     , folder_(std::move(folder))
     , theme_(std::move(theme))
+    , commands_(commands)
     , list_(new QListWidget(this))
     , message_(new QLabel(this))
 {
@@ -53,6 +51,7 @@ MergeView::MergeView(QString folder, Theme theme, QWidget *parent)
     message_->setObjectName(QStringLiteral("pageDescription"));
     message_->setAlignment(Qt::AlignCenter);
     message_->setWordWrap(true);
+    connect(commands_, &GitCommands::busyChanged, this, &MergeView::updateFooter);
 
     auto *fileArea = new QWidget(this);
     fileArea_ = new QVBoxLayout(fileArea);
@@ -68,6 +67,7 @@ MergeView::MergeView(QString folder, Theme theme, QWidget *parent)
     layout->setSpacing(0);
     layout->addWidget(createBar());
     layout->addLayout(body, 1);
+    layout->addWidget(createFooter());
     showMessage(tr("Reading the conflicts…"));
     reload();
 }
@@ -132,10 +132,43 @@ QWidget *MergeView::createBar()
     return bar;
 }
 
+QWidget *MergeView::createFooter()
+{
+    auto *footer = new QWidget(this);
+    hint_ = new QLabel(footer);
+    hint_->setObjectName(QStringLiteral("pageDescription"));
+    save_ = new QPushButton(tr("Save and Mark Resolved"), footer);
+    save_->setToolTip(tr("Write the result to the file and mark it resolved in git"));
+    abort_ = new QPushButton(footer);
+    continue_ = new QPushButton(footer);
+    continue_->setDefault(true);
+    close_ = new QPushButton(tr("Close"), footer);
+    connect(save_, &QPushButton::clicked, this, &MergeView::saveCurrentFile);
+    connect(abort_, &QPushButton::clicked, this, &MergeView::abortRequested);
+    connect(continue_, &QPushButton::clicked, this, &MergeView::continueRequested);
+    connect(close_, &QPushButton::clicked, this, &MergeView::closeRequested);
+    auto *layout = new QHBoxLayout(footer);
+    layout->setContentsMargins(barMarginPx, barMarginPx, barMarginPx, barMarginPx);
+    layout->setSpacing(barSpacingPx);
+    layout->addWidget(hint_, 1);
+    layout->addWidget(save_);
+    layout->addWidget(abort_);
+    layout->addWidget(continue_);
+    layout->addWidget(close_);
+    return footer;
+}
+
 void MergeView::showConflicts(const Conflicts &conflicts)
 {
+    // Reloads follow every change of the repository: most change nothing.
+    if (hasRead_ && conflicts == conflicts_)
+        return;
+    hasRead_ = true;
     conflicts_ = conflicts;
-    title_->setText(titleOf(conflicts));
+    std::erase_if(resolutions_, [&conflicts](const auto &entry) {
+        return std::ranges::find(conflicts.files, entry.second.file) == conflicts.files.end();
+    });
+    title_->setText(MergeTexts::title(conflicts.repository.operation, conflicts.sides));
     const QString selected = list_->currentItem() ? list_->currentItem()->data(Qt::UserRole).toString() : QString();
     {
         const QSignalBlocker block(list_);
@@ -148,11 +181,15 @@ void MergeView::showConflicts(const Conflicts &conflicts)
     }
     updateList();
     if (!conflicts.error.isEmpty()) {
+        showFile(-1);
         showMessage(conflicts.error);
     } else if (conflicts_.files.isEmpty()) {
-        showMessage(tr("No file is in conflict."));
+        showFile(-1);
+        showMessage(conflicts.repository.operation.isEmpty() ? tr("No conflict is left.")
+                                                             : tr("Every conflict is resolved."));
     } else {
         const auto found = std::ranges::find(conflicts_.files, selected, &ConflictVersions::File::path);
+        // From no row after the clear: showFile() follows.
         list_->setCurrentRow(found == conflicts_.files.end() ? 0 : int(found - conflicts_.files.begin()));
     }
     updateBar();
@@ -160,8 +197,12 @@ void MergeView::showConflicts(const Conflicts &conflicts)
 
 void MergeView::showFile(int row)
 {
-    if (panel_)
+    if (panel_) {
+        panel_->hide();
         panel_->deleteLater();
+        panel_ = nullptr;
+    }
+    updateFooter();
     if (row < 0 || row >= conflicts_.files.size())
         return;
     const ConflictVersions::File &file = conflicts_.files[row];
@@ -169,7 +210,7 @@ void MergeView::showFile(int row)
     if (!document) {
         showMessage(tr("%1: %2.\nFor now, resolve it from the Diff view's menu: Accept Current Version or Accept "
                        "Incoming Version.")
-                        .arg(file.path, stateOf(file)));
+                        .arg(file.path, MergeTexts::fileState(file, conflicts_.sides, nullptr)));
         updateBar();
         return;
     }
@@ -178,11 +219,13 @@ void MergeView::showFile(int row)
     connect(panel_, &MergeTextPanel::documentChanged, this, [this] {
         updateList();
         updateBar();
+        updateFooter();
     });
     fileArea_->addWidget(panel_);
     panel_->setFocus();
     updateList();
     updateBar();
+    updateFooter();
 }
 
 void MergeView::showMessage(const QString &message)
@@ -191,19 +234,38 @@ void MergeView::showMessage(const QString &message)
     message_->show();
 }
 
+void MergeView::saveCurrentFile()
+{
+    const ConflictVersions::File *file = currentFile();
+    const MergeDocument *document = file ? openedDocument(file->path) : nullptr;
+    if (!document || !document->isResolved())
+        return;
+    commands_->run(
+        tr("Resolving %1").arg(file->path),
+        [repository = conflicts_.repository, path = file->path, content = document->resultText()] {
+            Integration::writeResolution(repository, path, content);
+            return tr("%1 is resolved.").arg(path);
+        },
+        [view = QPointer(this)] {
+            if (view)
+                view->reload();
+        });
+}
+
 void MergeView::updateList()
 {
     for (int row = 0; row < list_->count(); ++row) {
         const ConflictVersions::File &file = conflicts_.files[row];
-        list_->item(row)->setText(QFileInfo(file.path).fileName() + QLatin1Char('\n') + stateOf(file));
+        const QString state = MergeTexts::fileState(file, conflicts_.sides, openedDocument(file.path));
+        list_->item(row)->setText(QFileInfo(file.path).fileName() + QLatin1Char('\n') + state);
     }
 }
 
 void MergeView::updateBar()
 {
     int unresolved = 0;
-    for (const auto &[path, document] : documents_)
-        unresolved += document->unresolvedCount();
+    for (const auto &[path, resolution] : resolutions_)
+        unresolved += resolution.document->unresolvedCount();
     const qsizetype files = conflicts_.files.size();
     summary_->setText(files == 0 ? QString()
                                  : tr("%n file(s) in conflict", nullptr, int(files)) + QStringLiteral(" · ") +
@@ -212,60 +274,51 @@ void MergeView::updateBar()
     next_->setEnabled(panel_);
 }
 
-QString MergeView::titleOf(const Conflicts &conflicts) const
+void MergeView::updateFooter()
 {
-    const QString &operation = conflicts.repository.operation;
-    const Integration::ConflictSides &sides = conflicts.sides;
-    if (operation == tr("merge"))
-        return tr("Merging %1 into %2").arg(sides.incoming, sides.current);
-    if (operation == tr("rebase"))
-        return tr("Rebasing onto %1: %2").arg(sides.current, sides.incoming);
-    if (operation == tr("cherry-pick"))
-        return tr("Cherry-picking %1 onto %2").arg(sides.incoming, sides.current);
-    if (operation == tr("revert"))
-        return tr("%1 on %2").arg(sides.incoming, sides.current);
-    return tr("Conflicts on %1").arg(sides.current);
+    const QString &operation = conflicts_.repository.operation;
+    const bool hasOperation = Integration::canContinue(operation);
+    const bool isDone = hasRead_ && conflicts_.error.isEmpty() && conflicts_.files.isEmpty();
+    const ConflictVersions::File *file = currentFile();
+    const MergeDocument *document = file ? openedDocument(file->path) : nullptr;
+    const bool canSave = document && document->isResolved() && !commands_->isBusy();
+    save_->setVisible(!isDone);
+    save_->setEnabled(canSave);
+    abort_->setText(tr("Abort %1").arg(operation));
+    abort_->setVisible(hasOperation);
+    continue_->setText(tr("Continue %1").arg(operation));
+    continue_->setVisible(hasOperation);
+    continue_->setEnabled(isDone && !commands_->isBusy());
+    close_->setVisible(isDone && !hasOperation);
+    if (isDone)
+        hint_->setText(hasOperation ? tr("Every file is resolved: the %1 can go on.").arg(operation) : QString());
+    else if (document && !document->isResolved())
+        hint_->setText(tr("Take a side, both, or type the result for each conflict, then save."));
+    else
+        hint_->setText(tr("Saving writes the result and marks the file resolved."));
 }
 
-QString MergeView::stateOf(const ConflictVersions::File &file) const
+const ConflictVersions::File *MergeView::currentFile() const
 {
-    const Integration::ConflictSides &sides = conflicts_.sides;
-    if (const auto found = documents_.find(file.path); found != documents_.end()) {
-        const int left = found->second->unresolvedCount();
-        return left == 0 ? tr("Resolved, not saved yet") : tr("%n conflict(s) left", nullptr, left);
-    }
-    if (file.isBinary)
-        return tr("Binary file changed on both sides");
-    switch (file.kind) {
-    case Kind::BothModified:
-        return tr("Changed on both sides");
-    case Kind::BothAdded:
-        return tr("Added on both sides");
-    case Kind::DeletedByCurrent:
-        return tr("Deleted on %1, changed on %2").arg(sides.current, sides.incoming);
-    case Kind::DeletedByIncoming:
-        return tr("Deleted on %1, changed on %2").arg(sides.incoming, sides.current);
-    case Kind::RenamedOnBothSides:
-        return tr("Renamed %1 on %2 and %3 on %4")
-            .arg(pathOf(file.current), sides.current, pathOf(file.incoming), sides.incoming);
-    case Kind::DeletedByBoth:
-        return tr("Deleted on both sides");
-    case Kind::AddedByCurrent:
-        return tr("Added on %1 only").arg(sides.current);
-    case Kind::AddedByIncoming:
-        return tr("Added on %1 only").arg(sides.incoming);
-    }
-    return {};
+    const int row = list_->currentRow();
+    return row >= 0 && row < conflicts_.files.size() ? &conflicts_.files[row] : nullptr;
 }
 
 MergeDocument *MergeView::documentOf(const ConflictVersions::File &file)
 {
     if (!isText(file))
         return nullptr;
-    std::unique_ptr<MergeDocument> &document = documents_[file.path];
-    if (!document) {
-        document = std::make_unique<MergeDocument>(
+    Resolution &resolution = resolutions_[file.path];
+    if (!resolution.document || resolution.file != file) {
+        resolution.file = file;
+        resolution.document = std::make_unique<MergeDocument>(
             ThreeWayMerge::merge(contentOf(file.base), contentOf(file.current), contentOf(file.incoming)));
     }
-    return document.get();
+    return resolution.document.get();
+}
+
+const MergeDocument *MergeView::openedDocument(const QString &path) const
+{
+    const auto found = resolutions_.find(path);
+    return found == resolutions_.end() ? nullptr : found->second.document.get();
 }

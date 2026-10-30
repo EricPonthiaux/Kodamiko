@@ -149,7 +149,9 @@ void MergeDocument::resolveRemaining(Choice choice)
 
 void MergeDocument::replaceResultLines(int first, int count, const QByteArrayList &lines)
 {
-    remember();
+    if (!isTyping_)
+        remember();
+    isTyping_ = true;
     if (segments_.isEmpty()) {
         segments_.append({{}, Choice::Edited, lines});
         return;
@@ -168,6 +170,7 @@ void MergeDocument::replaceResultLines(int first, int count, const QByteArrayLis
 
 void MergeDocument::undo()
 {
+    isTyping_ = false;
     if (history_.isEmpty())
         return;
     undone_.append(segments_);
@@ -176,6 +179,7 @@ void MergeDocument::undo()
 
 void MergeDocument::redo()
 {
+    isTyping_ = false;
     if (undone_.isEmpty())
         return;
     history_.append(segments_);
@@ -184,6 +188,7 @@ void MergeDocument::redo()
 
 void MergeDocument::remember()
 {
+    isTyping_ = false;
     history_.append(segments_);
     undone_.clear();
 }

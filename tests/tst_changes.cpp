@@ -1984,6 +1984,25 @@ private slots:
         QVERIFY(!view.operationBar()->isVisible());
     }
 
+    void announcesTheFilesThatFallIntoConflictAndTheirResolution()
+    {
+        const QTemporaryDir project;
+        stopMergeOnConflict(project);
+        GitCommands commands;
+        ChangesView view(Theme::kodamiko(), &commands);
+        view.setFolder(project.path());
+        QSignalSpy announced(&view, &ChangesView::conflictsChanged);
+
+        view.refresh();
+
+        QTRY_COMPARE(announced.size(), 1);
+        QCOMPARE(announced.first().first().toStringList(), QStringList{"a.txt"});
+        Git::run(project.path(), {"add", "a.txt"});
+        view.refresh();
+        QTRY_COMPARE(announced.size(), 2);
+        QVERIFY(announced.last().first().toStringList().isEmpty());
+    }
+
     void operationBarKeepsTheHeightOfItsText()
     {
         const QTemporaryDir project;

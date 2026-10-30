@@ -153,6 +153,9 @@ signals:
     // The conflicts of the operation in progress, to resolve in the merge
     // view.
     void mergeViewRequested();
+    // The conflicted files changed (repository paths): some appeared, were
+    // resolved, or none is left.
+    void conflictsChanged(const QStringList &paths);
 
 private:
     enum class Section {
@@ -291,6 +294,9 @@ private:
     void showListMenu(const QPoint &position);
 
     // The conflicted files among `refs`, each once.
+    // Emits conflictsChanged() if the status's conflicted files are not
+    // those last announced.
+    void announceConflicts();
     QList<FileRef> conflictedFiles(const QList<FileRef> &refs) const;
     // Accept Current, Accept Incoming and Mark as Resolved for the
     // conflicted files of `selection`, at the end of `menu`; nothing
@@ -326,6 +332,8 @@ private:
     GitCommands *commands_;
     QString folder_;
     std::optional<RepositoryStatus> status_;
+    // The conflicted files last announced (conflictsChanged()).
+    QStringList conflictPaths_;
     QString error_; // why there is no status_
 
     // Reading runs on pool_, one read at a time; a refresh() during a read

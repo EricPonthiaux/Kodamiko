@@ -65,7 +65,11 @@ public:
     // user types them: the stretches the lines belong to become one, with
     // the lines the user wrote. An insertion between two stretches goes to
     // an open conflict without lines there, else to the stretch after it.
+    // The replacements that follow one another are undone together, until
+    // finishTyping() or another change.
     void replaceResultLines(int first, int count, const QByteArrayList &lines);
+
+    void finishTyping() { isTyping_ = false; }
 
     bool canUndo() const { return !history_.isEmpty(); }
 
@@ -86,4 +90,6 @@ private:
     // the changes undone since, the last one undone last.
     QList<QList<Segment>> history_;
     QList<QList<Segment>> undone_;
+    // The last change was a replacement: the next one joins it.
+    bool isTyping_ = false;
 };

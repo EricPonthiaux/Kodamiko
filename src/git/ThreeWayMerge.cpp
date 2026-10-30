@@ -31,19 +31,6 @@ struct Cluster {
     QList<Hunk> incoming;
 };
 
-Lines splitLines(QByteArrayView text)
-{
-    Lines lines;
-    qsizetype start = 0;
-    while (start < text.size()) {
-        const qsizetype newline = text.indexOf('\n', start);
-        const qsizetype end = newline < 0 ? text.size() : newline + 1;
-        lines.append(text.sliced(start, end - start).toByteArray());
-        start = end;
-    }
-    return lines;
-}
-
 int hunkCallback(const git_diff_delta *, const git_diff_hunk *hunk, void *payload)
 {
     // A side that inserts or deletes only counts its start from the line
@@ -201,7 +188,20 @@ private:
 QList<Chunk> merge(QByteArrayView base, QByteArrayView current, QByteArrayView incoming)
 {
     const libgit2::Session session;
-    return Builder(splitLines(base), splitLines(current), splitLines(incoming)).build();
+    return Builder(lines(base), lines(current), lines(incoming)).build();
+}
+
+QByteArrayList lines(QByteArrayView text)
+{
+    QByteArrayList result;
+    qsizetype start = 0;
+    while (start < text.size()) {
+        const qsizetype newline = text.indexOf('\n', start);
+        const qsizetype end = newline < 0 ? text.size() : newline + 1;
+        result.append(text.sliced(start, end - start).toByteArray());
+        start = end;
+    }
+    return result;
 }
 
 } // namespace ThreeWayMerge

@@ -374,6 +374,19 @@ void MainWindow::openMergeView()
         mergeView_->reload();
         return;
     }
-    mergeView_ = new MergeView(folder_, theme_);
+    mergeView_ = new MergeView(folder_, theme_, gitCommands_);
+    connect(mergeView_, &MergeView::continueRequested, gitActions_, &GitActions::continueOperation);
+    connect(mergeView_, &MergeView::abortRequested, gitActions_, &GitActions::abortOperation);
+    connect(mergeView_, &MergeView::closeRequested, this, [this] { editorTabs_->closePage(mergeView_); });
     editorTabs_->showPage(mergeView_, tr("Merge"), QStringLiteral("branch"));
+}
+
+void MainWindow::followConflicts(const QStringList &paths)
+{
+    const bool appeared = !hasConflicts_ && !paths.isEmpty();
+    hasConflicts_ = !paths.isEmpty();
+    if (appeared)
+        openMergeView();
+    else if (mergeView_)
+        mergeView_->reload();
 }

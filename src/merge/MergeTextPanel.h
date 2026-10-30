@@ -11,12 +11,15 @@
 
 class MergeGutter;
 class MergePane;
+class QTimer;
 
 // The resolution of a conflicted text file: the current side, the result
 // and the incoming side in three columns that face each other row for row
 // and scroll together, an arrow at each conflict to take a side's lines
-// into the result (both sides, after a second arrow). F7 and Shift+F7 go
-// to the next and previous conflict; Ctrl+Z and Ctrl+Shift+Z undo and redo.
+// into the result (both sides, after a second arrow), Take All for every
+// conflict left. The result is typed in as in an editor. F7 and Shift+F7 go
+// to the next and previous conflict; Ctrl+Z and Ctrl+Shift+Z undo and redo,
+// the typing as the sides taken.
 class MergeTextPanel : public QWidget {
     Q_OBJECT
 
@@ -46,9 +49,12 @@ signals:
 private:
     void layOut(const Integration::ConflictSides &sides);
     QWidget *createHeader(const QString &name, const QString &role);
+    QWidget *createSideHeader(const QString &name, const QString &role, MergeDocument::Choice side);
     void connectPanes();
     void addShortcuts();
     void take(int segment, MergeDocument::Choice side);
+    // The user typed in the result: the document follows.
+    void onResultEdited();
     void refresh();
     void updateMarks();
     void alignWith(const MergePane &leader);
@@ -60,6 +66,12 @@ private:
     MergePane *incoming_;
     MergeGutter *currentGutter_;
     MergeGutter *incomingGutter_;
+    QTimer *typingPause_;
+    // Set while the columns are rewritten: their changes are not typing.
+    bool isShowing_ = false;
+    // The first line of the result changed since the document last
+    // followed, -1 for none.
+    int firstEditedLine_ = -1;
     // The first row of each segment, the same in the three columns.
     QList<int> segmentRows_;
 };

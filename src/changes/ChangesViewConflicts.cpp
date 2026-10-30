@@ -40,6 +40,22 @@ QList<ChangesView::FileRef> ChangesView::conflictedFiles(const QList<FileRef> &r
     return result;
 }
 
+void ChangesView::announceConflicts()
+{
+    QStringList paths;
+    if (status_) {
+        for (const FileDiff &diff : std::as_const(status_->unstaged)) {
+            const QString path = status_->info.repoPath(diff.change.path);
+            if (diff.change.kind == ChangeKind::Conflicted && !paths.contains(path))
+                paths.append(path);
+        }
+    }
+    if (paths == conflictPaths_)
+        return;
+    conflictPaths_ = paths;
+    emit conflictsChanged(paths);
+}
+
 void ChangesView::addConflictActions(QMenu &menu, const QList<FileRef> &selection)
 {
     const QList<FileRef> conflicted = conflictedFiles(selection);

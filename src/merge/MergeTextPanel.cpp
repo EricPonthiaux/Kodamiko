@@ -9,7 +9,9 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QShortcut>
+#include <QTimer>
 
 #include <algorithm>
 #include <ranges>
@@ -24,6 +26,7 @@ using Shade = MergePane::Shade;
 // Rows kept above a conflict the view goes to.
 constexpr int rowsAboveConflict = 3;
 constexpr int headerMarginPx = 8;
+constexpr int typingPauseMs = 1000;
 
 enum class Side {
     Current,
@@ -121,8 +124,14 @@ MergeTextPanel::MergeTextPanel(const Theme &theme, const File &file, QWidget *pa
     , incoming_(new MergePane(theme, file.path, this))
     , currentGutter_(new MergeGutter(MergeGutter::Direction::Right, file.sides.current, theme, this))
     , incomingGutter_(new MergeGutter(MergeGutter::Direction::Left, file.sides.incoming, theme, this))
+    , typingPause_(new QTimer(this))
 {
     layOut(file.sides);
+    result_->makeEditable();
+    // A pause in the typing ends what one undo takes back.
+    typingPause_->setSingleShot(true);
+    typingPause_->setInterval(typingPauseMs);
+    connect(typingPause_, &QTimer::timeout, this, [this] { document_.finishTyping(); });
     // One scroll bar, at the right, for the three columns.
     current_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     result_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -137,9 +146,9 @@ void MergeTextPanel::layOut(const Integration::ConflictSides &sides)
     auto *layout = new QGridLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(createHeader(sides.current, tr("yours")), 0, 0);
-    layout->addWidget(createHeader(tr("Result"), tr("written to the file")), 0, 2);
-    layout->addWidget(createHeader(sides.incoming, tr("incoming")), 0, 4);
+    layout->addWidget(createSideHeader(sides.current, tr("yours"), Choice::Current), 0, 0);
+    layout->addWidget(createHeader(tr("Result"), tr("type to edit it")), 0, 2);
+    layout->addWidget(createSideHeader(sides.incoming, tr("incoming"), Choice::Incoming), 0, 4);
     layout->addWidget(current_, 1, 0);
     layout->addWidget(currentGutter_, 1, 1);
     layout->addWidget(result_, 1, 2);
@@ -199,8 +208,30 @@ QWidget *MergeTextPanel::createHeader(const QString &name, const QString &role)
     return header;
 }
 
+QWidget *MergeTextPanel::createSideHeader(const QString &name, const QString &role, Choice side)
+{
+    QWidget *header = createHeader(name, role);
+    auto *takeAll = new QPushButton(tr("Take All"), header);
+    takeAll->setToolTip(tr("Take %1's lines for every conflict still open").arg(name));
+    connect(takeAll, &QPushButton::clicked, this, [this, side] {
+        document_.resolveRemaining(side);
+        refresh();
+    });
+    header->layout()->addWidget(takeAll);
+    return header;
+}
+
 void MergeTextPanel::connectPanes()
 {
+    connect(result_, &QsciScintillaBase::SCN_MODIFIED, this, [this](int position, int type) {
+        const bool changesText =
+            (type & (QsciScintillaBase::SC_MOD_INSERTTEXT | QsciScintillaBase::SC_MOD_DELETETEXT)) != 0;
+        if (isShowing_ || !changesText)
+            return;
+        const int line = int(result_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, long(position)));
+        firstEditedLine_ = firstEditedLine_ < 0 ? line : std::min(firstEditedLine_, line);
+    });
+    connect(result_, &QsciScintilla::textChanged, this, &MergeTextPanel::onResultEdited);
     for (const MergePane *pane : {current_, result_, incoming_}) {
         connect(pane, &QsciScintillaBase::SCN_UPDATEUI, this, [this, pane] {
             alignWith(*pane);
@@ -245,6 +276,28 @@ void MergeTextPanel::take(int segment, Choice side)
     refresh();
 }
 
+void MergeTextPanel::onResultEdited()
+{
+    if (isShowing_ || firstEditedLine_ < 0)
+        return;
+    const QByteArrayList typed = ThreeWayMerge::lines(result_->bytes());
+    const QByteArrayList before = ThreeWayMerge::lines(document_.resultText());
+    // What changed lies between the lines the two have in common at the
+    // start, up to the first line the edit touched, and at the end.
+    const qsizetype shorter = std::min(typed.size(), before.size());
+    qsizetype prefix = 0;
+    while (prefix < std::min<qsizetype>(shorter, firstEditedLine_) && typed[prefix] == before[prefix])
+        ++prefix;
+    qsizetype suffix = 0;
+    while (suffix < shorter - prefix && typed[typed.size() - 1 - suffix] == before[before.size() - 1 - suffix])
+        ++suffix;
+    firstEditedLine_ = -1;
+    document_.replaceResultLines(int(prefix), int(before.size() - prefix - suffix),
+                                 typed.mid(prefix, typed.size() - prefix - suffix));
+    typingPause_->start();
+    refresh();
+}
+
 void MergeTextPanel::refresh()
 {
     const int top = result_->firstVisibleLine();
@@ -264,9 +317,11 @@ void MergeTextPanel::refresh()
         segmentRows_.append(row);
         row += rows;
     }
+    isShowing_ = true;
     current_->showStretches(currentStretches);
     result_->showStretches(resultStretches);
     incoming_->showStretches(incomingStretches);
+    isShowing_ = false;
     result_->setFirstVisibleLine(top);
     alignWith(*result_);
     updateMarks();
@@ -306,7 +361,7 @@ QList<int> MergeTextPanel::conflictSegments() const
     QList<int> conflicts;
     const QList<Segment> &segments = document_.segments();
     for (int i = 0; i < segments.size(); ++i) {
-        if (segments[i].chunk.kind == ChunkKind::Conflict && segments[i].choice != Choice::Edited)
+        if (segments[i].chunk.kind == ChunkKind::Conflict)
             conflicts.append(i);
     }
     return conflicts;
