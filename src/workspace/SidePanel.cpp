@@ -7,10 +7,12 @@
 #include "ui/ViewHeader.h"
 
 #include <QEvent>
+#include <QFrame>
 #include <QImage>
 #include <QPainter>
 #include <QPointer>
 #include <QSplitter>
+#include <QStyle>
 #include <QStyleOptionTab>
 #include <QStylePainter>
 #include <QTabBar>
@@ -109,7 +111,7 @@ private:
     // device pixels and leaves the last one bare.
     void drawSeparator(QPainter &painter, int open) const
     {
-        const int x = width() - 1;
+        const int x = panel_->edge() == SidePanel::Edge::Left ? width() - 1 : 0;
         if (open < 0) {
             painter.fillRect(QRect(x, 0, 1, height()), theme_.line);
             return;
@@ -128,7 +130,10 @@ private:
         // the panel. Up to its own edge only, the tab's last device pixel is
         // half covered at a scale of 1.25 or 1.75, a line between it and the
         // panel.
-        option.rect.setRight(width());
+        if (panel_->edge() == SidePanel::Edge::Left)
+            option.rect.setRight(width());
+        else
+            option.rect.setLeft(-1);
         if (!panel_->isPanelVisible())
             option.state &= ~QStyle::State_Selected;
         painter.drawControl(QStyle::CE_TabBarTabShape, option);
@@ -148,8 +153,9 @@ private:
     {
         const qreal ratio = devicePixelRatioF();
         const QImage image = levelLabel(QSize(rect.height(), rect.width()), index, color);
-        // Read from bottom to top.
-        QImage turned = image.transformed(QTransform().rotate(270));
+        // Read from bottom to top at the left edge, from top to bottom at the right.
+        const qreal angle = panel_->edge() == SidePanel::Edge::Left ? 270 : 90;
+        QImage turned = image.transformed(QTransform().rotate(angle));
         turned.setDevicePixelRatio(ratio);
         painter.drawImage(rect.topLeft(), turned);
     }
@@ -240,6 +246,23 @@ void SidePanel::alignHeadersWith(QTabBar *tabs)
 QTabBar *SidePanel::tabBar() const
 {
     return tabBar_;
+}
+
+void SidePanel::setEdge(Edge edge)
+{
+    if (edge == edge_)
+        return;
+    edge_ = edge;
+    // The tabs' style follows their shape (::tab:right); the headers', the
+    // panel's property.
+    tabBar_->setShape(edge == Edge::Left ? QTabBar::RoundedWest : QTabBar::RoundedEast);
+    setProperty("edge", edge == Edge::Left ? QStringLiteral("left") : QStringLiteral("right"));
+    for (auto *headerTab : findChildren<QFrame *>(QStringLiteral("viewHeaderTab"))) {
+        headerTab->style()->unpolish(headerTab);
+        headerTab->style()->polish(headerTab);
+    }
+    tabBar_->updateGeometry();
+    tabBar_->update();
 }
 
 void SidePanel::applyTheme(const Theme &theme)

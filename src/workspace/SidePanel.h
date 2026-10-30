@@ -16,11 +16,16 @@ class SideTabBar;
 // show. Clicking the current tab folds the panel away, clicking it again
 // (or another tab) brings it back. The strip stays at the edge either way.
 // On a short window, the strip scrolls its tabs instead of making the
-// window taller.
+// window taller. At the window's right edge, the same, mirrored.
 class SidePanel : public QStackedWidget {
     Q_OBJECT
 
 public:
+    enum class Edge {
+        Left,
+        Right
+    };
+
     explicit SidePanel(QWidget *parent = nullptr);
 
     // The strip, the full height of the window's edge, for the caller to
@@ -28,6 +33,12 @@ public:
     QWidget *strip() const { return strip_; }
 
     QTabBar *tabBar() const;
+
+    Edge edge() const { return edge_; }
+
+    // The window's edge the caller places the strip at: its tabs face the
+    // panel, their text read from top to bottom at the right edge.
+    void setEdge(Edge edge);
 
     int addView(QWidget *view, const QIcon &icon, const QString &title);
     // The headers' height and the vertical strip's width follow the editor tabs' height.
@@ -55,4 +66,5 @@ private:
     QWidget *strip_;
     SideTabBar *tabBar_;
     QSplitter *splitter_ = nullptr;
+    Edge edge_ = Edge::Left;
 };

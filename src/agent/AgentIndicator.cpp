@@ -134,7 +134,7 @@ void AgentIndicator::alignWith(QTabBar *column)
 }
 
 // The left margin puts the square's center under the first tab's: the tab
-// bar can have spare width to the right of its tabs.
+// bar can have spare width beside its tabs.
 void AgentIndicator::updateAlignment()
 {
     const bool canMeasure = column_ && column_->count() > 0 && isVisible();
@@ -142,7 +142,10 @@ void AgentIndicator::updateAlignment()
         return;
     const int columnCenter = column_->mapTo(window(), column_->tabRect(0).center()).x();
     const int left = mapTo(window(), QPoint(0, 0)).x();
-    const int margin = std::max(0, columnCenter - left - squareSide() / 2);
+    // A column at the window's right edge would push the bar's items away:
+    // the square stays at the bar's start.
+    const bool columnAtRightEdge = columnCenter > window()->width() / 2;
+    const int margin = columnAtRightEdge ? 0 : std::max(0, columnCenter - left - squareSide() / 2);
     if (margin != contentsMargins().left())
         setContentsMargins(margin, 0, 0, 0);
 }

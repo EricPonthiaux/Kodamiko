@@ -20,6 +20,7 @@
 #include "settings/Keymap.h"
 #include "terminal/ProcessSpec.h"
 #include "ui/Theme.h"
+#include "workspace/SidePanel.h"
 
 #include <QElapsedTimer>
 #include <QJsonObject>
@@ -79,6 +80,8 @@ class HierarchyView;
 class ProjectSettingsPopup;
 class QAction;
 class QActionGroup;
+class QBoxLayout;
+class QFrame;
 class QLabel;
 class QMenuBar;
 class QSettings;
@@ -91,7 +94,6 @@ class QToolButton;
 class PulsingButton;
 class RepositoryWatcher;
 class Runner;
-class SidePanel;
 class SnapshotsPopup;
 class StashesPopup;
 class OccurrenceIndex;
@@ -157,6 +159,9 @@ private:
     void createGitServices();
     void createPopups();
     QWidget *createEditPage();
+    // The side panel at the window's left or right edge, the strip outside,
+    // the panel between it and the editors. View ▸ Side Panel at the Right.
+    void placeSidebar(SidePanel::Edge edge);
     void createFilesPanel();
     // The Files tree's options, as the user last set them.
     void restoreTreeOptions();
@@ -179,6 +184,10 @@ private:
     QWidget *createTerminalPage();
     void createModeTabs();
     void createStatusBar();
+    // The agent's square and usage, at the status bar's start.
+    QWidget *createAgentStatus();
+    // The divider between them, when both are shown.
+    void updateAgentStatusDivider();
     void createMenus();
     // Returns the actions macOS puts in the application menu.
     QList<QAction *> createFileMenu();
@@ -672,9 +681,11 @@ private:
     QAction *findInFilesAction_ = nullptr;
     QAction *paletteAction_ = nullptr;
     QAction *systemTitleBar_ = nullptr;
+    QAction *sidebarAtRight_ = nullptr;
     QAction *formatOnSave_ = nullptr;
     QActionGroup *themeActions_ = nullptr;
-    QLabel *usageLabel_ = nullptr;
+    QLabel *usageLabel_ = nullptr;         // status bar, after the agent's square
+    QFrame *agentStatusDivider_ = nullptr; // between the square and the usage
     CommandPalette *commandPalette_ = nullptr;
     FindBar *findBar_ = nullptr;
     EditorStatus *editorStatus_ = nullptr;
@@ -732,6 +743,7 @@ private:
     // Shown when the agent runs without a session (AgentFeatures::hasFileRuns).
     QList<QAction *> drawDiagramActions_;
     QSplitter *editSplitter_ = nullptr;
+    QBoxLayout *editPageLayout_ = nullptr; // the side strip, then the splitter (or the other way)
 
     QStackedWidget *modes_ = nullptr;
     QTabBar *modeTabs_ = nullptr;

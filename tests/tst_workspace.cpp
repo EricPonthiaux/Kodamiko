@@ -455,6 +455,47 @@ private slots:
         ThemeStyle::apply(Theme::kodamiko());
     }
 
+    void sideTabsAtTheRightEdgeMirrorTheLeft()
+    {
+        const Theme theme = Theme::kodamiko();
+        ThemeStyle::apply(theme);
+        QWidget window;
+        auto *layout = new QHBoxLayout(&window);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
+        auto *panel = new SidePanel(&window);
+        panel->addView(new QWidget, {}, "Files");
+        panel->addView(new QWidget, {}, "Outline");
+        panel->applyTheme(theme);
+        panel->setEdge(SidePanel::Edge::Right);
+        layout->addWidget(panel, 1);
+        layout->addWidget(panel->strip());
+        window.resize(600, 400);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+        QTabBar *tabs = panel->tabBar();
+        QCOMPARE(tabs->shape(), QTabBar::RoundedEast);
+        const QImage image = tabs->grab().toImage();
+        const qreal ratio = image.devicePixelRatio();
+        const QRect open = tabs->tabRect(0);
+        // The open tab reaches the panel at its left; the separator stays
+        // beside the other tabs.
+        QCOMPARE(image.pixelColor(0, int(open.center().y() * ratio)), theme.background);
+        QCOMPARE(image.pixelColor(0, int(tabs->tabRect(1).center().y() * ratio)), theme.line);
+        auto *files = panel->currentWidget();
+        files->setStyleSheet(QStringLiteral("background: red;"));
+        const QImage beside = window.grab().toImage();
+        const int panelLastColumn =
+            int((panel->mapTo(&window, QPoint()).x() + panel->width()) * beside.devicePixelRatio()) - 2;
+        QCOMPARE(beside.pixelColor(panelLastColumn, int(open.center().y() * ratio)), QColor(Qt::red));
+
+        // Back at the left edge.
+        panel->setEdge(SidePanel::Edge::Left);
+        QCOMPARE(tabs->shape(), QTabBar::RoundedWest);
+        ThemeStyle::apply(Theme::kodamiko());
+    }
+
     void frameResizesFromItsEdges()
     {
         const QSize size(800, 600);

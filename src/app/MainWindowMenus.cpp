@@ -306,6 +306,13 @@ void MainWindow::createViewMenu()
             showSidebar_->toggle();
     });
     showSidebar_->setChecked(QSettings().value(QStringLiteral("showSidebar"), true).toBool());
+    sidebarAtRight_ = view->addAction(tr("Side Panel at the &Right"));
+    sidebarAtRight_->setCheckable(true);
+    sidebarAtRight_->setChecked(sidebar_->edge() == SidePanel::Edge::Right);
+    connect(sidebarAtRight_, &QAction::toggled, this, [this](bool atRight) {
+        placeSidebar(atRight ? SidePanel::Edge::Right : SidePanel::Edge::Left);
+        QSettings().setValue(QStringLiteral("sidebarAtRight"), atRight);
+    });
 
     view->addSeparator();
     systemTitleBar_ = view->addAction(tr("Use System &Title Bar"));

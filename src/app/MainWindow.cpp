@@ -105,6 +105,12 @@
 
 namespace {
 
+// Between the agent's square, the divider and the usage: half the status
+// bar's gap between two items.
+constexpr int agentStatusSpacingPx = 6;
+// Between the divider's ends and the top or bottom of a control, as in the status bar.
+constexpr int agentStatusDividerInsetPx = 6;
+
 // Between the window's left edge and the agent indicator: macOS rounds the
 // window's bottom corners, and the indicator must clear them.
 QColor problemsIconColor(int errorCount, int warningCount, const Theme &theme)
@@ -445,12 +451,29 @@ QWidget *MainWindow::createEditPage()
     sidebar_->foldWithSplitter(editSplitter_);
 
     auto *page = new QWidget(this);
-    auto *pageLayout = new QHBoxLayout(page);
-    pageLayout->setContentsMargins(0, 0, 0, 0);
-    pageLayout->setSpacing(0);
-    pageLayout->addWidget(sidebar_->strip());
-    pageLayout->addWidget(editSplitter_, 1);
+    editPageLayout_ = new QHBoxLayout(page);
+    editPageLayout_->setContentsMargins(0, 0, 0, 0);
+    editPageLayout_->setSpacing(0);
+    editPageLayout_->addWidget(sidebar_->strip());
+    editPageLayout_->addWidget(editSplitter_, 1);
+    const bool atRight = QSettings().value(QStringLiteral("sidebarAtRight"), false).toBool();
+    placeSidebar(atRight ? SidePanel::Edge::Right : SidePanel::Edge::Left);
     return page;
+}
+
+void MainWindow::placeSidebar(SidePanel::Edge edge)
+{
+    sidebar_->setEdge(edge);
+    const int index = edge == SidePanel::Edge::Left ? 0 : 1;
+    editPageLayout_->removeWidget(sidebar_->strip());
+    editPageLayout_->insertWidget(index, sidebar_->strip());
+    if (editSplitter_->indexOf(sidebar_) == index)
+        return;
+    // The panel keeps its width on the other side; its stretch goes with it.
+    QList<int> sizes = editSplitter_->sizes();
+    std::ranges::reverse(sizes);
+    editSplitter_->insertWidget(index, sidebar_);
+    editSplitter_->setSizes(sizes);
 }
 
 void MainWindow::createFilesPanel()
@@ -744,12 +767,7 @@ void MainWindow::createStatusBar()
 {
     auto *bar = new WorkspaceStatusBar(modeTabs_, this);
     setStatusBar(bar);
-    agentIndicator_ = new AgentIndicator(this);
-    agentIndicator_->applyTheme(theme_);
-    agentIndicator_->alignWith(sidebar_->tabBar());
-    statusBar()->addWidget(agentIndicator_);
-    agentIndicator_->hide();
-    connect(agentIndicator_, &AgentIndicator::clicked, this, &MainWindow::showClaudeSession);
+    statusBar()->addWidget(createAgentStatus());
     connect(statusBar(), &QStatusBar::messageChanged, this, &MainWindow::updateAgentIndicator);
 
     syncButton_ = new QToolButton(this);
@@ -781,9 +799,6 @@ void MainWindow::createStatusBar()
     cancelGitButton_->setToolTip(tr("Stop the git operation"));
     cancelGitButton_->hide();
     connect(cancelGitButton_, &QToolButton::clicked, gitCommands_, &GitCommands::cancel);
-    usageLabel_ = new QLabel(this);
-    usageLabel_->setContentsMargins(8, 0, 8, 0);
-    usageLabel_->hide();
     editorStatus_ = new EditorStatus(this);
     auto *serverTasks = new ServerTasksLabel(languageServers_, this);
     auto *refactoring = new BusyIndicator(this);
@@ -792,7 +807,6 @@ void MainWindow::createStatusBar()
 
     bar->addGroup(tr("Refactoring"), {refactoring});
     bar->addGroup(tr("Language Servers"), {serverTasks});
-    bar->addGroup(tr("Agent Usage"), {usageLabel_});
     bar->addGroup(tr("Editor"), {editorStatus_});
     bar->addGroup(tr("Git"), {branchButton_, resumeButton_, syncButton_, cancelGitButton_});
     for (QToolButton *button :
@@ -800,6 +814,39 @@ void MainWindow::createStatusBar()
         UiMetrics::setControlHeight(button);
         UiMetrics::setScaledIconSize(button);
     }
+}
+
+// At the bar's start: the agent's square, then its context and limits
+// after a divider. A status message covers the whole row.
+QWidget *MainWindow::createAgentStatus()
+{
+    auto *row = new QWidget(this);
+    auto *layout = new QHBoxLayout(row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    agentIndicator_ = new AgentIndicator(row);
+    agentIndicator_->applyTheme(theme_);
+    agentIndicator_->alignWith(sidebar_->tabBar());
+    agentIndicator_->hide();
+    connect(agentIndicator_, &AgentIndicator::clicked, this, &MainWindow::showClaudeSession);
+    layout->addWidget(agentIndicator_);
+    agentStatusDivider_ = new QFrame(row);
+    agentStatusDivider_->setObjectName(QStringLiteral("statusDivider"));
+    agentStatusDivider_->setFixedSize(1, UiMetrics::controlHeight() - 2 * UiMetrics::scaled(agentStatusDividerInsetPx));
+    agentStatusDivider_->hide();
+    layout->addSpacing(UiMetrics::scaled(agentStatusSpacingPx));
+    layout->addWidget(agentStatusDivider_, 0, Qt::AlignVCenter);
+    usageLabel_ = new QLabel(row);
+    usageLabel_->setContentsMargins(UiMetrics::scaled(agentStatusSpacingPx), 0, 0, 0);
+    usageLabel_->hide();
+    layout->addWidget(usageLabel_);
+    return row;
+}
+
+void MainWindow::updateAgentStatusDivider()
+{
+    const bool hasBoth = !agentIndicator_->isHidden() && !usageLabel_->isHidden();
+    agentStatusDivider_->setVisible(hasBoth);
 }
 
 void MainWindow::restoreSettings()

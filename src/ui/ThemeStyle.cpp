@@ -197,6 +197,7 @@ EditorTabs QTabBar::tab:selected, QTabWidget#terminalTabs QTabBar::tab:selected,
 SidePanel > QWidget { background: @base; }
 SidePanel QFrame#viewHeader { border: none; }
 SidePanel QFrame#viewHeaderTab { border-left: none; border-top-left-radius: 0; }
+SidePanel[edge="right"] QFrame#viewHeaderTab { border-left: 1px solid @line; border-right: none; border-top-left-radius: 4px; border-top-right-radius: 0; }
 EditorTabs QTabBar[preview="true"]::tab:last { font-style: italic; }
 QTabBar#modeTabs::tab { background: transparent; color: @muted; padding: 0 10px; margin: 3px 2px; min-width: 0; border: 1px solid transparent; border-radius: 4px; }
 QTabBar#modeTabs::tab:first { margin-left: 3px; }
@@ -228,6 +229,10 @@ QTabBar#sideTabs::tab { padding: 14px 6px; margin: 2px 0 2px 4px; background: tr
 QTabBar#sideTabs::tab:hover { background: @hover; color: @text; }
 QTabBar#sideTabs::tab:selected { background: @base; border-color: @line; border-top-right-radius: 0; border-bottom-right-radius: 0; color: @text; }
 QTabBar#sideTabs::tab:first { margin-top: 0; }
+QTabBar#sideTabs::tab:right { margin: 2px 4px 2px 0; border: 1px solid transparent; border-left: none; border-radius: 0; border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+QTabBar#sideTabs::tab:right:hover { background: @hover; color: @text; }
+QTabBar#sideTabs::tab:right:selected { background: @base; border-color: @line; border-top-left-radius: 0; border-bottom-left-radius: 0; color: @text; }
+QTabBar#sideTabs::tab:right:first { margin-top: 0; }
 QHeaderView::section { background: @panel; color: @muted; border: none; border-bottom: 1px solid @line; padding: 4px 6px; }
 QTreeView, QTreeWidget, QListView { background: @base; border: none; outline: 0; }
 QTreeView { padding-top: 6px; }
@@ -275,6 +280,7 @@ QFrame#runBlock QToolButton:hover, QFrame#runBlock QToolButton:pressed { backgro
 QFrame#runBlock QToolButton::menu-indicator { image: none; width: 0; }
 QFrame#runDivider, QFrame#projectDivider { background: @border; border: none; }
 TitleBar QFrame#titleDivider { background: @line; }
+QFrame#statusDivider { background: @line; border: none; }
 QToolButton#chip { padding: 4px 9px; border-radius: 3px; }
 QToolButton#chip:hover { background: @button; }
 QToolButton#chip::menu-indicator { image: none; width: 0; }

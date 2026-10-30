@@ -29,8 +29,9 @@ public:
     // The agent shown: its name and mark. Not owned.
     void setProvider(const AgentProvider *provider);
     void applyTheme(const Theme &theme);
-    // Centers the square under the side-tab column, following its width as
-    // the layout or interface font changes. Not owned.
+    // Centers the square under the side-tab column at the window's left
+    // edge, following its width as the layout or interface font changes.
+    // Not owned.
     void alignWith(QTabBar *column);
 
     QSize sizeHint() const override;

@@ -392,6 +392,7 @@ void MainWindow::updateAgentIndicator()
     const bool hasSession = claudeTerminal_ && claudeTerminal_->isRunning();
     // Activity updates must not uncover the indicator over a status message.
     agentIndicator_->setVisible(hasSession && statusBar()->currentMessage().isEmpty());
+    updateAgentStatusDivider();
     if (hasSession)
         agentIndicator_->setStatus(indicatorStatus(state));
     agentIndicator_->setToolTip(description + QLatin1Char('\n') +
@@ -725,6 +726,7 @@ void MainWindow::updateUsage()
     const ClaudeUsage usage = ClaudeUsage::fromStatusJson(claudeStatus_);
     const QString summary = usage.summary();
     usageLabel_->setVisible(!summary.isEmpty());
+    updateAgentStatusDivider();
     usageLabel_->setToolTip(usage.details());
     const char *warning = usageWarningColor(usage.highestPercent(), theme_.isDark);
     usageLabel_->setText(
