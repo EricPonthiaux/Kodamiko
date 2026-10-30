@@ -68,6 +68,7 @@ class MessagePopup;
 class NewAgentPopup;
 class NewBranchPopup;
 class NewProjectPopup;
+class OverlayPopup;
 class NoticeBar;
 class OutlineView;
 class PreferencesPopup;
@@ -465,8 +466,11 @@ private:
     void warmUpLanguageServers();
     // Find bar of the editor, in Edit mode only.
     void showFind(bool withReplace);
+    // Go to, Find in Files and the command palette: one shown at a time,
+    // each closing the other two (dismissSearchPopupsBut).
     void showGoTo(int tab);
     void showFindInFiles();
+    void dismissSearchPopupsBut(const OverlayPopup *kept);
     // Next or previous change mark, or the one at the cursor rolled back.
     void goToChange(bool forward);
     void rollbackChange();

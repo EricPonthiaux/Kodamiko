@@ -17,6 +17,7 @@
 #include "navigation/GoToPopup.h"
 #include "search/FindInFilesPopup.h"
 #include "ui/NoticeBar.h"
+#include "workspace/CommandPalette.h"
 #include "workspace/FileTreeView.h"
 #include "workspace/FilesPanel.h"
 #include "workspace/SidePanel.h"
@@ -122,13 +123,26 @@ void MainWindow::showFind(bool withReplace)
 
 void MainWindow::showGoTo(int tab)
 {
+    dismissSearchPopupsBut(goToPopup_);
     goToPopup_->popup(static_cast<GoToPopup::Tab>(tab));
 }
 
 void MainWindow::showFindInFiles()
 {
+    dismissSearchPopupsBut(findInFiles_);
     const EditorWidget *editor = mode_ == Mode::Edit ? editorTabs_->currentEditor() : nullptr;
     findInFiles_->popup(editor && editor->hasSelectedText() ? editor->selectedText() : QString());
+}
+
+void MainWindow::dismissSearchPopupsBut(const OverlayPopup *kept)
+{
+    // Dismissed before the kept one shows, so that the focus it gives back
+    // is the one the kept popup returns to.
+    for (OverlayPopup *popup : {static_cast<OverlayPopup *>(goToPopup_), static_cast<OverlayPopup *>(findInFiles_),
+                                static_cast<OverlayPopup *>(commandPalette_)}) {
+        if (popup != kept)
+            popup->dismiss();
+    }
 }
 
 void MainWindow::goToChange(bool forward)

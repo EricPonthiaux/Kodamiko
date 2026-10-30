@@ -577,5 +577,6 @@ void MainWindow::updateProjectMenu()
 
 void MainWindow::showCommandPalette()
 {
+    dismissSearchPopupsBut(commandPalette_);
     commandPalette_->popup(titleBar_->menuBar());
 }
