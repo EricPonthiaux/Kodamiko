@@ -154,6 +154,7 @@ add_library(kdk_core STATIC
     editor/ConflictActionBar.cpp
     editor/EditorStatus.cpp
     editor/EditorTabs.cpp
+    editor/EmptyEditorBackdrop.cpp
     editor/EditorWidget.cpp
     editor/FileWatcher.cpp
     editor/FindBar.cpp

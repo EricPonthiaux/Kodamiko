@@ -19,6 +19,8 @@
 namespace {
 
 constexpr int boxGapPx = 4;
+// Between the mode track and the window's right edge, which it touched.
+constexpr int trailingMarginPx = 8;
 
 class StatusRow : public QWidget {
 public:
@@ -79,7 +81,7 @@ WorkspaceStatusBar::WorkspaceStatusBar(QTabBar *modes, QWidget *parent)
         // Room above and below the boxes: they stand in the middle of the
         // bar, clear of its line.
         const int gap = UiMetrics::scaled(boxGapPx);
-        trailingLayout_->setContentsMargins(0, gap, 0, gap);
+        trailingLayout_->setContentsMargins(0, gap, UiMetrics::scaled(trailingMarginPx), gap);
         detailsLayout_->setSpacing(UiMetrics::scaled(12));
         scheduleLayout();
     });
@@ -158,8 +160,11 @@ int WorkspaceStatusBar::expandedModesWidth() const
 void WorkspaceStatusBar::updateResponsiveLayout()
 {
     const int reserve = currentMessage().isEmpty() ? UiMetrics::scaled(48) : qMin(width() / 3, UiMetrics::scaled(280));
-    const int available = qMax(0, width() - reserve - 16);
-    trailing_->setMaximumWidth(available);
+    const int outerWidth = qMax(0, width() - reserve - 16);
+    trailing_->setMaximumWidth(outerWidth);
+    // What the boxes may take, inside the margin that keeps them off the edge.
+    const QMargins margins = trailingLayout_->contentsMargins();
+    const int available = qMax(0, outerWidth - margins.left() - margins.right());
     const int gap = trailingLayout_->spacing();
     int detailWidth = 0;
     for (const Group &group : std::as_const(groups_)) {

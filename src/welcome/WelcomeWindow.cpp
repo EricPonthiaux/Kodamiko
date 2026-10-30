@@ -6,7 +6,6 @@
 #include "ProjectListDelegate.h"
 #include "ProjectSetupForm.h"
 #include "ProjectSetupPanel.h"
-#include "ResumeCard.h"
 #include "projects/ProjectStore.h"
 #include "recipes/RecipeLibrary.h"
 #include "settings/Preferences.h"
@@ -43,11 +42,7 @@ constexpr QSize formSize{904, 640};
 
 constexpr const char *welcomeRules = R"(
 QFrame#welcomeTitleBar { border: none; border-bottom: 1px solid @line; }
-QLabel#welcomeVersion { color: @muted; border: 1px solid @border; border-radius: 3px; padding: 1px 5px; }
-QLabel#welcomeCaption, QLabel#welcomeCount, QLabel#welcomeNumber { color: @muted; }
-QLabel#welcomeNumber { color: @border; }
-QLabel#welcomeEyebrow { color: @accent; }
-QFrame#welcomePanel { border: none; border-left: 1px solid @line; }
+QLabel#welcomeVersion, QLabel#welcomeCount, QLabel#welcomeNoMatch { color: @muted; }
 QFrame#welcomeFooter { border: none; border-top: 1px solid @line; }
 QFrame#welcomeRule { background: @line; border: none; }
 QPushButton#welcomeLink { background: transparent; border: none; color: @muted; padding: 4px 6px; }
@@ -55,7 +50,6 @@ QPushButton#welcomeLink:hover { color: @text; }
 QPushButton#welcomeAction { padding: 8px 12px; border-radius: 5px; }
 QLineEdit#welcomeSearch { padding: 3px 6px; border-radius: 5px; }
 QListWidget#welcomeProjects { background: transparent; border: none; outline: none; }
-QLabel#templateChip { color: @muted; border: 1px solid @border; border-radius: 3px; padding: 3px 7px; }
 QLabel#keyCap { color: @text; background: @panel; border: 1px solid @line; border-bottom: 2px solid @line; border-radius: 4px; padding: 0 5px; }
 )";
 
@@ -95,10 +89,9 @@ QListWidgetItem *findProject(const QListWidget &list, const QString &path)
     return nullptr;
 }
 
-// Shows the projects matching `text`, and the headings of their groups;
-// the one at `featuredPath`, on the card, only in a search. Returns how
-// many projects show.
-int showMatches(const QListWidget &list, const QString &text, const QString &featuredPath)
+// Shows the projects matching `text` and the headings of their groups.
+// Returns how many projects show.
+int showMatches(const QListWidget &list, const QString &text)
 {
     QListWidgetItem *heading = nullptr;
     int shownCount = 0;
@@ -110,8 +103,7 @@ int showMatches(const QListWidget &list, const QString &text, const QString &fea
             heading->setHidden(true);
             continue;
         }
-        const bool isOnCard = text.isEmpty() && pathOf(item) == featuredPath;
-        const bool shown = !isOnCard && matches(item, text);
+        const bool shown = matches(item, text);
         item->setHidden(!shown);
         if (!shown)
             continue;
@@ -184,6 +176,7 @@ WelcomeWindow::~WelcomeWindow() = default;
 void WelcomeWindow::configureList()
 {
     list_->setObjectName(QStringLiteral("welcomeProjects"));
+    list_->setAccessibleName(tr("Recent projects"));
     const ProjectListDelegate::Actions actions{
         .showMenu = [this](const QModelIndex &index,
                            QPoint globalPosition) { showMenu(list_->item(index.row()), globalPosition); },
@@ -219,10 +212,6 @@ void WelcomeWindow::reload()
     if (QListWidgetItem *item = findProject(*list_, current))
         list_->setCurrentItem(item);
 
-    // The one opened last, on the card.
-    featuredPath_ = present.isEmpty() ? QString() : present.first().path;
-    if (!present.isEmpty())
-        card_->setProject(present.first());
     showProjectsState(present.size() + missing.size());
     filter(search_->text());
 }
@@ -230,14 +219,7 @@ void WelcomeWindow::reload()
 void WelcomeWindow::showProjectsState(qsizetype projectCount)
 {
     const bool hasProjects = projectCount > 0;
-    eyebrow_->setText(hasProjects ? tr("YOUR WORKSPACE") : tr("YOUR NEXT CHAPTER"));
-    title_->setText(tr("What will you make?"));
-    title_->setVisible(!hasProjects);
-    description_->setVisible(!hasProjects);
-    card_->setVisible(!featuredPath_.isEmpty());
-    // A single project is on the card: nothing else to list or search.
-    listHeading_->setVisible(projectCount > 1);
-    navigationHints_->setVisible(hasProjects);
+    search_->setEnabled(hasProjects);
     firstSteps_->setVisible(!hasProjects);
 }
 
@@ -259,13 +241,12 @@ QListWidgetItem *WelcomeWindow::addProject(const ProjectConfig &project)
 
 void WelcomeWindow::filter(const QString &text)
 {
-    const int shownCount = showMatches(*list_, text, featuredPath_);
+    const int shownCount = showMatches(*list_, text);
     count_->setText(QString::number(shownCount));
-    // Not isVisibleTo: on the way back from a form, the welcome page is
-    // still hidden in the stack when the list is filtered.
-    const bool isListed = !listHeading_->isHidden();
-    list_->setVisible(isListed && shownCount > 0);
-    noMatch_->setVisible(isListed && shownCount == 0);
+    const bool hasProjects = list_->count() > 0;
+    list_->setVisible(shownCount > 0);
+    noMatch_->setVisible(hasProjects && shownCount == 0);
+    navigationHints_->setVisible(shownCount > 0);
     const QListWidgetItem *current = list_->currentItem();
     QListWidgetItem *firstShown = firstShownProject();
     if (firstShown && (!current || current->isHidden()))
@@ -284,9 +265,9 @@ QListWidgetItem *WelcomeWindow::firstShownProject() const
 
 void WelcomeWindow::focusFirstChoice()
 {
-    if (card_->isVisibleTo(this))
-        card_->setFocus();
-    else if (listHeading_->isVisibleTo(this))
+    if (firstShownProject())
+        list_->setFocus();
+    else if (search_->isEnabled())
         search_->setFocus();
     else
         newButton_->setFocus();
@@ -363,7 +344,7 @@ void WelcomeWindow::showAbout()
 
 void WelcomeWindow::importProject()
 {
-    const QString folder = QFileDialog::getExistingDirectory(this, tr("Import Project"), QDir::homePath());
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Open Folder"), QDir::homePath());
     if (!folder.isEmpty())
         configure(QDir(folder).absolutePath());
 }
@@ -402,13 +383,6 @@ void WelcomeWindow::showContextMenu(const QPoint &position)
         showMenu(item, list_->viewport()->mapToGlobal(position));
 }
 
-void WelcomeWindow::showCardMenu(const QPoint &position)
-{
-    // The card's project is in the list too, hidden.
-    if (QListWidgetItem *item = findProject(*list_, featuredPath_))
-        showMenu(item, card_->mapToGlobal(position));
-}
-
 void WelcomeWindow::showMenu(QListWidgetItem *item, QPoint globalPosition)
 {
     const QString path = pathOf(item);
@@ -431,8 +405,6 @@ bool WelcomeWindow::eventFilter(QObject *watched, QEvent *event)
         const auto *key = static_cast<QKeyEvent *>(event);
         if (watched == search_)
             return searchKeyPressed(key);
-        if (watched == card_)
-            return cardKeyPressed(key);
         if (watched == list_)
             return listKeyPressed(key);
     }
@@ -443,7 +415,7 @@ bool WelcomeWindow::moveWindow(QObject *watched, const QEvent *event)
 {
     // The empty parts of the window move it, like a title bar; the
     // controls watched for their keys keep their clicks.
-    const bool isControl = watched == search_ || watched == card_ || watched == list_;
+    const bool isControl = watched == search_ || watched == list_;
     if (event->type() != QEvent::MouseButtonPress || isControl)
         return false;
     const auto *mouse = static_cast<const QMouseEvent *>(event);
@@ -461,10 +433,6 @@ bool WelcomeWindow::searchKeyPressed(const QKeyEvent *key)
         list_->setFocus();
         return true;
     }
-    if (key->key() == Qt::Key_Up && card_->isVisible()) {
-        card_->setFocus();
-        return true;
-    }
     if (isEnter(key) && hasCurrent) {
         open(pathOf(current));
         return true;
@@ -476,34 +444,12 @@ bool WelcomeWindow::searchKeyPressed(const QKeyEvent *key)
     return false;
 }
 
-bool WelcomeWindow::cardKeyPressed(const QKeyEvent *key)
-{
-    if (isEnter(key)) {
-        card_->click();
-        return true;
-    }
-    if (key->key() != Qt::Key_Down)
-        return false;
-    // Down the list, or to the search above an empty one.
-    if (QListWidgetItem *first = firstShownProject()) {
-        list_->setCurrentItem(first);
-        list_->setFocus();
-    } else if (search_->isVisible()) {
-        search_->setFocus();
-    }
-    return true;
-}
-
 bool WelcomeWindow::listKeyPressed(const QKeyEvent *key)
 {
     const bool isAtTop = list_->currentItem() == firstShownProject();
     if (key->key() != Qt::Key_Up || !isAtTop)
         return false;
-    // Up from the first row, back to the card.
-    if (card_->isVisible())
-        card_->setFocus();
-    else
-        search_->setFocus();
+    search_->setFocus();
     return true;
 }
 

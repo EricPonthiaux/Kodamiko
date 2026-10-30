@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- One color (the text's): the sizes keep the two cursors apart -->
-  <rect x="17" y="12" width="7" height="40" rx="3.5" fill="currentColor"/>
-  <rect x="31" y="24" width="16" height="28" rx="4" fill="currentColor"/>
+  <!-- The geometric K in one color, with transparent cuts -->
+  <path d="M14 12H22V52H14C12.9 52 12 51.1 12 50V14C12 12.9 12.9 12 14 12Z" fill="currentColor"/>
+  <path d="M26 29L43 12H55L36 31H26Z M26 35H36L53 52H41L26 37Z" fill="currentColor"/>
 </svg>

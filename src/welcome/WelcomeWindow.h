@@ -18,20 +18,14 @@ class QListWidget;
 class QListWidgetItem;
 class QPushButton;
 class QStackedWidget;
-class ResumeCard;
 class Toolchains;
 class WindowButton;
 class WindowFrame;
 
-// The window Kodamiko opens with, before the main one (docs/mockups/
-// welcome.html, "Constellation"): on the left, the mark at the centre of
-// its orbits (BrandHero); on the right, the project opened last on a card
-// to continue it, the other projects to search and reopen (those whose
-// folder is gone listed apart, to locate), New Project (NewProjectForm) and
-// Import Project. Without any project, it shows how to start one. Its
-// colors are those of the theme of the Preferences. A project not set up
-// yet gets its languages chosen first; then what it needs is downloaded,
-// and projectChosen comes.
+// The startup workspace: a full-width list of recent projects, with creation
+// and opening actions below. Missing folders are grouped separately
+// so they can be located. A project not set up yet gets its languages chosen
+// first, then its tools downloaded, before projectChosen is emitted.
 class WelcomeWindow : public QWidget {
     Q_OBJECT
 
@@ -46,10 +40,8 @@ public:
     // Shows the setup of `path`, detected again if it was never set up.
     void configure(const QString &path);
 
-    // Every project, the one on the card included, with the headings of
-    // their groups among them when some folders are gone
-    // (ProjectListDelegate::headingRole). The card's project is hidden in
-    // the list until a search.
+    // Every project, most recently opened first, with group headings when
+    // some folders are gone (ProjectListDelegate::headingRole).
     QListWidget *projectList() const { return list_; }
 
     // The New Project page, shown by its button. For tests.
@@ -67,18 +59,17 @@ protected:
 
 private:
     // Built in WelcomeWindowUi.cpp.
-    // Kodamiko's mark, name and version, a caption, the close button.
+    // The window's logo, name and close button.
     QWidget *createTitleBar();
-    // The hero and the projects side by side, the footer below.
+    // The projects, creation/opening actions and footer, stacked vertically.
     QWidget *createWelcomePage();
     QWidget *createProjectsPanel();
-    QWidget *createPanelHeading();
     // "Recent projects", their count and the search.
     QWidget *createListHeading();
     // What the panel shows without any project.
     QWidget *createFirstSteps();
     QWidget *createProjectButtons();
-    // About, a tagline and the keyboard's shortcuts.
+    // About, the version and the keyboard's shortcuts.
     QWidget *createFooter();
     void addShortcuts(QWidget *page);
 
@@ -96,18 +87,16 @@ private:
     void showForm(QWidget *page);
     void showAbout();
     void filter(const QString &text);
-    // The card when it shows, otherwise the search or New Project.
+    // The first matching project, the search for no matches, or New Project.
     void focusFirstChoice();
     QListWidgetItem *firstShownProject() const;
     void showContextMenu(const QPoint &position);
-    void showCardMenu(const QPoint &position);
     void showMenu(QListWidgetItem *item, QPoint globalPosition);
     // Asks where the folder of the project at `path` went, and moves it there.
     void locate(const QString &path);
     void remove(QListWidgetItem *item);
     bool moveWindow(QObject *watched, const QEvent *event);
     bool searchKeyPressed(const QKeyEvent *key);
-    bool cardKeyPressed(const QKeyEvent *key);
     bool listKeyPressed(const QKeyEvent *key);
 
     Theme theme_;
@@ -118,20 +107,13 @@ private:
     QListWidget *list_;
     ProjectSetupPanel *setup_;
     NewProjectForm *newProject_;
-    ResumeCard *card_ = nullptr;
     QWidget *titleBar_ = nullptr; // over the welcome, not the forms
     QWidget *welcomePage_ = nullptr;
     WindowButton *close_ = nullptr;
-    QLabel *eyebrow_ = nullptr;
-    QLabel *title_ = nullptr;
-    QLabel *description_ = nullptr;
-    QWidget *listHeading_ = nullptr;
     QLabel *count_ = nullptr;
     QLabel *noMatch_ = nullptr;
     QWidget *firstSteps_ = nullptr;
     QPushButton *newButton_ = nullptr;
     QWidget *navigationHints_ = nullptr;
-    // The folder of the project on the card; empty when none shows.
-    QString featuredPath_;
     AboutPopup *about_ = nullptr; // built on first use
 };

@@ -5,6 +5,8 @@
 #include <QPainter>
 #include <QPainterPath>
 
+#include <algorithm>
+
 namespace BrandMark {
 
 namespace {
@@ -23,21 +25,48 @@ QRectF gridRect(const QRectF &area, qreal x, qreal y, qreal w, qreal h)
 void paint(QPainter *painter, const QRectF &area, const Colors &colors)
 {
     const qreal unit = std::min(area.width(), area.height()) / 64.0;
-    const auto rect = [&](qreal x, qreal y, qreal w, qreal h) { return gridRect(area, x, y, w, h); };
+    const QPointF origin = gridRect(area, 0, 0, 64, 64).topLeft();
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
+    painter->translate(origin);
+    painter->scale(unit, unit);
     painter->setPen(Qt::NoPen);
+
+    // The upright keeps the editor's caret; the two cut strokes complete a K.
+    QPainterPath caret;
+    caret.moveTo(14, 12);
+    caret.lineTo(22, 12);
+    caret.lineTo(22, 52);
+    caret.lineTo(14, 52);
+    caret.cubicTo(12.9, 52, 12, 51.1, 12, 50);
+    caret.lineTo(12, 14);
+    caret.cubicTo(12, 12.9, 12.9, 12, 14, 12);
+    caret.closeSubpath();
     painter->setBrush(colors.caret);
-    painter->drawRoundedRect(rect(17, 12, 7, 40), 3.5 * unit, 3.5 * unit);
+    painter->drawPath(caret);
+
+    QPainterPath arms;
+    arms.moveTo(26, 29);
+    arms.lineTo(43, 12);
+    arms.lineTo(55, 12);
+    arms.lineTo(36, 31);
+    arms.lineTo(26, 31);
+    arms.closeSubpath();
+    arms.moveTo(26, 35);
+    arms.lineTo(36, 35);
+    arms.lineTo(53, 52);
+    arms.lineTo(41, 52);
+    arms.lineTo(26, 37);
+    arms.closeSubpath();
     painter->setBrush(colors.block);
-    painter->drawRoundedRect(rect(31, 24, 16, 28), 4 * unit, 4 * unit);
+    painter->drawPath(arms);
     painter->restore();
 }
 
 QRectF inkRect(const QRectF &area)
 {
-    // From the caret's left to the block's right, the shapes' tops to bottoms.
-    return gridRect(area, 17, 12, 30, 40);
+    // The visible bounds of the caret and the two diagonal strokes.
+    return gridRect(area, 12, 12, 43, 40);
 }
 
 Colors colorsFor(const Theme &theme)
@@ -55,6 +84,13 @@ QPixmap markPixmap(int size, const Theme &theme, qreal devicePixelRatio)
     return pixmap;
 }
 
+QRectF centredArea(const QRectF &square, qreal inkShare)
+{
+    const QRectF unitInk = inkRect(QRectF(0, 0, 1, 1));
+    const qreal side = square.height() * inkShare / unitInk.height();
+    return {square.center() - unitInk.center() * side, QSizeF(side, side)};
+}
+
 void paintAppIcon(QPainter *painter, const QRectF &area, const Theme &theme)
 {
     const qreal size = std::min(area.width(), area.height());
@@ -65,9 +101,8 @@ void paintAppIcon(QPainter *painter, const QRectF &area, const Theme &theme)
     painter->setBrush(theme.window);
     painter->drawRoundedRect(tile, size * 0.22, size * 0.22);
     painter->restore();
-    // The mark fills two thirds of the tile.
-    const qreal mark = size * 0.68;
-    paint(painter, QRectF(tile.center() - QPointF(mark / 2, mark / 2), QSizeF(mark, mark)), colorsFor(theme));
+    // The monogram occupies 64 % of the tile height.
+    paint(painter, centredArea(tile, 0.64), colorsFor(theme));
 }
 
 QPixmap appIcon(int size, const Theme &theme, qreal devicePixelRatio)

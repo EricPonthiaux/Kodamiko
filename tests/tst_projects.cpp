@@ -1222,6 +1222,64 @@ private slots:
         WelcomeWindow window;
 
         QCOMPARE(itemTexts(window.projectList()), QStringList({"alpha"}));
+        QVERIFY(!window.projectList()->item(0)->isHidden());
+        QVERIFY(window.projectList()->isVisibleTo(&window));
+        QCOMPARE(window.findChild<QLabel *>(QStringLiteral("welcomeCount"))->text(), QString("1"));
+    }
+
+    void opensTheMostRecentProjectWithEnter()
+    {
+        const QTemporaryDir dir;
+        QDir(dir.path()).mkpath("alpha");
+        ProjectConfig project = ProjectStore::touch(dir.filePath("alpha"));
+        project.configured = true;
+        ProjectStore::save(project);
+        WelcomeWindow window;
+        window.show();
+        QSignalSpy chosen(&window, &WelcomeWindow::projectChosen);
+        QTRY_VERIFY(window.projectList()->hasFocus());
+
+        QTest::keyClick(window.projectList(), Qt::Key_Return);
+
+        QCOMPARE(chosen.size(), 1);
+        QCOMPARE(chosen.first().first().value<ProjectConfig>().path, project.path);
+    }
+
+    void searchesAllRecentProjectsAndClearsWithEscape()
+    {
+        const QTemporaryDir dir;
+        for (const QString &name : {QStringLiteral("alpha"), QStringLiteral("beta")}) {
+            QDir(dir.path()).mkpath(name);
+            ProjectStore::touch(dir.filePath(name));
+        }
+        WelcomeWindow window;
+        window.show();
+        auto *search = window.findChild<QLineEdit *>(QStringLiteral("welcomeSearch"));
+        auto *count = window.findChild<QLabel *>(QStringLiteral("welcomeCount"));
+        auto *noMatch = window.findChild<QLabel *>(QStringLiteral("welcomeNoMatch"));
+        auto *empty = window.findChild<QWidget *>(QStringLiteral("welcomeEmptyState"));
+        QVERIFY(search && count && noMatch && empty);
+
+        search->setText(QStringLiteral("alpha"));
+        QCOMPARE(count->text(), QString("1"));
+        QCOMPARE(window.projectList()->currentItem()->text(), QString("alpha"));
+        QVERIFY(!window.projectList()->currentItem()->isHidden());
+        search->setText(QStringLiteral("does-not-exist"));
+        QCOMPARE(count->text(), QString("0"));
+        QVERIFY(noMatch->isVisibleTo(&window));
+        QVERIFY(!window.projectList()->isVisibleTo(&window));
+        QVERIFY(!empty->isVisibleTo(&window));
+
+        search->setFocus();
+        QTest::keyClick(search, Qt::Key_Escape);
+
+        QVERIFY(search->text().isEmpty());
+        QVERIFY(window.isVisible());
+        QCOMPARE(count->text(), QString("2"));
+        QVERIFY(window.projectList()->isVisibleTo(&window));
+        QVERIFY(!noMatch->isVisibleTo(&window));
+        QTest::keyClick(search, Qt::Key_Down);
+        QTRY_VERIFY(window.projectList()->hasFocus());
     }
 
     void relocatingAProjectKeepsItsSettings()

@@ -6,8 +6,8 @@
 #include "ClangFormatStyle.h"
 #include "CodeFormatter.h"
 #include "EditorWidget.h"
+#include "EmptyEditorBackdrop.h"
 #include "PreviewPage.h"
-#include "ui/BrandHero.h"
 #include "ui/ContextMenus.h"
 #include "ui/FileIcons.h"
 #include "ui/HoverCloseButtons.h"
@@ -89,17 +89,17 @@ EditorTabs::EditorTabs(Theme theme, QWidget *parent)
     new HoverCloseButtons(tabBar());
     baseLine_ = new TabBarBaseLine(tabBar());
     baseLine_->setColor(theme_.line);
-    createEmptyHero();
+    createEmptyBackdrop();
     composeWithGpuFromTheStart();
 }
 
-void EditorTabs::createEmptyHero()
+void EditorTabs::createEmptyBackdrop()
 {
-    // The welcome's illustration over the empty area; the clicks go through
-    // it, to the tab bar under it.
-    emptyHero_ = new BrandHero(theme_, this);
-    emptyHero_->setAttribute(Qt::WA_TransparentForMouseEvents);
-    emptyHero_->setGeometry(rect());
+    // A tint over the empty area; the clicks go through it, to the tab bar
+    // under it.
+    emptyBackdrop_ = new EmptyEditorBackdrop(theme_, this);
+    emptyBackdrop_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    emptyBackdrop_->setGeometry(rect());
 }
 
 void EditorTabs::composeWithGpuFromTheStart()
@@ -116,13 +116,13 @@ void EditorTabs::composeWithGpuFromTheStart()
 void EditorTabs::resizeEvent(QResizeEvent *event)
 {
     QTabWidget::resizeEvent(event);
-    emptyHero_->setGeometry(rect());
+    emptyBackdrop_->setGeometry(rect());
 }
 
 void EditorTabs::tabInserted(int index)
 {
     QTabWidget::tabInserted(index);
-    emptyHero_->hide();
+    emptyBackdrop_->hide();
     emit openFilesChanged();
 }
 
@@ -130,7 +130,7 @@ void EditorTabs::tabRemoved(int index)
 {
     QTabWidget::tabRemoved(index);
     preview_.tabRemoved();
-    emptyHero_->setVisible(count() == 0);
+    emptyBackdrop_->setVisible(count() == 0);
     emit openFilesChanged();
 }
 
@@ -1013,7 +1013,7 @@ void EditorTabs::applyTheme(const Theme &theme)
 {
     theme_ = theme;
     baseLine_->setColor(theme.line);
-    emptyHero_->applyTheme(theme);
+    emptyBackdrop_->applyTheme(theme);
     for (int i = 0; i < count(); ++i)
         updateTabIcon(widget(i));
     for (int i = 0; i < count(); ++i) {

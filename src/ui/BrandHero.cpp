@@ -3,82 +3,78 @@
 #include "BrandHero.h"
 
 #include "AppFonts.h"
+#include "BrandMark.h"
 
+#include <QFontMetricsF>
 #include <QPainter>
-#include <QPainterPath>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
-#include <numbers>
 #include <utility>
 
 namespace {
 
-constexpr qreal topPadding = 24;
-constexpr qreal sidePadding = 28;
-constexpr qreal bottomPadding = 20;
-constexpr qreal artGap = 6; // around the artwork
-constexpr qreal minimumArtHeight = 120;
 constexpr QSize preferredSize{420, 434};
+constexpr int smallestWidth = 315;
+constexpr qreal sidePadding = 24;
+constexpr qreal smallestMarkHeight = 80;
+constexpr qreal largestMarkHeight = 144;
+constexpr qreal nameGap = 28;
+constexpr qreal signatureGap = 12;
 
-// The artwork is drawn in the units of the mockup, where it is 276 high;
-// the sculpture is 150 × 200 in them, its caret 35 wide, its block 80 × 140.
-constexpr qreal artUnits = 276;
-constexpr qreal sculptureTop = 31;
-constexpr QSizeF caretSize{35, 200};
-constexpr QSizeF blockSize{80, 140};
-constexpr qreal caretToBlock = 35;
-constexpr qreal largestScale = 1.2;
-
-// The orbits, in the units of the mockup's 440 × 290 view box, turned
-// together around its centre.
-constexpr QSizeF orbitBox{440, 290};
-constexpr QPointF orbitCentre{220, 164};
-constexpr qreal orbitTilt = -27;
-constexpr qreal fieldTilt = -19;
-constexpr std::array<QSizeF, 3> orbitRadii{{{173, 60}, {205, 87}, {238, 116}}};
-constexpr std::array<QPointF, 2> orbitPlanets{{{65, 230}, {383, 88}}};
-constexpr qreal planetRadius = 3;
-
-constexpr qreal starSpacing = 19;
-constexpr qreal starRadius = 0.7;
-constexpr qreal starFade = 0.75; // of the way to the corners, where the stars are gone
-
-// Opacities, out of 255, of what is drawn in the theme's colors.
-constexpr int starAlpha = 56;
-constexpr int tintAlpha = 22;
-constexpr int glowAlpha = 60;
-constexpr int blockGlowAlpha = 54;
-constexpr int orbitAlpha = 96;
-constexpr int sparkleAlpha = 150;
-constexpr int captionAlpha = 200;
-
-QFont labelFontFor(const QFont &base)
-{
-    QFont label = AppFonts::codeFont(base.pointSizeF() * 0.72);
-    label.setLetterSpacing(QFont::AbsoluteSpacing, 1.6);
-    return label;
-}
-
-// The artwork is centred in the space below the overline.
-struct HeroLayout {
-    QRectF overline;
-    QRectF art;
+struct BrandType {
+    QFont name;
+    QFont signature;
 };
 
-HeroLayout layoutOf(const QRectF &area, const QFont &labelFont)
+struct BrandLayout {
+    QRectF mark;
+    QRectF name;
+    QRectF signature;
+};
+
+QString signature()
 {
-    const QRectF content = area.adjusted(sidePadding, topPadding, -sidePadding, -bottomPadding);
-    const qreal labelHeight = QFontMetricsF(labelFont).height();
-    const QRectF overline(content.left(), content.top(), content.width(), labelHeight);
-    // The artwork spans the whole width: its orbits go beyond the margins.
-    const qreal artTop = overline.bottom() + artGap;
-    const qreal availableHeight = content.bottom() - artTop;
-    const qreal artHeight = std::min(availableHeight, artUnits * largestScale);
-    const QRectF art(area.left(), artTop + (availableHeight - artHeight) / 2, area.width(), artHeight);
-    return {.overline = overline, .art = art};
+    return BrandHero::tr("Your editor. Your agent. In sync.");
 }
+
+BrandType typeFor(const QFont &base)
+{
+    QFont name = base;
+    name.setPointSizeF(base.pointSizeF() * 3.1);
+    name.setWeight(QFont::DemiBold);
+    name.setLetterSpacing(QFont::AbsoluteSpacing, -0.65 * base.pointSizeF() / AppFonts::defaultInterfaceSize);
+    QFont tagline = base;
+    tagline.setPointSizeF(base.pointSizeF() * 1.05);
+    tagline.setWeight(QFont::Normal);
+    return {.name = name, .signature = tagline};
+}
+
+qreal signatureHeight(const QFont &font, qreal width)
+{
+    return QFontMetricsF(font)
+        .boundingRect(QRectF(0, 0, width, 1000), Qt::AlignHCenter | Qt::TextWordWrap, signature())
+        .height();
+}
+
+BrandLayout layoutOf(const QRectF &area, const BrandType &type)
+{
+    const QRectF content = area.adjusted(sidePadding, sidePadding, -sidePadding, -sidePadding);
+    const qreal nameHeight = QFontMetricsF(type.name).height();
+    const qreal taglineHeight = signatureHeight(type.signature, content.width());
+    const qreal copyHeight = nameGap + nameHeight + signatureGap + taglineHeight;
+    const qreal markHeight =
+        std::min({largestMarkHeight, content.width() * 0.42, std::max(qreal(0), content.height() - copyHeight)});
+    const qreal top = area.center().y() - (markHeight + copyHeight) / 2;
+    const QRectF band(area.center().x() - markHeight / 2, top, markHeight, markHeight);
+    const QRectF name(content.left(), band.bottom() + nameGap, content.width(), nameHeight);
+    return {.mark = BrandMark::centredArea(band, 1),
+            .name = name,
+            .signature = QRectF(content.left(), name.bottom() + signatureGap, content.width(), taglineHeight)};
+}
+
+// The opacity, out of 255, of the accent at the heart of the mark's halo.
+constexpr int haloAlpha = 30;
 
 QColor withAlpha(QColor color, int alpha)
 {
@@ -86,161 +82,35 @@ QColor withAlpha(QColor color, int alpha)
     return color;
 }
 
-// A wide tint of the accent behind the stars, then the stars, fading out
-// towards the corners.
-void paintField(QPainter &painter, const QRectF &area, const Theme &theme)
+// A soft light of the accent behind the mark, fading out around it.
+void paintHalo(QPainter &painter, const QRectF &mark, const QColor &accent)
 {
-    QRadialGradient tint(QPointF(area.center().x(), area.height() * 0.45), area.width() * 0.6);
-    tint.setColorAt(0, withAlpha(theme.accent, tintAlpha));
-    tint.setColorAt(1, withAlpha(theme.accent, 0));
-    painter.fillRect(area, tint);
+    const QRectF ink = BrandMark::inkRect(mark);
+    const qreal radius = ink.height() * 0.85;
+    QRadialGradient halo(ink.center(), radius);
+    halo.setColorAt(0, withAlpha(accent, haloAlpha));
+    halo.setColorAt(1, withAlpha(accent, 0));
+    painter.fillRect(ink.adjusted(-radius, -radius, radius, radius), halo);
+}
 
+void paintName(QPainter &painter, const QRectF &area, const QFont &font, const Theme &theme)
+{
+    const QString name = QStringLiteral("Kodamiko");
+    const QFontMetricsF metrics(font);
+    const qreal cursorWidth = metrics.capHeight() * 0.065;
+    const qreal cursorGap = metrics.capHeight() * 0.23;
+    const qreal textWidth = metrics.horizontalAdvance(name);
+    const qreal left = area.center().x() - (textWidth + cursorGap + cursorWidth) / 2;
+    const qreal baseline = area.top() + metrics.ascent();
+    painter.setFont(font);
+    painter.setPen(theme.foreground);
+    painter.drawText(QPointF(left, baseline), name);
+    // A still insertion caret signs the wordmark without introducing motion.
     painter.setPen(Qt::NoPen);
-    const QPointF centre = area.center();
-    const qreal halfWidth = area.width() / 2;
-    const qreal halfHeight = area.height() / 2;
-    const int rows = int(area.height() / starSpacing);
-    const int columns = int(area.width() / starSpacing);
-    for (int row = 0; row <= rows; ++row) {
-        for (int column = 0; column <= columns; ++column) {
-            const QPointF star((column + 0.5) * starSpacing, (row + 0.5) * starSpacing);
-            const qreal dx = (star.x() - centre.x()) / halfWidth;
-            const qreal dy = (star.y() - centre.y()) / halfHeight;
-            const qreal distance = std::hypot(dx, dy) / std::numbers::sqrt2;
-            const qreal fade = 1 - distance / starFade;
-            if (fade <= 0)
-                continue;
-            painter.setBrush(withAlpha(theme.foreground, int(starAlpha * fade)));
-            painter.drawEllipse(star, starRadius, starRadius);
-        }
-    }
-}
-
-// The view box of the orbits, fitted and centred in `art`, turned.
-QTransform orbitTransform(const QRectF &art)
-{
-    const qreal scale = std::min(art.width() / orbitBox.width(), art.height() / orbitBox.height());
-    QTransform transform;
-    transform.translate(art.center().x(), art.center().y());
-    transform.scale(scale, scale);
-    transform.rotate(fieldTilt);
-    transform.translate(-orbitBox.width() / 2, -orbitBox.height() / 2);
-    return transform;
-}
-
-void paintOrbits(QPainter &painter, const QRectF &art, const Theme &theme)
-{
-    const QTransform field = orbitTransform(art);
-    QTransform tilt;
-    tilt.translate(orbitCentre.x(), orbitCentre.y());
-    tilt.rotate(orbitTilt);
-    const QColor color = withAlpha(theme.accent, orbitAlpha);
-    painter.save();
-    painter.setTransform(tilt * field);
-    painter.setPen(QPen(color, 1.0 / field.m11(), Qt::SolidLine));
-    painter.setBrush(Qt::NoBrush);
-    for (const QSizeF &radii : orbitRadii)
-        painter.drawEllipse(QPointF(0, 0), radii.width(), radii.height());
-    painter.setTransform(field);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(color);
-    for (const QPointF &planet : orbitPlanets)
-        painter.drawEllipse(planet, planetRadius, planetRadius);
-    painter.restore();
-}
-
-// The light the mark stands in, under and right of its centre.
-void paintGlow(QPainter &painter, const QRectF &art, const Theme &theme)
-{
-    const QPointF centre(art.left() + art.width() * 0.57, art.top() + art.height() * 0.63);
-    const qreal radius = art.width() * 0.42;
-    QRadialGradient glow(centre, radius);
-    glow.setColorAt(0, withAlpha(theme.accent, glowAlpha));
-    glow.setColorAt(1, withAlpha(theme.accent, 0));
-    painter.save();
-    // An ellipse, flatter than it is wide, as the mockup's.
-    painter.translate(centre);
-    painter.scale(1, art.height() / art.width() * 1.4);
-    painter.translate(-centre);
-    painter.fillRect(QRectF(centre.x() - radius, centre.y() - radius, 2 * radius, 2 * radius), glow);
-    painter.restore();
-}
-
-// The sculpture's two shapes, in the units of the mockup scaled by `scale`.
-struct Sculpture {
-    QRectF caret;
-    QRectF block;
-};
-
-Sculpture sculptureIn(const QRectF &art, qreal scale)
-{
-    const qreal width = (caretSize.width() + caretToBlock + blockSize.width()) * scale;
-    const qreal left = art.center().x() - width / 2;
-    const qreal bottom = art.top() + (sculptureTop + caretSize.height()) * scale;
-    const QRectF caret(left, bottom - caretSize.height() * scale, caretSize.width() * scale,
-                       caretSize.height() * scale);
-    const QRectF block(caret.right() + caretToBlock * scale, bottom - blockSize.height() * scale,
-                       blockSize.width() * scale, blockSize.height() * scale);
-    return {.caret = caret, .block = block};
-}
-
-void paintSculpture(QPainter &painter, const Sculpture &sculpture, const Theme &theme)
-{
-    // The block's own light, before it.
-    const QRectF block = sculpture.block;
-    QRadialGradient halo(block.center(), block.height() * 0.85);
-    halo.setColorAt(0, withAlpha(theme.accent, blockGlowAlpha));
-    halo.setColorAt(1, withAlpha(theme.accent, 0));
-    painter.fillRect(block.adjusted(-block.height(), -block.height(), block.height(), block.height()), halo);
-
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(theme.foreground);
-    const qreal caretRadius = sculpture.caret.width() / 2;
-    painter.drawRoundedRect(sculpture.caret, caretRadius, caretRadius);
-
     painter.setBrush(theme.accent);
-    const qreal blockRadius = block.width() / 4;
-    painter.drawRoundedRect(block, blockRadius, blockRadius);
-}
-
-// A label with a dot before it, its left at `position`.
-void paintMarker(QPainter &painter, QPointF position, const QString &text, const QColor &color)
-{
-    constexpr qreal dotSize = 4;
-    constexpr qreal dotGap = 6;
-    const QFontMetricsF metrics(painter.font());
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(color);
-    painter.drawEllipse(QRectF(position.x(), position.y() - dotSize / 2, dotSize, dotSize));
-    painter.setPen(color);
-    painter.drawText(QPointF(position.x() + dotSize + dotGap, position.y() + metrics.capHeight() / 2), text);
-}
-
-// Who each shape is, in the painter's font.
-void paintMarkers(QPainter &painter, const QRectF &art, qreal scale, const Theme &theme)
-{
-    const qreal centre = art.center().x();
-    paintMarker(painter, QPointF(centre - 128 * scale, art.top() + 107 * scale), QObject::tr("You"), theme.mutedText);
-    paintMarker(painter, QPointF(centre + 95 * scale, art.top() + 180 * scale), QObject::tr("Claude"), theme.accent);
-}
-
-void paintSparkles(QPainter &painter, const QRectF &art, qreal scale, const Theme &theme)
-{
-    painter.save();
-    painter.setFont(AppFonts::codeFont(painter.font().pointSizeF() * 1.6));
-    painter.setPen(withAlpha(theme.accent, sparkleAlpha));
-    const QString sparkle = QStringLiteral("+");
-    painter.drawText(QPointF(art.left() + art.width() * 0.16, art.top() + 40 * scale), sparkle);
-    painter.drawText(QPointF(art.right() - art.width() * 0.14, art.top() + 72 * scale), sparkle);
-    painter.drawText(QPointF(art.right() - art.width() * 0.23, art.bottom() - 32 * scale), sparkle);
-    painter.restore();
-}
-
-void paintCaption(QPainter &painter, const QRectF &art, const Theme &theme)
-{
-    painter.setPen(withAlpha(theme.mutedText, captionAlpha));
-    painter.drawText(art.adjusted(0, 0, 0, -2), Qt::AlignHCenter | Qt::AlignBottom,
-                     QObject::tr("TWO CURSORS. ONE FLOW."));
+    painter.drawRoundedRect(
+        QRectF(left + textWidth + cursorGap, baseline - metrics.capHeight(), cursorWidth, metrics.capHeight()),
+        cursorWidth / 2, cursorWidth / 2);
 }
 
 } // namespace
@@ -250,7 +120,8 @@ BrandHero::BrandHero(Theme theme, QWidget *parent)
     , theme_(std::move(theme))
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    setAccessibleName(tr("You and Claude. Two cursors, one flow."));
+    setAccessibleName(QStringLiteral("Kodamiko"));
+    setAccessibleDescription(signature());
     AppFonts::followApplicationFont(this, [this] {
         updateGeometry();
         update();
@@ -265,14 +136,18 @@ void BrandHero::applyTheme(const Theme &theme)
 
 QSize BrandHero::sizeHint() const
 {
-    return preferredSize;
+    return preferredSize.expandedTo(minimumSizeHint());
 }
 
 QSize BrandHero::minimumSizeHint() const
 {
-    const qreal labelHeight = QFontMetricsF(labelFontFor(font())).height();
-    return {preferredSize.width() * 3 / 4,
-            int(std::ceil(topPadding + labelHeight + artGap + minimumArtHeight + bottomPadding))};
+    const BrandType type = typeFor(font());
+    const QFontMetricsF nameMetrics(type.name);
+    const qreal nameWidth = nameMetrics.horizontalAdvance(QStringLiteral("Kodamiko")) + nameMetrics.capHeight() * 0.3;
+    const int width = std::max(smallestWidth, int(std::ceil(nameWidth + sidePadding * 2)));
+    const qreal copyHeight =
+        nameMetrics.height() + signatureGap + signatureHeight(type.signature, width - sidePadding * 2);
+    return {width, int(std::ceil(sidePadding * 2 + smallestMarkHeight + nameGap + copyHeight))};
 }
 
 void BrandHero::paintEvent(QPaintEvent *)
@@ -280,19 +155,12 @@ void BrandHero::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::TextAntialiasing);
-    const QRectF area = rect();
-    const QFont labelFont = labelFontFor(font());
-    const HeroLayout layout = layoutOf(area, labelFont);
-    const qreal scale = std::min(layout.art.height() / artUnits, largestScale);
-
-    paintField(painter, area, theme_);
-    paintGlow(painter, layout.art, theme_);
-    paintOrbits(painter, layout.art, theme_);
-    paintSculpture(painter, sculptureIn(layout.art, scale), theme_);
-    painter.setFont(labelFont);
-    paintMarkers(painter, layout.art, scale, theme_);
-    paintSparkles(painter, layout.art, scale, theme_);
-    paintCaption(painter, layout.art, theme_);
+    const BrandType type = typeFor(font());
+    const BrandLayout layout = layoutOf(rect(), type);
+    paintHalo(painter, layout.mark, theme_.accent);
+    BrandMark::paint(&painter, layout.mark, BrandMark::colorsFor(theme_));
+    paintName(painter, layout.name, type.name, theme_);
+    painter.setFont(type.signature);
     painter.setPen(theme_.mutedText);
-    painter.drawText(layout.overline, Qt::AlignCenter, tr("A SPACE FOR WHAT COMES NEXT"));
+    painter.drawText(layout.signature, Qt::AlignHCenter | Qt::TextWordWrap, signature());
 }

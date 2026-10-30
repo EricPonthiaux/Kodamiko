@@ -11,10 +11,12 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QContextMenuEvent>
 #include <QFontMetricsF>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QMimeData>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QScrollBar>
@@ -191,6 +193,28 @@ private:
     int runFont_ = 0;
     QRgb runPen_ = 0;
 };
+
+// A clipboard holding an image and no text, as after a screenshot.
+bool holdsOnlyAnImage(const QClipboard *clipboard)
+{
+    const QMimeData *data = clipboard->mimeData();
+    return data && data->hasImage() && clipboard->text().isEmpty();
+}
+
+// The key with which Claude Code pastes an image: it reads the image from the
+// system clipboard itself, which a terminal cannot pass as typed text.
+QKeyCombination imagePasteKey()
+{
+    switch (Host::operatingSystem()) {
+    case OperatingSystem::Windows:
+        return Qt::AltModifier | Qt::Key_V; // Ctrl+V is Windows Terminal's paste
+    case OperatingSystem::MacOS:
+        return Qt::MetaModifier | Qt::Key_V; // Qt's Meta is the Ctrl key, not Cmd
+    case OperatingSystem::Linux:
+        return Qt::ControlModifier | Qt::Key_V;
+    }
+    return Qt::ControlModifier | Qt::Key_V;
+}
 
 } // namespace
 
@@ -714,7 +738,8 @@ void TerminalWidget::contextMenuEvent(QContextMenuEvent *event)
     QAction *copy = menu.addAction(tr("Copy"), this, [this] { copySelection(QClipboard::Clipboard); });
     copy->setEnabled(!selectedText().isEmpty());
     QAction *paste = menu.addAction(tr("Paste"), this, &TerminalWidget::pasteClipboard);
-    paste->setEnabled(!QApplication::clipboard()->text().isEmpty());
+    const QClipboard *clipboard = QApplication::clipboard();
+    paste->setEnabled(!clipboard->text().isEmpty() || holdsOnlyAnImage(clipboard));
     ContextMenus::exec(menu, *this, event->globalPos());
 }
 
@@ -773,7 +798,15 @@ void TerminalWidget::clearSelection()
 
 void TerminalWidget::pasteClipboard()
 {
-    paste(QApplication::clipboard()->text());
+    const QClipboard *clipboard = QApplication::clipboard();
+    if (!holdsOnlyAnImage(clipboard)) {
+        paste(clipboard->text());
+        return;
+    }
+    // The program fetches the image: give it the key it pastes images with.
+    const QKeyCombination key = imagePasteKey();
+    screen_->sendKey(key.key(), key.keyboardModifiers(), QString(), terminalOptionKey);
+    scrollToBottom();
 }
 
 void TerminalWidget::paste(const QString &text)

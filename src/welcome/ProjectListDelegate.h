@@ -12,7 +12,7 @@ class QDate;
 class QDateTime;
 
 // Paints the welcome window's list of projects: each project with its
-// initials (ProjectAvatar), its name, its folder, when it was opened last
+// folder icon, its name, its path, when it was opened last
 // and a ⋯ button for its menu, shown on the row under the mouse or
 // selected; a project whose folder is gone gets a Locate… button. The
 // list can also hold the headings of its groups (headingRole).

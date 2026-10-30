@@ -15,7 +15,7 @@
 #include <functional>
 #include <optional>
 
-class BrandHero;
+class EmptyEditorBackdrop;
 class DiagramView;
 class ImageView;
 class TabBarBaseLine;
@@ -165,7 +165,7 @@ private:
     // Makes the window compose with the GPU before a preview needs it.
     void composeWithGpuFromTheStart();
     // The welcome's illustration, shown when no file is open.
-    void createEmptyHero();
+    void createEmptyBackdrop();
     // Adds a tab, before the preview's.
     int addPage(QWidget *page, const QString &title);
     // The tab showing the file at `absolutePath`, null if none.
@@ -223,8 +223,8 @@ private:
     void updateTabIcon(QWidget *page);
 
     Theme theme_;
-    TabBarBaseLine *baseLine_ = nullptr; // over the tab bar, which owns it
-    BrandHero *emptyHero_ = nullptr;     // over the empty area, hidden while a tab is open
+    TabBarBaseLine *baseLine_ = nullptr;           // over the tab bar, which owns it
+    EmptyEditorBackdrop *emptyBackdrop_ = nullptr; // over the empty area, hidden while a tab is open
     QString projectFolder_;
     FileWatcher watcher_;
     QSet<QString> pathsBeingResolved_; // conflicts awaiting an answer

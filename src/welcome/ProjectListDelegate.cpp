@@ -2,9 +2,8 @@
 
 #include "ProjectListDelegate.h"
 
-#include "ProjectAvatar.h"
 #include "projects/ProjectConfig.h"
-#include "ui/AppFonts.h"
+#include "ui/ThemeStyle.h"
 #include "ui/UiIcons.h"
 
 #include <QDateTime>
@@ -18,10 +17,11 @@
 namespace {
 
 constexpr qreal rowRadius = 6;
-constexpr qreal rowGap = 2;      // between two rows
-constexpr qreal rowPadding = 10; // above and below the names
-constexpr qreal sidePadding = 6;
-constexpr qreal avatarSize = 30;
+constexpr qreal rowGap = 4;      // between two rows
+constexpr qreal rowPadding = 14; // above and below the names
+constexpr qreal sidePadding = 18;
+constexpr qreal iconSize = 20;
+constexpr qreal nameGap = 16;
 constexpr qreal buttonSize = 24; // the ⋯ and Locate… buttons' height
 constexpr qreal whenWidth = 84;
 constexpr qreal spacing = 10;
@@ -30,7 +30,7 @@ constexpr qreal spacing = 10;
 // button) end at `contentRight`.
 struct RowGeometry {
     QRectF background;
-    QRectF avatar;
+    QRectF icon;
     QRectF more;
     QRectF when;
     qreal contentRight = 0;
@@ -44,7 +44,7 @@ RowGeometry rowGeometry(const QRect &rect)
     const QRectF more(content.right() - buttonSize, middle - buttonSize / 2, buttonSize, buttonSize);
     const QRectF when(more.left() - spacing - whenWidth, content.top(), whenWidth, content.height());
     return {.background = background,
-            .avatar = QRectF(content.left(), middle - avatarSize / 2, avatarSize, avatarSize),
+            .icon = QRectF(content.left(), middle - iconSize / 2, iconSize, iconSize),
             .more = more,
             .when = when,
             .contentRight = when.left() - spacing};
@@ -58,7 +58,7 @@ QString locateText()
 QRectF locateRect(const RowGeometry &geometry, const QFontMetrics &metrics)
 {
     const qreal width = metrics.horizontalAdvance(locateText()) + 2 * spacing;
-    return {geometry.contentRight - width, geometry.avatar.center().y() - buttonSize / 2, width, buttonSize};
+    return {geometry.contentRight - width, geometry.icon.center().y() - buttonSize / 2, width, buttonSize};
 }
 
 QFont smallFont(const QFont &font)
@@ -82,6 +82,27 @@ struct NameColors {
     QColor path;
 };
 
+void paintRowBackground(QPainter *painter,
+                        const RowGeometry &geometry,
+                        const QStyleOptionViewItem &option,
+                        const Theme &theme)
+{
+    const bool isSelected = option.state & QStyle::State_Selected;
+    if (!isSelected && !(option.state & QStyle::State_MouseOver))
+        return;
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(isSelected ? ThemeStyle::mixed(theme.window, theme.accent, 0.12) : theme.hover);
+    painter->drawRoundedRect(geometry.background, rowRadius, rowRadius);
+    if (isSelected) {
+        painter->setBrush(theme.accent);
+        painter->drawRoundedRect(QRectF(geometry.background.left(), geometry.background.top() + rowPadding, 3,
+                                        geometry.background.height() - 2 * rowPadding),
+                                 1.5, 1.5);
+    }
+    const QRect icon = geometry.more.toRect().adjusted(5, 5, -5, -5);
+    UiIcons::icon(QStringLiteral("more"), theme.mutedText).paint(painter, icon);
+}
+
 // The project's name, its folder below, centred together in `area`.
 void paintNames(QPainter *painter,
                 const QRectF &area,
@@ -90,8 +111,8 @@ void paintNames(QPainter *painter,
                 const NameColors &colors)
 {
     QFont bold = font;
-    bold.setWeight(QFont::DemiBold);
-    const QFont path = AppFonts::codeFont(font.pointSizeF() * 0.85);
+    bold.setWeight(QFont::Medium);
+    const QFont path = smallFont(font);
     const qreal lineHeight = QFontMetricsF(font).height();
     const qreal top = area.center().y() - lineHeight - 2;
     const int width = int(area.width());
@@ -120,7 +141,7 @@ QSize ProjectListDelegate::sizeHint(const QStyleOptionViewItem &option, const QM
     const int lineHeight = option.fontMetrics.height();
     if (index.data(headingRole).toBool())
         return {option.rect.width(), lineHeight + 18};
-    const int content = std::max(2 * lineHeight + 4, int(avatarSize));
+    const int content = std::max(2 * lineHeight + 4, int(iconSize));
     return {option.rect.width(), content + int(2 * rowPadding + rowGap)};
 }
 
@@ -141,8 +162,6 @@ void ProjectListDelegate::paintHeading(QPainter *painter,
 {
     QFont font = smallFont(option.font);
     font.setWeight(QFont::DemiBold);
-    font.setCapitalization(QFont::AllUppercase);
-    font.setLetterSpacing(QFont::AbsoluteSpacing, 0.8);
     painter->setFont(font);
     painter->setPen(theme_.mutedText);
     const QRectF area = QRectF(option.rect).adjusted(sidePadding, 0, -sidePadding, -6);
@@ -154,34 +173,22 @@ void ProjectListDelegate::paintProject(QPainter *painter,
                                        const QModelIndex &index) const
 {
     const RowGeometry geometry = rowGeometry(option.rect);
-    // The current row shows while the list has the focus only: until then,
-    // the keyboard is on the card above it or in the search.
-    const bool isSelected = (option.state & QStyle::State_Selected) && (option.state & QStyle::State_HasFocus);
-    const bool isHovered = option.state & QStyle::State_MouseOver;
-    if (isSelected || isHovered) {
-        painter->setPen(Qt::NoPen);
-        painter->setBrush(isSelected ? theme_.selection : theme_.hover);
-        painter->drawRoundedRect(geometry.background, rowRadius, rowRadius);
-        // The ⋯ button shows on the row it can act on.
-        const QRect icon = geometry.more.toRect().adjusted(5, 5, -5, -5);
-        UiIcons::icon(QStringLiteral("more"), theme_.mutedText).paint(painter, icon);
-    }
+    paintRowBackground(painter, geometry, option, theme_);
 
     const auto project = index.data(projectRole).value<ProjectConfig>();
     const bool isMissing = index.data(missingRole).toBool();
-    QFont bold = smallFont(option.font);
-    bold.setWeight(QFont::DemiBold);
-    painter->setFont(bold);
+    const bool isSelected = option.state & QStyle::State_Selected;
+    QColor iconColor = isSelected ? theme_.accent : theme_.mutedText;
     if (isMissing)
-        ProjectAvatar::paint(painter, geometry.avatar, QStringLiteral("!"), theme_.warning);
-    else
-        ProjectAvatar::paint(painter, geometry.avatar, ProjectAvatar::initials(index.data(Qt::DisplayRole).toString()),
-                             ProjectAvatar::color(theme_, project.path));
+        iconColor = theme_.warning;
+    UiIcons::icon(QStringLiteral("folder"), iconColor).paint(painter, geometry.icon.toRect());
 
-    painter->setFont(smallFont(option.font));
+    const QFont whenFont = smallFont(option.font);
+    painter->setFont(whenFont);
     painter->setPen(theme_.mutedText);
+    const QString when = LastOpened::describe(project.lastOpened, QDate::currentDate());
     painter->drawText(geometry.when, Qt::AlignRight | Qt::AlignVCenter,
-                      LastOpened::describe(project.lastOpened, QDate::currentDate()));
+                      QFontMetrics(whenFont).elidedText(when, Qt::ElideRight, int(geometry.when.width())));
 
     qreal right = geometry.contentRight;
     if (isMissing) {
@@ -191,7 +198,7 @@ void ProjectListDelegate::paintProject(QPainter *painter,
         right = locate.left() - spacing;
     }
 
-    const qreal left = geometry.avatar.right() + spacing;
+    const qreal left = geometry.icon.right() + nameGap;
     const QRectF names(left, geometry.background.top(), right - left, geometry.background.height());
     const NameColors colors{.name = isMissing ? theme_.mutedText : theme_.foreground, .path = theme_.mutedText};
     paintNames(painter, names, {index.data(Qt::DisplayRole).toString(), project.path}, option.font, colors);
