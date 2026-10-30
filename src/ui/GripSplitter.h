@@ -23,10 +23,26 @@ public:
         QColor color;
     };
 
+    // The panes' backgrounds carried into a handle up to its line, each
+    // half the color of the pane beside it: above `split`, a header's, with
+    // its bottom border; below, the content's. Invalid colors leave the
+    // handle's own background.
+    struct HandleSides {
+        int split = 0; // from the handle's top
+        QColor leftHeader;
+        QColor rightHeader;
+        QColor leftBorder; // the headers' bottom borders, `borderWidth` high
+        QColor rightBorder;
+        int borderWidth = 0;
+        QColor leftContent;
+        QColor rightContent;
+    };
+
     explicit GripSplitter(Qt::Orientation orientation, QWidget *parent = nullptr);
 
     // For the handle before the widget at `index`, side by side.
     void setHandleRule(int index, const HandleRule &rule);
+    void setHandleSides(int index, const HandleSides &sides);
 
 protected:
     QSplitterHandle *createHandle() override;

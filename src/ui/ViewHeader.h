@@ -30,6 +30,10 @@ public:
     // An icon button at the right, after those already added; `iconName`
     // is one of the UiIcons, drawn in the color of setIconColor().
     QToolButton *addButton(const QString &iconName, const QString &toolTip);
+    // Another widget at the right, after those already added.
+    void addWidget(QWidget *widget);
+    // The same as addButton(), with `text` beside the icon.
+    QToolButton *addTextButton(const QString &iconName, const QString &text, const QString &toolTip);
     // "2 errors, 1 warning"; empty hides it.
     void setDetail(const QString &text);
     void setIconColor(const QColor &color);

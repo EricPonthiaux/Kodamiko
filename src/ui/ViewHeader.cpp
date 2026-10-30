@@ -92,6 +92,25 @@ QToolButton *ViewHeader::addButton(const QString &iconName, const QString &toolT
     return button;
 }
 
+void ViewHeader::addWidget(QWidget *widget)
+{
+    layout_->addWidget(widget);
+}
+
+QToolButton *ViewHeader::addTextButton(const QString &iconName, const QString &text, const QString &toolTip)
+{
+    auto *button = new QToolButton(this);
+    button->setText(text);
+    button->setToolTip(toolTip);
+    button->setAutoRaise(true);
+    button->setFocusPolicy(Qt::NoFocus);
+    button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    UiMetrics::setScaledIconSize(button);
+    layout_->addWidget(button);
+    buttons_.append({button, iconName});
+    return button;
+}
+
 void ViewHeader::setDetail(const QString &text)
 {
     detail_->setText(text);

@@ -9,6 +9,8 @@
 #include <QPainter>
 #include <QSplitterHandle>
 
+#include <optional>
+
 namespace {
 
 constexpr int handleSize = 7;
@@ -32,6 +34,12 @@ public:
         update();
     }
 
+    void setSides(const GripSplitter::HandleSides &sides)
+    {
+        sides_ = sides;
+        update();
+    }
+
 protected:
     bool event(QEvent *event) override
     {
@@ -48,6 +56,8 @@ protected:
 
         const bool horizontal = orientation() == Qt::Horizontal; // side by side: a vertical line
         const QPointF center = QRectF(rect()).center();
+        if (horizontal && sides_)
+            paintSides(painter, center.x());
         painter.setPen(QPen(colors.color(QPalette::Mid), 1));
         if (horizontal)
             painter.drawLine(QPointF(center.x(), 0), QPointF(center.x(), height()));
@@ -67,7 +77,26 @@ private:
         painter.fillRect(QRectF(from, rule_.y, to - from, 1), rule_.color);
     }
 
+    void paintSides(QPainter &painter, qreal lineX) const
+    {
+        const GripSplitter::HandleSides &sides = *sides_;
+        const QRectF left(0, 0, lineX, height());
+        const QRectF right(lineX, 0, width() - lineX, height());
+        const auto fill = [&painter](const QRectF &area, const QColor &color) {
+            if (color.isValid())
+                painter.fillRect(area, color);
+        };
+        const qreal border = sides.split - sides.borderWidth;
+        fill(left.adjusted(0, 0, 0, sides.split - height()), sides.leftHeader);
+        fill(right.adjusted(0, 0, 0, sides.split - height()), sides.rightHeader);
+        fill(QRectF(left.left(), border, left.width(), sides.borderWidth), sides.leftBorder);
+        fill(QRectF(right.left(), border, right.width(), sides.borderWidth), sides.rightBorder);
+        fill(left.adjusted(0, sides.split, 0, 0), sides.leftContent);
+        fill(right.adjusted(0, sides.split, 0, 0), sides.rightContent);
+    }
+
     GripSplitter::HandleRule rule_;
+    std::optional<GripSplitter::HandleSides> sides_;
     HoverProgress hover_{this};
 };
 
@@ -83,6 +112,12 @@ void GripSplitter::setHandleRule(int index, const HandleRule &rule)
 {
     if (auto *gripHandle = static_cast<GripHandle *>(handle(index)))
         gripHandle->setRule(rule);
+}
+
+void GripSplitter::setHandleSides(int index, const HandleSides &sides)
+{
+    if (auto *gripHandle = static_cast<GripHandle *>(handle(index)))
+        gripHandle->setSides(sides);
 }
 
 QSplitterHandle *GripSplitter::createHandle()
