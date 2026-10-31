@@ -2,6 +2,7 @@
 
 #include "TerminalWidget.h"
 
+#include "GlyphCache.h"
 #include "IPty.h"
 #include "VtScreen.h"
 #include "settings/Preferences.h"
@@ -32,6 +33,10 @@ constexpr int initialColumns = 80;
 // Blank space between the viewport's edges and the grid, so that the text
 // does not touch the panel's border.
 constexpr int gridMarginPx = 6;
+// How long a window drag pauses before the program learns its new size.
+constexpr int ptyResizeDelayMs = 80;
+// Below this, an advance is one cell's (fonts measure in fractions of pixels).
+constexpr qreal gridTolerancePx = 0.05;
 // A preference of the whole application (TerminalWidget::setOptionKey).
 OptionKey terminalOptionKey = OptionKey::Compose;
 
@@ -110,15 +115,23 @@ struct RowGeometry {
     int cellWidth = 0;
 };
 
-// Draws the text of one row: runs of ASCII characters sharing a font and a
-// color in one drawText() call each, the other characters one by one.
+// What a row's text is drawn with, kept by the widget across paints.
+struct RowTextTools {
+    const std::array<QFont, 16> *fonts = nullptr;
+    QString *runText = nullptr; // a buffer reused to avoid allocating
+    GlyphCache *glyphs = nullptr;
+};
+
+// Draws the text of one row: runs of characters on the cell grid sharing a
+// font and a color in one drawText() call each, the other characters one by
+// one.
 class RowTextPainter {
 public:
-    // `runText` is a buffer reused across paints to avoid allocating.
-    RowTextPainter(QPainter &painter, const std::array<QFont, 16> &fonts, QString &runText, RowGeometry geometry)
+    RowTextPainter(QPainter &painter, RowTextTools tools, RowGeometry geometry)
         : painter_(&painter)
-        , fonts_(&fonts)
-        , runText_(&runText)
+        , fonts_(tools.fonts)
+        , runText_(tools.runText)
+        , glyphs_(tools.glyphs)
         , geometry_(geometry)
     {
         runText_->clear();
@@ -132,7 +145,7 @@ public:
             *runText_ += QLatin1Char(' ');
     }
 
-    void addRunCharacter(int column, int font, QRgb pen, char character)
+    void addRunCharacter(int column, int font, QRgb pen, char32_t character)
     {
         const bool extendsRun = !runText_->isEmpty() && font == runFont_ && pen == runPen_;
         if (!extendsRun) {
@@ -141,20 +154,18 @@ public:
             runFont_ = font;
             runPen_ = pen;
         }
-        *runText_ += QLatin1Char(character);
+        *runText_ += QChar::fromUcs4(character);
     }
 
     // A character that may come from a fallback font with another advance:
-    // drawn alone, at its cell.
+    // drawn alone, at its cell, from its picture.
     void drawAlone(int column, int font, QRgb pen, const VTermScreenCell &cell)
     {
         flush();
-        int length = 0;
-        while (length < VTERM_MAX_CHARS_PER_CELL && cell.chars[length] != 0)
-            ++length;
-        select(font, pen);
-        painter_->drawText(column * geometry_.cellWidth, geometry_.baseline,
-                           QString::fromUcs4(reinterpret_cast<const char32_t *>(cell.chars), length));
+        GlyphCache::Key key{.font = font, .color = pen};
+        std::copy_n(cell.chars, VTERM_MAX_CHARS_PER_CELL, key.characters.begin());
+        glyphs_->draw(*painter_, QPoint(column * geometry_.cellWidth, geometry_.baseline), key,
+                      (*fonts_)[static_cast<size_t>(font)]);
     }
 
     void flush()
@@ -186,6 +197,7 @@ private:
     QPainter *painter_;
     const std::array<QFont, 16> *fonts_;
     QString *runText_;
+    GlyphCache *glyphs_;
     RowGeometry geometry_;
     int currentFont_ = -1;
     QRgb currentPen_ = 0;
@@ -238,10 +250,14 @@ TerminalWidget::TerminalWidget(QWidget *parent)
     connect(screen_.get(), &VtScreen::titleChanged, this, &TerminalWidget::titleChanged);
     connect(screen_.get(), &VtScreen::bell, this, [] { QApplication::beep(); });
     connect(verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value) {
-        if (updatingScrollBar_)
-            return;
-        scrollOffset_ = verticalScrollBar()->maximum() - value;
-        viewport()->update();
+        if (!updatingScrollBar_)
+            setScrollOffset(verticalScrollBar()->maximum() - value);
+    });
+    ptyResizeTimer_.setSingleShot(true);
+    ptyResizeTimer_.setInterval(ptyResizeDelayMs);
+    connect(&ptyResizeTimer_, &QTimer::timeout, this, [this] {
+        if (pty_)
+            pty_->resize(QSize(screen_->columns(), screen_->rows()));
     });
 
     applyTheme(Theme::kodamiko());
@@ -321,6 +337,9 @@ void TerminalWidget::applyFont()
         variant.setLetterSpacing(QFont::AbsoluteSpacing, cellSize_.width() - advance);
         fonts_[static_cast<size_t>(index)] = variant;
     }
+    for (QHash<char32_t, bool> &known : fitsGrid_)
+        known.clear();
+    glyphs_.clear();
 
     updateGridSize();
     viewport()->update();
@@ -335,17 +354,102 @@ void TerminalWidget::onProcessFinished(int exitCode)
 
 void TerminalWidget::onScreenChanged()
 {
-    const QRect damage = screen_->takeDamage();
+    const ScreenChanges changes = screen_->takeChanges();
+    shiftSelection(changes.pushedLines);
+    if (scrollOffset_ != 0) {
+        followHistory(changes.pushedLines);
+        return;
+    }
     updateScrollBar();
-    if (scrollOffset_ != 0 || damage.isEmpty()) {
+    // A selection stays on its lines, which a scroll region may move
+    // without them going into the history: everything is repainted.
+    const bool hasSelection = selectionAnchor_.x() >= 0 && selectionAnchor_ != selectionEnd_;
+    if (hasSelection) {
         viewport()->update();
         return;
     }
+    copyScrolledRows(changes.scrolls);
+    QRegion dirty;
     // One extra column on each side: wide and italic glyphs overhang.
-    const QRect cells = damage.adjusted(-1, 0, 1, 0);
-    viewport()->update(QRect(gridMarginPx + cells.x() * cellSize_.width(),
-                             gridMarginPx + cells.y() * cellSize_.height(), cells.width() * cellSize_.width(),
-                             cells.height() * cellSize_.height()));
+    for (const QRect &cells : changes.damage)
+        dirty += pixelsOf(cells.adjusted(-1, 0, 1, 0));
+    viewport()->update(dirty);
+}
+
+// Rows that scrolled are copied on the viewport, not repainted: output that
+// scrolls repaints only the lines it adds.
+void TerminalWidget::copyScrolledRows(const std::vector<ScreenScroll> &scrolls)
+{
+    if (scrolls.empty())
+        return;
+    for (const ScreenScroll &scroll : scrolls) {
+        const QRect area = pixelsOf(scroll.area);
+        const int dy = scroll.rows * cellSize_.height();
+        viewport()->scroll(0, dy, area);
+        if (area.contains(paintedCursor_.center()))
+            paintedCursor_.translate(0, dy);
+    }
+    // The cursor's picture moved with its row: its new place is repainted.
+    viewport()->update(paintedCursor_);
+}
+
+// While the user reads the history, the lines they read stay in place as
+// new ones arrive below.
+void TerminalWidget::followHistory(int pushedLines)
+{
+    const int anchoredOffset = scrollOffset_ + pushedLines;
+    scrollOffset_ = std::clamp(anchoredOffset, 0, screen_->scrollbackSize());
+    updateScrollBar();
+    const bool showsTheSameHistory = scrollOffset_ == anchoredOffset && scrollOffset_ >= screen_->rows();
+    if (!showsTheSameHistory)
+        viewport()->update();
+}
+
+// Scrolls the view through the history: the rows still in sight are copied,
+// the others painted.
+void TerminalWidget::setScrollOffset(int offset)
+{
+    offset = std::clamp(offset, 0, screen_->scrollbackSize());
+    const int rows = offset - scrollOffset_;
+    if (rows == 0)
+        return;
+    scrollOffset_ = offset;
+    updateScrollBar();
+    if (std::abs(rows) >= screen_->rows()) {
+        viewport()->update();
+        return;
+    }
+    const int dy = rows * cellSize_.height();
+    viewport()->scroll(0, dy, pixelsOf(QRect(0, 0, screen_->columns(), screen_->rows())));
+    // The cursor shows at the bottom of the screen only: its old picture
+    // moved away, and its cell may come back into sight.
+    paintedCursor_.translate(0, dy);
+    viewport()->update(paintedCursor_);
+    viewport()->update(pixelsOf(QRect(screen_->cursorPosition(), QSize(1, 1))));
+}
+
+// Lines went into the history (or came back): the selection follows its text.
+void TerminalWidget::shiftSelection(int rows)
+{
+    if (rows == 0 || selectionAnchor_.x() < 0)
+        return;
+    selectionAnchor_.ry() -= rows;
+    selectionEnd_.ry() -= rows;
+}
+
+// Repaints the rows from one content row to another, both included.
+void TerminalWidget::updateSelectionRows(int contentRow, int otherContentRow)
+{
+    const int top = std::min(contentRow, otherContentRow) + scrollOffset_;
+    const int bottom = std::max(contentRow, otherContentRow) + scrollOffset_;
+    viewport()->update(
+        pixelsOf(QRect(0, top, screen_->columns(), bottom - top + 1)).adjusted(-gridMarginPx, 0, gridMarginPx, 0));
+}
+
+QRect TerminalWidget::pixelsOf(const QRect &cells) const
+{
+    return {gridMarginPx + cells.x() * cellSize_.width(), gridMarginPx + cells.y() * cellSize_.height(),
+            cells.width() * cellSize_.width(), cells.height() * cellSize_.height()};
 }
 
 void TerminalWidget::updateGridSize()
@@ -359,8 +463,7 @@ void TerminalWidget::updateGridSize()
     if (columns == screen_->columns() && rows == screen_->rows())
         return;
     screen_->resize(rows, columns);
-    if (pty_)
-        pty_->resize(QSize(columns, rows));
+    ptyResizeTimer_.start();
 }
 
 void TerminalWidget::updateScrollBar()
@@ -377,9 +480,7 @@ void TerminalWidget::updateScrollBar()
 
 void TerminalWidget::scrollToBottom()
 {
-    scrollOffset_ = 0;
-    updateScrollBar();
-    viewport()->update();
+    setScrollOffset(0);
 }
 
 bool TerminalWidget::isModeShortcut(const QKeyEvent &event)
@@ -470,37 +571,59 @@ void TerminalWidget::scheduleGridUpdate()
     });
 }
 
+// Only the rows, and the columns of each row, that the paint event covers:
+// the program usually changes a few cells at the top and at the bottom of
+// its screen.
 void TerminalWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(viewport());
-    painter.fillRect(event->rect(), background_);
+    for (const QRect &rect : event->region())
+        painter.fillRect(rect, background_);
     painter.translate(gridMarginPx, gridMarginPx);
 
-    const QRect area = event->rect().translated(-gridMarginPx, -gridMarginPx);
-    const int firstRow = std::max(0, area.top() / cellSize_.height());
-    const int lastRow = std::min(screen_->rows() - 1, area.bottom() / cellSize_.height());
-    for (int row = firstRow; row <= lastRow; ++row)
-        paintRow(painter, row);
-    if (scrollOffset_ == 0)
-        paintCursor(painter);
+    const QRegion area = event->region().translated(-gridMarginPx, -gridMarginPx);
+    const QRect bounds = area.boundingRect();
+    const int firstRow = std::max(0, bounds.top() / cellSize_.height());
+    const int lastRow = std::min(screen_->rows() - 1, bounds.bottom() / cellSize_.height());
+    for (int row = firstRow; row <= lastRow; ++row) {
+        if (const std::optional<ColumnSpan> columns = columnsToPaint(area, row))
+            paintRow(painter, row, *columns);
+    }
+    paintCursor(painter, area);
+}
+
+// The columns of `row` that `area` (grid coordinates) reaches, with one more
+// on each side for glyphs that overhang.
+std::optional<TerminalWidget::ColumnSpan> TerminalWidget::columnsToPaint(const QRegion &area, int row) const
+{
+    const QRect bounds = area.boundingRect();
+    const QRect band(bounds.left(), row * cellSize_.height(), bounds.width(), cellSize_.height());
+    const QRect covered = area.intersected(band).boundingRect();
+    if (covered.isEmpty())
+        return std::nullopt;
+    return ColumnSpan{.first = std::max(0, covered.left() / cellSize_.width() - 1),
+                      .last = std::min(screen_->columns() - 1, covered.right() / cellSize_.width() + 1)};
 }
 
 // Backgrounds are filled in runs of one color, then the text is drawn in
-// runs of ASCII characters sharing a font and a color: one drawText() per
-// run instead of one per cell. Other characters (box drawing, CJK, emoji)
-// may come from a fallback font with another advance: they are drawn one
+// runs of characters sharing a font and a color: one drawText() per run
+// instead of one per cell. Characters that may come from a fallback font
+// with another advance (emoji, CJK, symbols the font lacks) are drawn one
 // by one, at their cell.
-void TerminalWidget::paintRow(QPainter &painter, int row)
+void TerminalWidget::paintRow(QPainter &painter, int row, ColumnSpan columns)
 {
     const int contentRow = row - scrollOffset_;
     screen_->readRow(contentRow, rowCells_);
     computeRowColors(contentRow);
+    // The first half of a wide character draws the second.
+    if (columns.first > 0 && isContinuation(rowCells_[static_cast<size_t>(columns.first)]))
+        --columns.first;
     const int y = row * cellSize_.height();
-    paintRowBackgrounds(painter, y);
+    paintRowBackgrounds(painter, y, columns);
 
-    RowTextPainter text(painter, fonts_, runText_, {.baseline = y + ascent_, .cellWidth = cellSize_.width()});
-    const int columns = static_cast<int>(rowCells_.size());
-    for (int column = 0; column < columns; ++column) {
+    RowTextPainter text(painter, {.fonts = &fonts_, .runText = &runText_, .glyphs = &glyphs_},
+                        {.baseline = y + ascent_, .cellWidth = cellSize_.width()});
+    for (int column = columns.first; column <= columns.last; ++column) {
         const VTermScreenCell &cell = rowCells_[static_cast<size_t>(column)];
         if (isContinuation(cell))
             continue;
@@ -511,8 +634,8 @@ void TerminalWidget::paintRow(QPainter &painter, int row)
             text.addPlainSpace();
         else if (blank)
             text.addRunCharacter(column, font, pen, ' ');
-        else if (isRunCharacter(cell))
-            text.addRunCharacter(column, font, pen, static_cast<char>(cell.chars[0]));
+        else if (isRunCharacter(cell) || fitsCellGrid(cell, font))
+            text.addRunCharacter(column, font, pen, char32_t(cell.chars[0]));
         else
             text.drawAlone(column, font, pen, cell);
     }
@@ -538,21 +661,38 @@ void TerminalWidget::computeRowColors(int contentRow)
 }
 
 // Backgrounds in runs of one color; the default one is already there.
-void TerminalWidget::paintRowBackgrounds(QPainter &painter, int y) const
+void TerminalWidget::paintRowBackgrounds(QPainter &painter, int y, ColumnSpan columns) const
 {
-    const int columns = static_cast<int>(rowBackgrounds_.size());
     const int cellWidth = cellSize_.width();
     const QRgb defaultBackground = background_.rgb();
-    int runStart = 0;
-    for (int column = 1; column <= columns; ++column) {
+    int runStart = columns.first;
+    for (int column = columns.first + 1; column <= columns.last + 1; ++column) {
         const QRgb color = rowBackgrounds_[static_cast<size_t>(runStart)];
-        if (column < columns && rowBackgrounds_[static_cast<size_t>(column)] == color)
+        if (column <= columns.last && rowBackgrounds_[static_cast<size_t>(column)] == color)
             continue;
         if (color != defaultBackground)
             painter.fillRect(runStart * cellWidth, y, (column - runStart) * cellWidth, cellSize_.height(),
                              QColor(color));
         runStart = column;
     }
+}
+
+// A character alone in its cell that its font has and draws one cell wide
+// (box drawing, in most monospaced fonts): it joins a run like an ASCII
+// character instead of being shaped alone on every paint.
+bool TerminalWidget::fitsCellGrid(const VTermScreenCell &cell, int font)
+{
+    if (cell.chars[1] != 0 || cell.width != 1)
+        return false;
+    const auto character = char32_t(cell.chars[0]);
+    QHash<char32_t, bool> &known = fitsGrid_[static_cast<size_t>(font)];
+    if (const auto found = known.constFind(character); found != known.cend())
+        return *found;
+    const QFontMetricsF metrics(fonts_[static_cast<size_t>(font)]);
+    const qreal advance = metrics.horizontalAdvance(QString::fromUcs4(&character, 1));
+    const bool fits = metrics.inFontUcs4(character) && std::abs(advance - cellSize_.width()) < gridTolerancePx;
+    known.insert(character, fits);
+    return fits;
 }
 
 const QFont &TerminalWidget::fontFor(bool bold, bool italic, bool underline, bool strike) const
@@ -573,23 +713,28 @@ void TerminalWidget::paintCell(QPainter &painter, const TerminalCell &cell, cons
     painter.drawText(topLeft.x(), topLeft.y() + ascent_, cell.text);
 }
 
-void TerminalWidget::paintCursor(QPainter &painter) const
+// `painter` and `area` in grid coordinates.
+void TerminalWidget::paintCursor(QPainter &painter, const QRegion &area)
 {
-    if (!screen_->isCursorVisible())
-        return;
     const QPoint cursor = screen_->cursorPosition();
-    const QRect area(cursor.x() * cellSize_.width(), cursor.y() * cellSize_.height(), cellSize_.width(),
-                     cellSize_.height());
+    const QRect place(cursor.x() * cellSize_.width(), cursor.y() * cellSize_.height(), cellSize_.width(),
+                      cellSize_.height());
+    if (!area.intersects(place))
+        return;
+    paintedCursor_ = QRect();
+    if (scrollOffset_ != 0 || !screen_->isCursorVisible())
+        return;
+    paintedCursor_ = place.translated(gridMarginPx, gridMarginPx);
     if (!hasFocus()) {
         painter.setPen(foreground_);
-        painter.drawRect(area.adjusted(0, 0, -1, -1));
+        painter.drawRect(place.adjusted(0, 0, -1, -1));
         return;
     }
     TerminalCell cell = screen_->cell(cursor.y(), cursor.x());
     cell.width = 1;
     cell.foreground = background_;
     cell.background = foreground_;
-    paintCell(painter, cell, area.topLeft());
+    paintCell(painter, cell, place.topLeft());
 }
 
 void TerminalWidget::keyPressEvent(QKeyEvent *event)
@@ -653,9 +798,7 @@ void TerminalWidget::wheelEvent(QWheelEvent *event)
         return;
     }
     const int lines = event->angleDelta().y() / 40;
-    scrollOffset_ = std::clamp(scrollOffset_ + lines, 0, screen_->scrollbackSize());
-    updateScrollBar();
-    viewport()->update();
+    setScrollOffset(scrollOffset_ + lines);
 }
 
 QPoint TerminalWidget::cellAt(const QPoint &widgetPosition) const
@@ -706,8 +849,11 @@ void TerminalWidget::mouseMoveEvent(QMouseEvent *event)
     }
     if (!selecting_)
         return;
-    selectionEnd_ = cellAt(event->position().toPoint());
-    viewport()->update();
+    const QPoint end = cellAt(event->position().toPoint());
+    if (end == selectionEnd_)
+        return;
+    updateSelectionRows(selectionEnd_.y(), end.y());
+    selectionEnd_ = end;
 }
 
 void TerminalWidget::mouseReleaseEvent(QMouseEvent *event)

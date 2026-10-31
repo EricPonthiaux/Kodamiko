@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QPoint>
 #include <QRect>
+#include <QRegion>
 #include <QString>
 
 #include <vterm.h>
@@ -26,6 +27,22 @@ struct TerminalCell {
     bool strike = false;
     int width = 1;               // 2 for a wide character (CJK, emoji)
     bool isContinuation = false; // second half of a wide character
+};
+
+// Rows of the screen that moved as a block (a scroll): `area`, in cells,
+// holds the rows before and after the move; `rows` < 0 moves them up.
+struct ScreenScroll {
+    QRect area;
+    int rows = 0;
+};
+
+// What changed on the screen since the last VtScreen::takeChanges(). A view
+// that shows the screen applies `scrolls` to its picture, in order, then
+// repaints `damage`, which is already where the scrolls left it.
+struct ScreenChanges {
+    std::vector<ScreenScroll> scrolls;
+    QRegion damage;      // cells (x = column, y = row)
+    int pushedLines = 0; // lines that went into the history (< 0: came back from it)
 };
 
 // Screen of a VT/xterm terminal, emulated by libvterm.
@@ -63,8 +80,7 @@ public:
     void readRow(int row, std::vector<VTermScreenCell> &cells) const;
     void colorsOf(const VTermScreenCell &cell, QRgb &foreground, QRgb &background) const;
 
-    // Screen cells (x = column, y = row) changed since the last call.
-    QRect takeDamage();
+    ScreenChanges takeChanges();
 
     QPoint cursorPosition() const { return cursor_; } // x = column, y = row
 
@@ -98,6 +114,7 @@ signals:
 
 private:
     static int onDamage(VTermRect rect, void *user);
+    static int onMoveRect(VTermRect destination, VTermRect source, void *user);
     static int onMoveCursor(VTermPos position, VTermPos oldPosition, int visible, void *user);
     static int onSetTermProp(VTermProp property, VTermValue *value, void *user);
     static int onBell(void *user);
@@ -109,6 +126,7 @@ private:
     QColor toQColor(VTermColor color, bool isForeground) const;
     QRgb toRgb(VTermColor color, bool isForeground) const;
     void addDamage(const QRect &cells);
+    bool addScroll(const QRect &destination, const QRect &source);
 
     VTerm *terminal_ = nullptr;
     VTermScreen *screen_ = nullptr;
@@ -122,7 +140,7 @@ private:
     QColor defaultForeground_ = Qt::lightGray;
     QColor defaultBackground_ = Qt::black;
     QString titleBuffer_;
-    QRect damage_;
+    ScreenChanges changes_;
     bool changed_ = false; // something to signal at the end of feed()
     // Lines without their trailing blank cells.
     std::deque<std::vector<VTermScreenCell>> scrollback_;

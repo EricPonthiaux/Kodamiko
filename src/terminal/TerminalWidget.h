@@ -2,23 +2,29 @@
 
 #pragma once
 
+#include "GlyphCache.h"
 #include "OptionKey.h"
 #include "ProcessSpec.h"
 
 #include <QAbstractScrollArea>
 #include <QClipboard>
 #include <QFont>
+#include <QHash>
+#include <QTimer>
 
 #include <vterm.h>
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class IPty;
+class QRegion;
 class VtScreen;
 struct Theme;
 struct TerminalCell;
+struct ScreenScroll;
 
 // Graphical terminal: connects a PTY (the program) to a VtScreen (the
 // emulated screen) and draws the cell grid. The scroll bar browses the
@@ -92,8 +98,19 @@ protected:
     bool focusNextPrevChild(bool next) override;
 
 private:
+    // Columns of a row to paint, both included.
+    struct ColumnSpan {
+        int first = 0;
+        int last = 0;
+    };
+
     void onProcessFinished(int exitCode);
     void onScreenChanged();
+    void copyScrolledRows(const std::vector<ScreenScroll> &scrolls);
+    void followHistory(int pushedLines);
+    void setScrollOffset(int offset);
+    void shiftSelection(int rows);
+    void updateSelectionRows(int contentRow, int otherContentRow);
     void updateGridSize();
     void scheduleGridUpdate();
     // Rebuilds the fonts and the cell size from the theme font and zoom_.
@@ -101,12 +118,16 @@ private:
     void updateScrollBar();
     void scrollToBottom();
 
-    void paintRow(QPainter &painter, int row);
+    std::optional<ColumnSpan> columnsToPaint(const QRegion &area, int row) const;
+    void paintRow(QPainter &painter, int row, ColumnSpan columns);
     void computeRowColors(int contentRow);
-    void paintRowBackgrounds(QPainter &painter, int y) const;
+    void paintRowBackgrounds(QPainter &painter, int y, ColumnSpan columns) const;
+    bool fitsCellGrid(const VTermScreenCell &cell, int font);
     void paintCell(QPainter &painter, const TerminalCell &cell, const QPoint &topLeft) const;
-    void paintCursor(QPainter &painter) const;
+    void paintCursor(QPainter &painter, const QRegion &area);
     const QFont &fontFor(bool bold, bool italic, bool underline, bool strike) const;
+    // Viewport rectangle of a rectangle of screen cells.
+    QRect pixelsOf(const QRect &cells) const;
 
     // Position (column, content row) under a widget point; content rows are
     // negative in the history.
@@ -128,6 +149,9 @@ private:
     // letter spacing that puts each character on the cell grid, so a run
     // of cells is drawn in one call (see fontFor()).
     std::array<QFont, 16> fonts_;
+    // Per font of fonts_, whether a character joins runs (see fitsCellGrid()).
+    std::array<QHash<char32_t, bool>, 16> fitsGrid_;
+    GlyphCache glyphs_;
     QFont baseFont_;
     int zoom_ = 0;           // points added to the theme font by Ctrl+wheel
     int wheelRemainder_ = 0; // eighths of a degree not yet sent as a notch
@@ -143,6 +167,12 @@ private:
     bool gridUpdatePending_ = false;
     QPoint selectionAnchor_{-1, 0};
     QPoint selectionEnd_{-1, 0};
+    // Where the cursor was last drawn, in viewport coordinates: a copy of
+    // scrolled rows moves its picture along.
+    QRect paintedCursor_;
+    // The program learns the new size once a window drag settles: each
+    // resize makes it redraw its whole screen.
+    QTimer ptyResizeTimer_;
 
     // Reused by paintRow() to avoid allocating on every paint.
     std::vector<VTermScreenCell> rowCells_;

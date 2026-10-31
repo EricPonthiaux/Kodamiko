@@ -84,16 +84,53 @@ private slots:
     void signalsOncePerFeedWithMergedDamage()
     {
         VtScreen screen(5, 20);
-        screen.takeDamage();
+        screen.takeChanges();
         const QSignalSpy changed(&screen, &VtScreen::screenChanged);
         screen.feed("ab\x1b[1mcd\x1b[0m\r\nef");
         QCOMPARE(changed.size(), 1);
-        const QRect damage = screen.takeDamage();
+        const QRegion damage = screen.takeChanges().damage;
         QVERIFY(damage.contains(QPoint(0, 0)));
         QVERIFY(damage.contains(QPoint(1, 1)));
-        QVERIFY(screen.takeDamage().isEmpty());
+        QVERIFY(screen.takeChanges().damage.isEmpty());
         screen.feed("");
         QCOMPARE(changed.size(), 1); // nothing changed: no signal
+    }
+
+    void damagesOnlyTheRowsThatChanged()
+    {
+        VtScreen screen(10, 20);
+        screen.takeChanges();
+        screen.feed("\x1b[2;1Htop\x1b[9;1Hbottom");
+        const QRegion damage = screen.takeChanges().damage;
+        QVERIFY(damage.contains(QPoint(0, 1)));
+        QVERIFY(damage.contains(QPoint(0, 8)));
+        QVERIFY(!damage.contains(QPoint(0, 4))); // the rows between stay
+    }
+
+    void reportsAScrollAsRowsMovedUp()
+    {
+        VtScreen screen(4, 10);
+        screen.feed("a\r\nb\r\nc\r\nd");
+        screen.takeChanges();
+        screen.feed("\r\ne\r\nf");
+        const ScreenChanges changes = screen.takeChanges();
+        QCOMPARE(changes.scrolls.size(), size_t(1)); // two lines, one copy
+        QCOMPARE(changes.scrolls.front().area, QRect(0, 0, 10, 4));
+        QCOMPARE(changes.scrolls.front().rows, -2);
+        QCOMPARE(changes.pushedLines, 2);
+        QVERIFY(changes.damage.contains(QPoint(0, 3)));  // the new lines
+        QVERIFY(!changes.damage.contains(QPoint(5, 0))); // copied, not repainted
+    }
+
+    void movesEarlierDamageWithTheScroll()
+    {
+        VtScreen screen(4, 10);
+        screen.feed("a\r\nb\r\nc\r\nd");
+        screen.takeChanges();
+        screen.feed("\x1b[2;1HX\x1b[4;1H\r\n");
+        const ScreenChanges changes = screen.takeChanges();
+        QVERIFY(changes.damage.contains(QPoint(0, 0))); // X's row, one row up
+        QVERIFY(!changes.damage.contains(QPoint(0, 1)));
     }
 
     void readsRawRowsLikeCells()

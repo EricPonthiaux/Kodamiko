@@ -11,6 +11,10 @@
 
 namespace {
 
+// At most this much output is parsed per event-loop pass, as on Unix: a
+// burst that piled up while the interface was busy does not freeze it.
+constexpr qsizetype maxDrainBytes = 256 * 1024;
+
 COORD consoleSize(QSize cells)
 {
     return COORD{static_cast<SHORT>(cells.width()), static_cast<SHORT>(cells.height())};
@@ -186,10 +190,20 @@ void ConPty::readLoop()
 void ConPty::drainOutput()
 {
     QByteArray output;
+    bool hasMore = false;
     {
         const std::lock_guard lock(outputMutex_);
-        output.swap(pendingOutput_);
+        hasMore = pendingOutput_.size() > maxDrainBytes;
+        if (hasMore) {
+            output = pendingOutput_.first(maxDrainBytes);
+            pendingOutput_.remove(0, maxDrainBytes);
+        } else {
+            output.swap(pendingOutput_);
+        }
     }
+    // The reader queues no drain while output is pending: queue the next one.
+    if (hasMore)
+        QMetaObject::invokeMethod(this, &ConPty::drainOutput, Qt::QueuedConnection);
     if (!output.isEmpty())
         emit dataReceived(output);
 }

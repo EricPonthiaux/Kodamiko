@@ -310,6 +310,7 @@ add_library(kdk_core STATIC
     syntax/TreeSitterFolds.cpp
     syntax/TreeSitterGrammars.cpp
     syntax/TreeSitterHighlighter.cpp
+    terminal/GlyphCache.cpp
     terminal/IPty.h
     terminal/KeyModifiers.h
     terminal/OptionKey.h

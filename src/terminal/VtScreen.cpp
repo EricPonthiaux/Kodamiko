@@ -5,6 +5,7 @@
 #include "KeyModifiers.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 namespace {
@@ -75,6 +76,11 @@ VTermScreenCell blankCell()
     return blank;
 }
 
+QRect toQRect(VTermRect rect)
+{
+    return {rect.start_col, rect.start_row, rect.end_col - rect.start_col, rect.end_row - rect.start_row};
+}
+
 bool isBlank(const VTermScreenCell &cell)
 {
     return cell.chars[0] == 0 && VTERM_COLOR_IS_DEFAULT_BG(&cell.bg) && !cell.attrs.reverse &&
@@ -94,15 +100,17 @@ VtScreen::VtScreen(int rows, int columns, QObject *parent)
 
     screen_ = vterm_obtain_screen(terminal_);
     callbacks_.damage = &VtScreen::onDamage;
+    callbacks_.moverect = &VtScreen::onMoveRect;
     callbacks_.movecursor = &VtScreen::onMoveCursor;
     callbacks_.settermprop = &VtScreen::onSetTermProp;
     callbacks_.bell = &VtScreen::onBell;
     callbacks_.sb_pushline = &VtScreen::onPushLine;
     callbacks_.sb_popline = &VtScreen::onPopLine;
     vterm_screen_set_callbacks(screen_, &callbacks_, this);
-    // Damage is merged until the end of each feed(): one notification per
-    // batch of output instead of one per cell.
-    vterm_screen_set_damage_merge(screen_, VTERM_DAMAGE_SCREEN);
+    // Damage is merged within a row, and gathered in changes_ until the end
+    // of each feed(): one notification per batch of output, and a view
+    // repaints the rows that changed, not every row between them.
+    vterm_screen_set_damage_merge(screen_, VTERM_DAMAGE_ROW);
     vterm_screen_enable_altscreen(screen_, 1);
     vterm_screen_enable_reflow(screen_, true);
     vterm_screen_reset(screen_, 1);
@@ -133,6 +141,7 @@ void VtScreen::resize(int rows, int columns)
     columns_ = columns;
     vterm_set_size(terminal_, rows, columns);
     vterm_screen_flush_damage(screen_);
+    changes_.scrolls.clear(); // everything is repainted
     addDamage(QRect(0, 0, columns_, rows_));
     changed_ = false;
     emit screenChanged();
@@ -145,6 +154,7 @@ void VtScreen::setDefaultColors(const QColor &foreground, const QColor &backgrou
     const VTermColor fg = rgbColor(foreground);
     const VTermColor bg = rgbColor(background);
     vterm_screen_set_default_colors(screen_, &fg, &bg);
+    changes_.scrolls.clear(); // everything is repainted
     addDamage(QRect(0, 0, columns_, rows_));
     emit screenChanged();
 }
@@ -211,15 +221,43 @@ void VtScreen::colorsOf(const VTermScreenCell &cell, QRgb &foreground, QRgb &bac
         std::swap(foreground, background);
 }
 
-QRect VtScreen::takeDamage()
+ScreenChanges VtScreen::takeChanges()
 {
-    return std::exchange(damage_, QRect());
+    return std::exchange(changes_, ScreenChanges());
 }
 
 void VtScreen::addDamage(const QRect &cells)
 {
-    damage_ |= cells;
+    changes_.damage += cells;
     changed_ = true;
+}
+
+// A vertical move of whole rows, which a view copies instead of repainting.
+// libvterm flushed its damage before the move: the damage gathered so far
+// moves with the rows it marks. Returns false for a sideways move
+// (inserted or deleted characters), which libvterm then reports as damage.
+bool VtScreen::addScroll(const QRect &destination, const QRect &source)
+{
+    if (destination.left() != source.left() || destination.width() != source.width())
+        return false;
+    const int rows = destination.top() - source.top();
+    const QRect area = destination | source;
+    changes_.damage = changes_.damage.subtracted(area) + (changes_.damage & source).translated(0, rows);
+    changed_ = true;
+
+    std::vector<ScreenScroll> &scrolls = changes_.scrolls;
+    const bool continuesLast =
+        !scrolls.empty() && scrolls.back().area == area && (scrolls.back().rows < 0) == (rows < 0);
+    if (continuesLast)
+        scrolls.back().rows += rows;
+    else
+        scrolls.push_back({.area = area, .rows = rows});
+    // Moved out of sight: nothing left to copy, the area is repainted.
+    if (std::abs(scrolls.back().rows) >= area.height()) {
+        scrolls.pop_back();
+        changes_.damage += area;
+    }
+    return true;
 }
 
 QString VtScreen::lineText(int row) const
@@ -358,9 +396,13 @@ QRgb VtScreen::toRgb(VTermColor color, bool isForeground) const
 
 int VtScreen::onDamage(VTermRect rect, void *user)
 {
-    static_cast<VtScreen *>(user)->addDamage(
-        QRect(rect.start_col, rect.start_row, rect.end_col - rect.start_col, rect.end_row - rect.start_row));
+    static_cast<VtScreen *>(user)->addDamage(toQRect(rect));
     return 1;
+}
+
+int VtScreen::onMoveRect(VTermRect destination, VTermRect source, void *user)
+{
+    return static_cast<VtScreen *>(user)->addScroll(toQRect(destination), toQRect(source)) ? 1 : 0;
 }
 
 int VtScreen::onMoveCursor(VTermPos position, VTermPos oldPosition, int visible, void *user)
@@ -416,6 +458,8 @@ int VtScreen::onPushLine(int columns, const VTermScreenCell *cells, void *user)
     while (stored > 0 && isBlank(cells[stored - 1]))
         --stored;
     self->scrollback_.emplace_back(cells, cells + stored);
+    ++self->changes_.pushedLines;
+    self->changed_ = true;
     if (self->scrollback_.size() > maxScrollbackLines)
         self->scrollback_.pop_front();
     return 1;
@@ -434,6 +478,8 @@ int VtScreen::onPopLine(int columns, VTermScreenCell *cells, void *user)
     if (copied < columns)
         std::fill(cells + copied, cells + columns, blankCell());
     self->scrollback_.pop_back();
+    --self->changes_.pushedLines;
+    self->changed_ = true;
     return 1;
 }
 
