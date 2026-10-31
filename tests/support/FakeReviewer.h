@@ -29,8 +29,6 @@ public:
 
     QColor brandColor() const override { return claude_.brandColor(); }
 
-    const AgentMark &mark() const override { return claude_.mark(); }
-
     AgentFeatures features() const override { return claude_.features(); }
 
     QString findExecutable() const override { return claude_.findExecutable(); }

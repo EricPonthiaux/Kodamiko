@@ -13,7 +13,7 @@
 class AgentProvider;
 class QTabBar;
 
-// The agent's state in the status bar: the provider's mark alone (see
+// The agent's state in the status bar: the agents' mark alone (see
 // AgentMark), in a square tinted like the run block in the color of the
 // state. The mark's animation says the state without the color. The state's
 // name is in the tooltip. Without a provider, the square stays empty.
@@ -26,7 +26,7 @@ public:
     AgentStatus status() const { return status_; }
 
     void setStatus(AgentStatus status);
-    // The agent shown: its name and mark. Not owned.
+    // The agent shown: its name. Not owned.
     void setProvider(const AgentProvider *provider);
     void applyTheme(const Theme &theme);
     // Centers the square under the side-tab column at the window's left

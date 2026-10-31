@@ -86,7 +86,7 @@ add_library(kdk_core STATIC
     agent/vendor/claude/ClaudeLauncher.cpp
     agent/vendor/claude/ClaudeLint.cpp
     agent/vendor/claude/ClaudeLinter.cpp
-    agent/vendor/claude/ClaudeMark.cpp
+    agent/AgentMark.cpp
     agent/vendor/claude/ClaudeTrust.cpp
     agent/vendor/claude/ClaudeUsage.cpp
     agent/vendor/claude/CodeRequest.cpp

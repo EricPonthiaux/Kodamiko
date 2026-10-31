@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "ClaudeMark.h"
+#include "AgentMark.h"
 
 #include "ui/Motion.h"
 
@@ -54,7 +54,7 @@ qreal dotOpacity(int dot, AgentMarkFrame markFrame)
 
 } // namespace
 
-std::optional<std::chrono::milliseconds> ClaudeMark::frameStep(AgentStatus status) const
+std::optional<std::chrono::milliseconds> AgentMark::frameStep(AgentStatus status)
 {
     switch (status) {
     case AgentStatus::Working:
@@ -70,18 +70,18 @@ std::optional<std::chrono::milliseconds> ClaudeMark::frameStep(AgentStatus statu
 }
 
 // The spark and the breath loop on a multiple of their periods.
-int ClaudeMark::loopFrames() const
+int AgentMark::loopFrames()
 {
     return dotCount * pulseFrames;
 }
 
 // The twinkle plays once.
-bool ClaudeMark::isFinished(AgentMarkFrame frame) const
+bool AgentMark::isFinished(AgentMarkFrame frame)
 {
     return frame.status == AgentStatus::Done && frame.index >= twinkleFrames;
 }
 
-void ClaudeMark::paint(QPainter &painter, const QRectF &box, const QColor &color, AgentMarkFrame frame) const
+void AgentMark::paint(QPainter &painter, const QRectF &box, const QColor &color, AgentMarkFrame frame)
 {
     const QPointF center = box.center();
     const qreal orbit = 5;

@@ -24,24 +24,27 @@ struct AgentMarkFrame {
     int index = 0; // frames since the status changed, modulo loopFrames()
 };
 
-// An agent's mark in its indicator, and how it moves: each provider draws
-// its own (Claude's ring of dots…). The indicator owns the timer and counts the
-// frames; the mark says how fast they go, when they stop, and what each one
-// looks like. A mark is stateless.
-class AgentMark {
-public:
-    virtual ~AgentMark() = default;
+// The agents' mark in their indicator, and how it moves (see UiIcons'
+// "claude"): a ring of eight dots, the large ones on the axes, a neutral
+// motif shared by every agent. While the agent works, each dot lights up in
+// turn; while it waits for the user, the whole ring breathes; when a
+// response arrives, the large and the small dots flash in turn, then the
+// ring shines still. The indicator owns the timer and counts the frames;
+// the mark says how fast they go, when they stop, and what each one looks
+// like.
+namespace AgentMark {
 
-    // The time between two frames of `status`'s animation; nullopt when the
-    // mark stays still.
-    virtual std::optional<std::chrono::milliseconds> frameStep(AgentStatus status) const = 0;
-    // The frame counter goes back to 0 after this many frames: a multiple of
-    // the periods of the looping animations.
-    virtual int loopFrames() const = 0;
-    // Whether a one-off animation (a response arriving…) is over at `frame`.
-    virtual bool isFinished(AgentMarkFrame frame) const = 0;
-    // Draws the mark at `frame` in `box`, in `color`. With
-    // motion off (Motion::policy()), the timer does not run: the mark draws
-    // a still form that tells the state apart by its color alone.
-    virtual void paint(QPainter &painter, const QRectF &box, const QColor &color, AgentMarkFrame frame) const = 0;
-};
+// The time between two frames of `status`'s animation; nullopt when the
+// mark stays still.
+std::optional<std::chrono::milliseconds> frameStep(AgentStatus status);
+// The frame counter goes back to 0 after this many frames: a multiple of
+// the periods of the looping animations.
+int loopFrames();
+// Whether a one-off animation (a response arriving…) is over at `frame`.
+bool isFinished(AgentMarkFrame frame);
+// Draws the mark at `frame` in `box`, in `color`. With motion off
+// (Motion::policy()), the timer does not run: the mark draws a still form
+// that tells the state apart by its color alone.
+void paint(QPainter &painter, const QRectF &box, const QColor &color, AgentMarkFrame frame);
+
+} // namespace AgentMark

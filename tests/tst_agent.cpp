@@ -2,6 +2,7 @@
 
 #include "agent/AgentActivity.h"
 #include "agent/AgentIndicator.h"
+#include "agent/AgentMark.h"
 #include "agent/AgentProviders.h"
 #include "agent/DiagramRequestPopup.h"
 #include "agent/HookServer.h"
@@ -196,15 +197,13 @@ private slots:
         QCOMPARE(edit["additionalContext"].toString(), QStringLiteral("errors"));
     }
 
-    void claudeMarkTwinklesOnceThenStaysStill()
+    void agentMarkTwinklesOnceThenStaysStill()
     {
-        const ClaudeCodeProvider claude;
-        const AgentMark &mark = claude.mark();
-        QVERIFY(!mark.frameStep(AgentStatus::Ready));
-        QVERIFY(mark.frameStep(AgentStatus::Working));
-        QVERIFY(!mark.isFinished({.status = AgentStatus::Done, .index = 0}));
-        QVERIFY(mark.isFinished({.status = AgentStatus::Done, .index = mark.loopFrames() - 1}));
-        QVERIFY(!mark.isFinished({.status = AgentStatus::Working, .index = mark.loopFrames() - 1}));
+        QVERIFY(!AgentMark::frameStep(AgentStatus::Ready));
+        QVERIFY(AgentMark::frameStep(AgentStatus::Working));
+        QVERIFY(!AgentMark::isFinished({.status = AgentStatus::Done, .index = 0}));
+        QVERIFY(AgentMark::isFinished({.status = AgentStatus::Done, .index = AgentMark::loopFrames() - 1}));
+        QVERIFY(!AgentMark::isFinished({.status = AgentStatus::Working, .index = AgentMark::loopFrames() - 1}));
     }
 
     void indicatorIsNamedAfterItsAgent()
