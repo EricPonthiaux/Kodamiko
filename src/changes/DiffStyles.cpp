@@ -79,23 +79,22 @@ DiffFonts fontsFor(const Theme &theme)
     return fonts;
 }
 
-void defineStyle(const QsciScintilla &view, int style, const StyleLook &look)
+void defineStyle(const ScintillaView &view, int style, const StyleLook &look)
 {
-    view.SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, style, look.foreground);
-    view.SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, style, look.background);
-    view.SendScintilla(QsciScintillaBase::SCI_STYLESETFONT, style, look.font.family().toUtf8().constData());
-    view.SendScintilla(QsciScintillaBase::SCI_STYLESETSIZEFRACTIONAL, style,
-                       qRound(look.font.pointSizeF() * int(QsciScintillaBase::SC_FONT_SIZE_MULTIPLIER)));
-    view.SendScintilla(QsciScintillaBase::SCI_STYLESETWEIGHT, style, look.font.weight());
-    view.SendScintilla(QsciScintillaBase::SCI_STYLESETITALIC, style, look.font.italic());
+    view.send(SCI_STYLESETFORE, style, scintillaColor(look.foreground));
+    view.send(SCI_STYLESETBACK, style, scintillaColor(look.background));
+    view.sends(SCI_STYLESETFONT, style, look.font.family().toUtf8().constData());
+    view.send(SCI_STYLESETSIZEFRACTIONAL, style, qRound(look.font.pointSizeF() * SC_FONT_SIZE_MULTIPLIER));
+    view.send(SCI_STYLESETWEIGHT, style, look.font.weight());
+    view.send(SCI_STYLESETITALIC, style, look.font.italic());
 }
 
-void defineTextStyles(const QsciScintilla &view, const Theme &theme, const DiffColors &colors)
+void defineTextStyles(const ScintillaView &view, const Theme &theme, const DiffColors &colors)
 {
     const DiffFonts fonts = fontsFor(theme);
     // The default style first: STYLECLEARALL copies it to every style.
-    defineStyle(view, QsciScintillaBase::STYLE_DEFAULT, {theme.foreground, theme.background, theme.font});
-    view.SendScintilla(QsciScintillaBase::SCI_STYLECLEARALL);
+    defineStyle(view, STYLE_DEFAULT, {theme.foreground, theme.background, theme.font});
+    view.send(SCI_STYLECLEARALL);
     defineStyle(view, plainStyle, {theme.foreground, theme.background, theme.font});
     defineStyle(view, fileHeaderStyle, {colors.muted, colors.fileHeader, fonts.label});
     defineStyle(view, fileNameStyle, {theme.foreground, colors.fileHeader, fonts.name});
@@ -112,44 +111,43 @@ void defineTextStyles(const QsciScintilla &view, const Theme &theme, const DiffC
     defineStyle(view, noteErrorStyle, {theme.foreground, colors.errorNote, fonts.label});
     defineStyle(view, noteWarningStyle, {theme.foreground, colors.warningNote, fonts.label});
     defineStyle(view, noteFillerStyle, {theme.foreground, colors.filler, fonts.label});
-    view.SendScintilla(QsciScintillaBase::SCI_STYLESETHOTSPOT, revealStyle, 1L);
-    view.SendScintilla(QsciScintillaBase::SCI_SETHOTSPOTACTIVEFORE, 1L, theme.foreground);
-    view.SendScintilla(QsciScintillaBase::SCI_SETHOTSPOTACTIVEUNDERLINE, 0L);
-    defineStyle(view, QsciScintillaBase::STYLE_LINENUMBER,
-                {theme.marginForeground, theme.marginBackground, theme.font});
+    view.send(SCI_STYLESETHOTSPOT, revealStyle, 1L);
+    view.send(SCI_SETHOTSPOTACTIVEFORE, 1L, scintillaColor(theme.foreground));
+    view.send(SCI_SETHOTSPOTACTIVEUNDERLINE, 0L);
+    defineStyle(view, STYLE_LINENUMBER, {theme.marginForeground, theme.marginBackground, theme.font});
 }
 
-void defineMarker(QsciScintilla &view, QsciScintilla::MarkerSymbol symbol, int marker, const QColor &color)
+void defineMarker(ScintillaView &view, int symbol, int marker, const QColor &color)
 {
     view.markerDefine(symbol, marker);
     view.setMarkerBackgroundColor(color, marker);
 }
 
-void defineMarkers(QsciScintilla &view, const DiffColors &colors)
+void defineMarkers(ScintillaView &view, const DiffColors &colors)
 {
-    defineMarker(view, QsciScintilla::Background, addedBackground, colors.added);
-    defineMarker(view, QsciScintilla::Background, removedBackground, colors.removed);
-    defineMarker(view, QsciScintilla::Background, fileHeaderBackground, colors.fileHeader);
-    defineMarker(view, QsciScintilla::Background, hunkHeaderBackground, colors.hunkHeader);
-    defineMarker(view, QsciScintilla::Background, fillerBackground, colors.filler);
-    defineMarker(view, QsciScintilla::FullRectangle, addedStrip, colors.addedStrong);
-    defineMarker(view, QsciScintilla::FullRectangle, removedStrip, colors.removedStrong);
-    defineMarker(view, QsciScintilla::FullRectangle, fileHeaderStrip, colors.fileHeader);
-    defineMarker(view, QsciScintilla::FullRectangle, hunkHeaderStrip, colors.hunkHeader);
+    defineMarker(view, SC_MARK_BACKGROUND, addedBackground, colors.added);
+    defineMarker(view, SC_MARK_BACKGROUND, removedBackground, colors.removed);
+    defineMarker(view, SC_MARK_BACKGROUND, fileHeaderBackground, colors.fileHeader);
+    defineMarker(view, SC_MARK_BACKGROUND, hunkHeaderBackground, colors.hunkHeader);
+    defineMarker(view, SC_MARK_BACKGROUND, fillerBackground, colors.filler);
+    defineMarker(view, SC_MARK_FULLRECT, addedStrip, colors.addedStrong);
+    defineMarker(view, SC_MARK_FULLRECT, removedStrip, colors.removedStrong);
+    defineMarker(view, SC_MARK_FULLRECT, fileHeaderStrip, colors.fileHeader);
+    defineMarker(view, SC_MARK_FULLRECT, hunkHeaderStrip, colors.hunkHeader);
 }
 
-void defineWordsIndicator(const QsciScintilla &view, int indicator, const QColor &color)
+void defineWordsIndicator(const ScintillaView &view, int indicator, const QColor &color)
 {
-    view.SendScintilla(QsciScintillaBase::SCI_INDICSETSTYLE, indicator, long(QsciScintillaBase::INDIC_FULLBOX));
-    view.SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, indicator, color);
-    view.SendScintilla(QsciScintillaBase::SCI_INDICSETALPHA, indicator, 255L);
-    view.SendScintilla(QsciScintillaBase::SCI_INDICSETOUTLINEALPHA, indicator, 0L);
-    view.SendScintilla(QsciScintillaBase::SCI_INDICSETUNDER, indicator, 1L);
+    view.send(SCI_INDICSETSTYLE, indicator, long(INDIC_FULLBOX));
+    view.send(SCI_INDICSETFORE, indicator, scintillaColor(color));
+    view.send(SCI_INDICSETALPHA, indicator, 255L);
+    view.send(SCI_INDICSETOUTLINEALPHA, indicator, 0L);
+    view.send(SCI_INDICSETUNDER, indicator, 1L);
 }
 
 } // namespace
 
-void define(QsciScintilla &view, const Theme &theme)
+void define(ScintillaView &view, const Theme &theme)
 {
     const DiffColors colors = colorsFor(theme);
     defineTextStyles(view, theme, colors);

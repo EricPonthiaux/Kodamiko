@@ -2,7 +2,7 @@
 
 #include "TreeSitterFolds.h"
 
-#include <Qsci/qsciscintillabase.h>
+#include "scintilla/ScintillaView.h"
 
 #include <cstring>
 #include <set>
@@ -86,8 +86,7 @@ std::vector<int> levels(TSNode root, int lineCount)
     int depth = 0;
     for (int line = 0; line < lineCount; ++line) {
         depth += depthChange[line];
-        result[line] = (QsciScintillaBase::SC_FOLDLEVELBASE + depth) |
-                       (isHeader[line] ? QsciScintillaBase::SC_FOLDLEVELHEADERFLAG : 0);
+        result[line] = (SC_FOLDLEVELBASE + depth) | (isHeader[line] ? SC_FOLDLEVELHEADERFLAG : 0);
     }
     return result;
 }

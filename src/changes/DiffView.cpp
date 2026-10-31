@@ -25,29 +25,28 @@ long utf8Length(const QString &text, int characters)
 } // namespace
 
 DiffView::DiffView(const Theme &theme, QWidget *parent)
-    : QsciScintilla(parent)
+    : ScintillaView(parent)
     , theme_(theme)
 {
-    setUtf8(true);
     setReadOnly(true);
     setCaretLineVisible(false);
-    setWrapMode(QsciScintilla::WrapNone);
-    setScrollWidthTracking(true);
-    setScrollWidth(1);
-    setMarginType(numberMargin, QsciScintilla::TextMarginRightJustified);
-    setMarginType(stripMargin, QsciScintilla::SymbolMargin);
+    send(SCI_SETWRAPMODE, SC_WRAP_NONE);
+    send(SCI_SETSCROLLWIDTHTRACKING, true);
+    send(SCI_SETSCROLLWIDTH, 1);
+    setMarginType(numberMargin, SC_MARGIN_RTEXT);
+    setMarginType(stripMargin, SC_MARGIN_SYMBOL);
     setMarginMarkerMask(numberMargin, 0);
     setMarginMarkerMask(stripMargin,
                         (1 << addedStrip) | (1 << removedStrip) | (1 << fileHeaderStrip) | (1 << hunkHeaderStrip));
     setMarginWidth(stripMargin, 3);
     for (int margin = 2; margin < 5; ++margin)
         setMarginWidth(margin, 0);
-    SendScintilla(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_BOXED));
+    send(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_BOXED));
     applyTheme(theme);
     addShortcuts();
     // Queued: the arrow's lines replace the text Scintilla is handling the
     // click in.
-    connect(this, &QsciScintillaBase::SCN_HOTSPOTRELEASECLICK, this, &DiffView::onArrowClicked, Qt::QueuedConnection);
+    connect(this, &ScintillaView::hotspotReleased, this, &DiffView::onArrowClicked, Qt::QueuedConnection);
 }
 
 void DiffView::addShortcuts()
@@ -98,11 +97,11 @@ void DiffView::revealLines(int line, Reveal reveal)
 
 void DiffView::onArrowClicked(int position)
 {
-    const int line = int(SendScintilla(SCI_LINEFROMPOSITION, position));
+    const int line = int(send(SCI_LINEFROMPOSITION, position));
     if (line < 0 || line >= lines_.size())
         return;
     const DiffLine &separator = lines_[line];
-    const long column = position - SendScintilla(SCI_POSITIONFROMLINE, line);
+    const long column = position - send(SCI_POSITIONFROMLINE, line);
     for (const RevealArrow &arrow : separator.arrows) {
         const bool isOnArrow = column >= utf8Length(separator.text, arrow.position) &&
                                column < utf8Length(separator.text, arrow.position + 1);
@@ -194,9 +193,8 @@ int DiffView::searchStart() const
     int cursorLine = 0;
     int index = 0;
     getCursorPosition(&cursorLine, &index);
-    const int top = int(SendScintilla(SCI_DOCLINEFROMVISIBLE, firstVisibleLine()));
-    const int bottom =
-        int(SendScintilla(SCI_DOCLINEFROMVISIBLE, firstVisibleLine() + SendScintilla(SCI_LINESONSCREEN)));
+    const int top = int(send(SCI_DOCLINEFROMVISIBLE, firstVisibleLine()));
+    const int bottom = int(send(SCI_DOCLINEFROMVISIBLE, firstVisibleLine() + send(SCI_LINESONSCREEN)));
     const bool isCursorInView = cursorLine >= top && cursorLine < bottom;
     return isCursorInView ? cursorLine : top;
 }
@@ -220,7 +218,7 @@ void DiffView::showAtTop(int line)
 void DiffView::scrollToTop(int line)
 {
     // The notes' boxes above take rows of their own.
-    setFirstVisibleLine(int(SendScintilla(SCI_VISIBLEFROMDOCLINE, line)));
+    setFirstVisibleLine(int(send(SCI_VISIBLEFROMDOCLINE, line)));
 }
 
 int DiffView::newFileLine(int line) const
@@ -242,13 +240,13 @@ int DiffView::newFileLine(int line) const
 
 int DiffView::lineTop(int line) const
 {
-    const long position = SendScintilla(SCI_POSITIONFROMLINE, line);
-    return int(SendScintilla(SCI_POINTYFROMPOSITION, 0UL, position));
+    const long position = send(SCI_POSITIONFROMLINE, line);
+    return int(send(SCI_POINTYFROMPOSITION, 0UL, position));
 }
 
 int DiffView::lineHeight() const
 {
-    return int(SendScintilla(SCI_TEXTHEIGHT, 0UL));
+    return int(send(SCI_TEXTHEIGHT, 0UL));
 }
 
 void DiffView::render()
@@ -343,27 +341,27 @@ QString DiffView::marginText(const DiffLine &line, QChar sign) const
 void DiffView::styleLine(int line, int style)
 {
     const DiffLine &shown = lines_[line];
-    const long start = SendScintilla(SCI_POSITIONFROMLINE, line);
-    const long length = SendScintilla(SCI_LINELENGTH, line);
-    SendScintilla(SCI_STARTSTYLING, start);
-    SendScintilla(SCI_SETSTYLING, length, style);
+    const long start = send(SCI_POSITIONFROMLINE, line);
+    const long length = send(SCI_LINELENGTH, line);
+    send(SCI_STARTSTYLING, start);
+    send(SCI_SETSTYLING, length, style);
     if (shown.emphasis > 0) {
-        SendScintilla(SCI_STARTSTYLING, start);
-        SendScintilla(SCI_SETSTYLING, utf8Length(shown.text, shown.emphasis), fileNameStyle);
+        send(SCI_STARTSTYLING, start);
+        send(SCI_SETSTYLING, utf8Length(shown.text, shown.emphasis), fileNameStyle);
     }
     if (shown.statsStart >= 0)
         styleStats(shown, start, length);
     for (const RevealArrow &arrow : shown.arrows) {
         const long from = start + utf8Length(shown.text, arrow.position);
-        SendScintilla(SCI_STARTSTYLING, from);
-        SendScintilla(SCI_SETSTYLING, start + utf8Length(shown.text, arrow.position + 1) - from, revealStyle);
+        send(SCI_STARTSTYLING, from);
+        send(SCI_SETSTYLING, start + utf8Length(shown.text, arrow.position + 1) - from, revealStyle);
     }
     if (shown.changes.isEmpty())
         return;
-    SendScintilla(SCI_SETINDICATORCURRENT, shown.kind == DiffLineKind::Added ? addedWords : removedWords);
+    send(SCI_SETINDICATORCURRENT, shown.kind == DiffLineKind::Added ? addedWords : removedWords);
     for (const TextRange &range : shown.changes) {
         const long from = start + utf8Length(shown.text, range.start);
-        SendScintilla(SCI_INDICATORFILLRANGE, from, start + utf8Length(shown.text, range.start + range.length) - from);
+        send(SCI_INDICATORFILLRANGE, from, start + utf8Length(shown.text, range.start + range.length) - from);
     }
 }
 
@@ -373,26 +371,19 @@ void DiffView::styleStats(const DiffLine &title, long start, long length)
     const int minus = static_cast<int>(title.text.indexOf(QChar(0x2212), title.statsStart));
     const long statsStart = start + utf8Length(title.text, title.statsStart);
     const long minusStart = minus >= 0 ? start + utf8Length(title.text, minus) : start + length;
-    SendScintilla(SCI_STARTSTYLING, statsStart);
-    SendScintilla(SCI_SETSTYLING, minusStart - statsStart, addedStatsStyle);
+    send(SCI_STARTSTYLING, statsStart);
+    send(SCI_SETSTYLING, minusStart - statsStart, addedStatsStyle);
     if (minus < 0)
         return;
-    SendScintilla(SCI_STARTSTYLING, minusStart);
-    SendScintilla(SCI_SETSTYLING, start + length - minusStart, removedStatsStyle);
+    send(SCI_STARTSTYLING, minusStart);
+    send(SCI_SETSTYLING, start + length - minusStart, removedStatsStyle);
 }
 
 void DiffView::applyTheme(const Theme &theme)
 {
     theme_ = theme;
-    setPaper(theme.background);
-    setColor(theme.foreground);
-    setFont(theme.font);
-    setCaretForegroundColor(theme.caret);
-    setSelectionBackgroundColor(theme.selection);
-    SendScintilla(SCI_SETSELFORE, false, 0L);
-    setMarginsBackgroundColor(theme.marginBackground);
-    setMarginsForegroundColor(theme.marginForeground);
-    setMarginsFont(theme.font);
+    ScintillaStyles::applyDefaultStyle(*this, theme);
+    ScintillaStyles::applyEditorColors(*this, theme);
     ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     DiffStyles::define(*this, theme);
     // The old side first: rendering this side sets the old side's blank notes.
@@ -408,10 +399,10 @@ void DiffView::applyTheme(const Theme &theme)
 
 void DiffView::wheelEvent(QWheelEvent *event)
 {
-    // QScintilla zooms with the Control key on macOS; Kodamiko, as in its trees,
+    // Scintilla zooms with the Control key on macOS; Kodamiko, as in its trees,
     // with Command there (Qt's ControlModifier) and Ctrl elsewhere.
     if (!(event->modifiers() & Qt::ControlModifier)) {
-        QsciScintillaBase::wheelEvent(event);
+        ScintillaView::wheelEvent(event);
         return;
     }
     const int delta = event->angleDelta().y();

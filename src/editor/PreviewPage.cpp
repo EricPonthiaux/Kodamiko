@@ -325,7 +325,7 @@ PreviewPage::PreviewPage(EditorWidget *editor, Theme theme, QString projectFolde
     updateTimer_.setSingleShot(true);
     updateTimer_.setInterval(updateDelayMs);
     connect(&updateTimer_, &QTimer::timeout, this, &PreviewPage::updatePreview);
-    connect(editor_, &QsciScintilla::textChanged, this, [this] {
+    connect(editor_, &ScintillaView::textChanged, this, [this] {
         if (mode_ != Mode::Editor && preview())
             updateTimer_.start();
     });

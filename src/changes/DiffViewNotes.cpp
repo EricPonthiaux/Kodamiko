@@ -59,8 +59,8 @@ void DiffView::showNote(int note)
         return;
     setCursorPosition(line, 0); // scrolls to the cursor: first
     // A third down the view, its box below it in view as well.
-    const int row = int(SendScintilla(SCI_VISIBLEFROMDOCLINE, line));
-    setFirstVisibleLine(std::max(0, row - int(SendScintilla(SCI_LINESONSCREEN)) / 3));
+    const int row = int(send(SCI_VISIBLEFROMDOCLINE, line));
+    setFirstVisibleLine(std::max(0, row - int(send(SCI_LINESONSCREEN)) / 3));
 }
 
 void DiffView::goToNote(Direction direction)
@@ -96,9 +96,9 @@ int DiffView::lineOfNote(const DiffNote &note) const
 
 void DiffView::showNotes()
 {
-    SendScintilla(SCI_ANNOTATIONCLEARALL);
+    send(SCI_ANNOTATIONCLEARALL);
     if (oldSide_)
-        oldSide_->SendScintilla(SCI_ANNOTATIONCLEARALL);
+        oldSide_->send(SCI_ANNOTATIONCLEARALL);
     noteLines_.clear();
     QHash<int, QStringList> texts;
     QSet<int> errorLines;
@@ -117,12 +117,12 @@ void DiffView::showNotes()
     for (auto it = texts.cbegin(); it != texts.cend(); ++it) {
         const int style = errorLines.contains(it.key()) ? noteErrorStyle : noteWarningStyle;
         const QByteArray text = it.value().join(QLatin1Char('\n')).toUtf8();
-        SendScintilla(SCI_ANNOTATIONSETTEXT, it.key(), text.constData());
-        SendScintilla(SCI_ANNOTATIONSETSTYLE, it.key(), style);
+        sends(SCI_ANNOTATIONSETTEXT, it.key(), text.constData());
+        send(SCI_ANNOTATIONSETSTYLE, it.key(), style);
         if (!isSplit)
             continue;
         const QByteArray blank = QStringList(it.value().size(), QStringLiteral(" ")).join(QLatin1Char('\n')).toUtf8();
-        oldSide_->SendScintilla(SCI_ANNOTATIONSETTEXT, it.key(), blank.constData());
-        oldSide_->SendScintilla(SCI_ANNOTATIONSETSTYLE, it.key(), noteFillerStyle);
+        oldSide_->sends(SCI_ANNOTATIONSETTEXT, it.key(), blank.constData());
+        oldSide_->send(SCI_ANNOTATIONSETSTYLE, it.key(), noteFillerStyle);
     }
 }

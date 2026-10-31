@@ -111,12 +111,4 @@ void apply(const QList<Command> &commands, const Overrides &overrides)
         command.action->setShortcuts(shortcutsOf(command, overrides));
 }
 
-QList<QKeySequence> shortcutsInUse(const QList<Command> &commands)
-{
-    QList<QKeySequence> result;
-    for (const Command &command : commands)
-        result.append(command.action->shortcuts());
-    return result;
-}
-
 } // namespace Keymap

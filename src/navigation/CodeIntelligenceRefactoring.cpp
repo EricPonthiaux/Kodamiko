@@ -37,9 +37,9 @@ void CodeIntelligence::rename()
     EditorWidget *editor = tabs_->currentEditor();
     if (!editor || editor->isReadOnly())
         return;
-    const int caret = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const int start = int(editor->SendScintilla(QsciScintillaBase::SCI_WORDSTARTPOSITION, caret, true));
-    const int end = int(editor->SendScintilla(QsciScintillaBase::SCI_WORDENDPOSITION, caret, true));
+    const int caret = int(editor->send(SCI_GETCURRENTPOS));
+    const int start = int(editor->send(SCI_WORDSTARTPOSITION, caret, true));
+    const int end = int(editor->send(SCI_WORDENDPOSITION, caret, true));
     const QString word = editor->text(start, end);
     if (word.isEmpty()) {
         emit statusMessage(tr("Place the cursor on a name to rename it"));

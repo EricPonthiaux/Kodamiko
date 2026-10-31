@@ -3,27 +3,26 @@
 #pragma once
 
 #include "ISyntaxHighlighter.h"
+#include "LexillaLanguages.h"
 
 #include <QtGlobal>
 
-#include <memory>
-
-class QsciLexer;
-
-// Highlighting through a lexer built into QScintilla, for auxiliary files
-// (JSON, CMake, Markdown, XML...) that have no tree-sitter grammar.
+// Highlighting by one of Lexilla's lexers, for auxiliary files (JSON, CMake,
+// Markdown, XML...) that have no tree-sitter grammar.
 class LexillaHighlighter : public ISyntaxHighlighter {
     Q_DISABLE_COPY_MOVE(LexillaHighlighter)
 public:
-    explicit LexillaHighlighter(std::unique_ptr<QsciLexer> lexer);
-    ~LexillaHighlighter() override;
+    // `language` lives as long as the application (LexillaLanguages).
+    explicit LexillaHighlighter(const LexillaLanguage &language);
+    ~LexillaHighlighter() override = default;
 
-    void attach(QsciScintilla *editor) override;
+    void attach(ScintillaView *editor) override;
     void applyTheme(const Theme &theme) override;
+    QString styleCategory(int style, const Theme &theme) const override;
 
     void flush() override { } // nothing deferred
 
 private:
-    std::unique_ptr<QsciLexer> lexer_;
-    QsciScintilla *editor_ = nullptr;
+    const LexillaLanguage &language_;
+    ScintillaView *editor_ = nullptr;
 };

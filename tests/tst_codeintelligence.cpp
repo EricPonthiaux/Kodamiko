@@ -61,12 +61,12 @@ void placeCaretIn(const EditorWidget *editor, const QByteArray &before)
 {
     const qsizetype found = editor->utf8Bytes().toByteArray().indexOf(before);
     QVERIFY(found >= 0);
-    editor->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(found + 1));
+    editor->send(SCI_GOTOPOS, static_cast<unsigned long>(found + 1));
 }
 
 int caretLine(EditorWidget *editor)
 {
-    return CodeIntelligence::lspPosition(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))).line;
+    return CodeIntelligence::lspPosition(editor, int(editor->send(SCI_GETCURRENTPOS))).line;
 }
 
 struct ClangdProject {
@@ -376,9 +376,8 @@ private slots:
         servers.syncDocument(client, root + "/total.cpp", "cpp", read(root + "/total.cpp"));
         QTRY_VERIFY_WITH_TIMEOUT(client->isReady(), 30000);
         const auto placeCaret = [](EditorWidget *editor, const QString &before) {
-            editor->SendScintilla(
-                QsciScintillaBase::SCI_GOTOPOS,
-                static_cast<unsigned long>(editor->utf8Bytes().toByteArray().indexOf(before.toUtf8()) + 1));
+            editor->send(SCI_GOTOPOS,
+                         static_cast<unsigned long>(editor->utf8Bytes().toByteArray().indexOf(before.toUtf8()) + 1));
         };
 
         // Header and source, by clangd.
@@ -391,9 +390,7 @@ private slots:
         intelligence.goToDefinition();
         QTRY_COMPARE_WITH_TIMEOUT(tabs.currentFilePath(), root + "/total.cpp", 30000);
         EditorWidget *source = tabs.currentEditor();
-        QCOMPARE(CodeIntelligence::lspPosition(source, int(source->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)))
-                     .line,
-                 1);
+        QCOMPARE(CodeIntelligence::lspPosition(source, int(source->send(SCI_GETCURRENTPOS))).line, 1);
 
         intelligence.switchHeaderSource();
         QTRY_COMPARE_WITH_TIMEOUT(tabs.currentFilePath(), root + "/total.h", 30000);
@@ -409,15 +406,14 @@ private slots:
         main = EditorTabs::editorIn(tabs.openFile(root + "/main.cpp"));
         placeCaret(main, "2, 3");
         intelligence.showParameterInfo();
-        QTRY_VERIFY_WITH_TIMEOUT(main->SendScintilla(QsciScintillaBase::SCI_CALLTIPACTIVE) != 0, 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(main->send(SCI_CALLTIPACTIVE) != 0, 30000);
 
         // Rename: the open file in its editor (one undo step), the others on disk.
         tabs.closeFilesUnder(root + "/total.cpp"); // renamed on disk
         placeCaret(main, "total(2");
         const QJsonObject params{
             {"textDocument", QJsonObject{{"uri", uriOf(main->filePath())}}},
-            {"position", toJson(CodeIntelligence::lspPosition(
-                             main, int(main->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))))},
+            {"position", toJson(CodeIntelligence::lspPosition(main, int(main->send(SCI_GETCURRENTPOS))))},
             {"newName", "product"}};
         servers.syncDocument(client, main->filePath(), "cpp", main->utf8Bytes().toByteArray());
         servers.syncDocument(client, root + "/total.h", "cpp",

@@ -66,16 +66,15 @@ void editInEditor(EditorWidget *editor, const QList<TextEdit> &edits)
 {
     // One undo step; from the end, so that the positions still to change
     // do not move.
-    editor->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
+    editor->send(SCI_BEGINUNDOACTION);
     for (const TextEdit &textEdit : applicationOrder(edits)) {
         const int start = CodeIntelligence::positionOf(editor, textEdit.range.start);
         const int end = std::max(start, CodeIntelligence::positionOf(editor, textEdit.range.end));
         const QByteArray bytes = TextFile::withLineEnding(textEdit.newText, editor->format().lineEnding).toUtf8();
-        editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start), long(end));
-        editor->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<uintptr_t>(bytes.size()),
-                              bytes.constData());
+        editor->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(start), long(end));
+        editor->sends(SCI_REPLACETARGET, static_cast<uintptr_t>(bytes.size()), bytes.constData());
     }
-    editor->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
+    editor->send(SCI_ENDUNDOACTION);
 }
 
 // The line ending of a file the edit fills from empty: that of the first

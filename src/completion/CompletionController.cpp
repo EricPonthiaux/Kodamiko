@@ -19,7 +19,6 @@
 #include <QPainter>
 #include <QRegularExpression>
 #include <QScrollBar>
-#include <Qsci/qscilexer.h>
 
 namespace {
 
@@ -55,7 +54,7 @@ Theme shownTheme(const EditorWidget &editor)
 {
     constexpr qreal smallestZoomedSize = 2; // Scintilla's floor
     Theme theme = editor.theme();
-    const auto zoom = qreal(editor.SendScintilla(QsciScintillaBase::SCI_GETZOOM));
+    const auto zoom = qreal(editor.send(SCI_GETZOOM));
     theme.font.setPointSizeF(std::max(theme.font.pointSizeF() + zoom, smallestZoomedSize));
     return theme;
 }
@@ -135,9 +134,9 @@ bool isIdentifierByte(char c)
 // The preview's place for the text at `position`, on `line`.
 PreviewPlace previewPlaceAt(const EditorWidget &editor, long position, int line)
 {
-    const int x = static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, position));
-    const int y = static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, position));
-    const int lineHeight = static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line));
+    const int x = static_cast<int>(editor.send(SCI_POINTXFROMPOSITION, 0L, position));
+    const int y = static_cast<int>(editor.send(SCI_POINTYFROMPOSITION, 0L, position));
+    const int lineHeight = static_cast<int>(editor.send(SCI_TEXTHEIGHT, line));
     return {QPoint(x, y), lineHeight};
 }
 
@@ -211,11 +210,11 @@ CompletionController::CompletionController(EditorWidget *editor, CompletionServi
     snippet_ = new SnippetSession(editor_);
     connect(editor_->verticalScrollBar(), &QScrollBar::valueChanged, this, &CompletionController::updatePreview);
     connect(editor_->horizontalScrollBar(), &QScrollBar::valueChanged, this, &CompletionController::updatePreview);
-    connect(editor_, &QsciScintillaBase::SCN_MODIFIED, this,
-            [this](int position, int modificationType, const char *, int length) {
-                onModified(position, modificationType, length);
+    connect(editor_, &ScintillaEditBase::modified, this,
+            [this](Scintilla::ModificationFlags type, Scintilla::Position position, Scintilla::Position length) {
+                onModified(int(position), int(type), int(length));
             });
-    connect(editor_, &QsciScintillaBase::SCN_CHARADDED, this, &CompletionController::onCharacterAdded);
+    connect(editor_, &ScintillaEditBase::charAdded, this, &CompletionController::onCharacterAdded);
     // The cursor signal comes with the next repaint. A typed character is
     // followed in onCharacterAdded; a deletion, once the cursor has moved
     // (Scintilla reports it before).
@@ -223,13 +222,13 @@ CompletionController::CompletionController(EditorWidget *editor, CompletionServi
         if (active_)
             refilter();
     };
-    connect(editor_, &QsciScintilla::textChanged, this, follow, Qt::QueuedConnection);
-    connect(editor_, &QsciScintilla::cursorPositionChanged, this, follow);
+    connect(editor_, &ScintillaView::textChanged, this, follow, Qt::QueuedConnection);
+    connect(editor_, &ScintillaView::cursorPositionChanged, this, follow);
     // The Full Line suggestion only stays where it was made.
-    connect(editor_, &QsciScintilla::cursorPositionChanged, this, [this] {
+    connect(editor_, &ScintillaView::cursorPositionChanged, this, [this] {
         if (fullLine_.isEmpty())
             return;
-        if (editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS) != fullLinePosition_)
+        if (editor_->send(SCI_GETCURRENTPOS) != fullLinePosition_)
             clearFullLine();
     });
 }
@@ -299,8 +298,7 @@ QString CompletionController::textBetween(int start, int end) const
 int CompletionController::identifierStart(int position) const
 {
     int start = position;
-    while (start > 0 &&
-           isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, start - 1))))
+    while (start > 0 && isIdentifierByte(static_cast<char>(editor_->send(SCI_GETCHARAT, start - 1))))
         --start;
     return start;
 }
@@ -310,19 +308,10 @@ bool CompletionController::insideCommentOrString(int position) const
     if (position <= 0)
         return false;
     // The text just typed may not be styled yet.
-    const long lineStart =
-        editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE,
-                               editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
-    editor_->SendScintilla(QsciScintillaBase::SCI_COLOURISE, lineStart, static_cast<long>(position));
-    const int style = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position - 1));
-    QString name;
-    if (const QsciLexer *lexer = editor_->lexer()) {
-        name = lexer->description(style).toLower();
-    } else {
-        const int index = style - ScintillaStyles::firstSyntaxStyle;
-        if (index >= 0 && index < editor_->theme().syntaxStyles.size())
-            name = editor_->theme().syntaxStyles[index].first;
-    }
+    const long lineStart = editor_->send(SCI_POSITIONFROMLINE, editor_->send(SCI_LINEFROMPOSITION, position));
+    editor_->send(SCI_COLOURISE, lineStart, static_cast<long>(position));
+    const int style = static_cast<int>(editor_->send(SCI_GETSTYLEAT, position - 1));
+    const QString name = editor_->styleCategory(style);
     return name.contains(QLatin1String("comment")) || name.contains(QLatin1String("string"));
 }
 
@@ -349,8 +338,8 @@ QChar CompletionController::docCommentTrigger(QChar typed, int position) const
         return typed;
     if (typed == u' ') {
         // "@param |": the parameters.
-        const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
-        const int lineStart = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line));
+        const int line = static_cast<int>(editor_->send(SCI_LINEFROMPOSITION, position));
+        const int lineStart = static_cast<int>(editor_->send(SCI_POSITIONFROMLINE, line));
         static const QRegularExpression paramTag(
             QStringLiteral("[@\\\\](?:param|arg|argument|tparam|template)(?:\\[[^\\]]*\\])?\\s+(?:\\{[^}]*\\}\\s*)?$"));
         if (paramTag.match(textBetween(lineStart, position)).hasMatch())
@@ -361,7 +350,7 @@ QChar CompletionController::docCommentTrigger(QChar typed, int position) const
         // "@pa|": a tag being typed.
         const int start = identifierStart(position);
         if (start > 0) {
-            const char before = static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, start - 1));
+            const char before = static_cast<char>(editor_->send(SCI_GETCHARAT, start - 1));
             if (before == '@' || (before == '\\' && doxygen))
                 return {before};
         }
@@ -373,12 +362,12 @@ QChar CompletionController::charAt(int position) const
 {
     if (position < 0)
         return {};
-    return {static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, position))};
+    return {static_cast<char>(editor_->send(SCI_GETCHARAT, position))};
 }
 
 int CompletionController::currentPosition() const
 {
-    return static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    return static_cast<int>(editor_->send(SCI_GETCURRENTPOS));
 }
 
 bool CompletionController::followTyping()
@@ -426,7 +415,7 @@ bool CompletionController::isIdentifierToComplete(int position) const
 {
     // An identifier, not a number.
     const int start = identifierStart(position);
-    const char first = static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, start));
+    const char first = static_cast<char>(editor_->send(SCI_GETCHARAT, start));
     if (first >= '0' && first <= '9')
         return false;
     const bool calm = editor_->options().autoCompletion == AutoCompletion::Calm;
@@ -507,8 +496,8 @@ CompletionContext CompletionController::contextAt(int position, QChar triggerCha
     context.position = position;
     context.prefixStart = identifierStart(position);
     context.prefix = textBetween(context.prefixStart, position);
-    context.line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
-    const long lineStart = editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, context.line);
+    context.line = static_cast<int>(editor_->send(SCI_LINEFROMPOSITION, position));
+    const long lineStart = editor_->send(SCI_POSITIONFROMLINE, context.line);
     context.column = int(textBetween(int(lineStart), position).size());
     context.triggerCharacter = triggerCharacter;
     context.explicitRequest = explicitRequest;
@@ -574,8 +563,8 @@ void CompletionController::refilter()
 {
     if (!active_)
         return;
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
+    const int position = static_cast<int>(editor_->send(SCI_GETCURRENTPOS));
+    const int line = static_cast<int>(editor_->send(SCI_LINEFROMPOSITION, position));
     // The cursor left the identifier: completion is over.
     if (line != line_ || position < prefixStart_ || identifierStart(position) != prefixStart_) {
         close();
@@ -622,11 +611,9 @@ void CompletionController::refilter()
 void CompletionController::showPopup()
 {
     const QWidget *viewport = editor_->viewport();
-    const int x = static_cast<int>(
-        editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
-    const int y = static_cast<int>(
-        editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
-    const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line_));
+    const int x = static_cast<int>(editor_->send(SCI_POINTXFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
+    const int y = static_cast<int>(editor_->send(SCI_POINTYFROMPOSITION, 0L, static_cast<long>(prefixStart_)));
+    const int lineHeight = static_cast<int>(editor_->send(SCI_TEXTHEIGHT, line_));
     const QWidget *parent = popup_->parentWidget();
     const Theme theme = shownTheme(*editor_);
     // Aligned with the identifier's text: the badge, a line high, and its
@@ -694,12 +681,12 @@ void CompletionController::updatePreview()
 {
     auto *preview = static_cast<InlinePreview *>(preview_);
     const CompletionItem *item = isActive() ? popup_->current() : nullptr;
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int position = static_cast<int>(editor_->send(SCI_GETCURRENTPOS));
     const QString prefix = item ? textBetween(prefixStart_, position) : QString();
     // The rest of the name, as it will be: same case as typed, nothing
     // after the cursor on the line to hide.
     const bool fits = item && !choosing_ && item->label.size() > prefix.size() && item->label.startsWith(prefix) &&
-                      editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line_) == position;
+                      editor_->send(SCI_GETLINEENDPOSITION, line_) == position;
     if (!fits) {
         if (!isActive() && !fullLine_.isEmpty())
             showFullLine();
@@ -721,12 +708,12 @@ void CompletionController::onModified(int position, int modificationType, int le
         return;
     }
     Inserted &inserted = *inserted_;
-    if (modificationType & QsciScintillaBase::SC_MOD_INSERTTEXT) {
+    if (modificationType & SC_MOD_INSERTTEXT) {
         if (position <= inserted.start)
             inserted.start += length;
         return;
     }
-    if (!(modificationType & QsciScintillaBase::SC_MOD_DELETETEXT))
+    if (!(modificationType & SC_MOD_DELETETEXT))
         return;
     if (position + length <= inserted.start) {
         inserted.start -= length;
@@ -744,7 +731,7 @@ void CompletionController::acceptNextWord()
     if (!isActive() || !popup_->current())
         return;
     const QString label = popup_->current()->label;
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int position = static_cast<int>(editor_->send(SCI_GETCURRENTPOS));
     const QString prefix = textBetween(prefixStart_, position);
     if (!label.startsWith(prefix, Qt::CaseInsensitive) || label.size() <= prefix.size())
         return;
@@ -763,12 +750,11 @@ void CompletionController::acceptNextWord()
         return;
     }
     const QByteArray text = label.left(end).toUtf8();
-    editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(prefixStart_),
-                           static_cast<long>(position));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
-    editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
-    editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(prefixStart_ + text.size()));
+    editor_->send(SCI_BEGINUNDOACTION);
+    editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(prefixStart_), static_cast<long>(position));
+    editor_->sends(SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
+    editor_->send(SCI_ENDUNDOACTION);
+    editor_->send(SCI_GOTOPOS, static_cast<unsigned long>(prefixStart_ + text.size()));
     refilter();
 }
 
@@ -783,9 +769,8 @@ void CompletionController::close()
     if (choosing_) {
         choosing_ = false;
         choosingItem_ = {};
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT, choiceIndicator);
-        editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORCLEARRANGE, 0L,
-                               editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
+        editor_->send(SCI_SETINDICATORCURRENT, choiceIndicator);
+        editor_->send(SCI_INDICATORCLEARRANGE, 0L, editor_->send(SCI_GETLENGTH));
     }
     service_->cancel();
     if (popup_)
@@ -796,10 +781,9 @@ void CompletionController::close()
 
 int CompletionController::identifierEnd(int position) const
 {
-    const int length = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
+    const int length = static_cast<int>(editor_->send(SCI_GETLENGTH));
     int end = position;
-    while (end < length &&
-           isIdentifierByte(static_cast<char>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, end))))
+    while (end < length && isIdentifierByte(static_cast<char>(editor_->send(SCI_GETCHARAT, end))))
         ++end;
     return end;
 }
@@ -821,8 +805,7 @@ void CompletionController::selectExpansion(const ExpandedSnippet &expanded, int 
     const int selectionStart = start + int(expanded.text.left(expanded.selectionStart).toUtf8().size());
     const int selectionEnd =
         selectionStart + int(expanded.text.mid(expanded.selectionStart, expanded.selectionLength).toUtf8().size());
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETSEL, static_cast<unsigned long>(selectionStart),
-                           static_cast<long>(selectionEnd));
+    editor_->send(SCI_SETSEL, static_cast<unsigned long>(selectionStart), static_cast<long>(selectionEnd));
 }
 
 void CompletionController::watchInserted(const CompletionItem &item, int start, const QByteArray &text)
@@ -845,9 +828,9 @@ void CompletionController::resolveEditsLater(const CompletionItem &item,
     item.resolveEdits([self, start, insertedBytes, replacedBytes](const QList<TextEdit> &edits) {
         if (!self || edits.isEmpty())
             return;
-        self->editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
+        self->editor_->send(SCI_BEGINUNDOACTION);
         self->applyEdits(edits, start, insertedBytes, replacedBytes);
-        self->editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
+        self->editor_->send(SCI_ENDUNDOACTION);
     });
 }
 
@@ -869,10 +852,9 @@ void CompletionController::accept(bool replaceWord)
     const int start = item.replaceStart >= 0 ? std::min(item.replaceStart, prefixStart_) : prefixStart_;
     close();
     service_->history()->recordAccepted(editor_->languageId(), item.label);
-    editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start),
-                           static_cast<long>(end));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
+    editor_->send(SCI_BEGINUNDOACTION);
+    editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(start), static_cast<long>(end));
+    editor_->sends(SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
     selectExpansion(expanded, start);
     // An import that comes with it, in the same undo step.
     // Watched for a few seconds: erased at once, it was the wrong one. From
@@ -881,7 +863,7 @@ void CompletionController::accept(bool replaceWord)
     // Its placeholders, followed before an import moves them.
     snippet_->start(expanded, start);
     applyEdits(item.additionalEdits, start, int(text.size()), end - start);
-    editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
+    editor_->send(SCI_ENDUNDOACTION);
     // Known once chosen (jdtls): applied when the server answers.
     resolveEditsLater(item, start, int(text.size()), end - start);
     if (insertsCallWithArguments(item, expanded))
@@ -901,7 +883,7 @@ void CompletionController::beginChoice(const CompletionItem &item)
         row.order = i; // nearest first
         rows.append(row);
     }
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int position = static_cast<int>(editor_->send(SCI_GETCURRENTPOS));
     listedPrefix_ = textBetween(prefixStart_, position);
     listStale_ = false;
     popup_->setItems(rows, QString());
@@ -915,38 +897,36 @@ void CompletionController::beginChoice(const CompletionItem &item)
 void CompletionController::highlightChoice()
 {
     const CompletionItem *current = popup_ ? popup_->current() : nullptr;
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT, choiceIndicator);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORCLEARRANGE, 0L,
-                           editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
+    editor_->send(SCI_SETINDICATORCURRENT, choiceIndicator);
+    editor_->send(SCI_INDICATORCLEARRANGE, 0L, editor_->send(SCI_GETLENGTH));
     if (!choosing_ || !current)
         return;
     const CompletionItem::Choice choice = choosingItem_.choices.value(current->order);
     // Up to the dot ("?." in JavaScript).
     int end = prefixStart_ - 1;
-    if (end > 0 && editor_->SendScintilla(QsciScintillaBase::SCI_GETCHARAT, end - 1) == '?')
+    if (end > 0 && editor_->send(SCI_GETCHARAT, end - 1) == '?')
         --end;
     if (choice.replaceStart < 0 || choice.replaceStart >= end)
         return;
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETSTYLE, choiceIndicator, QsciScintillaBase::INDIC_STRAIGHTBOX);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, choiceIndicator, editor_->theme().accent);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETALPHA, choiceIndicator, 50);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETOUTLINEALPHA, choiceIndicator, 200);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETUNDER, choiceIndicator, true);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORFILLRANGE, static_cast<unsigned long>(choice.replaceStart),
-                           static_cast<long>(end - choice.replaceStart));
+    editor_->send(SCI_INDICSETSTYLE, choiceIndicator, INDIC_STRAIGHTBOX);
+    editor_->send(SCI_INDICSETFORE, choiceIndicator, scintillaColor(editor_->theme().accent));
+    editor_->send(SCI_INDICSETALPHA, choiceIndicator, 50);
+    editor_->send(SCI_INDICSETOUTLINEALPHA, choiceIndicator, 200);
+    editor_->send(SCI_INDICSETUNDER, choiceIndicator, true);
+    editor_->send(SCI_INDICATORFILLRANGE, static_cast<unsigned long>(choice.replaceStart),
+                  static_cast<long>(end - choice.replaceStart));
 }
 
 void CompletionController::insertSnippet(int start, int end, const QString &snippet)
 {
     const ExpandedSnippet expanded = Snippet::expand(snippet);
     const QByteArray text = expanded.text.toUtf8();
-    editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(start),
-                           static_cast<long>(end));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
+    editor_->send(SCI_BEGINUNDOACTION);
+    editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(start), static_cast<long>(end));
+    editor_->sends(SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
     selectExpansion(expanded, start);
     snippet_->start(expanded, start);
-    editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
+    editor_->send(SCI_ENDUNDOACTION);
 }
 
 bool CompletionController::writeDocComment(int position)
@@ -955,18 +935,16 @@ bool CompletionController::writeDocComment(int position)
     static const QStringList languages = {"c", "cpp", "java", "javascript", "typescript", "tsx"};
     if (!languages.contains(languageId))
         return false;
-    const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
+    const int line = static_cast<int>(editor_->send(SCI_LINEFROMPOSITION, position));
     if (line == 0)
         return false;
     // Enter at the end of a line holding only "/**".
-    const int previousStart =
-        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line - 1));
-    const int previousEnd =
-        static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line - 1));
+    const int previousStart = static_cast<int>(editor_->send(SCI_POSITIONFROMLINE, line - 1));
+    const int previousEnd = static_cast<int>(editor_->send(SCI_GETLINEENDPOSITION, line - 1));
     const QString opener = textBetween(previousStart, previousEnd).trimmed();
     if (opener != QLatin1String("/**") && opener != QLatin1String("/*!"))
         return false;
-    const int lineEnd = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line));
+    const int lineEnd = static_cast<int>(editor_->send(SCI_GETLINEENDPOSITION, line));
     if (!textBetween(position, lineEnd).trimmed().isEmpty())
         return false;
     // A comment already closed: "/**" typed above an old one.
@@ -1004,9 +982,9 @@ void CompletionController::scheduleFullLine(int position)
 {
     if (!service_->fullLineModel() || active_ || snippet_->isActive() || !fullLine_.isEmpty())
         return;
-    const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
+    const int line = static_cast<int>(editor_->send(SCI_LINEFROMPOSITION, position));
     // Where the gray text fits: at the end of a line.
-    if (editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line) != position)
+    if (editor_->send(SCI_GETLINEENDPOSITION, line) != position)
         return;
     fullLineTimer_.start(fullLineDelayMs);
 }
@@ -1016,10 +994,10 @@ void CompletionController::requestFullLine()
     FullLineModel *model = service_->fullLineModel();
     if (!model || active_ || snippet_->isActive() || editor_->isReadOnly() || !editor_->hasFocus())
         return;
-    const int position = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
-    const int lineStart = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line));
-    if (editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line) != position ||
+    const int position = static_cast<int>(editor_->send(SCI_GETCURRENTPOS));
+    const int line = static_cast<int>(editor_->send(SCI_LINEFROMPOSITION, position));
+    const int lineStart = static_cast<int>(editor_->send(SCI_POSITIONFROMLINE, line));
+    if (editor_->send(SCI_GETLINEENDPOSITION, line) != position ||
         textBetween(lineStart, position).trimmed().isEmpty() || insideCommentOrString(position))
         return;
     const QByteArray text = editor_->utf8Bytes().toByteArray();
@@ -1037,7 +1015,7 @@ void CompletionController::requestFullLine()
                    [self, generation, position](const QString &suggestion) {
                        if (!self || generation != self->fullLineGeneration_ || self->active_ || suggestion.isEmpty())
                            return;
-                       if (self->editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS) != position)
+                       if (self->editor_->send(SCI_GETCURRENTPOS) != position)
                            return;
                        self->fullLine_ = suggestion;
                        self->fullLinePosition_ = position;
@@ -1051,7 +1029,7 @@ void CompletionController::showFullLine()
         return;
     auto *preview = static_cast<InlinePreview *>(preview_);
     const long position = fullLinePosition_;
-    const int line = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position));
+    const int line = static_cast<int>(editor_->send(SCI_LINEFROMPOSITION, position));
     preview->show(fullLine_, QStringLiteral("Tab"), shownTheme(*editor_), previewPlaceAt(*editor_, position, line));
 }
 
@@ -1077,12 +1055,11 @@ void CompletionController::acceptFullLine(bool nextWordOnly)
     const int position = fullLinePosition_;
     const QByteArray bytes = text.toUtf8();
     clearFullLine();
-    editor_->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(position),
-                           static_cast<long>(position));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(bytes.size()), bytes.constData());
-    editor_->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
-    editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(position + bytes.size()));
+    editor_->send(SCI_BEGINUNDOACTION);
+    editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(position), static_cast<long>(position));
+    editor_->sends(SCI_REPLACETARGET, uintptr_t(bytes.size()), bytes.constData());
+    editor_->send(SCI_ENDUNDOACTION);
+    editor_->send(SCI_GOTOPOS, static_cast<unsigned long>(position + bytes.size()));
     if (!rest.trimmed().isEmpty()) {
         fullLine_ = rest;
         fullLinePosition_ = position + int(bytes.size());
@@ -1092,10 +1069,10 @@ void CompletionController::acceptFullLine(bool nextWordOnly)
 
 int CompletionController::positionOf(int line, int column) const
 {
-    const int lines = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLINECOUNT));
+    const int lines = static_cast<int>(editor_->send(SCI_GETLINECOUNT));
     if (line >= lines)
-        return static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
-    const int lineStart = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line));
+        return static_cast<int>(editor_->send(SCI_GETLENGTH));
+    const int lineStart = static_cast<int>(editor_->send(SCI_POSITIONFROMLINE, line));
     // Columns count UTF-16 units: the line's text says how many bytes.
     return lineStart + int(editor_->text(line).left(column).toUtf8().size());
 }
@@ -1123,10 +1100,8 @@ void CompletionController::applyEdits(const QList<TextEdit> &edits,
     // From the end, so that each edit leaves the next positions valid.
     std::sort(ranges.begin(), ranges.end(), [](const Range &a, const Range &b) { return a.start > b.start; });
     for (const Range &range : ranges) {
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(range.start),
-                               static_cast<long>(range.end));
-        editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(range.text.size()),
-                               range.text.constData());
+        editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(range.start), static_cast<long>(range.end));
+        editor_->sends(SCI_REPLACETARGET, uintptr_t(range.text.size()), range.text.constData());
     }
 }
 

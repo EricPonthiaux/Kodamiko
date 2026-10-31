@@ -67,9 +67,9 @@ void CodeNavigator::goToDefinition()
     if (!editor || editor->filePath().isEmpty())
         return;
 
-    const int caret = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const int start = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_WORDSTARTPOSITION, caret, true));
-    const int end = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_WORDENDPOSITION, caret, true));
+    const int caret = static_cast<int>(editor->send(SCI_GETCURRENTPOS));
+    const int start = static_cast<int>(editor->send(SCI_WORDSTARTPOSITION, caret, true));
+    const int end = static_cast<int>(editor->send(SCI_WORDENDPOSITION, caret, true));
     if (start == end)
         return;
 
@@ -78,11 +78,10 @@ void CodeNavigator::goToDefinition()
     request.filePath = editor->filePath();
     request.languageId = editor->languageId();
     request.position = start;
-    request.line = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, start));
+    request.line = static_cast<int>(editor->send(SCI_LINEFROMPOSITION, start));
 
     // "Foo::bar", "x.bar", "x->bar": what precedes the word on the line.
-    const int lineStart =
-        static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, request.line));
+    const int lineStart = static_cast<int>(editor->send(SCI_POSITIONFROMLINE, request.line));
     const QString before = editor->text(lineStart, request.position);
     static const QRegularExpression qualified(QStringLiteral("(\\w+)\\s*::\\s*$"));
     static const QRegularExpression member(QStringLiteral("(\\.|->)\\s*$"));
@@ -166,11 +165,11 @@ QString CodeNavigator::notFoundMessage(const QString &name) const
 // Several plausible targets: menu under the word.
 void CodeNavigator::chooseTarget(EditorWidget *editor, const QList<SymbolLocation> &targets)
 {
-    const int caret = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
-    const int line = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret));
-    const QPoint point(static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
-                       static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret)) +
-                           static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
+    const int caret = static_cast<int>(editor->send(SCI_GETCURRENTPOS));
+    const int line = static_cast<int>(editor->send(SCI_LINEFROMPOSITION, caret));
+    const QPoint point(static_cast<int>(editor->send(SCI_POINTXFROMPOSITION, 0, caret)),
+                       static_cast<int>(editor->send(SCI_POINTYFROMPOSITION, 0, caret)) +
+                           static_cast<int>(editor->send(SCI_TEXTHEIGHT, line)));
     chooseTargetAt(*editor, editor->viewport()->mapToGlobal(point), targets);
 }
 
@@ -211,9 +210,9 @@ void CodeNavigator::goToLine(const QString &filePath, int line, int column, int 
     const QString text = editor->text(line);
     const int start = static_cast<int>(text.left(column).toUtf8().size());
     const int end = static_cast<int>(text.left(column + length).toUtf8().size());
-    const long lineStart = editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
-    editor->SendScintilla(QsciScintillaBase::SCI_SETSEL, lineStart + start, lineStart + end);
-    editor->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
+    const long lineStart = editor->send(SCI_POSITIONFROMLINE, line);
+    editor->send(SCI_SETSEL, lineStart + start, lineStart + end);
+    editor->send(SCI_VERTICALCENTRECARET);
     editor->setFocus();
 }
 
@@ -234,9 +233,8 @@ void CodeNavigator::goForward()
 std::optional<NavigationHistory::Location> CodeNavigator::currentLocation() const
 {
     if (const EditorWidget *editor = tabs_->currentEditor(); editor && !editor->filePath().isEmpty())
-        return NavigationHistory::Location{
-            .filePath = editor->filePath(),
-            .position = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))};
+        return NavigationHistory::Location{.filePath = editor->filePath(),
+                                           .position = static_cast<int>(editor->send(SCI_GETCURRENTPOS))};
     if (const std::optional<EditorTabs::DiagramPlace> diagram = tabs_->currentDiagramPlace())
         return NavigationHistory::Location{.filePath = diagram->filePath, .element = diagram->element};
     return std::nullopt;
@@ -253,7 +251,7 @@ void CodeNavigator::showLocation(const NavigationHistory::Location &location)
         return;
     }
     tabs_->revealEditor(editor);
-    editor->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, location.position);
-    editor->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
+    editor->send(SCI_GOTOPOS, location.position);
+    editor->send(SCI_VERTICALCENTRECARET);
     editor->setFocus();
 }

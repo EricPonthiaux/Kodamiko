@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "scintilla/ScintillaView.h"
 #include "syntax/HighlighterFactory.h"
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
@@ -8,8 +9,9 @@
 #include "ui/MaterialThemes.h"
 #include "ui/Theme.h"
 
-#include <Qsci/qsciscintilla.h>
 #include <QtTest>
+
+#include <SciLexer.h>
 
 #include <algorithm>
 #include <array>
@@ -28,11 +30,11 @@ private:
     }
 
     // Style set on the first occurrence of `word` in `editor`.
-    static int styleOfWord(QsciScintilla &editor, const char *word)
+    static int styleOfWord(ScintillaView &editor, const char *word)
     {
         const int position = editor.text().toUtf8().indexOf(word);
         Q_ASSERT(position >= 0);
-        return editor.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position);
+        return editor.send(SCI_GETSTYLEAT, position);
     }
 
     // WCAG 2 contrast ratio, from 1:1 to 21:1.
@@ -50,17 +52,16 @@ private:
     }
 
     // Loads `code` into an editor highlighted for `languageId`, with the whole text styled.
-    static std::unique_ptr<ISyntaxHighlighter> highlight(QsciScintilla &editor,
+    static std::unique_ptr<ISyntaxHighlighter> highlight(ScintillaView &editor,
                                                          const QString &languageId,
                                                          const char *code,
                                                          const Theme &theme)
     {
-        editor.setUtf8(true);
         editor.setText(QString::fromUtf8(code));
         auto highlighter = HighlighterFactory::create(languageId);
         highlighter->attach(&editor);
         highlighter->applyTheme(theme);
-        editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
+        editor.send(SCI_COLOURISE, 0L, -1L);
         return highlighter;
     }
 
@@ -205,7 +206,7 @@ private slots:
     void highlightsC()
     {
         const Theme theme = Theme::kodamiko();
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(editor, "c", "int main(void) {\n  // note\n  return puts(\"hi\");\n}\n", theme);
         QCOMPARE(styleOfWord(editor, "int"), styleFor(theme, "type"));
         QCOMPARE(styleOfWord(editor, "main"), styleFor(theme, "function"));
@@ -217,7 +218,7 @@ private slots:
     void highlightsCppOverC()
     {
         const Theme theme = Theme::kodamiko();
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(editor, "cpp", "namespace app { class Foo {}; }\n", theme);
         QCOMPARE(styleOfWord(editor, "namespace"), styleFor(theme, "keyword"));
         QCOMPARE(styleOfWord(editor, "class"), styleFor(theme, "keyword"));
@@ -226,19 +227,19 @@ private slots:
     void highlightsTemplateTypes()
     {
         const Theme theme = Theme::kodamiko();
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(
             editor, "cpp", "// éléments\ntemplate <typename T>\nT sum(T a) { T total{}; return total; }\n", theme);
         const QByteArray text = editor.text().toUtf8();
         for (int i = 0; i < text.size(); ++i)
             if (text[i] == 'T')
-                QCOMPARE(int(editor.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, i)), styleFor(theme, "type"));
+                QCOMPARE(int(editor.send(SCI_GETSTYLEAT, i)), styleFor(theme, "type"));
     }
 
     void highlightsJava()
     {
         const Theme theme = Theme::kodamiko();
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(editor, "java", "public class App { static final int MAX = 3; }\n", theme);
         QCOMPARE(styleOfWord(editor, "public"), styleFor(theme, "keyword"));
         QCOMPARE(styleOfWord(editor, "MAX"), styleFor(theme, "constant"));
@@ -248,7 +249,7 @@ private slots:
     void highlightsJavaScript()
     {
         const Theme theme = Theme::kodamiko();
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(editor, "javascript", "const greet = (name) => console.log(`hi ${name}`);\n", theme);
         QCOMPARE(styleOfWord(editor, "const"), styleFor(theme, "keyword"));
         QCOMPARE(styleOfWord(editor, "greet"), styleFor(theme, "function"));
@@ -258,27 +259,27 @@ private slots:
     void restylesAfterEdit()
     {
         const Theme theme = Theme::kodamiko();
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(editor, "c", "int x;\n", theme);
         QCOMPARE(styleOfWord(editor, "x"), styleFor(theme, "variable"));
 
         editor.insertAt(QStringLiteral("/* "), 0, 0);
         editor.append(QStringLiteral("*/\n"));
-        editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
+        editor.send(SCI_COLOURISE, 0L, -1L);
         QCOMPARE(styleOfWord(editor, "int"), styleFor(theme, "comment"));
     }
 
     void fallsBackToLexerForJson()
     {
         const Theme theme = Theme::kodamiko();
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(editor, "json", "{\"key\": \"value\"}\n", theme);
-        QVERIFY(editor.lexer() != nullptr);
+        QCOMPARE(editor.send(SCI_GETLEXER), SCLEX_JSON);
     }
 
     void foldsBlocksCommentsAndConditionals()
     {
-        QsciScintilla editor;
+        ScintillaView editor;
         const auto h = highlight(editor, "cpp",
                                  "int f(int x) {\n"    // 0
                                  "    if (x) {\n"      // 1
@@ -296,13 +297,10 @@ private slots:
                                  "      int b);\n",
                                  Theme::kodamiko());
         const auto depth = [&editor](int line) {
-            return static_cast<int>((editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) &
-                                     QsciScintillaBase::SC_FOLDLEVELNUMBERMASK) -
-                                    QsciScintillaBase::SC_FOLDLEVELBASE);
+            return static_cast<int>((editor.send(SCI_GETFOLDLEVEL, line) & SC_FOLDLEVELNUMBERMASK) - SC_FOLDLEVELBASE);
         };
         const auto isHeader = [&editor](int line) {
-            return (editor.SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) &
-                    QsciScintillaBase::SC_FOLDLEVELHEADERFLAG) != 0;
+            return (editor.send(SCI_GETFOLDLEVEL, line) & SC_FOLDLEVELHEADERFLAG) != 0;
         };
         const QList<int> depths = {0, 1, 2, 1, 2, 1, 0, 0, 1, 0, 1, 0, 0, 0};
         const QList<int> headers = {0, 1, 3, 7, 9};
@@ -314,7 +312,7 @@ private slots:
         // The levels follow the edits.
         editor.setSelection(4, 0, 5, 0); // "return 2;": the else block has nothing left to hide
         editor.removeSelectedText();
-        editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
+        editor.send(SCI_COLOURISE, 0L, -1L);
         QTRY_VERIFY(!isHeader(3)); // once typing pauses
         QCOMPARE(depth(4), 1);
         QVERIFY(isHeader(6)); // the comment, one line up

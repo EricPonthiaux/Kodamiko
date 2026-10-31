@@ -574,8 +574,8 @@ private:
     void applyPreferences(const Preferences &preferences);
     // Full Line completion on or off, with its server.
     void applyFullLine(const Preferences &preferences);
-    // Menu shortcuts, with the user's changes; QScintilla leaves them to the
-    // menus.
+    // Menu shortcuts, with the user's changes; they win over the editors'
+    // keys (Scintilla's widget lets the shortcuts go first).
     void applyKeymap(const Keymap::Overrides &overrides);
 
     QString absolutePath(const QString &relativePath) const;

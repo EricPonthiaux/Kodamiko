@@ -10,7 +10,7 @@ class QScrollBar;
 
 // Marks drawn over a vertical scroll bar, to show where things are in the
 // whole document (the occurrences of a name…). An overlay rather than a
-// scroll bar subclass: QScintilla keeps its own scroll bar and its
+// scroll bar subclass: Scintilla keeps its own scroll bar and its
 // connections. Clicks go through to the scroll bar.
 class ScrollBarMarks : public QWidget {
     Q_OBJECT

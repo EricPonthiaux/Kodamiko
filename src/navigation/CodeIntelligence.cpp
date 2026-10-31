@@ -46,22 +46,20 @@ bool isCFamily(const QString &languageId)
 std::pair<int, int> problemRange(EditorWidget *editor, const Problem &problem)
 {
     const auto send = [editor](int message, long argument, long more = 0) {
-        return int(editor->SendScintilla(message, argument, more));
+        return int(editor->send(message, argument, more));
     };
     if (problem.column < 0) {
         // A line, without its indentation.
-        return {send(QsciScintillaBase::SCI_GETLINEINDENTPOSITION, problem.line),
-                send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line)};
+        return {send(SCI_GETLINEINDENTPOSITION, problem.line), send(SCI_GETLINEENDPOSITION, problem.line)};
     }
     const int start = CodeIntelligence::positionOf(editor, {problem.line, problem.column});
     if (problem.endLine >= 0)
         return {start, std::max(start, CodeIntelligence::positionOf(editor, {problem.endLine, problem.endColumn}))};
     // The word at the column, or its character.
-    const int wordEnd = send(QsciScintillaBase::SCI_WORDENDPOSITION, start, 1);
+    const int wordEnd = send(SCI_WORDENDPOSITION, start, 1);
     if (wordEnd > start)
         return {start, wordEnd};
-    return {start, std::min(send(QsciScintillaBase::SCI_POSITIONAFTER, start),
-                            send(QsciScintillaBase::SCI_GETLINEENDPOSITION, problem.line))};
+    return {start, std::min(send(SCI_POSITIONAFTER, start), send(SCI_GETLINEENDPOSITION, problem.line))};
 }
 
 // The characters of the active parameter in the signature's label: offsets
@@ -93,17 +91,16 @@ std::optional<std::pair<int, int>> parameterRange(const QJsonObject &signature, 
 void showCallTip(const EditorWidget *editor, const QString &text, std::optional<std::pair<int, int>> highlight)
 {
     const Theme &theme = editor->theme();
-    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETBACK, theme.alternateBase);
-    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETFORE, theme.foreground);
-    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETFOREHLT, theme.accent);
+    editor->send(SCI_CALLTIPSETBACK, scintillaColor(theme.alternateBase));
+    editor->send(SCI_CALLTIPSETFORE, scintillaColor(theme.foreground));
+    editor->send(SCI_CALLTIPSETFOREHLT, scintillaColor(theme.accent));
     const QByteArray bytes = text.toUtf8();
-    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSHOW,
-                          uintptr_t(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)), bytes.constData());
+    editor->sends(SCI_CALLTIPSHOW, uintptr_t(editor->send(SCI_GETCURRENTPOS)), bytes.constData());
     if (!highlight || highlight->second <= highlight->first)
         return;
     const auto byteOffset = [&text](int characters) { return long(text.left(characters).toUtf8().size()); };
-    editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPSETHLT,
-                          static_cast<unsigned long>(byteOffset(highlight->first)), byteOffset(highlight->second));
+    editor->send(SCI_CALLTIPSETHLT, static_cast<unsigned long>(byteOffset(highlight->first)),
+                 byteOffset(highlight->second));
 }
 
 } // namespace
@@ -167,7 +164,7 @@ void CodeIntelligence::attach(EditorWidget *editor)
     auto *sync = new QTimer(editor);
     sync->setSingleShot(true);
     sync->setInterval(problemsDelayMs);
-    connect(editor, &QsciScintilla::textChanged, sync, qOverload<>(&QTimer::start));
+    connect(editor, &ScintillaView::textChanged, sync, qOverload<>(&QTimer::start));
     connect(sync, &QTimer::timeout, this, [this, editor] {
         if (LspClient *client = servers_->runningClientFor(editor->languageId()))
             servers_->syncDocument(client, editor->filePath(), editor->languageId(), editor->utf8Bytes().toByteArray());
@@ -175,51 +172,49 @@ void CodeIntelligence::attach(EditorWidget *editor)
     showProblems(editor->filePath());
     editor->installEventFilter(this); // Undo and Redo of a refactoring
 
-    editor->SendScintilla(QsciScintillaBase::SCI_SETMOUSEDWELLTIME, hoverDelayMs);
-    connect(editor, &QsciScintillaBase::SCN_DWELLSTART, this, [this, editor](int position, int x, int y) {
+    editor->send(SCI_SETMOUSEDWELLTIME, hoverDelayMs);
+    connect(editor, &ScintillaView::dwellStarted, this, [this, editor](int position, QPoint point) {
         if (position >= 0 && editor->isActiveWindow() && !editor->areToolTipsSuspended())
-            showHover(editor, position, editor->viewport()->mapToGlobal(QPoint(x, y + 12)), false);
+            showHover(editor, position, editor->viewport()->mapToGlobal(point + QPoint(0, 12)), false);
     });
-    connect(editor, &QsciScintillaBase::SCN_DWELLEND, this, [this] {
+    connect(editor, &ScintillaView::dwellEnded, this, [this] {
         ++hoverGeneration_;
         QToolTip::hideText();
     });
-    connect(editor, &QsciScintillaBase::SCN_CHARADDED, this, [this, editor](int character) {
+    connect(editor, &ScintillaEditBase::charAdded, this, [this, editor](int character) {
         if (character == '(' || character == ',') {
             requestSignatureHelp(editor, false);
         } else if (character == ')') {
             ++signatureGeneration_;
-            editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPCANCEL);
+            editor->send(SCI_CALLTIPCANCEL);
         }
     });
     connect(editor->symbolOccurrences(), &SymbolOccurrences::nameSettled, this,
             [this, editor](int position) { requestOccurrences(editor, position); });
     // The parameters only show on the line of the call.
-    connect(editor, &QsciScintilla::cursorPositionChanged, this, [editor](int line, int) {
-        if (!editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPACTIVE))
+    connect(editor, &ScintillaView::cursorPositionChanged, this, [editor](int line, int) {
+        if (!editor->send(SCI_CALLTIPACTIVE))
             return;
-        const long start = editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPPOSSTART);
-        if (editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, start) != line)
-            editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPCANCEL);
+        const long start = editor->send(SCI_CALLTIPPOSSTART);
+        if (editor->send(SCI_LINEFROMPOSITION, start) != line)
+            editor->send(SCI_CALLTIPCANCEL);
     });
 }
 
 int CodeIntelligence::positionOf(EditorWidget *editor, const Position &position)
 {
     if (position.line >= editor->lines())
-        return int(editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
-    const int lineStart =
-        int(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, std::max(position.line, 0)));
-    const int lineEnd =
-        int(editor->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, std::max(position.line, 0)));
+        return int(editor->send(SCI_GETLENGTH));
+    const int lineStart = int(editor->send(SCI_POSITIONFROMLINE, std::max(position.line, 0)));
+    const int lineEnd = int(editor->send(SCI_GETLINEENDPOSITION, std::max(position.line, 0)));
     const QString line = QString::fromUtf8(editor->utf8Range(lineStart, lineEnd));
     return lineStart + int(line.left(std::max(position.character, 0)).toUtf8().size());
 }
 
 Position CodeIntelligence::lspPosition(EditorWidget *editor, int bytePosition)
 {
-    const int line = int(editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, bytePosition));
-    const int lineStart = int(editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line));
+    const int line = int(editor->send(SCI_LINEFROMPOSITION, bytePosition));
+    const int lineStart = int(editor->send(SCI_POSITIONFROMLINE, line));
     return {line, int(QString::fromUtf8(editor->utf8Range(lineStart, bytePosition)).size())};
 }
 
@@ -327,7 +322,7 @@ void CodeIntelligence::showDocumentation()
     EditorWidget *editor = tabs_->currentEditor();
     if (!editor)
         return;
-    showHover(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)), belowCaret(editor), true);
+    showHover(editor, int(editor->send(SCI_GETCURRENTPOS)), belowCaret(editor), true);
 }
 
 // Parameters
@@ -348,11 +343,10 @@ void CodeIntelligence::requestSignatureHelp(EditorWidget *editor, bool explicitR
     LspClient *client = serverFor(editor, !explicitRequest);
     if (!client || (!explicitRequest && !client->isReady()))
         return;
-    const int caret = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int caret = int(editor->send(SCI_GETCURRENTPOS));
     QJsonObject params = positionParams(editor, caret);
-    params.insert("context",
-                  QJsonObject{{"triggerKind", explicitRequest ? 1 : 2},
-                              {"isRetrigger", editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPACTIVE) != 0}});
+    params.insert("context", QJsonObject{{"triggerKind", explicitRequest ? 1 : 2},
+                                         {"isRetrigger", editor->send(SCI_CALLTIPACTIVE) != 0}});
     const int generation = ++signatureGeneration_;
     client->request(QStringLiteral("textDocument/signatureHelp"), params,
                     [this, generation, guard = QPointer<EditorWidget>(editor),
@@ -367,7 +361,7 @@ void CodeIntelligence::showSignatureHelp(const EditorWidget *editor, const QJson
 {
     const QJsonArray signatures = help.value("signatures").toArray();
     if (signatures.isEmpty()) {
-        editor->SendScintilla(QsciScintillaBase::SCI_CALLTIPCANCEL);
+        editor->send(SCI_CALLTIPCANCEL);
         if (explicitRequest)
             emit statusMessage(tr("No call here"));
         return;
@@ -439,7 +433,7 @@ void CodeIntelligence::goToLocations(EditorWidget *editor,
                                      const QString &method,
                                      const std::function<void(const QString &error)> &noneFound)
 {
-    const int caret = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int caret = int(editor->send(SCI_GETCURRENTPOS));
     client->request(
         method, positionParams(editor, caret),
         [this, guard = QPointer<EditorWidget>(editor), noneFound](const QJsonValue &result, const QString &error) {
@@ -504,11 +498,10 @@ int CodeIntelligence::chooseFrom(EditorWidget *editor, const QStringList &entrie
 
 QPoint CodeIntelligence::belowCaret(const EditorWidget *editor)
 {
-    const long caret = editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS);
-    const long line = editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, caret);
-    const QPoint point(int(editor->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, caret)),
-                       int(editor->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, caret) +
-                           editor->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line)));
+    const long caret = editor->send(SCI_GETCURRENTPOS);
+    const long line = editor->send(SCI_LINEFROMPOSITION, caret);
+    const QPoint point(int(editor->send(SCI_POINTXFROMPOSITION, 0, caret)),
+                       int(editor->send(SCI_POINTYFROMPOSITION, 0, caret) + editor->send(SCI_TEXTHEIGHT, line)));
     return editor->viewport()->mapToGlobal(point);
 }
 

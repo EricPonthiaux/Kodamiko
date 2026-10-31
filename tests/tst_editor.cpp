@@ -34,7 +34,6 @@
 #include <QToolButton>
 #include <QToolTip>
 #include <QWheelEvent>
-#include <Qsci/qscicommandset.h>
 #include <QtTest>
 
 #include <algorithm>
@@ -88,7 +87,7 @@ private slots:
 
         QCoreApplication::sendEvent(editor.viewport(), &wheel);
 
-        QCOMPARE(editor.SendScintilla(QsciScintillaBase::SCI_GETZOOM), 1);
+        QCOMPARE(editor.send(SCI_GETZOOM), 1);
     }
 
     void findCountsAndCyclesThroughMatches()
@@ -327,7 +326,7 @@ private slots:
         bool toolTipWhileOpen = true;
         QTimer::singleShot(0, &editor, [&] {
             suspendedWhileOpen = editor.areToolTipsSuspended();
-            emit editor.SCN_DWELLSTART(0, 10, 10);
+            emit editor.dwellStarted(0, QPoint(10, 10));
             toolTipWhileOpen = QToolTip::isVisible();
             if (QWidget *menu = QApplication::activePopupWidget())
                 menu->close();
@@ -709,12 +708,12 @@ private slots:
         const EditorWidget *code = tabs.currentEditor();
         QTRY_COMPARE(code->tabWidth(), 3);
         QVERIFY(!code->indentationsUseTabs());
-        QCOMPARE(code->edgeColumn(), 90);
-        QCOMPARE(code->edgeMode(), QsciScintilla::EdgeLine);
+        QCOMPARE(code->send(SCI_GETEDGECOLUMN), 90);
+        QCOMPARE(code->send(SCI_GETEDGEMODE), EDGE_LINE);
 
         // Files clang-format does not format keep the default.
         tabs.openFile(dir.filePath("notes.txt"));
-        QCOMPARE(tabs.currentEditor()->edgeMode(), QsciScintilla::EdgeNone);
+        QCOMPARE(tabs.currentEditor()->send(SCI_GETEDGEMODE), EDGE_NONE);
 
         // Saving the .clang-format restyles the open files.
         tabs.openFile(dir.filePath(".clang-format"));
@@ -722,7 +721,7 @@ private slots:
         config->setText("IndentWidth: 2\nColumnLimit: 0\n");
         QVERIFY(tabs.saveCurrent());
         QTRY_COMPARE(code->tabWidth(), 2);
-        QCOMPARE(code->edgeMode(), QsciScintilla::EdgeNone);
+        QCOMPARE(code->send(SCI_GETEDGEMODE), EDGE_NONE);
     }
 
     void formattedTextKeepsLineEndingAndUndoesAtOnce()
@@ -937,10 +936,8 @@ private slots:
         write(dir.filePath("a.cpp"), "int f() {\n    int a;\n    int b;\n}\nint g() {\n    int c;\n    int d;\n}\n");
         EditorWidget editor(Theme::kodamiko());
         QVERIFY(editor.load(dir.filePath("a.cpp"), nullptr));
-        editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
-        const auto visible = [&editor](int line) {
-            return editor.SendScintilla(QsciScintillaBase::SCI_GETLINEVISIBLE, line) != 0;
-        };
+        editor.send(SCI_COLOURISE, 0L, -1L);
+        const auto visible = [&editor](int line) { return editor.send(SCI_GETLINEVISIBLE, line) != 0; };
         const auto cursorLine = [&editor] {
             int line = 0;
             int index = 0;
@@ -1044,21 +1041,28 @@ private slots:
 
         QCOMPARE(editor.mergeConflicts()->conflicts().size(), 1);
         QVERIFY(!editor.mergeConflicts()->actionBar(0));
-        QVERIFY(editor.markersAtLine(1) != 0); // the current side's background
+        QVERIFY(editor.send(SCI_MARKERGET, 1) != 0); // the current side's background
     }
 
-    void menuShortcutsWinOverQScintilla()
+    void menuShortcutsWinOverScintillasKeys()
     {
-        EditorWidget editor(Theme::kodamiko());
-        const auto bound = [&editor](const char *shortcut) {
-            return editor.standardCommands()->boundTo(QKeySequence(shortcut)[0].toCombined()) != nullptr;
-        };
-        QVERIFY(bound("Ctrl+-")); // QScintilla's zoom out
-        EditorWidget::setReservedKeys({QKeySequence("Ctrl+-"), QKeySequence("Ctrl+K, Ctrl+O")});
-        QVERIFY(!bound("Ctrl+-"));
-        EditorWidget::setReservedKeys({});
-        QVERIFY(bound("Ctrl+-")); // given back
-        EditorWidget::setReservedKeys({QKeySequence("Ctrl+B"), QKeySequence("Alt+Left"), QKeySequence("Alt+Right")});
+        QWidget window;
+        auto *editor = new EditorWidget(Theme::kodamiko(), &window);
+        editor->setText("line\n");
+        // Ctrl+D duplicates the selection in Scintilla.
+        auto *action = new QAction(&window);
+        action->setShortcut(QKeySequence("Ctrl+D"));
+        window.addAction(action);
+        const QSignalSpy triggered(action, &QAction::triggered);
+        window.show();
+        window.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&window));
+        editor->setFocus();
+
+        QTest::keyClick(editor, Qt::Key_D, Qt::ControlModifier);
+
+        QCOMPARE(triggered.count(), 1);
+        QCOMPARE(editor->text(), QString("line\n"));
     }
 
 private:

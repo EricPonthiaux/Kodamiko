@@ -2,9 +2,8 @@
 
 #pragma once
 
+#include "scintilla/ScintillaView.h"
 #include "ui/Theme.h"
-
-#include <Qsci/qsciscintilla.h>
 
 // The Scintilla styles, markers, indicators and margins of a DiffView.
 namespace DiffStyles {
@@ -53,6 +52,6 @@ constexpr int stripMargin = 1;
 
 // Defines the styles, markers and indicators above in `view`, in `theme`'s
 // colors and fonts. Resets every style: the text must be styled again.
-void define(QsciScintilla &view, const Theme &theme);
+void define(ScintillaView &view, const Theme &theme);
 
 } // namespace DiffStyles

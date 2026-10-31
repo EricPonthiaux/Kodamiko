@@ -225,7 +225,7 @@ private slots:
         EditorWidget editor(Theme::kodamiko());
         QString error;
         QVERIFY(editor.load(path, &error));
-        editor.show(); // QScintilla reports the cursor move when shown
+        editor.show(); // Scintilla reports the cursor move when shown
 
         OutlineView view;
         view.show();
@@ -240,7 +240,7 @@ private slots:
 
         // A click on first places the cursor on its name.
         emit tree->itemClicked(tree->topLevelItem(0), 0);
-        QCOMPARE(int(editor.SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)), 4);
+        QCOMPARE(int(editor.send(SCI_GETCURRENTPOS)), 4);
 
         // An edit is taken into account after the delay.
         editor.append(QStringLiteral("int third() { return 3; }\n"));

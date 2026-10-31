@@ -43,7 +43,4 @@ QList<QKeySequence> shortcutsOf(const Command &command, const Overrides &overrid
 // Gives each command its shortcuts: the override, or else the default.
 void apply(const QList<Command> &commands, const Overrides &overrides);
 
-// Every shortcut the commands use (see EditorWidget::setReservedKeys).
-QList<QKeySequence> shortcutsInUse(const QList<Command> &commands);
-
 } // namespace Keymap

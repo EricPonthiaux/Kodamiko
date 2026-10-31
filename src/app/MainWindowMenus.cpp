@@ -523,7 +523,6 @@ void MainWindow::applyKeymap(const Keymap::Overrides &overrides)
 {
     const QList<Keymap::Command> commands = Keymap::commands(titleBar_->menuBar());
     Keymap::apply(commands, overrides);
-    EditorWidget::setReservedKeys(Keymap::shortcutsInUse(commands));
 }
 
 int MainWindow::addRecentProjects(QMenu *menu)

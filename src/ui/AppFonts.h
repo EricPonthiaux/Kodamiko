@@ -70,7 +70,7 @@ QString jetBrainsMono();
 QFont withLigatures(QFont font, bool ligatures);
 // The family to give Scintilla for `font`: Scintilla builds its fonts from
 // the family name alone, so "#liga" at its end turns the ligatures on (see
-// cmake/QScintilla.cmake); they are off otherwise.
+// cmake/Scintilla.cmake); they are off otherwise.
 QByteArray scintillaFamily(const QFont &font, bool ligatures);
 
 // Lines of code are set at a multiple of the font size (Zed's "standard"

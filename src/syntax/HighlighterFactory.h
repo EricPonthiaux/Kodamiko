@@ -11,7 +11,7 @@
 namespace HighlighterFactory {
 
 // Highlighter suited to the language (LanguageRegistry identifier):
-// tree-sitter for C, C++, Java, JavaScript and TypeScript, a QScintilla lexer
+// tree-sitter for C, C++, Java, JavaScript and TypeScript, a Lexilla lexer
 // for auxiliary files, no highlighting otherwise.
 std::unique_ptr<ISyntaxHighlighter> create(const QString &languageId);
 

@@ -11,7 +11,7 @@ class EditorWidget;
 
 // Syntax categories of a piece of code, as the editor finds them, for text
 // outside an editor (the code blocks of the Markdown preview): the same
-// highlighters (tree-sitter or QScintilla lexers) run on a hidden editor,
+// highlighters (tree-sitter or Lexilla lexers) run on a hidden editor,
 // whose styles are read back.
 class CodeColorizer {
 public:

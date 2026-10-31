@@ -30,16 +30,16 @@ void alignScroll(DiffView &follower, const DiffView &leader)
 {
     if (follower.firstVisibleLine() != leader.firstVisibleLine())
         follower.setFirstVisibleLine(leader.firstVisibleLine());
-    const long offset = leader.SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
-    if (follower.SendScintilla(QsciScintillaBase::SCI_GETXOFFSET) != offset)
-        follower.SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, offset);
+    const long offset = leader.send(SCI_GETXOFFSET);
+    if (follower.send(SCI_GETXOFFSET) != offset)
+        follower.send(SCI_SETXOFFSET, offset);
 }
 
 // `follower` zoomed as `leader` is: the rows keep facing each other.
 void alignZoom(DiffView &follower, const DiffView &leader)
 {
-    const int zoom = int(leader.SendScintilla(QsciScintillaBase::SCI_GETZOOM));
-    if (follower.SendScintilla(QsciScintillaBase::SCI_GETZOOM) != zoom)
+    const int zoom = int(leader.send(SCI_GETZOOM));
+    if (follower.send(SCI_GETZOOM) != zoom)
         follower.zoomTo(zoom);
 }
 
@@ -88,17 +88,17 @@ void DiffView::createOldSide()
     // The keys act on the new side, which keeps the focus.
     oldSide_->setFocusPolicy(Qt::NoFocus);
     // Blank space facing the notes of the new side, without their boxes.
-    oldSide_->SendScintilla(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_STANDARD));
+    oldSide_->send(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_STANDARD));
     oldSide_->setFrameShape(QFrame::NoFrame);
     oldSide_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     oldSide_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     // Whichever side scrolls, by the wheel or the keys, the other follows.
-    connect(this, &QsciScintillaBase::SCN_UPDATEUI, oldSide_, [this] { alignScroll(*oldSide_, *this); });
-    connect(oldSide_, &QsciScintillaBase::SCN_UPDATEUI, this, [this] { alignScroll(*this, *oldSide_); });
+    connect(this, &ScintillaEditBase::updateUi, oldSide_, [this] { alignScroll(*oldSide_, *this); });
+    connect(oldSide_, &ScintillaEditBase::updateUi, this, [this] { alignScroll(*this, *oldSide_); });
     // Same for the zoom (Ctrl+wheel), from the start.
     alignZoom(*oldSide_, *this);
-    connect(this, &QsciScintillaBase::SCN_ZOOM, oldSide_, [this] { alignZoom(*oldSide_, *this); });
-    connect(oldSide_, &QsciScintillaBase::SCN_ZOOM, this, [this] { alignZoom(*this, *oldSide_); });
+    connect(this, &ScintillaEditBase::zoom, oldSide_, [this] { alignZoom(*oldSide_, *this); });
+    connect(oldSide_, &ScintillaEditBase::zoom, this, [this] { alignZoom(*this, *oldSide_); });
     divider_ = new SideBySideDivider(this);
     // Only reachable shares are kept: dragged past a minimum, the side
     // still grows with the view.
@@ -130,6 +130,6 @@ void DiffView::placeOldSide()
 
 void DiffView::resizeEvent(QResizeEvent *event)
 {
-    QsciScintilla::resizeEvent(event);
+    ScintillaView::resizeEvent(event);
     placeOldSide();
 }

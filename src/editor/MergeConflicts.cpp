@@ -54,7 +54,7 @@ QColor incomingColor()
 
 int textLeft(const EditorWidget &editor)
 {
-    const int margins = static_cast<int>(editor.SendScintilla(QsciScintillaBase::SCI_GETMARGINS));
+    const int margins = static_cast<int>(editor.send(SCI_GETMARGINS));
     int width = 0;
     for (int margin = 0; margin < margins; ++margin)
         width += editor.marginWidth(margin);
@@ -72,9 +72,9 @@ MergeConflicts::MergeConflicts(EditorWidget *editor, Theme theme)
     update_.setSingleShot(true);
     update_.setInterval(updateDelayMs);
     connect(&update_, &QTimer::timeout, this, &MergeConflicts::refreshNow);
-    connect(editor_, &QsciScintilla::textChanged, &update_, qOverload<>(&QTimer::start));
+    connect(editor_, &ScintillaView::textChanged, &update_, qOverload<>(&QTimer::start));
     // On every scroll, edit and caret move.
-    connect(editor_, &QsciScintillaBase::SCN_UPDATEUI, this, &MergeConflicts::placeActionBars);
+    connect(editor_, &ScintillaEditBase::updateUi, this, &MergeConflicts::placeActionBars);
     defineMarkers();
 }
 
@@ -92,7 +92,7 @@ void MergeConflicts::defineMarkers()
 {
     const QColor &background = theme_.background;
     const auto define = [this](int marker, const QColor &color) {
-        editor_->markerDefine(QsciScintilla::Background, marker);
+        editor_->markerDefine(SC_MARK_BACKGROUND, marker);
         editor_->setMarkerBackgroundColor(color, marker);
     };
     define(currentMarkerLineMarker, blend(background, currentColor(), markerLineTint));
@@ -122,11 +122,10 @@ void MergeConflicts::resolve(int index, ConflictMarkers::Resolution resolution)
         return;
     const ConflictMarkers::Replacement replacement =
         ConflictMarkers::resolve(editor_->utf8Bytes(), conflicts_.at(index), resolution);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(replacement.span.start),
-                           static_cast<long>(replacement.span.end));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(replacement.text.size()),
-                           replacement.text.constData());
-    editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(replacement.span.start));
+    editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(replacement.span.start),
+                  static_cast<long>(replacement.span.end));
+    editor_->sends(SCI_REPLACETARGET, uintptr_t(replacement.text.size()), replacement.text.constData());
+    editor_->send(SCI_GOTOPOS, static_cast<unsigned long>(replacement.span.start));
     refreshNow();
 }
 
@@ -157,7 +156,7 @@ bool MergeConflicts::goTo(Direction direction)
     }
     editor_->setCursorPosition(target, 0);
     editor_->ensureLineVisible(target);
-    editor_->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
+    editor_->send(SCI_VERTICALCENTRECARET);
     return true;
 }
 
@@ -231,12 +230,11 @@ void MergeConflicts::placeActionBars()
     for (qsizetype index = 0; index < actionBars_.size(); ++index) {
         ConflictActionBar *bar = actionBars_.at(index);
         const int line = conflicts_.at(index).startLine;
-        const bool isLineShown =
-            line < editor_->lines() && editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEVISIBLE, line) != 0;
-        const long lineEnd = editor_->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line);
-        const int x = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0, lineEnd));
-        const int y = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, lineEnd));
-        const int height = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line));
+        const bool isLineShown = line < editor_->lines() && editor_->send(SCI_GETLINEVISIBLE, line) != 0;
+        const long lineEnd = editor_->send(SCI_GETLINEENDPOSITION, line);
+        const int x = static_cast<int>(editor_->send(SCI_POINTXFROMPOSITION, 0, lineEnd));
+        const int y = static_cast<int>(editor_->send(SCI_POINTYFROMPOSITION, 0, lineEnd));
+        const int height = static_cast<int>(editor_->send(SCI_TEXTHEIGHT, line));
         const bool isInView = isLineShown && y + height > 0 && y < viewportHeight;
         if (!isInView) {
             bar->hide();

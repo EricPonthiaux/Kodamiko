@@ -70,14 +70,14 @@ QList<CodeColorizer::Span> CodeColorizer::categorize(const QString &code, const 
     if (code.isEmpty() || languageId == LanguageRegistry::plainText)
         return spans;
     editor_->showReadOnlyText(code, languageId);
-    const long length = editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
-    editor_->SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0, -1L);
+    const long length = editor_->send(SCI_GETLENGTH);
+    editor_->send(SCI_COLOURISE, 0, -1L);
 
     QHash<int, QString> categoryOfStyle;
     const auto categoryOf = [this, &categoryOfStyle](int style) {
         if (const auto it = categoryOfStyle.constFind(style); it != categoryOfStyle.cend())
             return *it;
-        const QColor color = fromScintilla(editor_->SendScintilla(QsciScintillaBase::SCI_STYLEGETFORE, style));
+        const QColor color = fromScintilla(editor_->send(SCI_STYLEGETFORE, style));
         QString category;
         if (color.red() == 10 && color.green() >= 20) {
             const int index = (color.green() - 20) * 250 + color.blue();
@@ -91,10 +91,9 @@ QList<CodeColorizer::Span> CodeColorizer::categorize(const QString &code, const 
     long byte = 0;
     qsizetype index = 0;
     while (byte < length && index < code.size()) {
-        const int style = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, byte));
+        const int style = static_cast<int>(editor_->send(SCI_GETSTYLEAT, byte));
         const qsizetype runStart = index;
-        while (byte < length && index < code.size() &&
-               editor_->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, byte) == style) {
+        while (byte < length && index < code.size() && editor_->send(SCI_GETSTYLEAT, byte) == style) {
             qsizetype characters = 1;
             byte += utf8Length(code, index, &characters);
             index += characters;

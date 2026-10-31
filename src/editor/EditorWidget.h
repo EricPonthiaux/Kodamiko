@@ -4,12 +4,12 @@
 
 #include "TextFile.h"
 #include "diagnostics/Diagnostic.h"
+#include "scintilla/ScintillaView.h"
 #include "ui/Theme.h"
 
 #include <QKeySequence>
 #include <QList>
 #include <QMenu>
-#include <Qsci/qsciscintilla.h>
 
 #include <functional>
 #include <memory>
@@ -43,9 +43,9 @@ struct EditorOptions {
     bool operator==(const EditorOptions &) const = default;
 };
 
-// Editor for one file: QScintilla configured for code, with highlighting
+// Editor for one file: Scintilla configured for code, with highlighting
 // for the language detected from the file name.
-class EditorWidget : public QsciScintilla {
+class EditorWidget : public ScintillaView {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(EditorWidget)
 
@@ -80,9 +80,6 @@ public:
     // The document's UTF-8 bytes, without the copies and conversions of
     // text(): valid until the next change to the document.
     QByteArrayView utf8Bytes() const;
-    // Bytes [start, end[ of the document, copied in one call: for a short
-    // range, cheaper than utf8Bytes(), which may move the gap buffer.
-    QByteArray utf8Range(int start, int end) const;
 
     QString filePath() const { return filePath_; }
 
@@ -107,7 +104,7 @@ public:
     // separators included. Not owned.
     void setFileActions(const QList<QAction *> &actions) { fileActions_ = actions; }
 
-    // The context menu: QScintilla's without Undo and Redo, with the file
+    // The context menu: ScintillaView's without Undo and Redo, with the file
     // actions on top, and above them, inside a merge conflict, the ways to
     // resolve it.
     std::unique_ptr<QMenu> createContextMenu();
@@ -118,11 +115,6 @@ public:
     void foldBlock(bool collapse);
     // Folds (or unfolds) every block of the text.
     void foldEverything(bool collapse);
-
-    // Key combinations QScintilla must leave to the application's shortcuts
-    // (menu commands), in every editor. Without them, QScintilla takes the
-    // keys it has a command for (Ctrl+- zooms out...).
-    static void setReservedKeys(const QList<QKeySequence> &shortcuts);
 
     // Problems found in the text: a wavy underline, red for an error, amber
     // for a warning, and their messages when the mouse rests on them.
@@ -155,6 +147,10 @@ public:
 
     const Theme &theme() const { return theme_; }
 
+    // The theme's category ("comment", "string"…) of Scintilla style
+    // `style`, as the highlighter uses it; empty for the default text.
+    QString styleCategory(int style) const;
+
 signals:
     void languageChanged();
     // The line ending or the indentation settings changed.
@@ -176,9 +172,6 @@ private:
     // Accept Current, Incoming or Both for the conflict at the cursor, on
     // top of `menu`; nothing outside a conflict.
     void addConflictActions(QMenu &menu);
-    // Releases the reserved keys from QScintilla's commands, which keep
-    // their other keys.
-    void releaseReservedKeys();
     void applyFoldColors();
     // The open blocks' chevrons show only while the mouse is over the
     // margins; those of the folded blocks always.
@@ -221,6 +214,4 @@ private:
     // Apart from toolTipsSuspended_: opening the menu closes the completion
     // list, which lifts that one.
     bool isContextMenuShown_ = false;
-    // QScintilla's keys for each of its commands, before releaseReservedKeys.
-    QList<std::pair<int, int>> defaultCommandKeys_;
 };

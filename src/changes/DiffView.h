@@ -4,9 +4,8 @@
 
 #include "DiffLayout.h"
 #include "diagnostics/Diagnostic.h"
+#include "scintilla/ScintillaView.h"
 #include "ui/Theme.h"
-
-#include <Qsci/qsciscintilla.h>
 
 #include <optional>
 
@@ -37,7 +36,7 @@ struct DiffNote {
 // line between the two drags to share the width otherwise. Either side
 // scrolled or zoomed, the other follows. Notes (setNotes()) show in a box
 // under their lines; F8 and Shift+F8 go to the next and previous one.
-class DiffView : public QsciScintilla {
+class DiffView : public ScintillaView {
     Q_OBJECT
 
 public:

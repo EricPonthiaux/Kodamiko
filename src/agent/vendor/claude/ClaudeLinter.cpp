@@ -27,7 +27,7 @@ void ClaudeLinter::attach(EditorWidget *editor)
     timer->setSingleShot(true);
     timer->setInterval(checkDelayMs);
     connect(timer, &QTimer::timeout, editor, check);
-    connect(editor, &QsciScintilla::textChanged, timer, qOverload<>(&QTimer::start));
+    connect(editor, &ScintillaView::textChanged, timer, qOverload<>(&QTimer::start));
     if (kind == ClaudeLint::Kind::Settings) {
         editor->setHoverHelp([guard = QPointer<EditorWidget>(editor)](int position) {
             return guard ? ClaudeLint::settingsHelp(guard->utf8Bytes(), position) : QString();

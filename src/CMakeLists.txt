@@ -288,6 +288,7 @@ add_library(kdk_core STATIC
     run/RunConfiguration.cpp
     run/RunConfigurationMenu.cpp
     run/Runner.cpp
+    scintilla/ScintillaView.cpp
     search/FindInFiles.cpp
     search/FindInFilesPopup.cpp
     settings/FontSettings.cpp
@@ -303,6 +304,7 @@ add_library(kdk_core STATIC
     syntax/HighlightQuery.cpp
     syntax/LanguageRegistry.cpp
     syntax/LexillaHighlighter.cpp
+    syntax/LexillaLanguages.cpp
     syntax/PlainTextHighlighter.cpp
     syntax/ScintillaStyles.cpp
     syntax/TreeSitterFolds.cpp
@@ -455,7 +457,7 @@ endif()
 target_include_directories(kdk_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(kdk_core PUBLIC
     kdk_system Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets
-    qscintilla tree_sitter_grammars vterm git2 cmark_gfm)
+    scintilla lexilla tree_sitter_grammars vterm git2 cmark_gfm)
 kdk_add_queries(kdk_core)
 
 # Original language and framework logos for the project templates.

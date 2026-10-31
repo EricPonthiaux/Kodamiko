@@ -173,13 +173,14 @@ ChangeGutter::ChangeGutter(EditorWidget *editor)
     timer_.setSingleShot(true);
     timer_.setInterval(updateDelayMs);
     connect(&timer_, &QTimer::timeout, this, &ChangeGutter::update);
-    connect(editor_, &QsciScintilla::textChanged, this, &ChangeGutter::scheduleUpdate);
-    connect(editor_, &QsciScintilla::marginClicked, this, [this](int clickedMargin, int line, Qt::KeyboardModifiers) {
-        if (clickedMargin == margin)
-            showChangeAt(line);
-    });
+    connect(editor_, &ScintillaView::textChanged, this, &ChangeGutter::scheduleUpdate);
+    connect(editor_, &ScintillaView::marginLineClicked, this,
+            [this](int clickedMargin, int line, Qt::KeyboardModifiers) {
+                if (clickedMargin == margin)
+                    showChangeAt(line);
+            });
 
-    editor_->setMarginType(margin, QsciScintilla::SymbolMargin);
+    editor_->setMarginType(margin, SC_MARGIN_SYMBOL);
     editor_->setMarginMarkerMask(margin, markerMask);
     editor_->setMarginSensitivity(margin, true);
     editor_->setMarginWidth(margin, 0);
@@ -246,11 +247,11 @@ void ChangeGutter::update()
 void ChangeGutter::defineMarkers()
 {
     const ChangeColors colors = colorsFor(theme_);
-    editor_->markerDefine(QsciScintilla::LeftRectangle, addedMarker);
+    editor_->markerDefine(SC_MARK_LEFTRECT, addedMarker);
     editor_->setMarkerBackgroundColor(colors.added, addedMarker);
-    editor_->markerDefine(QsciScintilla::LeftRectangle, modifiedMarker);
+    editor_->markerDefine(SC_MARK_LEFTRECT, modifiedMarker);
     editor_->setMarkerBackgroundColor(colors.modified, modifiedMarker);
-    const int lineHeight = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0));
+    const int lineHeight = static_cast<int>(editor_->send(SCI_TEXTHEIGHT, 0));
     editor_->markerDefine(deletedMark(colors.deleted, lineHeight), deletedMarker);
 }
 
@@ -281,10 +282,8 @@ void ChangeGutter::rollback(const LineChange &change)
     const QByteArray replacement = LineChanges::lines(*base_, change.baseStart, change.baseCount);
 
     editor_->beginUndoAction();
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(from),
-                           static_cast<long>(to));
-    editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(replacement.size()),
-                           replacement.constData());
+    editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(from), static_cast<long>(to));
+    editor_->sends(SCI_REPLACETARGET, uintptr_t(replacement.size()), replacement.constData());
     editor_->endUndoAction();
     editor_->setCursorPosition(std::min(change.start, editor_->lines() - 1), 0);
     if (popup_)
@@ -322,7 +321,7 @@ bool ChangeGutter::goTo(bool forward)
     const int targetLine = markerLine(target, lineCount);
     editor_->setCursorPosition(targetLine, 0);
     editor_->ensureLineVisible(targetLine);
-    editor_->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
+    editor_->send(SCI_VERTICALCENTRECARET);
     return true;
 }
 
@@ -433,9 +432,9 @@ QPoint ChangeGutter::popupOrigin(const LineChange &change) const
 {
     // Under the change's last line, aligned with the text.
     const int belowLine = change.count > 0 ? change.start + change.count - 1 : markerLine(change, editor_->lines());
-    const long position = editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, belowLine);
-    const int y = static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0, position)) +
-                  static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, belowLine));
+    const long position = editor_->send(SCI_POSITIONFROMLINE, belowLine);
+    const int y = static_cast<int>(editor_->send(SCI_POINTYFROMPOSITION, 0, position)) +
+                  static_cast<int>(editor_->send(SCI_TEXTHEIGHT, belowLine));
     return editor_->viewport()->mapToGlobal(QPoint(0, y));
 }
 

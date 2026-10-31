@@ -181,8 +181,8 @@ planned next is in `docs/roadmap/`.
 
 ## License
 
-Kodamiko is distributed under the **GNU GPL v3** (see `LICENSE`), the license
-required by QScintilla, with the additional permission below for Graphviz.
+Kodamiko is distributed under the **GNU GPL v3** (see `LICENSE`), with the
+additional permission below for Graphviz.
 
 **Additional permission under GNU GPL version 3 section 7.** If you modify
 this Program, or any covered work, by linking or combining it with Graphviz
@@ -206,7 +206,7 @@ Third-party components:
 | Component | Distributed | License |
 |---|---|---|
 | Qt 6 | linked dynamically | LGPL v3 |
-| QScintilla | built and linked statically | GPL v3 |
+| Scintilla and Lexilla | built and linked statically | Scintilla's license (permissive, HPND-style) |
 | tree-sitter and grammars | built and linked statically | MIT |
 | libvterm | built and linked statically | MIT |
 | libgit2 | built and linked statically | GPL v2 with linking exception |

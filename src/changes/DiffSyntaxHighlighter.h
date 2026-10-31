@@ -4,10 +4,10 @@
 
 #include "DiffLayout.h"
 #include "ScratchEditors.h"
+#include "scintilla/ScintillaView.h"
 #include "ui/Theme.h"
 
 #include <QHash>
-#include <Qsci/qsciscintilla.h>
 
 #include <functional>
 
@@ -18,7 +18,7 @@
 class DiffSyntaxHighlighter {
 public:
     // `view` shows `lines`; both, and `theme`, must outlive the highlighter.
-    DiffSyntaxHighlighter(QsciScintilla &view, const Theme &theme, const QList<DiffLine> &lines);
+    DiffSyntaxHighlighter(ScintillaView &view, const Theme &theme, const QList<DiffLine> &lines);
 
     // Colors the code of the file whose title bar is displayed line
     // `fileStart`, at `path`, if it fits in what remains of the budget.
@@ -31,7 +31,7 @@ private:
     // Style of the diff for a syntax color, defined on first use.
     int syntaxStyle(long foreground, bool bold, bool italic);
 
-    QsciScintilla &view_;
+    ScintillaView &view_;
     const Theme &theme_;
     const QList<DiffLine> &lines_;
     ScratchEditors scratches_;

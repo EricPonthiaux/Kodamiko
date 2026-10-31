@@ -41,12 +41,10 @@ void closeDocumentsUnder(const QString &folder, LanguageServers *servers)
 void replaceText(const EditorWidget *editor, const QString &text)
 {
     const QByteArray bytes = text.toUtf8();
-    editor->SendScintilla(QsciScintillaBase::SCI_BEGINUNDOACTION);
-    editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, 0UL,
-                          editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
-    editor->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, static_cast<uintptr_t>(bytes.size()),
-                          bytes.constData());
-    editor->SendScintilla(QsciScintillaBase::SCI_ENDUNDOACTION);
+    editor->send(SCI_BEGINUNDOACTION);
+    editor->send(SCI_SETTARGETRANGE, 0UL, editor->send(SCI_GETLENGTH));
+    editor->sends(SCI_REPLACETARGET, static_cast<uintptr_t>(bytes.size()), bytes.constData());
+    editor->send(SCI_ENDUNDOACTION);
 }
 
 // The unsaved changes of `path`'s editor go with the file.

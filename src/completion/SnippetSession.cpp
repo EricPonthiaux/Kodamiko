@@ -31,11 +31,11 @@ SnippetSession::SnippetSession(EditorWidget *editor)
     : QObject(editor)
     , editor_(editor)
 {
-    connect(editor_, &QsciScintillaBase::SCN_MODIFIED, this,
-            [this](int position, int modificationType, const char *, int length) {
-                onModified(position, modificationType, length);
+    connect(editor_, &ScintillaEditBase::modified, this,
+            [this](Scintilla::ModificationFlags type, Scintilla::Position position, Scintilla::Position length) {
+                onModified(int(position), int(type), int(length));
             });
-    connect(editor_, &QsciScintilla::cursorPositionChanged, this, &SnippetSession::onCursorMoved);
+    connect(editor_, &ScintillaView::cursorPositionChanged, this, &SnippetSession::onCursorMoved);
 }
 
 void SnippetSession::start(const ExpandedSnippet &snippet, int start)
@@ -63,17 +63,16 @@ void SnippetSession::start(const ExpandedSnippet &snippet, int start)
     stops_ = stops;
     current_ = 0;
     const QColor accent = editor_->theme().accent;
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETSTYLE, stopIndicator, QsciScintillaBase::INDIC_STRAIGHTBOX);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, stopIndicator, editor_->theme().mutedText);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETALPHA, stopIndicator, 20);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETOUTLINEALPHA, stopIndicator, 110);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETSTYLE, currentIndicator,
-                           QsciScintillaBase::INDIC_STRAIGHTBOX);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, currentIndicator, accent);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETALPHA, currentIndicator, 40);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETOUTLINEALPHA, currentIndicator, 220);
+    editor_->send(SCI_INDICSETSTYLE, stopIndicator, INDIC_STRAIGHTBOX);
+    editor_->send(SCI_INDICSETFORE, stopIndicator, scintillaColor(editor_->theme().mutedText));
+    editor_->send(SCI_INDICSETALPHA, stopIndicator, 20);
+    editor_->send(SCI_INDICSETOUTLINEALPHA, stopIndicator, 110);
+    editor_->send(SCI_INDICSETSTYLE, currentIndicator, INDIC_STRAIGHTBOX);
+    editor_->send(SCI_INDICSETFORE, currentIndicator, scintillaColor(accent));
+    editor_->send(SCI_INDICSETALPHA, currentIndicator, 40);
+    editor_->send(SCI_INDICSETOUTLINEALPHA, currentIndicator, 220);
     for (const int indicator : {stopIndicator, currentIndicator})
-        editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETUNDER, indicator, true);
+        editor_->send(SCI_INDICSETUNDER, indicator, true);
     select();
 }
 
@@ -91,7 +90,7 @@ void SnippetSession::next()
         // $0: the cursor goes there and the snippet is done.
         const int end = stops_.last().ranges.first().start;
         stop();
-        editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, static_cast<unsigned long>(end));
+        editor_->send(SCI_GOTOPOS, static_cast<unsigned long>(end));
         return;
     }
     select();
@@ -117,17 +116,16 @@ void SnippetSession::select()
 {
     const Range range = stops_[current_].ranges.first();
     // The cursor at the end, the placeholder selected: typing replaces it.
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETSEL, static_cast<unsigned long>(range.start),
-                           static_cast<long>(range.end));
+    editor_->send(SCI_SETSEL, static_cast<unsigned long>(range.start), static_cast<long>(range.end));
     paint();
 }
 
 void SnippetSession::clearBoxes()
 {
-    const long length = editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+    const long length = editor_->send(SCI_GETLENGTH);
     for (const int indicator : {stopIndicator, currentIndicator}) {
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT, indicator);
-        editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORCLEARRANGE, 0L, length);
+        editor_->send(SCI_SETINDICATORCURRENT, indicator);
+        editor_->send(SCI_INDICATORCLEARRANGE, 0L, length);
     }
 }
 
@@ -135,13 +133,11 @@ void SnippetSession::paint()
 {
     clearBoxes();
     for (int i = 0; i < stops_.size() - 1; ++i) {
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT,
-                               i == current_ ? currentIndicator : stopIndicator);
+        editor_->send(SCI_SETINDICATORCURRENT, i == current_ ? currentIndicator : stopIndicator);
         for (const Range &range : stops_[i].ranges) {
             if (range.end > range.start)
-                editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORFILLRANGE,
-                                       static_cast<unsigned long>(range.start),
-                                       static_cast<long>(range.end - range.start));
+                editor_->send(SCI_INDICATORFILLRANGE, static_cast<unsigned long>(range.start),
+                              static_cast<long>(range.end - range.start));
         }
     }
 }
@@ -150,13 +146,13 @@ void SnippetSession::onModified(int position, int modificationType, int length)
 {
     if (!isActive())
         return;
-    if (modificationType & (QsciScintillaBase::SC_PERFORMED_UNDO | QsciScintillaBase::SC_PERFORMED_REDO)) {
+    if (modificationType & (SC_PERFORMED_UNDO | SC_PERFORMED_REDO)) {
         // Positions no longer mean anything; not changed from here.
         QTimer::singleShot(0, this, &SnippetSession::stop);
         return;
     }
-    const bool inserted = modificationType & QsciScintillaBase::SC_MOD_INSERTTEXT;
-    const bool deleted = modificationType & QsciScintillaBase::SC_MOD_DELETETEXT;
+    const bool inserted = modificationType & SC_MOD_INSERTTEXT;
+    const bool deleted = modificationType & SC_MOD_DELETETEXT;
     if (!inserted && !deleted)
         return;
     if (deleted)
@@ -205,7 +201,7 @@ void SnippetSession::synchronize()
     if (!isActive())
         return;
     QList<Range> &ranges = stops_[current_].ranges;
-    const int caret = int(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int caret = int(editor_->send(SCI_GETCURRENTPOS));
     // The occurrence being typed in is the model.
     qsizetype source = 0;
     for (qsizetype i = 0; i < ranges.size(); ++i) {
@@ -220,9 +216,9 @@ void SnippetSession::synchronize()
         if (i == source || editor_->utf8Range(ranges[i].start, ranges[i].end) == text)
             continue;
         // onModified moves every range, this one included.
-        editor_->SendScintilla(QsciScintillaBase::SCI_SETTARGETRANGE, static_cast<unsigned long>(ranges[i].start),
-                               static_cast<long>(ranges[i].end));
-        editor_->SendScintilla(QsciScintillaBase::SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
+        editor_->send(SCI_SETTARGETRANGE, static_cast<unsigned long>(ranges[i].start),
+                      static_cast<long>(ranges[i].end));
+        editor_->sends(SCI_REPLACETARGET, uintptr_t(text.size()), text.constData());
     }
     synchronizing_ = false;
     paint();
@@ -240,7 +236,7 @@ void SnippetSession::onCursorMoved()
             last = std::max(last, range.end);
         }
     }
-    const int caret = int(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int caret = int(editor_->send(SCI_GETCURRENTPOS));
     if (caret < first || caret > last)
         stop();
 }

@@ -99,7 +99,7 @@ DiffHeaderBar::DiffHeaderBar(DiffView *diff, QWidget *parent)
 
     connect(diff_, &DiffView::contentChanged, this, &DiffHeaderBar::follow);
     // Scintilla scrolls without the scroll bar telling: its own notice.
-    connect(diff_, &QsciScintillaBase::SCN_UPDATEUI, this, &DiffHeaderBar::follow);
+    connect(diff_, &ScintillaEditBase::updateUi, this, &DiffHeaderBar::follow);
     follow();
 }
 
@@ -220,7 +220,7 @@ void DiffHeaderBar::follow()
 void DiffHeaderBar::updateBlockPosition()
 {
     const QList<DiffLine> &lines = diff_->displayedLines();
-    const int top = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE, diff_->firstVisibleLine()));
+    const int top = int(diff_->send(SCI_DOCLINEFROMVISIBLE, diff_->firstVisibleLine()));
     int blockCount = 0;
     int current = 0;
     for (qsizetype i = 0; i < lines.size(); ++i) {
