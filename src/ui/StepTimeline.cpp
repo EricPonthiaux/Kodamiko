@@ -161,9 +161,23 @@ void StepTimeline::drawMarker(QPainter &painter, QPointF center, bool isCurrent)
     painter.drawEllipse(center, markerRadiusPx - 1, markerRadiusPx - 1);
 }
 
+void StepTimeline::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    updateMotion();
+}
+
+void StepTimeline::hideEvent(QHideEvent *event)
+{
+    QWidget::hideEvent(event);
+    updateMotion();
+}
+
+// Frames only while they can be seen: a review or a diagram being drawn
+// lasts minutes, often in a hidden tab or a minimized window.
 void StepTimeline::updateMotion()
 {
-    if (state_ == State::Running && Motion::policy().isEnabled())
+    if (state_ == State::Running && Motion::isOnScreen(this) && Motion::policy().isEnabled())
         frame_->start();
     else
         frame_->stop();

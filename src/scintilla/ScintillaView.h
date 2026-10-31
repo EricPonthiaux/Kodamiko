@@ -100,7 +100,7 @@ public:
     int tabWidth() const;
     bool indentationsUseTabs() const;
     void setCaretLineVisible(bool isVisible);
-    // Styles the whole text again (SCI_COLOURISE).
+    // Styles the text again, from the top, as it is painted.
     void recolor();
 
     // Undo, Redo (when editable), Cut, Copy, Paste, Delete and Select All,

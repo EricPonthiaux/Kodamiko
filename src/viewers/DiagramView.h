@@ -96,6 +96,7 @@ private:
     QToolButton *zoomButton_ = nullptr; // shows the zoom; resets it to 100 %
     QLabel *message_;
     QTimer *messageTimer_;
+    QTimer *modifiedTimer_; // updateModified() once the board stops changing
     QString filePath_;
     QByteArray diskContent_;   // as last read or written: recognizes our own writes
     QByteArray savedSnapshot_; // the board as last loaded or saved

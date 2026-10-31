@@ -431,15 +431,22 @@ void EditorWidget::paintActiveGuide(QPainter &painter)
 {
     // Scintilla lights a guide up only between two matching braces: the
     // caret's block's is drawn again over the faint ones, brighter.
+    const QRect guide = activeGuideRect();
+    if (!guide.isEmpty())
+        painter.fillRect(guide, theme_.marginForeground);
+}
+
+QRect EditorWidget::activeGuideRect() const
+{
     if (activeGuide_.column <= 0 || activeGuide_.lastLine >= lines())
-        return;
+        return {};
     const long guidePosition = send(SCI_FINDCOLUMN, activeGuide_.firstLine, activeGuide_.column);
     const int x = static_cast<int>(send(SCI_POINTXFROMPOSITION, 0, guidePosition));
     int marginsWidth = 0;
     for (int margin = 0; margin <= foldMargin; ++margin)
         marginsWidth += marginWidth(margin);
     if (x < marginsWidth || x >= viewport()->width())
-        return;
+        return {};
     const auto top = [this](int line) {
         return static_cast<int>(send(SCI_POINTYFROMPOSITION, 0, send(SCI_POSITIONFROMLINE, line)));
     };
@@ -449,8 +456,8 @@ void EditorWidget::paintActiveGuide(QPainter &painter)
         std::min(viewport()->height(), top(bottomLine) + static_cast<int>(send(SCI_TEXTHEIGHT, bottomLine)) *
                                                              static_cast<int>(send(SCI_WRAPCOUNT, bottomLine)));
     if (y2 <= y1)
-        return;
-    painter.fillRect(QRect(x, y1, 1, y2 - y1), theme_.marginForeground);
+        return {};
+    return {x, y1, 1, y2 - y1};
 }
 
 void EditorWidget::paintCurrentLineNumber(QPainter &painter, const QRect &dirty)
@@ -476,15 +483,22 @@ void EditorWidget::paintCurrentLineNumber(QPainter &painter, const QRect &dirty)
     painter.drawText(numbersWidth - 3 - metrics.horizontalAdvance(number), baseline, number);
 }
 
-void EditorWidget::followCaretLine()
+void EditorWidget::followCaretLine(Scintilla::Update updated)
 {
+    // A scroll moves neither the caret nor the text: the search for the
+    // guide's block, up to thousands of lines, would find the same one.
+    const bool caretOrTextChanged =
+        FlagSet(updated, Scintilla::Update::Content) || FlagSet(updated, Scintilla::Update::Selection);
+    if (!caretOrTextChanged)
+        return;
     int line = 0;
     int index = 0;
     getCursorPosition(&line, &index);
     const ActiveGuide guide = activeGuide(*this, line);
     if (guide != activeGuide_) {
+        viewport()->update(activeGuideRect());
         activeGuide_ = guide;
-        viewport()->update();
+        viewport()->update(activeGuideRect());
     }
     if (line == numberedLine_)
         return;

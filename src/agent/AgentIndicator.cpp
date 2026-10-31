@@ -97,7 +97,8 @@ void AgentIndicator::updateAnimation()
 {
     animationTimer_.stop();
     update();
-    if (!provider_ || !Motion::policy().isEnabled())
+    // Not in a minimized window: the agent waiting for the user can last hours.
+    if (!provider_ || !Motion::isOnScreen(this) || !Motion::policy().isEnabled())
         return;
     if (const std::optional<std::chrono::milliseconds> step = AgentMark::frameStep(status_))
         animationTimer_.start(*step);
@@ -223,9 +224,16 @@ void AgentIndicator::changeEvent(QEvent *event)
     QAbstractButton::changeEvent(event);
 }
 
+void AgentIndicator::hideEvent(QHideEvent *event)
+{
+    QAbstractButton::hideEvent(event);
+    updateAnimation();
+}
+
 void AgentIndicator::showEvent(QShowEvent *event)
 {
     QAbstractButton::showEvent(event);
+    updateAnimation();
     // Laid out once shown: measured on the next turn of the event loop.
     QMetaObject::invokeMethod(this, &AgentIndicator::updateAlignment, Qt::QueuedConnection);
 }

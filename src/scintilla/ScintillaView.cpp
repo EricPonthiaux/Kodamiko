@@ -386,7 +386,11 @@ void ScintillaView::setCaretLineVisible(bool isVisible)
 
 void ScintillaView::recolor()
 {
-    send(SCI_COLOURISE, 0, -1);
+    // Not SCI_COLOURISE, which styles the whole text at once: Scintilla
+    // styles from the top as far as it paints, the rest when it comes into
+    // sight, and nothing in a hidden tab.
+    send(SCI_STARTSTYLING, 0);
+    viewport()->update();
 }
 
 std::unique_ptr<QMenu> ScintillaView::createStandardContextMenu()
@@ -558,7 +562,11 @@ void ScintillaView::onModified(Scintilla::ModificationFlags type, Scintilla::Pos
 
 void ScintillaView::onUpdateUi(Scintilla::Update updated)
 {
-    if (isBraceMatchingEnabled_)
+    // Not on a scroll: the search for an unmatched brace runs to the end of
+    // the text.
+    const bool caretOrTextChanged =
+        FlagSet(updated, Scintilla::Update::Content) || FlagSet(updated, Scintilla::Update::Selection);
+    if (isBraceMatchingEnabled_ && caretOrTextChanged)
         matchBraces();
     if (!FlagSet(updated, Scintilla::Update::Selection))
         return;

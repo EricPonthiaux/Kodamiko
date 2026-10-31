@@ -474,21 +474,72 @@ QPainterPath ellipse(QPointF center, qreal rx, qreal ry)
     return path;
 }
 
+namespace {
+
+// A short shadow lifts the paper without thickening the outlines: blur 4,
+// offset 2, approximated by a few faint, growing copies.
+constexpr int shadowCopies = 3;
+using ShadowOutlines = std::array<QPainterPath, shadowCopies>;
+
+size_t hashOf(const QPainterPath &path)
+{
+    size_t hash = qHashMulti(0, path.elementCount(), int(path.fillRule()));
+    for (int index = 0; index < path.elementCount(); ++index) {
+        const QPainterPath::Element element = path.elementAt(index);
+        hash = qHashMulti(hash, element.x, element.y, int(element.type));
+    }
+    return hash;
+}
+
+ShadowOutlines computeShadowOutlines(const QPainterPath &path)
+{
+    ShadowOutlines outlines;
+    const QPainterPath below = path.translated(0, 2);
+    for (int i = 0; i < shadowCopies; ++i) {
+        QPainterPathStroker stroker;
+        stroker.setWidth(1.0 + i * 1.6);
+        stroker.setJoinStyle(Qt::RoundJoin);
+        outlines[size_t(i)] = below + stroker.createStroke(below);
+    }
+    return outlines;
+}
+
+// The shadow's copies around `path`. Each is a union of paths, a boolean
+// operation several times slower than filling it, and a diagram paints the
+// same shapes frame after frame (a pan, a zoom, an animation): they are
+// computed once per outline.
+const ShadowOutlines &shadowOutlines(const QPainterPath &path)
+{
+    struct Entry {
+        QPainterPath path;
+        ShadowOutlines outlines;
+    };
+
+    // Past this, the outlines of shapes since moved or resized are dropped.
+    constexpr size_t maxEntries = 2048;
+    static std::unordered_multimap<size_t, Entry> cache;
+    const size_t hash = hashOf(path);
+    const auto [first, last] = cache.equal_range(hash);
+    const auto found = std::find_if(first, last, [&path](const auto &entry) { return entry.second.path == path; });
+    if (found != last)
+        return found->second.outlines;
+    if (cache.size() >= maxEntries)
+        cache.clear();
+    return cache.emplace(hash, Entry{.path = path, .outlines = computeShadowOutlines(path)})->second.outlines;
+}
+
+} // namespace
+
 void shadowFill(QPainter &painter, const QPainterPath &path, const QColor &fill, const Style &style)
 {
-    // A short shadow lifts the paper without thickening the outlines: blur 4,
-    // offset 2, approximated by a few faint, growing copies.
     painter.save();
     painter.setPen(Qt::NoPen);
     QColor shadow = style.palette.shadow;
     const qreal alpha = shadow.alphaF();
-    const QPainterPath below = path.translated(0, 2);
-    for (int i = 0; i < 3; ++i) {
+    const ShadowOutlines &outlines = shadowOutlines(path);
+    for (int i = 0; i < shadowCopies; ++i) {
         shadow.setAlphaF(float(alpha * (0.45 - i * 0.12)));
-        QPainterPathStroker stroker;
-        stroker.setWidth(1.0 + i * 1.6);
-        stroker.setJoinStyle(Qt::RoundJoin);
-        painter.fillPath(below + stroker.createStroke(below), shadow);
+        painter.fillPath(outlines[size_t(i)], shadow);
     }
     painter.restore();
     painter.fillPath(path, fill);

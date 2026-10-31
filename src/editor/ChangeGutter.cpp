@@ -228,7 +228,10 @@ void ChangeGutter::update()
     editor_->markerDeleteAll(deletedMarker);
     if (changes_.isEmpty())
         return;
-    defineMarkers();
+    // Defining a marker makes Scintilla lay every line out again: only when
+    // the theme or the line height changed, not at every pause in typing.
+    if (editor_->send(SCI_TEXTHEIGHT, 0) != markersLineHeight_)
+        defineMarkers();
     const int lineCount = editor_->lines();
     for (const LineChange &change : std::as_const(changes_)) {
         switch (change.kind()) {
@@ -253,6 +256,7 @@ void ChangeGutter::defineMarkers()
     editor_->setMarkerBackgroundColor(colors.modified, modifiedMarker);
     const int lineHeight = static_cast<int>(editor_->send(SCI_TEXTHEIGHT, 0));
     editor_->markerDefine(deletedMark(colors.deleted, lineHeight), deletedMarker);
+    markersLineHeight_ = lineHeight;
 }
 
 QList<LineChange> ChangeGutter::changes()
@@ -441,6 +445,7 @@ QPoint ChangeGutter::popupOrigin(const LineChange &change) const
 void ChangeGutter::applyTheme(const Theme &theme)
 {
     theme_ = theme;
+    markersLineHeight_ = 0; // defined again in the new colors
     if (!changes_.isEmpty())
         defineMarkers();
 }

@@ -118,6 +118,24 @@ class TestWindowBars : public QObject {
 
 private slots:
 
+    void spinnerStopsInAMinimizedWindowAndResumesWhenRestored()
+    {
+        QWidget window;
+        auto *spinner = new Spinner(&window);
+        spinner->setSpinning(true);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        const QTimer *frame = spinner->findChild<QTimer *>();
+        QVERIFY(frame);
+        QVERIFY(frame->isActive());
+
+        window.showMinimized();
+        QTRY_VERIFY(!frame->isActive());
+
+        window.showNormal();
+        QTRY_VERIFY(frame->isActive());
+    }
+
     void init()
     {
         QFont font = AppFonts::interfaceFont();

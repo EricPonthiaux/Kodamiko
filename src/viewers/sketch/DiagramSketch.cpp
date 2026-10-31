@@ -152,9 +152,23 @@ void DiagramSketch::drawScene(QPainter &painter, qreal cycle) const
     drawNodes(false);
 }
 
+void DiagramSketch::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    updateMotion();
+}
+
+void DiagramSketch::hideEvent(QHideEvent *event)
+{
+    QWidget::hideEvent(event);
+    updateMotion();
+}
+
+// Frames only while they can be seen: a review or a diagram being drawn
+// lasts minutes, often in a hidden tab or a minimized window.
 void DiagramSketch::updateMotion()
 {
-    if (state_ == State::Drawing && Motion::policy().isEnabled())
+    if (state_ == State::Drawing && Motion::isOnScreen(this) && Motion::policy().isEnabled())
         frame_->start();
     else
         frame_->stop();

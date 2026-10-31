@@ -27,6 +27,11 @@ bool drawsOutsidePainter(const QObject *widget)
 
 namespace Motion {
 
+bool isOnScreen(const QWidget *widget)
+{
+    return widget->isVisible() && !widget->window()->isMinimized();
+}
+
 bool canAnimate(const QWidget *widget)
 {
     const QGraphicsEffect *effect = widget->graphicsEffect();

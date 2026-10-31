@@ -133,7 +133,7 @@ protected:
 private:
     void updateMotion()
     {
-        if (isVisible() && Motion::policy().isEnabled()) {
+        if (Motion::isOnScreen(this) && Motion::policy().isEnabled()) {
             if (beat_->state() != QAbstractAnimation::Running)
                 beat_->start();
             return;

@@ -37,6 +37,7 @@
 #include <QUrl>
 
 #include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 namespace {
@@ -1178,6 +1179,10 @@ void FileTreeView::paintEvent(QPaintEvent *event)
     if (stickyRows_.isEmpty())
         return;
     const int height = stickyRowHeight();
+    // A row repainted below them (a hover, a selection) leaves them as they are.
+    const QRect pinnedBand(0, 0, viewport()->width(), int(stickyRows_.size()) * height);
+    if (!event->region().intersects(pinnedBand))
+        return;
     QPainter painter(viewport());
     const QColor background = palette().color(QPalette::Base);
     QStyleOptionViewItem option;
@@ -1226,9 +1231,14 @@ void FileTreeView::scrollTo(const QModelIndex &index, ScrollHint hint)
 void FileTreeView::scrollContentsBy(int dx, int dy)
 {
     QTreeView::scrollContentsBy(dx, dy);
-    // The pinned rows are drawn over the contents: scrolling would move them.
-    if (dy != 0)
-        viewport()->update();
+    if (dy == 0)
+        return;
+    // The pinned rows are drawn over the contents, which the scroll copied
+    // along with them: only the band they cover, before and after, is
+    // painted again, the rest of the copy stays.
+    const int pinnedRows = int(std::max(stickyRows_.size(), computeStickyRows().size()));
+    if (pinnedRows > 0)
+        viewport()->update(QRect(0, 0, viewport()->width(), pinnedRows * stickyRowHeight() + std::abs(dy)));
 }
 
 void FileTreeView::drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const

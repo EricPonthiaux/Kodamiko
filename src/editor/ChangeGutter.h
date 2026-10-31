@@ -75,6 +75,7 @@ private:
     std::optional<QByteArray> base_; // UTF-8, like the editor's text
     QList<LineChange> changes_;
     bool upToDate_ = true;
+    int markersLineHeight_ = 0; // of the markers defined, 0 before they are
     QTimer timer_;
     QPointer<QFrame> popup_;
 };

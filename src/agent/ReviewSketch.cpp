@@ -260,9 +260,23 @@ void ReviewSketch::paintEvent(QPaintEvent *)
     drawMarks(painter, reading, ink);
 }
 
+void ReviewSketch::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    updateMotion();
+}
+
+void ReviewSketch::hideEvent(QHideEvent *event)
+{
+    QWidget::hideEvent(event);
+    updateMotion();
+}
+
+// Frames only while they can be seen: a review or a diagram being drawn
+// lasts minutes, often in a hidden tab or a minimized window.
 void ReviewSketch::updateMotion()
 {
-    if (state_ == State::Reading && Motion::policy().isEnabled())
+    if (state_ == State::Reading && Motion::isOnScreen(this) && Motion::policy().isEnabled())
         frame_->start();
     else
         frame_->stop();

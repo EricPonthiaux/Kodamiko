@@ -36,6 +36,9 @@
 namespace {
 
 constexpr int messageMs = 4000;
+// Comparing the board with the saved one serializes it: once a drag or a
+// run of typing pauses, not at every change.
+constexpr int modifiedCheckDelayMs = 150;
 constexpr int groupSpacingPx = 12;
 
 // `heightPx` is given for the default interface font.
@@ -85,6 +88,7 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     , inspector_(new diagram::Inspector(board_, canvas_, this))
     , message_(new QLabel(this))
     , messageTimer_(new QTimer(this))
+    , modifiedTimer_(new QTimer(this))
 {
     AppFonts::followApplicationFont(inspector_, [this] { inspector_->setMinimumWidth(UiMetrics::scaled(220)); });
     auto *splitter = new GripSplitter(Qt::Horizontal, this);
@@ -107,7 +111,10 @@ DiagramView::DiagramView(const Theme &theme, QWidget *parent)
     messageTimer_->setSingleShot(true);
     messageTimer_->setInterval(messageMs);
     connect(messageTimer_, &QTimer::timeout, message_, &QLabel::clear);
-    connect(board_, &diagram::Board::changed, this, &DiagramView::updateModified);
+    modifiedTimer_->setSingleShot(true);
+    modifiedTimer_->setInterval(modifiedCheckDelayMs);
+    connect(modifiedTimer_, &QTimer::timeout, this, &DiagramView::updateModified);
+    connect(board_, &diagram::Board::changed, modifiedTimer_, qOverload<>(&QTimer::start));
 
     applyTheme(theme);
     updateZoom(canvas_->zoom());
@@ -315,6 +322,7 @@ bool DiagramView::matchesDisk() const
 
 void DiagramView::updateModified()
 {
+    modifiedTimer_->stop();
     const bool modified = isModified();
     if (modified != lastModified_) {
         lastModified_ = modified;

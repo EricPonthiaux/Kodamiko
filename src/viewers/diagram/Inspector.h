@@ -12,6 +12,7 @@ class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
+class QShowEvent;
 class QStackedWidget;
 class QTimer;
 class QVBoxLayout;
@@ -37,6 +38,9 @@ public:
 signals:
     // The source was applied: the view lays out what needs it.
     void sourceApplied(const diagram::document::Loaded &loaded);
+
+protected:
+    void showEvent(QShowEvent *event) override;
 
 private:
     QWidget *createModeSelector(QStackedWidget *pages);
@@ -66,6 +70,8 @@ private:
     QPlainTextEdit *source_;
     QLabel *sourceError_;
     QTimer *sourceTimer_;
+    QTimer *rebuildTimer_;
+    bool rebuildPending_ = false; // the board changed while the panel was hidden
     QByteArray typingBase_;
     bool updating_ = false;
     QString shown_; // the selection the section was built for

@@ -176,9 +176,11 @@ private:
     // The open blocks' chevrons show only while the mouse is over the
     // margins; those of the folded blocks always.
     void showOpenFoldMarks(bool shown);
-    // The caret moved: its block's indentation guide lights up and its line
-    // number brightens.
-    void followCaretLine();
+    // The caret moved or the text changed: its block's indentation guide
+    // lights up and its line number brightens.
+    void followCaretLine(Scintilla::Update updated);
+    // Where activeGuide_ is drawn in the viewport; empty when out of sight.
+    QRect activeGuideRect() const;
     void paintActiveGuide(QPainter &painter);
     void paintCurrentLineNumber(QPainter &painter, const QRect &dirty);
     // The cursor got into a folded block (search, jump to a line): the block

@@ -89,6 +89,22 @@ protected:
 
 using Draw = void (*)(QPainter &, const QString &, bool);
 
+// A size at which an icon was drawn, in pixels of a given ratio.
+struct PictureSize {
+    QSize size;
+    qreal scale = 1;
+
+    bool operator==(const PictureSize &) const = default;
+};
+
+size_t qHash(const PictureSize &key, size_t seed = 0) noexcept
+{
+    return qHashMulti(seed, key.size.width(), key.size.height(), key.scale);
+}
+
+// A file kind's icon, drawn once per size: a tree paints the icon of every
+// visible row at each repaint, and paths and badge text cost far more than
+// copying a picture.
 class DrawnIconEngine : public PaintedIconEngine {
 public:
     DrawnIconEngine(QString kind, bool dark, Draw draw)
@@ -98,12 +114,26 @@ public:
     {
     }
 
-    void paint(QPainter *painter, const QRect &rect, QIcon::Mode, QIcon::State) override
+    void paint(QPainter *painter, const QRect &rect, QIcon::Mode mode, QIcon::State state) override
     {
-        painter->save();
-        enterUnits(*painter, rect);
-        draw_(*painter, kind_, dark_);
-        painter->restore();
+        const qreal ratio = painter->device() ? painter->device()->devicePixelRatioF() : 1.0;
+        painter->drawPixmap(rect, scaledPixmap(rect.size(), mode, state, ratio));
+    }
+
+    QPixmap scaledPixmap(const QSize &size, QIcon::Mode, QIcon::State, qreal scale) override
+    {
+        const PictureSize key{.size = size, .scale = scale};
+        if (const auto found = pictures_.constFind(key); found != pictures_.cend())
+            return *found;
+        QPixmap pixmap(size * scale);
+        pixmap.setDevicePixelRatio(scale);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        enterUnits(painter, QRect(QPoint(), size));
+        draw_(painter, kind_, dark_);
+        painter.end();
+        pictures_.insert(key, pixmap);
+        return pixmap;
     }
 
     QIconEngine *clone() const override { return new DrawnIconEngine(*this); }
@@ -112,6 +142,7 @@ private:
     QString kind_;
     bool dark_;
     Draw draw_;
+    QHash<PictureSize, QPixmap> pictures_;
 };
 
 // `base` with an orange dot (Claude's color) in its corner.

@@ -20,6 +20,20 @@ constexpr qreal iconUnits = 16;
 
 using Painter = void (*)(QPainter &);
 
+// A size and mode at which an icon was drawn, in pixels of a given ratio.
+struct PictureKey {
+    QSize size;
+    qreal scale = 1;
+    QIcon::Mode mode = QIcon::Normal;
+
+    bool operator==(const PictureKey &) const = default;
+};
+
+size_t qHash(const PictureKey &key, size_t seed = 0) noexcept
+{
+    return qHashMulti(seed, key.size.width(), key.size.height(), key.scale, int(key.mode));
+}
+
 // A line icon drawn at the size asked for, so that it stays sharp as the
 // interface font enlarges it (UiMetrics::iconSize), with its pen widened
 // in proportion.
@@ -42,7 +56,22 @@ public:
         return scaledPixmap(size, mode, state, 1.0);
     }
 
+    // Drawn once per size and mode: a tool button asks for its picture at
+    // every repaint, on hover and press too.
     QPixmap scaledPixmap(const QSize &size, QIcon::Mode mode, QIcon::State, qreal scale) override
+    {
+        const PictureKey key{.size = size, .scale = scale, .mode = mode};
+        if (const auto found = pictures_.constFind(key); found != pictures_.cend())
+            return *found;
+        const QPixmap pixmap = render(size, mode, scale);
+        pictures_.insert(key, pixmap);
+        return pixmap;
+    }
+
+    QIconEngine *clone() const override { return new LineIconEngine(*this); }
+
+private:
+    QPixmap render(const QSize &size, QIcon::Mode mode, qreal scale) const
     {
         QPixmap pixmap(size * scale);
         pixmap.setDevicePixelRatio(scale);
@@ -55,9 +84,6 @@ public:
         return QApplication::style()->generatedIconPixmap(QIcon::Disabled, pixmap, &option);
     }
 
-    QIconEngine *clone() const override { return new LineIconEngine(*this); }
-
-private:
     // The icon on the 16-unit square, centered in `size`.
     void drawCentered(QPixmap &pixmap, const QSize &size) const
     {
@@ -73,6 +99,7 @@ private:
 
     QColor color_;
     Painter draw_;
+    QHash<PictureKey, QPixmap> pictures_;
 };
 
 } // namespace

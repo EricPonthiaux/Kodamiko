@@ -38,6 +38,9 @@ namespace {
 
 // Keeps the color buttons from reading as one more row of swatches.
 constexpr int swatchButtonsGapPx = 8;
+// A drag changes the board at every move of the mouse: the fields catch up
+// once it pauses.
+constexpr int rebuildDelayMs = 100;
 
 const QStringList directions{QStringLiteral("TB"), QStringLiteral("LR"), QStringLiteral("BT"), QStringLiteral("RL")};
 
@@ -112,6 +115,7 @@ Inspector::Inspector(Board *board, Canvas *canvas, QWidget *parent)
     , source_(new QPlainTextEdit(this))
     , sourceError_(new QLabel(this))
     , sourceTimer_(new QTimer(this))
+    , rebuildTimer_(new QTimer(this))
 {
     propertiesLayout_->setContentsMargins(12, 12, 12, 12);
     propertiesLayout_->setSpacing(4);
@@ -160,9 +164,12 @@ Inspector::Inspector(Board *board, Canvas *canvas, QWidget *parent)
         endTyping();
         rebuild();
     });
+    rebuildTimer_->setSingleShot(true);
+    rebuildTimer_->setInterval(rebuildDelayMs);
+    connect(rebuildTimer_, &QTimer::timeout, this, &Inspector::rebuild);
     connect(board_, &Board::changed, this, [this] {
         if (!updating_ && typingBase_.isEmpty())
-            rebuild();
+            rebuildTimer_->start();
         sourceTimer_->start();
     });
     rebuild();
@@ -267,9 +274,21 @@ bool Inspector::showsAlready(const QString &key) const
     return section_->findChild<QWidget *>() && section_->isAncestorOf(QApplication::focusWidget());
 }
 
+void Inspector::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    if (rebuildPending_)
+        rebuild();
+}
+
 void Inspector::rebuild()
 {
+    rebuildTimer_->stop();
     if (updating_)
+        return;
+    // A hidden panel is built when it shows, not at every change of the board.
+    rebuildPending_ = !isVisible();
+    if (rebuildPending_)
         return;
     const QString key = selectionKey(*board_);
     // Rebuilt only when what it shows changes, so that a field being typed

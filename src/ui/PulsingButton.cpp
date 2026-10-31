@@ -69,7 +69,7 @@ void PulsingButton::paintEvent(QPaintEvent *event)
 
 void PulsingButton::updateMotion()
 {
-    if (isVisible() && Motion::policy().isEnabled()) {
+    if (Motion::isOnScreen(this) && Motion::policy().isEnabled()) {
         if (pulse_->state() != QAbstractAnimation::Running)
             pulse_->start();
         return;

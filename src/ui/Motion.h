@@ -56,6 +56,12 @@ void install();
 // Registers a child popup (which has no Qt::Popup window flag).
 void watchPopup(QWidget *widget);
 
+// Whether `widget` can be seen: shown, and its window not minimized. A
+// looping animation runs only then: it is updated from showEvent() and
+// hideEvent(), which a widget also receives when its window is minimized
+// or restored (isVisible() alone stays true in a minimized window).
+bool isOnScreen(const QWidget *widget);
+
 // False for foreign graphics effects or surfaces rendered outside QPainter.
 bool canAnimate(const QWidget *widget);
 

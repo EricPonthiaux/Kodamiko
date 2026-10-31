@@ -103,7 +103,7 @@ void Spinner::paintEvent(QPaintEvent *)
 
 void Spinner::updateMotion()
 {
-    if (spinning_ && isVisible() && Motion::policy().isEnabled())
+    if (spinning_ && Motion::isOnScreen(this) && Motion::policy().isEnabled())
         timer_->start();
     else
         timer_->stop();
