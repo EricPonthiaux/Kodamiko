@@ -7,9 +7,6 @@
 #include "syntax/ScintillaStyles.h"
 #include "ui/ThemeStyle.h"
 
-#include <Qsci/qscicommand.h>
-#include <Qsci/qscicommandset.h>
-
 #include <array>
 
 namespace {
@@ -68,25 +65,24 @@ int markerIndex(Shade shade)
 } // namespace
 
 MergePane::MergePane(const Theme &theme, const QString &path, QWidget *parent)
-    : QsciScintilla(parent)
+    : ScintillaView(parent)
     , theme_(theme)
     , highlighter_(HighlighterFactory::create(LanguageRegistry::languageForFile(path)))
 {
-    setUtf8(true);
     setReadOnly(true);
     setCaretLineVisible(false);
-    setWrapMode(QsciScintilla::WrapNone);
-    setScrollWidthTracking(true);
-    setScrollWidth(1);
+    send(SCI_SETWRAPMODE, SC_WRAP_NONE);
+    send(SCI_SETSCROLLWIDTHTRACKING, true);
+    send(SCI_SETSCROLLWIDTH, 1);
     setFrameShape(QFrame::NoFrame);
-    setMarginType(numberMargin, QsciScintilla::NumberMargin);
-    setMarginType(stripMargin, QsciScintilla::SymbolMargin);
+    setMarginType(numberMargin, SC_MARGIN_NUMBER);
+    setMarginType(stripMargin, SC_MARGIN_SYMBOL);
     setMarginMarkerMask(numberMargin, 0);
     setMarginMarkerMask(stripMargin, ((1 << shadeCount) - 1) << firstStripMarker);
     setMarginWidth(stripMargin, stripWidthPx);
-    paddingStyle_ = int(SendScintilla(SCI_ALLOCATEEXTENDEDSTYLES, 1L));
-    SendScintilla(SCI_ANNOTATIONSETSTYLEOFFSET, long(paddingStyle_));
-    SendScintilla(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_STANDARD));
+    paddingStyle_ = int(send(SCI_ALLOCATEEXTENDEDSTYLES, 1L));
+    send(SCI_ANNOTATIONSETSTYLEOFFSET, long(paddingStyle_));
+    send(SCI_ANNOTATIONSETVISIBLE, long(ANNOTATION_STANDARD));
     if (highlighter_)
         highlighter_->attach(this);
     applyTheme(theme);
@@ -102,19 +98,17 @@ void MergePane::makeEditable()
     // Undo is the document's (MergeDocument), which also undoes the sides
     // taken: Scintilla leaves its keys free, and its history is emptied at
     // each showStretches(). It keeps one meanwhile: its notifications only
-    // carry the deleted text then, which QScintilla's accessibility needs.
-    for (const QsciCommand::Command command : {QsciCommand::Undo, QsciCommand::Redo}) {
-        QsciCommand *bound = standardCommands()->find(command);
-        bound->setKey(0);
-        bound->setAlternateKey(0);
-    }
+    // carry the deleted text then.
+    for (const int key : {'Z' + (SCMOD_CTRL << 16), 'Z' + ((SCMOD_CTRL | SCMOD_SHIFT) << 16), 'Y' + (SCMOD_CTRL << 16),
+                          SCK_BACK + (SCMOD_ALT << 16)})
+        send(SCI_CLEARCMDKEY, uptr_t(key));
 }
 
 QByteArray MergePane::bytes() const
 {
-    const long length = SendScintilla(SCI_GETLENGTH);
+    const long length = send(SCI_GETLENGTH);
     QByteArray text(length + 1, '\0');
-    SendScintilla(SCI_GETTEXT, length + 1, text.data());
+    send(SCI_GETTEXT, length + 1, reinterpret_cast<sptr_t>(text.data()));
     text.chop(1);
     return text;
 }
@@ -127,10 +121,10 @@ void MergePane::showStretches(const QList<Stretch> &stretches)
     // The text the user just typed stays, with its caret.
     if (text != bytes()) {
         setReadOnly(false);
-        SendScintilla(SCI_SETTEXT, text.constData());
+        sends(SCI_SETTEXT, 0, text.constData());
         setReadOnly(!isEditable_);
     }
-    SendScintilla(SCI_ANNOTATIONCLEARALL);
+    send(SCI_ANNOTATIONCLEARALL);
     markerDeleteAll();
 
     int line = 0;
@@ -148,7 +142,7 @@ void MergePane::showStretches(const QList<Stretch> &stretches)
         line += count;
     }
     if (isEditable_)
-        SendScintilla(SCI_EMPTYUNDOBUFFER);
+        send(SCI_EMPTYUNDOBUFFER);
     const int digits = int(QString::number(std::max(lines(), 1)).size());
     setMarginWidth(numberMargin, QString(digits + 1, QLatin1Char('9')));
 }
@@ -156,24 +150,17 @@ void MergePane::showStretches(const QList<Stretch> &stretches)
 void MergePane::applyTheme(const Theme &theme)
 {
     theme_ = theme;
-    setPaper(theme.background);
+    ScintillaStyles::applyDefaultStyle(*this, theme);
     // Behind the transparent scroll bars: the code's background.
     QPalette background = ThemeStyle::palette(theme);
     background.setColor(QPalette::Window, theme.background);
     setPalette(background);
     setAutoFillBackground(true);
-    setColor(theme.foreground);
-    setFont(theme.font);
-    setSelectionBackgroundColor(theme.selection);
-    setCaretLineBackgroundColor(theme.caretLine);
-    setCaretForegroundColor(theme.caret);
     ScintillaStyles::applyTypography(*this, theme.font, theme.lineHeight);
     // The highlighter resets every style: the margins' come after.
     if (highlighter_)
         highlighter_->applyTheme(theme);
-    setMarginsBackgroundColor(theme.marginBackground);
-    setMarginsForegroundColor(theme.marginForeground);
-    setMarginsFont(theme.font);
+    ScintillaStyles::applyEditorColors(*this, theme);
     defineShades();
 }
 
@@ -182,15 +169,15 @@ void MergePane::defineShades()
     const std::array<QColor, shadeCount> colors = shadeColors(theme_);
     const double backgroundShare = theme_.isDark ? 0.16 : 0.12;
     for (int i = 0; i < shadeCount; ++i) {
-        markerDefine(QsciScintilla::Background, firstBackgroundMarker + i);
+        markerDefine(SC_MARK_BACKGROUND, firstBackgroundMarker + i);
         setMarkerBackgroundColor(mix(theme_.background, colors[i], backgroundShare), firstBackgroundMarker + i);
-        markerDefine(QsciScintilla::FullRectangle, firstStripMarker + i);
+        markerDefine(SC_MARK_FULLRECT, firstStripMarker + i);
         setMarkerBackgroundColor(colors[i], firstStripMarker + i);
     }
     // The blank rows: the background a shade darker or lighter.
     const QColor padding = mix(theme_.background, theme_.foreground, theme_.isDark ? 0.035 : 0.03);
-    SendScintilla(SCI_STYLESETBACK, long(paddingStyle_), padding);
-    SendScintilla(SCI_STYLESETFORE, long(paddingStyle_), padding);
+    send(SCI_STYLESETBACK, uptr_t(paddingStyle_), scintillaColor(padding));
+    send(SCI_STYLESETFORE, uptr_t(paddingStyle_), scintillaColor(padding));
 }
 
 void MergePane::addPadding(int line, int rows)
@@ -199,9 +186,10 @@ void MergePane::addPadding(int line, int rows)
     // rows under: the columns stay aligned from the next stretch on only.
     if (rows <= 0 || line < 0)
         return;
-    const QByteArray existing = annotation(line).toUtf8();
+    QByteArray existing(send(SCI_ANNOTATIONGETTEXT, uptr_t(line)), '\0');
+    send(SCI_ANNOTATIONGETTEXT, uptr_t(line), reinterpret_cast<sptr_t>(existing.data()));
     const int existingRows = existing.isEmpty() ? 0 : int(existing.count('\n')) + 1;
     const QByteArray blank = QByteArray(" ") + QByteArray("\n ").repeated(existingRows + rows - 1);
-    SendScintilla(SCI_ANNOTATIONSETTEXT, long(line), blank.constData());
-    SendScintilla(SCI_ANNOTATIONSETSTYLE, long(line), 0L);
+    sends(SCI_ANNOTATIONSETTEXT, long(line), blank.constData());
+    send(SCI_ANNOTATIONSETSTYLE, long(line), 0L);
 }

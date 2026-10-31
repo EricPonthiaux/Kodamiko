@@ -16,6 +16,8 @@
 #include <QMenu>
 #include <QShortcut>
 
+#include <memory>
+
 QHash<int, PatchSelection> ChangesView::selectedChanges() const
 {
     QHash<int, PatchSelection> result;
@@ -165,12 +167,12 @@ void ChangesView::showDiffMenu(const QPoint &position)
     const bool hasSelection = status_ && !diffSelection(line, &lines).isEmpty();
     const bool busy = commands_->isBusy();
 
-    QMenu *menu = diff_->createStandardContextMenu();
+    const std::unique_ptr<QMenu> menu = diff_->createStandardContextMenu();
     QAction *first = menu->actions().value(0);
     // The keys of addDiffShortcuts(), shown only: an action's shortcut
     // would take Space from the menu itself.
     const auto addAction = [&](const QString &text, const QKeySequence &keys, auto slot) {
-        auto *action = new QAction(text + QLatin1Char('\t') + keys.toString(QKeySequence::NativeText), menu);
+        auto *action = new QAction(text + QLatin1Char('\t') + keys.toString(QKeySequence::NativeText), menu.get());
         connect(action, &QAction::triggered, this, slot);
         menu->insertAction(first, action);
         return action;
@@ -193,7 +195,6 @@ void ChangesView::showDiffMenu(const QPoint &position)
         openFileAt(line);
     })->setEnabled(status_ && diff_->locate(line).file >= 0);
     menu->insertSeparator(first);
-    addFindingActions(menu, first, line);
+    addFindingActions(menu.get(), first, line);
     ContextMenus::exec(*menu, *diff_, diff_->viewport()->mapToGlobal(position));
-    delete menu;
 }

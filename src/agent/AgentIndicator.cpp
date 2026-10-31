@@ -99,7 +99,7 @@ void AgentIndicator::updateAnimation()
     update();
     if (!provider_ || !Motion::policy().isEnabled())
         return;
-    if (const std::optional<std::chrono::milliseconds> step = provider_->mark().frameStep(status_))
+    if (const std::optional<std::chrono::milliseconds> step = AgentMark::frameStep(status_))
         animationTimer_.start(*step);
 }
 
@@ -173,8 +173,8 @@ void AgentIndicator::paintEvent(QPaintEvent *)
     paintBackground(painter, color);
     const QRectF iconBox(QPointF(0, 0), QSizeF(iconPx, iconPx));
     if (provider_)
-        provider_->mark().paint(painter, iconBox.translated(QRectF(contentsRect()).center() - iconBox.center()), color,
-                                {.status = status_, .index = frame_});
+        AgentMark::paint(painter, iconBox.translated(QRectF(contentsRect()).center() - iconBox.center()), color,
+                         {.status = status_, .index = frame_});
 }
 
 void AgentIndicator::paintBackground(QPainter &painter, const QColor &color) const
@@ -195,9 +195,8 @@ void AgentIndicator::paintBackground(QPainter &painter, const QColor &color) con
 
 void AgentIndicator::advanceFrame()
 {
-    const AgentMark &mark = provider_->mark();
-    frame_ = (frame_ + 1) % mark.loopFrames();
-    if (mark.isFinished({.status = status_, .index = frame_}))
+    frame_ = (frame_ + 1) % AgentMark::loopFrames();
+    if (AgentMark::isFinished({.status = status_, .index = frame_}))
         animationTimer_.stop();
     update();
 }

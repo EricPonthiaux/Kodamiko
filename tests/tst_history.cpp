@@ -12,6 +12,7 @@
 #include "history/FileLens.h"
 #include "history/HistorySearchField.h"
 #include "history/HistoryView.h"
+#include "scintilla/ScintillaView.h"
 #include "ui/FoldedPane.h"
 
 #include <QDataStream>
@@ -25,7 +26,6 @@
 #include <QTemporaryFile>
 #include <QToolButton>
 #include <QTreeWidget>
-#include <Qsci/qsciscintilla.h>
 #include <QtTest>
 
 namespace {
@@ -685,7 +685,7 @@ private slots:
         auto *lens = view.findChild<FileLens *>();
         QVERIFY(lens->isVisible());
         QVERIFY(!view.findChild<DiffView *>()->isVisible());
-        QTRY_VERIFY(lens->findChild<QsciScintilla *>() && lens->findChild<QsciScintilla *>()->text() == "a");
+        QTRY_VERIFY(lens->findChild<ScintillaView *>() && lens->findChild<ScintillaView *>()->text() == "a");
         view.setPathFilter("sub");
         QVERIFY(!linesByAge->isVisible());
         QVERIFY(!lens->isVisible());
@@ -703,11 +703,11 @@ private slots:
         lens.show();
         QVERIFY(QTest::qWaitForWindowExposed(&lens));
         lens.showBlame("a.txt", blame);
-        auto *code = lens.findChild<QsciScintilla *>();
+        const auto *code = lens.findChild<ScintillaView *>();
         QWidget *viewport = code->viewport();
         const auto yOf = [code](int line) {
-            const long position = code->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
-            return int(code->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L, position)) + 3;
+            const long position = code->send(SCI_POSITIONFROMLINE, line);
+            return int(code->send(SCI_POINTYFROMPOSITION, 0L, position)) + 3;
         };
 
         QTest::mouseMove(viewport, QPoint(10, yOf(1))); // the second line of "create"'s run
@@ -717,7 +717,7 @@ private slots:
         QTRY_COMPARE(lens.hoveredRun(), 2);
         QTest::mouseMove(viewport, QPoint(viewport->width() - 10, yOf(2))); // over the text
         QTRY_COMPARE(lens.hoveredRun(), -1);
-        QCOMPARE(code->SendScintilla(QsciScintillaBase::SCI_GETMARGINCURSORN, 0L), 8L); // the hand
+        QCOMPARE(code->send(SCI_GETMARGINCURSORN, 0L), 8L); // the hand
     }
 
     void queryMatchesTheMessageBodyTheAuthorAndTheDays()
@@ -1090,7 +1090,7 @@ private slots:
 
         QTest::mouseClick(strip, Qt::LeftButton, {}, strip->chipRect(1).center());
 
-        QCOMPARE(int(diff->SendScintilla(QsciScintilla::SCI_GETFIRSTVISIBLELINE)), diff->fileStart(1));
+        QCOMPARE(int(diff->send(SCI_GETFIRSTVISIBLELINE)), diff->fileStart(1));
         QCOMPARE(strip->currentFile(), 1);
     }
 

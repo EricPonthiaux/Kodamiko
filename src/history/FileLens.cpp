@@ -4,6 +4,7 @@
 
 #include "CommitDelegate.h"
 #include "CommitTrack.h"
+#include "scintilla/ScintillaView.h"
 #include "syntax/HighlighterFactory.h"
 #include "syntax/LanguageRegistry.h"
 #include "syntax/ScintillaStyles.h"
@@ -14,7 +15,6 @@
 #include <QMouseEvent>
 #include <QStackedWidget>
 #include <QVBoxLayout>
-#include <Qsci/qsciscintilla.h>
 
 #include <algorithm>
 #include <array>
@@ -100,23 +100,23 @@ void FileLens::createCode(const QString &language)
     if (code_)
         code_->deleteLater();
     language_ = language;
-    code_ = new QsciScintilla(linesPage_);
+    code_ = new ScintillaView(linesPage_);
     code_->setReadOnly(true);
     code_->setFrameShape(QFrame::NoFrame);
     code_->setCaretLineVisible(false);
     hoveredRun_ = -1;
-    code_->setMarginType(commitMargin, QsciScintilla::TextMargin);
+    code_->setMarginType(commitMargin, SC_MARGIN_TEXT);
     code_->setMarginSensitivity(commitMargin, true);
-    code_->SendScintilla(QsciScintillaBase::SCI_SETMARGINCURSORN, commitMargin, handCursor);
+    code_->send(SCI_SETMARGINCURSORN, commitMargin, handCursor);
     // The name under the mouse stands out.
     code_->viewport()->setMouseTracking(true);
     code_->viewport()->installEventFilter(this);
-    code_->setMarginType(ageMargin, QsciScintilla::SymbolMargin);
+    code_->setMarginType(ageMargin, SC_MARGIN_SYMBOL);
     code_->setMarginWidth(ageMargin, ageMarginPx);
     code_->setMarginMarkerMask(ageMargin, (1 << ageCount) - 1);
-    code_->setMarginType(numberMargin, QsciScintilla::NumberMargin);
+    code_->setMarginType(numberMargin, SC_MARGIN_NUMBER);
     code_->setMarginMarkerMask(numberMargin, 0);
-    connect(code_, &QsciScintilla::marginClicked, this, [this](int, int line) {
+    connect(code_, &ScintillaView::marginLineClicked, this, [this](int, int line) {
         if (line >= 0 && line < blame_.lineCommits.size())
             emit commitClicked(blame_.commits.at(blame_.lineCommits.at(line)).id);
     });
@@ -166,32 +166,29 @@ void FileLens::styleCode()
     if (highlighter_)
         highlighter_->applyTheme(theme_);
     ScintillaStyles::applyTypography(*code_, theme_.font, theme_.lineHeight);
-    code_->setPaper(theme_.background);
-    code_->setMarginsBackgroundColor(theme_.marginBackground);
-    code_->setMarginsForegroundColor(theme_.marginForeground);
+    ScintillaStyles::applyEditorColors(*code_, theme_);
     // The commits' names in the interface's font, dimmed, the one under the
     // mouse bright and underlined; styles of their own, after those of the
     // highlighter.
-    code_->SendScintilla(QsciScintillaBase::SCI_RELEASEALLEXTENDEDSTYLES);
-    const long offset = code_->SendScintilla(QsciScintillaBase::SCI_ALLOCATEEXTENDEDSTYLES, commitNameStyleCount);
-    code_->SendScintilla(QsciScintillaBase::SCI_MARGINSETSTYLEOFFSET, offset);
+    code_->send(SCI_RELEASEALLEXTENDEDSTYLES);
+    const long offset = code_->send(SCI_ALLOCATEEXTENDEDSTYLES, commitNameStyleCount);
+    code_->send(SCI_MARGINSETSTYLEOFFSET, offset);
     const QByteArray family = font().family().toUtf8();
     for (const int style : {commitNameStyle, hoveredNameStyle}) {
         const long scintillaStyle = offset + style;
-        code_->SendScintilla(QsciScintillaBase::SCI_STYLESETFONT, scintillaStyle, family.constData());
-        code_->SendScintilla(QsciScintillaBase::SCI_STYLESETSIZE, scintillaStyle,
-                             long(std::max(7, theme_.font.pointSize() - 1)));
-        code_->SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, scintillaStyle, theme_.marginBackground);
+        code_->sends(SCI_STYLESETFONT, scintillaStyle, family.constData());
+        code_->send(SCI_STYLESETSIZE, scintillaStyle, long(std::max(7, theme_.font.pointSize() - 1)));
+        code_->send(SCI_STYLESETBACK, scintillaStyle, scintillaColor(theme_.marginBackground));
     }
-    code_->SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, offset + commitNameStyle, theme_.mutedText);
-    code_->SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, offset + hoveredNameStyle, theme_.foreground);
-    code_->SendScintilla(QsciScintillaBase::SCI_STYLESETUNDERLINE, offset + hoveredNameStyle, 1L);
+    code_->send(SCI_STYLESETFORE, offset + commitNameStyle, scintillaColor(theme_.mutedText));
+    code_->send(SCI_STYLESETFORE, offset + hoveredNameStyle, scintillaColor(theme_.foreground));
+    code_->send(SCI_STYLESETUNDERLINE, offset + hoveredNameStyle, 1L);
     code_->setMarginWidth(commitMargin, QString(commitMarginChars, QLatin1Char('m')));
     for (int age = 0; age < ageCount; ++age) {
-        code_->markerDefine(QsciScintilla::FullRectangle, age);
+        code_->markerDefine(SC_MARK_FULLRECT, age);
         code_->setMarkerBackgroundColor(ageColor(theme_, age), age);
     }
-    code_->markerDefine(QsciScintilla::Background, chosenMarker);
+    code_->markerDefine(SC_MARK_BACKGROUND, chosenMarker);
     code_->setMarkerBackgroundColor(blend(theme_.background, theme_.accent, chosenTint), chosenMarker);
 }
 
@@ -260,17 +257,16 @@ bool FileLens::eventFilter(QObject *watched, QEvent *event)
 
 void FileLens::hoverAt(QPoint position)
 {
-    const long marginWidth = code_->SendScintilla(QsciScintillaBase::SCI_GETMARGINWIDTHN, commitMargin);
+    const long marginWidth = code_->send(SCI_GETMARGINWIDTHN, commitMargin);
     if (position.x() >= marginWidth) {
         setHoveredRun(-1);
         return;
     }
-    const long nearest = code_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMPOINT, position.x(), position.y());
-    const int line = int(code_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, nearest));
+    const long nearest = code_->send(SCI_POSITIONFROMPOINT, position.x(), position.y());
+    const int line = int(code_->send(SCI_LINEFROMPOSITION, nearest));
     // Below the last line, the nearest position is still on it.
-    const long lineTop = code_->SendScintilla(QsciScintillaBase::SCI_POINTYFROMPOSITION, 0L,
-                                              code_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line));
-    const bool isOnLine = position.y() < lineTop + code_->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, line);
+    const long lineTop = code_->send(SCI_POINTYFROMPOSITION, 0L, code_->send(SCI_POSITIONFROMLINE, line));
+    const bool isOnLine = position.y() < lineTop + code_->send(SCI_TEXTHEIGHT, line);
     const bool isBlamed = line >= 0 && line < blame_.lineCommits.size();
     setHoveredRun(isOnLine && isBlamed ? runStart(line) : -1);
 }

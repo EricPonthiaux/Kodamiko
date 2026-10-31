@@ -14,8 +14,6 @@
 
 #include <optional>
 
-class AgentMark;
-
 enum class AgentProviderId {
     ClaudeCode,
 };
@@ -131,8 +129,6 @@ public:
     // Its icon among UiIcons, and the color it is drawn in at rest.
     virtual QString iconName() const = 0;
     virtual QColor brandColor() const = 0;
-    // Its mark in the status bar's indicator.
-    virtual const AgentMark &mark() const = 0;
     virtual AgentFeatures features() const = 0;
 
     // The program found, or an empty string when the agent is not installed.

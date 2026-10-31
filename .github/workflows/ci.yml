@@ -37,7 +37,8 @@ jobs:
           version: ${{ env.QT_VERSION }}
           # qtserialport: Qt Positioning's NMEA plugin links against it, and
           # the AppImage step deploys every plugin of a module it bundles.
-          modules: qtwebengine qtwebchannel qtpositioning qtserialport
+          # qt5compat: Scintilla's Qt widget uses QTextCodec.
+          modules: qtwebengine qtwebchannel qtpositioning qtserialport qt5compat
           cache: true
 
       - name: Linux tools
@@ -62,11 +63,13 @@ jobs:
             build/_deps/*-subbuild
           key: deps-v2-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/GraphvizWindows.cmake') }}
 
-      # LTO is off in the CI for now. KDK_NATIVE, on in the default preset,
-      # would build the packages for the runner's processor only: they could
-      # stop with an illegal instruction on an older one.
+      # LTO is off in the CI for now. KDK_NATIVE (-march=native), on in the
+      # default preset, stays on for macOS only: its runner is an M1, the
+      # first Apple Silicon processor, whose code every later one runs. On
+      # Linux and Windows, the packages would run on the runner's processor
+      # only, and could stop with an illegal instruction on an older one.
       - name: Configure
-        run: cmake --preset default -DKDK_LTO=OFF -DKDK_NATIVE=OFF
+        run: cmake --preset default -DKDK_LTO=OFF -DKDK_NATIVE=${{ runner.os == 'macOS' && 'ON' || 'OFF' }}
 
       - name: Build
         run: cmake --build --preset default

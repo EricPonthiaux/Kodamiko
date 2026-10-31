@@ -49,8 +49,8 @@ void CodeIntelligence::showQuickFixes()
             chooseQuickFix(editor, nullptr, {});
         return;
     }
-    const int from = int(editor->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONSTART));
-    const int to = int(editor->SendScintilla(QsciScintillaBase::SCI_GETSELECTIONEND));
+    const int from = int(editor->send(SCI_GETSELECTIONSTART));
+    const int to = int(editor->send(SCI_GETSELECTIONEND));
     const QJsonObject params{
         {"textDocument", QJsonObject{{"uri", uriOf(editor->filePath())}}},
         {"range", toJson(Range{lspPosition(editor, from), lspPosition(editor, to)})},

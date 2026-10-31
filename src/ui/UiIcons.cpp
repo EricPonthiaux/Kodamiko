@@ -179,15 +179,17 @@ const QHash<QString, Painter> &painters()
              links.lineTo(9.25, 6.5);
              p.drawPath(links);
          }},
-        // A burst: eight rays, as in Claude's mark.
+        // A ring of eight dots, the large ones on the axes: the agent's own
+        // neutral motif, not Anthropic's logo (which needs its permission).
         {QStringLiteral("claude"),
          [](QPainter &p) {
+             p.setBrush(p.pen().color());
+             p.setPen(Qt::NoPen);
              for (int i = 0; i < 8; ++i) {
                  const qreal angle = i * M_PI / 4;
-                 const qreal inner = 1.8;
-                 const qreal outer = i % 2 ? 5.2 : 6.3;
-                 p.drawLine(QPointF(8 + inner * std::cos(angle), 8 + inner * std::sin(angle)),
-                            QPointF(8 + outer * std::cos(angle), 8 + outer * std::sin(angle)));
+                 const qreal orbit = 5;
+                 const qreal radius = i % 2 ? 1.0 : 1.4;
+                 p.drawEllipse(QPointF(8 + orbit * std::cos(angle), 8 + orbit * std::sin(angle)), radius, radius);
              }
          }},
         // A target: a ring, four ticks and its center.

@@ -13,7 +13,7 @@ class CommitTrack;
 class ISyntaxHighlighter;
 class QLabel;
 class QStackedWidget;
-class QsciScintilla;
+class ScintillaView;
 
 // The lines of a file by age, in a file's history (Lines by Age): its
 // commits on a track of time (CommitTrack), a line that says what is
@@ -76,7 +76,7 @@ private:
     QLabel *message_;
     QStackedWidget *pages_; // the message, or the lines
     QWidget *linesPage_;
-    QsciScintilla *code_ = nullptr;
+    ScintillaView *code_ = nullptr;
     // Destroyed before the editor it colors.
     std::unique_ptr<ISyntaxHighlighter> highlighter_;
 };

@@ -9,11 +9,11 @@ ScratchEditors::ScratchEditors(const Theme &theme)
 {
 }
 
-QsciScintilla *ScratchEditors::forLanguage(const QString &language)
+ScintillaView *ScratchEditors::forLanguage(const QString &language)
 {
     if (const auto it = scratches_.find(language); it != scratches_.end())
         return it->second.editor.get();
-    Scratch scratch{std::make_unique<QsciScintilla>(), HighlighterFactory::create(language)};
+    Scratch scratch{std::make_unique<ScintillaView>(), HighlighterFactory::create(language)};
     if (scratch.highlighter) {
         scratch.highlighter->attach(scratch.editor.get());
         scratch.highlighter->applyTheme(theme_);

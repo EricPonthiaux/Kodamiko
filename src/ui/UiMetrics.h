@@ -7,6 +7,7 @@
 
 class QAbstractButton;
 class QAbstractItemView;
+class QTabBar;
 class QWidget;
 
 // Sizes of the interface, taken from IntelliJ's New UI (intellij-community:
@@ -43,6 +44,10 @@ int scaled(int referencePx);
 // The height of an editor tab at the application font: a line of text,
 // the tab's 7 px paddings and its 2 px accent line (ThemeStyle).
 int tabHeight();
+// The height of `tabs` as its tabs and style make it. With no tab, that of
+// a hidden copy holding one, so that what lines up with the tabs does not
+// move when the last one closes.
+int tabBarHeight(const QTabBar &tabs);
 // The height of the bars' boxes (chips, the run block, buttons, the mode
 // tabs): toolbarButtonSize scaled, but never taller than a tab, which
 // grows less than the font with it.

@@ -10,8 +10,8 @@
 #include "merge/MergeDocument.h"
 #include "merge/MergeGutter.h"
 #include "merge/MergePane.h"
-#include "merge/MergeTextPanel.h"
 #include "merge/MergeRequest.h"
+#include "merge/MergeTextPanel.h"
 #include "merge/MergeView.h"
 #include "merge/SimpleConflicts.h"
 #include "support/FakeReviewer.h"
@@ -785,7 +785,7 @@ private slots:
         QTRY_COMPARE(list->count(), 1);
         QVERIFY(list->item(0)->text().endsWith("0 of 1 conflict(s) resolved"));
         const MergePane *pane = view.findChild<MergePane *>();
-        const int rowHeight = int(pane->SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0L));
+        const int rowHeight = int(pane->send(SCI_TEXTHEIGHT, 0L));
         MergeGutter *gutter = view.findChild<MergeGutter *>();
 
         // The conflict is the second row.
@@ -799,11 +799,11 @@ private slots:
         OneConflict merge;
         QTRY_COMPARE(merge.list->count(), 1);
         MergePane *result = merge.result();
-        const long start = result->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, 1L);
-        const long end = result->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, 1L);
+        const long start = result->send(SCI_POSITIONFROMLINE, 1L);
+        const long end = result->send(SCI_GETLINEENDPOSITION, 1L);
 
-        result->SendScintilla(QsciScintillaBase::SCI_SETSEL, start, end);
-        result->SendScintilla(QsciScintillaBase::SCI_REPLACESEL, uintptr_t{0}, "main and other");
+        result->send(SCI_SETSEL, start, end);
+        result->sends(SCI_REPLACESEL, 0, "main and other");
 
         QCOMPARE(merge.state(), QString("Resolved, not saved yet"));
         QCOMPARE(result->bytes(), QByteArray("a\nmain and other\nz\n"));

@@ -9,6 +9,7 @@
 #include <QFontInfo>
 #include <QFontMetrics>
 #include <QGuiApplication>
+#include <QTabBar>
 #include <QWidget>
 
 #include <algorithm>
@@ -29,6 +30,20 @@ int tabHeight()
     constexpr int paddingsPx = 2 * 7;
     constexpr int accentLinePx = 2;
     return QFontMetrics(QGuiApplication::font()).height() + paddingsPx + accentLinePx;
+}
+
+int tabBarHeight(const QTabBar &tabs)
+{
+    if (tabs.count() > 0)
+        return tabs.sizeHint().height();
+    // Beside the tabs, so that the style sheet's rules for them apply.
+    QTabBar probe(tabs.parentWidget());
+    probe.setFont(tabs.font());
+    probe.setDocumentMode(tabs.documentMode());
+    probe.setTabsClosable(tabs.tabsClosable());
+    probe.addTab(QStringLiteral("M"));
+    probe.ensurePolished();
+    return probe.sizeHint().height();
 }
 
 int controlHeight()

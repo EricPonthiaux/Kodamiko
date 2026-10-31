@@ -57,7 +57,7 @@ void CodeIntelligence::changeSignature()
     EditorWidget *editor = tabs_->currentEditor();
     if (!editor || editor->filePath().isEmpty() || editor->isReadOnly())
         return;
-    const Position position = lspPosition(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)));
+    const Position position = lspPosition(editor, int(editor->send(SCI_GETCURRENTPOS)));
     const QString languageId = LanguageRegistry::languageForFile(editor->filePath());
     const ChangeSignature::Signature signature = ChangeSignature::read(languageId, editor->text(), position);
     if (!signature.error.isEmpty()) {

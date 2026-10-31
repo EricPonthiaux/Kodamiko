@@ -29,24 +29,17 @@ public:
     explicit TreeSitterHighlighter(const TreeSitterGrammar &grammar);
     ~TreeSitterHighlighter() override;
 
-    void attach(QsciScintilla *editor) override;
+    void attach(ScintillaView *editor) override;
     void applyTheme(const Theme &theme) override;
+    QString styleCategory(int style, const Theme &theme) const override;
     void flush() override;
 
     // Styles [start, end[. Public for tests; otherwise called by Scintilla.
     void styleRange(int start, int end);
 
 private:
-    void onModified(int position,
-                    int modificationType,
-                    const char *text,
-                    int length,
-                    int linesAdded,
-                    int line,
-                    int foldLevelNow,
-                    int foldLevelPrev,
-                    int token,
-                    int annotationLinesAdded);
+    // `modificationType` is SC_MOD_… flags.
+    void onModified(int modificationType, int position, int length);
     void onStyleNeeded(int endPosition);
 
     // Reparses if the text changed; returns the first position whose syntax
@@ -59,7 +52,7 @@ private:
     int documentLength() const;
 
     const TreeSitterGrammar &grammar_;
-    QsciScintilla *editor_ = nullptr;
+    ScintillaView *editor_ = nullptr;
     TSParser *parser_ = nullptr;
     TSTree *tree_ = nullptr;
     TSQueryCursor *cursor_ = nullptr;

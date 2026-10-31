@@ -2,10 +2,9 @@
 
 #pragma once
 
+#include "scintilla/ScintillaView.h"
 #include "syntax/ISyntaxHighlighter.h"
 #include "ui/Theme.h"
-
-#include <Qsci/qsciscintilla.h>
 
 #include <map>
 #include <memory>
@@ -20,12 +19,12 @@ public:
 
     // The editor coloring `language`, owned by this object; nullptr if the
     // language has no highlighter.
-    QsciScintilla *forLanguage(const QString &language);
+    ScintillaView *forLanguage(const QString &language);
 
 private:
     // The highlighter goes before the editor it is attached to.
     struct Scratch {
-        std::unique_ptr<QsciScintilla> editor;
+        std::unique_ptr<ScintillaView> editor;
         std::unique_ptr<ISyntaxHighlighter> highlighter;
     };
 

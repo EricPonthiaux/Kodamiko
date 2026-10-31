@@ -34,13 +34,13 @@ SymbolOccurrences::SymbolOccurrences(EditorWidget *editor, Theme theme)
     settle_.setSingleShot(true);
     settle_.setInterval(settleDelayMs);
     connect(&settle_, &QTimer::timeout, this, &SymbolOccurrences::refreshNow);
-    connect(editor_, &QsciScintilla::cursorPositionChanged, this, [this] {
+    connect(editor_, &ScintillaView::cursorPositionChanged, this, [this] {
         settledAt_ = -1;
         settle_.start();
     });
-    connect(editor_, &QsciScintilla::selectionChanged, &settle_, qOverload<>(&QTimer::start));
+    connect(editor_, &ScintillaView::selectionChanged, &settle_, qOverload<>(&QTimer::start));
     // The highlighted ranges no longer match the text.
-    connect(editor_, &QsciScintilla::textChanged, this, [this] {
+    connect(editor_, &ScintillaView::textChanged, this, [this] {
         settledAt_ = -1;
         clear();
         settle_.start();
@@ -58,12 +58,11 @@ void SymbolOccurrences::applyTheme(const Theme &theme)
 void SymbolOccurrences::styleIndicator()
 {
     const bool dark = theme_.background.lightness() < 128;
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETSTYLE, occurrenceIndicator,
-                           QsciScintillaBase::INDIC_ROUNDBOX);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, occurrenceIndicator, theme_.selection);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETALPHA, occurrenceIndicator, dark ? 110 : 90);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETOUTLINEALPHA, occurrenceIndicator, 200);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICSETUNDER, occurrenceIndicator, true);
+    editor_->send(SCI_INDICSETSTYLE, occurrenceIndicator, INDIC_ROUNDBOX);
+    editor_->send(SCI_INDICSETFORE, occurrenceIndicator, scintillaColor(theme_.selection));
+    editor_->send(SCI_INDICSETALPHA, occurrenceIndicator, dark ? 110 : 90);
+    editor_->send(SCI_INDICSETOUTLINEALPHA, occurrenceIndicator, 200);
+    editor_->send(SCI_INDICSETUNDER, occurrenceIndicator, true);
 }
 
 void SymbolOccurrences::refreshNow()
@@ -92,16 +91,16 @@ void SymbolOccurrences::showServerOccurrences(int position, const QList<Range> &
 std::optional<SymbolOccurrences::Range> SymbolOccurrences::nameAtCursor() const
 {
     const auto send = [this](unsigned int message, unsigned long wParam = 0, long lParam = 0) {
-        return int(editor_->SendScintilla(message, wParam, lParam));
+        return int(editor_->send(message, wParam, lParam));
     };
-    const int caret = send(QsciScintillaBase::SCI_GETCURRENTPOS);
-    const int start = send(QsciScintillaBase::SCI_WORDSTARTPOSITION, caret, 1);
-    const int end = send(QsciScintillaBase::SCI_WORDENDPOSITION, caret, 1);
+    const int caret = send(SCI_GETCURRENTPOS);
+    const int start = send(SCI_WORDSTARTPOSITION, caret, 1);
+    const int end = send(SCI_WORDENDPOSITION, caret, 1);
     if (end <= start)
         return std::nullopt;
     // A selection counts only when it is that word (a double click).
     if (editor_->hasSelectedText()) {
-        const int anchor = send(QsciScintillaBase::SCI_GETANCHOR);
+        const int anchor = send(SCI_GETANCHOR);
         const bool selectsTheWord = std::min(anchor, caret) == start && std::max(anchor, caret) == end;
         if (!selectsTheWord)
             return std::nullopt;
@@ -114,20 +113,18 @@ std::optional<SymbolOccurrences::Range> SymbolOccurrences::nameAtCursor() const
 QList<SymbolOccurrences::Range> SymbolOccurrences::wholeWordMatches(const QByteArray &word) const
 {
     const auto send = [this](unsigned int message, unsigned long wParam = 0, long lParam = 0) {
-        return int(editor_->SendScintilla(message, wParam, lParam));
+        return int(editor_->send(message, wParam, lParam));
     };
-    const int length = send(QsciScintillaBase::SCI_GETLENGTH);
-    send(QsciScintillaBase::SCI_SETSEARCHFLAGS,
-         QsciScintillaBase::SCFIND_WHOLEWORD | QsciScintillaBase::SCFIND_MATCHCASE);
+    const int length = send(SCI_GETLENGTH);
+    send(SCI_SETSEARCHFLAGS, SCFIND_WHOLEWORD | SCFIND_MATCHCASE);
     QList<Range> matches;
     int from = 0;
     while (matches.size() < maximumOccurrences) {
-        send(QsciScintillaBase::SCI_SETTARGETRANGE, from, length);
-        const int found =
-            int(editor_->SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET, word.size(), word.constData()));
+        send(SCI_SETTARGETRANGE, from, length);
+        const int found = int(editor_->sends(SCI_SEARCHINTARGET, word.size(), word.constData()));
         if (found < 0)
             break;
-        const int end = send(QsciScintillaBase::SCI_GETTARGETEND);
+        const int end = send(SCI_GETTARGETEND);
         matches.append({found, end});
         from = std::max(end, found + 1);
     }
@@ -137,9 +134,9 @@ QList<SymbolOccurrences::Range> SymbolOccurrences::wholeWordMatches(const QByteA
 void SymbolOccurrences::show(const QList<Range> &ranges)
 {
     occurrences_ = ranges;
-    const int length = int(editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT, occurrenceIndicator);
-    editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORCLEARRANGE, 0, length);
+    const int length = int(editor_->send(SCI_GETLENGTH));
+    editor_->send(SCI_SETINDICATORCURRENT, occurrenceIndicator);
+    editor_->send(SCI_INDICATORCLEARRANGE, 0, length);
     if (ranges.isEmpty()) {
         marks_->clear();
         return;
@@ -147,13 +144,12 @@ void SymbolOccurrences::show(const QList<Range> &ranges)
 
     // The scroll bar stands for the displayed lines: folded ones take no
     // room.
-    const int displayLines =
-        std::max(int(editor_->SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, editor_->lines())), 1);
+    const int displayLines = std::max(int(editor_->send(SCI_VISIBLEFROMDOCLINE, editor_->lines())), 1);
     QList<qreal> positions;
     for (const Range &range : ranges) {
-        editor_->SendScintilla(QsciScintillaBase::SCI_INDICATORFILLRANGE, range.start, range.end - range.start);
-        const int line = int(editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, range.start));
-        const int displayLine = int(editor_->SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, line));
+        editor_->send(SCI_INDICATORFILLRANGE, range.start, range.end - range.start);
+        const int line = int(editor_->send(SCI_LINEFROMPOSITION, range.start));
+        const int displayLine = int(editor_->send(SCI_VISIBLEFROMDOCLINE, line));
         positions.append(qreal(displayLine) / displayLines);
     }
     marks_->setMarks(positions, theme_.accent);

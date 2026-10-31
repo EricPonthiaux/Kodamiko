@@ -87,7 +87,7 @@ void CodeIntelligence::showHierarchy(const HierarchyKind &kind, Hierarchy hierar
         emit statusMessage(tr("%1 does not support this command").arg(QFileInfo(client->program()).fileName()));
         return;
     }
-    const int caret = int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const int caret = int(editor->send(SCI_GETCURRENTPOS));
     client->request(kind.prepareMethod, positionParams(editor, caret),
                     [this, kind, server = QPointer<LspClient>(client),
                      hierarchy = std::move(hierarchy)](const QJsonValue &result, const QString &error) mutable {

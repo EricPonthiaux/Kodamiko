@@ -110,8 +110,8 @@ void OutlineView::setEditor(EditorWidget *editor)
     editor_ = editor;
     if (editor_) {
         editorConnections_ = {
-            connect(editor_, &QsciScintilla::textChanged, this, &OutlineView::scheduleRefresh),
-            connect(editor_, &QsciScintilla::cursorPositionChanged, this, &OutlineView::selectSymbolAtCursor),
+            connect(editor_, &ScintillaView::textChanged, this, &OutlineView::scheduleRefresh),
+            connect(editor_, &ScintillaView::cursorPositionChanged, this, &OutlineView::selectSymbolAtCursor),
             connect(editor_, &EditorWidget::languageChanged, this,
                     [this] {
                         updateProvider();
@@ -207,9 +207,8 @@ void OutlineView::refresh()
         return;
     }
 
-    const auto *text =
-        static_cast<const char *>(editor_->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
-    const long length = editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+    const auto *text = editor_->characterPointer();
+    const long length = editor_->send(SCI_GETLENGTH);
     const std::vector<OutlineSymbol> symbols = provider_->symbols(QByteArray(text, length));
     if (symbols.empty()) {
         showPlaceholder(tr("No symbols in this file"));
@@ -311,8 +310,8 @@ void OutlineView::jumpTo(QTreeWidgetItem *item)
 {
     if (!editor_ || !item)
         return;
-    editor_->SendScintilla(QsciScintillaBase::SCI_GOTOPOS, item->data(0, positionRole).toInt());
-    editor_->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
+    editor_->send(SCI_GOTOPOS, item->data(0, positionRole).toInt());
+    editor_->send(SCI_VERTICALCENTRECARET);
     editor_->setFocus();
     emit symbolActivated(editor_);
 }

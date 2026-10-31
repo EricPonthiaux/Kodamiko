@@ -366,8 +366,7 @@ EditorWidget *openWithServer(ServerProject &project, const QString &folder)
             __FILE__, __LINE__);
         return nullptr;
     }
-    editor->SendScintilla(QsciScintillaBase::SCI_GOTOPOS,
-                          static_cast<unsigned long>(CodeIntelligence::positionOf(editor, copied.cursor)));
+    editor->send(SCI_GOTOPOS, static_cast<unsigned long>(CodeIntelligence::positionOf(editor, copied.cursor)));
     return editor;
 }
 
@@ -530,8 +529,7 @@ private slots:
         EditorWidget *editor = openWithServer(project, folder);
         if (!editor)
             return; // skipped or failed
-        const Position cursor =
-            CodeIntelligence::lspPosition(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)));
+        const Position cursor = CodeIntelligence::lspPosition(editor, int(editor->send(SCI_GETCURRENTPOS)));
         const QString language = LanguageRegistry::languageForFile(editor->filePath());
         std::optional<RefactoringOutcome> outcome;
 

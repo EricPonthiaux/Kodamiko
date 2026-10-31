@@ -240,7 +240,7 @@ private slots:
         QTest::keyClicks(f.editor, "pri");
         QTRY_VERIFY(f.controller->isActive());
 
-        emit f.editor->SCN_DWELLSTART(0, 10, 10);
+        emit f.editor->dwellStarted(0, QPoint(10, 10));
 
         QVERIFY(f.editor->areToolTipsSuspended());
         QVERIFY(!QToolTip::isVisible());
@@ -256,7 +256,7 @@ private slots:
         QTRY_VERIFY(f.controller->isActive());
         QTest::keyClick(f.editor, Qt::Key_Escape);
 
-        emit f.editor->SCN_DWELLSTART(0, 10, 10);
+        emit f.editor->dwellStarted(0, QPoint(10, 10));
 
         QVERIFY(!f.editor->areToolTipsSuspended());
         QTRY_VERIFY(QToolTip::isVisible() && QToolTip::text().contains("Help"));
@@ -502,7 +502,7 @@ private slots:
         QTest::keyClick(f.editor, Qt::Key_Escape);
         QTRY_VERIFY(!f.controller->isActive());
 
-        f.editor->SendScintilla(QsciScintillaBase::SCI_SETZOOM, 8);
+        f.editor->send(SCI_SETZOOM, 8);
         f.controller->complete();
         QTRY_VERIFY(f.controller->isActive());
 

@@ -143,7 +143,7 @@ Choice addingSide(const Segment &segment, Side side)
 
 int rowHeightOf(const MergePane &pane)
 {
-    return int(pane.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0L));
+    return int(pane.send(SCI_TEXTHEIGHT, 0L));
 }
 
 } // namespace
@@ -360,7 +360,7 @@ QWidget *MergeTextPanel::createSideHeader(const QString &name, const QString &ro
 // The conflict a third of the way down: what comes before it in view.
 void MergeTextPanel::scrollTo(int segment)
 {
-    const int rowsOnScreen = int(result_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN));
+    const int rowsOnScreen = int(result_->send(SCI_LINESONSCREEN));
     result_->setFirstVisibleLine(std::max(0, segmentRows_[segment] - rowsOnScreen / 3));
 }
 
@@ -414,24 +414,25 @@ ConflictState MergeTextPanel::stateOf(int segment) const
 
 void MergeTextPanel::connectPanes()
 {
-    connect(result_, &QsciScintillaBase::SCN_MODIFIED, this, [this](int position, int type) {
-        const bool changesText =
-            (type & (QsciScintillaBase::SC_MOD_INSERTTEXT | QsciScintillaBase::SC_MOD_DELETETEXT)) != 0;
-        if (isShowing_ || !changesText)
-            return;
-        const int line = int(result_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, long(position)));
-        firstEditedLine_ = firstEditedLine_ < 0 ? line : std::min(firstEditedLine_, line);
-    });
-    connect(result_, &QsciScintilla::textChanged, this, &MergeTextPanel::onResultEdited);
+    connect(result_, &ScintillaEditBase::modified, this,
+            [this](Scintilla::ModificationFlags modification, Scintilla::Position position) {
+                const int type = int(modification);
+                const bool changesText = (type & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0;
+                if (isShowing_ || !changesText)
+                    return;
+                const int line = int(result_->send(SCI_LINEFROMPOSITION, long(position)));
+                firstEditedLine_ = firstEditedLine_ < 0 ? line : std::min(firstEditedLine_, line);
+            });
+    connect(result_, &ScintillaView::textChanged, this, &MergeTextPanel::onResultEdited);
     for (const MergePane *pane : {current_, result_, incoming_}) {
-        connect(pane, &QsciScintillaBase::SCN_UPDATEUI, this, [this, pane] {
+        connect(pane, &ScintillaEditBase::updateUi, this, [this, pane] {
             alignWith(*pane);
             updateMarks();
         });
-        connect(pane, &QsciScintillaBase::SCN_ZOOM, this, [this, pane] {
-            const int zoom = int(pane->SendScintilla(QsciScintillaBase::SCI_GETZOOM));
+        connect(pane, &ScintillaEditBase::zoom, this, [this, pane] {
+            const int zoom = int(pane->send(SCI_GETZOOM));
             for (MergePane *other : {current_, result_, incoming_}) {
-                if (other->SendScintilla(QsciScintillaBase::SCI_GETZOOM) != zoom)
+                if (other->send(SCI_GETZOOM) != zoom)
                     other->zoomTo(zoom);
             }
             updateMarks();
@@ -439,7 +440,7 @@ void MergeTextPanel::connectPanes()
     }
     connect(overview_, &MergeOverview::conflictRequested, this, [this](int index) { goToConflict(index); });
     connect(overview_, &MergeOverview::rowRequested, this, [this](int row) {
-        const int rowsOnScreen = int(result_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN));
+        const int rowsOnScreen = int(result_->send(SCI_LINESONSCREEN));
         result_->setFirstVisibleLine(std::max(0, row - rowsOnScreen / 2));
         alignWith(*result_);
     });
@@ -621,7 +622,7 @@ void MergeTextPanel::updateOverview()
                            .current = currentConflict(),
                            .totalRows = totalRows_,
                            .firstVisibleRow = result_->firstVisibleLine(),
-                           .visibleRows = int(result_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN))};
+                           .visibleRows = int(result_->send(SCI_LINESONSCREEN))};
     for (const int segment : conflictSegments()) {
         const int end = segment + 1 < segmentRows_.size() ? segmentRows_[segment + 1] : totalRows_;
         map.conflicts.append(

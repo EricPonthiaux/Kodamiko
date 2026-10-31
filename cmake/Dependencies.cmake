@@ -1,6 +1,7 @@
 # Third-party dependencies, downloaded at configure time and built statically.
 #
-#   QScintilla   editing component (Scintilla for Qt)           GPLv3
+#   Scintilla    editing component and its Qt widget            HPND (Scintilla's license)
+#   Lexilla      lexers for Scintilla                           HPND (Scintilla's license)
 #   tree-sitter  incremental parsing + grammars                 MIT
 #   libvterm     VT220/xterm terminal emulation                 MIT
 #   libgit2      git repository reading (Diff mode)             GPLv2 + linking exception
@@ -20,9 +21,14 @@ set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 # targets ourselves (files included at the end), simpler than its own.
 set(DOWNLOAD_ONLY "_download_only_")
 
-FetchContent_Declare(qscintilla
-    URL https://www.riverbankcomputing.com/static/Downloads/QScintilla/2.14.1/QScintilla_src-2.14.1.tar.gz
-    URL_HASH SHA256=dfe13c6acc9d85dfcba76ccc8061e71a223957a6c02f3c343b30a9d43a4cdd4d
+FetchContent_Declare(scintilla
+    URL https://www.scintilla.org/scintilla568.tgz
+    URL_HASH SHA256=ca7fda23125289bbf473afd6fcd4959f65e828bff1a8ae60c603b34dfcb3a777
+    DOWNLOAD_EXTRACT_TIMESTAMP ON)
+
+FetchContent_Declare(lexilla
+    URL https://www.scintilla.org/lexilla555.tgz
+    URL_HASH SHA256=2a06aeeb5da5876f00bccd2e89e838546ebaea40af4f73364fb2557083afee43
     DOWNLOAD_EXTRACT_TIMESTAMP ON)
 
 FetchContent_Declare(tree_sitter
@@ -84,10 +90,10 @@ FetchContent_Declare(cmark_gfm
     GIT_SHALLOW ON
     EXCLUDE_FROM_ALL) # only its libraries are built, not its command
 
-FetchContent_MakeAvailable(qscintilla tree_sitter tree_sitter_c tree_sitter_cpp tree_sitter_java
+FetchContent_MakeAvailable(scintilla lexilla tree_sitter tree_sitter_c tree_sitter_cpp tree_sitter_java
                            tree_sitter_javascript tree_sitter_typescript tree_sitter_python libvterm)
 
-include(${CMAKE_CURRENT_LIST_DIR}/QScintilla.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/Scintilla.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/TreeSitter.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/Libvterm.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/Libgit2.cmake)

@@ -543,9 +543,9 @@ void MainWindow::registerMcpTools()
             [this] { mcpRegistry_.notifyResourceUpdated(QStringLiteral("kodamiko://editor/state")); });
     connect(editorTabs_, &QTabWidget::currentChanged, editorMoved, qOverload<>(&QTimer::start));
     connect(editorTabs_, &EditorTabs::editorOpened, this, [editorMoved](EditorWidget *editor) {
-        connect(editor, &QsciScintilla::cursorPositionChanged, editorMoved, qOverload<>(&QTimer::start));
-        connect(editor, &QsciScintilla::selectionChanged, editorMoved, qOverload<>(&QTimer::start));
-        connect(editor, &QsciScintilla::modificationChanged, editorMoved, qOverload<>(&QTimer::start));
+        connect(editor, &ScintillaView::cursorPositionChanged, editorMoved, qOverload<>(&QTimer::start));
+        connect(editor, &ScintillaView::selectionChanged, editorMoved, qOverload<>(&QTimer::start));
+        connect(editor, &ScintillaView::modificationChanged, editorMoved, qOverload<>(&QTimer::start));
     });
 }
 

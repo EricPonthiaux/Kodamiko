@@ -483,11 +483,11 @@ void FindInFilesPopup::updatePreview()
     }
     const int line = std::min(match.line, std::max(preview_->lines() - 1, 0));
     const QString text = preview_->text(line);
-    const long lineStart = preview_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+    const long lineStart = preview_->send(SCI_POSITIONFROMLINE, line);
     const long start = lineStart + text.left(match.column).toUtf8().size();
     const long end = lineStart + text.left(match.column + match.length).toUtf8().size();
-    preview_->SendScintilla(QsciScintillaBase::SCI_SETSEL, start, end);
-    preview_->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
+    preview_->send(SCI_SETSEL, start, end);
+    preview_->send(SCI_VERTICALCENTRECARET);
 }
 
 void FindInFilesPopup::openCurrent()

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "scintilla/ScintillaView.h"
 #include "settings/Keymap.h"
 #include "settings/Preferences.h"
 #include "settings/PreferencesPopup.h"
@@ -21,7 +22,6 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QTreeWidget>
-#include <Qsci/qsciscintilla.h>
 #include <QtTest>
 
 namespace {
@@ -105,14 +105,14 @@ private slots:
         QVERIFY(!AppFonts::scintillaFamily(theme.font, false).contains('#'));
     }
 
-    // Through QScintilla, as the editor draws: ligatures, weight and line
+    // Through Scintilla, as the editor draws: ligatures, weight and line
     // height each change what is drawn.
     void editorDrawsTheTypography()
     {
-        QsciScintilla editor;
+        ScintillaView editor;
         editor.resize(400, 120);
         editor.setText("a -> b != c\nnext line");
-        editor.setCaretWidth(0);
+        editor.send(SCI_SETCARETWIDTH, 0);
         editor.setMarginWidth(1, 0);
         editor.show();
         const auto draw = [&editor](const Preferences &preferences) {
@@ -125,7 +125,7 @@ private slots:
         Preferences preferences;
         preferences.codeFontFamily = AppFonts::jetBrainsMono(); // the built-in font with ligatures
         const QImage plain = draw(preferences);
-        const long plainHeight = editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0);
+        const long plainHeight = editor.send(SCI_TEXTHEIGHT, 0);
         preferences.ligatures = true;
         QVERIFY(draw(preferences) != plain);
         preferences.ligatures = false;
@@ -143,7 +143,7 @@ private slots:
         preferences.codeFontWeight = QFont::Normal;
         preferences.codeLineHeight = 2.0;
         draw(preferences);
-        QVERIFY(editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0) > plainHeight);
+        QVERIFY(editor.send(SCI_TEXTHEIGHT, 0) > plainHeight);
     }
 
     void oldDarkThemeSettingIsRead()

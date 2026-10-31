@@ -410,9 +410,8 @@ private slots:
         const qsizetype hiddenCount = view.displayedLines().size();
 
         // The ↑ after "⋯ " on the separator, line 2.
-        const long position =
-            view.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, 2) + long(QStringLiteral("⋯ ").toUtf8().size());
-        const QPoint arrow(int(view.SendScintilla(QsciScintillaBase::SCI_POINTXFROMPOSITION, 0UL, position)) + 2,
+        const long position = view.send(SCI_POSITIONFROMLINE, 2) + long(QStringLiteral("⋯ ").toUtf8().size());
+        const QPoint arrow(int(view.send(SCI_POINTXFROMPOSITION, 0UL, position)) + 2,
                            view.lineTop(2) + view.lineHeight() / 2);
         QTest::mouseClick(view.viewport(), Qt::LeftButton, {}, arrow);
 
@@ -1057,7 +1056,7 @@ private slots:
         diff.setMode(DiffView::Mode::SideBySide);
         diff.setFiles({{"src/one.cpp", "modified", FilePatch::parse(patch)}});
         auto *oldSide = diff.findChild<DiffView *>();
-        const auto zoom = [](const DiffView &view) { return view.SendScintilla(QsciScintillaBase::SCI_GETZOOM); };
+        const auto zoom = [](const DiffView &view) { return view.send(SCI_GETZOOM); };
         QCOMPARE(zoom(*oldSide), 1);
 
         diff.zoomIn();
@@ -1077,7 +1076,7 @@ private slots:
         const int lineOfC = 5;
         QCOMPARE(diff.displayedLines()[lineOfC].newNumber, 2);
         QCOMPARE(diff.notesAt(lineOfC), QList<int>({0}));
-        QCOMPARE(diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETLINES, lineOfC), 2);
+        QCOMPARE(diff.send(SCI_ANNOTATIONGETLINES, lineOfC), 2);
     }
 
     void diffShowsANoteOfALineItHidesUnderItsFileTitle()
@@ -1090,10 +1089,8 @@ private slots:
 
         const int title = diff.fileStart(0);
         QCOMPARE(diff.notesAt(title), QList<int>({0}));
-        QByteArray text(qsizetype(diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETTEXT, title,
-                                                     static_cast<char *>(nullptr))),
-                        '\0');
-        diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETTEXT, title, text.data());
+        QByteArray text(qsizetype(diff.send(SCI_ANNOTATIONGETTEXT, title)), '\0');
+        diff.send(SCI_ANNOTATIONGETTEXT, title, reinterpret_cast<sptr_t>(text.data()));
         QCOMPARE(QString::fromUtf8(text), QString("Line 40 · wrong"));
     }
 
@@ -1107,7 +1104,7 @@ private slots:
         diff.setFiles({{"src/two.cpp", "modified", FilePatch::parse(patch)}});
 
         QVERIFY(diff.notesAt(5).isEmpty());
-        QCOMPARE(diff.SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETLINES, 5), 0);
+        QCOMPARE(diff.send(SCI_ANNOTATIONGETLINES, 5), 0);
     }
 
     void sideBySideTheOldSideLeavesTheRoomOfANote()
@@ -1123,7 +1120,7 @@ private slots:
         // The row of c, the last one: a and b face each other above it.
         const int rowOfC = diff.lines() - 1;
         QCOMPARE(diff.notesAt(rowOfC), QList<int>({0}));
-        QCOMPARE(oldSide->SendScintilla(QsciScintillaBase::SCI_ANNOTATIONGETLINES, rowOfC), 2);
+        QCOMPARE(oldSide->send(SCI_ANNOTATIONGETLINES, rowOfC), 2);
     }
 
     void f8GoesToTheNextNote()
@@ -1443,8 +1440,8 @@ private slots:
                 added = i;
         }
         const auto styleAt = [&diff](int line) {
-            const long position = diff.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
-            return int(diff.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position));
+            const long position = diff.send(SCI_POSITIONFROMLINE, line);
+            return int(diff.send(SCI_GETSTYLEAT, position));
         };
 
         const int comment = styleAt(removed);
@@ -1467,8 +1464,8 @@ private slots:
         const QList<DiffLine> &lines = diff.displayedLines();
         const int lastAdded = static_cast<int>(lines.size()) - 1;
         QCOMPARE(lines[lastAdded].kind, DiffLineKind::Added);
-        const long position = diff.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, lastAdded);
-        QVERIFY(diff.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position) != 0);
+        const long position = diff.send(SCI_POSITIONFROMLINE, lastAdded);
+        QVERIFY(diff.send(SCI_GETSTYLEAT, position) != 0);
     }
 
     void outsideARepository()

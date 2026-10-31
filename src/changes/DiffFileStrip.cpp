@@ -56,7 +56,7 @@ DiffFileStrip::DiffFileStrip(DiffView *diff, QWidget *parent)
     setCursor(Qt::PointingHandCursor);
     connect(diff_, &DiffView::contentChanged, this, &DiffFileStrip::onContentChanged);
     // Scrolled, or lines revealed: as the diff's header follows it.
-    connect(diff_, &QsciScintillaBase::SCN_UPDATEUI, this, &DiffFileStrip::followScroll);
+    connect(diff_, &ScintillaEditBase::updateUi, this, &DiffFileStrip::followScroll);
     onContentChanged();
 }
 
@@ -158,7 +158,7 @@ void DiffFileStrip::onContentChanged()
 
 void DiffFileStrip::followScroll()
 {
-    const int top = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE, diff_->firstVisibleLine()));
+    const int top = int(diff_->send(SCI_DOCLINEFROMVISIBLE, diff_->firstVisibleLine()));
     const int file = diff_->fileSummaries().isEmpty() ? -1 : std::max(0, diff_->locate(top).file);
     if (file == current_)
         return;

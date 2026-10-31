@@ -32,11 +32,11 @@ endif()
 # their sources: only Qt 6 needs to be installed on the machine.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Test WebEngineWidgets)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Core Core5Compat Gui Widgets Network Test WebEngineWidgets)
 qt_standard_project_setup()
 
 # Link-time optimization across the application and the statically built
-# dependencies (QScintilla, tree-sitter, libvterm, libgit2, cmark-gfm).
+# dependencies (Scintilla, Lexilla, tree-sitter, libvterm, libgit2, cmark-gfm).
 option(KDK_LTO "Build with link-time optimization" OFF)
 if(KDK_LTO)
     include(CheckIPOSupported)

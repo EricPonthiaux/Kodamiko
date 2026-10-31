@@ -192,6 +192,7 @@ QTabBar#goToTabs::tab:selected { background: @base; color: @accentText; border: 
 EditorTabs QTabBar, QTabWidget#terminalTabs QTabBar, SidePanel QFrame#viewHeader { background: @window; }
 EditorTabs QTabBar::tab, QTabWidget#terminalTabs QTabBar::tab, SidePanel QFrame#viewHeaderTab { margin-top: @tabTopMarginpx; border: 1px solid transparent; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
 EditorTabs QTabBar::tab, QTabWidget#terminalTabs QTabBar::tab { background: transparent; color: @muted; padding: 8px 12px 9px; min-width: 64px; max-width: 240px; }
+QTabWidget#terminalTabs QTabBar::tab:first, QTabWidget#terminalTabs QTabBar::tab:only-one { margin-left: 6px; }
 EditorTabs QTabBar::tab:hover, QTabWidget#terminalTabs QTabBar::tab:hover { background: @hover; color: @text; }
 EditorTabs QTabBar::tab:selected, QTabWidget#terminalTabs QTabBar::tab:selected, SidePanel QFrame#viewHeaderTab { background: @base; color: @text; border-color: @line; border-bottom: none; }
 SidePanel > QWidget { background: @base; }

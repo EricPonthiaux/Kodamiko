@@ -361,7 +361,7 @@ void MainWindow::goToProblem(bool forward)
     }
     Diagnostics problems = editor->diagnostics();
     std::ranges::sort(problems, {}, &Diagnostic::start);
-    const auto cursor = static_cast<int>(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS));
+    const auto cursor = static_cast<int>(editor->send(SCI_GETCURRENTPOS));
     const Diagnostic &target = forward ? problemAfter(problems, cursor) : problemBefore(problems, cursor);
     int line = 0;
     int index = 0;

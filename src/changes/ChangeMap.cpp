@@ -63,12 +63,10 @@ qreal ChangeMap::scale() const
 std::pair<int, int> ChangeMap::linesInView() const
 {
     // Notes under lines take display lines of their own: in lines of the text.
-    const auto lineOf = [this](long displayLine) {
-        return int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE, displayLine));
-    };
+    const auto lineOf = [this](long displayLine) { return int(diff_->send(SCI_DOCLINEFROMVISIBLE, displayLine)); };
     const long top = diff_->firstVisibleLine();
     const int first = lineOf(top);
-    const int last = lineOf(top + diff_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN));
+    const int last = lineOf(top + diff_->send(SCI_LINESONSCREEN));
     return {first, std::max(1, last - first)};
 }
 

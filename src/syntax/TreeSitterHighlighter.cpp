@@ -6,9 +6,8 @@
 #include "ScintillaStyles.h"
 #include "TreeSitterFolds.h"
 #include "TreeSitterGrammars.h"
+#include "scintilla/ScintillaView.h"
 #include "ui/Theme.h"
-
-#include <Qsci/qsciscintilla.h>
 
 #include <algorithm>
 #include <climits>
@@ -52,20 +51,31 @@ TreeSitterHighlighter::~TreeSitterHighlighter()
     ts_parser_delete(parser_);
 }
 
-void TreeSitterHighlighter::attach(QsciScintilla *editor)
+void TreeSitterHighlighter::attach(ScintillaView *editor)
 {
     editor_ = editor;
-    editor_->setLexer(nullptr);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETLEXER, QsciScintillaBase::SCLEX_CONTAINER);
+    // No lexer: Scintilla asks this highlighter to style (SCN_STYLENEEDED).
+    editor_->send(SCI_SETILEXER, 0, 0);
 
     // BEFOREDELETE is essential: after a deletion, the line/column of the end
     // of the deleted text can no longer be computed.
-    const long eventMask = editor_->SendScintilla(QsciScintillaBase::SCI_GETMODEVENTMASK);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETMODEVENTMASK,
-                           eventMask | QsciScintillaBase::SC_MOD_INSERTTEXT | QsciScintillaBase::SC_MOD_BEFOREDELETE);
+    const long eventMask = editor_->send(SCI_GETMODEVENTMASK);
+    editor_->send(SCI_SETMODEVENTMASK, eventMask | SC_MOD_INSERTTEXT | SC_MOD_BEFOREDELETE);
 
-    connect(editor_, &QsciScintillaBase::SCN_MODIFIED, this, &TreeSitterHighlighter::onModified);
-    connect(editor_, &QsciScintillaBase::SCN_STYLENEEDED, this, &TreeSitterHighlighter::onStyleNeeded);
+    connect(editor_, &ScintillaEditBase::modified, this,
+            [this](Scintilla::ModificationFlags type, Scintilla::Position position, Scintilla::Position length) {
+                onModified(int(type), int(position), int(length));
+            });
+    connect(editor_, &ScintillaEditBase::styleNeeded, this, &TreeSitterHighlighter::onStyleNeeded);
+}
+
+// The styles are the theme's categories, from ScintillaStyles::firstSyntaxStyle.
+QString TreeSitterHighlighter::styleCategory(int style, const Theme &theme) const
+{
+    const int index = style - ScintillaStyles::firstSyntaxStyle;
+    if (index < 0 || index >= theme.syntaxStyles.size())
+        return {};
+    return theme.syntaxStyles[index].first;
 }
 
 void TreeSitterHighlighter::applyTheme(const Theme &theme)
@@ -84,31 +94,21 @@ void TreeSitterHighlighter::applyTheme(const Theme &theme)
     editor_->recolor();
 }
 
-// NOLINTNEXTLINE(readability-function-size): the ten parameters of QsciScintillaBase::SCN_MODIFIED
-void TreeSitterHighlighter::onModified(int position,
-                                       int modificationType,
-                                       const char *,
-                                       int length,
-                                       int,
-                                       int,
-                                       int,
-                                       int,
-                                       int,
-                                       int)
+void TreeSitterHighlighter::onModified(int modificationType, int position, int length)
 {
     // Without a tree, the next parse will be a full one: nothing to apply.
     if (!tree_)
         return;
 
     TSInputEdit edit{};
-    if (modificationType & QsciScintillaBase::SC_MOD_INSERTTEXT) {
+    if (modificationType & SC_MOD_INSERTTEXT) {
         edit.start_byte = position;
         edit.old_end_byte = position;
         edit.new_end_byte = position + length;
         edit.start_point = pointAt(position);
         edit.old_end_point = edit.start_point;
         edit.new_end_point = pointAt(position + length);
-    } else if (modificationType & QsciScintillaBase::SC_MOD_BEFOREDELETE) {
+    } else if (modificationType & SC_MOD_BEFOREDELETE) {
         edit.start_byte = position;
         edit.old_end_byte = position + length;
         edit.new_end_byte = position;
@@ -124,9 +124,9 @@ void TreeSitterHighlighter::onModified(int position,
 
 void TreeSitterHighlighter::onStyleNeeded(int endPosition)
 {
-    const int endStyled = editor_->SendScintilla(QsciScintillaBase::SCI_GETENDSTYLED);
-    const int firstLine = editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, endStyled);
-    const int lineStart = editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, firstLine);
+    const int endStyled = editor_->send(SCI_GETENDSTYLED);
+    const int firstLine = editor_->send(SCI_LINEFROMPOSITION, endStyled);
+    const int lineStart = editor_->send(SCI_POSITIONFROMLINE, firstLine);
 
     // An edit can change the meaning of the text before it (typing "(" after
     // an identifier turns it into a function call), so we also recolor from
@@ -176,13 +176,13 @@ void TreeSitterHighlighter::updateFoldLevels()
 {
     if (!tree_)
         return;
-    const int lineCount = editor_->SendScintilla(QsciScintillaBase::SCI_GETLINECOUNT);
+    const int lineCount = editor_->send(SCI_GETLINECOUNT);
     const std::vector<int> levels = TreeSitterFolds::levels(ts_tree_root_node(tree_), lineCount);
-    constexpr int levelMask = QsciScintillaBase::SC_FOLDLEVELNUMBERMASK | QsciScintillaBase::SC_FOLDLEVELHEADERFLAG;
+    constexpr int levelMask = SC_FOLDLEVELNUMBERMASK | SC_FOLDLEVELHEADERFLAG;
     for (int line = 0; line < lineCount; ++line) {
         // Only the lines that change: Scintilla redraws (and may unfold) them.
-        if ((editor_->SendScintilla(QsciScintillaBase::SCI_GETFOLDLEVEL, line) & levelMask) != levels[line])
-            editor_->SendScintilla(QsciScintillaBase::SCI_SETFOLDLEVEL, line, levels[line]);
+        if ((editor_->send(SCI_GETFOLDLEVEL, line) & levelMask) != levels[line])
+            editor_->send(SCI_SETFOLDLEVEL, line, levels[line]);
     }
 }
 
@@ -233,24 +233,24 @@ void TreeSitterHighlighter::styleRange(int start, int end)
         std::fill(styles.begin() + (from - start), styles.begin() + (to - start), span.style);
     }
 
-    editor_->SendScintilla(QsciScintillaBase::SCI_STARTSTYLING, start, 0L);
-    editor_->SendScintilla(QsciScintillaBase::SCI_SETSTYLINGEX, styles.size(), styles.data());
+    editor_->send(SCI_STARTSTYLING, start, 0L);
+    editor_->sends(SCI_SETSTYLINGEX, styles.size(), styles.data());
 }
 
 TSPoint TreeSitterHighlighter::pointAt(int position) const
 {
-    const long line = editor_->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, position);
-    const long lineStart = editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+    const long line = editor_->send(SCI_LINEFROMPOSITION, position);
+    const long lineStart = editor_->send(SCI_POSITIONFROMLINE, line);
     return TSPoint{static_cast<uint32_t>(line), static_cast<uint32_t>(position - lineStart)};
 }
 
 const char *TreeSitterHighlighter::documentText() const
 {
     // The pointer stays valid until the next modification of the text.
-    return static_cast<const char *>(editor_->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
+    return editor_->characterPointer();
 }
 
 int TreeSitterHighlighter::documentLength() const
 {
-    return editor_->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+    return editor_->send(SCI_GETLENGTH);
 }

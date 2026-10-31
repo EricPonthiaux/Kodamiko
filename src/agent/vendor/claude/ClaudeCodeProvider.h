@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "ClaudeMark.h"
 #include "agent/AgentProvider.h"
 
 // Claude Code: the `claude` CLI started by ClaudeLauncher, its hooks' JSON
@@ -14,8 +13,6 @@ public:
     QString name() const override;
     QString iconName() const override;
     QColor brandColor() const override;
-
-    const AgentMark &mark() const override { return mark_; }
 
     AgentFeatures features() const override;
 
@@ -36,7 +33,4 @@ public:
     QJsonObject blockReply(const QString &reason) const override;
     QJsonObject permissionReply(const HookEvent &request, PermissionAnswer answer) const override;
     QJsonObject editContextReply(const QString &context) const override;
-
-private:
-    ClaudeMark mark_;
 };

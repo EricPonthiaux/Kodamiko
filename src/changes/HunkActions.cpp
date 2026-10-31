@@ -44,7 +44,7 @@ HunkActions::HunkActions(DiffView *diff)
     diff_->viewport()->installEventFilter(this); // resized
     connect(diff_, &DiffView::contentChanged, this, &HunkActions::placeBars);
     // However it scrolls (wheel, keys, scroll bar), the bars follow their blocks.
-    connect(diff_, &QsciScintillaBase::SCN_UPDATEUI, this, &HunkActions::placeBars);
+    connect(diff_, &ScintillaEditBase::updateUi, this, &HunkActions::placeBars);
 }
 
 void HunkActions::setStagedFiles(const QSet<int> &files)
@@ -139,10 +139,8 @@ QList<std::pair<int, int>> HunkActions::blocksInView() const
 {
     const QList<DiffLine> &lines = diff_->displayedLines();
     const long firstShown = diff_->firstVisibleLine();
-    const int top = int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE, firstShown));
-    const int bottom =
-        int(diff_->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE,
-                                 firstShown + diff_->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN)));
+    const int top = int(diff_->send(SCI_DOCLINEFROMVISIBLE, firstShown));
+    const int bottom = int(diff_->send(SCI_DOCLINEFROMVISIBLE, firstShown + diff_->send(SCI_LINESONSCREEN)));
     QList<std::pair<int, int>> blocks;
     // The block at the top, its separator scrolled away: its bar at the top.
     if (const int scrolledAway = diff_->hunkStart(top); scrolledAway >= 0 && scrolledAway < top)

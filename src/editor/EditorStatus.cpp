@@ -61,8 +61,8 @@ void EditorStatus::setEditor(EditorWidget *editor)
     // Diffs and other read-only texts have no file to describe.
     editor_ = editor && !editor->filePath().isEmpty() ? editor : nullptr;
     if (editor_) {
-        connect(editor_, &QsciScintilla::cursorPositionChanged, this, &EditorStatus::scheduleUpdate);
-        connect(editor_, &QsciScintilla::selectionChanged, this, &EditorStatus::scheduleUpdate);
+        connect(editor_, &ScintillaView::cursorPositionChanged, this, &EditorStatus::scheduleUpdate);
+        connect(editor_, &ScintillaView::selectionChanged, this, &EditorStatus::scheduleUpdate);
         connect(editor_, &EditorWidget::formatChanged, this, &EditorStatus::update);
     }
     setVisible(editor_ != nullptr);
@@ -77,9 +77,8 @@ QString EditorStatus::positionText() const
     int index = 0;
     editor_->getCursorPosition(&line, &index);
     // Column in characters, not in bytes: tabs count as one, like IntelliJ.
-    const QString before =
-        editor_->text(static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line)),
-                      static_cast<int>(editor_->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS)));
+    const QString before = editor_->text(static_cast<int>(editor_->send(SCI_POSITIONFROMLINE, line)),
+                                         static_cast<int>(editor_->send(SCI_GETCURRENTPOS)));
     QString text = QStringLiteral("%1:%2").arg(line + 1).arg(before.size() + 1);
     if (editor_->hasSelectedText()) {
         // A CRLF line break counts as one character.
@@ -186,13 +185,13 @@ void EditorStatus::goToLine()
             if (!editor)
                 return {};
             const int line = std::min(target->first, editor->lines() - 1);
-            // QScintilla counts the column in characters.
+            // ScintillaView counts the column in characters.
             QString lineText = editor->text(line);
             while (lineText.endsWith(QLatin1Char('\n')) || lineText.endsWith(QLatin1Char('\r')))
                 lineText.chop(1);
             editor->setCursorPosition(line, std::min(target->second, static_cast<int>(lineText.size())));
             editor->ensureLineVisible(line);
-            editor->SendScintilla(QsciScintillaBase::SCI_VERTICALCENTRECARET);
+            editor->send(SCI_VERTICALCENTRECARET);
             editor->setFocus();
             return {};
         },

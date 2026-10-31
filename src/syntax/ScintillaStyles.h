@@ -5,7 +5,7 @@
 #include <QtGlobal>
 
 class QFont;
-class QsciScintilla;
+class ScintillaView;
 struct Theme;
 
 namespace ScintillaStyles {
@@ -16,14 +16,18 @@ constexpr int firstSyntaxStyle = 1;
 constexpr int maxSyntaxStyles = 31;
 
 // Default font, text and background colors, copied into every style.
-void applyDefaultStyle(const QsciScintilla &editor, const Theme &theme);
+void applyDefaultStyle(const ScintillaView &editor, const Theme &theme);
 
 // Syntax category styles (firstSyntaxStyle + index in the theme).
-void applySyntaxStyles(const QsciScintilla &editor, const Theme &theme);
+void applySyntaxStyles(const ScintillaView &editor, const Theme &theme);
+
+// The editor's caret, caret line, selection, margins, braces, indentation
+// guides and column limit in the theme's colors.
+void applyEditorColors(const ScintillaView &editor, const Theme &theme);
 
 // Lines set at `lineHeight` times the font size, some room between the
 // margin and the text, a caret two pixels wide.
-void applyTypography(const QsciScintilla &editor, const QFont &font, qreal lineHeight);
+void applyTypography(const ScintillaView &editor, const QFont &font, qreal lineHeight);
 
 // The weight of a style in `font`'s weight, bold or not: bold stays bold
 // whatever the weight chosen for the code (Light, Medium…).

@@ -36,7 +36,7 @@ MoveClass::Input CodeIntelligence::moveClassInput(EditorWidget *editor) const
         .path = editor->filePath(),
         .languageId = isJava ? QStringLiteral("java") : QStringLiteral("cpp"),
         .text = editor->text(),
-        .cursor = lspPosition(editor, int(editor->SendScintilla(QsciScintillaBase::SCI_GETCURRENTPOS))),
+        .cursor = lspPosition(editor, int(editor->send(SCI_GETCURRENTPOS))),
     };
     if (isJava)
         return input;

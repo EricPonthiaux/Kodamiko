@@ -2,11 +2,11 @@
 
 #pragma once
 
+#include "scintilla/ScintillaView.h"
 #include "ui/Theme.h"
 
 #include <QByteArrayList>
 #include <QList>
-#include <Qsci/qsciscintilla.h>
 
 #include <memory>
 
@@ -18,7 +18,7 @@ class ISyntaxHighlighter;
 // row for row. A stretch's background says where its lines come from. The
 // code is colored as the editor colors the file's language. Read-only,
 // unless made editable (the result).
-class MergePane : public QsciScintilla {
+class MergePane : public ScintillaView {
     Q_OBJECT
 
 public:
