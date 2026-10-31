@@ -63,8 +63,8 @@ void ViewHeader::alignWith(QTabBar *tabs)
 
 void ViewHeader::updateHeight()
 {
-    const int height = editorTabBar_ && editorTabBar_->count() > 0 ? editorTabBar_->sizeHint().height()
-                                                                   : UiMetrics::scaled(UiMetrics::panelHeaderHeight);
+    const int height =
+        editorTabBar_ ? UiMetrics::tabBarHeight(*editorTabBar_) : UiMetrics::scaled(UiMetrics::panelHeaderHeight);
     setFixedHeight(height);
 }
 

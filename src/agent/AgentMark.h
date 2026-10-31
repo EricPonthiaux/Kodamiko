@@ -25,7 +25,7 @@ struct AgentMarkFrame {
 };
 
 // An agent's mark in its indicator, and how it moves: each provider draws
-// its own (Claude's burst…). The indicator owns the timer and counts the
+// its own (Claude's ring of dots…). The indicator owns the timer and counts the
 // frames; the mark says how fast they go, when they stop, and what each one
 // looks like. A mark is stateless.
 class AgentMark {

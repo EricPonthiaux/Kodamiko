@@ -4,10 +4,11 @@
 
 #include "agent/AgentMark.h"
 
-// Claude's burst (see UiIcons' "claude"): eight branches, the long ones on
-// the axes. While Claude works, each branch lights up in turn; while it
-// waits for the user, the whole star breathes; when a response arrives, the
-// long and the short branches flash in turn, then the star shines still.
+// The Claude agent's mark (see UiIcons' "claude"): a ring of eight dots, the
+// large ones on the axes, a neutral motif rather than Anthropic's logo. While
+// Claude works, each dot lights up in turn; while it waits for the user, the
+// whole ring breathes; when a response arrives, the large and the small dots
+// flash in turn, then the ring shines still.
 class ClaudeMark final : public AgentMark {
 public:
     std::optional<std::chrono::milliseconds> frameStep(AgentStatus status) const override;

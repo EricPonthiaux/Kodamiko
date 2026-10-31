@@ -99,8 +99,8 @@ private:
     int alignedWidth() const
     {
         // The same thickness around the workspace, including the tabs' outer margin.
-        return editorTabBar_ && editorTabBar_->count() > 0 ? editorTabBar_->sizeHint().height()
-                                                           : UiMetrics::scaled(UiMetrics::panelHeaderHeight);
+        return editorTabBar_ ? UiMetrics::tabBarHeight(*editorTabBar_)
+                             : UiMetrics::scaled(UiMetrics::panelHeaderHeight);
     }
 
     void updateWidth() { setFixedWidth(alignedWidth()); }
