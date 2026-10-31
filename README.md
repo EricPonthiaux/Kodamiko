@@ -83,15 +83,15 @@ rearrange it while Claude keeps editing its source.
 
 ## Getting started
 
-Kodamiko **alpha.1.0.1** is a pre-release, the second public build: its
+Kodamiko **alpha.1.0.2** is a pre-release, the third public build: its
 settings and interfaces may still change, and you will meet bugs. Download
-it from the [release page](https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0.1):
+it from the [release page](https://github.com/EricPonthiaux/Kodamiko/releases/tag/alpha.1.0.2):
 
 | System | Package |
 |---|---|
-| Linux x86-64 | `Kodamiko-alpha.1.0.1-linux-x86_64.AppImage`: make it executable (`chmod +x`), then run it |
-| Windows x64 | `Kodamiko-alpha.1.0.1-windows-x64.zip`: unzip it anywhere, then run `bin\kodamiko.exe` |
-| macOS, Apple silicon | `Kodamiko-alpha.1.0.1-macos-arm64.dmg`: drag Kodamiko to Applications |
+| Linux x86-64 | `Kodamiko-alpha.1.0.2-linux-x86_64.AppImage`: make it executable (`chmod +x`), then run it |
+| Windows x64 | `Kodamiko-alpha.1.0.2-windows-x64.zip`: unzip it anywhere, then run `bin\kodamiko.exe` |
+| macOS, Apple silicon | `Kodamiko-alpha.1.0.2-macos-arm64.dmg`: drag Kodamiko to Applications |
 
 Macs with an Intel processor are not supported yet. The packages are not
 signed: Windows SmartScreen and macOS Gatekeeper warn before the first
